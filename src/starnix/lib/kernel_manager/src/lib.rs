@@ -35,12 +35,6 @@ const KERNEL_COLLECTION: &str = "kernels";
 /// running component inside the container.
 const CONTAINER_RUNNER_PROTOCOL: &str = "fuchsia.starnix.container.Runner";
 
-/// The signal that the runner raises when handing over an event to the kernel.
-const RUNNER_SIGNAL: zx::Signals = zx::Signals::USER_0;
-
-/// The signal that the kernel raises to indicate that a message has been handled.
-const KERNEL_SIGNAL: zx::Signals = zx::Signals::USER_1;
-
 #[allow(dead_code)]
 pub struct StarnixKernel {
     /// The name of the kernel intsance in the kernels collection.
@@ -243,6 +237,7 @@ pub async fn serve_starnix_manager(
                     continue;
                 };
 
+                let (wake_locks, wake_event) = (payload.wake_locks, payload.wake_event);
                 // These handles need to kept alive until the end of the block, as they will
                 // resume the kernel when dropped.
                 let _suspend_handles = match suspend_kernel(&container_job).await {
@@ -261,7 +256,7 @@ pub async fn serve_starnix_manager(
                 // TODO(https://fxbug.dev/328306129): Replace this with boot time.
                 let suspend_start = zx::MonotonicTime::get();
 
-                if let Some(wake_locks) = payload.wake_locks {
+                if let Some(wake_locks) = wake_locks {
                     match wake_locks
                         .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::ZERO)
                     {
@@ -286,10 +281,17 @@ pub async fn serve_starnix_manager(
                     .iter()
                     .map(|e: &zx::EventPair| zx::WaitItem {
                         handle: e.as_handle_ref(),
-                        waitfor: RUNNER_SIGNAL,
+                        waitfor: zx::Signals::EVENT_SIGNALED,
                         pending: zx::Signals::empty(),
                     })
                     .collect();
+                if let Some(wake_event) = wake_event.as_ref() {
+                    wait_items.push(zx::WaitItem {
+                        handle: wake_event.as_handle_ref(),
+                        waitfor: zx::Signals::EVENT_SIGNALED,
+                        pending: zx::Signals::empty(),
+                    });
+                }
 
                 // TODO: We will likely have to handle a larger number of wake sources in the
                 // future, at which point we may want to consider a Port-based approach. This
@@ -365,7 +367,7 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
         let mut bounce_handles =
             [const { MaybeUninit::uninit() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
 
-        'outer: loop {
+        loop {
             const CONTAINER_CHANNEL_INDEX: usize = 0;
             const REMOTE_CHANNEL_INDEX: usize = 1;
 
@@ -387,42 +389,40 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
                 Ok(_) => {}
                 Err(e) => {
                     tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
-                    break 'outer;
                 }
             };
+
+            // If there was a peer closed, return before attempting to read or write from the channels.
+            // The `ChannelProxy` will be dropped on return, and both proxy endpoints in the
+            // `ChannelProxy` will be closed.
+            for item in &wait_items {
+                if item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
+                    tracing::warn!("Proxy received peer closed, exiting proxy loop.");
+                    resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
+                    return;
+                }
+            }
 
             // Forward messages in both directions. Only messages that are entering the container
             // should signal `proxy.resume_event`, since those are the only messages that should
             // wake the container if it's suspended.
-            if forward_message(
+            forward_message(
                 &wait_items[CONTAINER_CHANNEL_INDEX],
                 &proxy.container_channel,
                 &proxy.remote_channel,
                 None,
                 &mut bounce_bytes,
                 &mut bounce_handles,
-            )
-            .is_err()
-            {
-                tracing::warn!("Proxy failed to forward message from kernel");
-                break 'outer;
-            }
-            if forward_message(
+            );
+            forward_message(
                 &wait_items[REMOTE_CHANNEL_INDEX],
                 &proxy.remote_channel,
                 &proxy.container_channel,
                 Some(&proxy.resume_event),
                 &mut bounce_bytes,
                 &mut bounce_handles,
-            )
-            .is_err()
-            {
-                tracing::warn!("Proxy failed to forward message to kernel");
-                break 'outer;
-            }
+            );
         }
-
-        resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
     });
 }
 
@@ -438,36 +438,16 @@ fn forward_message(
     event: Option<&zx::EventPair>,
     bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
     handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
-) -> Result<(), Error> {
+) {
     if wait_item.pending.contains(zx::Signals::CHANNEL_READABLE) {
-        let (actual_bytes, actual_handles) = match read_channel.read_uninit(bytes, handles) {
-            zx::ChannelReadResult::Ok(r) => r,
-            _ => return Err(anyhow!("Failed to read from channel")),
-        };
-        write_channel.write(actual_bytes, actual_handles)?;
-
+        let (actual_bytes, actual_handles) =
+            read_channel.read_uninit(bytes, handles).expect("Failed kernel read");
+        write_channel.write(actual_bytes, actual_handles).expect("Failed remote write");
         if let Some(event) = event {
-            // Signal event with `RUNNER_SIGNAL`, indicating that an event is being sent to
-            // the kernel.
-            let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
-            event.signal_handle(clear_mask, set_mask)?;
-
-            // Wait for the kernel endpoint to signal that the event has been handled, and
-            // that it is now safe to suspend the container again.
-            match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicTime::INFINITE) {
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
-                    return Err(anyhow!("Failed to wait on signal from kernel"));
-                }
-            };
-
-            // Clear any remaining signals from the event before continuing the proxy.
-            let (clear_mask, set_mask) = (KERNEL_SIGNAL | RUNNER_SIGNAL, zx::Signals::NONE);
-            event.signal_handle(clear_mask, set_mask)?;
+            let (clear_mask, set_mask) = (zx::Signals::empty(), zx::Signals::EVENT_SIGNALED);
+            event.signal_handle(clear_mask, set_mask).expect("Failed to signal event");
         }
     }
-    Ok(())
 }
 
 async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {

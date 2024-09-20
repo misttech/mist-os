@@ -15,9 +15,7 @@ use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Weak};
 
-use crate::power::{
-    create_proxy_for_wake_events, OnWakeOps, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
-};
+use crate::power::{create_proxy_for_wake_events, OnWakeOps};
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
@@ -117,7 +115,7 @@ impl HrTimerManagerState {
     fn reset_wake_event(&mut self) {
         self.wake_event.as_ref().map(|e| {
             e.as_handle_ref()
-                .signal(RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL)
+                .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::empty())
                 .expect("Failed to clear signal on timer event")
         });
     }

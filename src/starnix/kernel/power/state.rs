@@ -117,6 +117,7 @@ impl BytesFileOps for PowerStateFile {
                             .duplicate(zx::Rights::SAME_RIGHTS)
                             .expect("Failed to dup handle"),
                     ),
+                    wake_event: current_task.kernel().hrtimer_manager.duplicate_timer_event(),
                     wake_locks: Some(
                         current_task.kernel().suspend_resume_manager.duplicate_lock_event(),
                     ),

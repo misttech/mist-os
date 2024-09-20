@@ -26,6 +26,8 @@ open protocol Manager {
         /// The event that is used to signal whether or not there are any active wake locks
         /// in the container.
         2: wake_locks zx.Handle:EVENTPAIR;
+        /// The event that will be signaled when the container should resume.
+        3: wake_event zx.Handle:EVENT;
     }) -> (table {
         /// The amount of time spent in the suspend state.
         ///
