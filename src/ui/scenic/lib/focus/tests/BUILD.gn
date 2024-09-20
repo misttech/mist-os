@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-executable("unittests") {
+import("//build/testing/cc_test_executable.gni")
+
+cc_test_executable("unittests") {
   testonly = true
   output_name = "focus_unittests"
   sources = [
