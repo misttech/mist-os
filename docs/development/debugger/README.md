@@ -137,6 +137,7 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 You can also follow the zxdb tutorials:
 
 * [Tutorial: Debug tests using zxdb][zxdb-testing-tutorial]
+* [Tutorial: Debug with minidumps using zxdb][zxdb-minidumps-tutorial]
 
 Additionally, if you are interested in contributing to zxdb:
 
@@ -156,6 +157,7 @@ Additionally, if you are interested in contributing to zxdb:
 [zxdb-exceptions]: /docs/development/debugger/exceptions.md
 [zxdb-tests]: /docs/development/debugger/tests.md
 [zxdb-testing-tutorial]: /docs/development/debugger/tutorial-tests.md
+[zxdb-minidumps-tutorial]: /docs/development/debugger/tutorial-minidumps.md
 [component-urls]: /docs/reference/components/url.md
 [component-identifiers]: /docs/concepts/components/v2/identifiers.md
 [component-monikers]: /docs/concepts/components/v2/identifiers.md#monikers
