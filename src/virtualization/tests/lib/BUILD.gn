@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -134,7 +135,7 @@ source_set("fake_memory_pressure_provider") {
       [ "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_hlcpp" ]
 }
 
-executable("unit_tests") {
+cc_test_executable("unit_tests") {
   testonly = true
   output_name = "guest_unit_tests"
   sources = [

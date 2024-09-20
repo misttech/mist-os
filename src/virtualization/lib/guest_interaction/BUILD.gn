@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/virtualization/buildtools/linux_paths.gni")
 import("//src/virtualization/buildtools/romfs_image.gni")
 import("//third_party/protobuf/proto_library.gni")
@@ -114,7 +115,7 @@ source_set("integration_test_lib") {
   ]
 }
 
-executable("client_operation_test") {
+cc_test_executable("client_operation_test") {
   testonly = true
   sources = [ "test/client_operation_test.cc" ]
   deps = [
@@ -130,7 +131,7 @@ executable("client_operation_test") {
   ]
 }
 
-executable("server_operation_test") {
+cc_test_executable("server_operation_test") {
   testonly = true
   sources = [ "test/server_operation_test.cc" ]
   deps = [
@@ -225,7 +226,7 @@ source_set("guest_interaction_client") {
   configs += [ "//build/config:all_source" ]
 }
 
-executable("server_daemon_test") {
+cc_test_executable("server_daemon_test") {
   testonly = true
 
   sources = [ "test/server_integration_test.cc" ]

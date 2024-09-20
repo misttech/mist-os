@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("smoke") {
   testonly = true
   deps = [ ":zircon_guest_smoke_tests_pkg" ]
 }
 
-executable("zircon_guest_smoke_tests") {
+cc_test_executable("zircon_guest_smoke_tests") {
   visibility = [ ":*" ]
   testonly = true
 

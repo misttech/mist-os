@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/cc_test_executable.gni")
 
 static_library("guest-ethernet") {
   sources = [
@@ -102,7 +103,7 @@ fuchsia_component("virtio_net_component") {
   component_name = "virtio_net"
 }
 
-executable("virtio_net_cpp_unittests_bin") {
+cc_test_executable("virtio_net_cpp_unittests_bin") {
   testonly = true
 
   sources = [ "src/cpp/completion_queue_test.cc" ]
