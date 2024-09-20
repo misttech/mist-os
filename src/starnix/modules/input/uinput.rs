@@ -52,7 +52,7 @@ pub fn register_uinput_device(
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
     let device = UinputDevice::new(input_event_relay);
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "uinput".into(),
@@ -77,7 +77,7 @@ where
 
     let input_class = registry.objects.input_class();
 
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         FsString::from(format!("event{}", device_id)).as_ref(),

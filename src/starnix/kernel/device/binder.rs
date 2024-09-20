@@ -4535,25 +4535,35 @@ impl FileSystemOps for BinderFs {
     }
 }
 
+const DEFAULT_BINDERS: [&str; 3] = ["binder", "hwbinder", "vndbinder"];
+
 #[derive(Debug)]
 struct BinderFsDir {
     devices: BTreeMap<FsString, DeviceType>,
 }
 
 impl BinderFsDir {
-    fn new(kernel: &Kernel) -> Result<Self, Errno> {
-        let remote_dev = kernel.device_registry.register_dyn_chrdev(RemoteBinderDevice {})?;
-        let mut devices = BTreeMap::default();
-        devices.insert("remote".into(), remote_dev);
-        Ok(Self { devices })
-    }
+    fn new(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) -> Result<Self, Errno> {
+        let kernel = current_task.kernel();
+        let registry = &kernel.device_registry;
+        let mut devices = BTreeMap::<FsString, DeviceType>::default();
+        let remote_device = registry.register_misc_device(
+            locked,
+            current_task,
+            "remote-binder".into(),
+            RemoteBinderDevice {},
+        )?;
+        devices.insert("remote".into(), remote_device.metadata.device_type);
 
-    fn add_binder_device(&mut self, kernel: &Kernel, name: FsString) -> Result<(), Errno> {
-        let driver = BinderDevice::default();
-        let dev = kernel.device_registry.register_dyn_chrdev(driver.clone())?;
-        self.devices.insert(name, dev);
-        kernel.binders.write().insert(dev, driver);
-        Ok(())
+        for name in DEFAULT_BINDERS {
+            let driver = BinderDevice::default();
+            let device =
+                registry.register_misc_device(locked, current_task, name.into(), driver.clone())?;
+            devices.insert(name.into(), device.metadata.device_type);
+            kernel.binders.write().insert(device.metadata.device_type, driver);
+        }
+
+        Ok(Self { devices })
     }
 }
 
@@ -4598,21 +4608,15 @@ impl FsNodeOps for BinderFsDir {
     }
 }
 
-const DEFAULT_BINDERS: [&str; 3] = ["binder", "hwbinder", "vndbinder"];
-
 impl BinderFs {
     pub fn new_fs(
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
-        let mut root = BinderFsDir::new(kernel)?;
-        for name in DEFAULT_BINDERS {
-            root.add_binder_device(kernel, FsString::from(name))?;
-        }
-        fs.set_root(root);
+        fs.set_root(BinderFsDir::new(locked, current_task)?);
         Ok(fs)
     }
 }

@@ -245,7 +245,7 @@ where
     let registry = &kernel.device_registry;
 
     let graphics_class = registry.objects.graphics_class();
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "fb0".into(),

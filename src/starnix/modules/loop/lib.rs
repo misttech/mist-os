@@ -572,7 +572,7 @@ pub fn loop_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &Curren
     // Device registry.
     kernel
         .device_registry
-        .register_major(LOOP_MAJOR, get_or_create_loop_device, DeviceMode::Block)
+        .register_major("loop".into(), DeviceMode::Block, LOOP_MAJOR, get_or_create_loop_device)
         .expect("loop device register failed.");
 
     // Ensure initial loop devices.

@@ -49,12 +49,14 @@ where
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    registry.add_and_register_dyn_device(
-        locked,
-        current_task,
-        "virtgralloc0".into(),
-        registry.objects.starnix_class(),
-        DeviceDirectory::new,
-        GrallocDevice::new(mode_setter),
-    );
+    registry
+        .register_dyn_device(
+            locked,
+            current_task,
+            "virtgralloc0".into(),
+            registry.objects.starnix_class(),
+            DeviceDirectory::new,
+            GrallocDevice::new(mode_setter),
+        )
+        .expect("can register virtgralloc0");
 }

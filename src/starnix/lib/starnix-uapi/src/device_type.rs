@@ -12,6 +12,11 @@ pub const MISC_MAJOR: u32 = 10;
 pub const INPUT_MAJOR: u32 = 13;
 pub const FB_MAJOR: u32 = 29;
 
+// These minor device numbers in the MISC major device appear to be dynamically allocated.
+// The lower bound is taken from observing /proc/misc an Android device. The upper bound is
+// taken from the value of /dev/beep in devices.txt.
+pub const MISC_DYNANIC_MINOR_RANGE: Range<u32> = 52..128;
+
 // TODO: The range for dynamic character devices actually goes all the way to 254, but we
 // still have a few hardcoded devices registered at high numbers. We can expand this range
 // to 254 once we dynamically allocate those devices.
@@ -66,6 +71,10 @@ impl DeviceType {
                 | (((minor & 0xffffff00) as u64) << 12)
                 | ((minor & 0xff) as u64),
         )
+    }
+
+    pub const fn new_range(major: u32, minor: Range<u32>) -> Range<DeviceType> {
+        Self::new(major, minor.start)..Self::new(major, minor.end)
     }
 
     pub const fn from_bits(dev: u64) -> DeviceType {

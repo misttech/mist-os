@@ -41,7 +41,7 @@ impl TouchPowerPolicyDevice {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
         let misc_class = registry.objects.misc_class();
-        registry.add_and_register_device(
+        registry.register_device(
             locked,
             system_task,
             FsString::from("touch_standby").as_ref(),

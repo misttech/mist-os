@@ -68,7 +68,12 @@ pub fn device_mapper_init(current_task: &CurrentTask) {
 
     kernel
         .device_registry
-        .register_major(DEVICE_MAPPER_MAJOR, get_or_create_dm_device, DeviceMode::Block)
+        .register_major(
+            "device-mapper".into(),
+            DeviceMode::Block,
+            DEVICE_MAPPER_MAJOR,
+            get_or_create_dm_device,
+        )
         .expect("dm device register failed.");
 }
 

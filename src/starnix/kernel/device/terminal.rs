@@ -61,10 +61,6 @@ pub struct TTYState {
 }
 
 impl TTYState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Returns the next available terminal.
     pub fn get_next_terminal(
         self: &Arc<Self>,

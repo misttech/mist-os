@@ -34,7 +34,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         current_task,
         // TODO(https://fxbug.dev/322365477) consider making this configurable
@@ -44,7 +44,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         current_task,
         "fuse".into(),
@@ -53,7 +53,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
         DeviceDirectory::new,
         open_fuse_device,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         current_task,
         "device-mapper".into(),
@@ -62,7 +62,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
         DeviceDirectory::new,
         create_device_mapper,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         current_task,
         "loop-control".into(),
@@ -71,7 +71,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
         DeviceDirectory::new,
         create_loop_control_device,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         current_task,
         "tun".into(),

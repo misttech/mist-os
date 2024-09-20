@@ -34,12 +34,14 @@ where
     let _ = RutabagaBuilder::new(RutabagaComponentType::Gfxstream, 0)
         .build(RutabagaFenceHandler::new(move |_| {}), std::option::Option::None);
 
-    registry.add_and_register_dyn_device(
-        locked,
-        current_task,
-        "virtio-gpu".into(),
-        registry.objects.starnix_class(),
-        DeviceDirectory::new,
-        create_gpu_device,
-    );
+    registry
+        .register_dyn_device(
+            locked,
+            current_task,
+            "virtio-gpu".into(),
+            registry.objects.starnix_class(),
+            DeviceDirectory::new,
+            create_gpu_device,
+        )
+        .expect("can register virtio-gpu");
 }

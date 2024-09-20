@@ -28,12 +28,14 @@ where
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    registry.add_and_register_dyn_device(
-        locked,
-        current_task,
-        "magma0".into(),
-        registry.objects.starnix_class(),
-        DeviceDirectory::new,
-        create_magma_device,
-    );
+    registry
+        .register_dyn_device(
+            locked,
+            current_task,
+            "magma0".into(),
+            registry.objects.starnix_class(),
+            DeviceDirectory::new,
+            create_magma_device,
+        )
+        .expect("can register magma0");
 }

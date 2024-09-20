@@ -172,7 +172,7 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
     let virtual_block_class = registry.objects.virtual_block_class();
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "zram0".into(),

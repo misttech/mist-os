@@ -224,7 +224,12 @@ pub fn remote_block_device_init(_locked: &mut Locked<'_, Unlocked>, current_task
     current_task
         .kernel()
         .device_registry
-        .register_major(REMOTE_BLOCK_MAJOR, open_remote_block_device, DeviceMode::Block)
+        .register_major(
+            "remote-block".into(),
+            DeviceMode::Block,
+            REMOTE_BLOCK_MAJOR,
+            open_remote_block_device,
+        )
         .expect("remote block device register failed.");
 }
 
@@ -278,6 +283,7 @@ impl RemoteBlockDeviceRegistry {
 
 #[cfg(test)]
 mod tests {
+    use super::remote_block_device_init;
     use crate::mm::MemoryAccessor as _;
     use crate::testing::{create_kernel_task_and_unlocked, map_object_anywhere};
     use crate::vfs::{Anon, SeekTarget, VecInputBuffer, VecOutputBuffer};
@@ -289,6 +295,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_remote_block_device_registry() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        remote_block_device_init(&mut locked, &current_task);
         let registry = kernel.remote_block_device_registry.clone();
 
         registry
@@ -334,6 +341,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_past_eof() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        remote_block_device_init(&mut locked, &current_task);
         let registry = kernel.remote_block_device_registry.clone();
 
         registry
