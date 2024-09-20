@@ -56,7 +56,7 @@ async fn main() -> Result<(), Error> {
 }
 
 struct Puppet {
-    start_time: zx::MonotonicTime,
+    start_time: zx::BootTime,
     socket: Socket,
     info: PuppetInfo,
     proxy: LogSinkPuppetProxy,
@@ -177,7 +177,7 @@ impl Puppet {
             panic!("puppet should not exit! status: {:?}", status);
         });
 
-        let start_time = zx::MonotonicTime::get();
+        let start_time = zx::BootTime::get();
         let proxy =
             instance.root.connect_to_protocol_at_exposed_dir::<LogSinkPuppetMarker>().unwrap();
 
@@ -213,7 +213,7 @@ impl Puppet {
                     .unwrap(),
                 RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
                     .add_string("message", "Puppet started.�(")
-                    .build(puppet.start_time..zx::MonotonicTime::get())
+                    .build(puppet.start_time..zx::BootTime::get())
             );
         } else {
             info!("Reading regular record.");
@@ -224,7 +224,7 @@ impl Puppet {
                     .unwrap(),
                 RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
                     .add_string("message", "Puppet started.")
-                    .build(puppet.start_time..zx::MonotonicTime::get())
+                    .build(puppet.start_time..zx::BootTime::get())
             );
         }
         info!("Testing dot removal.");
@@ -337,10 +337,10 @@ impl Puppet {
         &self,
         spec: RecordSpec,
         new_file_line_rules: bool,
-    ) -> Result<(TestRecord, Range<zx::MonotonicTime>), Error> {
-        let before = zx::MonotonicTime::get();
+    ) -> Result<(TestRecord, Range<zx::BootTime>), Error> {
+        let before = zx::BootTime::get();
         self.proxy.emit_log(&spec).await?;
-        let after = zx::MonotonicTime::get();
+        let after = zx::BootTime::get();
 
         // read until we get to a non-ignored record
         let record = loop {
@@ -377,7 +377,7 @@ async fn assert_logged_severities(
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
             RecordAssertion::new(&puppet.info, *severity, new_file_line_rules)
                 .add_string("message", &severity_to_string(*severity))
-                .build(puppet.start_time..zx::MonotonicTime::get())
+                .build(puppet.start_time..zx::BootTime::get())
         );
     }
     Ok(())
@@ -420,7 +420,7 @@ where
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Warn, new_file_line_rules)
             .add_string("message", "Changed severity")
-            .build(puppet.start_time..zx::MonotonicTime::get())
+            .build(puppet.start_time..zx::BootTime::get())
     );
 
     send_log_with_severity!(Debug);
@@ -438,7 +438,7 @@ where
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
             .add_string("message", "Changed severity")
-            .build(puppet.start_time..zx::MonotonicTime::get())
+            .build(puppet.start_time..zx::BootTime::get())
     );
     send_log_with_severity!(Trace);
     send_log_with_severity!(Debug);
@@ -462,7 +462,7 @@ where
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
             .add_string("message", "Changed severity")
-            .build(puppet.start_time..zx::MonotonicTime::get())
+            .build(puppet.start_time..zx::BootTime::get())
     );
 
     send_log_with_severity!(Debug);
@@ -498,7 +498,7 @@ where
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
             RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
                 .add_string("message", "Changed severity")
-                .build(puppet.start_time..zx::MonotonicTime::get())
+                .build(puppet.start_time..zx::BootTime::get())
         );
         info!("Changed interest back");
     }
@@ -529,7 +529,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
             .add_string("file", "test_file.cc")
             .add_string("key", "value")
             .add_unsigned("line", 9001)
-            .build(puppet.start_time..zx::MonotonicTime::get())
+            .build(puppet.start_time..zx::BootTime::get())
     );
     info!("Dot removed");
     Ok(())
@@ -677,7 +677,7 @@ impl PartialEq<RecordAssertion> for TestRecord {
 
 #[derive(Debug)]
 struct RecordAssertion {
-    valid_times: Range<zx::MonotonicTime>,
+    valid_times: Range<zx::BootTime>,
     severity: Severity,
     arguments: BTreeMap<String, Value>,
 }
@@ -704,7 +704,7 @@ impl RecordAssertion {
 
 impl PartialEq<TestRecord> for RecordAssertion {
     fn eq(&self, rhs: &TestRecord) -> bool {
-        self.valid_times.contains(&zx::MonotonicTime::from_nanos(rhs.timestamp))
+        self.valid_times.contains(&zx::BootTime::from_nanos(rhs.timestamp))
             && self.severity == rhs.severity
             && self.arguments == rhs.arguments
     }
@@ -716,7 +716,7 @@ struct RecordAssertionBuilder {
 }
 
 impl RecordAssertionBuilder {
-    fn build(&mut self, valid_times: Range<zx::MonotonicTime>) -> RecordAssertion {
+    fn build(&mut self, valid_times: Range<zx::BootTime>) -> RecordAssertion {
         RecordAssertion {
             valid_times,
             severity: self.severity,

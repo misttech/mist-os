@@ -56,10 +56,6 @@ pub struct LogsArtifactsContainer {
     /// Mutable state for the container.
     state: Arc<Mutex<ContainerState>>,
 
-    /// The time when the container was created by the logging
-    /// framework.
-    pub event_timestamp: zx::MonotonicTime,
-
     /// Current object ID used in place of a memory address
     /// used to uniquely identify an object in a BTreeMap.
     next_hanging_get_id: AtomicUsize,
@@ -123,7 +119,6 @@ impl LogsArtifactsContainer {
                 is_initializing: true,
             })),
             stats: Arc::new(stats),
-            event_timestamp: zx::MonotonicTime::get(),
             next_hanging_get_id: AtomicUsize::new(0),
             hanging_get_test_state: Arc::new(Mutex::new(TestState::NoRequest)),
         };
@@ -151,11 +146,8 @@ impl LogsArtifactsContainer {
         parent_trace_id: ftrace::Id,
     ) -> PinStream<Arc<LogsData>> {
         let identity = Arc::clone(&self.identity);
-        let earliest_timestamp = self
-            .buffer
-            .peek_front()
-            .map(|f| f.timestamp())
-            .unwrap_or(zx::MonotonicTime::from_nanos(0));
+        let earliest_timestamp =
+            self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(zx::BootTime::ZERO);
         Box::pin(
             self.buffer
                 .cursor(mode)
@@ -494,7 +486,7 @@ impl LogsArtifactsContainer {
     }
 
     /// Returns the timestamp of the earliest log message in this container's buffer, if any.
-    pub fn oldest_timestamp(&self) -> Option<zx::MonotonicTime> {
+    pub fn oldest_timestamp(&self) -> Option<zx::BootTime> {
         self.buffer.peek_front().map(|m| m.timestamp())
     }
 

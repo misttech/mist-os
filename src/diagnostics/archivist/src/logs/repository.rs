@@ -497,9 +497,9 @@ mod tests {
             "fuchsia-pkg://bar",
         )));
 
-        foo_container.ingest_message(make_message("a", zx::MonotonicTime::from_nanos(1)));
-        bar_container.ingest_message(make_message("b", zx::MonotonicTime::from_nanos(2)));
-        foo_container.ingest_message(make_message("c", zx::MonotonicTime::from_nanos(3)));
+        foo_container.ingest_message(make_message("a", zx::BootTime::from_nanos(1)));
+        bar_container.ingest_message(make_message("b", zx::BootTime::from_nanos(2)));
+        foo_container.ingest_message(make_message("c", zx::BootTime::from_nanos(3)));
 
         let stream = repo.logs_cursor(StreamMode::Snapshot, None, ftrace::Id::random());
 
@@ -605,7 +605,7 @@ mod tests {
         assert_eq!(initial_interest.min_severity, expected_severity);
     }
 
-    fn make_message(msg: &str, timestamp: zx::MonotonicTime) -> StoredMessage {
+    fn make_message(msg: &str, timestamp: zx::BootTime) -> StoredMessage {
         let record = Record {
             timestamp: timestamp.into_nanos(),
             severity: StreamSeverity::Debug.into_primitive(),

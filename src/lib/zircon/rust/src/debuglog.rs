@@ -4,9 +4,7 @@
 
 //! Type-safe bindings for Zircon resources.
 
-use crate::{
-    ok, AsHandleRef, Handle, HandleBased, HandleRef, Koid, MonotonicTime, Resource, Status,
-};
+use crate::{ok, AsHandleRef, BootTime, Handle, HandleBased, HandleRef, Koid, Resource, Status};
 use bitflags::bitflags;
 use bstr::BStr;
 use fuchsia_zircon_sys as sys;
@@ -87,8 +85,7 @@ impl DebugLog {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct DebugLogRecord {
     pub sequence: u64,
-    // TODO(https://fxbug.dev/358164839) switch to boot time
-    pub timestamp: MonotonicTime,
+    pub timestamp: BootTime,
     pub severity: DebugLogSeverity,
     pub pid: Koid,
     pub tid: Koid,
@@ -102,7 +99,7 @@ impl DebugLogRecord {
     pub fn from_raw(raw: &sys::zx_log_record_t) -> Result<Self, Status> {
         if raw.datalen <= sys::ZX_LOG_RECORD_DATA_MAX as u16 {
             Ok(Self {
-                timestamp: MonotonicTime::from_nanos(raw.timestamp),
+                timestamp: BootTime::from_nanos(raw.timestamp),
                 sequence: raw.sequence,
                 severity: DebugLogSeverity::from_raw(raw.severity),
                 pid: Koid::from_raw(raw.pid),

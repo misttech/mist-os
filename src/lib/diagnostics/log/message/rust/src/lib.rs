@@ -148,7 +148,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoggerMessage {
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::BootTime,
     pub severity: Severity,
     pub verbosity: Option<i8>,
     pub pid: u64,
@@ -180,7 +180,7 @@ impl TryFrom<&[u8]> for LoggerMessage {
 
         let pid = LittleEndian::read_u64(&bytes[..8]);
         let tid = LittleEndian::read_u64(&bytes[8..16]);
-        let timestamp = zx::MonotonicTime::from_nanos(LittleEndian::read_i64(&bytes[16..24]));
+        let timestamp = zx::BootTime::from_nanos(LittleEndian::read_i64(&bytes[16..24]));
 
         let raw_severity = LittleEndian::read_i32(&bytes[24..28]);
         let severity = LegacySeverity::try_from(raw_severity)?;

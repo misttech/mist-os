@@ -36,6 +36,8 @@ impl AsRef<str> for EventType {
 pub struct Event {
     /// The contents of the event.
     pub payload: EventPayload,
+    // TODO(https://fxbug.dev/357825314): this should be boot time ideally, but the CF API returns
+    // Monotonic atm.
     pub timestamp: zx::MonotonicTime,
 }
 

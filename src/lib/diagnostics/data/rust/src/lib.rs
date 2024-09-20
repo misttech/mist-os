@@ -234,15 +234,15 @@ mod zircon {
     use super::*;
     use fuchsia_zircon as zx;
 
-    impl From<zx::MonotonicTime> for Timestamp {
-        fn from(t: zx::MonotonicTime) -> Timestamp {
+    impl From<zx::BootTime> for Timestamp {
+        fn from(t: zx::BootTime) -> Timestamp {
             Timestamp(t.into_nanos())
         }
     }
 
-    impl Into<zx::MonotonicTime> for Timestamp {
-        fn into(self) -> zx::MonotonicTime {
-            zx::MonotonicTime::from_nanos(self.0)
+    impl Into<zx::BootTime> for Timestamp {
+        fn into(self) -> zx::BootTime {
+            zx::BootTime::from_nanos(self.0)
         }
     }
 }
@@ -262,7 +262,7 @@ pub struct InspectMetadata {
     /// The url with which the component was launched.
     pub component_url: FlyStr,
 
-    /// Monotonic time in nanos.
+    /// Boot time in nanos.
     pub timestamp: Timestamp,
 
     /// When set to true, the data was escrowed. Otherwise, the data was fetched live from the
@@ -293,7 +293,7 @@ pub struct LogsMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub component_url: Option<FlyStr>,
 
-    /// Monotonic time in nanos.
+    /// Boot time in nanos.
     pub timestamp: Timestamp,
 
     /// Severity of the message.

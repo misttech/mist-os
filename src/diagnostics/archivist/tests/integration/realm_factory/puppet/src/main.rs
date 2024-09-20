@@ -276,7 +276,7 @@ async fn handle_puppet_request(
                             dispatcher.downcast_ref().unwrap();
                         let record = TestRecord {
                             severity: severity.into_primitive(),
-                            timestamp: zx::MonotonicTime::from_nanos(time),
+                            timestamp: zx::BootTime::from_nanos(time),
                             file: None,
                             line: None,
                             record_arguments: vec![Argument {
