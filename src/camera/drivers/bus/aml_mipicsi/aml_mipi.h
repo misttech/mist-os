@@ -6,9 +6,8 @@
 #define SRC_CAMERA_DRIVERS_BUS_AML_MIPICSI_AML_MIPI_H_
 
 #include <fuchsia/hardware/mipicsi/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
@@ -35,9 +34,9 @@ class AmlMipiDevice : public DeviceType,
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlMipiDevice);
 
-  explicit AmlMipiDevice(zx_device_t* parent) : DeviceType(parent), pdev_(parent) {}
+  explicit AmlMipiDevice(zx_device_t* parent) : DeviceType(parent) {}
 
-  static zx_status_t Create(zx_device_t* parent);
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
   ~AmlMipiDevice();
 
@@ -50,7 +49,7 @@ class AmlMipiDevice : public DeviceType,
 
  private:
   zx_status_t InitBuffer(const mipi_adap_info_t* info, size_t size);
-  zx_status_t InitPdev(zx_device_t* parent);
+  zx_status_t Init();
   static uint32_t AdapGetDepth(const mipi_adap_info_t* info);
   int AdapterIrqHandler();
 
@@ -96,8 +95,6 @@ class AmlMipiDevice : public DeviceType,
   std::optional<fdf::MmioBuffer> csi_host0_mmio_;
   std::optional<fdf::MmioBuffer> mipi_adap_mmio_;
   std::optional<fdf::MmioBuffer> hiu_mmio_;
-
-  ddk::PDevFidl pdev_;
 
   zx::bti bti_;
   zx::interrupt adap_irq_;

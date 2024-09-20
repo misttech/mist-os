@@ -45,56 +45,81 @@ void AmlMipiDevice::InitMipiClock() {
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
 }
 
-zx_status_t AmlMipiDevice::InitPdev(zx_device_t* /*parent*/) {
-  if (!pdev_.is_valid()) {
+zx_status_t AmlMipiDevice::Init() {
+  fdf::PDev pdev;
+  {
+    zx::result pdev_client =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent_,
+                                                                                          "pdev");
+    if (pdev_client.is_error()) {
+      zxlogf(ERROR, "Failed to connect to pdev: %s", pdev_client.status_string());
+      return pdev_client.status_value();
+    }
+    pdev = fdf::PDev{std::move(pdev_client.value())};
+  }
+  if (!pdev.is_valid()) {
+    zxlogf(ERROR, "Platform device connection is invalid.");
     return ZX_ERR_NO_RESOURCES;
   }
 
-  zx_status_t status = pdev_.MapMmio(kCsiPhy0, &csi_phy0_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_.MapMmio failed %d", __func__, status);
-    return status;
+  zx::result mmio = pdev.MapMmio(kCsiPhy0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio %d: %s", kCsiPhy0, mmio.status_string());
+    return mmio.status_value();
   }
+  csi_phy0_mmio_ = std::move(mmio.value());
 
-  status = pdev_.MapMmio(kAphy0, &aphy0_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_.MapMmio failed %d", __func__, status);
-    return status;
+  mmio = pdev.MapMmio(kAphy0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio %d: %s", kAphy0, mmio.status_string());
+    return mmio.status_value();
   }
+  aphy0_mmio_ = std::move(mmio.value());
 
-  status = pdev_.MapMmio(kCsiHost0, &csi_host0_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_.MapMmio failed %d", __func__, status);
-    return status;
+  mmio = pdev.MapMmio(kCsiHost0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio %d: %s", kCsiHost0, mmio.status_string());
+    return mmio.status_value();
   }
+  csi_host0_mmio_ = std::move(mmio.value());
 
-  status = pdev_.MapMmio(kMipiAdap, &mipi_adap_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_.MapMmio failed %d", __func__, status);
-    return status;
+  mmio = pdev.MapMmio(kMipiAdap);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio %d: %s", kMipiAdap, mmio.status_string());
+    return mmio.status_value();
   }
+  mipi_adap_mmio_ = std::move(mmio.value());
 
-  status = pdev_.MapMmio(kHiu, &hiu_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_.MapMmio failed %d", __func__, status);
-    return status;
+  mmio = pdev.MapMmio(kHiu);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio %d: %s", kHiu, mmio.status_string());
+    return mmio.status_value();
   }
+  hiu_mmio_ = std::move(mmio.value());
 
   // Get our bti.
-  status = pdev_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not obtain bti: %d", __func__, status);
-    return status;
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
+  bti_ = std::move(bti.value());
 
   // Get adapter interrupt.
-  status = pdev_.GetInterrupt(0, &adap_irq_);
+  zx::result irq = pdev.GetInterrupt(0);
+  if (irq.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", irq.status_string());
+    return irq.status_value();
+  }
+  adap_irq_ = std::move(irq.value());
+
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("aml-mipi"));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not obtain adapter interrupt %d", __func__, status);
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
     return status;
   }
 
-  return status;
+  return ZX_OK;
 }
 
 void AmlMipiDevice::MipiPhyReset() {
@@ -202,26 +227,19 @@ zx_status_t AmlMipiDevice::MipiCsiDeInit() {
 void AmlMipiDevice::DdkRelease() { delete this; }
 
 // static
-zx_status_t AmlMipiDevice::Create(zx_device_t* parent) {
+zx_status_t AmlMipiDevice::Bind(void* ctx, zx_device_t* parent) {
   auto mipi_device = std::make_unique<AmlMipiDevice>(parent);
 
-  zx_status_t status = mipi_device->InitPdev(parent);
+  zx_status_t status = mipi_device->Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: mipi_device->InitPdev failed %d", __func__, status);
+    zxlogf(ERROR, "Failed to init mipi device: %s", zx_status_get_string(status));
     return status;
   }
-
-  status = mipi_device->DdkAdd(ddk::DeviceAddArgs("aml-mipi"));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: mipi_device->DdkAdd failed %d", __func__, status);
-    return status;
-  }
-  zxlogf(INFO, "aml-mipi driver added");
 
   // mipi_device intentionally leaked as it is now held by DevMgr.
   [[maybe_unused]] auto ptr = mipi_device.release();
 
-  return status;
+  return ZX_OK;
 }
 
 AmlMipiDevice::~AmlMipiDevice() {
@@ -232,14 +250,10 @@ AmlMipiDevice::~AmlMipiDevice() {
   }
 }
 
-zx_status_t aml_mipi_bind(void* /*ctx*/, zx_device_t* device) {
-  return camera::AmlMipiDevice::Create(device);
-}
-
 static constexpr zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = aml_mipi_bind;
+  ops.bind = &AmlMipiDevice::Bind;
   return ops;
 }();
 
