@@ -34,6 +34,16 @@ fuchsia_package(
 )
 
 fuchsia_package(
+    name = "pkg_with_static_cpp",
+    package_name = "pkg_with_static_cpp_for_test",
+    components = [
+        ":cc_component_static_cpp",
+    ],
+    fuchsia_api_level = "HEAD",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_package(
     name = "pkg_with_subpkg",
     package_name = "pkg_with_subpkg_for_test",
     components = [":empty_component"],
@@ -90,6 +100,12 @@ fuchsia_cc_binary(
     srcs = [":cc_main"],
 )
 
+fuchsia_cc_binary(
+    name = "cc_bin_static_cpp",
+    srcs = [":cc_main"],
+    features = ["static_cpp_standard_library"],
+)
+
 fuchsia_component_manifest(
     name = "manifest",
     component_name = "cc_component",
@@ -132,6 +148,14 @@ fuchsia_component(
     manifest = ":manifest",
     deps = [
         ":cc_bin",
+    ],
+)
+
+fuchsia_component(
+    name = "cc_component_static_cpp",
+    manifest = ":manifest",
+    deps = [
+        ":cc_bin_static_cpp",
     ],
 )
 

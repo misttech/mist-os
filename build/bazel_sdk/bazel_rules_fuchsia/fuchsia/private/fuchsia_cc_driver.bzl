@@ -75,6 +75,11 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     else:
         shared_library_deps = deps
 
+    features = kwargs.pop("features", []) + [
+        # Ensure that we are statically linking c++.
+        "static_cpp_standard_library",
+    ]
+
     cc_shared_library_name = name + "_cc_shared_library"
     native.cc_shared_library(
         name = cc_shared_library_name,
@@ -82,10 +87,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         additional_linker_inputs = ["@fuchsia_sdk//fuchsia/private:driver.ld"],
         user_link_flags = user_link_flags,
         shared_lib_name = shared_lib_name,
-        features = kwargs.pop("features", []) + [
-            # Ensure that we are statically linking c++.
-            "static_cpp_standard_library",
-        ],
+        features = features,
         visibility = ["//visibility:private"],
         **kwargs
     )
@@ -102,10 +104,9 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         install_root = "driver/",
         cc_binary = ":{}".format(cc_shared_library_name),
         exact_cc_binary_deps = deps,
-        # We do not want libc++ and libunwind packaged since they get statically linked.
-        package_clang_dist_files = False,
         visibility = visibility,
         testonly = testonly,
+        features = features,
         tags = tags,
         # TODO(352586714) Enable this check when we understand why the symbols are getting
         # pulled in.
