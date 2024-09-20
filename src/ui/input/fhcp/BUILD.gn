@@ -4,8 +4,9 @@
 
 import("//build/components.gni")
 import("//build/drivers/fhcp_test_package.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("touchpad-test-bin") {
+cc_test_executable("touchpad-test-bin") {
   testonly = true
   output_name = "touchpad-test"
 

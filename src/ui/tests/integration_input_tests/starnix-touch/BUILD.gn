@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 
 # Most targets in this file are implementation details. Make them
 # inaccessible outside this file.
@@ -13,7 +14,7 @@ visibility = [ ":*" ]
 ### The actual test binary, generated from C++ source.
 ###
 
-executable("starnix-touch-test-bin") {
+cc_test_executable("starnix-touch-test-bin") {
   testonly = true
   sources = [
     "relay-api.h",

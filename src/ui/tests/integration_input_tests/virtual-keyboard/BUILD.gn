@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 
 fidl("test.virtualkeyboard") {
   testonly = true
@@ -12,7 +13,7 @@ fidl("test.virtualkeyboard") {
   enable_hlcpp = true
 }
 
-executable("virtual-keyboard-test-bin") {
+cc_test_executable("virtual-keyboard-test-bin") {
   testonly = true
   sources = [ "virtual-keyboard-test.cc" ]
   output_name = "virtual-keyboard-test"

@@ -4,8 +4,9 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("touch-input-test-bin") {
+cc_test_executable("touch-input-test-bin") {
   testonly = true
   sources = [ "touch-input-test.cc" ]
   output_name = "touch-input-test"
@@ -92,7 +93,7 @@ fuchsia_test_package("touch-input-test") {
   }
 }
 
-executable("pointerinjector-config-test-bin") {
+cc_test_executable("pointerinjector-config-test-bin") {
   testonly = true
   sources = [ "pointerinjector-config-test.cc" ]
   output_name = "pointerinjector-config-test"

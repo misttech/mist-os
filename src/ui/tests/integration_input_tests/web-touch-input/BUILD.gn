@@ -4,8 +4,9 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("web-touch-input-test-bin") {
+cc_test_executable("web-touch-input-test-bin") {
   testonly = true
   sources = [ "web-touch-input-test.cc" ]
   output_name = "web-touch-input-test"

@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("display-pixel-ratio-test-bin") {
+cc_test_executable("display-pixel-ratio-test-bin") {
   testonly = true
   sources = [ "display_pixel_ratio_test.cc" ]
   deps = [
