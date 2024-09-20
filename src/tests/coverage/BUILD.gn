@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/zircon/c_utils.gni")
 
 group("tests") {
@@ -46,7 +47,7 @@ config("disable_hwasan_globals") {
 
 # Clang coverage test is compiled with coverage enabled.
 # It generates an llvm raw profile (.profraw file) upon execution.
-executable("clang_coverage_test_bin") {
+cc_test_executable("clang_coverage_test_bin") {
   testonly = true
   sources = [ "clang_coverage_test.cc" ]
   cflags = [
