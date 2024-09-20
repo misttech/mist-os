@@ -14,10 +14,12 @@
 #include <lib/mistos/starnix/kernel/vfs/memory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/simple_directory.h>
 #include <lib/mistos/util/status.h>
+#include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/view.h>
 #include <trace.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
@@ -124,6 +126,21 @@ class ScratchAllocator {
   ZX_PANIC("");
 }
 
+bool zbi_bootfs_is_aligned(uint32_t size) { return (size % ZBI_BOOTFS_PAGE_SIZE == 0); }
+
+// Transferring data from Bootfs can only be done with page-aligned offsets
+// and sizes. It is expected for the VMO offset to be aligned by BootfsParser,
+// but the size alignment is not guaranteed.
+fit::result<zx_status_t, util::Range<uint64_t>> aligned_range(uint32_t offset, uint32_t size) {
+  if (!zbi_bootfs_is_aligned(offset)) {
+    return fit::error(ZX_ERR_INTERNAL);
+  }
+  uint64_t aligned_offset = static_cast<uint64_t>(offset);
+  uint64_t aligned_size = static_cast<uint64_t>(ZBI_BOOTFS_PAGE_ALIGN(size));
+  return fit::ok(
+      util::Range<uint64_t>{.start = aligned_offset, .end = (aligned_offset + aligned_size)});
+}
+
 /*
 [[noreturn]] void Fail(const BootfsView::Error& error) {
   zbitl::PrintBootfsError(error, [&](const char* fmt, ...) {
@@ -188,9 +205,17 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
   BootfsView view = bootfs->bootfs_reader_.root();
   for (auto item : view) {
     LTRACEF("name=[%.*s]\n", static_cast<int>(item.name.length()), item.name.data());
-    auto memory = MemoryFileNode::New().value();
+    auto vmo_range = aligned_range(item.offset, item.size);
+    if (vmo_range.is_error()) {
+      return fit::error(errno(EIO));
+    }
+    auto memory = bootfs->create_vmo_from_bootfs(vmo_range.value(), item.size);
+    if (memory.is_error()) {
+      return fit::error(errno(EIO));
+    }
+    auto node = MemoryFileNode::from_memory(ktl::move(memory.value()));
     auto result =
-        tree.add_entry(split_and_filter(item.name, '/'), ktl::unique_ptr<FsNodeOps>(memory));
+        tree.add_entry(split_and_filter(item.name, '/'), ktl::unique_ptr<FsNodeOps>(node));
     ZX_ASSERT(result.is_ok());
   }
 
@@ -256,6 +281,40 @@ BootFs::BootFs(HandleOwner zbi_vmo) {
       bootfs_reader_ = ktl::move(result.value());
     }
   }
+}
+
+fit::result<Errno, fbl::RefPtr<MemoryObject>> BootFs::create_vmo_from_bootfs(
+    util::Range<uint64_t> range, uint64_t original_size) {
+  auto aligned_size = range.end - range.start;
+
+  fbl::RefPtr<VmObjectPaged> vmo;
+  uint64_t size;
+  zx_status_t status = VmObject::RoundSize(aligned_size, &size);
+  ZX_ASSERT(status == ZX_OK);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, size, &vmo);
+  ZX_ASSERT(status == ZX_OK);
+
+  // zx_vmo_transfer_data
+  VmPageSpliceList pages;
+  status = bootfs_reader_.storage()->TakePages(range.start, aligned_size, &pages);
+  ZX_ASSERT(status == ZX_OK);
+
+  // TODO(https://fxbug.dev/42082399): Stop decompressing compressed pages from the source range.
+  status = vmo->SupplyPages(0, aligned_size, &pages, SupplyOptions::TransferData);
+  ZX_ASSERT(status == ZX_OK);
+
+  // create a Vm Object dispatcher
+  KernelHandle<VmObjectDispatcher> kernel_handle;
+  zx_rights_t rights;
+  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
+                                      VmObjectDispatcher::InitialMutability::kMutable,
+                                      &kernel_handle, &rights);
+  ZX_ASSERT(status == ZX_OK);
+
+  // Set the VMO content size back to the original size.
+  kernel_handle.dispatcher()->SetSize(original_size);
+
+  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
 }
 
 BootFs::~BootFs() = default;
