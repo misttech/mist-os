@@ -5,11 +5,23 @@
 use crate::{escape_text, md_path, HEADER};
 use anyhow::{bail, Context, Result};
 use ffx_command::{CliArgsInfo, ErrorCodeInfo, FlagInfo, SubCommandInfo};
-use std::fs::File;
+use serde::{Deserialize, Serialize};
+use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use tracing::debug;
+
+//LINT.IfChange(clidoc_subtool_manifest)
+/// Subtool manifest entry
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct SubToolManifestEntry {
+    pub(crate) category: String,
+    pub(crate) executable: PathBuf,
+    pub(crate) executable_metadata: PathBuf,
+    pub(crate) name: String,
+}
+// LINT.ThenChange(//src/developer/ffx/build/ffx_tool.gni:clidoc_subtool_manifest)
 
 pub(crate) fn write_formatted_output_for_ffx(
     cmd_path: &PathBuf,
@@ -17,6 +29,7 @@ pub(crate) fn write_formatted_output_for_ffx(
     sdk_root_path: &Option<PathBuf>,
     sdk_manifest_path: &Option<PathBuf>,
     isolate_dir_path: &Option<PathBuf>,
+    subtool_manifest_path: &Option<PathBuf>,
 ) -> Result<(String, String, PathBuf)> {
     // Get name of command from full path to the command executable.
     let cmd_name = cmd_path.file_name().expect("Could not get file name for command");
@@ -35,6 +48,12 @@ pub(crate) fn write_formatted_output_for_ffx(
             &format!("sdk.module={}", sdk_manifest.file_name().unwrap().to_string_lossy()),
         ]);
     }
+    if let Some(subtool_manifest) = subtool_manifest_path {
+        cmd.args([
+            "--config",
+            &format!("ffx.subtool-manifest={}", subtool_manifest.to_string_lossy()),
+        ]);
+    }
     if let Some(isolate_dir) = isolate_dir_path {
         cmd.args(["--isolate-dir", &isolate_dir.to_string_lossy()]);
     }
@@ -50,7 +69,10 @@ pub(crate) fn write_formatted_output_for_ffx(
             output.status.to_string(),
             String::from_utf8(output.stderr)?
         );
+    } else if !output.stderr.is_empty() {
+        tracing::info!("stderr for ffx is {}", String::from_utf8(output.stderr.clone())?);
     }
+
     let value: CliArgsInfo = serde_json::from_slice(&output.stdout)
         .or_else(|e| -> Result<CliArgsInfo> {
             panic!(
@@ -265,6 +287,18 @@ fn build_anchor(parent_cmd: &str, cmd: &str) -> String {
     } else {
         format!("{prefix}_{cmd}").replace(" ", "_")
     }
+}
+
+pub(crate) fn list_subtool_files(subtool_manifest: &PathBuf) -> Vec<PathBuf> {
+    let file = fs::File::open(subtool_manifest).expect("file should open");
+    let entries: Vec<SubToolManifestEntry> =
+        serde_json::from_reader(file).expect("manifest should be json");
+
+    entries
+        .iter()
+        .map(|item| vec![item.executable.clone(), item.executable_metadata.clone()])
+        .flatten()
+        .collect()
 }
 
 #[cfg(test)]

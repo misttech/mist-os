@@ -170,11 +170,13 @@ template("ffx_tool") {
 
   group(tool_list_metadata_target) {
     metadata = {
-      #
+      # LINT.IfChange(clidoc_subtool_manifest)
 
-      # TODO add ITTH for clidoc in the next CL.
+      # this is a comment to remember to change clidoc.
+      # nested IfThisThenThat are not allowed.
+      # nor multiple files in the then clause.
 
-      #
+      # LINT.ThenChange(//tools/clidoc/src/ffx_doc.rs:clidoc_subtool_manifest)
 
       # LINT.IfChange(subtool_manifest)
       ffx_tool = [

@@ -3,15 +3,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import argparse
 import os
 import sys
 import tarfile
-import unittest
 
-clidoc_tarfile = sys.argv.pop()
-
-want_names = [
+# These names are from the tools included in the SDK.
+# Excluding deprecated and internal tools.
+# Eventually, it could be integrated into the build
+# so the list is always updated.
+WANT_NAMES = [
     "clidoc",
+    "clidoc/_toc.yaml",
+    "clidoc/bindc.md",
     "clidoc/blobfs-compression.md",
     "clidoc/bootserver.md",
     "clidoc/cmc.md",
@@ -24,7 +28,6 @@ want_names = [
     "clidoc/fidlgen_hlcpp.md",
     "clidoc/fidlgen_rust.md",
     "clidoc/fpublish.md",
-    "clidoc/fremote.md",
     "clidoc/fserve.md",
     "clidoc/fssh.md",
     "clidoc/funnel.md",
@@ -36,61 +39,118 @@ want_names = [
     "clidoc/zxdb.md",
 ]
 
+# This is the list of subtools included in the SDK.
+# It should match the output of `ffx commands` when run
+# from the SDK. The list should not include in-tree only commands
+# since it makes the output dependent on which tools are built.
+WANT_FFX_SUBTOOLS = [
+    "agis",
+    "assembly",
+    "audio",
+    "component",
+    "config",
+    "coverage",
+    "daemon",
+    "debug",
+    "doctor",
+    "driver",
+    "emu",
+    "fuzz",
+    "inspect",
+    "log",
+    "net",
+    "package",
+    "platform",
+    "process",
+    "product",
+    "profile",
+    "repository",
+    "scrutiny",
+    "sdk",
+    "session",
+    "setui",
+    "starnix",
+    "target",
+    "test",
+    "trace",
+    "version",
+    "wlan",
+]
 
-class CliDocTest(unittest.TestCase):
-    """
-    Validate the clidoc contents
-    """
 
-    def test_tarball_exists(self) -> None:
-        tarball = clidoc_tarfile
-        parents = os.listdir(os.path.dirname(clidoc_tarfile))
-        parents += os.listdir(os.path.dirname(os.path.dirname(clidoc_tarfile)))
-        self.assertTrue(
-            os.path.exists(tarball), f"{tarball} does not exist in {parents}"
-        )
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Checks the contents of the clidoc tarball for correctness.",
+    )
+    parser.add_argument(
+        "--input",
+        type=str,
+        required=True,
+        help="Output location where generated docs should go",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        required=True,
+        help="Output location where the contents should be listed.",
+    )
 
-    def test_tarball_contents(self) -> None:
-        tarball = clidoc_tarfile
-        got_names = []
-        with tarfile.open(tarball, mode="r:gz") as tf:
-            got_names = [m.name for m in tf.getmembers()]
-        # sort to make it stable
-        got_names.sort()
-        self.assertEqual(got_names, want_names)
+    args = parser.parse_args()
 
-    def test_ffx_contents(self) -> None:
-        want_subcommands = [
-            "component",
-            "config",
-            "daemon",
-            "debug",
-            "doctor",
-            "emu",
-            "net",
-            "package",
-            "platform",
-            "product",
-            "repository",
-            "sdk",
-            "session",
-            "target",
-            "version",
-        ]
-        tarball = clidoc_tarfile
-        with tarfile.open(tarball, mode="r:gz") as tf:
-            ffx_member = tf.getmember("clidoc/ffx.md")
-            self.assertIsNotNone(ffx_member)
-            ffx_file = tf.extractfile(ffx_member)
-            contents = ffx_file.readlines() if ffx_file else []
-        # filter the H2 elements these are subcommands
-        subcommands_headings = [
-            l.decode() for l in contents if l.startswith(b"## ")
-        ]
-        got_subcommands = [h[3:].strip() for h in subcommands_headings]
-        got_subcommands.sort()
-        self.assertEqual(want_subcommands, got_subcommands)
+    if not os.path.exists(args.input):
+        raise ValueError(f"{args.input} does not exist.")
+
+    contents = check_clidoc_contents(args.input)
+    check_ffx_contents(args.input)
+
+    with open(args.output, "w") as f:
+        f.write(f"{contents}")
+
+    return 0
+
+
+def check_clidoc_contents(tarball: str) -> list[str]:
+    got_names = []
+    with tarfile.open(tarball, mode="r:gz") as tf:
+        got_names = [m.name for m in tf.getmembers()]
+    # sort to make it stable
+    got_names.sort()
+    want_names = set(WANT_NAMES)
+    for name in got_names:
+        # Remove name from the set. If name is unexpected, that's ok (maybe update want_names?).
+        if name in want_names:
+            want_names.remove(name)
+    if want_names:
+        raise ValueError(f"Missing files from clidoc tarball: {want_names}")
+    return got_names
+
+
+def check_ffx_contents(tarball: str) -> None:
+    want_subcommands = set(WANT_FFX_SUBTOOLS)
+
+    with tarfile.open(tarball, mode="r:gz") as tf:
+        ffx_member = tf.getmember("clidoc/ffx.md")
+        if not ffx_member:
+            raise ValueError("clidoc/ffx.md is missing from clidoc tarball.")
+        ffx_file = tf.extractfile(ffx_member)
+        contents = ffx_file.readlines() if ffx_file else []
+    # filter the H2 elements these are subcommands
+    subcommands_headings = [
+        l.decode() for l in contents if l.startswith(b"## ")
+    ]
+    got_subcommands = [h[3:].split()[0] for h in subcommands_headings]
+
+    for cmd in got_subcommands:
+        if cmd in want_subcommands:
+            want_subcommands.remove(cmd)
+
+    if want_subcommands:
+        want = list(want_subcommands)
+        want.sort()
+        got = list(got_subcommands)
+        got.sort()
+        raise ValueError(f"Missing ffx subcommands: {want} in {got}")
 
 
 if __name__ == "__main__":
-    unittest.main()
+    sys.exit(main())
