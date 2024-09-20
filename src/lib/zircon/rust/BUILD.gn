@@ -8,6 +8,7 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
 _common_sources = [
+  # keep-sorted start
   "src/bti.rs",
   "src/channel/io_slice.rs",
   "src/channel/message_buf.rs",
@@ -50,6 +51,8 @@ _common_sources = [
   "src/vmar.rs",
   "src/vmo.rs",
   "src/wait.rs",
+
+  # keep-sorted end
 ]
 _common_deps = [
   "//src/lib/zircon/rust/fuchsia-zircon-status",

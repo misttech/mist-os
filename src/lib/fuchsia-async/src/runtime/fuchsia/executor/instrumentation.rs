@@ -12,7 +12,7 @@
 
 use fuchsia_zircon as zx;
 use std::panic::Location;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
 use std::{cmp, mem};
 
 /// A low-overhead metrics collection type intended for use by an async executor.
@@ -25,8 +25,8 @@ pub struct Collector {
     wakeups_io: AtomicUsize,
     wakeups_deadline: AtomicUsize,
     wakeups_notification: AtomicUsize,
-    ticks_awake: AtomicU64,
-    ticks_asleep: AtomicU64,
+    ticks_awake: AtomicI64,
+    ticks_asleep: AtomicI64,
 }
 
 impl Collector {
@@ -64,7 +64,7 @@ impl Collector {
     pub fn create_local_collector(&self) -> LocalCollector<'_> {
         LocalCollector {
             collector: &self,
-            last_ticks: zx::ticks_get(),
+            last_ticks: zx::MonotonicTicks::get(),
             polls: 0,
             tasks_pending_max: 0, // Loading not necessary, handled by first update with same cost
         }
@@ -95,7 +95,7 @@ pub struct LocalCollector<'a> {
     collector: &'a Collector,
 
     /// Ticks since the awake state was last toggled
-    last_ticks: i64,
+    last_ticks: zx::MonotonicTicks,
 
     /// Number of polls since last `will_wait`
     polls: usize,
@@ -130,7 +130,7 @@ impl<'a> LocalCollector<'a> {
     /// Called before the loop waits. Must be followed by a `woke_up` call.
     pub fn will_wait(&mut self) {
         let delta = self.bump_ticks();
-        self.collector.ticks_awake.fetch_add(delta, Ordering::Relaxed);
+        self.collector.ticks_awake.fetch_add(delta.into_raw(), Ordering::Relaxed);
         self.collector.polls.fetch_add(mem::replace(&mut self.polls, 0), Ordering::Relaxed);
     }
 
@@ -144,17 +144,17 @@ impl<'a> LocalCollector<'a> {
             WakeupReason::Notification => &self.collector.wakeups_notification,
         };
         counter.fetch_add(1, Ordering::Relaxed);
-        self.collector.ticks_asleep.fetch_add(delta, Ordering::Relaxed);
+        self.collector.ticks_asleep.fetch_add(delta.into_raw(), Ordering::Relaxed);
     }
 
     /// Helper which replaces `last_ticks` with the current ticks.
     /// Returns the ticks elapsed since `last_ticks`.
-    fn bump_ticks(&mut self) -> u64 {
-        let current_ticks = zx::ticks_get();
+    fn bump_ticks(&mut self) -> zx::DurationTicks {
+        let current_ticks = zx::MonotonicTicks::get();
         let delta = current_ticks - self.last_ticks;
-        assert!(delta >= 0, "time moved backwards in zx::ticks_get()");
+        assert!(delta.into_raw() >= 0, "time moved backwards in zx::MonotonicTicks::get()");
         self.last_ticks = current_ticks;
-        delta as u64
+        delta
     }
 }
 
@@ -162,7 +162,7 @@ impl<'a> Drop for LocalCollector<'a> {
     fn drop(&mut self) {
         let delta = self.bump_ticks();
         self.collector.polls.fetch_add(self.polls, Ordering::Release);
-        self.collector.ticks_awake.fetch_add(delta, Ordering::Release);
+        self.collector.ticks_awake.fetch_add(delta.into_raw(), Ordering::Release);
     }
 }
 
@@ -190,8 +190,8 @@ pub struct Snapshot {
     pub wakeups_io: usize,
     pub wakeups_deadline: usize,
     pub wakeups_notification: usize,
-    pub ticks_awake: u64,
-    pub ticks_asleep: u64,
+    pub ticks_awake: i64,
+    pub ticks_asleep: i64,
 }
 
 #[cfg(test)]
@@ -211,13 +211,13 @@ mod tests {
     /// changes.
     struct Ticker<'a> {
         c: &'a Collector,
-        awake: u64,  // Last observed awake ticks
-        asleep: u64, // Last observed asleep ticks
+        awake: zx::MonotonicTicks,  // Last observed awake ticks
+        asleep: zx::MonotonicTicks, // Last observed asleep ticks
     }
 
     impl<'a> Ticker<'a> {
         fn new(c: &'a Collector) -> Self {
-            let result = Self { c, awake: 0, asleep: 0 };
+            let result = Self { c, awake: Default::default(), asleep: Default::default() };
             // Ensure that the next interaction with the collector that's supposed to accumulate
             // ticks will actually observe time having passed.
             sleep(1 * MICROSECOND);
@@ -228,10 +228,14 @@ mod tests {
         /// 2-tuple indicating whether awake and asleep time, respectively,
         /// progressed since last cycle.
         fn update(&mut self) -> (bool, bool) {
-            let old_awake =
-                mem::replace(&mut self.awake, self.c.ticks_awake.load(Ordering::Relaxed));
-            let old_asleep =
-                mem::replace(&mut self.asleep, self.c.ticks_asleep.load(Ordering::Relaxed));
+            let old_awake = mem::replace(
+                &mut self.awake,
+                zx::MonotonicTicks::from_raw(self.c.ticks_awake.load(Ordering::Relaxed)),
+            );
+            let old_asleep = mem::replace(
+                &mut self.asleep,
+                zx::MonotonicTicks::from_raw(self.c.ticks_asleep.load(Ordering::Relaxed)),
+            );
 
             // Ensure that the next interaction with the collector that's supposed to accumulate
             // ticks will actually observe time having passed.

@@ -10,50 +10,58 @@ use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 use std::hash::{Hash, Hasher};
 use std::{ops, time as stdtime};
 
-pub type MonotonicTime = Time<MonotonicTimeline>;
-pub type SyntheticTime = Time<SyntheticTimeline>;
+pub type MonotonicTime = Time<MonotonicTimeline, NsUnit>;
+pub type SyntheticTime = Time<SyntheticTimeline, NsUnit>;
+
+pub type Ticks<T> = Time<T, TicksUnit>;
+pub type MonotonicTicks = Time<MonotonicTimeline, TicksUnit>;
+pub type DurationTicks = Duration<TicksUnit>;
 
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct Time<T>(sys::zx_time_t, std::marker::PhantomData<T>);
+pub struct Time<T, U = NsUnit>(sys::zx_time_t, std::marker::PhantomData<(T, U)>);
 
-impl<T> Default for Time<T> {
+impl<T, U> Default for Time<T, U> {
     fn default() -> Self {
         Time(0, std::marker::PhantomData)
     }
 }
 
-impl<T> Hash for Time<T> {
+impl<T, U> Hash for Time<T, U> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl<T> PartialEq for Time<T> {
+impl<T, U> PartialEq for Time<T, U> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-impl<T> Eq for Time<T> {}
+impl<T, U> Eq for Time<T, U> {}
 
-impl<T> PartialOrd for Time<T> {
+impl<T, U> PartialOrd for Time<T, U> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
-impl<T> Ord for Time<T> {
+impl<T, U> Ord for Time<T, U> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
     }
 }
 
-impl<T> std::fmt::Debug for Time<T> {
+impl<T, U> std::fmt::Debug for Time<T, U> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Avoid line noise from the marker type but do include the timeline in the output.
         let timeline_name = std::any::type_name::<T>();
         let short_timeline_name =
             timeline_name.rsplit_once("::").map(|(_, n)| n).unwrap_or(timeline_name);
-        f.debug_tuple(&format!("Time<{short_timeline_name}>")).field(&self.0).finish()
+        let units_name = std::any::type_name::<U>();
+        let short_units_name = units_name.rsplit_once("::").map(|(_, n)| n).unwrap_or(units_name);
+        f.debug_tuple(&format!("Time<{short_timeline_name}, {short_units_name}>"))
+            .field(&self.0)
+            .finish()
     }
 }
 
@@ -89,140 +97,188 @@ impl MonotonicTime {
 }
 
 impl<T: Timeline> Time<T> {
-    pub const INFINITE: Time<T> = Time(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
-    pub const INFINITE_PAST: Time<T> = Time(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
-    pub const ZERO: Time<T> = Time(0, std::marker::PhantomData);
+    pub const INFINITE: Time<T, NsUnit> = Time(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
+    pub const INFINITE_PAST: Time<T, NsUnit> =
+        Time(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
+    pub const ZERO: Time<T, NsUnit> = Time(0, std::marker::PhantomData);
 
     /// Returns the number of nanoseconds since the epoch contained by this `Time`.
     pub const fn into_nanos(self) -> i64 {
         self.0
     }
 
+    /// Return a strongly-typed `Time` from a raw number of nanoseconds.
     pub const fn from_nanos(nanos: i64) -> Self {
         Time(nanos, std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::Add<Duration> for Time<T> {
-    type Output = Time<T>;
-    fn add(self, dur: Duration) -> Self::Output {
-        Time::from_nanos(dur.into_nanos().saturating_add(self.into_nanos()))
+impl MonotonicTicks {
+    /// Read the number of high-precision timer ticks on the monotonic timeline. These ticks may be
+    /// processor cycles, high speed timer, profiling timer, etc. They do not advance while the
+    /// system is suspended.
+    ///
+    /// Wraps the
+    /// [zx_ticks_get](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_get.md)
+    /// syscall.
+    pub fn get() -> Self {
+        // SAFETY: FFI call that is always sound to call.
+        Self(unsafe { sys::zx_ticks_get() }, std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::Sub<Duration> for Time<T> {
-    type Output = Time<T>;
-    fn sub(self, dur: Duration) -> Self::Output {
-        Time::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
+impl<T: Timeline> Ticks<T> {
+    /// Return the number of ticks contained by this `Ticks`.
+    pub const fn into_raw(self) -> i64 {
+        self.0
+    }
+
+    /// Return a strongly-typed `Ticks` from a raw number of system ticks.
+    pub const fn from_raw(raw: i64) -> Self {
+        Self(raw, std::marker::PhantomData)
+    }
+
+    /// Return the number of high-precision timer ticks in a second.
+    ///
+    /// Wraps the
+    /// [zx_ticks_per_second](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_per_second.md)
+    /// syscall.
+    pub fn per_second() -> i64 {
+        // SAFETY: FFI call that is always sound to call.
+        unsafe { sys::zx_ticks_per_second() }
     }
 }
 
-impl<T: Timeline> ops::Sub<Time<T>> for Time<T> {
-    type Output = Duration;
-    fn sub(self, other: Time<T>) -> Self::Output {
-        Duration::from_nanos(self.into_nanos().saturating_sub(other.into_nanos()))
+impl<T: Timeline, U: TimeUnit> ops::Add<Duration<U>> for Time<T, U> {
+    type Output = Time<T, U>;
+    fn add(self, dur: Duration<U>) -> Self::Output {
+        Self(self.0.saturating_add(dur.0), std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::AddAssign<Duration> for Time<T> {
-    fn add_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_add(dur.into_nanos());
+impl<T: Timeline, U: TimeUnit> ops::Sub<Duration<U>> for Time<T, U> {
+    type Output = Time<T, U>;
+    fn sub(self, dur: Duration<U>) -> Self::Output {
+        Self(self.0.saturating_sub(dur.0), std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::SubAssign<Duration> for Time<T> {
-    fn sub_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_sub(dur.into_nanos());
+impl<T: Timeline, U: TimeUnit> ops::Sub<Time<T, U>> for Time<T, U> {
+    type Output = Duration<U>;
+    fn sub(self, rhs: Time<T, U>) -> Self::Output {
+        Duration(self.0.saturating_sub(rhs.0), std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline, U: TimeUnit> ops::AddAssign<Duration<U>> for Time<T, U> {
+    fn add_assign(&mut self, dur: Duration<U>) {
+        self.0 = self.0.saturating_add(dur.0);
+    }
+}
+
+impl<T: Timeline, U: TimeUnit> ops::SubAssign<Duration<U>> for Time<T, U> {
+    fn sub_assign(&mut self, dur: Duration<U>) {
+        self.0 = self.0.saturating_sub(dur.0);
     }
 }
 
 /// A marker trait for times to prevent accidental comparison between different timelines.
 pub trait Timeline {}
 
+/// A marker type representing the monotonic timeline which is able to pause during system
+/// suspension.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonotonicTimeline;
 impl Timeline for MonotonicTimeline {}
 
+/// A marker type representing a synthetic timeline defined by a kernel clock object.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SyntheticTimeline;
 impl Timeline for SyntheticTimeline {}
 
+/// A marker trait for times and durations to prevent accidental comparison between different units.
+pub trait TimeUnit {}
+
+/// A marker type representing nanoseconds.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct NsUnit;
+impl TimeUnit for NsUnit {}
+
+/// A marker type representing system ticks.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct TicksUnit;
+impl TimeUnit for TicksUnit {}
+
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Duration(sys::zx_duration_t);
+pub struct Duration<U = NsUnit>(sys::zx_duration_t, std::marker::PhantomData<U>);
 
-impl From<stdtime::Duration> for Duration {
+impl From<stdtime::Duration> for Duration<NsUnit> {
     fn from(dur: stdtime::Duration) -> Self {
         Duration::from_seconds(dur.as_secs() as i64)
             + Duration::from_nanos(dur.subsec_nanos() as i64)
     }
 }
 
-impl<T: Timeline> ops::Add<Time<T>> for Duration {
-    type Output = Time<T>;
-    fn add(self, time: Time<T>) -> Self::Output {
-        Time::from_nanos(self.into_nanos().saturating_add(time.into_nanos()))
+impl<T: Timeline, U: TimeUnit> ops::Add<Time<T, U>> for Duration<U> {
+    type Output = Time<T, U>;
+    fn add(self, time: Time<T, U>) -> Self::Output {
+        Time(self.0.saturating_add(time.0), std::marker::PhantomData)
     }
 }
 
-impl ops::Add for Duration {
-    type Output = Duration;
-    fn add(self, dur: Duration) -> Duration {
-        Duration::from_nanos(self.into_nanos().saturating_add(dur.into_nanos()))
+impl<U: TimeUnit> ops::Add for Duration<U> {
+    type Output = Duration<U>;
+    fn add(self, rhs: Duration<U>) -> Self::Output {
+        Self(self.0.saturating_add(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl ops::Sub for Duration {
-    type Output = Duration;
-    fn sub(self, dur: Duration) -> Duration {
-        Duration::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
+impl<U: TimeUnit> ops::Sub for Duration<U> {
+    type Output = Duration<U>;
+    fn sub(self, rhs: Duration<U>) -> Duration<U> {
+        Self(self.0.saturating_sub(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl ops::AddAssign for Duration {
-    fn add_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_add(dur.into_nanos());
+impl<U: TimeUnit> ops::AddAssign for Duration<U> {
+    fn add_assign(&mut self, rhs: Duration<U>) {
+        self.0 = self.0.saturating_add(rhs.0);
     }
 }
 
-impl ops::SubAssign for Duration {
-    fn sub_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_sub(dur.into_nanos());
+impl<U: TimeUnit> ops::SubAssign for Duration<U> {
+    fn sub_assign(&mut self, rhs: Duration<U>) {
+        self.0 = self.0.saturating_sub(rhs.0);
     }
 }
 
-impl<T> ops::Mul<T> for Duration
-where
-    T: Into<i64>,
-{
+impl<T: Into<i64>, U: TimeUnit> ops::Mul<T> for Duration<U> {
     type Output = Self;
     fn mul(self, mul: T) -> Self {
-        Duration::from_nanos(self.0.saturating_mul(mul.into()))
+        Self(self.0.saturating_mul(mul.into()), std::marker::PhantomData)
     }
 }
 
-impl<T> ops::Div<T> for Duration
-where
-    T: Into<i64>,
-{
+impl<T: Into<i64>, U: TimeUnit> ops::Div<T> for Duration<U> {
     type Output = Self;
     fn div(self, div: T) -> Self {
-        Duration::from_nanos(self.0.saturating_div(div.into()))
+        Self(self.0.saturating_div(div.into()), std::marker::PhantomData)
     }
 }
 
-impl ops::Neg for Duration {
+impl<U: TimeUnit> ops::Neg for Duration<U> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self(self.0.saturating_neg())
+        Self(self.0.saturating_neg(), std::marker::PhantomData)
     }
 }
 
-impl Duration {
-    pub const INFINITE: Duration = Duration(sys::zx_duration_t::MAX);
-    pub const INFINITE_PAST: Duration = Duration(sys::zx_duration_t::MIN);
-    pub const ZERO: Duration = Duration(0);
+impl Duration<NsUnit> {
+    pub const INFINITE: Duration = Duration(sys::zx_duration_t::MAX, std::marker::PhantomData);
+    pub const INFINITE_PAST: Duration = Duration(sys::zx_duration_t::MIN, std::marker::PhantomData);
+    pub const ZERO: Duration = Duration(0, std::marker::PhantomData);
 
     /// Sleep for the given amount of time.
     pub fn sleep(self) {
@@ -265,11 +321,11 @@ impl Duration {
     }
 
     pub const fn from_nanos(nanos: i64) -> Self {
-        Duration(nanos)
+        Duration(nanos, std::marker::PhantomData)
     }
 
     pub const fn from_micros(micros: i64) -> Self {
-        Duration(micros.saturating_mul(1_000))
+        Duration(micros.saturating_mul(1_000), std::marker::PhantomData)
     }
 
     pub const fn from_millis(millis: i64) -> Self {
@@ -289,28 +345,40 @@ impl Duration {
     }
 }
 
+impl Duration<TicksUnit> {
+    /// Return the raw number of ticks represented by this `Duration`.
+    pub const fn into_raw(self) -> i64 {
+        self.0
+    }
+
+    /// Return a typed wrapper around the provided number of ticks.
+    pub const fn from_raw(raw: i64) -> Self {
+        Self(raw, std::marker::PhantomData)
+    }
+}
+
 pub trait DurationNum: Sized {
-    fn nanos(self) -> Duration;
-    fn micros(self) -> Duration;
-    fn millis(self) -> Duration;
-    fn seconds(self) -> Duration;
-    fn minutes(self) -> Duration;
-    fn hours(self) -> Duration;
+    fn nanos(self) -> Duration<NsUnit>;
+    fn micros(self) -> Duration<NsUnit>;
+    fn millis(self) -> Duration<NsUnit>;
+    fn seconds(self) -> Duration<NsUnit>;
+    fn minutes(self) -> Duration<NsUnit>;
+    fn hours(self) -> Duration<NsUnit>;
 
     // Singular versions to allow for `1.milli()` and `1.second()`, etc.
-    fn micro(self) -> Duration {
+    fn micro(self) -> Duration<NsUnit> {
         self.micros()
     }
-    fn milli(self) -> Duration {
+    fn milli(self) -> Duration<NsUnit> {
         self.millis()
     }
-    fn second(self) -> Duration {
+    fn second(self) -> Duration<NsUnit> {
         self.seconds()
     }
-    fn minute(self) -> Duration {
+    fn minute(self) -> Duration<NsUnit> {
         self.minutes()
     }
-    fn hour(self) -> Duration {
+    fn hour(self) -> Duration<NsUnit> {
         self.hours()
     }
 }
@@ -318,49 +386,29 @@ pub trait DurationNum: Sized {
 // Note: this could be implemented for other unsized integer types, but it doesn't seem
 // necessary to support the usual case.
 impl DurationNum for i64 {
-    fn nanos(self) -> Duration {
+    fn nanos(self) -> Duration<NsUnit> {
         Duration::from_nanos(self)
     }
 
-    fn micros(self) -> Duration {
+    fn micros(self) -> Duration<NsUnit> {
         Duration::from_micros(self)
     }
 
-    fn millis(self) -> Duration {
+    fn millis(self) -> Duration<NsUnit> {
         Duration::from_millis(self)
     }
 
-    fn seconds(self) -> Duration {
+    fn seconds(self) -> Duration<NsUnit> {
         Duration::from_seconds(self)
     }
 
-    fn minutes(self) -> Duration {
+    fn minutes(self) -> Duration<NsUnit> {
         Duration::from_minutes(self)
     }
 
-    fn hours(self) -> Duration {
+    fn hours(self) -> Duration<NsUnit> {
         Duration::from_hours(self)
     }
-}
-
-/// Read the number of high-precision timer ticks since boot. These ticks may be processor cycles,
-/// high speed timer, profiling timer, etc. They are not guaranteed to continue advancing when the
-/// system is asleep.
-///
-/// Wraps the
-/// [zx_ticks_get](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_get.md)
-/// syscall.
-pub fn ticks_get() -> i64 {
-    unsafe { sys::zx_ticks_get() }
-}
-
-/// Return the number of high-precision timer ticks in a second.
-///
-/// Wraps the
-/// [zx_ticks_per_second](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_per_second.md)
-/// syscall.
-pub fn ticks_per_second() -> i64 {
-    unsafe { sys::zx_ticks_per_second() }
 }
 
 /// An object representing a Zircon timer, such as the one returned by
@@ -396,7 +444,7 @@ impl Timer {
     /// Start a one-shot timer that will fire when `deadline` passes. Wraps the
     /// [zx_timer_set](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_set.md)
     /// syscall.
-    pub fn set(&self, deadline: MonotonicTime, slack: Duration) -> Result<(), Status> {
+    pub fn set(&self, deadline: MonotonicTime, slack: Duration<NsUnit>) -> Result<(), Status> {
         let status = unsafe {
             sys::zx_timer_set(self.raw_handle(), deadline.into_nanos(), slack.into_nanos())
         };
@@ -419,8 +467,14 @@ mod tests {
 
     #[test]
     fn time_debug_repr_is_short() {
-        assert_eq!(format!("{:?}", MonotonicTime::from_nanos(0)), "Time<MonotonicTimeline>(0)");
-        assert_eq!(format!("{:?}", SyntheticTime::from_nanos(0)), "Time<SyntheticTimeline>(0)");
+        assert_eq!(
+            format!("{:?}", MonotonicTime::from_nanos(0)),
+            "Time<MonotonicTimeline, NsUnit>(0)"
+        );
+        assert_eq!(
+            format!("{:?}", SyntheticTime::from_nanos(0)),
+            "Time<SyntheticTimeline, NsUnit>(0)"
+        );
     }
 
     #[test]
@@ -433,21 +487,23 @@ mod tests {
 
     #[test]
     fn ticks_increases() {
-        let ticks1 = ticks_get();
+        let ticks1 = MonotonicTicks::get();
         1_000.nanos().sleep();
-        let ticks2 = ticks_get();
+        let ticks2 = MonotonicTicks::get();
         assert!(ticks2 > ticks1);
     }
 
     #[test]
     fn tick_length() {
         let sleep_time = 1.milli();
-        let ticks1 = ticks_get();
+        let ticks1 = MonotonicTicks::get();
         sleep_time.sleep();
-        let ticks2 = ticks_get();
+        let ticks2 = MonotonicTicks::get();
 
         // The number of ticks should have increased by at least 1 ms worth
-        let sleep_ticks = (sleep_time.into_millis() as i64) * ticks_per_second() / 1000;
+        let sleep_ticks = DurationTicks::from_raw(
+            sleep_time.into_millis() * (MonotonicTicks::per_second() / 1000),
+        );
         assert!(ticks2 >= (ticks1 + sleep_ticks));
     }
 

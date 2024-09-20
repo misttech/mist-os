@@ -368,14 +368,14 @@ pub struct DurationScope<'a> {
     category: &'static CStr,
     name: &'static CStr,
     args: &'a [Arg<'a>],
-    start_time: sys::trace_ticks_t,
+    start_time: zx::MonotonicTicks,
 }
 
 impl<'a> DurationScope<'a> {
     /// Starts a new duration scope that starts now and will be end'ed when
     /// this object is dropped.
     pub fn begin(category: &'static CStr, name: &'static CStr, args: &'a [Arg<'_>]) -> Self {
-        let start_time = zx::ticks_get();
+        let start_time = zx::MonotonicTicks::get();
         Self { category, name, args, start_time }
     }
 }
@@ -393,7 +393,7 @@ impl<'a> Drop for DurationScope<'a> {
 pub fn complete_duration(
     category: &'static CStr,
     name: &'static CStr,
-    start_time: sys::trace_ticks_t,
+    start_time: zx::MonotonicTicks,
     args: &[Arg<'_>],
 ) {
     if let Some(context) = TraceCategoryContext::acquire(category) {
@@ -1045,12 +1045,12 @@ impl TraceCategoryContext {
 
     #[inline]
     pub fn write_instant(&self, name_ref: sys::trace_string_ref_t, scope: Scope, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_instant_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1067,12 +1067,12 @@ impl TraceCategoryContext {
     }
 
     fn write_counter(&self, name_ref: sys::trace_string_ref_t, counter_id: u64, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_counter_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1091,16 +1091,16 @@ impl TraceCategoryContext {
     fn write_duration(
         &self,
         name_ref: sys::trace_string_ref_t,
-        start_time: sys::trace_ticks_t,
+        start_time: zx::MonotonicTicks,
         args: &[Arg<'_>],
     ) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_duration_event_record(
                 self.raw,
-                start_time,
-                ticks,
+                start_time.into_raw(),
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1113,7 +1113,7 @@ impl TraceCategoryContext {
     pub fn write_duration_with_inline_name(
         &self,
         name: &str,
-        start_time: sys::trace_ticks_t,
+        start_time: zx::MonotonicTicks,
         args: &[Arg<'_>],
     ) {
         let name_ref = trace_make_inline_string_ref(name);
@@ -1121,12 +1121,12 @@ impl TraceCategoryContext {
     }
 
     fn write_duration_begin(&self, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_duration_begin_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1142,12 +1142,12 @@ impl TraceCategoryContext {
     }
 
     fn write_duration_end(&self, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_duration_end_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1163,12 +1163,12 @@ impl TraceCategoryContext {
     }
 
     fn write_async_begin(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_async_begin_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1185,12 +1185,12 @@ impl TraceCategoryContext {
     }
 
     fn write_async_end(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_async_end_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1207,12 +1207,12 @@ impl TraceCategoryContext {
     }
 
     fn write_async_instant(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_async_instant_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1224,12 +1224,12 @@ impl TraceCategoryContext {
     }
 
     fn write_blob(&self, name_ref: sys::trace_string_ref_t, bytes: &[u8], args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_blob_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1242,12 +1242,12 @@ impl TraceCategoryContext {
     }
 
     fn write_flow_begin(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_flow_begin_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1259,12 +1259,12 @@ impl TraceCategoryContext {
     }
 
     fn write_flow_end(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_flow_end_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1276,12 +1276,12 @@ impl TraceCategoryContext {
     }
 
     fn write_flow_step(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
-        let ticks = zx::ticks_get();
+        let ticks = zx::MonotonicTicks::get();
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_flow_step_event_record(
                 self.raw,
-                ticks,
+                ticks.into_raw(),
                 &thread_ref,
                 &self.category_ref,
                 &name_ref,
@@ -1929,7 +1929,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
     fn trace_create(&mut self, context: TraceCategoryContext) {
         let name_ref = context.register_string_literal(self.name);
         let flow_id = self.flow_id.get_or_insert_with(Id::new);
-        let duration_start = zx::ticks_get();
+        let duration_start = zx::MonotonicTicks::get();
         context.write_flow_begin(name_ref, *flow_id, &[]);
         self.args.push(ArgValue::of("state", "created"));
         context.write_duration(name_ref, duration_start, &self.args);
@@ -1945,7 +1945,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let this = self.project();
         let name_ref = context.register_string_literal(this.name);
         let flow_id = this.flow_id.get_or_insert_with(Id::new);
-        let duration_start = zx::ticks_get();
+        let duration_start = zx::MonotonicTicks::get();
         context.write_flow_step(name_ref, *flow_id, &[]);
         let result = this.future.poll(cx);
         let result_str: &'static str = if result.is_pending() { "pending" } else { "ready" };
@@ -1960,7 +1960,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let this = self.project();
         let name_ref = context.register_string_literal(this.name);
         let flow_id = this.flow_id.get_or_insert_with(Id::new);
-        let duration_start = zx::ticks_get();
+        let duration_start = zx::MonotonicTicks::get();
         context.write_flow_end(name_ref, *flow_id, &[]);
         this.args.push(ArgValue::of("state", "dropped"));
         context.write_duration(name_ref, duration_start, &this.args);
