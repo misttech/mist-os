@@ -132,6 +132,9 @@ import("//build/testing/host_test_data.gni")
 #   enable_banjo (optional flag, default to false)
 #     Set to true to enable Banjo bindings for this library.
 #
+#   enable_rust_next (optional flag, default to false)
+#     Set to true to enable next-generation Rust bindings for this library
+#
 #   enable_zither (optional flag, default to false)
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
@@ -181,12 +184,15 @@ template("fidl") {
   # These bindings are not:
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
   enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
+  enable_rust_next =
+      defined(invoker.enable_rust_next) && invoker.enable_rust_next
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
 
   not_needed([
                "enable_bindlib",
                "enable_cpp",
                "enable_rust",
+               "enable_rust_next",
                "enable_banjo",
                "enable_hlcpp",
                "enable_zither",
@@ -444,6 +450,30 @@ template("fidl") {
           deps += [ "//sdk:marker-${marker_category}" ]
         }
         fidl_gen_dir += "/rust"
+      }
+    } else {
+      not_needed(invoker, [ "disable_rustdoc" ])
+    }
+
+    if (enable_rust_next &&
+        (is_fidl_toolchain || toolchain_variant.supports_rust)) {
+      # Only import the fidl_rust_next() template if in a rust-capable toolchain and
+      # rust bindings are to be defined.
+      import("//build/rust/fidl_rust_next.gni")
+
+      # Define the Rust bindings.
+      fidl_rust_next("${target_name}_rust_next") {
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                                 "disable_rustdoc",
+                               ])
+        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        deps = []
+        fidl_gen_dir += "/rust_next"
       }
     } else {
       not_needed(invoker, [ "disable_rustdoc" ])
