@@ -120,6 +120,7 @@ pub struct SuspendResumeManagerInner {
     /// The currently active wake locks in the system. If non-empty, this prevents
     /// the container from suspending.
     active_locks: HashSet<String>,
+    inactive_locks: HashSet<String>,
 
     /// The currently active EPOLLWAKEUPs in the system. If non-empty, this prevents
     /// the container from suspending.
@@ -151,6 +152,7 @@ impl Default for SuspendResumeManagerInner {
             lease_control_channel: Default::default(),
             suspend_waiter: Default::default(),
             active_locks: Default::default(),
+            inactive_locks: Default::default(),
             active_epolls: Default::default(),
             active_lock_reader,
             active_lock_writer,
@@ -302,17 +304,24 @@ impl SuspendResumeManager {
     }
 
     /// Adds a wake lock `name` to the active wake locks.
-    pub fn add_lock(&self, name: String) {
+    pub fn add_lock(&self, name: &str) -> bool {
         let mut state = self.lock();
-        state.active_locks.insert(name);
+        let res = state.active_locks.insert(String::from(name));
         state.signal_wake_events();
+        res
     }
 
     /// Removes a wake lock `name` from the active wake locks.
-    pub fn remove_lock(&self, name: &str) {
+    pub fn remove_lock(&self, name: &str) -> bool {
         let mut state = self.lock();
-        state.active_locks.remove(name);
+        let res = state.active_locks.remove(name);
+        if !res {
+            return false;
+        }
+
+        state.inactive_locks.insert(String::from(name));
         state.signal_wake_events();
+        res
     }
 
     /// Adds a wake lock `key` to the active epoll wake locks.
@@ -327,6 +336,14 @@ impl SuspendResumeManager {
         let mut state = self.lock();
         state.active_epolls.remove(&key);
         state.signal_wake_events();
+    }
+
+    pub fn active_wake_locks(&self) -> Vec<String> {
+        Vec::from_iter(self.lock().active_locks.clone())
+    }
+
+    pub fn inactive_wake_locks(&self) -> Vec<String> {
+        Vec::from_iter(self.lock().inactive_locks.clone())
     }
 
     /// Returns a duplicate handle to the `EventPair` that is signaled when wake

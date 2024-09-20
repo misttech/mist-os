@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::power::{PowerStateFile, PowerSyncOnSuspendFile, PowerWakeupCountFile};
+use crate::power::{
+    PowerStateFile, PowerSyncOnSuspendFile, PowerWakeLockFile, PowerWakeUnlockFile,
+    PowerWakeupCountFile,
+};
 use crate::task::CurrentTask;
-use crate::vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile};
-use starnix_logging::bug_ref;
+use crate::vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder};
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
@@ -18,23 +20,12 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             PowerWakeupCountFile::new_node(),
             mode!(IFREG, 0o644),
         );
-        dir.entry(
-            current_task,
-            "wake_lock",
-            StubEmptyFile::new_node(
-                "/sys/power/wake_lock",
-                bug_ref!("https://fxbug.dev/322893982"),
-            ),
-            mode!(IFREG, 0o644),
-        );
+        dir.entry(current_task, "wake_lock", PowerWakeLockFile::new_node(), mode!(IFREG, 0o660));
         dir.entry(
             current_task,
             "wake_unlock",
-            StubEmptyFile::new_node(
-                "/sys/power/wake_unlock",
-                bug_ref!("https://fxbug.dev/322894043"),
-            ),
-            mode!(IFREG, 0o644),
+            PowerWakeUnlockFile::new_node(),
+            mode!(IFREG, 0o660),
         );
         dir.entry(current_task, "state", PowerStateFile::new_node(), mode!(IFREG, 0o644));
         dir.entry(
