@@ -34,7 +34,6 @@ import("config.gni")
 #   category
 #     Describes the availability of the element.
 #     Possible values, from most restrictive to least restrictive:
-#       - excluded         : the atom may not be included in SDKs;
 #       - experimental     : the atom is available with no quality guarantee;
 #       - internal         : the atom is exposed in-tree to the Bazel SDK build via `@internal_sdk`.
 #       - cts              : Currently unsupported - See https://fxbug.dev/367760026.
@@ -155,7 +154,7 @@ template("sdk_atom") {
   category = invoker.category
 
   _allowed_categories = [
-    "excluded",
+    # "excluded" is deprecated.
     "experimental",
     "internal",
     "cts",

@@ -10,7 +10,7 @@ sdk_atom("sdk_atom_unittest") {
   testonly = true
 
   id = "sdk://pkg/sdk_atom_unittest"
-  category = "excluded"
+  category = "partner_internal"
   files = [
     {
       source = "empty_file"
@@ -29,7 +29,7 @@ sdk_atom("sdk_atom_unittest") {
 sdk_collection("sdk_collection_unittest") {
   testonly = true
 
-  category = "excluded"
+  category = "partner_internal"
   deps = [ ":sdk_atom_unittest" ]
 }
 

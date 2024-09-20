@@ -104,7 +104,7 @@ when and how FIDL APIs change. The SDK category mechanism determines the
 SDK categories have been implemented in the [`sdk_atom`](/docs/glossary#sdk-atom) GN Rule.
 Each SDK Atom has an `category` parameter with one of the following values:
 
-- `excluded`: the Atom may not be included in SDKs;
+- `excluded`: deprecated
 - `experimental`: (this SDK category does not make much sense);
 - `internal`: supported for use within the Fuchsia platform source tree;
 - `cts`: supported for use in the Compatibility Tests for Fuchsia (not yet supported)

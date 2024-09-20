@@ -54,6 +54,7 @@ class SdkCommonTests(unittest.TestCase):
         )
 
     def test_unsupported_categories(self) -> None:
+        # Documented categories that are temporarily disabled.
         atoms = [_atom("hello", "internal"), _atom("world", "public")]
         self.assertRaisesRegex(
             Exception,
@@ -67,10 +68,20 @@ class SdkCommonTests(unittest.TestCase):
             lambda: [*detect_category_violations("internal", atoms)],
         )
 
+        # Documented categories that are no longer supported.
+        atoms = [_atom("hello", "partner"), _atom("world", "excluded")]
+        self.assertRaisesRegex(
+            Exception,
+            'Unknown SDK category "excluded"',
+            lambda: [*detect_category_violations("internal", atoms)],
+        )
+
     def test_category_name_bogus(self) -> None:
         atoms = [_atom("hello", "foobarnotgood"), _atom("world", "public")]
-        self.assertRaises(
-            Exception, lambda: [*detect_category_violations("partner", atoms)]
+        self.assertRaisesRegex(
+            Exception,
+            'Unknown SDK category "foobarnotgood"',
+            lambda: [*detect_category_violations("partner", atoms)],
         )
 
     def test_area_name(self) -> None:

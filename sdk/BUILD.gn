@@ -566,7 +566,7 @@ sdk_collection("zircon_sysroot") {
   # `$OUTPUT_DIR/sdk/exported/zircon_sysroot/` to be populated,
   # TODO(https://fxbug.dev/331962496): Find a solution that doesn't depend on
   # sdk_* templates.
-  category = "excluded"
+  category = "internal"
 
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
 }
@@ -978,7 +978,7 @@ if (is_host) {
     # collection is not included in any SDK.
     # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
     # sdk_* templates.
-    category = "excluded"
+    category = "internal"
 
     id = sdk_id
 
