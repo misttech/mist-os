@@ -1,35 +1,5 @@
 {
     "metrics": [
-        // TODO(https://fxbug.dev/42071858): move to audio-drivers.json
-        {
-            "event_codes": [],
-            "metric_id": 1,
-            "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/tas27xx:seconds_until_error",
-            "project_id": 14
-        },
-        {
-            "event_codes": [],
-            "metric_id": 2,
-            "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/tas27xx:seconds_until_interrupt",
-            "project_id": 14
-        },
-        {
-            "event_codes": [],
-            "metric_id": 3,
-            "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/tas27xx:seconds_until_first_error",
-            "project_id": 14
-        },
-        {
-            "event_codes": [],
-            "metric_id": 4,
-            "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/tas27xx:resets_count",
-            "project_id": 14
-        },
-
         // TODO(https://fxbug.dev/42071858): move to connectivity-wlan.json
         {
             "event_codes": [],
