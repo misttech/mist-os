@@ -11,6 +11,23 @@ set -euE -o pipefail
 # RBE that will error out if run in a sub-namespace.
 ENTER_ISOLATED_NAMESPACE="false"
 
+function usage() {
+  echo "Usage: $0 subcommand [args]"
+  echo ""
+  echo "The following subcommands are supported:"
+  echo "* checkout <name>: Create a new checkout in checkouts/<name> from snapshots/update.success"
+  echo "* cleanup: Inspects the contents of checkouts, prints out a command line to remove old ones"
+  echo "* enter <name>: Create an isolated shell environment to work in"
+  echo "* mount <name>: Bind-mounts checkouts/<name> on MOUNTPOINT without isolation"
+  echo "* pack: Commits pending changes, and then stores the result in a git branch."
+  echo "* rebase <name>: Rebases a checkout on a new snapshot."
+  echo "* status: Summarises the latest state of nightly builds and the snapshots."
+  echo "* sync_and_build: Syncs the clean checkout to HEAD for all repositories and rebuild."
+  echo "* update: Updates the snapshot at snapshots/update.success and performs an fx ota".
+  exit 1
+}
+
+
 function swap() {
   local -r file1=$1
   local -r file2=$2
@@ -81,6 +98,9 @@ function cmd_sync_and_build_here() {
 }
 
 function cmd_checkout() {
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   local -r branch="$1"
   local mode="$DEFAULT_CHECKOUT_MODE"
   if [ $# -eq 2 ]; then
@@ -140,6 +160,9 @@ function cmd_checkout() {
 }
 
 function cmd_mount() {
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   local -r branch="$1"
 
   unmount_repo
@@ -180,6 +203,9 @@ function unmount_repo() {
 ## rebase
 
 function cmd_rebase() {
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   local -r checkout_name="$1"
   local checkout
   checkout="$(dirname "$(lookup_checkout "$checkout_name")"/fakefile)"
@@ -470,6 +496,9 @@ function cmd_cleanup() {
 }
 
 function cmd_enter() {
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   local -r checkout_name="$1"
   shift
   local checkout
@@ -630,9 +659,11 @@ function cmd_status() {
 }
 
 function main() {
+  if [ "$#" -lt 1 ]; then
+    usage
+  fi
   local -r subcommand="$1"
   shift
-
 
   if [ "$subcommand" != "sync_and_build_here" ]; then
     # note: cmd_sync_and_build_here isn't called from the workdir (and therefore
