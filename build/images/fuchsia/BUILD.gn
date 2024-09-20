@@ -51,30 +51,6 @@ if (is_fuchsia) {
   # Shared parameters across assemblies in this file
   ##################################################
 
-  # A scope of dependencies that serves to transition deps from the
-  # legacy_assembly_input_bundle.gni mechanism to the new platform
-  # assembly_input_bundle.gni.
-  #
-  # This is used to do a metadata walk on the list of dependencies we intend to
-  # delete from the legacy AIB after a successful transition, because the
-  # assembly_input_bundle.gni template does not use a metadata walk to gather
-  # transitive dependencies, and thus the set of declared targets in the
-  # assembly_input_bundle invocation will often contain more explicit targets
-  # than those being removed from the legacy_assembly_input_bundle invocation.
-  # This makes it otherwise difficult to validate that the list of resultant
-  # dependencies in the build does not change.
-
-  must_exist = {
-    base_packages = []
-    cache_packages = []
-    bootfs_labels = []
-    bootfs_package_labels = []
-    extra_base_deps = []
-    boot_args = []
-    cmdline = []
-    cmdline_deps = []
-  }
-
   fuchsia_base = {
     testonly = fuchsia_zbi_testonly
     check_production_tag = check_production_eligibility
@@ -169,7 +145,6 @@ if (is_fuchsia) {
     create_legacy_aib_archive = create_legacy_aib_archive
 
     image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
-    must_exist_deps = must_exist
     include_assembly_inputs = true
   }
 
