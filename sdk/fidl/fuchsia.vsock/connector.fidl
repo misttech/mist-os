@@ -66,6 +66,7 @@ closed protocol Connector {
     /// by the server when there a connection ready to accept.
     strict Listen2(struct {
         local_port uint32;
+        remote_cid uint32;
         /// The maximum length to which the queue of pending connections waiting to
         /// be accepted.
         backlog uint32;

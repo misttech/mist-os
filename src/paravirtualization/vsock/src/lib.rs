@@ -15,7 +15,7 @@ mod tests {
     use super::*;
     use fidl::endpoints::{self, Proxy};
     use fidl_fuchsia_hardware_vsock::{
-        CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream,
+        CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream, VMADDR_CID_HOST,
     };
     use fidl_fuchsia_vsock::{
         AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
@@ -141,17 +141,22 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn basic_listen2() -> Result<(), anyhow::Error> {
         let (mut driver, service) = common_setup().await?;
-
         let app_client = make_client(&service)?;
 
         // Should reject listening at the ephemeral port ranges.
-        assert_eq!(app_client.listen2(49152, 1).await?, Err(zx::sys::ZX_ERR_UNAVAILABLE));
+        assert_eq!(
+            app_client.listen2(49152, VMADDR_CID_HOST, 1).await?,
+            Err(zx::sys::ZX_ERR_UNAVAILABLE)
+        );
 
         // Listen on a reasonable value.
-        assert_eq!(app_client.listen2(8000, 1).await?, Ok(()));
+        assert_eq!(app_client.listen2(8000, VMADDR_CID_HOST, 1).await?, Ok(()));
 
         // Validate that we cannot listen twice
-        assert_eq!(app_client.listen2(8000, 1).await?, Err(zx::sys::ZX_ERR_ALREADY_BOUND));
+        assert_eq!(
+            app_client.listen2(8000, VMADDR_CID_HOST, 1).await?,
+            Err(zx::sys::ZX_ERR_ALREADY_BOUND)
+        );
 
         // Create a connection from the driver
         driver.callbacks.request(&*addr::Vsock::new(8000, 80, 4))?;
@@ -177,7 +182,7 @@ mod tests {
 
         // Send a connection request
         let (_data_socket, _client_end, con) = make_con()?;
-        let request = app_client.connect(4, 8000, con);
+        let request = app_client.connect(VMADDR_CID_HOST, 8000, con);
 
         // Expect a driver message
         {
@@ -201,7 +206,7 @@ mod tests {
 
         // Create a connection.
         let (_data_socket_request, client_end_request, con) = make_con()?;
-        let request = app_client.connect(4, 8000, con);
+        let request = app_client.connect(VMADDR_CID_HOST, 8000, con);
         let (addr, server_data_socket_request, responder) =
             unwrap_msg!(DeviceRequest::SendRequest{addr, data, responder} from driver.client);
         responder.send(Ok(()))?;

@@ -38,7 +38,7 @@ use const_unwrap::const_unwrap_option;
 use fidl::endpoints;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_hardware_vsock::{
-    CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy,
+    CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy, VMADDR_CID_HOST,
 };
 use fidl_fuchsia_vsock::{
     AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
@@ -310,10 +310,11 @@ impl Vsock {
             ConnectorRequest::Listen { local_port, acceptor, responder } => responder.send(
                 self.start_listener(acceptor, local_port).map_err(|e| e.into_status().into_raw()),
             ),
-            ConnectorRequest::Listen2 { local_port, backlog, responder } => responder.send(
-                self.listen_port_and_queue(client, local_port, backlog)
-                    .map_err(|e| e.into_status().into_raw()),
-            ),
+            ConnectorRequest::Listen2 { local_port, remote_cid, backlog, responder } => responder
+                .send(
+                    self.listen_port_and_queue(client, local_port, remote_cid, backlog)
+                        .map_err(|e| e.into_status().into_raw()),
+                ),
             ConnectorRequest::Accept { con, responder } => match self.accept(client, con).await {
                 Ok(addr) => responder.send(Ok(&addr)),
                 Err(e) => responder.send(Err(e.into_status().into_raw())),
@@ -377,8 +378,13 @@ impl Vsock {
         &self,
         client: &ClientContext,
         port: u32,
+        cid: u32,
         backlog: u32,
     ) -> Result<(), Error> {
+        if cid != VMADDR_CID_HOST {
+            tracing::info!("Rejecting request to listen on unsupported CID {}", cid);
+            return Err(Error::ConnectionRefused);
+        }
         if port::is_ephemeral(port) {
             tracing::info!("Rejecting request to listen on ephemeral port {}", port);
             return Err(Error::ConnectionRefused);
@@ -541,6 +547,10 @@ impl Vsock {
         remote_port: u32,
         con: ConnectionTransport,
     ) -> Result<u32, Error> {
+        if remote_cid != VMADDR_CID_HOST {
+            tracing::info!("Rejecting request to connect to unsupported CID {}", remote_cid);
+            return Err(Error::ConnectionRefused);
+        }
         let data = con.data;
         let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
         let port = self.clone().alloc_ephemeral_port().ok_or(Error::OutOfPorts)?;
