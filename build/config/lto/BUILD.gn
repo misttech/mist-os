@@ -9,7 +9,7 @@ import("//build/toolchain/variant.gni")
 
 config("fat-lto-objects") {
   # only add fat-lto-objects when the feature is enabled
-  if (fat_lto_objects) {
+  if (fat_lto_objects && !is_gcc) {
     # TODO(https://fxbug.dev/340553826): - Add FatLTO support for Mach-O and COFF file formats
     # Currently, FatLTO requires ELF, so its only valid on non-EFI Fuchsia and Linux
     if (is_elf) {
@@ -20,14 +20,23 @@ config("fat-lto-objects") {
 }
 
 config("no-fat-lto-objects-compilation") {
-  if (fat_lto_objects) {
-    cflags = [ "-fno-fat-lto-objects" ]
+  if (fat_lto_objects && !is_gcc) {
+    # TODO(https://fxbug.dev/340553826): - Add FatLTO support for Mach-O and COFF file formats
+    # Currently, FatLTO requires ELF, so its only valid on non-EFI Fuchsia and Linux
+    if (is_elf) {
+      cflags = [ "-fno-fat-lto-objects" ]
+    }
   }
 }
 
 config("no-fat-lto-objects-linking") {
-  if (fat_lto_objects) {
-    ldflags = [ "-Wl,--no-fat-lto-objects" ]
+  # The --no-fat-lto-objects option is only valid in LLD
+  if (fat_lto_objects && !is_gcc) {
+    # TODO(https://fxbug.dev/340553826): - Add FatLTO support for Mach-O and COFF file formats
+    # Currently, FatLTO requires ELF, so its only valid on non-EFI Fuchsia and Linux
+    if (is_elf) {
+      ldflags = [ "-Wl,--no-fat-lto-objects" ]
+    }
   }
 }
 
