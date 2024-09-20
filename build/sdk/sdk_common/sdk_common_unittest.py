@@ -69,6 +69,12 @@ class SdkCommonTests(unittest.TestCase):
         )
 
         # Documented categories that are no longer supported.
+        atoms = [_atom("hello", "partner"), _atom("world", "experimental")]
+        self.assertRaisesRegex(
+            Exception,
+            'Unknown SDK category "experimental"',
+            lambda: [*detect_category_violations("internal", atoms)],
+        )
         atoms = [_atom("hello", "partner"), _atom("world", "excluded")]
         self.assertRaisesRegex(
             Exception,
