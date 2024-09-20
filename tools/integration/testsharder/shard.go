@@ -298,27 +298,42 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 // This assumes that `Env.Dimensions` is always sufficient to distinguish two
 // shards with the same name.
 func makeShardNamesUnique(shards []*Shard) {
-	sameNameShards := make(map[string][]*Shard)
+	type shardDims struct {
+		shard *Shard
+		dims  map[string]any
+	}
+	sameNameShards := make(map[string][]shardDims)
 	for _, s := range shards {
-		sameNameShards[s.Name] = append(sameNameShards[s.Name], s)
+		dims := make(map[string]any)
+		for k, v := range s.Env.Dimensions {
+			dims[k] = v
+		}
+		for k, v := range s.Env.EmuDimensions {
+			dims[k] = v
+		}
+		sameNameShards[s.Name] = append(sameNameShards[s.Name], shardDims{s, dims})
 	}
 
 	for _, dupes := range sameNameShards {
 		if len(dupes) < 2 {
 			continue
 		}
-		common := commonDimensions(dupes)
+		duplicateEnvs := []map[string]any{}
+		for _, shard := range dupes {
+			duplicateEnvs = append(duplicateEnvs, shard.dims)
+		}
+		common := commonDimensions(duplicateEnvs)
 		for _, shard := range dupes {
 			var tokens []string
-			dims := maps.Keys(shard.Env.Dimensions)
+			dims := maps.Keys(shard.dims)
 			slices.Sort(dims)
 			for _, dim := range dims {
 				if _, ok := common[dim]; !ok {
-					tokens = append(tokens, dim+":"+shard.Env.Dimensions[dim])
+					tokens = append(tokens, fmt.Sprintf("%s:%v", dim, shard.dims[dim]))
 				}
 			}
 			if len(tokens) > 0 {
-				shard.Name += "-" + strings.Join(tokens, "-")
+				shard.shard.Name += "-" + strings.Join(tokens, "-")
 			}
 		}
 	}
@@ -326,17 +341,17 @@ func makeShardNamesUnique(shards []*Shard) {
 
 // commonDimensions calculates the intersection of the environment dimensions of
 // a set of shards.
-func commonDimensions(shards []*Shard) map[string]string {
-	res := make(map[string]string)
-	if len(shards) == 0 {
+func commonDimensions(dims []map[string]any) map[string]any {
+	res := make(map[string]any)
+	if len(dims) == 0 {
 		return res
 	}
 
-	maps.Copy(res, shards[0].Env.Dimensions)
+	maps.Copy(res, dims[0])
 
-	for i := 1; i < len(shards); i++ {
-		maps.DeleteFunc(res, func(k, v string) bool {
-			v2, ok := shards[i].Env.Dimensions[k]
+	for i := 1; i < len(dims); i++ {
+		maps.DeleteFunc(res, func(k string, v any) bool {
+			v2, ok := dims[i][k]
 			return !ok || v != v2
 		})
 	}
