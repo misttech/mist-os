@@ -16,7 +16,8 @@ pub struct ZxTimer {
 
 impl ZxTimer {
     pub fn new() -> Self {
-        Self { timer: Arc::new(zx::Timer::create()) }
+        // TODO(https://fxbug.dev/361583841) rationalize with boot time
+        Self { timer: Arc::new(zx::MonotonicTimer::create()) }
     }
 }
 

@@ -10,13 +10,30 @@ use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 use std::hash::{Hash, Hasher};
 use std::{ops, time as stdtime};
 
+/// A timestamp from the monontonic clock. Does not advance while the system is suspended.
 pub type MonotonicTime = Time<MonotonicTimeline, NsUnit>;
+
+/// A timestamp from a user-defined clock with arbitrary behavior.
 pub type SyntheticTime = Time<SyntheticTimeline, NsUnit>;
 
+/// A timestamp from the boot clock. Advances while the system is suspended.
+pub type BootTime = Time<BootTimeline>;
+
+/// A timestamp from system ticks. Has an arbitrary unit that can be measured with
+/// `Ticks::per_second()`.
 pub type Ticks<T> = Time<T, TicksUnit>;
+
+/// A timestamp from system ticks on the monotonic timeline. Does not advance while the system is
+/// suspended.
 pub type MonotonicTicks = Time<MonotonicTimeline, TicksUnit>;
+
+/// A timestamp from system ticks on the boot timeline. Advances while the system is suspended.
+pub type BootTicks = Time<BootTimeline, TicksUnit>;
+
+/// A duration between two system ticks timestamps.
 pub type DurationTicks = Duration<TicksUnit>;
 
+/// A timestamp from the kernel. Generic over both the timeline and the units it is measured in.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Time<T, U = NsUnit>(sys::zx_time_t, std::marker::PhantomData<(T, U)>);
@@ -66,7 +83,7 @@ impl<T, U> std::fmt::Debug for Time<T, U> {
 }
 
 impl MonotonicTime {
-    /// Get the current monotonic time.
+    /// Get the current monotonic time which does not advance during system suspend.
     ///
     /// Wraps the
     /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
@@ -93,6 +110,20 @@ impl MonotonicTime {
         unsafe {
             sys::zx_nanosleep(self.0);
         }
+    }
+}
+
+impl BootTime {
+    /// Get the current boot time which advances during system suspend.
+    ///
+    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
+    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
+    /// clock begins pausing during suspend.
+    pub fn get() -> Self {
+        // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
+        unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
     }
 }
 
@@ -124,6 +155,22 @@ impl MonotonicTicks {
     pub fn get() -> Self {
         // SAFETY: FFI call that is always sound to call.
         Self(unsafe { sys::zx_ticks_get() }, std::marker::PhantomData)
+    }
+}
+
+impl BootTicks {
+    /// Read the number of high-precision timer ticks on the boot timeline. These ticks may be
+    /// processor cycles, high speed timer, profiling timer, etc. They advance while the
+    /// system is suspended.
+    ///
+    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
+    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
+    /// clock begins pausing during suspend.
+    pub fn get() -> Self {
+        // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
+        Self(MonotonicTicks::get().0, std::marker::PhantomData)
     }
 }
 
@@ -185,11 +232,21 @@ impl<T: Timeline, U: TimeUnit> ops::SubAssign<Duration<U>> for Time<T, U> {
 /// A marker trait for times to prevent accidental comparison between different timelines.
 pub trait Timeline {}
 
-/// A marker type representing the monotonic timeline which is able to pause during system
-/// suspension.
+/// A marker type for the system's monotonic timeline which pauses during suspend.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonotonicTimeline;
 impl Timeline for MonotonicTimeline {}
+
+/// A marker type for the system's boot timeline which continues running during suspend.
+///
+/// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+/// not yet available in the stable vdso. This currently uses the monotonic clock which is
+/// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+/// suspend in the near future. This will be migrated to the boot clock before the monotonic
+/// clock begins pausing during suspend.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BootTimeline;
+impl Timeline for BootTimeline {}
 
 /// A marker type representing a synthetic timeline defined by a kernel clock object.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -417,12 +474,18 @@ impl DurationNum for i64 {
 /// As essentially a subtype of `Handle`, it can be freely interconverted.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Timer(Handle);
-impl_handle_based!(Timer);
+// TODO(https://fxbug.dev/361661898) remove default type when FIDL understands mono vs. boot timers
+pub struct Timer<T = MonotonicTimeline>(Handle, std::marker::PhantomData<T>);
 
-impl Timer {
-    /// Create a timer, an object that can signal when a specified point in time has been reached.
-    /// Wraps the
+/// A timer that measures its deadlines against the monotonic clock.
+pub type MonotonicTimer = Timer<MonotonicTimeline>;
+
+/// A timer that measures its deadlines against the boot clock.
+pub type BootTimer = Timer<BootTimeline>;
+
+impl Timer<MonotonicTimeline> {
+    /// Create a timer, an object that can signal when a specified point on the monotonic clock has
+    /// been reached. Wraps the
     /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md)
     /// syscall.
     ///
@@ -440,18 +503,44 @@ impl Timer {
             .expect("timer creation always succeeds except with OOM or when job policy denies it");
         unsafe { Self::from(Handle::from_raw(out)) }
     }
+}
 
+impl Timer<BootTimeline> {
+    /// Create a timer, an object that can signal when a specified point on the boot clock has been
+    /// reached. Wraps the
+    /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md)
+    /// syscall.
+    ///
+    /// If the timer elapses while the system is suspended it will not wake the system.
+    ///
+    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
+    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
+    /// clock begins pausing during suspend.
+    ///
+    /// # Panics
+    ///
+    /// If the kernel reports no memory available to create a timer or the process' job policy
+    /// denies timer creation.
+    pub fn create() -> Self {
+        // TODO(https://fxbug.dev/328306129) change the clock ID to the boot clock
+        Self(MonotonicTimer::create().0, std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline> Timer<T> {
     /// Start a one-shot timer that will fire when `deadline` passes. Wraps the
     /// [zx_timer_set](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_set.md)
     /// syscall.
-    pub fn set(&self, deadline: MonotonicTime, slack: Duration<NsUnit>) -> Result<(), Status> {
+    pub fn set(&self, deadline: Time<T>, slack: Duration<NsUnit>) -> Result<(), Status> {
         let status = unsafe {
             sys::zx_timer_set(self.raw_handle(), deadline.into_nanos(), slack.into_nanos())
         };
         ok(status)
     }
 
-    /// Cancels a pending timer that was started with start(). Wraps the
+    /// Cancels a pending timer that was started with set(). Wraps the
     /// [zx_timer_cancel](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_cancel.md)
     /// syscall.
     pub fn cancel(&self) -> Result<(), Status> {
@@ -459,6 +548,26 @@ impl Timer {
         ok(status)
     }
 }
+
+impl<T: Timeline> AsHandleRef for Timer<T> {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        self.0.as_handle_ref()
+    }
+}
+
+impl<T: Timeline> From<Handle> for Timer<T> {
+    fn from(handle: Handle) -> Self {
+        Timer(handle, std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline> From<Timer<T>> for Handle {
+    fn from(x: Timer<T>) -> Handle {
+        x.0
+    }
+}
+
+impl<T: Timeline> HandleBased for Timer<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -490,6 +599,22 @@ mod tests {
         let ticks1 = MonotonicTicks::get();
         1_000.nanos().sleep();
         let ticks2 = MonotonicTicks::get();
+        assert!(ticks2 > ticks1);
+    }
+
+    #[test]
+    fn boot_time_increases() {
+        let time1 = BootTime::get();
+        1_000.nanos().sleep();
+        let time2 = BootTime::get();
+        assert!(time2 > time1);
+    }
+
+    #[test]
+    fn boot_ticks_increases() {
+        let ticks1 = BootTicks::get();
+        1_000.nanos().sleep();
+        let ticks2 = BootTicks::get();
         assert!(ticks2 > ticks1);
     }
 
@@ -542,7 +667,7 @@ mod tests {
         let five_secs = 5.seconds();
 
         // Create a timer
-        let timer = Timer::create();
+        let timer = MonotonicTimer::create();
 
         // Should not signal yet.
         assert_eq!(
@@ -552,6 +677,36 @@ mod tests {
 
         // Set it, and soon it should signal.
         assert_eq!(timer.set(Time::after(five_secs), slack), Ok(()));
+        assert_eq!(
+            timer.wait_handle(Signals::TIMER_SIGNALED, Time::INFINITE),
+            Ok(Signals::TIMER_SIGNALED)
+        );
+
+        // Cancel it, and it should stop signalling.
+        assert_eq!(timer.cancel(), Ok(()));
+        assert_eq!(
+            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            Err(Status::TIMED_OUT)
+        );
+    }
+
+    #[test]
+    fn boot_timer_basic() {
+        let slack = 0.millis();
+        let ten_ms = 10.millis();
+        let five_secs = 5.seconds();
+
+        // Create a timer
+        let timer = BootTimer::create();
+
+        // Should not signal yet.
+        assert_eq!(
+            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            Err(Status::TIMED_OUT)
+        );
+
+        // Set it, and soon it should signal.
+        assert_eq!(timer.set(BootTime::get() + five_secs, slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Time::INFINITE),
             Ok(Signals::TIMER_SIGNALED)
