@@ -4,6 +4,7 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 
+use fuchsia_zircon as zx;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
@@ -26,9 +27,37 @@ impl BytesFileOps for PowerWakeLockFile {
     ///    automatically deactivated.
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let lock_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
-        // TODO(https://fxbug.dev/322893982): Support the timeout option.
-        let clean_lock_str = lock_str.split('\n').next().unwrap_or("");
+        let clean_str = lock_str.trim_end_matches('\n');
+        let mut clean_str_split = clean_str.split(' ');
+        let Some(clean_lock_str) = clean_str_split.next() else {
+            return error!(EINVAL);
+        };
+
+        // Check if there is a timeout.
+        let target_monotonic = match clean_str_split.next() {
+            Some(timeout_str) => Some(
+                zx::MonotonicTime::get() // now
+                    + zx::Duration::from_nanos(
+                        timeout_str
+                            .parse()
+                            .map_err(|_| errno!(EINVAL, "Failed to parse the timeout string"))?,
+                    ),
+            ),
+            None => None,
+        };
+
         current_task.kernel().suspend_resume_manager.add_lock(clean_lock_str);
+
+        // Set a timer to disable the wake lock when expired.
+        if let Some(target_monotonic) = target_monotonic {
+            let kernel_ref = current_task.kernel().clone();
+            let clean_lock_string = clean_lock_str.to_string();
+            current_task.kernel().kthreads.spawn_future(async move {
+                fuchsia_async::Timer::new(target_monotonic).await;
+                kernel_ref.suspend_resume_manager.remove_lock(&clean_lock_string);
+            });
+        }
+
         Ok(())
     }
 
@@ -51,7 +80,7 @@ impl BytesFileOps for PowerWakeUnlockFile {
     /// Writing a string to this file deactivates the wakeup source with that name.
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let lock_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
-        let clean_lock_str = lock_str.split('\n').next().unwrap_or("");
+        let clean_lock_str = lock_str.trim_end_matches('\n');
         if !current_task.kernel().suspend_resume_manager.remove_lock(clean_lock_str) {
             return error!(EPERM);
         }
