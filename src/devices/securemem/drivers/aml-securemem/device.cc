@@ -82,55 +82,67 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
   return status;
 }
 
-// TODO(https://fxbug.dev/42112465): Determine if we only ever use mexec to reboot from zedboot into
-// a netboot(ed) image. Iff so, we could avoid some complexity here by not loading aml-securemem in
-// zedboot, and not handling suspend(mexec) here, and not having UnregisterSecureMem().
-void AmlogicSecureMemDevice::DdkSuspend(ddk::SuspendTxn txn) {
-  LOG(DEBUG, "aml-securemem: begin DdkSuspend() - Suspend Reason: %d", txn.suspend_reason());
+void AmlogicSecureMemDevice::StartCleanServerClose(fit::closure on_unbind_callback) {
+  ZX_DEBUG_ASSERT(!is_clean_server_close_started_);
+  is_clean_server_close_started_ = true;
+  on_unbind_callback_ = std::move(on_unbind_callback);
 
-  if ((txn.suspend_reason() & DEVICE_MASK_SUSPEND_REASON) != DEVICE_SUSPEND_REASON_MEXEC) {
-    // When a driver doesn't set a suspend function, the default impl returns
-    // ZX_OK.
-    txn.Reply(ZX_OK, txn.requested_state());
-    return;
-  }
-
-  // Sysmem loads first (by design, to maximize chance of getting contiguous
-  // memory), and aml-securemem depends on sysmem.  This means aml-securemem
-  // will suspend before sysmem, so we have aml-securemem clean up secure memory
-  // during its suspend (instead of sysmem trying to call aml-securemem after
-  // aml-securemem has already suspended).
-  ZX_DEBUG_ASSERT((txn.suspend_reason() & DEVICE_MASK_SUSPEND_REASON) ==
-                  DEVICE_SUSPEND_REASON_MEXEC);
-
-  // If the server is running, rendezvous with server shutdown and suspend asynchronously.
-  if (sysmem_secure_mem_server_.has_value()) {
-    is_suspend_mexec_ = true;
-    suspend_txn_.emplace(std::move(txn));
-
-    // We are shutting down the sysmem_secure_mem_server_ intentionally before any channel close. In
-    // this case, tell sysmem that all is well, before the sysmem_secure_mem_server_ closes the
-    // channel (which sysmem would otherwise intentionally interpret as justifying a hard reboot).
-    LOG(DEBUG, "Sending UnregisterSecureMem request");
-    fidl::WireResult result = sysmem_->UnregisterSecureMem();
-    LOG(DEBUG, "Received UnregisterSecureMem response");
-    if (!result.ok()) {
-      LOG(ERROR, "Failed to send UnregisterSecureMem request: %s", result.status_string());
-      txn.Reply(result.status(), txn.requested_state());
-      return;
-    }
+  // We are shutting down the sysmem_secure_mem_server_ intentionally before any channel close. In
+  // this case, tell sysmem that all is well, before the sysmem_secure_mem_server_ closes the
+  // channel (which sysmem would otherwise intentionally interpret as justifying a hard reboot).
+  LOG(DEBUG, "Sending UnregisterSecureMem request");
+  fidl::WireResult result = sysmem_->UnregisterSecureMem();
+  if (!result.ok()) {
+    LOG(ERROR, "Failed UnregisterSecureMem request: %s", result.status_string());
+    // keep going
+  } else {
     if (result->is_error()) {
       LOG(ERROR, "Failed to unregister secure mem: %s",
           zx_status_get_string(result->error_value()));
+      // keep going
+    } else {
+      LOG(DEBUG, "UnregisterSecureMem success");
     }
+  }
 
-    sysmem_secure_mem_server_.AsyncCall(&SysmemSecureMemServer::Unbind);
-    // Suspend will continue at |SysmemSecureMemServerOnUnbound|.
+  // on_unbind_callback_ will be called from SysmemSecureMemServerOnUnbound, which is after
+  // SysmemSecureMemServer::Unbind has prevented any more inbound calls from sysmem and deleted all
+  // the secure ranges
+  sysmem_secure_mem_server_.AsyncCall(&SysmemSecureMemServer::Unbind);
+}
+
+void AmlogicSecureMemDevice::DdkSuspend(ddk::SuspendTxn txn) {
+  LOG(DEBUG, "aml-securemem: begin DdkSuspend() - Suspend Reason: %d", txn.suspend_reason());
+
+  // If the server is running, rendezvous with server shutdown and finish suspend op asynchronously.
+  if (!is_clean_server_close_started_ && sysmem_secure_mem_server_.has_value()) {
+    StartCleanServerClose([txn = std::move(txn)]() mutable {
+      LOG(DEBUG, "aml-securemem: end DdkSuspend() (async)");
+      txn.Reply(ZX_OK, txn.requested_state());
+    });
+    // The DdkSuspend op will continue at |SysmemSecureMemServerOnUnbound|.
     return;
   }
 
-  LOG(DEBUG, "aml-securemem: end DdkSuspend()");
+  LOG(DEBUG, "aml-securemem: end DdkSuspend() (sync)");
   txn.Reply(ZX_OK, txn.requested_state());
+}
+
+void AmlogicSecureMemDevice::DdkUnbind(ddk::UnbindTxn txn) {
+  LOG(DEBUG, "aml-securemem: begin DdkUnbind()");
+
+  // If the server is running, rendezvous with server shutdown and finish unbind op asynchronously.
+  if (!is_clean_server_close_started_ && sysmem_secure_mem_server_.has_value()) {
+    StartCleanServerClose([txn = std::move(txn)]() mutable {
+      LOG(DEBUG, "aml-securemem: end DdkUnbind() (async)");
+      txn.Reply();
+    });
+    // The DdkUnbind op will continue at |SysmemSecureMemServerOnUnbound|.
+    return;
+  }
+
+  LOG(DEBUG, "aml-securemem: end DdkUnbind() (sync)");
+  txn.Reply();
 }
 
 void AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound(bool is_success) {
@@ -154,7 +166,7 @@ void AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound(bool is_success) {
     // If is_success, that means the sysmem_secure_mem_server_ is being shut down
     // intentionally before any channel close.  So far, we only do this for suspend(mexec).
     // See the initiation logic in AmlogicSecureMemDevice::DdkSuspend.
-    ZX_DEBUG_ASSERT(is_suspend_mexec_);
+    ZX_DEBUG_ASSERT(is_clean_server_close_started_);
   }
 
   // Regardless of whether this is due to DdkSuspend() or unexpected channel closure, we
@@ -162,9 +174,8 @@ void AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound(bool is_success) {
   sysmem_secure_mem_server_.reset();
   LOG(DEBUG, "Done serving fuchsia::sysmem::Tee");
 
-  if (suspend_txn_) {
-    suspend_txn_->Reply(ZX_OK, suspend_txn_->requested_state());
-    suspend_txn_.reset();
+  if (on_unbind_callback_) {
+    std::move(on_unbind_callback_)();
   }
 }
 
