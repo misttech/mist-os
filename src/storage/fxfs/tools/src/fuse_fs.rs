@@ -4,7 +4,7 @@
 
 use crate::fuse_attr::{create_dir_attr, create_file_attr, create_symlink_attr};
 use crate::fuse_errors::FxfsResult;
-use event_listener::Event;
+use event_listener::{Event, Listener as _};
 use fuse3::raw::prelude::*;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::{FxFilesystem, OpenFxFilesystem};

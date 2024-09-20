@@ -274,7 +274,7 @@ group("eui48") {
 }
 
 group("event-listener") {
-  public_deps = [ ":event-listener-v2_5_1" ]
+  public_deps = [ ":event-listener-v5_3_1" ]
 }
 
 group("fancy-regex") {
@@ -5071,6 +5071,45 @@ rust_library("event-listener-v2_5_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":event-listener-v2_5_1.license" ]
+}
+
+license("event-listener-v5_3_1.license") {
+  public_package_name = "event_listener"
+  license_files = [
+    "//third_party/rust_crates/vendor/event-listener-5.3.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/event-listener-5.3.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("event-listener-v5_3_1") {
+  crate_name = "event_listener"
+  crate_root =
+      "//third_party/rust_crates/vendor/event-listener-5.3.1/src/lib.rs"
+  output_name = "event_listener-c172a3bc39537b04"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":concurrent-queue-v2_5_0" ]
+  deps += [ ":pin-project-lite-v0_2_13" ]
+  if (!(current_cpu == "wasm32")) {
+    deps += [ ":parking-v2_0_0" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=c172a3bc39537b04",
+    "-Cextra-filename=-c172a3bc39537b04",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"parking\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":event-listener-v5_3_1.license" ]
 }
 
 license("fancy-regex-v0_8_0.license") {
