@@ -8,7 +8,7 @@ use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::task::CurrentTask;
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr};
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_uapi::device_type::{DeviceType, DYN_MAJOR};
+use starnix_uapi::device_type::{DeviceType, DYN_MAJOR_RANGE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error};
@@ -51,7 +51,7 @@ pub trait DeviceOps: DynClone + Send + Sync + 'static {
         &self,
         _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
-        _id: DeviceType,
+        _device_type: DeviceType,
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno>;
@@ -62,11 +62,11 @@ impl<T: DeviceOps> DeviceOps for Arc<T> {
         &self,
         locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
-        id: DeviceType,
+        device_type: DeviceType,
         node: &FsNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        self.deref().open(locked, current_task, id, node, flags)
+        self.deref().open(locked, current_task, device_type, node, flags)
     }
 }
 
@@ -426,31 +426,68 @@ impl Default for DeviceRegistry {
             next_listener_id: 0,
             next_event_id: 0,
         };
-        state
-            .char_devices
-            .register(DYN_MAJOR, DeviceMode::Char.minor_range(), Arc::clone(&state.dyn_devices))
-            .expect("Failed to register DYN_MAJOR");
+        for major in DYN_MAJOR_RANGE {
+            state
+                .char_devices
+                .register(major, DeviceMode::Char.minor_range(), Arc::clone(&state.dyn_devices))
+                .expect("Failed to register dynamic char devices");
+        }
         Self { objects: Default::default(), state: Mutex::new(state) }
     }
 }
 
-#[derive(Default)]
+struct DeviceTypeAllocator {
+    /// The available ranges of device types to allocate.
+    ///
+    /// Devices will be allocated from the back of the vector first.
+    freelist: Vec<Range<DeviceType>>,
+}
+
+impl DeviceTypeAllocator {
+    /// Create an allocator for the given ranges of device types.
+    ///
+    /// The devices will be allocated from the front of the vector first.
+    fn new(mut available: Vec<Range<DeviceType>>) -> Self {
+        available.reverse();
+        Self { freelist: available }
+    }
+
+    fn allocate(&mut self) -> Result<DeviceType, Errno> {
+        let Some(range) = self.freelist.pop() else {
+            return error!(ENOMEM);
+        };
+        let allocated = range.start;
+        if let Some(next) = allocated.next_minor() {
+            if next < range.end {
+                self.freelist.push(next..range.end);
+            }
+        }
+        Ok(allocated)
+    }
+}
+
 struct DynRegistry {
-    dyn_devices: BTreeMap<u32, Arc<Box<dyn DeviceOps>>>,
-    next_dynamic_minor: u32,
+    devices: BTreeMap<DeviceType, Arc<Box<dyn DeviceOps>>>,
+    allocator: DeviceTypeAllocator,
 }
 
 impl DynRegistry {
     fn register(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
         track_stub!(TODO("https://fxbug.dev/322873632"), "emit uevent for dynamic registration");
+        let device_type = self.allocator.allocate()?;
+        self.devices.insert(device_type, Arc::new(Box::new(device)));
+        Ok(device_type)
+    }
+}
 
-        let minor = self.next_dynamic_minor;
-        if minor > 255 {
-            return error!(ENOMEM);
+impl Default for DynRegistry {
+    fn default() -> Self {
+        fn minor_device_range(major: u32) -> Range<DeviceType> {
+            DeviceType::new(major, 0)..DeviceType::new(major, DeviceMode::Char.minor_count())
         }
-        self.next_dynamic_minor += 1;
-        self.dyn_devices.insert(minor, Arc::new(Box::new(device)));
-        Ok(DeviceType::new(DYN_MAJOR, minor))
+        // devices.txt says to allocate major numbers starting from the top of the range.
+        let available = DYN_MAJOR_RANGE.map(minor_device_range).rev().collect();
+        DynRegistry { devices: Default::default(), allocator: DeviceTypeAllocator::new(available) }
     }
 }
 
@@ -459,13 +496,13 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
         &self,
         locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
-        id: DeviceType,
+        device_type: DeviceType,
         node: &FsNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let device =
-            Arc::clone(self.read().dyn_devices.get(&id.minor()).ok_or_else(|| errno!(ENODEV))?);
-        device.open(locked, current_task, id, node, flags)
+            Arc::clone(self.read().devices.get(&device_type).ok_or_else(|| errno!(ENODEV))?);
+        device.open(locked, current_task, device_type, node, flags)
     }
 }
 
@@ -557,7 +594,7 @@ mod tests {
 
         let registry = DeviceRegistry::default();
         let device_type = registry.register_dyn_chrdev(create_test_device).unwrap();
-        assert_eq!(device_type.major(), DYN_MAJOR);
+        assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
         let node = FsNode::new_root(PanickingFsNode);
         let _ = registry
