@@ -164,8 +164,8 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             self.device.wlan_policy.get_saved_networks(),
             [NetworkConfig(test_ssid, SecurityType.NONE, "None", "")],
         )
-        self.assert_network_state(test_ssid, ConnectionState.CONNECTING)
-        self.assert_network_state(test_ssid, ConnectionState.CONNECTED)
+        self.wait_for_network(test_ssid, ConnectionState.CONNECTING)
+        self.wait_for_network(test_ssid, ConnectionState.CONNECTED)
 
         # Connecting explicitly again shouldn't do anything.
         self.device.wlan_policy.connect(test_ssid, SecurityType.NONE)
@@ -174,21 +174,36 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
 
         # Stopping client connections should initiate a auto-disconnection.
         self.device.wlan_policy.stop_client_connections()
-        self.assert_network_state(
-            test_ssid,
-            ConnectionState.DISCONNECTED,
-            DisconnectStatus.CONNECTION_STOPPED,
+        asserts.assert_equal(
+            self.device.wlan_policy.get_update(),
+            ClientStateSummary(
+                state=WlanClientState.CONNECTIONS_ENABLED,
+                networks=[
+                    NetworkState(
+                        NetworkIdentifier(test_ssid, SecurityType.NONE),
+                        ConnectionState.DISCONNECTED,
+                        DisconnectStatus.CONNECTION_STOPPED,
+                    )
+                ],
+            ),
+        )
+        asserts.assert_equal(
+            self.device.wlan_policy.get_update(),
+            ClientStateSummary(
+                state=WlanClientState.CONNECTIONS_DISABLED,
+                networks=[],
+            ),
         )
 
         # Starting client connections again should initiate an auto-connection.
         self.device.wlan_policy.start_client_connections()
-        self.assert_network_state(test_ssid, ConnectionState.CONNECTING)
-        self.assert_network_state(test_ssid, ConnectionState.CONNECTED)
+        self.wait_for_network(test_ssid, ConnectionState.CONNECTING)
+        self.wait_for_network(test_ssid, ConnectionState.CONNECTED)
 
         # Removing the network should initiate a auto-disconnection.
         self.device.wlan_policy.remove_all_networks()
         asserts.assert_equal(self.device.wlan_policy.get_saved_networks(), [])
-        self.assert_network_state(
+        self.wait_for_network(
             test_ssid,
             ConnectionState.DISCONNECTED,
             DisconnectStatus.CONNECTION_STOPPED,
@@ -301,34 +316,41 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             except TimeoutError:
                 return
 
-    def assert_network_state(
+    def wait_for_update(self, expected_update: ClientStateSummary) -> None:
+        """Assert an update eventually matches the specified state."""
+        last_updates: list[ClientStateSummary] = []
+
+        for update in self.get_updates_until(DEFAULT_GET_UPDATE_TIMEOUT):
+            if update == expected_update:
+                return
+            last_updates.append(update)
+
+        asserts.fail(
+            f"Timed out waiting {DEFAULT_GET_UPDATE_TIMEOUT}s for client "
+            f"state: {expected_update}\n"
+            f"Last updates: {last_updates}"
+        )
+
+    def wait_for_network(
         self,
         ssid: str,
         expected_state: ConnectionState,
         expected_status: DisconnectStatus | None = None,
-        timeout_sec: int = DEFAULT_GET_UPDATE_TIMEOUT,
+        expected_client_state: WlanClientState = WlanClientState.CONNECTIONS_ENABLED,
     ) -> None:
         """Assert the next update matches the specified network state."""
-        for client_state in self.get_updates_until(timeout_sec):
-            asserts.assert_equal(
-                client_state,
-                ClientStateSummary(
-                    state=WlanClientState.CONNECTIONS_ENABLED,
-                    networks=[
-                        NetworkState(
-                            NetworkIdentifier(ssid, SecurityType.NONE),
-                            expected_state,
-                            expected_status,
-                        )
-                    ],
-                ),
+        self.wait_for_update(
+            ClientStateSummary(
+                state=expected_client_state,
+                networks=[
+                    NetworkState(
+                        NetworkIdentifier(ssid, SecurityType.NONE),
+                        expected_state,
+                        expected_status,
+                    )
+                ],
             )
-            return
-
-        msg = f'Timed out waiting {timeout_sec}s for "{ssid}" to reach state {expected_state}'
-        if expected_status:
-            msg += f" and status {expected_status}"
-        asserts.fail(msg)
+        )
 
 
 if __name__ == "__main__":
