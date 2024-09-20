@@ -4147,4 +4147,110 @@ INSTANTIATE_TEST_SUITE_P(DatagramLinearizedSendSemanticsTests, DatagramLinearize
                            return std::string(socketDomainToString(info.param));
                          });
 
+// When `IP_RECVORIGDSTADDR` is set on a dual-stack socket then `IP_ORIGDSTADDR` control message
+// should be delivered only when receiving an IPv4 packet.
+class OrigDstAddrOnDualStackSocket : public testing::Test {
+ protected:
+  void SetUp() {
+    ASSERT_TRUE(receiver_ = fbl::unique_fd(socket(AF_INET6, SOCK_DGRAM, 0))) << strerror(errno);
+
+    sockaddr_in6 addr = {};
+    addr.sin6_family = AF_INET6;
+    addr.sin6_addr = IN6ADDR_ANY_INIT;
+    ASSERT_EQ(bind(receiver_.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+        << strerror(errno);
+
+    int enable = 1;
+    ASSERT_EQ(setsockopt(receiver_.get(), SOL_IP, IP_RECVORIGDSTADDR, &enable, sizeof(enable)), 0)
+        << strerror(errno);
+
+    socklen_t bound_addrlen = sizeof(addr);
+    ASSERT_EQ(getsockname(receiver_.get(), reinterpret_cast<sockaddr*>(&addr), &bound_addrlen), 0)
+        << strerror(errno);
+    ASSERT_EQ(sizeof(addr), bound_addrlen);
+
+    receiver_port_ = addr.sin6_port;
+  }
+
+  void Send(SocketDomain domain) {
+    fbl::unique_fd sender;
+    ASSERT_TRUE(sender = fbl::unique_fd(socket(domain.Get(), SOCK_DGRAM, 0))) << strerror(errno);
+
+    sockaddr_storage addr{
+        .ss_family = domain.Get(),
+    };
+    socklen_t addrlen;
+    switch (domain.which()) {
+      case SocketDomain::Which::IPv4: {
+        auto& sin = *reinterpret_cast<sockaddr_in*>(&addr);
+        sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        sin.sin_port = receiver_port_;
+        addrlen = sizeof(sockaddr_in);
+        break;
+      }
+      case SocketDomain::Which::IPv6: {
+        auto& sin6 = *reinterpret_cast<sockaddr_in6*>(&addr);
+        sin6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
+        sin6.sin6_port = receiver_port_;
+        addrlen = sizeof(sockaddr_in6);
+        break;
+      }
+    }
+
+    char msg[] = "A";
+    ASSERT_EQ(sendto(sender.get(), msg, sizeof(msg), 0, reinterpret_cast<const sockaddr*>(&addr),
+                     addrlen),
+              static_cast<ssize_t>(sizeof(msg)))
+        << strerror(errno);
+  }
+
+  void RecvAndCheckCmsg(bool origdstaddr_expected) {
+    char recv_buf[10];
+    struct sockaddr_storage addr;
+    struct iovec iov = {
+        .iov_base = recv_buf,
+        .iov_len = sizeof(recv_buf),
+    };
+    char control_buffer[512];
+    struct msghdr msg = {
+        .msg_name = &addr,
+        .msg_namelen = sizeof(addr),
+        .msg_iov = &iov,
+        .msg_iovlen = 1,
+        .msg_control = control_buffer,
+        .msg_controllen = sizeof(control_buffer),
+    };
+
+    ssize_t recvd = recvmsg(receiver_.get(), &msg, 0);
+    ASSERT_GT(recvd, 0);
+
+    if (origdstaddr_expected) {
+      struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+      ASSERT_NE(CMSG_FIRSTHDR(&msg), nullptr);
+      ASSERT_EQ(cmsg->cmsg_level, IPPROTO_IP);
+      ASSERT_EQ(cmsg->cmsg_type, IP_ORIGDSTADDR);
+      ASSERT_GT(cmsg->cmsg_len, sizeof(sockaddr_in));
+      struct sockaddr_in* addr = reinterpret_cast<struct sockaddr_in*>(CMSG_DATA(cmsg));
+      ASSERT_EQ(addr->sin_family, AF_INET);
+      ASSERT_EQ(addr->sin_addr.s_addr, htonl(INADDR_LOOPBACK));
+    } else {
+      ASSERT_EQ(CMSG_FIRSTHDR(&msg), nullptr);
+    }
+  }
+
+ private:
+  fbl::unique_fd receiver_;
+  uint16_t receiver_port_ = 0;
+};
+
+TEST_F(OrigDstAddrOnDualStackSocket, Ipv4) {
+  Send(SocketDomain::IPv4());
+  RecvAndCheckCmsg(true);
+}
+
+TEST_F(OrigDstAddrOnDualStackSocket, Ipv6) {
+  Send(SocketDomain::IPv6());
+  RecvAndCheckCmsg(false);
+}
+
 }  // namespace

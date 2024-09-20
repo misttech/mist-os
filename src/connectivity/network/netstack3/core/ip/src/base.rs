@@ -3298,6 +3298,12 @@ pub fn receive_ipv6_packet<
                         "receive_ipv6_packet: handled IPv6 extension headers: dispatching packet"
                     );
 
+                    let meta = ReceiveIpPacketMeta {
+                        broadcast: None,
+                        transparent_override: None,
+                        dscp_and_ecn: packet.dscp_and_ecn(),
+                    };
+
                     // TODO(joshlf):
                     // - Do something with ICMP if we don't have a handler for
                     //   that protocol?
@@ -3309,7 +3315,7 @@ pub fn receive_ipv6_packet<
                         frame_dst,
                         packet,
                         packet_metadata,
-                        ReceiveIpPacketMeta::default(),
+                        meta,
                     )
                     .unwrap_or_else(|err| {
                         err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer)

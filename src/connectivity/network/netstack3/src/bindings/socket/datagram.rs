@@ -632,7 +632,9 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             destination_port: dst_port.get(),
             timestamp: fasync::Time::now(),
             data: body.as_ref().to_vec(),
+            dscp_and_ecn: meta.dscp_and_ecn,
         };
+
         self.message_queue.lock().receive(message);
     }
 }
@@ -1059,6 +1061,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             destination_port: id,
             timestamp: fasync::Time::now(),
             data: data.as_ref().to_vec(),
+            dscp_and_ecn: DscpAndEcn::default(),
         };
         self.message_queue.lock().receive(message);
     }
@@ -1074,6 +1077,7 @@ struct AvailableMessage<I: Ip> {
     destination_port: u16,
     timestamp: fasync::Time,
     data: Vec<u8>,
+    dscp_and_ecn: DscpAndEcn,
 }
 
 impl<I: Ip> BodyLen for AvailableMessage<I> {
@@ -1114,8 +1118,11 @@ impl<I: Ip + BindingsDataIpExt> GenericOverIp<I> for Ipv4BindingsData {
 /// Datagram bindings data specific to IPv6 sockets.
 #[derive(Default)]
 struct Ipv6BindingsData {
-    // Corresponds to the IPV6_RECVPKTINFO socket option.
+    /// `IPV6_RECVPKTINFO` option.
     recv_pkt_info: bool,
+
+    /// `IPV6_RECVTCLASS` option.
+    recv_tclass: bool,
 }
 impl<I: Ip + BindingsDataIpExt> GenericOverIp<I> for Ipv6BindingsData {
     type Type = I::VersionSpecificData;
@@ -1131,10 +1138,28 @@ struct BindingData<I: BindingsDataIpExt, T: Transport<I>> {
     /// modified using the SetIpReceiveOriginalDestinationAddress method (a.k.a. IP_RECVORIGDSTADDR)
     /// and is useful for transparent sockets (IP_TRANSPARENT).
     ip_receive_original_destination_address: bool,
-    /// SO_TIMESTAMP, SO_TIMESTAMPNS state.
+    /// `SO_TIMESTAMP` and `SO_TIMESTAMPNS` state.
     timestamp_option: fposix_socket::TimestampOption,
     /// `IP_MULTICAST_IF` option. It can be set separately from `IPV6_MULTICAST_IF`.
     ipv4_multicast_if_addr: Option<SpecifiedAddr<Ipv4Addr>>,
+    /// `IP_RECVTOS` options.
+    ip_recv_tos: bool,
+}
+
+// Helper to add `get_or_default()` method for `Option<T>`.
+// TODO(https://github.com/rust-lang/rust/issues/82901): Replace with `get_or_default()`
+// once it's enabled in Rust.
+trait GetOrInsertDefault<T> {
+    fn get_or_default(&mut self) -> &mut T;
+}
+
+impl<T> GetOrInsertDefault<T> for Option<T>
+where
+    T: Default,
+{
+    fn get_or_default(&mut self) -> &mut T {
+        self.get_or_insert_with(Default::default)
+    }
 }
 
 impl<I, T> BindingData<I, T>
@@ -1167,6 +1192,7 @@ where
             ip_receive_original_destination_address: false,
             timestamp_option: fposix_socket::TimestampOption::Disabled,
             ipv4_multicast_if_addr: None,
+            ip_recv_tos: false,
         }
     }
 }
@@ -1661,11 +1687,15 @@ where
                 maybe_log_error!("drop_ipv6_membership", &result);
                 responder.send(result).unwrap_or_log("failed to respond");
             }
-            Request::SetIpv6ReceiveTrafficClass { value: _, responder } => {
-                respond_not_supported!("syncudp::SetIpv6ReceiveTrafficClass", responder)
+            Request::SetIpv6ReceiveTrafficClass { value, responder } => {
+                let result = self.set_ipv6_receive_traffic_class(value);
+                maybe_log_error!("set_ipv6_receive_traffic_class", &result);
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetIpv6ReceiveTrafficClass { responder } => {
-                respond_not_supported!("syncudp::GetIpv6ReceiveTrafficClass", responder)
+                let result = self.get_ipv6_receive_traffic_class();
+                maybe_log_error!("get_ipv6_receive_traffic_class", &result);
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::SetIpv6ReceiveHopLimit { value, responder } => {
                 debug!("syncudp::SetIpv6ReceiveHopLimit({value}) is not implemented, returning Ok");
@@ -1674,11 +1704,15 @@ where
             Request::GetIpv6ReceiveHopLimit { responder } => {
                 respond_not_supported!("syncudp::GetIpv6ReceiveHopLimit", responder)
             }
-            Request::SetIpReceiveTypeOfService { value: _, responder } => {
-                respond_not_supported!("syncudp::SetIpReceiveTypeOfService", responder)
+            Request::SetIpReceiveTypeOfService { value, responder } => {
+                let result = self.ip_set_receive_type_of_service(value);
+                maybe_log_error!("ip_set_ip_recv_tos", &result);
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetIpReceiveTypeOfService { responder } => {
-                respond_not_supported!("syncudp::GetIpReceiveTypeOfService", responder)
+                let result = self.ip_get_receive_type_of_service();
+                maybe_log_error!("ip_get_ip_recv_tos", &result);
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::SetIpv6ReceivePacketInfo { value, responder } => {
                 let result = self.set_ipv6_recv_pkt_info(value);
@@ -1855,6 +1889,7 @@ where
                     info: SocketControlInfo { id, .. },
                     version_specific_data,
                     ip_receive_original_destination_address,
+                    ip_recv_tos,
                     timestamp_option,
                     ..
                 },
@@ -1876,6 +1911,7 @@ where
             destination_port,
             timestamp,
             mut data,
+            dscp_and_ecn,
         } = match front {
             None => {
                 // This is safe from races only because the setting of the
@@ -1914,34 +1950,57 @@ where
 
         let mut network: Option<fposix_socket::NetworkSocketRecvControlData> = None;
         if want_control {
-            let mut ip = None;
+            // Destination IPv4 address if this was an IPv4 packet.
+            let ipv4_dest_ip = I::map_ip_in(
+                destination_addr,
+                |ipv4_addr| Some(ipv4_addr),
+                |ipv6_addr| ipv6_addr.to_ipv4_mapped(),
+            );
+
+            let mut ip_data: Option<fposix_socket::IpRecvControlData> = None;
+
+            // `IP_TOS` is included only for IPv4 packets.
+            if *ip_recv_tos && ipv4_dest_ip.is_some() {
+                ip_data.get_or_default().tos = Some(dscp_and_ecn.raw());
+            }
+
             if *ip_receive_original_destination_address {
-                ip.get_or_insert_with(|| fposix_socket::IpRecvControlData::default())
-                    .original_destination_address = Some(
-                    I::SocketAddress::new(
-                        SpecifiedAddr::new(destination_addr).map(|a| ZonedAddr::Unzoned(a).into()),
-                        destination_port,
-                    )
-                    .into_sock_addr(),
-                );
+                // `IP_ORIGDSTADDR` is included only for IPv4 packets.
+                if let Some(ipv4_dest_ip) = ipv4_dest_ip {
+                    ip_data.get_or_default().original_destination_address =
+                        Some(fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                            address: ipv4_dest_ip.into_fidl(),
+                            port: destination_port,
+                        }))
+                }
             }
 
             let ipv6_control_data = I::map_ip_in(
                 (version_specific_data, destination_addr, IpInvariant(interface_id)),
                 |(Ipv4BindingsData {}, _ipv4_dst_addr, _interface_id)| None,
-                |(Ipv6BindingsData { recv_pkt_info }, ipv6_dst_addr, IpInvariant(interface_id))| {
-                    let mut ipv6_control_data = None;
+                |(
+                    Ipv6BindingsData { recv_pkt_info, recv_tclass },
+                    ipv6_dst_addr,
+                    IpInvariant(interface_id),
+                )| {
+                    let mut ipv6_data: Option<fposix_socket::Ipv6RecvControlData> = None;
+
                     if *recv_pkt_info {
-                        ipv6_control_data
-                            .get_or_insert_with(|| fposix_socket::Ipv6RecvControlData::default())
-                            .pktinfo = Some(fposix_socket::Ipv6PktInfoRecvControlData {
-                            iface: interface_id.into(),
-                            header_destination_addr: ipv6_dst_addr.into_fidl(),
-                        })
+                        ipv6_data.get_or_default().pktinfo =
+                            Some(fposix_socket::Ipv6PktInfoRecvControlData {
+                                iface: interface_id.into(),
+                                header_destination_addr: ipv6_dst_addr.into_fidl(),
+                            });
                     }
-                    // TODO(https://fxbug.dev/326102014): Support SOL_IPV6, IPV6_RECVTCLASS.
-                    // TODO(https://fxbug.dev/326102020): Support SOL_IPV6, IPV6_RECVHOPLIMIT.
-                    ipv6_control_data
+
+                    // `IPV6_TCLASS` is included only if this is an IPv6 packet.
+                    if *recv_tclass && ipv4_dest_ip.is_none() {
+                        ipv6_data.get_or_default().tclass = Some(dscp_and_ecn.raw());
+                    }
+
+                    // TODO(https://fxbug.dev/326102020): Support SOL_IPV6,
+                    // IPV6_RECVHOPLIMIT.
+                    ipv6_data
                 },
             );
 
@@ -1953,20 +2012,16 @@ where
                     }
                 });
 
-            if let Some(ip) = ip {
-                network.get_or_insert_with(Default::default).ip = Some(ip);
+            if ip_data.is_some() {
+                network.get_or_default().ip = ip_data;
             }
 
-            if let Some(ipv6_control_data) = ipv6_control_data {
-                network.get_or_insert_with(Default::default).ipv6 = Some(ipv6_control_data);
+            if ipv6_control_data.is_some() {
+                network.get_or_default().ipv6 = ipv6_control_data;
             }
 
             if let Some(timestamp) = timestamp {
-                network
-                    .get_or_insert_with(Default::default)
-                    .socket
-                    .get_or_insert_with(Default::default)
-                    .timestamp = Some(timestamp);
+                network.get_or_default().socket.get_or_default().timestamp = Some(timestamp);
             };
         };
 
@@ -2066,9 +2121,9 @@ where
     fn set_ipv6_recv_pkt_info(self, new: bool) -> Result<(), fposix::Errno> {
         let correct_ip_version: Option<()> = I::map_ip(
             &mut self.data.version_specific_data,
-            |_v4| None,
-            |Ipv6BindingsData { recv_pkt_info: old }| {
-                *old = new;
+            |_v4_data| None,
+            |v6_data| {
+                v6_data.recv_pkt_info = new;
                 Some(())
             },
         );
@@ -2078,8 +2133,8 @@ where
     fn get_ipv6_recv_pkt_info(self) -> Result<bool, fposix::Errno> {
         let correct_ip_version: Option<bool> = I::map_ip(
             &self.data.version_specific_data,
-            |_v4| None,
-            |Ipv6BindingsData { recv_pkt_info }| Some(*recv_pkt_info),
+            |_v4_data| None,
+            |v6_data| Some(v6_data.recv_pkt_info),
         );
         correct_ip_version.ok_or(fposix::Errno::Eopnotsupp)
     }
@@ -2351,6 +2406,34 @@ where
                 e => e,
             })
             .map(DscpAndEcn::raw)
+    }
+
+    fn set_ipv6_receive_traffic_class(self, value: bool) -> Result<(), fposix::Errno> {
+        I::map_ip_in(
+            &mut self.data.version_specific_data,
+            |_v4_data| Err(fposix::Errno::Enoprotoopt),
+            |v6_data| {
+                v6_data.recv_tclass = value;
+                Ok(())
+            },
+        )
+    }
+
+    fn get_ipv6_receive_traffic_class(self) -> Result<bool, fposix::Errno> {
+        I::map_ip_in(
+            &self.data.version_specific_data,
+            |_v4_data| Err(fposix::Errno::Eopnotsupp),
+            |v6_data| Ok(v6_data.recv_tclass),
+        )
+    }
+
+    fn ip_set_receive_type_of_service(self, value: bool) -> Result<(), fposix::Errno> {
+        self.data.ip_recv_tos = value;
+        Ok(())
+    }
+
+    fn ip_get_receive_type_of_service(self) -> Result<bool, fposix::Errno> {
+        Ok(self.data.ip_recv_tos)
     }
 }
 
@@ -4063,34 +4146,43 @@ mod tests {
             .expect("get_ip_receive_original_destination_address (FIDL) failed")
             .expect("get_ip_receive_original_destination_address failed"),);
 
-        assert_matches!(
-            alice_socket
-                .recv_msg(false, 2048, true, fposix_socket::RecvMsgFlags::empty())
-                .await
-                .unwrap()
-                .expect("recvmsg suceeeds"),
-            (
-                _,
-                _,
-                fposix_socket::DatagramSocketRecvControlData {
-                    network:
-                        Some(fposix_socket::NetworkSocketRecvControlData {
-                            ip:
-                                Some(fposix_socket::IpRecvControlData {
-                                    original_destination_address: Some(addr),
-                                    ..
-                                }),
-                            ..
-                        }),
-                    ..
-                },
-                _,
-            ) => {
-                let addr = A::from_sock_addr(addr).expect("bad socket address return");
-                assert_eq!(addr.addr(), A::LOCAL_ADDR);
-                assert_eq!(addr.port(), 200);
-            }
-        );
+        let recvmsg_result = alice_socket
+            .recv_msg(false, 2048, true, fposix_socket::RecvMsgFlags::empty())
+            .await
+            .unwrap()
+            .expect("recvmsg suceeeds");
+
+        // `original_destination_address` should be sent only for IPv4 packets.
+        if A::DOMAIN == fposix_socket::Domain::Ipv4 {
+            assert_matches!(recvmsg_result,
+                (
+                    _,
+                    _,
+                    fposix_socket::DatagramSocketRecvControlData {
+                        network:
+                            Some(fposix_socket::NetworkSocketRecvControlData {
+                                ip:
+                                    Some(fposix_socket::IpRecvControlData {
+                                        original_destination_address: Some(addr),
+                                        ..
+                                    }),
+                                ..
+                            }),
+                        ..
+                    },
+                    _,
+                ) => {
+                    let addr = A::from_sock_addr(addr).expect("bad socket address return");
+                    assert_eq!(addr.addr(), A::LOCAL_ADDR);
+                    assert_eq!(addr.port(), 200);
+                }
+            );
+        } else {
+            assert_matches!(
+                recvmsg_result,
+                (_, _, fposix_socket::DatagramSocketRecvControlData { network: None, .. }, _,)
+            );
+        }
 
         // Turn it off.
         alice_socket

@@ -14,6 +14,9 @@
             matchers: [
                 // TODO(https://fxbug.dev/42074274): Return ENODEV instead of EINVAL.
                 "LocalhostTest.IpAddMembershipInvalidIface",
+
+                // IP_RECVORIGDSTADDR is not supported with netstack2.
+                "OrigDstAddrOnDualStackSocket.Ipv?",
             ],
         },
     ],
