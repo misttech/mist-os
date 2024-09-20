@@ -103,7 +103,7 @@ bootstrap_userdebug_platform_aib_names = [
   "power_framework_sag",
 
   # Trusted application support.
-  "ta_manager",
+  "trusted_execution_environment",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -413,7 +413,7 @@ experimental_aib_names = [
   "power_framework_sag",
   "power_framework_testing_sag",
   "topology_test_daemon",
-  "ta_manager",
+  "trusted_execution_environment",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

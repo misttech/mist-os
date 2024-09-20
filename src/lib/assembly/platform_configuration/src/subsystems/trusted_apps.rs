@@ -19,7 +19,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsSubsyst
             return Ok(());
         }
 
-        builder.platform_bundle("ta_manager");
+        builder.platform_bundle("trusted_execution_environment");
 
         // Create a domain config package for all the TA configs.
         let dir = builder
