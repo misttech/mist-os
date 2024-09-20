@@ -43,7 +43,7 @@ impl DeviceMode {
         }
     }
 
-    fn minor_range(&self) -> Range<u32> {
+    pub fn minor_range(&self) -> Range<u32> {
         0..self.minor_count()
     }
 }
@@ -124,8 +124,6 @@ pub trait DeviceListener: Send + Sync {
 }
 
 struct DeviceEntry {
-    // Will be used in /proc/devices and /proc/misc.
-    #[allow(dead_code)]
     name: FsString,
     ops: Arc<dyn DeviceOps>,
 }
@@ -164,6 +162,17 @@ impl RegisteredDevices {
         } else {
             error!(ENODEV)
         }
+    }
+
+    fn list_major_devices(&self) -> Vec<(u32, FsString)> {
+        self.majors.iter().map(|(major, entry)| (*major, entry.name.clone())).collect()
+    }
+
+    fn list_minor_devices(&self, range: Range<DeviceType>) -> Vec<(DeviceType, FsString)> {
+        self.minors
+            .range(range)
+            .map(|(device_type, entry)| (device_type.clone(), entry.name.clone()))
+            .collect()
     }
 }
 
@@ -306,6 +315,18 @@ impl DeviceRegistry {
         {
             log_error!("Cannot remove device {:?} ({:?})", device, err);
         }
+    }
+
+    pub fn list_major_devices(&self, mode: DeviceMode) -> Vec<(u32, FsString)> {
+        self.devices(mode).list_major_devices()
+    }
+
+    pub fn list_minor_devices(
+        &self,
+        mode: DeviceMode,
+        range: Range<DeviceType>,
+    ) -> Vec<(DeviceType, FsString)> {
+        self.devices(mode).list_minor_devices(range)
     }
 
     fn devices(&self, mode: DeviceMode) -> MappedMutexGuard<'_, RegisteredDevices> {
