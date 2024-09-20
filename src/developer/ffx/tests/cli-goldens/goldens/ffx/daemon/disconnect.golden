@@ -1,0 +1,21 @@
+{
+  "name": "disconnect",
+  "description": "Disconnect from a target",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "Tells the daemon to disconnect from the specified target.\nUseful when the client knows the connection is no longer valid, e.g.\nin a test in which the target has been rebooted."
+  ],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}
