@@ -27,6 +27,13 @@ zx_status_t Interrupter::Init(uint16_t interrupter, size_t page_size, fdf::MmioB
   snprintf(name, sizeof(name), "Interrupter %hu", interrupter_);
   inspect_root_ = hci_->inspect_root_node().CreateChild(name);
   total_irqs_ = inspect_root_.CreateUint("Total IRQs", 0);
+  wake_events_ = inspect_root_.CreateChild("Wake Events");
+  total_wake_events_ = wake_events_.CreateUint("Total Wake Events", 0);
+  wake_lease_held_ = wake_events_.CreateBool("Wake Lease Held", false);
+  wake_lease_last_acquired_timestamp_ =
+      wake_events_.CreateUint("Wake Lease Last Acquired Timestamp (ms)", 0);
+  wake_lease_last_refreshed_timestamp_ =
+      wake_events_.CreateUint("Wake Lease Last Refreshed Timestamp (ms)", 0);
 
   return event_ring_.Init(page_size, hci_->bti(), buffer, hci->Is32BitController(), erst_max,
                           ERSTSZ::Get(offset, interrupter_).ReadFrom(buffer),
@@ -101,12 +108,20 @@ void Interrupter::HandleWakeLease() {
           // Drops the lease and resets handler
           lease.reset();
           lease_timeout_.set_handler({});
+
+          wake_lease_held_.Set(false);
         });
+
+    total_wake_events_.Add(1);
+    wake_lease_held_.Set(true);
+    wake_lease_last_acquired_timestamp_.Set(zx::clock::get_monotonic().get());
   }
 
   // Start timeout.
   const zx::duration kLeaseTimeout = zx::msec(500);
   lease_timeout_.PostDelayed(dispatcher_.async_dispatcher(), kLeaseTimeout);
+
+  wake_lease_last_refreshed_timestamp_.Set(zx::clock::get_monotonic().get());
 }
 
 zx_status_t Interrupter::StartIrqThread() {

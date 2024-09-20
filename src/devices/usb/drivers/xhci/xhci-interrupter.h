@@ -90,6 +90,12 @@ class Interrupter {
   inspect::Node inspect_root_;
   inspect::UintProperty total_irqs_;
 
+  inspect::Node wake_events_;
+  inspect::UintProperty total_wake_events_;
+  inspect::BoolProperty wake_lease_held_;
+  inspect::UintProperty wake_lease_last_acquired_timestamp_;
+  inspect::UintProperty wake_lease_last_refreshed_timestamp_;
+
   // Reference to the xHCI core. Since Interrupter is a part of the
   // UsbXhci (always instantiated as a class member), this reference
   // will always be valid for the lifetime of the Interrupter.
