@@ -60,6 +60,8 @@ _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_LIST": ["--machine", "json", "target", "list"],
     "TARGET_WAIT": ["target", "wait", "--timeout", "0"],
     "TARGET_WAIT_DOWN": ["target", "wait", "--down", "--timeout", "0"],
+    # Tell the daemon to drop its connection to the target
+    "TARGET_DISCONNECT": ["daemon", "disconnect"],
     "TEST_RUN": ["test", "run"],
     "TARGET_SSH": ["target", "ssh"],
 }
@@ -615,10 +617,15 @@ class FFX(ffx_interface.FFX):
         _LOGGER.info(
             "Waiting for %s to disconnect from host...", self._target_name
         )
-
         self.run(cmd=_FFX_CMDS["TARGET_WAIT_DOWN"])
-
         _LOGGER.info("%s is not connected to host", self._target_name)
+
+        _LOGGER.debug(
+            "Informing the FFX daemon to drop the connection to %s",
+            self._target_name,
+        )
+        self.run(cmd=_FFX_CMDS["TARGET_DISCONNECT"])
+
         return
 
     def generate_ffx_cmd(

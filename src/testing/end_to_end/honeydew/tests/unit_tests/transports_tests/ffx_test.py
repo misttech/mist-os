@@ -713,4 +713,4 @@ class FfxTests(unittest.TestCase):
     def test_wait_for_rcs_disconnection(self, mock_ffx_run: mock.Mock) -> None:
         """Test case for ffx.wait_for_rcs_disconnection()"""
         self.ffx_obj_with_ip.wait_for_rcs_disconnection()
-        mock_ffx_run.assert_called()
+        self.assertEqual(mock_ffx_run.call_count, 2)
