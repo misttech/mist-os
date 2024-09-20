@@ -159,7 +159,7 @@ impl<'a> ScannedStore<'a> {
                         ))?;
                     }
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs, .. },
+                        kind: ObjectKind::File { refs },
                         attributes: ObjectAttributes { project_id, allocated_size, .. },
                     } => {
                         if *project_id > 0 {
@@ -322,7 +322,7 @@ impl<'a> ScannedStore<'a> {
             }
             ObjectKeyData::Attribute(attribute_id, AttributeKey::Attribute) => {
                 match value {
-                    ObjectValue::Attribute { size } => {
+                    ObjectValue::Attribute { size, .. } => {
                         match self.objects.get_mut(&key.object_id) {
                             Some(
                                 ScannedObject::File(ScannedFile { attributes, .. })

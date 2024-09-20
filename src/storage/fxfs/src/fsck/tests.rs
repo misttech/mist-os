@@ -242,7 +242,7 @@ async fn test_bad_graveyard_value() {
             root_store.store_object_id(),
             Mutation::replace_or_insert_object(
                 ObjectKey::graveyard_entry(graveyard_id, 1000),
-                ObjectValue::Attribute { size: 500 },
+                ObjectValue::Attribute { size: 500, has_overwrite_extents: false },
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -853,7 +853,10 @@ async fn test_mismatched_key_and_value() {
         install_items_in_store(
             &fs,
             store.as_ref(),
-            vec![Item::new(ObjectKey::object(10), ObjectValue::Attribute { size: 100 })],
+            vec![Item::new(
+                ObjectKey::object(10),
+                ObjectValue::Attribute { size: 100, has_overwrite_extents: false },
+            )],
         )
         .await;
         store.store_object_id()
@@ -1127,7 +1130,7 @@ async fn test_verified_file_merkle_attribute_missing() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
+                        kind: ObjectKind::File { refs: 1 },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -1261,7 +1264,7 @@ async fn test_orphaned_extended_attribute() {
             store.as_ref(),
             vec![Item::new(
                 ObjectKey::attribute(store.root_directory_object_id(), 64, AttributeKey::Attribute),
-                ObjectValue::attribute(100),
+                ObjectValue::attribute(100, false),
             )],
         )
         .await;
@@ -1292,7 +1295,7 @@ async fn test_orphaned_attribute() {
             store.as_ref(),
             vec![Item::new(
                 ObjectKey::attribute(10, 1, AttributeKey::Attribute),
-                ObjectValue::attribute(100),
+                ObjectValue::attribute(100, false),
             )],
         )
         .await;
@@ -1325,7 +1328,7 @@ async fn test_records_for_tombstoned_object() {
                 Item::new(ObjectKey::object(10), ObjectValue::None),
                 Item::new(
                     ObjectKey::attribute(10, 1, AttributeKey::Attribute),
-                    ObjectValue::attribute(100),
+                    ObjectValue::attribute(100, false),
                 ),
             ],
         )
@@ -1359,13 +1362,13 @@ async fn test_invalid_value_graveyard_attribute_entry() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
+                        kind: ObjectKind::File { refs: 1 },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
                 Item::new(
                     ObjectKey::attribute(10, 1, AttributeKey::Attribute),
-                    ObjectValue::attribute(100),
+                    ObjectValue::attribute(100, false),
                 ),
                 Item::new(
                     ObjectKey::graveyard_attribute_entry(
@@ -1625,7 +1628,7 @@ async fn test_incorrect_merkle_tree_size_empty_file() {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(0),
+                ObjectValue::attribute(0, false),
             ),
         );
         transaction.commit().await.expect("commit transaction failed");
@@ -1685,7 +1688,7 @@ async fn test_incorrect_merkle_tree_size_one_data_block() {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(2 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64),
+                ObjectValue::attribute(2 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64, false),
             ),
         );
         transaction.commit().await.expect("commit transaction failed");
@@ -1746,7 +1749,7 @@ async fn test_incorrect_merkle_tree_size_data_unaligned() {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(10 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64),
+                ObjectValue::attribute(10 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64, false),
             ),
         );
         transaction.commit().await.expect("commit transaction failed");
@@ -1818,7 +1821,7 @@ async fn test_file_length_mismatch() {
                     handle.attribute_id(),
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(123),
+                ObjectValue::attribute(123, false),
             ),
         );
         transaction.add(
@@ -1826,7 +1829,7 @@ async fn test_file_length_mismatch() {
             Mutation::replace_or_insert_object(
                 ObjectKey::object(handle.object_id()),
                 ObjectValue::Object {
-                    kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
+                    kind: ObjectKind::File { refs: 1 },
                     attributes: ObjectAttributes {
                         creation_time: Timestamp::now(),
                         modification_time: Timestamp::now(),

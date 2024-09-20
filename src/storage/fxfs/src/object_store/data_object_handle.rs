@@ -17,8 +17,8 @@ use crate::object_store::object_record::{
 };
 use crate::object_store::store_object_handle::{MaybeChecksums, NeedsTrim};
 use crate::object_store::transaction::{
-    self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
-    Transaction,
+    self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Operation,
+    Options, Transaction,
 };
 use crate::object_store::{
     HandleOptions, HandleOwner, RootDigest, StoreObjectHandle, TrimMode, TrimResult,
@@ -223,18 +223,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .allocator()
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
-        transaction.add_with_object(
-            self.store().store_object_id,
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    self.object_id(),
-                    self.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
-                ObjectValue::attribute(new_size),
-            ),
-            AssocObj::Borrowed(self),
-        );
+        self.txn_update_size(transaction, new_size).await?;
         transaction.add(
             self.store().store_object_id,
             Mutation::merge_object(
@@ -586,21 +575,28 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             to_allocate.push(new_range.clone());
         }
 
+        // We can update the size in the first transaction because even if subsequent transactions
+        // don't get replayed, the data between the current and new end of the file will be zero
+        // (either sparse zero or allocated zero). On the other hand, if we don't update the size
+        // in the first transaction, overwrite extents may be written past the end of the file
+        // which is an fsck error.
+        let new_size = std::cmp::max(new_range.end, self.get_size());
         // Make sure the mutation that flips the has_overwrite_extents advisory flag is in the
         // first transaction, in case we split transactions. This makes it okay to only replay the
         // first transaction if power loss occurs - the file will be in an unusual state, but not
         // an invalid one, if only part of the allocate goes through.
-        let mut mutation =
-            self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
-        if let ObjectValue::Object {
-            kind: ObjectKind::File { has_overwrite_extents, .. }, ..
-        } = &mut mutation.item.value
-        {
-            *has_overwrite_extents = true;
-        } else {
-            bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
-        }
-        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+        transaction.add_with_object(
+            self.store().store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    self.object_id(),
+                    self.attribute_id(),
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::Attribute { size: new_size, has_overwrite_extents: true },
+            ),
+            AssocObj::Borrowed(self),
+        );
 
         // The maximum number of mutations we are going to allow per transaction in allocate. This
         // is probably quite a bit lower than the actual limit, but it should be large enough to
@@ -624,9 +620,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let allocator = self.store().allocator();
         for mut allocate_range in to_allocate {
             while allocate_range.start < allocate_range.end {
-                // TODO(https://fxbug.dev/293943124): if any extents are beyond the end of the file
-                // and the transaction gets split, it will cause an fsck failure. We need to handle
-                // that case somehow (probably by adding a temporary TRIM record).
                 let device_range = allocator
                     .allocate(
                         &mut transaction,
@@ -657,28 +650,16 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 allocated += device_range_len;
 
                 if transaction.mutations().len() >= MAX_TRANSACTION_SIZE {
+                    self.update_allocated_size(&mut transaction, allocated, 0).await?;
                     transaction.commit_and_continue().await?;
+                    allocated = 0;
                 }
             }
         }
 
-        if new_range.end > self.txn_get_size(&transaction) {
-            transaction.add_with_object(
-                self.store().store_object_id(),
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id(),
-                        self.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(new_range.end),
-                ),
-                AssocObj::Borrowed(self),
-            );
-        }
         self.update_allocated_size(&mut transaction, allocated, 0).await?;
-
         transaction.commit().await?;
+
         Ok(())
     }
 
@@ -809,18 +790,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         )
         .await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
-            transaction.add_with_object(
-                self.store().store_object_id,
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id(),
-                        self.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(offset + buf.len() as u64),
-                ),
-                AssocObj::Borrowed(self),
-            );
+            self.txn_update_size(transaction, offset + buf.len() as u64).await?;
         }
         Ok(())
     }
@@ -1069,13 +1039,43 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 ),
             )
             .and_then(|m| {
-                if let ObjectItem { value: ObjectValue::Attribute { size }, .. } = m.item {
+                if let ObjectItem { value: ObjectValue::Attribute { size, .. }, .. } = m.item {
                     Some(size)
                 } else {
                     None
                 }
             })
             .unwrap_or_else(|| self.get_size())
+    }
+
+    pub async fn txn_update_size<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        new_size: u64,
+    ) -> Result<(), Error> {
+        let key =
+            ObjectKey::attribute(self.object_id(), self.attribute_id(), AttributeKey::Attribute);
+        let mut mutation = if let Some(mutation) =
+            transaction.get_object_mutation(self.store().store_object_id(), key.clone())
+        {
+            mutation.clone()
+        } else {
+            ObjectStoreMutation {
+                item: self.store().tree().find(&key).await?.ok_or(FxfsError::NotFound)?,
+                op: Operation::ReplaceOrInsert,
+            }
+        };
+        if let ObjectValue::Attribute { size, .. } = &mut mutation.item.value {
+            *size = new_size;
+        } else {
+            bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
+        }
+        transaction.add_with_object(
+            self.store().store_object_id(),
+            Mutation::ObjectStore(mutation),
+            AssocObj::Borrowed(self),
+        );
+        Ok(())
     }
 
     async fn update_allocated_size(
@@ -1093,18 +1093,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         size: u64,
     ) -> Result<NeedsTrim, Error> {
         let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
-        transaction.add_with_object(
-            self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    self.object_id(),
-                    self.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
-                ObjectValue::attribute(size),
-            ),
-            AssocObj::Borrowed(self),
-        );
+        self.txn_update_size(transaction, size).await?;
         Ok(needs_trim)
     }
 
@@ -1183,18 +1172,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 }
             }
         }
-        transaction.add_with_object(
-            store.store_object_id,
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    self.object_id(),
-                    self.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
-                ObjectValue::attribute(size),
-            ),
-            AssocObj::Borrowed(self),
-        );
+        self.txn_update_size(transaction, size).await?;
         Ok(())
     }
 
@@ -1333,18 +1311,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         }
         // Update the file size if it changed.
         if file_range.start > round_up(self.txn_get_size(transaction), block_size).unwrap() {
-            transaction.add_with_object(
-                self.store().store_object_id,
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id(),
-                        self.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(file_range.start),
-                ),
-                AssocObj::Borrowed(self),
-            );
+            self.txn_update_size(transaction, file_range.start).await?;
         }
         self.update_allocated_size(transaction, allocated, 0).await?;
         Ok(ranges)
@@ -1525,7 +1492,7 @@ impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
     fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
         match mutation {
             Mutation::ObjectStore(ObjectStoreMutation {
-                item: ObjectItem { value: ObjectValue::Attribute { size }, .. },
+                item: ObjectItem { value: ObjectValue::Attribute { size, .. }, .. },
                 ..
             }) => self.content_size.store(*size, atomic::Ordering::Relaxed),
             Mutation::ObjectStore(ObjectStoreMutation {

@@ -13,12 +13,9 @@ use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle};
 use fxfs::object_store::allocator::{Allocator, Reservation, ReservationOwner};
 use fxfs::object_store::transaction::{
-    lock_keys, AssocObj, LockKey, Mutation, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
+    lock_keys, LockKey, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
-use fxfs::object_store::{
-    AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
-    Timestamp,
-};
+use fxfs::object_store::{DataObjectHandle, ObjectStore, StoreObjectHandle, Timestamp};
 use fxfs::range::RangeExt;
 use fxfs::round::{how_many, round_up};
 use scopeguard::ScopeGuard;
@@ -424,18 +421,7 @@ impl PagedObjectHandle {
         ctime: Option<Timestamp>,
     ) -> Result<(), Error> {
         if let Some(content_size) = content_size {
-            transaction.add_with_object(
-                self.store().store_object_id(),
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.handle.object_id(),
-                        self.handle.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(content_size),
-                ),
-                AssocObj::Borrowed(&self.handle),
-            );
+            self.handle.txn_update_size(transaction, content_size).await?;
         }
         let attributes = fio::MutableNodeAttributes {
             creation_time: crtime.map(|t| t.as_nanos()),

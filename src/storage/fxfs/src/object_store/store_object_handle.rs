@@ -706,7 +706,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let item = self.store().tree().find(&key).await?;
         let size = match item {
             Some(item) if item.key == key => match item.value {
-                ObjectValue::Attribute { size } => size,
+                ObjectValue::Attribute { size, .. } => size,
                 _ => bail!(FxfsError::Inconsistent),
             },
             _ => return Ok(0),
@@ -882,7 +882,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let mut iter = merger.query(Query::FullRange(&key)).await?;
         let (mut buffer, size) = match iter.get() {
             Some(item) if item.key == &key => match item.value {
-                ObjectValue::Attribute { size } => {
+                ObjectValue::Attribute { size, .. } => {
                     // TODO(https://fxbug.dev/42073113): size > max buffer size
                     (
                         store
@@ -1122,7 +1122,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(data.len() as u64),
+                ObjectValue::attribute(data.len() as u64, false),
             ),
         );
         let chunks = data.chunks(batch_size);
@@ -1182,7 +1182,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .await?
         {
             match item.value {
-                ObjectValue::Attribute { size } => (data.len() as u64) < size,
+                ObjectValue::Attribute { size: _, has_overwrite_extents: true } => {
+                    bail!(anyhow!(FxfsError::Inconsistent)
+                        .context("write_attr on an attribute with overwrite extents"))
+                }
+                ObjectValue::Attribute { size, .. } => (data.len() as u64) < size,
                 _ => bail!(FxfsError::Inconsistent),
             }
         } else {
@@ -1197,7 +1201,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(data.len() as u64),
+                ObjectValue::attribute(data.len() as u64, false),
             ),
         );
         if should_trim {
@@ -2151,7 +2155,7 @@ mod tests {
             object.store().store_object_id,
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(object.object_id(), attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(block_size * 2),
+                ObjectValue::attribute(block_size * 2, false),
             ),
         );
         transaction.commit().await.unwrap();

@@ -797,7 +797,7 @@ impl ObjectStore {
             ))
             .await?
             .ok_or(FxfsError::NotFound)?;
-        if let ObjectValue::Attribute { size } = item.value {
+        if let ObjectValue::Attribute { size, .. } = item.value {
             Ok(size)
         } else {
             bail!(FxfsError::NotFile);
@@ -829,7 +829,7 @@ impl ObjectStore {
             .ok_or(FxfsError::NotFound)?;
 
         let size = match item.value {
-            ObjectValue::Attribute { size } => size,
+            ObjectValue::Attribute { size, .. } => size,
             ObjectValue::VerifiedAttribute { size, fsverity_metadata } => {
                 fsverity_descriptor = Some(fsverity_metadata);
                 size
@@ -923,7 +923,8 @@ impl ObjectStore {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::attribute(object_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
-                ObjectValue::attribute(0),
+                // This is a new object so nothing has pre-allocated overwrite extents yet.
+                ObjectValue::attribute(0, false),
             ),
         );
         Ok(DataObjectHandle::new(
@@ -1155,7 +1156,7 @@ impl ObjectStore {
                                     ObjectKeyData::Attribute(size_attribute_id, AttributeKey::Attribute),
                                 ..
                             },
-                        value: ObjectValue::Attribute { size },
+                        value: ObjectValue::Attribute { size, .. },
                         ..
                     } = item_ref
                     {
@@ -2347,7 +2348,7 @@ mod tests {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(0),
+                ObjectValue::attribute(0, false),
             ),
         );
 
