@@ -981,6 +981,36 @@ void Node::AddChild(fuchsia_driver_framework::NodeAddArgs args,
       });
 }
 
+void Node::OnNodeServerUnbound(fidl::UnbindInfo info) {
+  node_ref_.reset();
+  // If the unbind is initiated from us, we don't need to do anything to handle
+  // the closure.
+  if (info.is_user_initiated()) {
+    return;
+  }
+
+  // IF the driver fails to bind to the node, don't remove the node.
+  if (driver_component_->state == DriverState::kBinding) {
+    LOGF(WARNING, "The driver for node %s failed to bind.", name().c_str());
+    return;
+  }
+
+  if (GetNodeState() == NodeState::kRunning) {
+    // If the node is running but this node closure has happened, then we want to restart
+    // the node if it has the host_restart_on_crash_ enabled on it.
+    if (host_restart_on_crash_) {
+      LOGF(INFO, "Restarting node %s due to node closure while running.", name().c_str());
+      RestartNode();
+      return;
+    }
+
+    LOGF(WARNING, "fdf::Node binding for node %s closed while the node was running: %s",
+         name().c_str(), info.FormatDescription().c_str());
+  }
+
+  Remove(RemovalSet::kAll, nullptr);
+}
+
 void Node::Remove(RemoveCompleter::Sync& completer) {
   LOGF(DEBUG, "Remove() Fidl call for %s", name().c_str());
   Remove(RemovalSet::kAll, nullptr);
@@ -1173,37 +1203,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   // Bind the Node associated with the driver.
   auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
-  node_ref_.emplace(
-      dispatcher_, std::move(server_end), this, [](Node* node, fidl::UnbindInfo info) {
-        node->node_ref_.reset();
-        // If the unbind is initiated from us, we don't need to do anything to handle
-        // the closure.
-        if (info.is_user_initiated()) {
-          return;
-        }
-
-        // IF the driver fails to bind to the node, don't remove the node.
-        if (node->driver_component_->state == DriverState::kBinding) {
-          LOGF(WARNING, "The driver for node %s failed to bind.", node->name().c_str());
-          return;
-        }
-
-        if (node->GetNodeState() == NodeState::kRunning) {
-          // If the node is running but this node closure has happened, then we want to restart
-          // the node if it has the host_restart_on_crash_ enabled on it.
-          if (node->host_restart_on_crash_) {
-            LOGF(INFO, "Restarting node %s due to node closure while running.",
-                 node->name().c_str());
-            node->RestartNode();
-            return;
-          }
-
-          LOGF(WARNING, "fdf::Node binding for node %s closed while the node was running: %s",
-               node->name().c_str(), info.FormatDescription().c_str());
-        }
-
-        node->Remove(RemovalSet::kAll, nullptr);
-      });
+  node_ref_.emplace(dispatcher_, std::move(server_end), this,
+                    [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
@@ -1269,11 +1270,15 @@ void Node::StartDriverWithDynamicLinker(
     DriverDynamicLinkerArgs args, std::string_view url,
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
     fit::callback<void(zx::result<>)> cb) {
+  auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
+  node_ref_.emplace(dispatcher_, std::move(server_end), this,
+                    [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
+
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints.client));
-  driver_host_.value()->StartWithDynamicLinker(args.driver_soname, std::move(args.driver_file),
-                                               std::move(args.lib_dir),
+  driver_host_.value()->StartWithDynamicLinker(std::move(client_end), name_, args.driver_soname,
+                                               std::move(args.driver_file), std::move(args.lib_dir),
                                                std::move(driver_endpoints.server), std::move(cb));
 }
 

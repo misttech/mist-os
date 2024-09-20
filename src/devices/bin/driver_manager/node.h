@@ -130,6 +130,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
+  // This is called when |node_ref_| is unbound from the dispatcher.
+  void OnNodeServerUnbound(fidl::UnbindInfo info);
+
   // NodeShutdownBridge
   // Exposed for testing.
   bool HasDriverComponent() const override {

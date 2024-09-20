@@ -217,6 +217,7 @@ DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
 }
 
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
+    fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
     std::string_view driver_soname, zx::vmo driver, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
   // TODO(https://fxbug.dev/357854682): pass this to the started driver host once
@@ -255,6 +256,10 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
       cb(zx::error(status));
       return;
     }
+
+    // TODO(https://fxbug.dev/355233670): send node client as part of
+    // |fuchsia_driver_host::DriverHost::Start|.
+
     cb(zx::ok());
   });
 }

@@ -28,6 +28,7 @@ class DriverHost {
 
   // Loads and starts a driver using dynamic linking.
   virtual void StartWithDynamicLinker(
+      fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
       std::string_view driver_soname, zx::vmo driver,
       fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
       fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
@@ -94,7 +95,8 @@ class DynamicLinkerDriverHostComponent final
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
-  void StartWithDynamicLinker(std::string_view driver_soname, zx::vmo driver,
+  void StartWithDynamicLinker(fidl::ClientEnd<fuchsia_driver_framework::Node> node,
+                              std::string node_name, std::string_view driver_soname, zx::vmo driver,
                               fidl::ClientEnd<fuchsia_io::Directory>,
                               fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
                               StartCallback cb) override;
