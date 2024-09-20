@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
 
@@ -142,6 +143,7 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
 }
 
 zx_status_t AmlSuspend::SystemSuspendEnter(zx_time_t resume_deadline) {
+  TRACE_DURATION("power", "aml-suspend:suspend");
   return zx_system_suspend_enter(cpu_resource_.get(), resume_deadline);
 }
 
