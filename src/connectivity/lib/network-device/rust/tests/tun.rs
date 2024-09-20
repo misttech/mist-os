@@ -11,6 +11,8 @@ use futures::stream::TryStreamExt as _;
 use netdevice_client::{Client, Port, Session};
 use std::convert::TryInto as _;
 use std::io::{Read as _, Write as _};
+use std::pin::pin;
+use std::task::Poll;
 use {
     fidl_fuchsia_hardware_network as netdev, fidl_fuchsia_net_tun as tun, fuchsia_async as fasync,
     fuchsia_zircon as zx,
@@ -241,6 +243,83 @@ async fn test_port_stream() {
         stream.try_next().await.expect("failed to get next event"),
         Some(netdev::DevicePortEvent::Removed(p)) if p == port.into()
     );
+}
+
+#[test]
+fn tx_wait_idle() {
+    let mut executor = fasync::TestExecutor::new();
+
+    let (tun, _tun_port, port) = executor.run_singlethreaded(create_tun_device_and_port());
+    let client = create_netdev_client(&tun);
+
+    let session = executor.run_singlethreaded(async {
+        let (session, task) = client
+            .primary_session("tx_wait_idle", SESSION_BUFFER_LEN)
+            .await
+            .expect("failed to create session");
+        session
+            .attach(port, &[netdev::FrameType::Ethernet])
+            .await
+            .expect("failed to attach session");
+        // Given we're manually running the executor, detaching the task and
+        // panicking on exit is easier than driving it manually and we don't
+        // lose any signal.
+        fasync::Task::spawn(
+            task.map(|res| panic!("the background task for session terminated with {:?}", res)),
+        )
+        .detach();
+        session
+    });
+
+    let mut fut = pin!(session.wait_tx_idle());
+    assert_eq!(executor.run_until_stalled(&mut fut), Poll::Ready(()));
+
+    // Send 2 buffers.
+    executor.run_singlethreaded(async {
+        let buffers = session
+            .alloc_tx_buffers(DATA_LEN)
+            .await
+            .expect("failed to alloc tx buffers")
+            .take(2)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("failed to collect tx buffers");
+        for mut buffer in buffers {
+            assert_eq!(
+                buffer.write(&[DATA_BYTE; DATA_LEN][..]).expect("failed to write into the buffer"),
+                DATA_LEN
+            );
+            buffer.set_port(port);
+            buffer.set_frame_type(netdev::FrameType::Ethernet);
+            session.send(buffer).expect("failed to send the buffer");
+        }
+    });
+
+    // We have now 2 outstanding buffers so we try to wait idle it should block.
+    let mut fut = pin!(session.wait_tx_idle());
+    assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
+
+    // Complete a single frame.
+    executor.run_singlethreaded(async {
+        let tun::Frame { .. } = tun
+            .read_frame()
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .expect("failed to read frame from the tun device");
+    });
+
+    // Must still be pending.
+    assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
+
+    // Complete the second frame then the future will eventually resolve.
+    let ((), ()) = executor.run_singlethreaded(futures::future::join(fut, async {
+        let tun::Frame { .. } = tun
+            .read_frame()
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .expect("failed to read frame from the tun device");
+    }));
 }
 
 fn default_base_port_config() -> tun::BasePortConfig {

@@ -11,6 +11,7 @@ use std::mem::MaybeUninit;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, TryFromIntError};
 use std::ops::Range;
 use std::pin::Pin;
+use std::sync::atomic::{self, AtomicUsize};
 use std::sync::Arc;
 use std::task::Waker;
 
@@ -47,6 +48,7 @@ impl Debug for Session {
             tx_pending: _,
             rx_ready: _,
             tx_ready: _,
+            tx_idle_listeners: _,
         } = &**inner;
         f.debug_struct("Session").field("name", &name).finish_non_exhaustive()
     }
@@ -122,6 +124,22 @@ impl Session {
             .map_err(|raw| Error::Detach(port, zx::Status::from_raw(raw)))?;
         Ok(())
     }
+
+    /// Blocks until there are no more tx buffers in flight to the backing
+    /// device.
+    ///
+    /// Note that this method does not prevent new buffers from being allocated
+    /// and sent, it is up to the caller to prevent any races. This future will
+    /// resolve as soon as it observes a tx idle event. That is, there are no
+    /// frames in flight to the backing device at all and the session currently
+    /// owns all allocated tx buffers.
+    ///
+    /// The synchronization guarantee provided by this method is that any
+    /// buffers previously given to [`Session::send`] will be accounted as
+    /// pending until the device has replied back.
+    pub async fn wait_tx_idle(&self) {
+        self.inner.tx_idle_listeners.wait().await;
+    }
 }
 
 struct Inner {
@@ -134,6 +152,7 @@ struct Inner {
     tx_pending: Pending<Tx>,
     rx_ready: Mutex<ReadyBuffer<DescId<Rx>>>,
     tx_ready: Mutex<ReadyBuffer<DescId<Tx>>>,
+    tx_idle_listeners: TxIdleListeners,
 }
 
 impl Inner {
@@ -175,6 +194,7 @@ impl Inner {
             tx_pending: Pending::new(Vec::new()),
             rx_ready: Mutex::new(ReadyBuffer::new(config.num_rx_buffers.get().into())),
             tx_ready: Mutex::new(ReadyBuffer::new(config.num_tx_buffers.get().into())),
+            tx_idle_listeners: TxIdleListeners::new(),
         }))
     }
 
@@ -202,14 +222,22 @@ impl Inner {
 
     /// Polls completed tx descriptors from the driver then puts them in pool.
     fn poll_complete_tx(&self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        let mut tx_ready = self.tx_ready.lock();
-        // TODO(https://github.com/rust-lang/rust/issues/63569): Provide entire
-        // chain of completed descriptors to the pool at once when slice of
-        // MaybeUninit is stabilized.
-        tx_ready.poll_with_fifo(cx, &self.tx).map(|r| match r {
-            Ok(desc) => self.pool.tx_completed(desc),
-            Err(status) => Err(Error::Fifo("read", "tx", status)),
-        })
+        let result = {
+            let mut tx_ready = self.tx_ready.lock();
+            // TODO(https://github.com/rust-lang/rust/issues/63569): Provide entire
+            // chain of completed descriptors to the pool at once when slice of
+            // MaybeUninit is stabilized.
+            tx_ready.poll_with_fifo(cx, &self.tx).map(|r| match r {
+                Ok(desc) => self.pool.tx_completed(desc),
+                Err(status) => Err(Error::Fifo("read", "tx", status)),
+            })
+        };
+
+        match &result {
+            Poll::Ready(Ok(())) => self.tx_idle_listeners.tx_complete(),
+            Poll::Pending | Poll::Ready(Err(_)) => {}
+        }
+        result
     }
 
     /// Sends the [`Buffer`] to the driver.
@@ -217,6 +245,7 @@ impl Inner {
         buffer.pad()?;
         buffer.commit();
         self.tx_pending.extend(std::iter::once(buffer.leak()));
+        self.tx_idle_listeners.tx_started();
         Ok(())
     }
 
@@ -622,6 +651,60 @@ impl<T> ReadyBuffer<T> {
     }
 }
 
+struct TxIdleListeners {
+    event: event_listener::Event,
+    tx_in_flight: AtomicUsize,
+}
+
+impl TxIdleListeners {
+    fn new() -> Self {
+        Self { event: event_listener::Event::new(), tx_in_flight: AtomicUsize::new(0) }
+    }
+
+    /// Decreases the number of outstanding tx buffers by 1.
+    ///
+    /// Notifies any tx idle listeners if the number reaches 0.
+    fn tx_complete(&self) {
+        let Self { event, tx_in_flight } = self;
+        let old_value = tx_in_flight.fetch_sub(1, atomic::Ordering::SeqCst);
+        debug_assert_ne!(old_value, 0);
+        if old_value == 1 {
+            let _notified: usize = event.notify(usize::MAX);
+        }
+    }
+
+    /// Increases the number of outstanding tx buffers by 1.
+    fn tx_started(&self) {
+        let Self { event: _, tx_in_flight } = self;
+        let _: usize = tx_in_flight.fetch_add(1, atomic::Ordering::SeqCst);
+    }
+
+    async fn wait(&self) {
+        let Self { event, tx_in_flight } = self;
+        // This is _the correct way_ of holding an `event_listener::Listener`.
+        // We check the condition before installing the listener in the fast
+        // case, then we must check the condition again after creating the
+        // listener in case we've raced with the condition updating. Finally we
+        // must loop and check the condition again because we're not fully
+        // guaranteed to not have spurious wakeups.
+        //
+        // See the event_listener crate documentation for more details.
+        loop {
+            if tx_in_flight.load(atomic::Ordering::SeqCst) == 0 {
+                return;
+            }
+
+            event_listener::listener!(event => listener);
+
+            if tx_in_flight.load(atomic::Ordering::SeqCst) == 0 {
+                return;
+            }
+
+            listener.await;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU32;
@@ -634,6 +717,8 @@ mod tests {
     use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
     use test_case::test_case;
     use zerocopy::{FromBytes, Immutable, IntoBytes};
+
+    use crate::session::TxIdleListeners;
 
     use super::buffer::{
         AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
@@ -841,6 +926,7 @@ mod tests {
             tx_pending: Pending::new(vec![]),
             rx_ready: Mutex::new(ReadyBuffer::new(10)),
             tx_ready: Mutex::new(ReadyBuffer::new(10)),
+            tx_idle_listeners: TxIdleListeners::new(),
         });
 
         inner.send(buf).expect("can send");
