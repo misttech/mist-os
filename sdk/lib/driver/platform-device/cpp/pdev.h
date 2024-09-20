@@ -30,18 +30,22 @@ class PDev {
   zx::result<fdf::MmioBuffer> MapMmio(
       uint32_t index, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
 
-  template <typename FidlType, typename = std::enable_if_t<fidl::IsFidlObject<FidlType>::value>>
-  zx::result<FidlType> GetMetadata(int32_t metadata_type) const {
-    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> raw_metadata =
+  template <typename FidlType>
+  zx::result<FidlType> GetFidlMetadata(int32_t metadata_type) const {
+    static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
+    static_assert(!fidl::IsResource<FidlType>::value,
+                  "|FidlType| cannot be a resource type. Resources cannot be persisted.");
+
+    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> encoded_metadata =
         pdev_->GetMetadata(metadata_type);
-    if (!raw_metadata.ok()) {
-      return zx::error(raw_metadata.status());
+    if (!encoded_metadata.ok()) {
+      return zx::error(encoded_metadata.status());
     }
-    if (raw_metadata->is_error()) {
-      return raw_metadata->take_error();
+    if (encoded_metadata->is_error()) {
+      return encoded_metadata->take_error();
     }
 
-    auto result = fidl::Unpersist<FidlType>(raw_metadata.value()->metadata.get());
+    auto result = fidl::Unpersist<FidlType>(encoded_metadata.value()->metadata.get());
     if (result.is_error()) {
       return zx::error(result.error_value().status());
     }
