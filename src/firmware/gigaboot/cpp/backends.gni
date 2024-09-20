@@ -17,4 +17,10 @@ declare_args() {
   # Permanent attributes file for prod-signed gigaboot. Setting this enables
   # target //src/firmware/gigaboot/cpp:user-esp
   gigaboot_user_permanent_attributes = ""
+
+  # Path label to the GBL EFI app file.
+  # If non-empty, the file will be embedded into gigaboot and gigaboot will boot from it instead.
+  # The argument can be set via `fx set --args=...` or by directly modifying the `args.gn` file,
+  # i.e. `out/default/args.gn`.
+  gigaboot_gbl_efi_app = ""
 }

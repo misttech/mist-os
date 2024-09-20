@@ -3,9 +3,13 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Convert avb permanent attributes to software blob
+"""Generates various data blobs needed by Gigaboot
 
-Usage: <script> <path to permanent attributes files> <output source file>
+Usage:
+    <script>
+    <path to permanent attributes files>
+    [--gbl <path to GBL EFI app file>]
+    <output source file>
 """
 
 import argparse
@@ -15,6 +19,7 @@ import textwrap
 
 PERMANENT_ATTRIBUTE_ARRAY_NAME = "kPermanentAttributes"
 PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME = "kPermanentAttributesHash"
+GBL_EFI_APP_ARRAY_NAME = "kGblEfiApp"
 
 
 def byte_array_declaration(data: bytes, name: str) -> str:
@@ -32,6 +37,7 @@ def parse_args():
         "permanent_attributes", help="path to permanent attributes file"
     )
     parser.add_argument("out", help="path to output file")
+    parser.add_argument("--gbl", help="path to the GBL EFI app file")
 
     return parser.parse_args()
 
@@ -41,6 +47,12 @@ def main() -> int:
     with open(args.permanent_attributes, "rb") as input_file:
         attr_data = input_file.read()
         attr_data_hash = hashlib.sha256(attr_data).digest()
+
+    # Don't care. Prevents compiler from complaining about zero size array.
+    gbl = b"\x00"
+    if args.gbl:
+        with open(args.gbl, "rb") as input_file:
+            gbl = input_file.read()
 
     with open(args.out, "w") as output_file:
         output_file.write(
@@ -56,6 +68,7 @@ def main() -> int:
                 namespace {
                     %s
                     %s
+                    %s
                 }
 
                 namespace gigaboot {
@@ -64,6 +77,10 @@ def main() -> int:
                     }
 
                     const cpp20::span<const uint8_t> GetPermanentAttributesHash() {
+                        return cpp20::span{%s};
+                    }
+
+                    const cpp20::span<const uint8_t> GetGblEfiApp() {
                         return cpp20::span{%s};
                     }
                 }
@@ -75,8 +92,10 @@ def main() -> int:
                     byte_array_declaration(
                         attr_data_hash, PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME
                     ),
+                    byte_array_declaration(gbl, GBL_EFI_APP_ARRAY_NAME),
                     PERMANENT_ATTRIBUTE_ARRAY_NAME,
                     PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME,
+                    GBL_EFI_APP_ARRAY_NAME,
                 )
             )
         )
