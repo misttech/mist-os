@@ -638,6 +638,8 @@ impl ClientInner {
             let cx = &mut Context::from_waker(&waker);
 
             let mut buf = MessageBufEtc::new();
+            buf.ensure_capacity_bytes(crate::encoding::MIN_BUF_BYTES_SIZE);
+
             let result = self.channel.recv_etc_from(cx, &mut buf);
             match result {
                 Poll::Ready(Ok(())) => {}
@@ -677,6 +679,7 @@ impl ClientInner {
             let txid = Txid(header.tx_id);
 
             let waker = {
+                buf.shrink_bytes_to_fit();
                 let mut interests = self.interests.lock();
                 if txid == Txid(0) {
                     interests.push_event(buf)

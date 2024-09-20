@@ -2845,7 +2845,7 @@ struct TlsBuf {
 impl TlsBuf {
     fn new() -> TlsBuf {
         TlsBuf {
-            bytes: Vec::with_capacity(MIN_TLS_BUF_BYTES_SIZE),
+            bytes: Vec::with_capacity(MIN_BUF_BYTES_SIZE),
             encode_handles: Vec::new(),
             decode_handles: Vec::new(),
         }
@@ -2854,7 +2854,7 @@ impl TlsBuf {
 
 thread_local!(static TLS_BUF: RefCell<TlsBuf> = RefCell::new(TlsBuf::new()));
 
-const MIN_TLS_BUF_BYTES_SIZE: usize = 512;
+pub(crate) const MIN_BUF_BYTES_SIZE: usize = 512;
 
 /// Acquire a mutable reference to the thread-local buffers used for encoding.
 ///

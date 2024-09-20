@@ -56,6 +56,11 @@ impl MessageBuf {
         self.bytes.resize(n_bytes, 0);
     }
 
+    /// Ensure that the allocation for the message's bytes is as small as possible.
+    pub fn shrink_bytes_to_fit(&mut self) {
+        self.bytes.shrink_to_fit();
+    }
+
     /// Get a reference to the bytes of the message buffer, as a `&[u8]` slice.
     pub fn bytes(&self) -> &[u8] {
         self.bytes.as_slice()
@@ -142,6 +147,11 @@ impl MessageBufEtc {
             return;
         }
         self.bytes.resize(n_bytes, 0);
+    }
+
+    /// Ensure that the allocation for the message's bytes is as small as possible.
+    pub fn shrink_bytes_to_fit(&mut self) {
+        self.bytes.shrink_to_fit();
     }
 
     /// Get a reference to the bytes of the message buffer, as a `&[u8]` slice.
