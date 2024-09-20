@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/testing/cc_test_executable.gni")
 import("//build/testing/host_test.gni")
 
 # This declares a test executable.
@@ -67,7 +66,7 @@ template("test") {
     }
   }
 
-  cc_test_executable(_exe_target_name) {
+  executable(_exe_target_name) {
     deps = []
     forward_variables_from(invoker,
                            "*",
