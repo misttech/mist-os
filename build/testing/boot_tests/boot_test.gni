@@ -29,6 +29,7 @@ default_boot_test_timeout_secs = 600
 
 _all_emu_envs = [
   qemu_env,
+  qemu_1cpu_env,
   aemu_env,
 ]
 
