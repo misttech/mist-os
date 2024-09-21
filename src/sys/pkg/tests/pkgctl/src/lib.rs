@@ -463,6 +463,12 @@ impl MockPackageCacheService {
                 PackageCacheRequest::Sync { .. } => {
                     panic!("should only support Get requests, received Sync")
                 }
+                PackageCacheRequest::SetUpgradableUrls { .. } => {
+                    panic!("should only support Get requests, received SetUpgradableUrls")
+                }
+                PackageCacheRequest::_UnknownMethod { .. } => {
+                    panic!("should only support Get requests, received UnknownMethod")
+                }
             }
         }
         Ok(())

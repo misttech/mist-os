@@ -140,6 +140,10 @@ pub(crate) async fn serve(
                         Status::INTERNAL.into_raw()
                     }))?;
                 }
+                PackageCacheRequest::SetUpgradableUrls { .. } => todo!(),
+                PackageCacheRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!("unknown method called, ordinal: {ordinal}")
+                }
             }
 
             Ok(())
