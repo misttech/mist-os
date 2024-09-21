@@ -78,8 +78,6 @@ constexpr bool ENABLE_SBI_TOPOLOGY_DETECT_FALLBACK = true;
 void* ramdisk_base;
 size_t ramdisk_size;
 
-bool uart_disabled = false;
-
 ktl::atomic<int> panic_started;
 ktl::atomic<int> halted;
 
@@ -420,9 +418,6 @@ void platform_early_init() {
             nvram.length);
     allocate_persistent_ram(nvram.base, nvram.length);
   }
-
-  // Check if serial should be enabled
-  ktl::visit([](const auto& uart) { uart_disabled = uart.extra() == 0; }, gBootOptions->serial);
 
   // Serial port should be active now
 
