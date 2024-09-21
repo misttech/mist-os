@@ -29,3 +29,6 @@ toc:
 - title: "SDMMC drivers"
   section:
   - include: /docs/development/drivers/concepts/driver_architectures/sdmmc_drivers/_toc.yaml
+- title: "SPMI drivers"
+  section:
+  - include: /docs/development/drivers/driver_guides/spmi/_toc.yaml
