@@ -34,7 +34,6 @@
 #include <dev/interrupt.h>
 #include <dev/power.h>
 #include <dev/psci.h>
-#include <dev/uart.h>
 #include <explicit-memory/bytes.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/cpu.h>

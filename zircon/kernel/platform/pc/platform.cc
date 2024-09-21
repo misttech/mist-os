@@ -33,7 +33,6 @@
 #include <arch/x86/apic.h>
 #include <arch/x86/mmu.h>
 #include <arch/x86/pv.h>
-#include <dev/uart.h>
 #include <explicit-memory/bytes.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>

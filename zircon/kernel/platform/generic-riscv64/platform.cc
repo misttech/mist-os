@@ -30,7 +30,6 @@
 #include <dev/hw_rng.h>
 #include <dev/interrupt.h>
 #include <dev/power.h>
-#include <dev/uart.h>
 #include <explicit-memory/bytes.h>
 #include <fbl/array.h>
 #include <kernel/cpu_distance_map.h>
