@@ -21,7 +21,7 @@ class TouchStandbyTest : public ::testing::Test {
 
     touch_standby_fd_ = fbl::unique_fd(open("/dev/touch_standby", O_RDWR));
     ASSERT_TRUE(touch_standby_fd_.is_valid())
-        << "open(\"/dev/touch_standby_fd_\") failed: " << strerror(errno) << "(" << errno << ")";
+        << "open(\"/dev/touch_standby\") failed: " << strerror(errno) << "(" << errno << ")";
   }
 
  protected:
