@@ -7,13 +7,14 @@
 
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fit/function.h>
 #include <lib/zx/event.h>
 #include <lib/zx/handle.h>
 
-#include "sdk/lib/driver/power/cpp/element-description-builder.h"
-#include "sdk/lib/driver/power/cpp/types.h"
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 /// Collection of helpers for driver authors working with the power framework.
 /// The basic usage model is
@@ -349,5 +350,7 @@ fit::result<Error> AddElement(
 fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
                               ElementDesc& description);
 }  // namespace fdf_power
+
+#endif
 
 #endif  // LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_

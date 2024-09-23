@@ -7,8 +7,7 @@
 
 #include <fidl/fuchsia.hardware.power/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.power/cpp/wire_types.h>
-
-#include "sdk/lib/driver/power/cpp/types.h"
+#include <lib/driver/power/cpp/types.h>
 
 namespace power::from_fidl {
 

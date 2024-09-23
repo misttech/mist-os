@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/power/cpp/power-support.h"
-
 #include <dirent.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
@@ -13,6 +11,8 @@
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/power/cpp/power-support.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -29,9 +29,6 @@
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls.h>
-#include <zircon/system/public/zircon/errors.h>
-
-#include "sdk/lib/driver/power/cpp/types.h"
 
 namespace fdf_power {
 
@@ -248,30 +245,30 @@ void ElementRunner::SetLevel(
 
 fit::result<Error, ElementDependencyMap> LevelDependencyFromConfig(
     const PowerElementConfiguration& element_config) {
-  ElementDependencyMap level_deps{};
+  ElementDependencyMap element_deps{};
 
   // No dependencies, just return!
   if (element_config.dependencies.empty()) {
-    return fit::success(std::move(level_deps));
+    return fit::success(std::move(element_deps));
   }
 
   for (const PowerDependency& power_dep : element_config.dependencies) {
     ParentElement pe = power_dep.parent;
-    auto& deps_on_parent = level_deps[pe];
+    auto& deps_on_parent = element_deps[pe];
 
     // Get the dependencies between this parent and this child
-    auto dep = ConvertPowerDepsToLevelDeps(power_dep);
-    if (dep.is_error()) {
-      return fit::error(dep.error_value());
+    auto level_deps = ConvertPowerDepsToLevelDeps(power_dep);
+    if (level_deps.is_error()) {
+      return fit::error(level_deps.error_value());
     }
 
     // Add each level dependency to the vector associated with this parent name
-    for (auto& dep : dep.value()) {
-      deps_on_parent.push_back(std::move(dep));
+    for (auto& level_dep : level_deps.value()) {
+      deps_on_parent.push_back(std::move(level_dep));
     }
   }
 
-  return fit::success(std::move(level_deps));
+  return fit::success(std::move(element_deps));
 }
 
 std::vector<fuchsia_power_broker::PowerLevel> PowerLevelsFromConfig(
@@ -360,7 +357,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(const PowerElementConfiguration
   fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> governor;
   governor.Bind(std::move(governor_connect.value()));
 
-  fidl::WireResult elements = governor->GetPowerElements();
+  fidl::WireResult<fuchsia_power_system::ActivityGovernor::GetPowerElements> elements =
+      governor->GetPowerElements();
   if (!elements.ok()) {
     if (elements.is_peer_closed()) {
       return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);

@@ -65,6 +65,7 @@ cc_source_library://pkg/driver_logging_cpp
 cc_source_library://pkg/driver_metadata_cpp (unstable)
 cc_source_library://pkg/driver_node_cpp
 cc_source_library://pkg/driver_outgoing_cpp
+cc_source_library://pkg/driver_power_cpp (unstable)
 cc_source_library://pkg/driver_runtime
 cc_source_library://pkg/driver_runtime_cpp
 cc_source_library://pkg/driver_runtime_env
@@ -320,8 +321,10 @@ fidl_library://fidl/fuchsia.net.mdns
 fidl_library://fidl/fuchsia.net.reachability
 fidl_library://fidl/fuchsia.net.routes
 fidl_library://fidl/fuchsia.net.stackmigrationdeprecated
+fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel
 fidl_library://fidl/fuchsia.power.profile
+fidl_library://fidl/fuchsia.power.system (unstable)
 fidl_library://fidl/fuchsia.power.systemmode
 fidl_library://fidl/fuchsia.process
 fidl_library://fidl/fuchsia.process.lifecycle
