@@ -684,9 +684,9 @@ class SystemPowerStateController(
             or suspend_exit_timer < suspend_enter_timer
         ):
             _LOGGER.info(
-                "FSH inspect based suspend_resume_events associated with current suspend-resume operation: {}".format(
-                    current_suspend_resume_events
-                )
+                "FSH inspect based suspend_resume_events associated with "
+                "current suspend-resume operation: %s",
+                current_suspend_resume_events,
             )
             raise errors.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
