@@ -492,6 +492,34 @@ mod tests {
     }
 
     #[test]
+    fn async_ping_pong_on_fuchsia_async() {
+        with_raw_dispatcher("async ping pong", |dispatcher| {
+            let (fin_tx, fin_rx) = mpsc::channel();
+            let (ping_chan, pong_chan) = Channel::create().unwrap();
+
+            dispatcher
+                .post_task_sync(|_status| {
+                    let rust_async_dispatcher = crate::DispatcherBuilder::new()
+                        .name("fuchsia-async")
+                        .allow_thread_blocking()
+                        .create()
+                        .expect("failure creating blocking dispatcher for rust async");
+
+                    dispatcher.spawn_task(pong(&dispatcher, fin_tx, pong_chan)).unwrap();
+                    rust_async_dispatcher
+                        .post_task_sync(|_| {
+                            let mut executor = fuchsia_async::LocalExecutor::new();
+                            executor.run_singlethreaded(ping(&dispatcher, ping_chan));
+                        })
+                        .unwrap();
+                })
+                .unwrap();
+
+            fin_rx.recv().expect("to receive final value");
+        });
+    }
+
+    #[test]
     fn early_cancel_future() {
         with_raw_dispatcher("early cancellation", |dispatcher| {
             let (fin_tx, fin_rx) = mpsc::channel();

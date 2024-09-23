@@ -38,7 +38,7 @@ impl DispatcherBuilder {
     /// See `FDF_DISPATCHER_OPTION_UNSYNCHRONIZED` in the C API
     const UNSYNCHRONIZED: u32 = 0b01;
     /// See `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS` in the C API
-    const ALLOW_THREAD_BLOCKING: u32 = 0x10;
+    const ALLOW_THREAD_BLOCKING: u32 = 0b10;
 
     /// Creates a new [`DispatcherBuilder`] that can be used to configure a new dispatcher.
     /// For more information on the threading-related flags for the dispatcher, see
@@ -117,10 +117,8 @@ impl DispatcherBuilder {
         let name_len = self.name.len();
         let scheduler_role = self.scheduler_role.as_ptr() as *mut ffi::c_char;
         let scheduler_role_len = self.scheduler_role.len();
-        let observer = match self.shutdown_observer {
-            Some(observer) => observer.into_ptr(),
-            None => null_mut(),
-        };
+        let observer =
+            self.shutdown_observer.unwrap_or_else(|| ShutdownObserver::new(|_| {})).into_ptr();
         // SAFETY: all arguments point to memory that will be available for the duration
         // of the call, except `observer`, which will be available until it is unallocated
         // by the dispatcher exit handler.

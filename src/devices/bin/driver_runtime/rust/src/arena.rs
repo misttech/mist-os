@@ -550,6 +550,8 @@ impl<'a, T: 'a> IntoIterator for ArenaBox<'a, [T]> {
         let ptr = self.0.cast();
         // SAFETY: we will never dereference `end`
         let end = unsafe { ptr.add(len) };
+        // the IntoIter now owns the data, so we don't want to drop them here.
+        core::mem::forget(self);
         IntoIter { ptr, end, _arena: PhantomData }
     }
 }
