@@ -244,8 +244,8 @@ impl Inner {
     fn send(&self, mut buffer: Buffer<Tx>) -> Result<()> {
         buffer.pad()?;
         buffer.commit();
-        self.tx_pending.extend(std::iter::once(buffer.leak()));
         self.tx_idle_listeners.tx_started();
+        self.tx_pending.extend(std::iter::once(buffer.leak()));
         Ok(())
     }
 
