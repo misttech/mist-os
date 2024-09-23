@@ -59,7 +59,6 @@
                 "ram-disk",
                 "virtual-audio",
                 "fake-battery",
-                "fake-ac",
             ],
         },
         {
@@ -71,7 +70,6 @@
                 45, // PDEV_DID_RAM_DISK
                 47, // PDEV_DID_VIRTUAL_AUDIO
                 51, // PDEV_DID_FAKE_BATTERY
-                55, // PDEV_DID_FAKE_AC
             ],
         },
     ],
