@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
-use super::instrumentation::{Collector, LocalCollector, WakeupReason};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeRef;
 use super::time::Time;
@@ -15,7 +14,6 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::future::Future;
 use std::mem::ManuallyDrop;
-use std::panic::Location;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
@@ -81,8 +79,6 @@ pub(crate) struct Executor {
     task_count: AtomicUsize,
     pub(super) ready_tasks: SegQueue<Arc<Task>>,
     time: ExecutorTime,
-    pub(super) collector: Collector,
-    pub(super) source: Option<&'static Location<'static>>,
     // The low byte is the number of threads currently sleeping. The high byte is the number of
     // of wake-up notifications pending.
     pub(super) threads_state: AtomicU16,
@@ -94,15 +90,7 @@ pub(crate) struct Executor {
 }
 
 impl Executor {
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn new(time: ExecutorTime, is_local: bool, num_threads: u8) -> Self {
-        #[cfg(trace_level_logging)]
-        let source = Some(Location::caller());
-        #[cfg(not(trace_level_logging))]
-        let source = None;
-
-        let collector = Collector::new();
-
         #[cfg(test)]
         ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
 
@@ -114,8 +102,6 @@ impl Executor {
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
             ready_tasks: SegQueue::new(),
             time,
-            collector,
-            source,
             threads_state: AtomicU16::new(0),
             num_threads,
             polled: AtomicU64::new(0),
@@ -131,19 +117,13 @@ impl Executor {
         });
     }
 
-    fn poll_ready_tasks(&self, local_collector: &mut LocalCollector<'_>) -> PollReadyTasksResult {
+    fn poll_ready_tasks(&self) -> PollReadyTasksResult {
         loop {
             for _ in 0..16 {
                 let Some(task) = self.ready_tasks.pop() else {
                     return PollReadyTasksResult::NoneReady;
                 };
                 let complete = self.try_poll(&task);
-                local_collector.task_polled(
-                    task.id,
-                    task.source(),
-                    complete,
-                    self.ready_tasks.len(),
-                );
                 if complete && task.id == MAIN_TASK_ID {
                     return PollReadyTasksResult::MainTaskCompleted;
                 }
@@ -169,7 +149,6 @@ impl Executor {
         }
     }
 
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn(self: &Arc<Self>, scope: &ScopeRef, future: AtomicFuture<'static>) -> usize {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = {
@@ -179,12 +158,10 @@ impl Executor {
             }
             task
         };
-        self.collector.task_created(next_id, task.source());
         task.wake();
         next_id
     }
 
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local<F: Future<Output = R> + 'static, R: 'static>(
         self: &Arc<Self>,
         scope: &ScopeRef,
@@ -206,7 +183,6 @@ impl Executor {
     /// Spawns the main future.
     pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeRef, future: AtomicFuture<'static>) {
         let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
-        self.collector.task_created(MAIN_TASK_ID, task.source());
         if !root_scope.insert_task(MAIN_TASK_ID, task.clone()) {
             panic!("Could not spawn main task");
         }
@@ -390,9 +366,6 @@ impl Executor {
         // Drop all of the uncompleted tasks
         while let Some(_) = self.ready_tasks.pop() {}
 
-        // Synthetic main task marked completed
-        self.collector.task_completed(MAIN_TASK_ID, self.source);
-
         // Do not allow any receivers to outlive the executor. That's very likely a bug waiting to
         // happen. See discussion above.
         //
@@ -427,13 +400,11 @@ impl Executor {
     // LINT.IfChange
     pub fn worker_lifecycle<const UNTIL_STALLED: bool>(self: &Arc<Executor>) {
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
-        let mut local_collector = self.collector.create_local_collector();
-
         loop {
             // Keep track of whether we are considered asleep.
             let mut sleeping = false;
 
-            match self.poll_ready_tasks(&mut local_collector) {
+            match self.poll_ready_tasks() {
                 PollReadyTasksResult::NoneReady => {
                     // No more tasks, indicate we are sleeping. We use SeqCst ordering because we
                     // want this change here to happen *before* we check ready_tasks below. This
@@ -478,13 +449,10 @@ impl Executor {
                     timer_heap.next_deadline().map(|t| t.time()).unwrap_or(Time::INFINITE)
                 };
 
-                local_collector.will_wait();
-
                 // into_zx: we are using real time, so the time is a monotonic time.
                 match self.port.wait(deadline.into_zx()) {
                     Ok(packet) => {
                         if packet.key() == TASK_READY_WAKEUP_ID {
-                            local_collector.woke_up(WakeupReason::Notification);
                             notified = true;
                             Work::None
                         } else {
@@ -522,11 +490,9 @@ impl Executor {
 
             match work {
                 Work::Packet(packet) => {
-                    local_collector.woke_up(WakeupReason::Io);
                     self.deliver_packet(packet.key() as usize, packet);
                 }
                 Work::Timer(timer) => {
-                    local_collector.woke_up(WakeupReason::Deadline);
                     timer.wake();
                 }
                 Work::None => {}
@@ -649,7 +615,6 @@ impl EHandle {
     }
 
     /// See `Inner::spawn`.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub(crate) fn spawn<R: Send + 'static>(
         &self,
         scope: &ScopeRef,
@@ -662,13 +627,11 @@ impl EHandle {
     ///
     /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
     /// may be run on either a singlethreaded or multithreaded executor.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
         self.inner().spawn(self.root_scope(), AtomicFuture::new(future, true));
     }
 
     /// See `Inner::spawn_local`.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub(crate) fn spawn_local<R: 'static>(
         &self,
         scope: &ScopeRef,
@@ -682,7 +645,6 @@ impl EHandle {
     /// This is similar to the `spawn_detached` method, but tasks spawned using this method do not
     /// have to be threads-safe (implement the `Send` trait). In return, this method requires that
     /// this executor is a LocalExecutor.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
         self.inner().spawn_local(self.root_scope(), future, true);
     }
@@ -692,20 +654,11 @@ pub(super) struct Task {
     id: usize,
     pub(super) future: AtomicFuture<'static>,
     pub(super) scope: ScopeRef,
-    #[cfg(trace_level_logging)]
-    source: &'static Location<'static>,
 }
 
 impl Task {
-    #[cfg_attr(trace_level_logging, track_caller)]
     fn new(id: usize, scope: ScopeRef, future: AtomicFuture<'static>) -> Arc<Self> {
-        let this = Arc::new(Self {
-            id,
-            future,
-            scope,
-            #[cfg(trace_level_logging)]
-            source: Location::caller(),
-        });
+        let this = Arc::new(Self { id, future, scope });
 
         // Take a weak reference now to be used as a waker.
         let _ = Arc::downgrade(&this).into_raw();
@@ -718,15 +671,6 @@ impl Task {
             self.scope.executor().ready_tasks.push(self.clone());
             self.scope.executor().notify_task_ready();
         }
-    }
-
-    fn source(&self) -> Option<&'static Location<'static>> {
-        #[cfg(trace_level_logging)]
-        {
-            Some(self.source)
-        }
-        #[cfg(not(trace_level_logging))]
-        None
     }
 }
 

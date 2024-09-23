@@ -169,11 +169,6 @@ impl SendExecutor {
             thread.join().expect("Couldn't join worker thread.");
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.inner.collector.snapshot()
-    }
 }
 
 impl Drop for SendExecutor {

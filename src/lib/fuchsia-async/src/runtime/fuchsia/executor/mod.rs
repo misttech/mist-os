@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod common;
-mod instrumentation;
 mod local;
 mod packets;
 pub mod scope;

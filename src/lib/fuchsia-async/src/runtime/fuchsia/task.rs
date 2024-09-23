@@ -75,7 +75,6 @@ impl<T: Send + 'static> Task<T> {
     ///
     /// `spawn` may panic if not called in the context of an executor (e.g.
     /// within a call to `run` or `run_singlethreaded`).
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn(future: impl Future<Output = T> + Send + 'static) -> Task<T> {
         let executor = EHandle::local();
         let scope = executor.root_scope();
@@ -106,7 +105,6 @@ impl<T: 'static> Task<T> {
     ///
     /// `local` may panic if not called in the context of a local executor (e.g.
     /// within a call to `run` or `run_singlethreaded`).
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn local(future: impl Future<Output = T> + 'static) -> Task<T> {
         let executor = EHandle::local();
         let scope = executor.root_scope();

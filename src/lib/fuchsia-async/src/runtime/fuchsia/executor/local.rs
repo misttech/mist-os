@@ -118,11 +118,6 @@ impl LocalExecutor {
     pub fn root_scope(&self) -> &ScopeRef {
         self.ehandle.root_scope()
     }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.ehandle.inner().collector.snapshot()
-    }
 }
 
 impl Drop for LocalExecutor {
@@ -284,11 +279,6 @@ impl TestExecutor {
     /// Returns the deadline for the next timer due to expire.
     pub fn next_timer() -> Option<Time> {
         with_local_timer_heap(|timer_heap| timer_heap.next_deadline().map(|t| t.time()))
-    }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.local.ehandle.inner().collector.snapshot()
     }
 
     /// Advances fake time to the specified time.  This will only work if the executor is being run
@@ -594,17 +584,6 @@ mod tests {
             Poll::Pending
         })
         .await;
-    }
-
-    #[test]
-    fn dedup_wakeups() {
-        let run = |n| {
-            let mut executor = LocalExecutor::new();
-            executor.run_singlethreaded(multi_wake(n));
-            let snapshot = executor.ehandle.inner().collector.snapshot();
-            snapshot.wakeups_notification
-        };
-        assert_eq!(run(5), run(10)); // Same number of notifications independent of wakeup calls
     }
 
     // Ensure that a large amount of wakeups does not exhaust kernel resources,
