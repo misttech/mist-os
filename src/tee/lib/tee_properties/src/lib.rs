@@ -186,20 +186,19 @@ impl PropSet {
 }
 
 pub struct PropEnumerator {
-    properties: PropSet,
+    properties: Option<PropSet>,
     index: usize,
-    started: bool,
 }
 
 impl PropEnumerator {
-    pub fn new(properties: PropSet) -> Self {
-        Self { properties, index: 0, started: false }
+    pub fn new() -> Self {
+        Self { properties: None, index: 0 }
     }
 
     // Spec indicates that callers should start() before doing other operations.
     // This impl doesn't need to do any functional work here since the initial state is valid.
-    pub fn start(&mut self) {
-        self.started = true;
+    pub fn start(&mut self, propset: PropSet) {
+        self.properties = Some(propset);
         self.index = 0;
     }
 
@@ -208,7 +207,7 @@ impl PropEnumerator {
     }
 
     pub fn next(&mut self) -> Result<(), PropertyError> {
-        if !self.started {
+        if self.properties.is_none() {
             return Err(PropertyError::ItemNotFound {
                 name: "enumerator has not been started".to_string(),
             });
@@ -218,58 +217,57 @@ impl PropEnumerator {
     }
 
     pub fn get_property_name(&self) -> Result<String, PropertyError> {
-        if !self.started {
-            return Err(PropertyError::ItemNotFound {
-                name: "enumerator has not been started".to_string(),
-            });
-        }
         // This will return ItemNotFound when going out-of-bounds, compliant with spec.
-        self.properties.get_property_name_at_index(self.index)
+        self.get_props()?.get_property_name_at_index(self.index)
     }
 
     pub fn get_property_type(&self) -> Result<PropType, PropertyError> {
-        if !self.started {
-            return Err(PropertyError::ItemNotFound {
-                name: "enumerator has not been started".to_string(),
-            });
-        }
         // This will return ItemNotFound when going out-of-bounds, compliant with spec.
-        self.properties.get_property_type_at_index(self.index)
+        self.get_props()?.get_property_type_at_index(self.index)
     }
 
     pub fn get_property_as_string(&self) -> Result<String, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_string_property(prop_name)
+        self.get_props()?.get_string_property(prop_name)
     }
 
     pub fn get_property_as_bool(&self) -> Result<bool, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_boolean_property(prop_name)
+        self.get_props()?.get_boolean_property(prop_name)
     }
 
     pub fn get_property_as_u32(&self) -> Result<u32, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_uint32_property(prop_name)
+        self.get_props()?.get_uint32_property(prop_name)
     }
 
     pub fn get_property_as_u64(&self) -> Result<u64, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_uint64_property(prop_name)
+        self.get_props()?.get_uint64_property(prop_name)
     }
 
     pub fn get_property_as_binary_block(&self) -> Result<Vec<u8>, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_binary_block_property(prop_name)
+        self.get_props()?.get_binary_block_property(prop_name)
     }
 
     pub fn get_property_as_uuid(&self) -> Result<TEE_UUID, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_uuid_property(prop_name)
+        self.get_props()?.get_uuid_property(prop_name)
     }
 
     pub fn get_property_as_identity(&self) -> Result<TEE_Identity, PropertyError> {
         let prop_name = self.get_property_name()?;
-        self.properties.get_identity_property(prop_name)
+        self.get_props()?.get_identity_property(prop_name)
+    }
+
+    fn get_props(&self) -> Result<&PropSet, PropertyError> {
+        match &self.properties {
+            Some(prop_set) => Ok(prop_set),
+            None => Err(PropertyError::ItemNotFound {
+                name: "enumerator has not been started".to_string(),
+            }),
+        }
     }
 }
 
@@ -447,10 +445,10 @@ pub mod tests {
     // *** Enumerator Tests ***
     #[test]
     pub fn test_enumerator_query_prop_types_success() {
-        let mut enumerator = PropEnumerator::new(create_test_prop_set());
+        let mut enumerator = PropEnumerator::new();
 
         // Enumerate in the order of test prop set, starting with string.
-        enumerator.start();
+        enumerator.start(create_test_prop_set());
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_STRING.to_string(), prop_name);
@@ -561,8 +559,8 @@ pub mod tests {
 
     #[test]
     pub fn test_enumerator_restart() {
-        let mut enumerator = PropEnumerator::new(create_test_prop_set());
-        enumerator.start();
+        let mut enumerator = PropEnumerator::new();
+        enumerator.start(create_test_prop_set());
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_STRING.to_string(), prop_name);
@@ -580,8 +578,8 @@ pub mod tests {
 
     #[test]
     pub fn test_enumerator_wrong_prop_type_error() {
-        let mut enumerator = PropEnumerator::new(create_test_prop_set());
-        enumerator.start();
+        let mut enumerator = PropEnumerator::new();
+        enumerator.start(create_test_prop_set());
 
         // First value is string type and not interpretable as bool, should error.
         let res = enumerator.get_property_as_bool();
@@ -608,7 +606,7 @@ pub mod tests {
     pub fn test_enumerator_not_started_error() {
         // This enumerator functionally starts in a usable initial state, with internal index = 0.
         // The spec says callers should call start() first though, so we error if it isn't called.
-        let enumerator = PropEnumerator::new(create_test_prop_set());
+        let enumerator = PropEnumerator::new();
 
         let res = enumerator.get_property_name();
 

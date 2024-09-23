@@ -193,8 +193,8 @@ pub mod tests {
         let prop_set =
             PropSet::from_config_file(&properties_file_path, PropSetType::TeeImplementation)
                 .expect("prop set loads successfully");
-        let mut prop_enum = PropEnumerator::new(prop_set);
-        prop_enum.start();
+        let mut prop_enum = PropEnumerator::new();
+        prop_enum.start(prop_set);
 
         // Will report ItemNotFound error when it moves past the end of the property set.
         while prop_enum.get_property_name().is_ok() {
