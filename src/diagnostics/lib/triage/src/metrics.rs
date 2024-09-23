@@ -271,22 +271,6 @@ fn unwrap_for_math<'b>(value: &'b MetricValue) -> &'b MetricValue {
     }
 }
 
-// Condense the visual clutter of iter() and collect::<Vec<_>>().
-fn map_vec<T, U, F>(vec: &Vec<T>, f: F) -> Vec<U>
-where
-    F: FnMut(&T) -> U,
-{
-    vec.iter().map(f).collect::<Vec<U>>()
-}
-
-// Condense visual clutter of iterating over vec of references.
-fn map_vec_r<'a, T, U, F>(vec: &'a [T], f: F) -> Vec<&'a U>
-where
-    F: FnMut(&'a T) -> &'a U,
-{
-    vec.iter().map(f).collect::<Vec<&'a U>>()
-}
-
 // Construct Problem() metric from a message
 fn missing(message: impl AsRef<str>) -> MetricValue {
     MetricValue::Problem(Problem::Missing(message.as_ref().to_string()))
@@ -546,7 +530,7 @@ impl<'a> MetricState<'a> {
         match function {
             Function::Math(operation) => arithmetic::calculate(
                 operation,
-                &map_vec(operands, |o| self.evaluate(namespace, o)),
+                &operands.iter().map(|o| self.evaluate(namespace, o)).collect(),
             ),
             Function::Equals => self.apply_boolean_function(namespace, &|a, b| a == b, operands),
             Function::NotEq => self.apply_boolean_function(namespace, &|a, b| a != b, operands),
@@ -927,9 +911,9 @@ impl<'a> MetricState<'a> {
             ExpressionTree::Function(f, operands) => self.evaluate_function(namespace, f, operands),
             ExpressionTree::Variable(name) => self.evaluate_variable(namespace, name),
             ExpressionTree::Value(value) => value.clone(),
-            ExpressionTree::Vector(values) => {
-                MetricValue::Vector(map_vec(values, |value| self.evaluate(namespace, value)))
-            }
+            ExpressionTree::Vector(values) => MetricValue::Vector(
+                values.iter().map(|value| self.evaluate(namespace, value)).collect(),
+            ),
         }
     }
 
@@ -998,8 +982,10 @@ impl<'a> MetricState<'a> {
         if operands.len() != 2 {
             return syntax_error(format!("Bad arg list {:?} for binary operator", operands));
         }
-        let operand_values = map_vec(&operands, |operand| self.evaluate(namespace, operand));
-        let args = map_vec_r(&operand_values, |operand| unwrap_for_math(operand));
+        let operand_values =
+            operands.iter().map(|operand| self.evaluate(namespace, operand)).collect::<Vec<_>>();
+        let args =
+            operand_values.iter().map(|operand| unwrap_for_math(operand)).collect::<Vec<_>>();
         match (args[0], args[1]) {
             // TODO(https://fxbug.dev/42136933): Refactor all the arg-sanitizing boilerplate into one function
             (MetricValue::Problem(p), MetricValue::Problem(q)) => {
