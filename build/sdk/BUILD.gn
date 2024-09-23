@@ -16,9 +16,9 @@ group("tests") {
   ]
 }
 
-# Contains all the source sets distributed with the partner or public SDK.
+# Contains all stable source sets distributed with the partner or public SDK.
 _sdk_source_sets_list = [
-  # sdk_source_set() targets:
+  # Stable `sdk_source_set()` targets:
   # keep-sorted: begin
   "//sdk/lib/async-loop-testing/cpp",
   "//sdk/lib/component/incoming/cpp",
@@ -97,19 +97,39 @@ _sdk_source_sets_list = [
   "//sdk/testing/sl4f/client",
 ]
 
+# Contains all unstable source sets distributed with the partner or public SDK.
+_sdk_unstable_source_sets_list = [
+  # Unstable `sdk_source_set()` targets:
+  # keep-sorted: begin
+  "//sdk/lib/driver/metadata/cpp",
+  "//src/lib/memory_barriers:memory_barriers",
+  "//sdk/lib/driver/fake-bti/cpp",
+  "//sdk/lib/driver/fake-object/cpp",
+  "//sdk/lib/driver/fake-resource/cpp",
+
+  # keep-sorted: end
+]
+
 # TODO(https://fxbug.dev/330709069): Replace this with another mechanism that ensure these targets
 # are built at all supported API levels. See https://fxbug.dev/42083950.
 group("deprecated_sdk_source_sets_to_build_at_all_supported_api_levels") {
   visibility = [ ":*" ]
-  deps = _sdk_source_sets_list
+  deps = _sdk_source_sets_list + _sdk_unstable_source_sets_list
+
+  # Some of the allowed libraries are marked testonly.
+  testonly = true
 }
 
-# All `sdk_shared_library()` targets depend on this target to ensure that they are in the allowlist.
+# All `sdk_source_set()` targets depend on one of these targets to ensure that
+# they are in the appropriate allowlist.
 group("sdk_source_sets_allowlist") {
   visibility = _sdk_source_sets_list
 }
+group("sdk_unstable_source_sets_allowlist") {
+  visibility = _sdk_unstable_source_sets_list
+}
 
-# Contains all the shared libraries distributed with the partner or public SDK.
+# Contains all shared libraries distributed with the partner or public SDK.
 _sdk_versioned_shared_libraries_list = [
   # sdk_shared_library() targets:
   # keep-sorted: begin
@@ -143,6 +163,9 @@ group("sdk_shared_libraries_allowlist") {
 group("sdk_versioned_source_sets") {
   visibility = [ "//:root_targets" ]
   deps = [ ":deprecated_sdk_source_sets_to_build_at_all_supported_api_levels" ]
+
+  # Some of the allowed libraries are marked testonly.
+  testonly = true
 }
 group("sdk_versioned_shared_libraries") {
   visibility = [ "//:root_targets" ]

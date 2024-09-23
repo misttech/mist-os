@@ -70,10 +70,11 @@ import("//build/sdk/sdk_atom.gni")
 #     See https://fxbug.dev/42068255 for more details about this field.
 #
 #   stable (optional)
-#     Whether this library is stabilized. If false, there will not be
-#     .api file generated, and the atom will be marked as unstable in the final
-#     IDK.
-#     Defaults to false.
+#     Whether this source library is stabilized.
+#     When true, an .api file is generated. When false, the atom is marked as
+#     unstable in the final IDK.
+#     Must be specified when `sdk_category` is defined and not "internal";
+#     otherwise, must not be specified.
 #
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
@@ -128,10 +129,21 @@ template("sdk_source_set") {
 
   sdk_id = "sdk://${sdk_root_path}"
 
-  stable = defined(invoker.stable) && invoker.stable
+  is_exempt_from_unstable_allowlist = false
+  if (invoker.category == "internal" || invoker.category == "firmware_sdk" ||
+      # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
+      invoker.category == "experimental") {
+    assert(!defined(invoker.stable) || !invoker.stable)
+    is_stable = false
+    is_exempt_from_unstable_allowlist = true
+  } else {
+    assert(defined(invoker.stable), "Must specify stability.")
+    is_stable = invoker.stable
+  }
+  assert(!is_stable || invoker.category == "partner")
 
   # Only stable library has API validation
-  if (stable) {
+  if (is_stable) {
     api_reference = "${sdk_name}.api"
     if (defined(invoker.api)) {
       api_reference = invoker.api
@@ -186,8 +198,11 @@ template("sdk_source_set") {
     # Ensure that stable 'sdk_source_set()' targets are included in the SDK
     # source_sets allowlist. The allowlist target's `visibility`
     # list ensures that the target using this template is in the allowlist.
-    if (stable) {
+    if (is_stable) {
       deps += [ "//build/sdk:sdk_source_sets_allowlist" ]
+      not_needed([ "is_exempt_from_unstable_allowlist" ])
+    } else if (!is_exempt_from_unstable_allowlist) {
+      deps += [ "//build/sdk:sdk_unstable_source_sets_allowlist" ]
     }
 
     # TODO(https://fxbug.dev/42079584): Fix failures and remove exception.
@@ -332,11 +347,6 @@ template("sdk_source_set") {
   metadata_target_name = "${target_name}_sdk_metadata"
   metadata_file = "$target_gen_dir/$target_name.sdk_meta.json"
 
-  _stable = false
-  if (defined(invoker.stable)) {
-    _stable = invoker.stable
-  }
-
   action(metadata_target_name) {
     forward_variables_from(invoker, [ "testonly" ])
     script = "//build/cpp/gen_sdk_sources_meta_file.py"
@@ -360,7 +370,7 @@ template("sdk_source_set") {
     args += [ "--sources" ] + sdk_metadata_sources
     args += [ "--headers" ] + sdk_metadata_headers
 
-    if (_stable) {
+    if (is_stable) {
       args += [ "--stable" ]
     }
     deps = sdk_deps
@@ -400,7 +410,7 @@ template("sdk_source_set") {
       source = metadata_file
       dest = "$sdk_root_path/meta.json"
       schema = "cc_source_library"
-      stable = _stable
+      stable = is_stable
     }
 
     files = sdk_files

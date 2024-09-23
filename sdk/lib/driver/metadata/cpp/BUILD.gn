@@ -28,6 +28,7 @@ group("drivers") {
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_metadata_cpp"
+  stable = false
   include_base = "//sdk"
 
   sources = [
