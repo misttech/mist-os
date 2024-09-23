@@ -1,0 +1,14 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.wm") {
+  sdk_category = "partner_internal"
+  sdk_area = "View System"
+
+  sources = [ "controls.fidl" ]
+
+  public_deps = [ "//sdk/fidl/fuchsia.element" ]
+}
