@@ -5,6 +5,9 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.inspect/cpp/markers.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/channel.h>
@@ -92,10 +95,10 @@ class DeviceInspect {
 
   // Set the values that should not change during the life of the device.
   // This should only be called once, calling it more than once will create duplicate entries.
-  void SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
-                       const std::string& type,
-                       const cpp20::span<const zx_device_prop_t>& properties,
-                       const std::string& driver_url);
+  void SetStaticValues(
+      const std::string& topological_path, uint32_t protocol_id, const std::string& type,
+      const cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>& properties,
+      const std::string& driver_url);
 
   void set_state(const std::string& state) { state_.Set(state); }
   void set_local_id(uint64_t local_id) { local_id_.Set(local_id); }

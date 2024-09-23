@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/controller_allowlist_passthrough.h"
@@ -1435,27 +1436,21 @@ void Node::SetAndPublishInspect() {
   constexpr char kDeviceTypeString[] = "Device";
   constexpr char kCompositeDeviceTypeString[] = "Composite Device";
 
-  std::vector<zx_device_prop_t> property_vector;
+  cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> property_vector;
   uint32_t protocol_id = 0;
   if (type_ == NodeType::kNormal) {
-    const auto node_properties = GetNodeProperties();
-    ZX_ASSERT_MSG(node_properties.has_value(), "Non-composite node \"%s\" missing node properties",
+    auto properties = GetNodeProperties();
+    ZX_ASSERT_MSG(properties.has_value(), "Non-composite node \"%s\" missing node properties",
                   name_.c_str());
-    for (auto& node_property : node_properties.value()) {
-      if (node_property.key.is_int_value() && node_property.value.is_int_value()) {
-        auto key = node_property.key.int_value();
-        auto value = node_property.value.int_value();
-        property_vector.push_back(zx_device_prop_t{
-            .id = static_cast<uint16_t>(key),
-            .value = value,
-        });
-        // TODO(b/361852885): Remove this hardcoded value once integer based keys are
-        // removed.
-        if (key == 0x01 /* BIND_PROTOCOL */) {
-          protocol_id = value;
+    for (auto& node_property : properties.value()) {
+      if (node_property.key.is_string_value() && node_property.value.is_int_value()) {
+        if (node_property.key.string_value().get() == bind_fuchsia::PROTOCOL) {
+          protocol_id = node_property.value.int_value();
         }
       }
     }
+
+    property_vector = properties.value();
   }
 
   inspect_.SetStaticValues(MakeTopologicalPath(), protocol_id,
