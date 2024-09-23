@@ -300,7 +300,7 @@ template("sdk_shared_library") {
 
   # Process headers.
   all_headers = []
-  if ((defined(invoker.public) || defined(invoker.sources)) && !no_headers) {
+  if (!no_headers) {
     if (defined(invoker.public)) {
       all_headers += invoker.public
     }
@@ -320,6 +320,10 @@ template("sdk_shared_library") {
       }
     }
   }
+  assert(
+      all_headers != [] || no_headers,
+      "Library does not contain any headers or sources. If this is intentional, set `no_headers = true`")
+
   sdk_metadata_headers = []
   sdk_header_files = []
   foreach(header, all_headers) {

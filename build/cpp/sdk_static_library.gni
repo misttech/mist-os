@@ -28,12 +28,7 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     This file is used to ensure modifications to the library's API are
 #     explicitly acknowledged.
 #     If not specified, the path will be "<SDK name>.api".
-#     Only allowed when `no_headers` is false and category is not "internal".
-#
-#   no_headers (optional)
-#     Specifies that the library's headers are NOT included in the SDK.
-#     When true, the modification acknowledgement mechanism is disabled.
-#     Defaults to false.
+#     Only allowed when `category` is not "internal".
 #
 #   libcxx_linkage (optional)
 #     Whether or how to link libc++. SDK shared libraries cannot link libc++.so
@@ -132,8 +127,7 @@ template("sdk_static_library") {
   }
   sdk_id = "sdk://${sdk_root_path}"
 
-  no_headers = defined(invoker.no_headers) && invoker.no_headers
-  if (!no_headers && !is_internal) {
+  if (!is_internal) {
     # TODO(https://fxbug.dev/366221510): Move this to where it is used.
     if (defined(invoker.api)) {
       api_reference = invoker.api
@@ -143,7 +137,7 @@ template("sdk_static_library") {
   } else {
     assert(
         !defined(invoker.api),
-        "`no_header` and \"internal\" targets do not require/support modification acknowledgement.")
+        "\"internal\" targets do not require/support modification acknowledgement.")
   }
 
   main_target_name = target_name
@@ -259,61 +253,54 @@ template("sdk_static_library") {
   sdk_header_files = []
   sdk_metadata_headers = []
 
-  if (!no_headers) {
-    # Process headers.
-    all_headers = []
-    if (defined(invoker.public)) {
-      if (defined(invoker.public)) {
-        all_headers += invoker.public
-      }
-    } else {
-      # If no explicit headers are defined, pick them out from sources.
-      if (defined(invoker.sources)) {
-        foreach(source_file, invoker.sources) {
-          extension = get_path_info(source_file, "extension")
-          if (extension == "h") {
-            all_headers += [ source_file ]
-          }
+  # Process headers.
+  all_headers = []
+  if (defined(invoker.public)) {
+    all_headers += invoker.public
+  } else {
+    # If no explicit headers are defined, pick them out from sources.
+    if (defined(invoker.sources)) {
+      foreach(source_file, invoker.sources) {
+        extension = get_path_info(source_file, "extension")
+        if (extension == "h") {
+          all_headers += [ source_file ]
         }
       }
     }
+  }
+  assert(all_headers != [], "Library does not contain any headers or sources.")
 
-    assert(
-        all_headers != [],
-        "Library does not contain any headers or sources. If this is intentional then set `no_headers = true`")
-
-    if (defined(invoker.include_base)) {
-      include_base = invoker.include_base
+  if (defined(invoker.include_base)) {
+    include_base = invoker.include_base
+  } else {
+    if (is_internal) {
+      # by default, we want internal SDK elements to have their include path similar when used through
+      # an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source code doesn't need to be changed
+      # when switching from one to the other.
+      include_base = "//"
     } else {
-      if (is_internal) {
-        # by default, we want internal SDK elements to have their include path similar when used through
-        # an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source code doesn't need to be changed
-        # when switching from one to the other.
-        include_base = "//"
-      } else {
-        include_base = "include"
-      }
+      include_base = "include"
     }
+  }
 
-    include_dest = "${sdk_root_path}/include"
-    foreach(header, all_headers) {
-      destination = rebase_path(header, include_base)
-      header_dest = "${include_dest}/${destination}"
-      sdk_metadata_headers += [ header_dest ]
-      sdk_header_files += [
-        {
-          source = header
-          dest = header_dest
-        },
-      ]
-    }
+  include_dest = "${sdk_root_path}/include"
+  foreach(header, all_headers) {
+    destination = rebase_path(header, include_base)
+    header_dest = "${include_dest}/${destination}"
+    sdk_metadata_headers += [ header_dest ]
+    sdk_header_files += [
+      {
+        source = header
+        dest = header_dest
+      },
+    ]
+  }
 
-    verify_public_headers_target = "$target_name.verify_public_headers"
-    verify_public_headers(verify_public_headers_target) {
-      forward_variables_from(invoker, [ "testonly" ])
-      target_label = ":${target_name}"
-      headers = all_headers
-    }
+  verify_public_headers_target = "$target_name.verify_public_headers"
+  verify_public_headers(verify_public_headers_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    target_label = ":${target_name}"
+    headers = all_headers
   }
 
   # Add binaries.
@@ -404,7 +391,7 @@ template("sdk_static_library") {
   }
 
   # Exempt internal libraries from pragma verification.
-  should_verify_pragma = !is_internal && !no_headers
+  should_verify_pragma = !is_internal
   if (should_verify_pragma) {
     verify_pragma_target_name = "${target_name}_sdk_pragma"
     verify_pragma_once(verify_pragma_target_name) {
@@ -422,7 +409,6 @@ template("sdk_static_library") {
 
     id = sdk_id
     if (defined(api_reference)) {
-      assert(!no_headers)
       api = api_reference
       api_contents = sdk_header_files
     }
@@ -465,10 +451,10 @@ template("sdk_static_library") {
 
   sdk_atom_alias(sdk_target_name) {
     atom = ":${manifest_target_name}"
-    non_sdk_deps = [ ":${verify_runtime_deps_target}" ]
-    if (!no_headers) {
-      non_sdk_deps += [ ":${verify_public_headers_target}" ]
-    }
+    non_sdk_deps = [
+      ":${verify_public_headers_target}",
+      ":${verify_runtime_deps_target}",
+    ]
     if (generate_plasa_artifacts) {
       non_sdk_deps += [ ":$_plasa_artifacts_target_name" ]
     }
