@@ -41,6 +41,8 @@ python_binary("check_size_hermetic_inputs") {
 }
 
 python_binary("collect_partitions_config") {
+  # TODO(b/367413842): Enable MyPy type checking
+  enable_mypy = false
   main_source = "collect_partitions_config.py"
 }
 
