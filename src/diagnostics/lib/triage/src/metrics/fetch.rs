@@ -80,9 +80,9 @@ impl<'a> FileDataFetcher<'a> {
 
     pub(crate) fn fetch(&self, selector: &SelectorString) -> MetricValue {
         match selector.selector_type {
-            // Selectors return a vector. Non-wildcarded Inspect selectors will return a
-            // single element, except in the case of multiple components with the same
-            // entry in the "moniker" field, where multiple matches are possible.
+            // Selectors return a vector. Non-wildcarded Inspect selectors will usually return
+            // a vector with a single element, but when a component exposes multiple
+            // `fuchsia.inspect.Tree`s, a non-wildcarded selector may match multiple properties.
             SelectorType::Inspect => MetricValue::Vector(self.inspect.fetch(&selector)),
         }
     }
