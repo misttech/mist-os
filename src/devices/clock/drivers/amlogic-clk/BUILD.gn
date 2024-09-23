@@ -51,7 +51,7 @@ source_set("amlogic-clk-driver-source") {
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/ddk",
     "//src/lib/ddktl",

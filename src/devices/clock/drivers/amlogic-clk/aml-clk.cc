@@ -11,7 +11,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <string.h>
 
 #include <fbl/auto_lock.h>
@@ -26,8 +26,6 @@
 #include "aml-g12b-blocks.h"
 #include "aml-gxl-blocks.h"
 #include "aml-sm1-blocks.h"
-#include "fidl/fuchsia.hardware.clock.measure/cpp/wire_types.h"
-#include "lib/fidl/cpp/wire/string_view.h"
 
 namespace amlogic_clock {
 
@@ -687,11 +685,20 @@ AmlClock::AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffe
     case PDEV_DID_AMLOGIC_A5_CLK: {
       // AV400
       uint32_t chip_id = PDEV_PID_AMLOGIC_A5;
-      zx::resource smc_resource;
 
-      ddk::PDevFidl pdev(device);
-      if ((pdev.GetSmc(0, &smc_resource)) != ZX_OK) {
-        zxlogf(ERROR, "pdev.GetSmc failed");
+      fdf::PDev pdev;
+      {
+        zx::result result =
+            DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(device);
+        if (result.is_error()) {
+          zxlogf(ERROR, "Failed to connect to platform device: %s", result.status_string());
+          return;
+        }
+        pdev = fdf::PDev{std::move(result.value())};
+      }
+      zx::result smc_resource = pdev.GetSmc(0);
+      if (smc_resource.is_error()) {
+        zxlogf(ERROR, "Failed to get SMC resource: %s", smc_resource.status_string());
         return;
       }
 
@@ -714,7 +721,7 @@ AmlClock::AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffe
       cpu_clks_.reserve(cpu_clk_count);
       // For A5, there is only 1 CPU clock
       cpu_clks_.emplace_back(&hiu_mmio_, a5_cpu_clks[0].reg, &pllclk_[a5_cpu_clks[0].pll],
-                             a5_cpu_clks[0].initial_hz, chip_id, std::move(smc_resource));
+                             a5_cpu_clks[0].initial_hz, chip_id, std::move(smc_resource.value()));
 
       break;
     }
@@ -753,85 +760,88 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
   zx_status_t status;
 
   // Get the platform device protocol and try to map all the MMIO regions.
-  ddk::PDevFidl pdev(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-clk: failed to get pdev protocol");
-    return ZX_ERR_NO_RESOURCES;
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      return result.status_value();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
-
-  std::optional<fdf::MmioBuffer> hiu_mmio = std::nullopt;
-  std::optional<fdf::MmioBuffer> dosbus_mmio = std::nullopt;
-  std::optional<fdf::MmioBuffer> msr_mmio = std::nullopt;
-  std::optional<fdf::MmioBuffer> cpuctrl_mmio = std::nullopt;
 
   // All AML clocks have HIU and dosbus regs but only some support MSR regs.
   // Figure out which of the varieties we're dealing with.
-  status = pdev.MapMmio(kHiuMmio, &hiu_mmio);
-  if (status != ZX_OK || !hiu_mmio) {
-    zxlogf(ERROR, "aml-clk: failed to map HIU regs, status = %d", status);
-    return status;
+  zx::result hiu_mmio = pdev.MapMmio(kHiuMmio);
+  if (hiu_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map HIU mmio: %s", hiu_mmio.status_string());
+    return hiu_mmio.status_value();
   }
 
-  status = pdev.MapMmio(kDosbusMmio, &dosbus_mmio);
-  if (status != ZX_OK || !dosbus_mmio) {
-    zxlogf(ERROR, "aml-clk: failed to map DOS regs: %s", zx_status_get_string(status));
-    return status;
+  zx::result dosbus_mmio = pdev.MapMmio(kDosbusMmio);
+  if (dosbus_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map DOS mmio: %s", dosbus_mmio.status_string());
+    return dosbus_mmio.status_value();
   }
 
   // Use the Pdev Device Info to determine if we've been provided with two
   // MMIO regions.
-  pdev_device_info_t info;
-  status = pdev.GetDeviceInfo(&info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-clk: failed to get pdev device info, status = %d", status);
-    return status;
+  zx::result device_info = pdev.GetDeviceInfo();
+  if (device_info.is_error()) {
+    zxlogf(ERROR, "Failed to get device info: %s", device_info.status_string());
+    return device_info.status_value();
   }
 
-  if (info.vid == PDEV_VID_GENERIC && info.pid == PDEV_PID_GENERIC &&
-      info.did == PDEV_DID_DEVICETREE_NODE) {
+  if (device_info->vid == PDEV_VID_GENERIC && device_info->pid == PDEV_PID_GENERIC &&
+      device_info->did == PDEV_DID_DEVICETREE_NODE) {
     // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
-    pdev_board_info_t board_info;
-    if ((status = pdev.GetBoardInfo(&board_info)) != ZX_OK) {
-      zxlogf(ERROR, "aml-clk: GetBoardInfo failed, status = %d", status);
-      return status;
+    zx::result board_info = pdev.GetBoardInfo();
+    if (board_info.is_error()) {
+      zxlogf(ERROR, "Failed to get board info: %s", board_info.status_string());
+      return board_info.status_value();
     }
 
-    if (board_info.vid == PDEV_VID_KHADAS) {
-      switch (board_info.pid) {
+    if (board_info->vid == PDEV_VID_KHADAS) {
+      switch (board_info->pid) {
         case PDEV_PID_VIM3:
-          info.pid = PDEV_PID_AMLOGIC_A311D;
-          info.did = PDEV_DID_AMLOGIC_G12B_CLK;
+          device_info->pid = PDEV_PID_AMLOGIC_A311D;
+          device_info->did = PDEV_DID_AMLOGIC_G12B_CLK;
           break;
         default:
-          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
+          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info->pid, board_info->vid);
           return ZX_ERR_INVALID_ARGS;
       }
     } else {
-      zxlogf(ERROR, "Unsupported VID 0x%x", board_info.vid);
+      zxlogf(ERROR, "Unsupported VID 0x%x", board_info->vid);
       return ZX_ERR_INVALID_ARGS;
     }
   }
 
-  if (info.mmio_count > kMsrMmio) {
-    status = pdev.MapMmio(kMsrMmio, &msr_mmio);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "aml-clk: failed to map MSR regs, status = %d", status);
-      return status;
+  std::optional<fdf::MmioBuffer> msr_mmio;
+  if (device_info->mmio_count > kMsrMmio) {
+    zx::result result = pdev.MapMmio(kMsrMmio);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to map MSR mmio: %s", result.status_string());
+      return result.status_value();
     }
+    msr_mmio = std::move(msr_mmio.value());
   }
 
   // For A1, this register is within cpuctrl mmio
-  if (info.pid == PDEV_PID_AMLOGIC_A1 && info.mmio_count > kCpuCtrlMmio) {
-    status = pdev.MapMmio(kCpuCtrlMmio, &cpuctrl_mmio);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "aml-clk: failed to map cpuctrl regs, status = %d", status);
-      return status;
+  std::optional<fdf::MmioBuffer> cpuctrl_mmio;
+  if (device_info->pid == PDEV_PID_AMLOGIC_A1 && device_info->mmio_count > kCpuCtrlMmio) {
+    zx::result result = pdev.MapMmio(kCpuCtrlMmio);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to map cpuctrl mmio: %s", result.status_string());
+      return result.status_value();
     }
+    cpuctrl_mmio = std::move(result.value());
   }
 
   auto clock_device = std::make_unique<amlogic_clock::AmlClock>(
-      parent, std::move(*hiu_mmio), *std::move(dosbus_mmio), *std::move(msr_mmio),
-      *std::move(cpuctrl_mmio), info.did);
+      parent, std::move(hiu_mmio.value()), std::move(dosbus_mmio.value()), *std::move(msr_mmio),
+      *std::move(cpuctrl_mmio), device_info->did);
 
   status = clock_device->DdkAdd(ddk::DeviceAddArgs("clocks")
                                     .forward_metadata(parent, DEVICE_METADATA_CLOCK_IDS)
