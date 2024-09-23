@@ -63,11 +63,14 @@ rustc_binary("fshost") {
     "//src/storage/lib/vfs/rust:vfs",
     "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_rust",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
+    "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:hkdf",
     "//third_party/rust_crates:scopeguard",
+    "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
@@ -79,6 +82,7 @@ rustc_binary("fshost") {
     "//src/storage/lib/fs_management/c",
   ]
   test_deps = [
+    "testing:test_zxcrypt_config",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-async",
   ]

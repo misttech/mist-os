@@ -26,8 +26,8 @@ closed protocol Crypt {
         purpose KeyPurpose;
     }) -> (struct {
         wrapping_key_id uint64;
-        wrapped_key vector<uint8>:48;
-        unwrapped_key vector<uint8>:32;
+        wrapped_key vector<uint8>:132;
+        unwrapped_key vector<uint8>:80;
     }) error zx.Status;
 
     /// Unwraps a key that is wrapped by the key identified by `wrapping_key_id`.  `owner` must be
@@ -37,9 +37,9 @@ closed protocol Crypt {
     strict UnwrapKey(struct {
         wrapping_key_id uint64;
         owner uint64;
-        key vector<uint8>:48;
+        key vector<uint8>:132;
     }) -> (struct {
-        unwrapped_key vector<uint8>:32;
+        unwrapped_key vector<uint8>:80;
     }) error zx.Status;
 };
 

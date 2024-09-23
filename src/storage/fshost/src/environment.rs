@@ -426,7 +426,7 @@ impl FshostEnvironment {
         // Potentially bind and format zxcrypt first.
         let mut zxcrypt_device;
         let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
-            || self.launcher.requires_zxcrypt(format, device)
+            || self.launcher.requires_zxcrypt(format, self.launcher.is_ramdisk_device(device))
         {
             tracing::info!(
                 path = device.path(),
@@ -647,7 +647,7 @@ impl FshostEnvironment {
         // Potentially bind and unseal zxcrypt before serving data.
         let mut zxcrypt_device = None;
         let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
-            || self.launcher.requires_zxcrypt(format, device)
+            || self.launcher.requires_zxcrypt(format, self.launcher.is_ramdisk_device(device))
         {
             tracing::info!(path = device.path(), "Attempting to unseal zxcrypt device",);
             let ignore_paths = &mut *self.matcher_lock.lock().await;
@@ -767,7 +767,8 @@ impl Environment for FshostEnvironment {
             "Mounting fvm"
         );
         let serving_fs = self.launcher.serve_fvm(device).await?;
-        self.container = Some(Box::new(FvmContainer::new(serving_fs)));
+        self.container =
+            Some(Box::new(FvmContainer::new(serving_fs, self.launcher.is_ramdisk_device(device))));
         Ok(())
     }
 
@@ -1074,13 +1075,13 @@ impl FilesystemLauncher {
             .map_or(false, |prefix| device.topological_path().starts_with(prefix))
     }
 
-    pub fn requires_zxcrypt(&self, format: DiskFormat, device: &dyn Device) -> bool {
+    pub fn requires_zxcrypt(&self, format: DiskFormat, is_ramdisk: bool) -> bool {
         match format {
             // Fxfs never has zxcrypt underneath
             DiskFormat::Fxfs => false,
             _ if self.config.no_zxcrypt => false,
             // No point using zxcrypt for ramdisk devices.
-            _ if self.is_ramdisk_device(device) => false,
+            _ if is_ramdisk => false,
             _ => true,
         }
     }

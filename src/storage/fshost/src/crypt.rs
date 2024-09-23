@@ -37,14 +37,14 @@ pub async fn get_policy() -> Result<Policy, Error> {
 }
 
 #[derive(Debug)]
-enum KeySource {
+pub enum KeySource {
     Null,
     Tee,
 }
 
 /// Fxfs and zxcrypt have different null keys, so operations have to indicate which is ultimately
 /// going to consume the key we produce.
-enum KeyConsumer {
+pub enum KeyConsumer {
     /// The null key for fxfs is a 128-bit key with the bytes "zxcrypt" at the beginning and then
     /// padded with zeros. This is for legacy reasons - earlier versions of this code picked this
     /// key, so we need to continue to use it to avoid wiping everyone's null-key-encrypted fxfs
@@ -55,7 +55,7 @@ enum KeyConsumer {
 }
 
 impl KeySource {
-    async fn get_key(&self, consumer: KeyConsumer) -> Result<Vec<u8>, Error> {
+    pub async fn get_key(&self, consumer: KeyConsumer) -> Result<Vec<u8>, Error> {
         match self {
             KeySource::Null => match consumer {
                 KeyConsumer::Fxfs => {
@@ -86,7 +86,7 @@ fn format_sources(policy: Policy) -> Vec<KeySource> {
     }
 }
 
-fn unseal_sources(policy: Policy) -> Vec<KeySource> {
+pub fn unseal_sources(policy: Policy) -> Vec<KeySource> {
     match policy {
         Policy::Null => vec![KeySource::Null],
         Policy::TeeRequired => vec![KeySource::Tee],

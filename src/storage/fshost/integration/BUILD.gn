@@ -331,6 +331,20 @@ fshost_integration_test_package("fshost_integration_tests_fxfs_gpt") {
 }
 
 fshost_integration_test_package("fshost_integration_tests_storage_host_minfs") {
+  options = {
+    data_filesystem_format = "minfs"
+    use_disk_migration = false
+    storage_host = true
+    fxfs_blob = false
+  }
+  extra_deps = [
+    "//src/storage/fvm:fvm-component",
+    "//src/storage/storage-host",
+  ]
+}
+
+fshost_integration_test_package(
+    "fshost_integration_tests_storage_host_minfs_no_zxcrypt") {
   data_filesystem_variant = "minfs-no-zxcrypt"
   options = {
     data_filesystem_format = "minfs"
@@ -395,5 +409,6 @@ group("tests") {
     ":fshost_integration_tests_minfs",
     ":fshost_integration_tests_minfs_no_zxcrypt",
     ":fshost_integration_tests_storage_host_minfs",
+    ":fshost_integration_tests_storage_host_minfs_no_zxcrypt",
   ]
 }
