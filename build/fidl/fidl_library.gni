@@ -681,6 +681,7 @@ template("fidl_library") {
       id = "sdk://fidl/$library_name"
 
       category = sdk_category
+
       if (defined(api_reference)) {
         api = api_reference
         api_contents = [
@@ -695,6 +696,7 @@ template("fidl_library") {
         source = meta_file
         dest = "$file_base/meta.json"
         schema = "fidl_library"
+        stable = stable
       }
 
       files = all_files

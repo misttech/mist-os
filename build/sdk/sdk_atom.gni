@@ -10,6 +10,28 @@ import("//build/sdk/plasa/config.gni")
 import("//build/testing/golden_files.gni")
 import("config.gni")
 
+_types_supporting_unstable_atoms = [
+  "fidl_library",
+  "cc_source_library",
+]
+_categories_supporting_unstable_atoms = [
+  "internal",
+  "partner_internal",  # TODO(https://fxbug.dev/364727245): Remove when fixed.
+  "partner",
+]
+_types_not_requiring_compatibility = [
+  "bind_library",
+  "companion_host_tool",
+  "dart_library",
+  "data",
+  "documentation",
+  "experimental_python_e2e_test",
+  "ffx_tool",
+  "host_tool",
+  "package",
+  "version_history",
+]
+
 # Defines an SDK element.
 #
 # Outputs
@@ -117,10 +139,12 @@ import("config.gni")
 #     the `schema` variable.
 #
 #   stable (optional)
-#     Whether this sdk_atom is stabilized. If false, there will not be
-#     .api file generated, and the atom will be marked as unstable in the final
-#     IDK.
-#     Defaults to false.
+#     Whether this sdk_atom is stabilized.
+#     Must be specified for types "fidl_library" and "cc_source_library" and
+#     otherwise unspecified.
+#     This is only informative. The value must match the `stable` value in the
+#     atom metadata specified by `source`/`value`. (That metadata is what
+#     controls whether the atom is marked as unstable in the final IDK.)
 #
 #   type (optional)
 #     Type of the atom. Defaults to schema.
@@ -173,6 +197,55 @@ template("sdk_atom") {
   assert(
       category != "cts" && category != "public",
       "'${target_name}' has SDK category '${category}', which is not yet supported.")
+
+  # Ensure that we only want write `stable` in the manifest for types that
+  # support unstable atoms. For those types, ensure that `meta.stable`is always
+  # specified and either it is true and an `api` file was specified or the
+  # category supports unstable atoms.
+  is_type_supporting_unstable = _types_supporting_unstable_atoms + [ type ] -
+                                [ type ] != _types_supporting_unstable_atoms
+  assert(
+      is_type_supporting_unstable == defined(meta.stable),
+      "`meta.stable` must be set if and only if the type ('${type}') is one of ${_types_supporting_unstable_atoms}.")
+  if (defined(meta.stable)) {
+    if (meta.stable) {
+      assert(category != "internal",
+             "Atoms in SDK category '${category}' cannot be `stable`.")
+      add_stable_property = true
+
+      # For types that specify stable, ensure the `api` file was specified for stable atoms.
+      assert(defined(invoker.api))
+    } else {
+      is_category_supporting_unstable =
+          _categories_supporting_unstable_atoms + [ category ] - [ category ] !=
+          _categories_supporting_unstable_atoms
+      assert(
+          is_category_supporting_unstable,
+          "`meta.stable` must be true unless the SDK category ('${category}') is one of ${_categories_supporting_unstable_atoms}.")
+      add_stable_property = false
+    }
+  } else {
+    add_stable_property = false
+  }
+
+  is_type_not_requiring_compatibility =
+      _types_not_requiring_compatibility + [ type ] - [ type ] !=
+      _types_not_requiring_compatibility
+  if ((type == "cc_prebuilt_library" &&
+       (target_name == "driver_runtime_sdk_manifest" ||
+        target_name == "libvulkan_sdk_manifest")) ||
+      (type == "loadable_module" && target_name == "vulkan_layers")) {
+    # These few targets specify `no_headers` (or would if using a template).
+    # Since this list is unlikely to change much, just exempt them by name.
+    is_type_not_requiring_compatibility = true
+  }
+
+  assert(
+      defined(invoker.api) || category == "internal" ||
+          (defined(meta.stable) && !meta.stable) ||
+          is_type_not_requiring_compatibility,
+      "All atoms with types ('${type}') and categories ('${category}') requiring compatibility must specify an `api` file unless explicitly unstable.")
+  not_needed([ "is_type_not_requiring_compatibility" ])
 
   if (defined(invoker.api)) {
     if (!defined(invoker.current_api) && !defined(invoker.api_contents)) {
@@ -386,7 +459,9 @@ template("sdk_atom") {
              "--deps",
            ] + rebase_path(dep_manifests, root_build_dir) + file_args
 
-    if (defined(meta.stable) && meta.stable) {
+    if (add_stable_property) {
+      # This is only informational and does not affect the build. It should
+      # match the value in `meta_file_for_idk`.
       args += [ "--stable" ]
     }
 
