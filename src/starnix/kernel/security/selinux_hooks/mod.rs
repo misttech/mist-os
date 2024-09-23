@@ -102,13 +102,11 @@ pub(super) fn fs_node_init_on_create(
     new_node: &FsNode,
     _parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    // By definition this is a new `FsNode` so should not have already been labeled!
-    if !new_node.info().security_state.label.is_initialized() {
-        log_warn!(
-            "fs_node_init_on_create: node {} in {:?} already created?",
-            new_node.info().ino,
-            new_node.fs().name()
-        );
+    // By definition this is a new `FsNode` so should not have already been labeled
+    // (unless we're working in the context of overlayfs and affected by
+    // https://fxbug.dev/369067922).
+    if new_node.info().security_state.label.is_initialized() {
+        track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
     }
 
     // If the creating task's "fscreate" attribute is set then it overrides the normal process
