@@ -57,7 +57,6 @@
             max_count: 20,
             value: [
                 "ram-disk",
-                "ram-nand",
                 "virtual-audio",
                 "fake-battery",
                 "fake-ac",
@@ -70,7 +69,6 @@
             max_count: 20,
             value: [
                 45, // PDEV_DID_RAM_DISK
-                46, // PDEV_DID_RAM_NAND
                 47, // PDEV_DID_VIRTUAL_AUDIO
                 51, // PDEV_DID_FAKE_BATTERY
                 55, // PDEV_DID_FAKE_AC
