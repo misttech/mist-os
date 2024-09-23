@@ -6,11 +6,12 @@
 
 import argparse
 import json
+import sys
 
 import yaml
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--doc_list",
@@ -38,7 +39,7 @@ def main():
 
     doc_list = args.doc_list.read().splitlines()
 
-    all_drivers_doc_dict = {}
+    all_drivers_doc_dict: dict[str, list[str]] = {}
 
     all_drivers_doc_dict["drivers_areas"] = []
     areas_list = args.areas_list.read().splitlines()
@@ -63,7 +64,8 @@ def main():
 
     yaml.dump(all_drivers_doc_dict, args.output)
     args.dep_file.write("{}: {}\n".format(args.output.name, " ".join(doc_list)))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -18,7 +18,7 @@ FLUTTER_PACKAGES = [
 ]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser("Builds a metadata file")
     parser.add_argument("--out", help="Path to the output file", required=True)
     parser.add_argument(
