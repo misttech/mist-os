@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(target_os = "fuchsia")]
-use tracing::{error, warn};
-
 use super::config::DiagnosticData;
 use super::metrics::fetch::{Fetcher, FileDataFetcher};
 use super::metrics::metric_value::{MetricValue, Problem};
 use super::metrics::{MetricState, Metrics, ValueSource};
 use super::plugins::{register_plugins, Plugin};
 use crate::act::{Action, Actions, Alert, Gauge, Snapshot};
+use crate::inspect_logger;
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -147,19 +145,19 @@ impl StructuredActionContext<'_> {
             MetricValue::Bool(false) => {}
             MetricValue::Problem(Problem::Ignore(_)) => {}
             MetricValue::Problem(_reason) => {
-                #[cfg(target_os = "fuchsia")]
-                warn!(
-                    "Snapshot trigger was not boolean in '{}::{}': {:?}",
-                    namespace, name, _reason,
-                );
-            }
-            _other => {
-                #[cfg(target_os = "fuchsia")]
-                error!(
-                    "[DEBUG: BAD CONFIG] Unexpected value type in config '{}::{}' (need boolean): {}",
+                inspect_logger::log_warn(
+                    "Snapshot trigger not boolean",
                     namespace,
                     name,
-                    _other,
+                    &format!("{:?}", _reason),
+                );
+            }
+            other => {
+                inspect_logger::log_error(
+                    "Bad config: Unexpected value type (need boolean)",
+                    namespace,
+                    name,
+                    &format!("{}", other),
                 );
             }
         };

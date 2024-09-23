@@ -13,6 +13,7 @@ use regex::Regex;
 pub(crate) mod act; // Perform appropriate actions and collect results as strings.
 pub(crate) mod act_structured; // Perform appropriate actions and collect serializable actions.
 pub(crate) mod config; // Read the config file(s) for metric and action specs.
+pub mod inspect_logger;
 pub(crate) mod metrics; // Retrieve and calculate the metrics.
 pub(crate) mod plugins; // Plugins for additional analysis.
 pub(crate) mod result_format; // Formats the triage results.

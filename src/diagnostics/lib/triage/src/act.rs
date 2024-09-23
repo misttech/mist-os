@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(target_os = "fuchsia")]
-use tracing::{error, warn};
-
 use crate::config::ActionConfig;
 
 use super::config::DiagnosticData;
@@ -14,7 +11,7 @@ use super::metrics::{
     ExpressionContext, ExpressionTree, Function, Metric, MetricState, Metrics, ValueSource,
 };
 use super::plugins::{register_plugins, Plugin};
-use crate::metric_value_to_int;
+use crate::{inspect_logger, metric_value_to_int};
 use anyhow::{bail, Error};
 use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
 use serde::{Deserialize, Serialize};
@@ -444,36 +441,38 @@ impl ActionContext<'_> {
                             "Bad interval in config '{}::{}': {:?}",
                             namespace, name, bad_type,
                         ));
-                        #[cfg(target_os = "fuchsia")]
-                        error!("Bad interval in config '{}::{}': {:?}", namespace, name, interval);
+                        inspect_logger::log_error(
+                            "Bad interval",
+                            namespace,
+                            name,
+                            &format!("{:?}", interval),
+                        );
                     }
                 }
             }
             MetricValue::Bool(false) => (),
             MetricValue::Problem(Problem::Ignore(_)) => (),
             MetricValue::Problem(reason) => {
-                #[cfg(target_os = "fuchsia")]
-                warn!(
-                    "Snapshot trigger was not boolean in config '{}::{}': {:?}",
-                    namespace, name, reason,
+                inspect_logger::log_warn(
+                    "Snapshot trigger not boolean",
+                    namespace,
+                    name,
+                    &format!("{:?}", reason),
                 );
                 self.action_results
                     .infos
                     .push(format!("[MISSING] In config '{}::{}': {:?}", namespace, name, reason,));
             }
             other => {
-                #[cfg(target_os = "fuchsia")]
-                error!(
-                    "[DEBUG: BAD CONFIG] Unexpected value type in config '{}::{}' (need boolean): {}",
+                inspect_logger::log_error(
+                    "Bad config: Unexpected value type (need boolean)",
                     namespace,
                     name,
-                    other,
+                    &format!("{}", other),
                 );
                 self.action_results.errors.push(format!(
-                    "[DEBUG: BAD CONFIG] Unexpected value type in config '{}::{}' (need boolean): {}",
-                    namespace,
-                    name,
-                    other,
+                    "Bad config: Unexpected value type in config '{}::{}' (need boolean): {}",
+                    namespace, name, other,
                 ));
             }
         };

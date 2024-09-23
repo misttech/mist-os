@@ -1125,7 +1125,7 @@ impl<'a> MetricState<'a> {
 //   $ fx test triage_lib_test
 
 #[cfg(test)]
-pub(crate) mod test {
+mod test {
     use super::*;
     use crate::config::{DiagnosticData, Source};
     use anyhow::Error;
