@@ -14,7 +14,7 @@ cc_library(
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],
     deps = [
-        "@fuchsia_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
-        "@fuchsia_sdk//pkg/driver_power_cpp",
+        "//sdk/lib/driver/power/cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     ],
 )

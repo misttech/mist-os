@@ -5,8 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.power.broker") {
-  sdk_category = "partner"
-  sdk_area = "Power"
+  sdk_category = "internal"
   sources = [ "broker.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 
@@ -14,7 +13,6 @@ fidl("fuchsia.power.broker") {
   visibility = [
     "//examples/power/*",
     "//sdk:*",
-    "//sdk/fidl:*",
     "//sdk/fidl/fuchsia.hardware.hrtimer/*:*",
     "//sdk/fidl/fuchsia.power.system/*:*",
     "//sdk/fidl/fuchsia.power.topology.test/*:*",

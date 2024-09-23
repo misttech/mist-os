@@ -14,7 +14,6 @@
 #include <lib/async/default.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/power-support.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/power/cpp/testing/fake_topology.h>
 #include <lib/driver/power/cpp/testing/fidl_bound_server.h>
@@ -41,6 +40,8 @@
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
+
+#include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace power_lib_test {
 

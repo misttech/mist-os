@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/power/cpp/types.h>
+#include "sdk/lib/driver/power/cpp/types.h"
+
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 

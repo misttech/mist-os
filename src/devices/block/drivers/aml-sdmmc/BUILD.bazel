@@ -47,6 +47,7 @@ fuchsia_cc_driver(
     deps = [
         ":aml-sdmmc-config",
         "//sdk/lib/driver/compat/cpp",
+        "//sdk/lib/driver/power/cpp",
         "//src/devices/block/lib/sdio",
         "//src/devices/block/lib/sdmmc",
         "//src/devices/lib/amlogic",
@@ -60,9 +61,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-        "@fuchsia_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
-        "@fuchsia_sdk//pkg/driver_power_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/fit",
         "@fuchsia_sdk//pkg/hwreg",
@@ -71,6 +70,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/sync",
         "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
         "@internal_sdk//pkg/zircon-internal",
     ],
 )

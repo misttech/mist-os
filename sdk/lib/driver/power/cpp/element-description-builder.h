@@ -8,9 +8,8 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
-#include <lib/driver/power/cpp/types.h>
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#include "sdk/lib/driver/power/cpp/types.h"
 
 namespace fdf_power {
 
@@ -87,7 +86,5 @@ class ElementDescBuilder {
 };
 
 }  // namespace fdf_power
-
-#endif
 
 #endif  // LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
