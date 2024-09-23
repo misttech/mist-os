@@ -519,7 +519,6 @@ class IncomingNamespace {
     role_manager_.emplace(std::move(expected_profile_role));
 
     std::map<std::string, std::string> arguments;
-    arguments["kernel.shell"] = "true";
     arguments["driver.foo"] = "true";
     boot_args_ = mock_boot_arguments::Server(std::move(arguments));
 
