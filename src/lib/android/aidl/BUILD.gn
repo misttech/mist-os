@@ -117,6 +117,8 @@ if (is_host) {
   }
 
   python_binary("aidl_rust_glue") {
+    # TODO(b/367413842): Enable MyPy type checking
+    enable_mypy = false
     main_source = "//third_party/android/platform/system/tools/aidl/build/aidl_rust_glue.py"
     main_callable = "execute"
   }
