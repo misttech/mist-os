@@ -9,7 +9,7 @@ import sys
 from run_assembly import run_product_assembly
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run ffx assembly with the provided arguments."
     )
@@ -81,3 +81,5 @@ def main():
 
     with open(args.stamp, "w") as f:
         pass  # creates the file
+
+    return 0

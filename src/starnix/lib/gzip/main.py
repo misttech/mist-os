@@ -16,7 +16,7 @@ parser.add_argument(
 )
 
 
-def main():
+def main() -> None:
     args = parser.parse_args()
     with open(args.input, "rb") as F:
         with gzip.open(args.output, "wb") as G:
