@@ -190,8 +190,8 @@ template("sdk_source_set") {
       deps += [ "//build/sdk:sdk_source_sets_allowlist" ]
     }
 
-    # TODO(https://fxbug.dev/42079584): All SDK libraries should compile with `sdk_extra_warnings`.
-    if (invoker.category == "partner" || invoker.category == "public") {
+    # TODO(https://fxbug.dev/42079584): Fix failures and remove exception.
+    if (invoker.category != "internal") {
       configs += [ "//build/config:sdk_extra_warnings" ]
     }
 

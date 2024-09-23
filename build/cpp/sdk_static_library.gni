@@ -24,11 +24,16 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     See //build/sdk/sdk_atom.gni.
 #
 #   api (optional)
-#     Path to the file representing the API of this library.
+#     Override path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
-#     explicitly acknowledged. It is mandatory for publication categories of
-#     "partner" or "public".
-#     Defaults to "<SDK name>.api".
+#     explicitly acknowledged.
+#     If not specified, the path will be "<SDK name>.api".
+#     Only allowed when `no_headers` is false and category is not "internal".
+#
+#   no_headers (optional)
+#     Specifies that the library's headers are NOT included in the SDK.
+#     When true, the modification acknowledgement mechanism is disabled.
+#     Defaults to false.
 #
 #   libcxx_linkage (optional)
 #     Whether or how to link libc++. SDK shared libraries cannot link libc++.so
@@ -125,14 +130,18 @@ template("sdk_static_library") {
   }
   sdk_id = "sdk://${sdk_root_path}"
 
-  is_partner_or_public =
-      invoker.category == "partner" || invoker.category == "public"
   no_headers = defined(invoker.no_headers) && invoker.no_headers
-  if (is_partner_or_public && !no_headers) {
-    api_reference = "${sdk_name}.api"
+  if (!no_headers && !is_internal) {
+    # TODO(https://fxbug.dev/366221510): Move this to where it is used.
     if (defined(invoker.api)) {
       api_reference = invoker.api
+    } else {
+      api_reference = "${sdk_name}.api"
     }
+  } else {
+    assert(
+        !defined(invoker.api),
+        "`no_header` and \"internal\" targets do not require/support modification acknowledgement.")
   }
 
   main_target_name = target_name
@@ -410,7 +419,8 @@ template("sdk_static_library") {
                            ])
 
     id = sdk_id
-    if (defined(api_reference) && !no_headers) {
+    if (defined(api_reference)) {
+      assert(!no_headers)
       api = api_reference
       api_contents = sdk_header_files
     }
