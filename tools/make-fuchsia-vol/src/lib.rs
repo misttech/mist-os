@@ -9,7 +9,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use crc::crc32;
 use fatfs::{FsOptions, NullTimeProvider, OemCpConverter, TimeProvider};
 use gpt::partition_types::{OperatingSystem, Type as PartType};
-use gpt::GptDisk;
+use gpt::{DiskDevice, GptDisk};
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use sdk_metadata::{LoadedProductBundle, ProductBundle};
@@ -20,6 +20,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::os::unix::fs::FileExt;
+use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
 use zerocopy::{Immutable, IntoBytes};
@@ -188,6 +189,21 @@ fn get_image(images: &HashMap<String, Utf8PathBuf>, name: &str) -> Result<Utf8Pa
     }
 }
 
+/// Create a protective MBR
+///
+/// The disk size is the number of logical blocks on the disk.
+fn write_protective_mbr<D>(disk: &mut D, disk_size: u64, block_size: u64) -> Result<usize, Error>
+where
+    D: DiskDevice,
+{
+    let mbr = gpt::mbr::ProtectiveMBR::with_lb_size(
+        // The with_lb_size fn expects the disk size minus 1 block since the protected partition
+        // begins at LBA 1, not 0.
+        u32::try_from((disk_size - 1) / block_size).unwrap_or(0xffffffff),
+    );
+    Ok(mbr.overwrite_lba0(disk)?)
+}
+
 pub fn run(mut args: TopLevel) -> Result<(), Error> {
     check_args(&mut args)?;
 
@@ -350,12 +366,7 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
 
     gpt_disk.write()?;
 
-    // Create a protective MBR
-    // The size here should be the number of logical-blocks on the disk less one for the MBR itself.
-    let mbr = gpt::mbr::ProtectiveMBR::with_lb_size(
-        u32::try_from((disk_size - 1) / block_size).unwrap_or(0xffffffff),
-    );
-    mbr.overwrite_lba0(&mut disk)?;
+    write_protective_mbr(&mut disk, disk_size, block_size)?;
 
     let search_path = if let Some(build_dir) = &args.fuchsia_build_dir {
         // Use tools from the build directory over $PATH.
@@ -811,6 +822,70 @@ fn write_abr(disk: &mut File, offset: u64, boot_part: BootPart) -> Result<(), Er
     disk.seek(SeekFrom::Start(offset))?;
     disk.write_all(data.as_bytes())?;
     disk.write_u32::<BigEndian>(crc32::checksum_ieee(data.as_bytes()))?;
+    Ok(())
+}
+
+/// Sets up a Fuchsia disk with the required partitions and an imaged UEFI partition.
+pub fn make_empty_disk_with_uefi(disk_path: &Path, efi_data: &[u8]) -> anyhow::Result<()> {
+    // TODO(http://b/369045905): Some of this can probably be deduplicated with run()
+    const EFI_SIZE: u64 = 63 * 1024 * 1024;
+    const VBMETA_SIZE: u64 = 64 * 1024;
+    const ABR_SIZE: u64 = 256 * 1024 * 1024;
+
+    // For x64, the FVM size is hardcoded to 16GB.
+    // If the partition size is less than 16GB, it fails to mount.
+    const DISK_SIZE: u64 = 20 * 1024 * 1024 * 1024;
+
+    let mut disk = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(disk_path)
+        .context(format!("Failed to open output file {}", disk_path.display()))?;
+
+    disk.set_len(DISK_SIZE)?;
+
+    let config = gpt::GptConfig::new().writable(true).initialized(false);
+    let mut gpt_disk = config.create_from_device(Box::new(&mut disk), None)?;
+    gpt_disk.update_partitions(std::collections::BTreeMap::new())?;
+
+    struct Partitions {
+        efi: Range<u64>,
+        _zircon_a: Range<u64>,
+        _vbmeta_a: Range<u64>,
+        _zircon_b: Range<u64>,
+        _vbmeta_b: Range<u64>,
+        _zircon_r: Range<u64>,
+        _vbmeta_r: Range<u64>,
+        _misc: Range<u64>,
+    }
+
+    let part = Partitions {
+        efi: add_partition(&mut gpt_disk, "fuchsia-esp", EFI_SIZE, gpt::partition_types::EFI)?,
+        _zircon_a: add_partition(&mut gpt_disk, "zircon-a", ABR_SIZE, ZIRCON_A_GUID)?,
+        _vbmeta_a: add_partition(&mut gpt_disk, "vbmeta_a", VBMETA_SIZE, VBMETA_A_GUID)?,
+        _zircon_b: add_partition(&mut gpt_disk, "zircon-b", ABR_SIZE, ZIRCON_B_GUID)?,
+        _vbmeta_b: add_partition(&mut gpt_disk, "vbmeta_b", VBMETA_SIZE, VBMETA_B_GUID)?,
+        _zircon_r: add_partition(&mut gpt_disk, "zircon-r", ABR_SIZE, ZIRCON_R_GUID)?,
+        _vbmeta_r: add_partition(&mut gpt_disk, "vbmeta_r", VBMETA_SIZE, VBMETA_R_GUID)?,
+        _misc: add_partition(&mut gpt_disk, "misc", VBMETA_SIZE, MISC_GUID)?,
+    };
+
+    let block_size: u64 = gpt_disk.logical_block_size().clone().into();
+
+    let fvm_size =
+        gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
+            * block_size;
+
+    let _fvm_part = add_partition(&mut gpt_disk, "fvm", fvm_size, FVM_GUID)?;
+
+    gpt_disk.write()?;
+
+    write_protective_mbr(&mut disk, DISK_SIZE, block_size)?;
+
+    disk.write_all_at(efi_data, part.efi.start)?;
+
     Ok(())
 }
 
