@@ -355,8 +355,14 @@ impl Socket {
             Anon,
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
-        node.set_socket(socket.clone());
         FileObject::new_anonymous(SocketFile::new(socket), node, open_flags)
+    }
+
+    /// Returns the Socket that this FileHandle refers to. If this file is not a socket file,
+    /// returns ENOTSOCK.
+    pub fn get_from_file(file: &FileHandle) -> Result<&SocketHandle, Errno> {
+        let socket_file = file.downcast_file::<SocketFile>().ok_or_else(|| errno!(ENOTSOCK))?;
+        Ok(&socket_file.socket)
     }
 
     pub fn downcast_socket<T>(&self) -> Option<&T>

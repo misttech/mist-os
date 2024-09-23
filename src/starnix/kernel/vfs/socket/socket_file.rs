@@ -37,7 +37,7 @@ pub fn new_socket_file(
 }
 
 pub struct SocketFile {
-    socket: SocketHandle,
+    pub(super) socket: SocketHandle,
 }
 
 impl FileOps for SocketFile {

@@ -151,7 +151,7 @@ pub fn sys_bind(
     user_address_length: usize,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     if !address.valid_for_domain(socket.domain) {
         return match socket.domain {
@@ -216,7 +216,7 @@ pub fn sys_listen(
     backlog: i32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
     socket.listen(backlog, current_task.as_ucred())?;
     Ok(())
 }
@@ -240,7 +240,7 @@ pub fn sys_accept4(
     flags: u32,
 ) -> Result<FdNumber, Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
     let accepted_socket =
         file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             socket.accept()
@@ -271,7 +271,7 @@ pub fn sys_connect(
     user_address_length: usize,
 ) -> Result<(), Errno> {
     let client_file = current_task.files.get(fd)?;
-    let client_socket = client_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let client_socket = Socket::get_from_file(&client_file)?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
         SocketAddress::Unspecified => return error!(EAFNOSUPPORT),
@@ -352,7 +352,7 @@ pub fn sys_getsockname(
     user_address_length: UserRef<socklen_t>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
     let address_bytes = socket.getsockname();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
@@ -368,7 +368,7 @@ pub fn sys_getpeername(
     user_address_length: UserRef<socklen_t>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
     let address_bytes = socket.getpeername()?;
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
@@ -784,7 +784,7 @@ pub fn sys_getsockopt(
     user_optlen: UserRef<socklen_t>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
 
     let optlen = current_task.read_object(user_optlen)?;
     let optval = current_task.read_memory_to_vec(user_optval, optlen as usize)?;
@@ -815,7 +815,7 @@ pub fn sys_setsockopt(
     optlen: socklen_t,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
 
     let user_opt = UserBuffer { address: user_optval, length: optlen as usize };
     if socket.domain.is_inet() && IpTables::can_handle_setsockopt(level, optname) {
@@ -837,7 +837,7 @@ pub fn sys_shutdown(
     how: u32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+    let socket = Socket::get_from_file(&file)?;
     let how = match how {
         SHUT_RD => SocketShutdownFlags::READ,
         SHUT_WR => SocketShutdownFlags::WRITE,

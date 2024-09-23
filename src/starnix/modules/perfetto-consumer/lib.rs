@@ -13,7 +13,7 @@ use prost::Message;
 use starnix_core::task::{CurrentTask, EventHandler, Kernel, Waiter};
 use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use starnix_core::vfs::socket::{
-    new_socket_file, resolve_unix_socket_address, SocketDomain, SocketPeer, SocketProtocol,
+    new_socket_file, resolve_unix_socket_address, Socket, SocketDomain, SocketPeer, SocketProtocol,
     SocketType,
 };
 use starnix_core::vfs::{FileHandle, FsStr, FsString};
@@ -140,7 +140,7 @@ impl PerfettoConnection {
             OpenFlags::RDWR,
             SocketProtocol::from_raw(0),
         )?;
-        let conn_socket = conn_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
+        let conn_socket = Socket::get_from_file(&conn_file)?;
         let peer = SocketPeer::Handle(resolve_unix_socket_address(current_task, socket_path)?);
         conn_socket.connect(current_task, peer)?;
         let mut frame_reader = FrameReader::new(conn_file.clone());

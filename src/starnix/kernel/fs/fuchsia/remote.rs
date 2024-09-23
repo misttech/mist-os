@@ -41,7 +41,7 @@ use starnix_uapi::{
 };
 use std::sync::Arc;
 use syncio::zxio::{
-    zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
+    zxio_get_posix_mode, zxio_node_attr, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
     ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, ZXIO_OBJECT_TYPE_DIR, ZXIO_OBJECT_TYPE_FILE,
     ZXIO_OBJECT_TYPE_NONE, ZXIO_OBJECT_TYPE_PACKET_SOCKET, ZXIO_OBJECT_TYPE_RAW_SOCKET,
     ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
@@ -291,6 +291,31 @@ pub fn new_remote_file(
     handle: zx::Handle,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
+    let (attrs, ops) = remote_file_attrs_and_ops(handle)?;
+    let mut mode = get_mode(&attrs);
+    if ops.as_any().is::<SocketFile>() {
+        // Set the file mode to socket.
+        mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
+    }
+    let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
+        let mut info = FsNodeInfo::new(id, mode, FsCred::root());
+        update_info_from_attrs(&mut info, &attrs);
+        info
+    });
+    Ok(file_handle)
+}
+
+// Create a FileOps from a zx::Handle.
+//
+// The handle must satisfy the same requirements as `new_remote_file`.
+pub fn new_remote_file_ops(handle: zx::Handle) -> Result<Box<dyn FileOps>, Errno> {
+    let (_, ops) = remote_file_attrs_and_ops(handle)?;
+    Ok(ops)
+}
+
+fn remote_file_attrs_and_ops(
+    handle: zx::Handle,
+) -> Result<(zxio_node_attr, Box<dyn FileOps>), Errno> {
     let handle_type =
         handle.basic_info().map_err(|status| from_status_like_fdio!(status))?.object_type;
     let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
@@ -305,37 +330,25 @@ pub fn new_remote_file(
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
-    let mut mode = get_mode(&attrs);
-    let (ops, socket): (Box<dyn FileOps>, Option<Arc<Socket>>) =
-        match (handle_type, attrs.object_type) {
-            (_, ZXIO_OBJECT_TYPE_DIR) => (Box::new(RemoteDirectoryObject::new(zxio)), None),
-            (zx::ObjectType::VMO, _)
-            | (zx::ObjectType::DEBUGLOG, _)
-            | (_, ZXIO_OBJECT_TYPE_FILE)
-            | (_, ZXIO_OBJECT_TYPE_NONE) => (Box::new(RemoteFileObject::new(zxio)), None),
-            (zx::ObjectType::SOCKET, _)
-            | (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
-            | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
-            | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
-            | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
-            | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
-                // Set the file mode to socket.
-                mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
-                let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
-                let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-                (SocketFile::new(socket.clone()), Some(socket))
-            }
-            _ => return error!(ENOTSUP),
-        };
-    let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
-        let mut info = FsNodeInfo::new(id, mode, FsCred::root());
-        update_info_from_attrs(&mut info, &attrs);
-        info
-    });
-    if let Some(socket) = socket {
-        file_handle.node().set_socket(socket);
-    }
-    Ok(file_handle)
+    let ops: Box<dyn FileOps> = match (handle_type, attrs.object_type) {
+        (_, ZXIO_OBJECT_TYPE_DIR) => Box::new(RemoteDirectoryObject::new(zxio)),
+        (zx::ObjectType::VMO, _)
+        | (zx::ObjectType::DEBUGLOG, _)
+        | (_, ZXIO_OBJECT_TYPE_FILE)
+        | (_, ZXIO_OBJECT_TYPE_NONE) => Box::new(RemoteFileObject::new(zxio)),
+        (zx::ObjectType::SOCKET, _)
+        | (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
+            let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
+            let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+            SocketFile::new(socket.clone())
+        }
+        _ => return error!(ENOTSUP),
+    };
+    Ok((attrs, ops))
 }
 
 pub fn create_fuchsia_pipe(

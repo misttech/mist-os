@@ -410,7 +410,7 @@ impl UnixSocket {
         let unix_socket = downcast_socket_to_unix(socket);
         let mut inner = unix_socket.lock();
         inner.bind(address)?;
-        node.set_socket(socket.clone());
+        node.set_bound_socket(socket.clone());
         Ok(())
     }
 }
@@ -955,7 +955,7 @@ pub fn resolve_unix_socket_address(
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
-        name.entry.node.socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
+        name.entry.node.bound_socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
     }
 }
 
