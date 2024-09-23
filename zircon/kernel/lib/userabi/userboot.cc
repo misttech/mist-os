@@ -108,10 +108,10 @@ KCOUNTER(init_time, "init.userboot.time.msec")
 
 class UserbootImage : private RoDso {
  public:
-  UserbootImage(const VDso* vdso, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle)
-      : RoDso("userboot", userboot_image, USERBOOT_CODE_END, USERBOOT_CODE_START,
-              vmo_kernel_handle),
-        vdso_(vdso) {}
+  static UserbootImage Create(const VDso* vdso) {
+    fbl::RefPtr<VmObject> userboot = GetEmbeddedVmo(userboot_image, USERBOOT_CODE_END, "userboot");
+    return {ktl::move(userboot), vdso};
+  }
 
   // The whole userboot image consists of the userboot rodso image
   // immediately followed by the vDSO image.  This returns the size
@@ -147,6 +147,9 @@ class UserbootImage : private RoDso {
   }
 
  private:
+  UserbootImage(fbl::RefPtr<VmObject> vmo, const VDso* vdso)
+      : RoDso(ktl::move(vmo), USERBOOT_CODE_END, USERBOOT_CODE_START), vdso_(vdso) {}
+
   const VDso* vdso_;
 };
 
@@ -334,20 +337,19 @@ void userboot_init() {
   ASSERT(handles[userboot::kRootJob]);
 
   // It also gets many VMOs for VDSOs and other things.
-  constexpr int kVariants = static_cast<int>(userboot::VdsoVariant::COUNT);
-  KernelHandle<VmObjectDispatcher> vdso_kernel_handles[kVariants];
+  KernelHandle<VmObjectDispatcher> vdso_kernel_handles[userboot::kNumVdsoVariants];
   KernelHandle<VmObjectDispatcher> time_values_handle;
-  const VDso* vdso = VDso::Create(vdso_kernel_handles, &time_values_handle);
+  const VDso* vdso = VDso::Create(ktl::span{vdso_kernel_handles}, &time_values_handle);
   handles[userboot::kTimeValues] =
       Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
           .release();
   ASSERT(handles[userboot::kTimeValues]);
-  for (int i = 0; i < kVariants; ++i) {
+  for (size_t i = 0; i < userboot::kNumVdsoVariants; ++i) {
     handles[userboot::kFirstVdso + i] =
         Handle::Make(ktl::move(vdso_kernel_handles[i]), vdso->vmo_rights()).release();
     ASSERT(handles[userboot::kFirstVdso + i]);
   }
-  DEBUG_ASSERT(handles[userboot::kFirstVdso + 1]->dispatcher() == vdso->vmo());
+  DEBUG_ASSERT(handles[userboot::kFirstVdso + 1]->dispatcher() == vdso->dispatcher());
   if (gBootOptions->always_use_next_vdso) {
     ktl::swap(handles[userboot::kFirstVdso], handles[userboot::kFirstVdso + 1]);
   }
@@ -370,8 +372,7 @@ void userboot_init() {
   process->handle_table().AddHandle(ktl::move(user_handle_owner));
 
   // Map in the userboot image along with the vDSO.
-  KernelHandle<VmObjectDispatcher> userboot_vmo_kernel_handle;
-  UserbootImage userboot(vdso, &userboot_vmo_kernel_handle);
+  UserbootImage userboot = UserbootImage::Create(vdso);
   uintptr_t vdso_base = 0;
   uintptr_t entry = 0;
   status = userboot.Map(vmar, &vdso_base, &entry);

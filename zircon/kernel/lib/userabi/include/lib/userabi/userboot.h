@@ -23,6 +23,8 @@ namespace userboot {
 // is correct.
 enum class VdsoVariant { STABLE, NEXT, TEST1, TEST2, COUNT };
 
+constexpr size_t kNumVdsoVariants = static_cast<size_t>(userboot::VdsoVariant::COUNT);
+
 // The handles in the bootstrap message are as follows:
 enum HandleIndex : uint32_t {
   // These describe userboot itself.

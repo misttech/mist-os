@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <lib/userabi/rodso.h>
 
+#include <ktl/array.h>
 #include <object/handle.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
@@ -16,33 +17,24 @@
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
 
-EmbeddedVmo::EmbeddedVmo(const char* name, const void* image, size_t size,
-                         KernelHandle<VmObjectDispatcher>* vmo_kernel_handle)
-    : name_(name), size_(size) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+#include <ktl/enforce.h>
 
-  // create vmo out of ro data mapped in kernel space
+fbl::RefPtr<VmObject> GetEmbeddedVmo(const void* image, size_t size, ktl::string_view name) {
+  ASSERT(IS_PAGE_ALIGNED(size));
+
+  // Create VMO out of rodata mapped in kernel space.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status = VmObjectPaged::CreateFromWiredPages(image, size, true, &vmo);
   ASSERT(status == ZX_OK);
 
-  // build and point a dispatcher at it
-  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
-                                      VmObjectDispatcher::InitialMutability::kMutable,
-                                      vmo_kernel_handle, &vmo_rights_);
+  status = vmo->set_name(name.data(), name.size());
   ASSERT(status == ZX_OK);
-
-  status = vmo_kernel_handle->dispatcher()->set_name(name, strlen(name));
-  ASSERT(status == ZX_OK);
-  vmo_ = vmo_kernel_handle->dispatcher();
-  vmo_rights_ &= ~ZX_RIGHT_WRITE;
-  vmo_rights_ |= ZX_RIGHT_EXECUTE;
+  return vmo;
 }
 
 // Map one segment from our VM object.
-zx_status_t EmbeddedVmo::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar, bool code,
-                                    size_t vmar_offset, size_t start_offset,
-                                    size_t end_offset) const {
+zx_status_t RoDso::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar, bool code,
+                              size_t vmar_offset, size_t start_offset, size_t end_offset) const {
   uint32_t flags = ZX_VM_SPECIFIC | ZX_VM_PERM_READ;
   if (code)
     flags |= ZX_VM_PERM_EXECUTE;
@@ -50,16 +42,18 @@ zx_status_t EmbeddedVmo::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar,
   size_t len = end_offset - start_offset;
 
   zx::result<VmAddressRegion::MapResult> mapping_result =
-      vmar->Map(vmar_offset, vmo_->vmo(), start_offset, len, flags);
+      vmar->Map(vmar_offset, vmo_, start_offset, len, flags);
 
+  ktl::array<char, ZX_MAX_NAME_LEN> name;
+  vmo_->get_name(name.data(), name.size());
   const char* segment_name = code ? "code" : "rodata";
   if (mapping_result.is_error()) {
-    dprintf(CRITICAL, "userboot: %s %s mapping %#zx @ %#" PRIxPTR " size %#zx failed %d\n", name_,
-            segment_name, start_offset, vmar->vmar()->base() + vmar_offset, len,
+    dprintf(CRITICAL, "userboot: %s %s mapping %#zx @ %#" PRIxPTR " size %#zx failed %d\n",
+            name.data(), segment_name, start_offset, vmar->vmar()->base() + vmar_offset, len,
             mapping_result.status_value());
   } else {
     DEBUG_ASSERT(mapping_result->base == vmar->vmar()->base() + vmar_offset);
-    dprintf(SPEW, "userboot: %-8s %-6s %#7zx @ [%#" PRIxPTR ",%#" PRIxPTR ")\n", name_,
+    dprintf(SPEW, "userboot: %-8s %-6s %#7zx @ [%#" PRIxPTR ",%#" PRIxPTR ")\n", name.data(),
             segment_name, start_offset, mapping_result->base, mapping_result->base + len);
   }
 
@@ -69,6 +63,6 @@ zx_status_t EmbeddedVmo::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar,
 zx_status_t RoDso::Map(fbl::RefPtr<VmAddressRegionDispatcher> vmar, size_t offset) const {
   zx_status_t status = MapSegment(vmar, false, offset, 0, code_start_);
   if (status == ZX_OK)
-    status = MapSegment(ktl::move(vmar), true, offset + code_start_, code_start_, size());
+    status = MapSegment(ktl::move(vmar), true, offset + code_start_, code_start_, size_);
   return status;
 }

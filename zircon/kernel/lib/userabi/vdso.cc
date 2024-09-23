@@ -343,30 +343,41 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
 const VDso* VDso::instance_ = NULL;
 
 // Private constructor, can only be called by Create (below).
-VDso::VDso(KernelHandle<VmObjectDispatcher>* vmo_kernel_handle)
-    : RoDso("vdso/next", vdso_image, VDSO_CODE_END, VDSO_CODE_START, vmo_kernel_handle) {}
+VDso::VDso(fbl::RefPtr<VmObject> next) : RoDso(ktl::move(next), VDSO_CODE_END, VDSO_CODE_START) {}
 
 // This is called exactly once, at boot time.
-const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
-                         KernelHandle<VmObjectDispatcher>* time_values_handle) {
+const VDso* VDso::Create(
+    ktl::span<KernelHandle<VmObjectDispatcher>, userboot::kNumVdsoVariants> vmo_kernel_handles,
+    KernelHandle<VmObjectDispatcher>* time_values_handle) {
   ASSERT(!instance_);
 
+  fbl::RefPtr<VmObject> next = GetEmbeddedVmo(vdso_image, VDSO_CODE_END, "vdso/next");
   fbl::AllocChecker ac;
-  VDso* vdso = new (&ac) VDso(&vmo_kernel_handles[variant_index(Variant::NEXT)]);
+  VDso* vdso = new (&ac) VDso(ktl::move(next));
   ASSERT(ac.check());
 
+  // build and point a dispatcher at it
+  zx_status_t status = VmObjectDispatcher::Create(
+      vdso->vmo(), vdso->size(), VmObjectDispatcher::InitialMutability::kMutable,
+      &vmo_kernel_handles[variant_index(Variant::NEXT)], &vdso->vmo_rights_);
+  ASSERT(status == ZX_OK);
+  vdso->vmo_rights_ &= ~ZX_RIGHT_WRITE;
+  vdso->vmo_rights_ |= ZX_RIGHT_EXECUTE;
+
+  vdso->variant_vmo_[variant_index(Variant::NEXT)] =
+      vmo_kernel_handles[variant_index(Variant::NEXT)].dispatcher();
+
   // Sanity-check that it's the exact vDSO image the kernel was compiled for.
-  CheckBuildId(vdso->vmo()->vmo());
+  CheckBuildId(vdso->vmo());
 
   // Fill out the contents of the vdso_constants struct.
-  SetConstants(vdso->vmo()->vmo());
+  SetConstants(vdso->vmo());
 
-  PatchTimeSyscalls(VDsoMutator{vdso->vmo()->vmo()});
+  PatchTimeSyscalls(VDsoMutator{vdso->vmo()});
 
   // Fill out the contents of the time_values struct.
-  SetTimeValues(vdso->vmo()->vmo());
+  SetTimeValues(vdso->vmo());
 
-  DEBUG_ASSERT(!(vdso->vmo_rights() & ZX_RIGHT_WRITE));
   // Create the standalone time values VMO for use by fasttime.
   vdso->CreateTimeValuesVmo(time_values_handle);
 
@@ -380,7 +391,7 @@ const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
   for (size_t v = static_cast<size_t>(Variant::STABLE); v < static_cast<size_t>(Variant::COUNT);
        ++v) {
     Variant var = static_cast<Variant>(v);
-    zx_status_t status = vdso->MapTimeValuesVmo(var, vdso->variant_vmo_[variant_index(var)]->vmo());
+    status = vdso->MapTimeValuesVmo(var, vdso->variant_vmo_[variant_index(var)]->vmo());
     ASSERT(status == ZX_OK);
   }
 
@@ -396,8 +407,8 @@ uintptr_t VDso::base_address(const fbl::RefPtr<VmMapping>& code_mapping) {
 // time_values structure.
 void VDso::CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_handle) {
   fbl::RefPtr<VmObject> new_vmo;
-  zx_status_t status = vmo()->CreateChild(ZX_VMO_CHILD_SLICE, VDSO_DATA_TIME_VALUES,
-                                          VDSO_DATA_TIME_VALUES_SIZE, false, &new_vmo);
+  zx_status_t status = dispatcher()->CreateChild(ZX_VMO_CHILD_SLICE, VDSO_DATA_TIME_VALUES,
+                                                 VDSO_DATA_TIME_VALUES_SIZE, false, &new_vmo);
   ASSERT(status == ZX_OK);
 
   zx_rights_t rights;
@@ -452,16 +463,17 @@ zx_status_t VDso::MapTimeValuesVmo(Variant variant, const fbl::RefPtr<VmObject>&
 void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle) {
   DEBUG_ASSERT(variant >= Variant::STABLE);
   DEBUG_ASSERT(variant < Variant::COUNT);
-  DEBUG_ASSERT(!variant_vmo_[variant_index(variant)]);
 
   if (variant == Variant::NEXT) {
     // The next variant already has a VMO.
-    variant_vmo_[variant_index(variant)] = vmo_kernel_handle->dispatcher();
+    DEBUG_ASSERT(variant_vmo_[variant_index(variant)] == vmo_kernel_handle->dispatcher());
     return;
   }
 
+  DEBUG_ASSERT(!variant_vmo_[variant_index(variant)]);
+
   fbl::RefPtr<VmObject> new_vmo;
-  zx_status_t status = vmo()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0, size(), false, &new_vmo);
+  zx_status_t status = dispatcher()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0, size(), false, &new_vmo);
   ASSERT(status == ZX_OK);
 
   LTRACEF("variant %u\n", static_cast<unsigned int>(variant));
