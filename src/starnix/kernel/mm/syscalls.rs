@@ -23,10 +23,12 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, pid_t, robust_list_head, timespec, uapi, FUTEX_BITSET_MATCH_ANY,
-    FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_LOCK_PI, FUTEX_PRIVATE_FLAG,
-    FUTEX_REQUEUE, FUTEX_UNLOCK_PI, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET,
-    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE,
-    MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK, PROT_EXEC,
+    FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI,
+    FUTEX_LOCK_PI2, FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI,
+    FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET,
+    FUTEX_WAKE_OP, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN,
+    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK,
+    PROT_EXEC,
 };
 use std::ops::Deref as _;
 
@@ -443,6 +445,10 @@ fn do_futex<Key: FutexKey>(
             Ok(0)
         }
         FUTEX_WAKE => futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY),
+        FUTEX_WAKE_OP => {
+            track_stub!(TODO("https://fxbug.dev/361181940"), "FUTEX_WAKE_OP");
+            error!(ENOSYS)
+        }
         FUTEX_WAIT_BITSET => {
             if value3 == 0 {
                 return error!(EINVAL);
@@ -466,9 +472,25 @@ fn do_futex<Key: FutexKey>(
             let expected_value = if cmd == FUTEX_CMP_REQUEUE { Some(value3) } else { None };
             futexes.requeue(current_task, addr, wake_count, requeue_count, addr2, expected_value)
         }
+        FUTEX_WAIT_REQUEUE_PI => {
+            track_stub!(TODO("https://fxbug.dev/361181558"), "FUTEX_WAIT_REQUEUE_PI");
+            error!(ENOSYS)
+        }
+        FUTEX_CMP_REQUEUE_PI => {
+            track_stub!(TODO("https://fxbug.dev/361181773"), "FUTEX_CMP_REQUEUE_PI");
+            error!(ENOSYS)
+        }
         FUTEX_LOCK_PI => {
             futexes.lock_pi(current_task, addr, read_timeout(current_task)?)?;
             Ok(0)
+        }
+        FUTEX_LOCK_PI2 => {
+            track_stub!(TODO("https://fxbug.dev/361181560"), "FUTEX_LOCK_PI2");
+            error!(ENOSYS)
+        }
+        FUTEX_TRYLOCK_PI => {
+            track_stub!(TODO("https://fxbug.dev/361175318"), "FUTEX_TRYLOCK_PI");
+            error!(ENOSYS)
         }
         FUTEX_UNLOCK_PI => {
             futexes.unlock_pi(current_task, addr)?;
