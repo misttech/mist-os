@@ -5,7 +5,7 @@
 
 import asyncio
 import unittest
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from unittest import mock
 
 import fidl.fuchsia_net_interfaces as f_net_interfaces
@@ -16,7 +16,7 @@ from honeydew.errors import NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
-from honeydew.typing.netstack import InterfaceProperties
+from honeydew.typing.netstack import InterfaceProperties, PortClass
 
 
 # pylint: disable=protected-access
@@ -90,12 +90,24 @@ class NetstackFCTests(unittest.TestCase):
                 items=[
                     InterfaceProperties(
                         1,
-                        "wlan1",
-                        ipv4_addresses=[IPv4Address("192.168.42.1")],
-                        ipv6_addresses=[],
+                        "lo",
+                        ipv4_addresses=[IPv4Address("127.0.0.1")],
+                        ipv6_addresses=[IPv6Address("fe80::1")],
+                        port_class=PortClass.LOOPBACK,
                     ),
                     InterfaceProperties(
-                        2, "wlan2", ipv4_addresses=[], ipv6_addresses=[]
+                        2,
+                        "eth1",
+                        ipv4_addresses=[IPv4Address("192.168.42.1")],
+                        ipv6_addresses=[],
+                        port_class=PortClass.ETHERNET,
+                    ),
+                    InterfaceProperties(
+                        3,
+                        "wlan1",
+                        ipv4_addresses=[],
+                        ipv6_addresses=[],
+                        port_class=PortClass.WLAN_CLIENT,
                     ),
                 ],
             )
@@ -110,12 +122,24 @@ class NetstackFCTests(unittest.TestCase):
             [
                 InterfaceProperties(
                     1,
-                    "wlan1",
-                    ipv4_addresses=[IPv4Address("192.168.42.1")],
-                    ipv6_addresses=[],
+                    "lo",
+                    ipv4_addresses=[IPv4Address("127.0.0.1")],
+                    ipv6_addresses=[IPv6Address("fe80::1")],
+                    port_class=PortClass.LOOPBACK,
                 ),
                 InterfaceProperties(
-                    2, "wlan2", ipv4_addresses=[], ipv6_addresses=[]
+                    2,
+                    "eth1",
+                    ipv4_addresses=[IPv4Address("192.168.42.1")],
+                    ipv6_addresses=[],
+                    port_class=PortClass.ETHERNET,
+                ),
+                InterfaceProperties(
+                    3,
+                    "wlan1",
+                    ipv4_addresses=[],
+                    ipv6_addresses=[],
+                    port_class=PortClass.WLAN_CLIENT,
                 ),
             ],
         )

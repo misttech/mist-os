@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv6Address
 
@@ -33,6 +34,9 @@ class InterfaceProperties:
     ipv6_addresses: list[IPv6Address]
     """IPv6 addresses currently installed on the interface."""
 
+    port_class: PortClass
+    """The port class of the interface."""
+
     @staticmethod
     def from_fidl(fidl: f_net_interfaces.Properties) -> "InterfaceProperties":
         """Create an InterfaceProperties from the FIDL equivalent."""
@@ -49,11 +53,19 @@ class InterfaceProperties:
             else:
                 raise TypeError(f"Unknown IP address type: {ip}")
 
+        if fidl.port_class.loopback:
+            port_class = PortClass.LOOPBACK
+        elif fidl.port_class.device:
+            port_class = PortClass(fidl.port_class.device)
+        else:
+            raise TypeError(f"Unknown port_class: {fidl.port_class}")
+
         return InterfaceProperties(
             id=fidl.id,
             name=fidl.name,
             ipv4_addresses=ipv4_addresses,
             ipv6_addresses=ipv6_addresses,
+            port_class=port_class,
         )
 
     def to_fidl(self) -> f_net_interfaces.Properties:
@@ -94,6 +106,12 @@ class InterfaceProperties:
                 )
             )
 
+        port_class = f_net_interfaces.PortClass()
+        if self.port_class is PortClass.LOOPBACK:
+            port_class.loopback = f_net_interfaces.Empty()
+        else:
+            port_class.device = self.port_class.value
+
         return f_net_interfaces.Properties(
             id=self.id,
             addresses=addresses,
@@ -102,5 +120,21 @@ class InterfaceProperties:
             has_default_ipv4_route=None,
             has_default_ipv6_route=None,
             name=self.name,
-            port_class=None,
+            port_class=port_class,
         )
+
+
+class PortClass(enum.IntEnum):
+    """Network port class.
+
+    Loosely mirrors fuchsia.hardware.network/PortClass.
+    """
+
+    LOOPBACK = 0  # not part of fuchsia.hardware.network/PortClass
+    ETHERNET = 1
+    WLAN_CLIENT = 2
+    PPP = 3
+    BRIDGE = 4
+    WLAN_AP = 5
+    VIRTUAL = 6
+    LOWPAN = 7
