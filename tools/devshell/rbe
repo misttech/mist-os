@@ -7,8 +7,10 @@
 ### check remote build configuration
 
 ## usage:
-##  fx rbe auth
-##       Verify authentication to RBE services through reclient and bazel.
+##  fx rbe auth [options...]
+##      Verify authentication to RBE services through reclient and bazel.
+##      Options:
+##        -f,--force: Always request a fresh authentication token.
 ##
 
 set -e
@@ -84,11 +86,12 @@ readonly gcloud_auth_args=(auth login --update-adc)
 function gcloud_auth() {
   ensure_gcloud &&
     echo "running: gcloud ${gcloud_auth_args[@]}" &&
-    echo "If you see a warning about running on a \"Google Compute Engine virtual machine\", hit Y to continue to use a personal account." &&
+    echo "If you see a warning about running on a \"Google Compute Engine virtual machine\", hit 'Y' to continue to use a personal account." &&
     "$gcloud" "${gcloud_auth_args[@]}"
 }
 
 function reclient_auth() {
+  echo  # blank line
   until "${reclient_auth_test_cmd[@]}"
   do
     # gcert only works in environments that get unrestricted LOAS credentials
@@ -130,16 +133,37 @@ function bazel_auth() {
   style::echo --green "bazel+RBE authentication successful"
 }
 
+function auth_subcommand() {
+  local force=0
+  for opt in "$@"
+  do
+    case "$opt" in
+      -f|--force) force=1 ;;
+      *) echo "Unknown option: $opt" ; return 1 ;;
+    esac
+  done
+
+  if [[ "$force" == 1 ]]
+  then
+    # Start with a re-auth to get a fresh token.
+    # This is a good idea if you don't know when your current token expires.
+    gcloud_auth || {
+      echo "Failed to authenticate with gcloud."
+      return 1
+    }
+  fi
+
+  bazel_auth && reclient_auth && echo && style::echo --bold --green "You can now 'fx build' with RBE."
+}
+
+# main
 case "$action" in
   -h|--help)
     usage
     exit 0
     ;;
 
-  auth)
-    bazel_auth && reclient_auth && echo && style::echo --bold --green "You can now 'fx build' with RBE."
-    exit "$?"
-    ;;
+  auth) auth_subcommand "${action_args[@]}" ;;
 
   *)
     fx-error Invalid syntax
