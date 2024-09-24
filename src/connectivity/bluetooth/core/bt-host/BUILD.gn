@@ -82,16 +82,10 @@ group("config") {
 
 # This is the OOT built bt-host component.
 # See https://pigweed.dev/pw_bluetooth_sapphire/.
-# TODO(https://fxbug.dev/324107025): Rename this target to "bt-host" and update
-#   `//build:non_hermetic_deps` once it's fully migrated OOT.
-prebuilt_package("bt-host-oot") {
+prebuilt_package("bt-host") {
   # component-url: fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
   package_name = "bt-host"
   archive = "//prebuilt/connectivity/bluetooth/bt-host/$target_cpu/bt-host"
-}
-
-bazel_fuchsia_package("bt-host") {
-  package_name = "bt-host"
 }
 
 group("stack") {
