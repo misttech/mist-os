@@ -131,6 +131,14 @@ bool CheckInspectData(CobaltTestAppLogger* logger, uint32_t project_id, LoggerMe
     }
   }
 
+  pointer = rapidjson::Pointer("/payload/root/cobalt_app/system_data/channel");
+  value = rapidjson::GetValueByPointerWithDefault(inspect, pointer, "");
+  if (value.GetString() != std::string("fake-current-channel")) {
+    FX_LOGS(ERROR) << "Expected 'fake-current-channel', found '" << value.GetString() << "'."
+                   << "\nFull inspect data: " << inspect_json;
+    return false;
+  }
+
   return true;
 }
 

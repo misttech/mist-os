@@ -234,6 +234,17 @@ CobaltApp::CobaltApp(
         std::move(lifecycle_handle), dispatcher);
   }
 
+  if (current_channel_provider_ != nullptr) {
+    current_channel_provider_->GetCurrentChannel([this](const std::string& current_channel) {
+      // TODO(https://fxbug.dev/369213457): Call SetChannel instead.
+      // TODO(https://fxbug.dev/341104129): Verify this is called in a unit test.
+      const system_data::SoftwareDistributionInfo info{
+          .channel = current_channel,
+      };
+      cobalt_service_->system_data()->SetSoftwareDistributionInfo(info);
+    });
+  }
+
   if (watch_for_user_consent) {
     user_consent_watcher_ = std::make_unique<UserConsentWatcher>(
         dispatcher, inspect_node_.CreateChild("user_consent_watcher"), context_->svc(),

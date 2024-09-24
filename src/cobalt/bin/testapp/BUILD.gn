@@ -65,6 +65,7 @@ cc_test_executable("cobalt_testapp") {
     "//src/cobalt/bin/utils:error_utils",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
+    "//src/sys/pkg/bin/fake-channel-control",
     "//third_party/cobalt/src/lib/util:datetime_util",
     "//third_party/cobalt/src/public/lib:clock_interfaces",
     "//third_party/cobalt/src/registry:cobalt_registry_proto",
