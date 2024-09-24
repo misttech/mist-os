@@ -339,7 +339,8 @@ struct Vmars {
   util::Range<UserAddress> address_range() const;
 
   fit::result<zx_status_t, size_t> raw_map(fbl::RefPtr<MemoryObject> memory, size_t vmar_offset,
-                                           uint64_t memory_offset, size_t len, MappingFlags flags);
+                                           uint64_t memory_offset, size_t len,
+                                           zx_vm_option_t flags);
 
   fit::result<zx_status_t> destroy() const;
 

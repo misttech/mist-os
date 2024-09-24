@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/logging/logging.h>
+#include <lib/mistos/util/status.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/features.h>
@@ -25,7 +26,7 @@
 
 #include "../kernel_priv.h"
 
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace {
 
@@ -97,6 +98,7 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
   zx::result<VmAddressRegionDispatcher::MapResult> map_result =
       vmar->Map(vmar_offset, ktl::move(vmo), vmo_offset, len, options);
   if (map_result.is_error()) {
+    TRACEF("vmar failed to map %s\n", zx_status_get_string(map_result.status_value()));
     return map_result.status_value();
   }
 
@@ -110,6 +112,7 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
     zx_status_t status =
         map_result->mapping->MapRange(0, len, /*commit=*/false, /*ignore_existing=*/true);
     if (status != ZX_OK) {
+      TRACEF("failed to MapRange %s\n", zx_status_get_string(status));
       return status;
     }
   }
@@ -174,6 +177,7 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> create_child_vmo(const Vmo& 
                                                                      uint32_t options,
                                                                      uint64_t offset,
                                                                      uint64_t size) {
+  LTRACEF("offset %#" PRIx64 ", size %#" PRIx64 "\n", offset, size);
   zx_status_t status;
   fbl::RefPtr<VmObject> child_vmo;
   bool no_write = false;
@@ -211,8 +215,8 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> create_child_vmo(const Vmo& 
   }
 
   // clone the vmo into a new one
-  status = vmo.dispatcher()->CreateChild(options, offset, size, in_rights & ZX_RIGHT_GET_PROPERTY,
-                                         &child_vmo);
+  status = vmo.dispatcher()->CreateChild(options, offset, vmo_size,
+                                         in_rights & ZX_RIGHT_GET_PROPERTY, &child_vmo);
   if (status != ZX_OK) {
     return fit::error(status);
   }
@@ -361,6 +365,11 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::duplicate_hand
   return ktl::visit(
       MemoryObject::overloaded{
           [&rights](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
+            if (!vmo.vmo->HasRights(ZX_RIGHT_DUPLICATE))
+              return fit::error(ZX_ERR_ACCESS_DENIED);
+            if (rights == ZX_RIGHT_SAME_RIGHTS) {
+              rights = vmo.vmo->rights();
+            }
             auto handle_ownwer = Handle::Dup(vmo.vmo.get(), rights);
             if (!handle_ownwer) {
               return fit::error(ZX_ERR_NO_MEMORY);
@@ -377,8 +386,10 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::duplicate_hand
 fit::result<zx_status_t> MemoryObject::read(ktl::span<uint8_t>& data, uint64_t offset) const {
   return ktl::visit(MemoryObject::overloaded{
                         [&](const Vmo& vmo) -> fit::result<zx_status_t> {
-                          /*if (!vmo.HasRights(ZX_RIGHT_READ))
+                          if (!vmo.vmo->HasRights(ZX_RIGHT_READ))
                             return fit::error(ZX_ERR_ACCESS_DENIED);
+
+                          /*
                           user_out_ptr<void> _data =
                               make_user_out_ptr(reinterpret_cast<void*>(data.data()));
                           zx_status_t status = vmo.vmo->Read(_data.reinterpret<char>(), offset,
@@ -407,31 +418,40 @@ fit::result<zx_status_t> MemoryObject::read_uninit(ktl::span<uint8_t>& data,
 
 fit::result<zx_status_t, fbl::Vector<uint8_t>> MemoryObject::read_to_vec(uint64_t offset,
                                                                          uint64_t length) const {
-  fbl::AllocChecker ac;
-  fbl::Vector<uint8_t> buffer;
-  buffer.reserve(length, &ac);
-  if (!ac.check()) {
-    return fit::error(ZX_ERR_NO_MEMORY);
-  }
-  ktl::span<uint8_t> data{buffer.data(), length};
-  auto result = read_uninit(data, offset);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  {
-    // SAFETY: since read_uninit succeeded we know that we can consider the buffer
-    // initialized.
-    buffer.set_size(length);
-  }
-  return fit::ok(ktl::move(buffer));
+  return ktl::visit(MemoryObject::overloaded{
+                        [&](const Vmo& vmo) -> fit::result<zx_status_t, fbl::Vector<uint8_t>> {
+                          fbl::AllocChecker ac;
+                          fbl::Vector<uint8_t> buffer;
+                          buffer.reserve(length, &ac);
+                          if (!ac.check()) {
+                            return fit::error(ZX_ERR_NO_MEMORY);
+                          }
+                          ktl::span<uint8_t> data{buffer.data(), length};
+                          auto result = read_uninit(data, offset);
+                          if (result.is_error()) {
+                            return result.take_error();
+                          }
+                          {
+                            // SAFETY: since read_uninit succeeded we know that we can consider the
+                            // buffer initialized.
+                            buffer.set_size(length);
+                          }
+                          return fit::ok(ktl::move(buffer));
+                        },
+                        [](const RingBuf& buf) -> fit::result<zx_status_t, fbl::Vector<uint8_t>> {
+                          return fit::error(ZX_ERR_NOT_SUPPORTED);
+                        },
+                    },
+                    variant_);
 }
 
 fit::result<zx_status_t> MemoryObject::write(const ktl::span<const uint8_t>& data,
                                              uint64_t offset) const {
   return ktl::visit(MemoryObject::overloaded{
                         [&](const Vmo& vmo) -> fit::result<zx_status_t> {
-                          /*if (!vmo.HasRights(ZX_RIGHT_WRITE))
+                          if (!vmo.vmo->HasRights(ZX_RIGHT_WRITE))
                             return fit::error(ZX_ERR_ACCESS_DENIED);
+                          /*
                           user_in_ptr<const void> _data =
                               make_user_in_ptr(reinterpret_cast<const void*>(data.data()));
                           zx_status_t status = vmo.vmo->Write(_data.reinterpret<const char>(),
@@ -519,7 +539,7 @@ fit::result<zx_status_t> MemoryObject::op_range(uint32_t op, uint64_t* offset,
 fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::replace_as_executable() {
   return ktl::visit(MemoryObject::overloaded{
                         [&](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
-                          HandleOwner handle = Handle::Make(ktl::move(vmo.dispatcher()),
+                          HandleOwner handle = Handle::Make(vmo.dispatcher(),
                                                             (vmo.vmo->rights() | ZX_RIGHT_EXECUTE));
                           return fit::ok(MemoryObject::From(ktl::move(handle)));
                         },
@@ -533,25 +553,26 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::replace_as_exe
 // zx_vmar_map
 fit::result<zx_status_t, size_t> MemoryObject::map_in_vmar(const Vmar& vmar, size_t vmar_offset,
                                                            uint64_t* memory_offset, size_t len,
-                                                           MappingFlags flags) const {
-  return ktl::visit(MemoryObject::overloaded{
-                        [&](const Vmo& vmo) -> fit::result<zx_status_t, size_t> {
-                          zx_vaddr_t mapped_addr;
-                          auto result =
-                              vmar_map_common(flags.bits(), vmar.dispatcher(), vmar_offset,
-                                              vmar.vmar->rights(), vmo.dispatcher()->vmo(),
-                                              *memory_offset, vmo.vmo->rights(), len, &mapped_addr);
+                                                           zx_vm_option_t flags) const {
+  return ktl::visit(
+      MemoryObject::overloaded{
+          [&](const Vmo& vmo) -> fit::result<zx_status_t, size_t> {
+            zx_vaddr_t mapped_addr;
+            auto result = vmar_map_common(flags, vmar.dispatcher(), vmar_offset,
+                                          vmar.vmar->rights(), vmo.dispatcher()->vmo(),
+                                          *memory_offset, vmo.vmo->rights(), len, &mapped_addr);
 
-                          if (result != ZX_OK) {
-                            return fit::error(result);
-                          }
-                          return fit::ok(mapped_addr);
-                        },
-                        [](const RingBuf&) -> fit::result<zx_status_t, size_t> {
-                          return fit::error(ZX_ERR_NOT_SUPPORTED);
-                        },
-                    },
-                    variant_);
+            if (result != ZX_OK) {
+              LTRACEF_LEVEL(2, "vmar_map_common failed: %s\n", zx_status_get_string(result));
+              return fit::error(result);
+            }
+            return fit::ok(mapped_addr);
+          },
+          [](const RingBuf&) -> fit::result<zx_status_t, size_t> {
+            return fit::error(ZX_ERR_NOT_SUPPORTED);
+          },
+      },
+      variant_);
 }
 
 }  // namespace starnix

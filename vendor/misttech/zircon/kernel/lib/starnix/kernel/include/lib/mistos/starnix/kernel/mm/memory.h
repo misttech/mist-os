@@ -10,12 +10,12 @@
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <zircon/rights.h>
-#include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
+#include <ktl/array.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
@@ -79,17 +79,31 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
 
   fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> duplicate_handle(zx_rights_t rights) const;
 
-  /// Read from a virtual memory object.
-  ///
   fit::result<zx_status_t> read(ktl::span<uint8_t>& data, uint64_t offset) const;
 
-  /// Same as read, but reads into memory that might not be initialized, returning an initialized
-  /// slice of bytes on success.
-  fit::result<zx_status_t> read_uninit(ktl::span<uint8_t>& data, uint64_t offset) const;
+  template <typename T, std::size_t N>
+  fit::result<zx_status_t, ktl::array<T, N>> read_to_array(uint64_t offset) const {
+    return ktl::visit(MemoryObject::overloaded{
+                          [&](const Vmo& vmo) -> fit::result<zx_status_t, ktl::array<T, N>> {
+                            ktl::array<T, N> array;
+                            ktl::span<uint8_t> buf{(uint8_t*)array.data(), array.size()};
+                            auto result = read_uninit(buf, offset);
+                            if (result.is_error()) {
+                              return result.take_error();
+                            }
+                            return fit::ok(ktl::move(array));
+                          },
+                          [](const RingBuf& buf) -> fit::result<zx_status_t, ktl::array<T, N>> {
+                            return fit::error(ZX_ERR_NOT_SUPPORTED);
+                          },
+                      },
+                      variant_);
+  }
 
-  /// Same as read, but returns a Vec.
   fit::result<zx_status_t, fbl::Vector<uint8_t>> read_to_vec(uint64_t offset,
                                                              uint64_t length) const;
+
+  fit::result<zx_status_t> read_uninit(ktl::span<uint8_t>& data, uint64_t offset) const;
 
   fit::result<zx_status_t> write(const ktl::span<const uint8_t>& data, uint64_t offset) const;
 
@@ -107,7 +121,7 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
 
   fit::result<zx_status_t, size_t> map_in_vmar(const Vmar& vmar, size_t vmar_offset,
                                                uint64_t* memory_offset, size_t len,
-                                               MappingFlags flags) const;
+                                               zx_vm_option_t flags) const;
 
  private:
   // Helpers from the reference documentation for std::visit<>, to allow

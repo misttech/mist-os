@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
@@ -15,8 +16,6 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/weak_wrapper.h>
-
-#include <vm/vm_object.h>
 
 #include <asm/stat.h>
 
@@ -94,10 +93,10 @@ class FileOps {
   /// The `length` is a hint for the desired size of the VMO. The returned VMO may be larger or
   /// smaller than the requested length.
   /// This method is typically called by [`Self::mmap`].
-  virtual fit::result<Errno, fbl::RefPtr<VmObject>> get_vmo(const FileObject& file,
-                                                            const CurrentTask& current_task,
-                                                            ktl::optional<size_t> length,
-                                                            ProtectionFlags prot) {
+  virtual fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(const FileObject& file,
+                                                                   const CurrentTask& current_task,
+                                                                   ktl::optional<size_t> length,
+                                                                   ProtectionFlags prot) {
     return fit::error(errno(ENODEV));
   }
 
@@ -367,10 +366,10 @@ struct OPathOps : FileOps {
     return fit::error(errno(EBADF));
   }
 
-  fit::result<Errno, fbl::RefPtr<VmObject>> get_vmo(const FileObject& file,
-                                                    const CurrentTask& current_task,
-                                                    std::optional<size_t> length,
-                                                    ProtectionFlags prot) final {
+  fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(const FileObject& file,
+                                                           const CurrentTask& current_task,
+                                                           ktl::optional<size_t> length,
+                                                           ProtectionFlags prot) final {
     return fit::error(errno(EBADF));
   }
 
