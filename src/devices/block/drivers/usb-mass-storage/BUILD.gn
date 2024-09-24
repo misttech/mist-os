@@ -35,6 +35,7 @@ fuchsia_driver("usb-mass-storage-driver") {
     "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/third_party/ulib/safemath",
   ]
 }
@@ -75,6 +76,7 @@ test("ums") {
     "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zxtest",
     "//zircon/third_party/ulib/safemath",
   ]

@@ -15,6 +15,7 @@
 #include <lib/scsi/controller.h>
 #include <lib/sync/completion.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
 #include <zircon/listnode.h>
 
@@ -173,12 +174,13 @@ class UsbMassStorageDevice : public fdf::DriverBase, public scsi::Controller {
   std::atomic_bool dead_ = false;
 
   // list of queued transactions
-  list_node_t queued_txns_;
+  list_node_t queued_txns_ TA_GUARDED(queue_lock_);
 
   sync_completion_t txn_completion_;  // signals WorkerLoop when new txns are available
                                       // and when device is dead
-  std::mutex txn_lock_;               // protects queued_txns, txn_completion and dead
-  std::mutex luns_lock_;              // Synchronizes the checking of whether LUNs are ready.
+  std::mutex queue_lock_;
+  std::mutex txn_lock_;   // Synchronizes RequestQueue completion.
+  std::mutex luns_lock_;  // Synchronizes the checking of whether LUNs are ready.
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;

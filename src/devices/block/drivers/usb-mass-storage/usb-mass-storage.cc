@@ -74,7 +74,7 @@ void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iov
 
   // Queue transaction.
   {
-    std::lock_guard<std::mutex> l(txn_lock_);
+    std::lock_guard<std::mutex> l(queue_lock_);
     list_add_tail(&queued_txns_, &txn->node);
   }
   sync_completion_signal(&txn_completion_);
@@ -84,10 +84,7 @@ void UsbMassStorageDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
   // wait for worker loop to finish before removing devices
   if (worker_dispatcher_.get()) {
     // terminate our worker loop
-    {
-      std::lock_guard<std::mutex> l(txn_lock_);
-      dead_ = true;
-    }
+    dead_ = true;
 
     sync_completion_signal(&txn_completion_);
     worker_dispatcher_.ShutdownAsync();
@@ -220,7 +217,10 @@ zx_status_t UsbMassStorageDevice::Init() {
   FDF_LOG(DEBUG, "UMS: Max lun is: %u", max_lun);
   max_lun_ = max_lun;
 
-  list_initialize(&queued_txns_);
+  {
+    std::lock_guard<std::mutex> l(queue_lock_);
+    list_initialize(&queued_txns_);
+  }
   sync_completion_reset(&txn_completion_);
 
   usb_ = usb;
@@ -626,6 +626,7 @@ void UsbMassStorageDevice::WorkerLoop() {
   while (1) {
     if (wait) {
       waiter_->Wait(&txn_completion_, ZX_SEC(1));
+      std::lock_guard<std::mutex> l(queue_lock_);
       if (list_is_empty(&queued_txns_) && !dead_) {
         async::PostTask(dispatcher(), [&] {
           // This must be done in the default dispatcher because it accesses
@@ -641,21 +642,21 @@ void UsbMassStorageDevice::WorkerLoop() {
       sync_completion_reset(&txn_completion_);
     }
     std::lock_guard<std::mutex> lock(luns_lock_);
+    if (dead_) {
+      break;
+    }
     Transaction* txn = nullptr;
     {
-      std::lock_guard<std::mutex> l(txn_lock_);
-      if (dead_) {
-        break;
-      }
+      std::lock_guard<std::mutex> l(queue_lock_);
       txn = list_remove_head_type(&queued_txns_, Transaction, node);
-      if (txn == NULL) {
-        wait = true;
-        continue;
-      } else {
-        wait = false;
-      }
-      current_txn = txn;
     }
+    if (txn == NULL) {
+      wait = true;
+      continue;
+    } else {
+      wait = false;
+    }
+    current_txn = txn;
     const block_op_t& op = txn->device_op.op;
     FDF_LOG(DEBUG, "UMS PROCESS (%p)", &op);
 
@@ -722,12 +723,12 @@ void UsbMassStorageDevice::WorkerLoop() {
   // complete any pending txns
   list_node_t txns = LIST_INITIAL_VALUE(txns);
   {
-    std::lock_guard<std::mutex> l(txn_lock_);
+    std::lock_guard<std::mutex> l(queue_lock_);
     list_move(&queued_txns_, &txns);
   }
 
   Transaction* txn;
-  while ((txn = list_remove_head_type(&queued_txns_, Transaction, node)) != NULL) {
+  while ((txn = list_remove_head_type(&txns, Transaction, node)) != NULL) {
     const block_op_t& op = txn->device_op.op;
     switch (op.command.opcode) {
       case BLOCK_OPCODE_READ:
