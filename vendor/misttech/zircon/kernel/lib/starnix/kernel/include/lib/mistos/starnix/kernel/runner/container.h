@@ -33,10 +33,8 @@ struct Container {
 
 fit::result<Errno, Container> create_container(const Config& config);
 
-/*
 fit::result<zx_status_t, fbl::RefPtr<FsContext>> create_fs_context(
     const fbl::RefPtr<Kernel>& kernel, const Config& config);
-*/
 
 }  // namespace starnix
 

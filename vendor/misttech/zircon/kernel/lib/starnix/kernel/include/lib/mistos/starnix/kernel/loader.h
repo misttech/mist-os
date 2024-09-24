@@ -7,6 +7,8 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_LOADER_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
+#include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 
@@ -38,11 +40,9 @@ struct ResolvedInterpElf {
   /// A file handle to the resolved ELF interpreter.
   FileHandle file;
   // A VMO to the resolved ELF interpreter.
-  fbl::RefPtr<VmObject> vmo;
+  fbl::RefPtr<MemoryObject> memory;
   /// Exec/write lock.
   // file_write_guard: FileWriteGuardRef,
-
-  ~ResolvedInterpElf();
 };
 
 // Holds a resolved ELF VMO and associated parameters necessary for an execve call.
@@ -50,19 +50,27 @@ struct ResolvedElf {
   /// A file handle to the resolved ELF executable.
   FileHandle file;
   // A VMO to the resolved ELF executable.
-  fbl::RefPtr<VmObject> vmo;
+  fbl::RefPtr<MemoryObject> memory;
   /// An ELF interpreter, if specified in the ELF executable header.
   ktl::optional<ResolvedInterpElf> interp;
   /// Arguments to be passed to the new process.
-  fbl::Vector<std::string_view> argv;
+  fbl::Vector<ktl::string_view> argv;
   /// The environment to initialize for the new process.
-  fbl::Vector<std::string_view> environ;
+  fbl::Vector<ktl::string_view> environ;
   /// The SELinux state for the new process. None if SELinux is disabled.
   // pub selinux_state: Option<SeLinuxResolvedElfState>,
   /// Exec/write lock.
   // pub file_write_guard: FileWriteGuardRef,
+};
 
-  ~ResolvedElf();
+struct StackResult {
+  UserAddress stack_pointer;
+  UserAddress auxv_start;
+  UserAddress auxv_end;
+  UserAddress argv_start;
+  UserAddress argv_end;
+  UserAddress environ_start;
+  UserAddress environ_end;
 };
 
 // Resolves a file into a validated executable ELF, following script interpreters to a fixed
@@ -78,6 +86,11 @@ fit::result<Errno, ResolvedElf> resolve_executable(
 fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_task,
                                                     const ResolvedElf& resolved_elf,
                                                     const ktl::string_view& original_path);
+
+fit::result<Errno, StackResult> test_populate_initial_stack(
+    const MemoryAccessor& ma, const ktl::string_view& path,
+    const fbl::Vector<ktl::string_view>& argv, const fbl::Vector<ktl::string_view>& envp,
+    fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr);
 
 }  // namespace starnix
 

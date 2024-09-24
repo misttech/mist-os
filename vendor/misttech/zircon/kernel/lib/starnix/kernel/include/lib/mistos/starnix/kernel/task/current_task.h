@@ -299,11 +299,8 @@ class CurrentTask : public MemoryAccessorExt {
                                                            ktl::optional<Signal> exit_signal);
 
  public:
-  // FIXME(Herrera) Temporay method to be deleted
-  static fit::result<Errno, FileHandle> open_file_bootfs(
-      const ktl::string_view& path /*, OpenFlags flags*/);
-
   /// impl MemoryAccessor for CurrentTask
+
   fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
                                                      ktl::span<uint8_t>& bytes) const final;
 

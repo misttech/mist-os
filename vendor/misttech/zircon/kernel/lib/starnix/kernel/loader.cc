@@ -5,14 +5,14 @@
 
 #include "lib/mistos/starnix/kernel/loader.h"
 
+#include <lib/crypto/global_prng.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/fit/result.h>
-#include <lib/mistos/elfldltl/vmar-loader.h>
-#include <lib/mistos/elfldltl/vmo.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
@@ -25,11 +25,10 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/math.h>
+#include <lib/mistos/starnix_uapi/time.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/cprng.h>
-#include <lib/mistos/zx/vmar.h>
-#include <lib/mistos/zx/vmo.h>
-#include <lib/zbi-format/internal/bootfs.h>
+#include <lib/starnix/elfldtl/vmo.h>
 #include <trace.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -39,14 +38,15 @@
 #include <numeric>
 #include <optional>
 
+#include <explicit-memory/bytes.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/static_vector.h>
-#include <fbl/string.h>
 #include <fbl/vector.h>
 #include <ktl/byte.h>
 #include <ktl/numeric.h>
 #include <ktl/span.h>
+#include <ktl/string_view.h>
 
 #include "../kernel_priv.h"
 #include "starnix-loader.h"
@@ -55,28 +55,19 @@
 
 #include <linux/auxvec.h>
 
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace {
 
 using namespace starnix;
 
-struct StackResult {
-  UserAddress stack_pointer;
-  UserAddress auxv_start;
-  UserAddress auxv_end;
-  UserAddress argv_start;
-  UserAddress argv_end;
-  UserAddress environ_start;
-  UserAddress environ_end;
-};
-
 constexpr size_t kMaxSegments = 4;
 constexpr size_t kMaxPhdrs = 16;
 const size_t kRandomSeedBytes = 16;
 
-size_t get_initial_stack_size(const fbl::String& path, const fbl::Vector<fbl::String>& argv,
-                              const fbl::Vector<fbl::String>& environ,
+size_t get_initial_stack_size(const ktl::string_view& path,
+                              const fbl::Vector<ktl::string_view>& argv,
+                              const fbl::Vector<ktl::string_view>& environ,
                               const fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv) {
   auto accumulate_size = [](size_t accumulator, const auto& arg) {
     return accumulator + arg.length() + 1;
@@ -91,11 +82,28 @@ size_t get_initial_stack_size(const fbl::String& path, const fbl::Vector<fbl::St
   return stack_size;
 }
 
+constexpr size_t kMaxCPRNGDraw = ZX_CPRNG_DRAW_MAX_LEN;
+
+zx_status_t cprng_draw(void* buffer, size_t len) {
+  if (len > kMaxCPRNGDraw)
+    return ZX_ERR_INVALID_ARGS;
+
+  uint8_t kernel_buf[kMaxCPRNGDraw];
+  // Ensure we get rid of the stack copy of the random data as this function returns.
+  explicit_memory::ZeroDtor<uint8_t> zero_guard(kernel_buf, sizeof(kernel_buf));
+
+  auto prng = crypto::global_prng::GetInstance();
+  ASSERT(prng->is_thread_safe());
+  prng->Draw(kernel_buf, len);
+
+  memcpy(buffer, kernel_buf, len);
+  return ZX_OK;
+}
+
 fit::result<Errno, StackResult> populate_initial_stack(
-    const MemoryAccessor& ma, UserAddress mapping_base, const fbl::String& path,
-    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& envp,
+    const MemoryAccessor& ma, const ktl::string_view& path,
+    const fbl::Vector<ktl::string_view>& argv, const fbl::Vector<ktl::string_view>& envp,
     fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr) {
-  LTRACE;
   auto stack_pointer = original_stack_start_addr;
 
   auto write_stack = [&ma](const ktl::span<const uint8_t>& data,
@@ -111,8 +119,9 @@ fit::result<Errno, StackResult> populate_initial_stack(
 
     stack_pointer -= arg.size();
     auto result = write_stack(arg, stack_pointer);
-    if (result.is_error())
+    if (result.is_error()) {
       return result.take_error();
+    }
   }
   auto argv_start = stack_pointer;
 
@@ -132,16 +141,18 @@ fit::result<Errno, StackResult> populate_initial_stack(
   auto execfn_addr = stack_pointer;
   auto result =
       write_stack({reinterpret_cast<const uint8_t*>(path.data()), path.length() + 1}, execfn_addr);
-  if (result.is_error())
+  if (result.is_error()) {
     return result.take_error();
+  }
 
   ktl::array<uint8_t, kRandomSeedBytes> random_seed{};
   cprng_draw(random_seed.data(), random_seed.size());
   stack_pointer -= random_seed.size();
   auto random_seed_addr = stack_pointer;
   result = write_stack({random_seed.data(), random_seed.size()}, random_seed_addr);
-  if (result.is_error())
+  if (result.is_error()) {
     return result.take_error();
+  }
   stack_pointer = random_seed_addr;
 
   fbl::AllocChecker ac;
@@ -203,13 +214,13 @@ fit::result<Errno, StackResult> populate_initial_stack(
   auto auxv_end = stack_pointer + auxv_end_offset;
 
   return fit::ok(StackResult{
-      stack_pointer,
-      auxv_start,
-      auxv_end,
-      argv_start,
-      argv_end,
-      environ_start,
-      environ_end,
+      .stack_pointer = stack_pointer,
+      .auxv_start = auxv_start,
+      .auxv_end = auxv_end,
+      .argv_start = argv_start,
+      .argv_end = argv_end,
+      .environ_start = environ_start,
+      .environ_end = environ_end,
   });
 }
 
@@ -233,11 +244,15 @@ struct LoadedElf {
 };
 
 fit::result<Errno, LoadedElf> load_elf(
-    const FileHandle& file, zx::ArcVmo vmo,
+    const FileHandle& file, fbl::RefPtr<MemoryObject> elf_memory,
     const fbl::RefPtr<starnix::MemoryManager>& mm /*file_write_guard: FileWriteGuardRef,*/) {
-  LTRACE;
+  auto vmo = elf_memory->as_vmo();
+  if (!vmo) {
+    return fit::error(errno(EINVAL));
+  }
+
   auto diag = GetDiagnostics();
-  elfldltl::UnownedVmoFile vmo_file(vmo->as_ref().borrow(), diag);
+  elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
   auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
@@ -258,79 +273,80 @@ fit::result<Errno, LoadedElf> load_elf(
   size_t vaddr_bias = file_base - load_info.vaddr_start();
 
   StarnixLoader loader(mm);
-  ZX_ASSERT(loader.map_elf_segments(diag, load_info, vmo->as_ref().borrow(), mm->base_addr.ptr(),
-                                    vaddr_bias));
+  ZX_ASSERT(loader.map_elf_segments(diag, load_info, elf_memory, mm->base_addr.ptr(), vaddr_bias));
 
   LTRACEF("loaded at %lx, entry point %lx\n", file_base, ehdr.entry + vaddr_bias);
 
-  return fit::ok(LoadedElf{ehdr, file_base, vaddr_bias});
+  return fit::ok(LoadedElf{.file_header = ehdr, .file_base = file_base, .vaddr_bias = vaddr_bias});
+}
+
+ktl::optional<ktl::string_view> from_bytes_until_nul(const char* bytes, size_t len) {
+  const char* nul_pos = static_cast<const char*>(memchr(bytes, '\0', len));
+  if (nul_pos == nullptr) {
+    return ktl::nullopt;
+  }
+  return ktl::string_view(bytes, nul_pos - bytes);
 }
 
 // Resolves a file handle into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_elf(
-    const CurrentTask& current_task, const starnix::FileHandle& file, zx::vmo vmo,
-    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& environ
+    const CurrentTask& current_task, const starnix::FileHandle& file,
+    fbl::RefPtr<MemoryObject> memory, const fbl::Vector<ktl::string_view>& argv,
+    const fbl::Vector<ktl::string_view>& environ
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
-  LTRACE;
+  auto vmo = memory->as_vmo();
+  if (!vmo) {
+    return fit::error(errno(EINVAL));
+  }
+
   ktl::optional<starnix::ResolvedInterpElf> resolved_interp;
 
   auto diag = GetDiagnostics();
-  elfldltl::UnownedVmoFile vmo_file(vmo.borrow(), diag);
-  auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
+  elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
+  auto elf_headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
-  ZX_ASSERT(headers);
-  auto& [ehdr, phdrs_result] = *headers;
+  ZX_ASSERT(elf_headers);
+  auto& [ehdr, phdrs_result] = *elf_headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
   ktl::optional<elfldltl::Elf<>::Phdr> interp;
   elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container> load_info;
   ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(PAGE_SIZE),
                                   elfldltl::PhdrInterpObserver<elfldltl::Elf<>>(interp)));
-
-  // The ELF header specified an ELF interpreter.
-  // Read the path and load this ELF as well.
   if (interp) {
-    // While PT_INTERP names can be arbitrarily large, bootfs entries
-    // have names of bounded length.
-    constexpr size_t kInterpMaxLen = ZBI_BOOTFS_MAX_NAME_LEN;
+    // The ELF header specified an ELF interpreter.
+    // Read the path and load this ELF as well.
 
-    if (interp->filesz > kInterpMaxLen) {
-      return fit::error(errno(from_status_like_fdio(ZX_ERR_INVALID_ARGS)));
+    auto interp_data = memory->read_to_vec(interp->offset, interp->filesz);
+    if (interp_data.is_error()) {
+      return fit::error(errno(from_status_like_fdio(interp_data.error_value())));
     }
 
-    // Add one for the trailing nul.
-    char interp_path[kInterpMaxLen + 1];
+    auto interp_path =
+        from_bytes_until_nul(reinterpret_cast<char*>(interp_data->data()), interp_data->size());
+    if (!interp_path.has_value()) {
+      return fit::error(errno(EINVAL));
+    }
+    LTRACEF("PT_INTERP=[%.*s]\n", static_cast<int>(interp_path->size()), interp_path->data());
 
-    // Copy the suffix.
-    zx_status_t status = vmo.read(interp_path, interp->offset, interp->filesz);
-    if (status != ZX_OK) {
-      return fit::error(errno(from_status_like_fdio(status)));
+    auto interp_file = current_task.open_file(*interp_path, OpenFlags(OpenFlagsEnum::RDONLY));
+    if (interp_file.is_error()) {
+      return interp_file.take_error();
     }
 
-    // Copy the nul.
-    interp_path[interp->filesz] = '\0';
-
-    LTRACEF("PT_INTERP %s\n", interp_path);
-
-    auto open_result = current_task.open_file_bootfs(interp_path);
-    if (open_result.is_error()) {
-      return open_result.take_error();
+    auto interp_memory = interp_file->get_memory(
+        current_task, {},
+        ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::EXEC));
+    if (interp_memory.is_error()) {
+      return interp_memory.take_error();
     }
+    /*
+      let file_write_guard =
+            interp_file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
+    */
 
-    zx::vmo interp_vmo;
-    status = open_result->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &interp_vmo);
-    if (status != ZX_OK) {
-      return fit::error(errno(from_status_like_fdio(status)));
-    }
-
-    fbl::AllocChecker ac;
-    resolved_interp = starnix::ResolvedInterpElf{
-        open_result.value(),
-        ktl::move(fbl::AdoptRef(new (&ac) zx::Arc<zx::vmo>(ktl::move(interp_vmo)))),
-    };
-    if (!ac.check()) {
-      return fit::error(errno(ENOMEM));
-    }
+    resolved_interp =
+        starnix::ResolvedInterpElf{.file = interp_file.value(), .memory = interp_memory.value()};
   }
 
   /*
@@ -338,68 +354,64 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
       file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
   */
 
-  fbl::Vector<fbl::String> argv_cpy;
+  fbl::Vector<ktl::string_view> argv_cpy;
   ktl::copy(argv.begin(), argv.end(), util::back_inserter(argv_cpy));
 
-  fbl::Vector<fbl::String> environ_cpy;
+  fbl::Vector<ktl::string_view> environ_cpy;
   ktl::copy(environ.begin(), environ.end(), util::back_inserter(environ_cpy));
 
-  fbl::AllocChecker ac;
-  auto arc_vmo = fbl::AdoptRef(new (&ac) zx::Arc<zx::vmo>(ktl::move(vmo)));
-  if (!ac.check()) {
-    return fit::error(errno(ENOMEM));
-  }
-
   return fit::ok(starnix::ResolvedElf{
-      ktl::move(file), ktl::move(arc_vmo), ktl::move(resolved_interp), ktl::move(argv_cpy),
-      ktl::move(environ_cpy) /*, selinux_state, file_write_guard*/});
+      .file = file,
+      .memory = memory,
+      .interp = ktl::move(resolved_interp),
+      .argv = ktl::move(argv_cpy),
+      .environ = ktl::move(environ_cpy) /*, selinux_state, file_write_guard*/});
 }
 
 // Resolves a #! script file into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_script(
-    const starnix::CurrentTask& current_task, zx::vmo vmo, const fbl::String& path,
-    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& environ,
-    size_t recursion_depth
+    const starnix::CurrentTask& current_task, fbl::RefPtr<MemoryObject> memory,
+    const ktl::string_view& path, const fbl::Vector<ktl::string_view>& argv,
+    const fbl::Vector<ktl::string_view>& environ, size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
-  LTRACE;
   return fit::error(errno(-1));
 }
 
 // Resolves a file into a validated executable ELF, following script interpreters to a fixed
 // recursion depth.
 fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
-    const starnix::CurrentTask& current_task, const starnix::FileHandle& file, fbl::String path,
-    const fbl::Vector<fbl::String>& argv, const fbl::Vector<fbl::String>& environ,
-    size_t recursion_depth
+    const starnix::CurrentTask& current_task, const starnix::FileHandle& file,
+    ktl::string_view path, const fbl::Vector<ktl::string_view>& argv,
+    const fbl::Vector<ktl::string_view>& environ, size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
-  LTRACE;
   if (recursion_depth > MAX_RECURSION_DEPTH) {
     return fit::error(errno(ELOOP));
   }
 
-  // let vmo = file.get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
-  zx::vmo file_vmo;
-  zx_status_t status = file->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &file_vmo);
-  if (status != ZX_OK) {
-    return fit::error(errno(from_status_like_fdio(status)));
+  auto memory = file->get_memory(
+      current_task, {},
+      ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::EXEC));
+  if (memory.is_error()) {
+    return memory.take_error();
   }
 
-  ktl::array<char, HASH_BANG_SIZE> header{};
-  status = file_vmo.read(header.data(), 0, HASH_BANG_SIZE);
-  switch (status) {
-    case ZX_OK:
-      break;
-    case ZX_ERR_OUT_OF_RANGE:
-      return fit::error(errno(ENOEXEC));
-    default:
-      return fit::error(errno(EINVAL));
+  auto header = memory->read_to_array<char, HASH_BANG_SIZE>(0);
+  if (header.is_error()) {
+    switch (header.error_value()) {
+      case ZX_ERR_OUT_OF_RANGE:
+        return fit::error(errno(ENOEXEC));
+      default:
+        return fit::error(errno(EINVAL));
+    }
   }
 
-  if (header == HASH_BANG) {
-    return resolve_script(current_task, ktl::move(file_vmo), path, argv, environ, recursion_depth
-                          /*, selinux_state*/);
+  if (header.value() == HASH_BANG) {
+    return resolve_script(
+        current_task, ktl::move(memory.value()), path, argv, environ, recursion_depth
+        /*, selinux_state*/);
   } else {
-    return resolve_elf(current_task, file, ktl::move(file_vmo), argv, environ /*, selinux_state*/);
+    return resolve_elf(current_task, file, ktl::move(memory.value()), argv,
+                       environ /*, selinux_state*/);
   }
 }
 
@@ -408,16 +420,17 @@ fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
 namespace starnix {
 
 fit::result<Errno, ResolvedElf> resolve_executable(
-    const CurrentTask& current_task, const FileHandle& file, const fbl::String& path,
-    const fbl::Vector<fbl::String>& argv,
-    const fbl::Vector<fbl::String>& environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
+    const CurrentTask& current_task, const FileHandle& file, const ktl::string_view& path,
+    const fbl::Vector<ktl::string_view>& argv,
+    const fbl::Vector<ktl::string_view>&
+        environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   return resolve_executable_impl(current_task, file, path, argv, environ, 0);
 }
 
 fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_task,
                                                     const ResolvedElf& resolved_elf,
-                                                    const fbl::String& original_path) {
-  auto main_elf = load_elf(resolved_elf.file, resolved_elf.vmo, current_task->mm()/*,
+                                                    const ktl::string_view& original_path) {
+  auto main_elf = load_elf(resolved_elf.file, resolved_elf.memory, current_task->mm()/*,
                            resolved_elf.file_write_guard*/);
   if (main_elf.is_error()) {
     return main_elf.take_error();
@@ -426,7 +439,7 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   ktl::optional<LoadedElf> interp_elf;
   if (resolved_elf.interp.has_value()) {
     auto& interp = resolved_elf.interp.value();
-    auto load_interp_result = load_elf(interp.file, interp.vmo, current_task->mm()/*,
+    auto load_interp_result = load_elf(interp.file, interp.memory, current_task->mm()/*,
                            resolved_elf.file_write_guard*/);
     if (load_interp_result.is_error()) {
       return load_interp_result.take_error();
@@ -482,8 +495,17 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
         FileWriteGuardRef(None),
     )?;
   */
+  auto vdso_base = UserAddress();
 
   auto creds = current_task->creds();
+  auto secure = [&creds]() {
+    if (creds.uid != creds.euid || creds.gid != creds.egid) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }();
+
   fbl::AllocChecker ac;
   fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
   auxv.push_back(ktl::pair(AT_UID, creds.uid), &ac);
@@ -494,15 +516,23 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   ZX_ASSERT(ac.check());
   auxv.push_back(ktl::pair(AT_EGID, creds.egid), &ac);
   ZX_ASSERT(ac.check());
-  // auxv.push_back(ktl::pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0), &ac);
+  auxv.push_back(ktl::pair(AT_BASE, interp_elf.value_or(LoadedElf{.file_base = 0}).file_base), &ac);
+  ZX_ASSERT(ac.check());
   auxv.push_back(ktl::pair(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE)), &ac);
   ZX_ASSERT(ac.check());
-  // auxv.push_back(ktl::make_pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff));
-  // auxv.push_back(ktl::make_pair(AT_PHENT, info.main_elf.header.phentsize));
-  // auxv.push_back(ktl::make_pair(AT_PHNUM, info.main_elf.header.phnum));
-  // auxv.push_back(ktl::make_pair(AT_ENTRY, info.main_elf.load_bias + info.main_elf.header.entry));
-  // auxv.push_back(ktl::make_pair(AT_SYSINFO_EHDR, vdso_base));
-  auxv.push_back(ktl::pair(AT_SECURE, 0), &ac);
+  auxv.push_back(ktl::pair(AT_PHDR, main_elf->file_base + main_elf->file_header.phoff), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_PHENT, main_elf->file_header.phentsize), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_PHNUM, main_elf->file_header.phnum), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_ENTRY, main_elf->vaddr_bias + main_elf->file_header.entry), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_CLKTCK, SCHEDULER_CLOCK_HZ), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_SYSINFO_EHDR, vdso_base.ptr()), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_SECURE, secure), &ac);
   ZX_ASSERT(ac.check());
 
   // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
@@ -510,9 +540,8 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   auto stack_size_result = round_up_to_system_page_size(
       get_initial_stack_size(original_path, resolved_elf.argv, resolved_elf.environ, auxv) +
       0xf0000);
-
   if (stack_size_result.is_error()) {
-    LTRACEF("stack is too big");
+    LTRACEF("Stack is too big\n");
     return stack_size_result.take_error();
   }
 
@@ -520,9 +549,10 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
       ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::WRITE);
 
   auto stack_base = current_task->mm()->map_anonymous(
-      {DesiredAddressType::Any, 0}, stack_size_result.value(), prot_flags,
-      MappingOptionsFlags(MappingOptions::ANONYMOUS), {MappingNameType::Stack});
+      {.type = DesiredAddressType::Any, .address = 0}, stack_size_result.value(), prot_flags,
+      MappingOptionsFlags(MappingOptions::ANONYMOUS), {.type = MappingNameType::Stack});
   if (stack_base.is_error()) {
+    TRACEF("Failed map stack\n");
     return stack_base.take_error();
   }
 
@@ -531,10 +561,10 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   LTRACEF("stack [%lx, %lx) sp=%lx\n", stack_base.value().ptr(),
           stack_base.value().ptr() + stack_size_result.value(), stack.ptr());
 
-  auto stack_result = populate_initial_stack(current_task, stack_base.value(), original_path,
-                                             resolved_elf.argv, resolved_elf.environ, auxv, stack);
-
+  auto stack_result = populate_initial_stack(current_task, original_path, resolved_elf.argv,
+                                             resolved_elf.environ, auxv, stack);
   if (stack_result.is_error()) {
+    TRACEF("Failed to populate initial stack\n");
     return stack_result.take_error();
   }
 
@@ -548,9 +578,17 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   (*mm_state)->argv_end = stack_result->argv_end;
   (*mm_state)->environ_start = stack_result->environ_start;
   (*mm_state)->environ_end = stack_result->environ_end;
-  // mm_state.vdso_base = vdso_base;
 
-  return fit::ok(ThreadStartInfo{entry, stack_result->stack_pointer});
+  (*mm_state)->vdso_base = vdso_base;
+
+  return fit::ok(ThreadStartInfo{.entry = entry, .stack = stack_result->stack_pointer});
+}
+
+fit::result<Errno, StackResult> test_populate_initial_stack(
+    const MemoryAccessor& ma, const ktl::string_view& path,
+    const fbl::Vector<ktl::string_view>& argv, const fbl::Vector<ktl::string_view>& envp,
+    fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr) {
+  return populate_initial_stack(ma, path, argv, envp, auxv, original_stack_start_addr);
 }
 
 }  // namespace starnix
