@@ -45,7 +45,7 @@ bool test_brk() {
     if (auto opt = state->mappings.get(addr); opt) {
       return opt->first;
     }
-    return util::Range<UserAddress>({0, 0});
+    return util::Range<UserAddress>({.start=0, .end=0});
   };
 
   // Initialize the program break.

@@ -114,7 +114,7 @@ Vmars Vmars::New(Vmar vmar, zx_info_vmar_t vmar_info) {
     }
   }();
 
-  return Vmars{ktl::move(vmar), vmar_info, ktl::move(lower_4gb)};
+  return Vmars{.vmar = ktl::move(vmar), .vmar_info = vmar_info, .lower_4gb = ktl::move(lower_4gb)};
 }
 
 Vmar& Vmars::vmar_for_addr(UserAddress addr) {
@@ -129,7 +129,6 @@ Vmar& Vmars::vmar_for_addr(UserAddress addr) {
 fit::result<Errno, UserAddress> Vmars::map(DesiredAddress addr, fbl::RefPtr<MemoryObject> memory,
                                            uint64_t memory_offset, size_t length,
                                            MappingFlags flags, bool populate) const {
-  LTRACE;
   auto base_addr = UserAddress::from_ptr(vmar_info.base);
   auto mflags = MappingFlagsImpl(flags);
 
@@ -230,8 +229,8 @@ fit::result<zx_status_t> Vmars::protect(UserAddress addr, size_t length, uint32_
 }
 
 util::Range<UserAddress> Vmars::address_range() const {
-  return util::Range<UserAddress>{UserAddress::from_ptr(vmar_info.base),
-                                  UserAddress::from_ptr(vmar_info.base + vmar_info.len)};
+  return util::Range<UserAddress>{.start = UserAddress::from_ptr(vmar_info.base),
+                                  .end = UserAddress::from_ptr(vmar_info.base + vmar_info.len)};
 }
 
 fit::result<zx_status_t, size_t> Vmars::raw_map(fbl::RefPtr<MemoryObject> memory,
@@ -320,7 +319,7 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_memory(
   auto mapping = Mapping::New(mapped_addr.value(), memory, vmo_offset,
                               MappingFlagsImpl(flags) /*, file_write_guard*/);
   mapping.name_ = name;
-  mappings.insert({mapped_addr.value(), end}, mapping);
+  mappings.insert({.start = mapped_addr.value(), .end = end}, mapping);
 
   if (flags.contains(MappingFlagsEnum::GROWSDOWN)) {
     // track_stub !(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
@@ -342,8 +341,8 @@ fit::result<Errno, ktl::optional<UserAddress>> MemoryManagerState::try_remap_in_
     return fit::error(errno(EINVAL));
   }
 
-  util::Range<UserAddress> old_range{old_addr, old_end_range.value()};
-  util::Range<UserAddress> new_range_in_place{old_addr, new_end_range.value()};
+  util::Range<UserAddress> old_range{.start = old_addr, .end = old_end_range.value()};
+  util::Range<UserAddress> new_range_in_place{.start = old_addr, .end = new_end_range.value()};
 
   if (new_length <= old_length) {
     // Shrink the mapping in-place, which should always succeed.
@@ -357,8 +356,8 @@ fit::result<Errno, ktl::optional<UserAddress>> MemoryManagerState::try_remap_in_
     return fit::ok(old_addr);
   }
 
-  if (auto it =
-          mappings.intersection(util::Range<UserAddress>{old_range.end, new_range_in_place.end});
+  if (auto it = mappings.intersection(
+          util::Range<UserAddress>{.start = old_range.end, .end = new_range_in_place.end});
       (it.begin() != it.end() && (++it.begin() != it.end()))) {
     // There is some mapping in the growth range prevening an in-place growth.
     return fit::ok(ktl::nullopt);
@@ -406,12 +405,13 @@ fit::result<Errno, ktl::optional<UserAddress>> MemoryManagerState::try_remap_in_
             }
 
             // Re-map the original range, which may include pages before the requested range.
-            return map_memory(mm, {DesiredAddressType::FixedOverwrite, original_range.start},
-                              backing.memory_, backing.memory_offset_, final_length,
-                              original_mapping.flags(), false, original_mapping.name() /*,
-                                                              original_mapping.file_write_guard*/
-                              ,
-                              released_mappings);
+            return map_memory(
+                mm, {.type = DesiredAddressType::FixedOverwrite, .address = original_range.start},
+                backing.memory_, backing.memory_offset_, final_length, original_mapping.flags(),
+                false, original_mapping.name() /*,
+                      original_mapping.file_write_guard*/
+                ,
+                released_mappings);
           },
           [](const PrivateAnonymous&) -> fit::result<Errno, ktl::optional<UserAddress>> {
             return fit::error(errno(EFAULT));
@@ -611,14 +611,14 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(fbl::RefPtr<MemoryMana
     if (auto pair = mappings.get(end_addr); pair) {
       auto& [range, mapping] = pair.value();
       if (range.end != end_addr && mapping.private_anonymous()) {
-        return ktl::pair(util::Range<UserAddress>{end_addr, range.end}, mapping);
+        return ktl::pair(util::Range<UserAddress>{.start = end_addr, .end = range.end}, mapping);
       }
     }
     return ktl::nullopt;
   }();
 
   // Remove the original range of mappings from our map.
-  auto vec = mappings.remove(util::Range<UserAddress>{addr, end_addr});
+  auto vec = mappings.remove(util::Range<UserAddress>{.start = addr, .end = end_addr});
   ktl::copy(vec.begin(), vec.end(), util::back_inserter(released_mappings));
 
   if (truncated_tail) {
@@ -658,8 +658,8 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(fbl::RefPtr<MemoryMana
     backing.base_ = range.start;
     backing.memory_offset_ = 0;
 
-    auto result = map_internal({DesiredAddressType::FixedOverwrite, range.start}, backing.memory_,
-                               0, child_length, mapping.flags_, false);
+    auto result = map_internal({.type = DesiredAddressType::FixedOverwrite, .address = range.start},
+                               backing.memory_, 0, child_length, mapping.flags_, false);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -856,7 +856,8 @@ uint64_t MappingBackingMemory::address_to_offset(UserAddress addr) const {
 
 Mapping Mapping::New(UserAddress base, fbl::RefPtr<MemoryObject> memory, uint64_t memory_offset,
                      MappingFlagsImpl flags) {
-  return Mapping::with_name(base, ktl::move(memory), memory_offset, flags, {MappingNameType::None});
+  return Mapping::with_name(base, ktl::move(memory), memory_offset, flags,
+                            {.type = MappingNameType::None});
 }
 
 Mapping Mapping::with_name(UserAddress base, fbl::RefPtr<MemoryObject> memory,
@@ -903,14 +904,15 @@ fit::result<Errno, UserAddress> MemoryManager::map_memory(
   //  Unmapped mappings must be released after the state is unlocked.
   fbl::Vector<Mapping> released_mappings;
   fit::result<Errno, UserAddress> result = fit::error(errno(EINVAL));
-
   {
     auto _state = state.Write();
     result = _state->map_memory(
         fbl::RefPtr<MemoryManager>(this), addr, ktl::move(memory), memory_offset, length, flags,
         options.contains(MappingOptions::POPULATE), name, released_mappings);
-    if (result.is_error())
+    if (result.is_error()) {
+      LTRACEF("failed to map memory %d\n", result.error_value().error_code());
       return result.take_error();
+    }
   }
 
   // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
@@ -968,7 +970,17 @@ MemoryManager::MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar
 
   auto _state = state.Write();
   _state->user_vmars = Vmars::New(ktl::move(user_vmar), user_vmar_info);
-  _state->forkable_state_ = MemoryManagerForkableState{{}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  _state->forkable_state_ = MemoryManagerForkableState{.brk = {},
+                                                       .stack_base = 0,
+                                                       .stack_size = 0,
+                                                       .stack_start = 0,
+                                                       .auxv_start = 0,
+                                                       .auxv_end = 0,
+                                                       .argv_start = 0,
+                                                       .argv_end = 0,
+                                                       .environ_start = 0,
+                                                       .environ_end = 0,
+                                                       .vdso_base = 0};
 }
 
 fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& current_task,
@@ -994,13 +1006,15 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
     // prevent other mappings using the range, unless they do so deliberately.  Pages
     // in this range are made writable, and added to `mappings`, as the caller grows
     // the program break.
-    auto map_addr = (*_state).map_internal(DesiredAddress{DesiredAddressType::Any}, memory.value(),
-                                           0, kProgramBreakLimit,
+    auto map_addr = (*_state).map_internal(DesiredAddress{.type = DesiredAddressType::Any},
+                                           memory.value(), 0, kProgramBreakLimit,
                                            MappingFlags(MappingFlagsEnum::ANONYMOUS), false);
     if (map_addr.is_error()) {
       return map_addr.take_error();
     }
-    (*_state)->brk = brk = ProgramBreak{map_addr.value(), map_addr.value(), memory.value()};
+    (*_state)->brk = brk = ProgramBreak{.base = map_addr.value(),
+                                        .current = map_addr.value(),
+                                        .placeholder_memory = memory.value()};
   } else {
     brk = (*_state)->brk.value();
   }
@@ -1027,8 +1041,9 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
 #else
     auto memory_offset = old_end - brk.base;
     auto result = (*_state).map_internal(
-        DesiredAddress{DesiredAddressType::FixedOverwrite, new_end}, brk.placeholder_memory,
-        memory_offset, delta, MappingFlags(MappingFlagsEnum::ANONYMOUS), false);
+        DesiredAddress{.type = DesiredAddressType::FixedOverwrite, .address = new_end},
+        brk.placeholder_memory, memory_offset, delta, MappingFlags(MappingFlagsEnum::ANONYMOUS),
+        false);
 
     if (result.is_error()) {
       return fit::ok(brk.current);
@@ -1044,7 +1059,7 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
       return fit::ok(brk.current);
     }
   } else if (new_end > old_end) {
-    util::Range<UserAddress> range{old_end, new_end};
+    util::Range<UserAddress> range{.start = old_end, .end = new_end};
     auto delta = new_end - old_end;
 
     // Check for mappings over the program break region.
@@ -1106,9 +1121,9 @@ bool MemoryManager::extend_brk(MemoryManagerState& _state, fbl::RefPtr<MemoryMan
   // Otherwise, allocating fresh anonymous pages is good-enough.
   return _state
       .map_anonymous(
-          mm, DesiredAddress{DesiredAddressType::FixedOverwrite, old_end}, delta,
+          mm, DesiredAddress{.type = DesiredAddressType::FixedOverwrite, .address = old_end}, delta,
           ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::WRITE),
-          MappingOptionsFlags(MappingOptions::ANONYMOUS), {MappingNameType::Heap},
+          MappingOptionsFlags(MappingOptions::ANONYMOUS), {.type = MappingNameType::Heap},
           released_mappings)
       .is_ok();
 }
@@ -1269,8 +1284,8 @@ fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target
                   }
 
                   auto map_or_error = _state.user_vmars.map(
-                      {DesiredAddressType::FixedOverwrite, crange.start}, replaced_memory->memory,
-                      memory_offset, length, cmapping.flags_, false);
+                      {.type = DesiredAddressType::FixedOverwrite, .address = crange.start},
+                      replaced_memory->memory, memory_offset, length, cmapping.flags_, false);
 
                   if (map_or_error.is_error()) {
                     return map_or_error.take_error();
@@ -1282,8 +1297,9 @@ fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target
 
               fbl::Vector<Mapping> released_mappings;
               auto map_or_error = target_state->map_memory(
-                  target, {DesiredAddressType::Fixed, crange.start}, target_memory, memory_offset,
-                  length, cmapping.flags_, false, cmapping.name_, released_mappings);
+                  target, {.type = DesiredAddressType::Fixed, .address = crange.start},
+                  target_memory, memory_offset, length, cmapping.flags_, false, cmapping.name_,
+                  released_mappings);
               if (map_or_error.is_error()) {
                 return map_or_error.take_error();
               }
@@ -1428,7 +1444,8 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
   auto _state = state.Write();
 
   fbl::Vector<ktl::pair<util::Range<UserAddress>, Mapping>> mappings_in_range;
-  auto mappings = _state->mappings.intersection(util::Range<UserAddress>({addr, end.value()}));
+  auto mappings =
+      _state->mappings.intersection(util::Range<UserAddress>({.start = addr, .end = end.value()}));
   ktl::copy(mappings.begin(), mappings.end(), util::back_inserter(mappings_in_range));
 
   if (mappings_in_range.is_empty()) {
@@ -1451,7 +1468,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
     if (range.start < addr) {
       // This mapping starts before the named region. Split the mapping so we can apply the name
       // only to the specified region.
-      auto start_split_range = util::Range<UserAddress>{range.start, addr};
+      auto start_split_range = util::Range<UserAddress>{.start = range.start, .end = addr};
       auto start_split_length = addr - range.start;
 
       auto start_split_mapping =
@@ -1472,7 +1489,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
                      mapping.backing_.variant);
 
       _state->mappings.insert(start_split_range, start_split_mapping);
-      range = util::Range<UserAddress>{addr, range.end};
+      range = util::Range<UserAddress>{.start = addr, .end = range.end};
     }
     if (last_range_end.has_value()) {
       if (last_range_end.value() != range.start) {
@@ -1500,7 +1517,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
     if (range.end > end) {
       // The named region ends before the last mapping ends. Split the tail off of the
       // last mapping to have an unnamed mapping after the named region.
-      auto tail_range = util::Range<UserAddress>{end.value(), range.end};
+      auto tail_range = util::Range<UserAddress>{.start = end.value(), .end = range.end};
       auto tail_offset = range.end - end.value();
       auto tail_mapping =
           ktl::visit(MappingBacking::overloaded{
@@ -1522,7 +1539,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
     }
 
     if (name.has_value()) {
-      mapping.name_ = MappingName{MappingNameType::Vma, name.value()};
+      mapping.name_ = MappingName{.type = MappingNameType::Vma, .vmaName = name.value()};
     }
     _state->mappings.insert(range, mapping);
   }

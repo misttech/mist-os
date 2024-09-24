@@ -39,6 +39,7 @@ class Namespace : public fbl::RefCounted<Namespace> {
  private:
   MountHandle root_mount_;
 
+ public:
   // Unique ID of this namespace.
   uint64_t id_;
 
@@ -46,6 +47,8 @@ class Namespace : public fbl::RefCounted<Namespace> {
   // impl Namespace
 
   static fbl::RefPtr<Namespace> New(FileSystemHandle fs);
+
+  static fbl::RefPtr<Namespace> new_with_flags(FileSystemHandle fs, MountFlags flags);
 
   NamespaceNode root();
 
