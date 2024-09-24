@@ -84,6 +84,7 @@
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
             from: "#power_manager",
             to: "#shutdown_shim",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
