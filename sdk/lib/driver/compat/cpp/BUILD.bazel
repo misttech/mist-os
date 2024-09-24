@@ -32,6 +32,7 @@ cc_library(
     deps = [
         "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "//sdk/lib/driver/async-helpers/cpp",
+        "//src/devices/bind/fuchsia:fuchsia_cc",
         "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
         "@fuchsia_sdk//pkg/component_incoming_cpp",
         "@fuchsia_sdk//pkg/component_outgoing_cpp",

@@ -9,6 +9,8 @@
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/client.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/ethernet/cpp/bind.h>
 #include <gtest/gtest.h>
 #include <src/connectivity/wlan/drivers/wlansoftmac/softmac_driver.h>
 
@@ -51,7 +53,8 @@ TEST_F(GoodSoftmacDriverTest, VerifyChildNode) {
     ASSERT_EQ(1u, node.children().size());
     ASSERT_EQ(node.children().count("wlansoftmac-ethernet"), 1ul);
 
-    auto expected_property = fdf::MakeProperty(1, ZX_PROTOCOL_ETHERNET_IMPL);
+    auto expected_property =
+        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_ethernet::BIND_PROTOCOL_IMPL);
     auto properties = node.children().find("wlansoftmac-ethernet")->second.GetProperties();
 
     ASSERT_EQ(properties.size(), 1ul);

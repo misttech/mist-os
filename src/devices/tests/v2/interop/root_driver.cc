@@ -9,6 +9,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 
 namespace fdf {
@@ -43,7 +44,7 @@ class RootDriver : public fdf::DriverBase {
 
     // Set the properties of the node that a driver will bind to.
     fdf::NodeProperty property =
-        fdf::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
+        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
     auto offers = child_.CreateOffers2();
 

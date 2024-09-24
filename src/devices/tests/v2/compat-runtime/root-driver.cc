@@ -12,6 +12,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 
 namespace fdf {
@@ -67,7 +68,7 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
 
     // Set the properties of the node that a driver will bind to.
     auto property =
-        fdf::MakeProperty(1 /*BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
+        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
     auto args = fdf::NodeAddArgs{{
         .name = std::string(kChildName),
