@@ -47,7 +47,7 @@ pub struct FsNodeState {
 }
 
 /// Opaque structure holding security state for a [`crate::vfs::Filesystem`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FileSystemState {
     state: selinux_hooks::FileSystemState,
 }

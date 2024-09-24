@@ -7,7 +7,7 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+    DirEntryHandle, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use selinux::{SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
@@ -100,11 +100,26 @@ pub struct FsNodeSecurityXattr {
 /// this is a no-op.
 pub fn fs_node_init_with_dentry(
     current_task: &CurrentTask,
-    dir_entry: &DirEntry,
+    dir_entry: &DirEntryHandle,
 ) -> Result<(), Errno> {
-    if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::fs_node_init_with_dentry(security_server, current_task, dir_entry)
-    })
+    if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_init_with_dentry(security_server, current_task, dir_entry)
+        },
+        || {
+            if let Some(state) = &current_task.kernel().security_state.state {
+                if !state.server.has_policy() {
+                    // TODO: https://fxbug.dev/367585803 - Revise locking to guard against a policy load
+                    // sneaking in, in-between `has_policy()` and this `insert()`.
+                    log_debug!("Queuing FsNode for {:?} for labeling", dir_entry);
+                    let fs_state = &dir_entry.node.fs().security_state.state;
+                    fs_state.pending_entries.lock().insert(WeakKey::from(dir_entry));
+                }
+            };
+            Ok(())
+        },
+    )
 }
 
 /// Called by file-system implementations when creating the `FsNode` for a new file, to determine the
