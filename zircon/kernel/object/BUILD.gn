@@ -117,6 +117,10 @@ zx_library("object") {
     # <object/clock_dispatcher.h> has #include <lib/affine/transform.h>.
     "//zircon/system/ulib/affine",
   ]
+
+  if (is_mistos) {
+    deps += [ "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-zircon" ]
+  }
 }
 
 source_set("tests") {

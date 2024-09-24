@@ -15,6 +15,7 @@
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_zircon/task_wrapper.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -104,12 +105,19 @@ fit::result<zx_status_t> run_task(const CurrentTask& current_task) {
   auto thread = current_task->thread.Read();
 
   if (thread->has_value()) {
+    auto t = thread->value();
+    fbl::AllocChecker ac;
+    t->SetTask(fbl::MakeRefCountedChecked<TaskWrapper>(&ac, current_task.weak_task().Lock()));
+    if (!ac.check()) {
+      return fit::error(ZX_ERR_NO_MEMORY);
+    }
+
     auto status = thread->value()->Start(
         ThreadDispatcher::EntryState{.pc = current_task.thread_state.registers->rip,
                                      .sp = current_task.thread_state.registers->rsp,
                                      .arg1 = {},
                                      .arg2 = 0},
-        /* ensure_initial_thread= */ true);
+        /* ensure_initial_thread= */ false);
     if (status != ZX_OK) {
       TRACEF("failed to start process %d\n", status);
       return fit::error(status);
