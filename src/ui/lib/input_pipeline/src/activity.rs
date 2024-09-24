@@ -208,6 +208,7 @@ impl ActivityManager {
         suspend_enabled: bool,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Rc<Self> {
+        fuchsia_async::TestExecutor::advance_to(zx::MonotonicTime::ZERO.into()).await;
         Self::new_internal(
             idle_threshold_ms,
             zx::MonotonicTime::ZERO,
@@ -426,14 +427,14 @@ mod tests {
 
     #[test_case(true; "Suspend enabled")]
     #[test_case(false; "Suspend disabled")]
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn aggregator_reports_activity(suspend_enabled: bool) {
         let activity_manager = create_activity_manager(suspend_enabled).await;
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
         proxy.report_discrete_activity(0).await.expect("Failed to report activity");
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn aggregator_handoff_wake_ok_when_suspend_enabled() {
         let activity_manager = create_activity_manager(/* suspend_enabled */ true).await;
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
@@ -441,7 +442,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), true);
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn aggregator_handoff_wake_error_when_suspend_disabled() {
         let activity_manager = create_activity_manager(/* suspend_enabled */ false).await;
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
@@ -451,7 +452,7 @@ mod tests {
 
     #[test_case(true; "Suspend enabled")]
     #[test_case(false; "Suspend disabled")]
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn notifier_sends_initial_state(suspend_enabled: bool) {
         let activity_manager = create_activity_manager(suspend_enabled).await;
         let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
@@ -465,7 +466,6 @@ mod tests {
     #[fuchsia::test]
     fn notifier_sends_idle_state_after_timeout(suspend_enabled: bool) -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager_fut = create_activity_manager(suspend_enabled);
         pin_mut!(activity_manager_fut);
@@ -506,7 +506,6 @@ mod tests {
         suspend_enabled: bool,
     ) -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager_fut = create_activity_manager(suspend_enabled);
         pin_mut!(activity_manager_fut);
@@ -556,7 +555,6 @@ mod tests {
     #[fuchsia::test]
     fn notifier_sends_active_state_with_handoff_wake_suspend_enabled() -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager_fut = create_activity_manager(/* suspend_enabled */ true);
         pin_mut!(activity_manager_fut);
@@ -607,7 +605,6 @@ mod tests {
     #[fuchsia::test]
     fn notifier_sends_nothing_with_handoff_wake_suspend_disabled() -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager_fut = create_activity_manager(/* suspend_enabled */ false);
         pin_mut!(activity_manager_fut);
@@ -678,7 +675,6 @@ mod tests {
         assert_eq!(ACTIVITY_TIMEOUT.into_nanos() % 2, 0);
 
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager_fut = create_activity_manager(suspend_enabled);
         pin_mut!(activity_manager_fut);
@@ -733,7 +729,6 @@ mod tests {
     #[fuchsia::test]
     fn activity_manager_drops_late_activities(suspend_enabled: bool) -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
         let activity_manager_fut = create_activity_manager(suspend_enabled);
         pin_mut!(activity_manager_fut);
