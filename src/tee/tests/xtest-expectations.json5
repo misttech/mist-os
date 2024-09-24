@@ -21,6 +21,7 @@
                 "regression1013",
                 "regression1021",
                 "regression1038",
+                "regression1040",
                 "regression4001",
                 "regression4002",
                 "regression4003",
@@ -79,13 +80,6 @@
                 "regression6019",
                 "regression6020",
                 "regression6021",
-            ],
-        },
-        {
-            type: "skip",
-            matchers: [
-                // TODO(https://fxbug.dev/348473568): Investigate why this hangs.
-                "regression1040",
             ],
         },
     ],
