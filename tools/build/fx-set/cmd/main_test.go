@@ -470,6 +470,14 @@ func TestConstructStaticSpec(t *testing.T) {
 			expectErr: !rbeSupported,
 		},
 		{
+			name: "build_event_service enabled",
+			args: &setArgs{disableCxxRbe: true, buildEventService: "sponge"},
+			expected: &fintpb.Static{
+				BuildEventService: "sponge",
+				GnArgs:            []string{rbe_mode_off, `bazel_upload_build_events = "sponge"`},
+			},
+		},
+		{
 			name: "fuzzer variants",
 			args: &setArgs{
 				fuzzSanitizers: []string{"asan", "ubsan"},

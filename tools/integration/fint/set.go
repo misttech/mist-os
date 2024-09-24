@@ -29,7 +29,25 @@ var (
 
 	// Path within a checkout to script which will clobber a build when new fences appear.
 	forceCleanScript = []string{"build", "force_clean", "force_clean_if_needed.py"}
+
+	// Known build event services (for set artifacts).
+	// GN args may name configurations like "sponge_infra", but as far as recipes
+	// are concerned, they only need to distinguish between the name prefixes
+	// "sponge" and "resultstore".
+	validBuildEventServices = []string{"sponge", "resultstore"} // constant
 )
+
+// canonicalizeBuildEventService translates a GN configuration name for
+// build event services into a canonical name to be used in recipes.
+// For example, "resultstore_infra" maps to "resultstore".
+func canonicalizeBuildEventService(configName string) string {
+	for _, s := range validBuildEventServices {
+		if strings.HasPrefix(configName, s) {
+			return s
+		}
+	}
+	return configName
+}
 
 // Set runs `gn gen` given a static and context spec. It's intended to be
 // consumed as a library function.
@@ -91,6 +109,7 @@ func setImpl(
 			TargetArch: strings.ToLower(staticSpec.TargetArch.String()),
 			Variants:   staticSpec.Variants,
 		},
+		BuildEventService: canonicalizeBuildEventService(staticSpec.BuildEventService),
 		// True if any toolchain is using RBE and needs reproxy to run.
 		// Note: bazel+RBE doesn't require reproxy.
 		EnableRbe: staticSpec.RustRbeEnable || staticSpec.CxxRbeEnable || staticSpec.LinkRbeEnable,
@@ -286,6 +305,10 @@ func genArgs(
 	}
 	if staticSpec.BazelRbeEnable {
 		vars["enable_bazel_remote_rbe"] = staticSpec.BazelRbeEnable
+	}
+
+	if staticSpec.BuildEventService != "" {
+		vars["bazel_upload_build_events"] = staticSpec.BuildEventService
 	}
 
 	if staticSpec.Product != "" {

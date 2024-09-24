@@ -42,4 +42,8 @@ message SetArtifacts {
   // This is not needed for bazel+RBE.
   // Hindsight: a better name for this would have been "enable_reclient_rbe".
   bool enable_rbe = 5;
+
+  // Set to "sponge" or "resultstore" to indicate that bazel will
+  // be streaming build events live to the named build event service.
+  string build_event_service = 6;
 }
