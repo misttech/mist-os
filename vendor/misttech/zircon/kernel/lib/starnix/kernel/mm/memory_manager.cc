@@ -255,8 +255,13 @@ UserAddress Vmars::get_random_base(size_t length) const {
   KernelHandle<VmAddressRegionDispatcher> temp_vmar;
   zx_rights_t rights;
   uintptr_t base;
-  ASSERT(vmar.dispatcher()->Allocate(0, length, 0, &temp_vmar, &rights));
+  zx_status_t status = vmar.dispatcher()->Allocate(0, length, 0, &temp_vmar, &rights);
+  ASSERT(status == ZX_OK);
+
   base = temp_vmar.dispatcher()->vmar()->base();
+
+  // SAFETY: This is safe because the vmar is not in the current process.
+  temp_vmar.dispatcher()->vmar()->Destroy();
   temp_vmar.reset();
   return UserAddress::from_ptr(base);
 }
