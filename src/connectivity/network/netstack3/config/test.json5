@@ -5,4 +5,5 @@
     // Netstack3 structured configuration values for use in tests.
     num_threads: 4,
     debug_logs: false,
+    suspend_enabled: false,
 }

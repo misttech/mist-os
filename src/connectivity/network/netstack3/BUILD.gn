@@ -209,23 +209,23 @@ rustc_binary("bin-instrumented") {
 
 fuchsia_component_manifest("component_manifest") {
   component_name = "netstack3"
-  manifest = "meta/netstack3.cml"
+  manifest = "meta/netstack3_prod.cml"
 }
 
 network_unified_binary_regular_and_gub_components("component") {
   cm_label = ":component_manifest"
   component_name = "netstack3"
   gub_deps = [ ":bin" ]
+  visibility = [
+    # Only available to top level network for bubbling up into assembly. Use the
+    # test components everywhere else.
+    "//src/connectivity/network:*",
+  ]
 }
 
 fuchsia_structured_config_rust_lib("config_lib") {
   name = "ns3_config"
   cm_label = ":component_manifest"
-}
-
-fuchsia_structured_config_values("config_for_tests") {
-  cm_label = ":component_manifest"
-  values_source = "config/test.json5"
 }
 
 template("ns3_test_component") {
@@ -259,6 +259,14 @@ template("ns3_test_component") {
   }
 }
 
+# A stand-in for :component to use for tests.
+ns3_test_component("component-for-tests") {
+  component_name = "netstack3"
+  manifest = "meta/netstack3_test.cml"
+  config_values_source = "config/test.json5"
+  deps = [ ":bin" ]
+}
+
 # Component with debugging instrumentation enabled. This should be used for
 # tests but not benchmarks.
 ns3_test_component("component-debug") {
@@ -271,7 +279,7 @@ ns3_test_component("component-debug") {
 # Drop-in component with the name "netstack" rather than "netstack3."
 ns3_test_component("component-dropin") {
   component_name = "netstack"
-  manifest = "meta/netstack3.cml"
+  manifest = "meta/netstack3_test.cml"
   config_values_source = "config/test.json5"
   deps = [ ":bin" ]
 }

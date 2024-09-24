@@ -6,4 +6,5 @@
     // debug instrumented netstack.
     num_threads: 4,
     debug_logs: true,
+    suspend_enabled: false,
 }

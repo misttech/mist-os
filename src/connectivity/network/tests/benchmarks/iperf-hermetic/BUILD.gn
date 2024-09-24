@@ -90,15 +90,8 @@ fuchsia_test_package("iperf-test") {
 # benchmarks GN target.
 fuchsia_test_package("iperf-benchmark") {
   test_components = [ ":iperf-benchmark-component" ]
-  deps = common_deps + ns2_package_deps + [
-           "//src/connectivity/network/netstack3:component",
-           "//src/connectivity/network/netstack3:config_for_tests",
-
-           # TODO(https://fxbug.dev/42076541): remove this when the production Netstack3
-           # component no longer brings its own DHCPv4 client, given that it is
-           # otherwise unused in this benchmark.
-           "//src/connectivity/network/dhcpv4/client/bindings:component",
-         ]
+  deps = common_deps + ns2_package_deps +
+         [ "//src/connectivity/network/netstack3:component-for-tests" ]
 
   # Don't run the benchmark on the target as it is run as a part of the
   # host-driven iPerf benchmarks.

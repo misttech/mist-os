@@ -99,9 +99,8 @@ common_package_deps = [
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
   # netstack3 is commonly under test.
-  "//src/connectivity/network/netstack3:component",
   "//src/connectivity/network/netstack3:component-debug",
-  "//src/connectivity/network/netstack3:config_for_tests",
+  "//src/connectivity/network/netstack3:component-for-tests",
 ]
 
 # RISC-V on Fuchsia does not support Golang.

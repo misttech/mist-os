@@ -116,17 +116,17 @@
     ],
     offer: [
         {
-            from: "parent",
-            to: [ "#font_provider" ],
             config: [
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
             ],
+            from: "parent",
+            to: [ "#font_provider" ],
         },
         {
+            config: "fuchsia.power.SuspendEnabled",
             from: "parent",
             to: "#exceptions",
-            config: "fuchsia.power.SuspendEnabled",
         },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
@@ -135,9 +135,9 @@
             dependency: "weak",
         },
         {
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             from: "parent",
             to: "#network",
-            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             availability: "same_as_target",
         },
         {
@@ -235,6 +235,20 @@
             storage: "data",
             from: "self",
             to: [ "#network" ],
+        },
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            to: "#network",
+            availability: "same_as_target",
+        },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "parent",
+            to: "#network",
         },
         {
             protocol: [ "fuchsia.pkg.PackageCache" ],

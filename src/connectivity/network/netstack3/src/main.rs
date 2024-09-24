@@ -19,7 +19,7 @@ use bindings::{InspectPublisher, NetstackSeed, Service};
 /// Runs Netstack3.
 pub fn main() {
     let config = ns3_config::Config::take_from_startup_handle();
-    let ns3_config::Config { num_threads, debug_logs } = &config;
+    let ns3_config::Config { num_threads, debug_logs, suspend_enabled } = &config;
     let num_threads = NonZeroU8::new(*num_threads).expect("invalid 0 thread count value");
     let mut executor = fuchsia_async::SendExecutor::new(num_threads.get().into());
 
@@ -35,6 +35,9 @@ pub fn main() {
     diagnostics_log::initialize(log_options).expect("failed to initialize log");
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
+
+    // TODO(https://fxbug.dev/367333990): Wire up suspend enablement.
+    let _ = suspend_enabled;
 
     info!("starting netstack3 with {config:?}");
 

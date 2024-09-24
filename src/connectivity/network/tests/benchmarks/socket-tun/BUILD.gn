@@ -50,14 +50,8 @@ common_deps = [
   "//src/sys/stash:stash_secure_v2",
 ]
 
-netstack3_deps = common_deps + [
-                   "//src/connectivity/network/netstack3:component",
-
-                   # TODO(https://fxbug.dev/42076541): remove this when the production Netstack3
-                   # component no longer brings its own DHCPv4 client, given that it is
-                   # otherwise unused in this benchmark.
-                   "//src/connectivity/network/dhcpv4/client/bindings:component",
-                 ]
+netstack3_deps =
+    common_deps + [ "//src/connectivity/network/netstack3:component-for-tests" ]
 
 fuchsia_test_component("tun-socket-benchmarks-netstack3") {
   deps = netstack3_deps
@@ -75,7 +69,6 @@ fuchsia_test_package("tun-socket-benchmarks-tests-netstack3") {
     ":tun-socket-benchmarks-netstack3",
     ":tun-socket-benchmarks-netstack3-with-tracing",
   ]
-  deps = [ "//src/connectivity/network/netstack3:config_for_tests" ]
 }
 
 fuchsia_component_perf_test("tun_socket_benchmarks_with_netstack3") {
