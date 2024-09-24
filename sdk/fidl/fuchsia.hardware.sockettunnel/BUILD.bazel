@@ -1,0 +1,41 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_bind_cc_library",
+    "fuchsia_fidl_bind_library",
+    "fuchsia_fidl_library",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_fidl_library(
+    name = "fuchsia.hardware.sockettunnel",
+    srcs = [
+        "socket_tunnel.fidl",
+    ],
+    cc_bindings = [
+        "cpp",
+        "cpp_wire",
+        "cpp_driver_wire",
+        "cpp_driver",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@fuchsia_sdk//fidl/zx",
+    ],
+)
+
+fuchsia_fidl_bind_library(
+    name = "fuchsia.hardware.sockettunnel_bindlib",
+    library = ":fuchsia.hardware.sockettunnel",
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)
+
+fuchsia_bind_cc_library(
+    name = "fuchsia.hardware.sockettunnel_bindlib_cc",
+    library = ":fuchsia.hardware.sockettunnel_bindlib",
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)
