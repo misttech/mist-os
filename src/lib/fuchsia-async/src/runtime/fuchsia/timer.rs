@@ -8,17 +8,41 @@
 //! at a particular point in the future.
 
 use crate::runtime::{EHandle, Time, WakeupTime};
+use crate::PacketReceiver;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
+use fuchsia_zircon::AsHandleRef as _;
 use futures::stream::FusedStream;
 use futures::task::{AtomicWaker, Context};
 use futures::{FutureExt, Stream};
-use std::cmp;
 use std::collections::BinaryHeap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use std::task::Poll;
+use std::{cmp, fmt};
+
+pub trait TimeInterface:
+    Clone + Copy + fmt::Debug + PartialEq + PartialOrd + Ord + Send + Sync + 'static
+{
+    type Timeline: zx::Timeline + Send + Sync + 'static;
+
+    fn into_zx(self) -> zx::Time<Self::Timeline>;
+    fn now() -> Self;
+}
+
+impl TimeInterface for Time {
+    type Timeline = zx::MonotonicTimeline;
+
+    fn into_zx(self) -> zx::MonotonicTime {
+        self.into_zx()
+    }
+
+    fn now() -> Self {
+        EHandle::local().inner().now()
+    }
+}
 
 impl WakeupTime for std::time::Instant {
     fn into_time(self) -> Time {
@@ -57,7 +81,7 @@ impl Timer {
     {
         let waker_and_bool = Arc::new((AtomicWaker::new(), AtomicBool::new(false)));
         let this = Timer { waker_and_bool };
-        EHandle::register_timer(time.into_time(), this.handle());
+        EHandle::local().register_timer(time.into_time(), this.handle());
         this
     }
 
@@ -70,7 +94,7 @@ impl Timer {
     pub fn reset(&mut self, time: Time) {
         assert!(self.did_fire());
         self.waker_and_bool.1.store(false, Ordering::SeqCst);
-        EHandle::register_timer(time, self.handle());
+        EHandle::local().register_timer(time, self.handle());
     }
 
     fn did_fire(&self) -> bool {
@@ -109,7 +133,7 @@ pub(crate) struct TimerHandle {
 }
 
 impl TimerHandle {
-    pub fn is_defunct(&self) -> bool {
+    fn is_defunct(&self) -> bool {
         self.inner.upgrade().is_none()
     }
 
@@ -167,56 +191,195 @@ impl Stream for Interval {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct TimerHeap {
-    inner: BinaryHeap<TimeWaker>,
+pub(crate) struct TimerHeap<T: TimeInterface> {
+    inner: Mutex<Inner<T>>,
 }
 
-impl TimerHeap {
-    pub fn add_timer(&mut self, time: Time, handle: TimerHandle) {
-        self.inner.push(TimeWaker { time, handle })
-    }
+struct Inner<T: TimeInterface> {
+    // We can't easily use ReceiverRegistration because there would be a circular dependency we'd
+    // have to break: Executor -> TimerHeap -> ReceiverRegistration -> EHandle -> ScopeRef ->
+    // Executor, so instead we just store the port key and then change the executor to drop the
+    // registration at the appropriate place.
+    port_key: u64,
 
-    pub fn next_deadline(&mut self) -> Option<&TimeWaker> {
-        while self.inner.peek().map(|t| t.handle.is_defunct()).unwrap_or_default() {
-            self.inner.pop();
+    fake: bool,
+
+    heap: BinaryHeap<TimeWaker<T>>,
+
+    // True if there's a pending async_wait.
+    async_wait: bool,
+
+    timer: zx::Timer<T::Timeline>,
+}
+
+impl<T: TimeInterface> Inner<T> {
+    fn set_timer(&mut self, time: T) {
+        self.timer.set(time.into_zx(), Default::default()).unwrap();
+
+        if !self.async_wait {
+            if self.fake {
+                // Clear the signal used for fake timers so that we can use it to trigger
+                // next time.
+                self.timer.signal_handle(zx::Signals::USER_0, zx::Signals::empty()).unwrap();
+            }
+
+            self.timer
+                .wait_async_handle(
+                    EHandle::local().port(),
+                    self.port_key,
+                    if self.fake { zx::Signals::USER_0 } else { zx::Signals::TIMER_SIGNALED },
+                    zx::WaitAsyncOpts::empty(),
+                )
+                .unwrap();
+
+            self.async_wait = true;
         }
-        self.inner.peek()
-    }
-
-    pub fn pop(&mut self) -> Option<TimeWaker> {
-        self.inner.pop()
     }
 }
 
-pub(crate) struct TimeWaker {
-    time: Time,
+impl TimerHeap<Time> {
+    pub fn new(port_key: u64, fake: bool) -> Self {
+        Self {
+            inner: Mutex::new(Inner {
+                port_key,
+                fake,
+                heap: BinaryHeap::default(),
+                async_wait: false,
+                timer: zx::Timer::<zx::MonotonicTimeline>::create(),
+            }),
+        }
+    }
+}
+
+impl<T: TimeInterface> TimerHeap<T> {
+    pub fn port_key(&self) -> u64 {
+        self.inner.lock().port_key
+    }
+
+    /// Adds a timer.
+    pub fn add_timer(&self, time: T, handle: TimerHandle) {
+        let mut inner = self.inner.lock();
+        if T::now() >= time {
+            handle.wake();
+            return;
+        }
+        if inner.heap.peek().map_or(true, |t| time < t.time) {
+            inner.set_timer(time);
+        }
+        inner.heap.push(TimeWaker { time, handle });
+    }
+
+    /// Wakes timers that should be firing now.  Returns true if any timers were woken.
+    pub fn wake_timers(&self) -> bool {
+        self.wake_timers_impl(false)
+    }
+
+    fn wake_timers_impl(&self, from_receive_packet: bool) -> bool {
+        let now = T::now();
+        let mut timers_woken = false;
+        loop {
+            let timer = {
+                let mut inner = self.inner.lock();
+
+                if from_receive_packet {
+                    inner.async_wait = false;
+                }
+
+                while inner.heap.peek().map_or(false, |t| t.handle.is_defunct()) {
+                    inner.heap.pop();
+                }
+
+                match inner.heap.peek() {
+                    Some(t) => {
+                        if t.time <= now {
+                            inner.heap.pop().unwrap()
+                        } else {
+                            let time = t.time;
+                            inner.set_timer(time);
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+            };
+            timer.handle.wake();
+            timers_woken = true;
+        }
+        timers_woken
+    }
+
+    /// Wakes the next timer and returns its time.
+    pub fn wake_next_timer(&self) -> Option<T> {
+        let mut inner = self.inner.lock();
+        loop {
+            let timer = inner.heap.pop();
+            if let Some(timer) = timer {
+                if timer.handle.is_defunct() {
+                    continue;
+                }
+                std::mem::drop(inner);
+                timer.handle.wake();
+                return Some(timer.time);
+            } else {
+                return None;
+            }
+        }
+    }
+
+    /// Returns the next timer due to expire.
+    pub fn next_timer(&self) -> Option<T> {
+        let mut inner = self.inner.lock();
+        loop {
+            if let Some(timer) = inner.heap.peek() {
+                if timer.handle.is_defunct() {
+                    inner.heap.pop();
+                    continue;
+                }
+                return Some(timer.time);
+            } else {
+                return None;
+            }
+        }
+    }
+
+    /// If there's a timer ready, sends a notification to wake up the receiver.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if we are not using fake time.
+    pub fn maybe_notify(&self, now: T) {
+        let inner = self.inner.lock();
+        assert!(inner.fake);
+        if inner.heap.peek().map_or(false, |t| t.time <= now) {
+            inner.timer.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
+        }
+    }
+}
+
+impl<T: TimeInterface> PacketReceiver for TimerHeap<T> {
+    fn receive_packet(&self, _packet: zx::Packet) {
+        self.wake_timers_impl(true);
+    }
+}
+
+struct TimeWaker<T> {
+    time: T,
     handle: TimerHandle,
 }
 
-impl TimeWaker {
-    pub fn wake(&self) {
-        self.handle.wake();
-    }
-
-    pub fn time(&self) -> Time {
-        self.time
-    }
-}
-
-impl Ord for TimeWaker {
+impl<T: TimeInterface> Ord for TimeWaker<T> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.time.cmp(&other.time).reverse() // Reverse to get min-heap rather than max
     }
 }
 
-impl PartialOrd for TimeWaker {
+impl<T: TimeInterface> PartialOrd for TimeWaker<T> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for TimeWaker {
+impl<T: TimeInterface> PartialEq for TimeWaker<T> {
     /// BinaryHeap requires `TimeWaker: Ord` above so that there's a total ordering between
     /// elements, and `T: Ord` requires `T: Eq` even we don't actually need to check these for
     /// equality. We could use `Weak::ptr_eq` to check the handles here, but then that would cause
@@ -226,7 +389,7 @@ impl PartialEq for TimeWaker {
         self.time == other.time
     }
 }
-impl Eq for TimeWaker {}
+impl<T: TimeInterface> Eq for TimeWaker<T> {}
 
 #[cfg(test)]
 mod test {

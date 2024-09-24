@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::timer::TimerHeap;
-use super::common::{with_local_timer_heap, EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
+use super::common::{EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeRef;
 use super::time::Time;
 use crate::atomic_future::AtomicFuture;
@@ -48,7 +47,7 @@ impl LocalExecutor {
             /* num_threads */ 1,
         ));
         let root_scope = ScopeRef::root(inner.clone());
-        Executor::set_local(root_scope.clone(), TimerHeap::default());
+        Executor::set_local(root_scope.clone());
         Self { ehandle: EHandle { root_scope } }
     }
 
@@ -148,12 +147,12 @@ impl TestExecutor {
     /// Create a new single-threaded executor running with fake time.
     pub fn new_with_fake_time() -> Self {
         let inner = Arc::new(Executor::new(
-            ExecutorTime::FakeTime(AtomicI64::new(Time::INFINITE_PAST.into_nanos())),
+            ExecutorTime::FakeTime(AtomicI64::new(zx::MonotonicTime::INFINITE_PAST.into_nanos())),
             /* is_local */ true,
             /* num_threads */ 1,
         ));
         let root_scope = ScopeRef::root(inner.clone());
-        Executor::set_local(root_scope.clone(), TimerHeap::default());
+        Executor::set_local(root_scope.clone());
         Self { local: LocalExecutor { ehandle: EHandle { root_scope } } }
     }
 
@@ -239,16 +238,7 @@ impl TestExecutor {
     ///
     /// This is intended for use in test code in conjunction with fake time.
     pub fn wake_expired_timers(&mut self) -> bool {
-        let now = self.now();
-        with_local_timer_heap(|timer_heap| {
-            let mut ret = false;
-            while let Some(waker) = timer_heap.next_deadline().filter(|waker| waker.time() <= now) {
-                waker.wake();
-                timer_heap.pop();
-                ret = true;
-            }
-            ret
-        })
+        self.local.ehandle.inner().monotonic_timers().wake_timers()
     }
 
     /// Wake up the next task waiting for a timer, if any, and return the time for which the
@@ -264,21 +254,12 @@ impl TestExecutor {
     ///     assert_eq!(Some(deadline), exec.wake_next_timer());
     ///     assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut future));
     pub fn wake_next_timer(&mut self) -> Option<Time> {
-        with_local_timer_heap(|timer_heap| {
-            let deadline = timer_heap.next_deadline().map(|waker| {
-                waker.wake();
-                waker.time()
-            });
-            if deadline.is_some() {
-                timer_heap.pop();
-            }
-            deadline
-        })
+        self.local.ehandle.inner().monotonic_timers().wake_next_timer()
     }
 
     /// Returns the deadline for the next timer due to expire.
     pub fn next_timer() -> Option<Time> {
-        with_local_timer_heap(|timer_heap| timer_heap.next_deadline().map(|t| t.time()))
+        EHandle::local().inner().monotonic_timers().next_timer()
     }
 
     /// Advances fake time to the specified time.  This will only work if the executor is being run

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
+use super::super::timer::{TimerHandle, TimerHeap};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeRef;
 use super::time::Time;
@@ -27,21 +27,8 @@ pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 pub(crate) const MAIN_TASK_ID: usize = 0;
 
 thread_local!(
-    static EXECUTOR: RefCell<Option<(ScopeRef, TimerHeap)>> = RefCell::new(None)
+    static EXECUTOR: RefCell<Option<ScopeRef>> = RefCell::new(None)
 );
-
-pub(crate) fn with_local_timer_heap<F, R>(f: F) -> R
-where
-    F: FnOnce(&mut TimerHeap) -> R,
-{
-    EXECUTOR.with(|e| {
-        (f)(&mut e
-            .borrow_mut()
-            .as_mut()
-            .expect("can't get timer heap before fuchsia_async::Executor is initialized")
-            .1)
-    })
-}
 
 pub enum ExecutorTime {
     RealTime,
@@ -73,6 +60,7 @@ static ACTIVE_EXECUTORS: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) struct Executor {
     pub(super) port: zx::Port,
+    monotonic_timers: Arc<TimerHeap<Time>>,
     pub(super) done: AtomicBool,
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
@@ -94,11 +82,18 @@ impl Executor {
         #[cfg(test)]
         ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
 
+        let mut receivers: PacketReceiverMap<Arc<dyn PacketReceiver>> = PacketReceiverMap::new();
+        let monotonic_timers = receivers.insert(|key| {
+            let timers = Arc::new(TimerHeap::new(key, matches!(time, ExecutorTime::FakeTime(_))));
+            (timers.clone(), timers)
+        });
+
         Executor {
             port: zx::Port::create(),
+            monotonic_timers,
             done: AtomicBool::new(false),
             is_local,
-            receivers: Mutex::new(PacketReceiverMap::new()),
+            receivers: Mutex::new(receivers),
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
             ready_tasks: SegQueue::new(),
             time,
@@ -109,11 +104,11 @@ impl Executor {
         }
     }
 
-    pub fn set_local(root_scope: ScopeRef, timers: TimerHeap) {
+    pub fn set_local(root_scope: ScopeRef) {
         EXECUTOR.with(|e| {
             let mut e = e.borrow_mut();
             assert!(e.is_none(), "Cannot create multiple Fuchsia Executors");
-            *e = Some((root_scope, timers));
+            *e = Some(root_scope);
         });
     }
 
@@ -245,7 +240,7 @@ impl Executor {
         }
     }
 
-    pub fn deliver_packet(&self, key: usize, packet: zx::Packet) {
+    pub fn deliver_packet(&self, key: u64, packet: zx::Packet) {
         let receiver = match self.receivers.lock().get(key) {
             // Clone the `Arc` so that we don't hold the lock
             // any longer than absolutely necessary.
@@ -270,6 +265,7 @@ impl Executor {
             }
             ExecutorTime::FakeTime(t) => t.store(new.into_nanos(), Ordering::Relaxed),
         }
+        self.monotonic_timers.maybe_notify(new);
     }
 
     pub fn is_real_time(&self) -> bool {
@@ -366,6 +362,9 @@ impl Executor {
         // Drop all of the uncompleted tasks
         while let Some(_) = self.ready_tasks.pop() {}
 
+        // Unregister the timer receiver so that we can perform the check below.
+        self.receivers.lock().remove(self.monotonic_timers.port_key());
+
         // Do not allow any receivers to outlive the executor. That's very likely a bug waiting to
         // happen. See discussion above.
         //
@@ -435,22 +434,20 @@ impl Executor {
             enum Work {
                 None,
                 Packet(zx::Packet),
-                Timer(TimeWaker),
                 Stalled,
             }
 
             let mut notified = false;
-            let work = with_local_timer_heap(|timer_heap| {
+            let work = {
                 // If we're considered awake choose INFINITE_PAST which will make the wait call
-                // return immediately. Otherwise choose a deadline from the timers.
+                // return immediately.  Otherwise, wait until a packet arrives.
                 let deadline = if !sleeping || UNTIL_STALLED {
-                    Time::INFINITE_PAST
+                    zx::Time::INFINITE_PAST
                 } else {
-                    timer_heap.next_deadline().map(|t| t.time()).unwrap_or(Time::INFINITE)
+                    zx::Time::INFINITE
                 };
 
-                // into_zx: we are using real time, so the time is a monotonic time.
-                match self.port.wait(deadline.into_zx()) {
+                match self.port.wait(deadline) {
                     Ok(packet) => {
                         if packet.key() == TASK_READY_WAKEUP_ID {
                             notified = true;
@@ -460,28 +457,17 @@ impl Executor {
                         }
                     }
                     Err(zx::Status::TIMED_OUT) => {
-                        if !sleeping {
+                        if !UNTIL_STALLED || !sleeping {
                             Work::None
-                        } else if UNTIL_STALLED {
-                            // Fire timers if using fake time.
-                            if !self.is_real_time() {
-                                if let Some(deadline) = timer_heap.next_deadline().map(|t| t.time())
-                                {
-                                    if deadline <= self.now() {
-                                        return Work::Timer(timer_heap.pop().unwrap());
-                                    }
-                                }
-                            }
-                            Work::Stalled
                         } else {
-                            Work::Timer(timer_heap.pop().unwrap())
+                            Work::Stalled
                         }
                     }
                     Err(status) => {
                         panic!("Error calling port wait: {:?}", status);
                     }
                 }
-            });
+            };
 
             let threads_state_sub = make_threads_state(sleeping as u8, notified as u8);
             if threads_state_sub > 0 {
@@ -490,10 +476,7 @@ impl Executor {
 
             match work {
                 Work::Packet(packet) => {
-                    self.deliver_packet(packet.key() as usize, packet);
-                }
-                Work::Timer(timer) => {
-                    timer.wake();
+                    self.deliver_packet(packet.key(), packet);
                 }
                 Work::None => {}
                 Work::Stalled => return,
@@ -527,6 +510,11 @@ impl Executor {
             _ => false,
         }
     }
+
+    /// Returns the monotonic timers.
+    pub fn monotonic_timers(&self) -> &TimerHeap<Time> {
+        &self.monotonic_timers
+    }
 }
 
 #[cfg(test)]
@@ -558,7 +546,7 @@ impl EHandle {
     /// If called outside the context of an active async executor.
     pub fn local() -> Self {
         let root_scope = EXECUTOR
-            .with(|e| e.borrow().as_ref().map(|x| x.0.clone()))
+            .with(|e| e.borrow().as_ref().map(|x| x.clone()))
             .expect("Fuchsia Executor must be created first");
 
         EHandle { root_scope }
@@ -587,18 +575,17 @@ impl EHandle {
     where
         T: PacketReceiver,
     {
-        let key = self.inner().receivers.lock().insert(receiver.clone()) as u64;
-
-        ReceiverRegistration { ehandle: self.clone(), key, receiver }
+        self.inner().receivers.lock().insert(|key| {
+            (receiver.clone(), ReceiverRegistration { ehandle: self.clone(), key, receiver })
+        })
     }
 
     #[inline(always)]
-    pub(super) fn inner(&self) -> &Arc<Executor> {
+    pub(crate) fn inner(&self) -> &Arc<Executor> {
         &self.root_scope.executor()
     }
 
     pub(crate) fn deregister_receiver(&self, key: u64) {
-        let key = key as usize;
         let mut lock = self.inner().receivers.lock();
         if lock.contains(key) {
             lock.remove(key);
@@ -608,10 +595,9 @@ impl EHandle {
         }
     }
 
-    pub(crate) fn register_timer(time: Time, handle: TimerHandle) {
-        with_local_timer_heap(|timer_heap| {
-            timer_heap.add_timer(time, handle);
-        });
+    pub(crate) fn register_timer(&self, time: Time, handle: TimerHandle) {
+        let executor = self.root_scope.executor();
+        executor.monotonic_timers.add_timer(time, handle);
     }
 
     /// See `Inner::spawn`.

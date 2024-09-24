@@ -6,7 +6,6 @@ use fuchsia_zircon as zx;
 use rustc_hash::FxHashMap as HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
-use std::{u64, usize};
 
 use super::common::EHandle;
 
@@ -34,8 +33,8 @@ pub trait PacketReceiver: Send + Sync + 'static {
 // Simple slab::Slab replacement that doesn't re-use keys
 // TODO(https://fxbug.dev/42119369): figure out how to safely cancel async waits so we can re-use keys again.
 pub(crate) struct PacketReceiverMap<T> {
-    next_key: usize,
-    pub mapping: HashMap<usize, T>,
+    next_key: u64,
+    pub mapping: HashMap<u64, T>,
 }
 
 impl<T> PacketReceiverMap<T> {
@@ -43,22 +42,23 @@ impl<T> PacketReceiverMap<T> {
         Self { next_key: 0, mapping: HashMap::default() }
     }
 
-    pub fn get(&self, key: usize) -> Option<&T> {
+    pub fn get(&self, key: u64) -> Option<&T> {
         self.mapping.get(&key)
     }
 
-    pub fn insert(&mut self, val: T) -> usize {
+    pub fn insert<R>(&mut self, val: impl FnOnce(u64) -> (T, R)) -> R {
         let key = self.next_key;
         self.next_key = self.next_key.checked_add(1).expect("ran out of keys");
+        let (val, out) = val(key);
         self.mapping.insert(key, val);
-        key
+        out
     }
 
-    pub fn remove(&mut self, key: usize) -> T {
+    pub fn remove(&mut self, key: u64) -> T {
         self.mapping.remove(&key).unwrap_or_else(|| panic!("invalid key"))
     }
 
-    pub fn contains(&self, key: usize) -> bool {
+    pub fn contains(&self, key: u64) -> bool {
         self.mapping.contains_key(&key)
     }
 }
@@ -121,11 +121,11 @@ mod tests {
         }
         let mut map = PacketReceiverMap::<DummyPacketReceiver>::new();
         let e1 = DummyPacketReceiver { id: 1 };
-        assert_eq!(map.insert(e1), 0);
-        assert_eq!(map.insert(e1), 1);
+        assert_eq!(map.insert(|key| (e1, key)), 0);
+        assert_eq!(map.insert(|key| (e1, key)), 1);
 
         // Still doesn't reuse IDs after one is removed
         map.remove(1);
-        assert_eq!(map.insert(e1), 2);
+        assert_eq!(map.insert(|key| (e1, key)), 2);
     }
 }

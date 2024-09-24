@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::timer::TimerHeap;
-use super::common::{with_local_timer_heap, Executor, ExecutorTime};
+use super::common::{Executor, ExecutorTime};
 use super::scope::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
@@ -13,7 +12,7 @@ use std::future::Future;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fmt, mem, thread, usize};
+use std::{fmt, thread, usize};
 
 /// A multi-threaded port-based executor for Fuchsia OS. Requires that tasks scheduled on it
 /// implement `Send` so they can be load balanced between worker threads.
@@ -52,7 +51,7 @@ impl SendExecutor {
             num_threads.try_into().expect("no more than 256 threads are supported"),
         ));
         let root_scope = ScopeRef::root(inner.clone());
-        Executor::set_local(root_scope.clone(), TimerHeap::default());
+        Executor::set_local(root_scope.clone());
         Self { inner, root_scope, threads: Vec::default() }
     }
 
@@ -94,10 +93,7 @@ impl SendExecutor {
 
         // Start worker threads, handing off timers from the current thread.
         self.inner.done.store(false, Ordering::SeqCst);
-        with_local_timer_heap(|timer_heap| {
-            let timer_heap = mem::replace(timer_heap, TimerHeap::default());
-            self.create_worker_threads(Some(timer_heap));
-        });
+        self.create_worker_threads();
 
         // Wait until the signal the future has completed.
         let (lock, cvar) = &*pair;
@@ -149,13 +145,12 @@ impl SendExecutor {
 
     /// Add `self.num_threads` worker threads to the executor's thread pool.
     /// `timers`: timers from the "main" thread which would otherwise be lost.
-    fn create_worker_threads(&mut self, mut timers: Option<TimerHeap>) {
+    fn create_worker_threads(&mut self) {
         for _ in 0..self.inner.num_threads {
             let inner = self.inner.clone();
             let root_scope = self.root_scope.clone();
-            let timers = timers.take().unwrap_or(TimerHeap::default());
             self.threads.push(thread::spawn(move || {
-                Executor::set_local(root_scope, timers);
+                Executor::set_local(root_scope);
                 inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
             }));
         }

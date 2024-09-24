@@ -34,9 +34,16 @@ pub type BootTicks = Time<BootTimeline, TicksUnit>;
 pub type DurationTicks = Duration<TicksUnit>;
 
 /// A timestamp from the kernel. Generic over both the timeline and the units it is measured in.
-#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Time<T, U = NsUnit>(sys::zx_time_t, std::marker::PhantomData<(T, U)>);
+
+impl<T, U> Clone for Time<T, U> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T, U> Copy for Time<T, U> {}
 
 impl<T, U> Default for Time<T, U> {
     fn default() -> Self {
