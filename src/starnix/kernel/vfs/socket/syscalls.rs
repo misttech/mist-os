@@ -217,7 +217,7 @@ pub fn sys_listen(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    socket.listen(backlog, current_task.as_ucred())?;
+    socket.listen(current_task, backlog)?;
     Ok(())
 }
 

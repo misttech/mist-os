@@ -548,9 +548,17 @@ impl BytesFileOps for VerityRequireSignaturesFile {
     }
 }
 
+pub struct SocketLimits {
+    /// The maximum backlog size for a socket.
+    pub max_connections: AtomicI32,
+}
+
 pub struct SystemLimits {
     /// Limits applied to inotify objects.
     pub inotify: InotifyLimits,
+
+    /// Limits applied to socket objects.
+    pub socket: SocketLimits,
 
     /// The maximum size of pipes in the system.
     pub pipe_max_size: AtomicUsize,
@@ -564,6 +572,7 @@ impl Default for SystemLimits {
                 max_user_instances: AtomicI32::new(128),
                 max_user_watches: AtomicI32::new(1048576),
             },
+            socket: SocketLimits { max_connections: AtomicI32::new(4096) },
             pipe_max_size: AtomicUsize::new((*PAGE_SIZE * 256) as usize),
         }
     }
@@ -992,6 +1001,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
+        dir.entry(current_task, "somaxconn", SoMaxConnFile::new_node(), file_mode);
         dir.entry(
             current_task,
             "wmem_max",
@@ -1158,40 +1168,66 @@ impl BytesFileOps for PtraceYamaScope {
     }
 }
 
-trait AtomicGetter {
-    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicUsize;
+trait AtomicLimit {
+    type ValueType: std::str::FromStr + std::fmt::Display;
+
+    fn load(current_task: &CurrentTask) -> Self::ValueType;
+    fn store(current_task: &CurrentTask, value: Self::ValueType);
 }
 
-struct PipeMaxSizeGetter;
-impl AtomicGetter for PipeMaxSizeGetter {
-    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicUsize {
-        &current_task.kernel().system_limits.pipe_max_size
-    }
+struct SystemLimitFile<T: AtomicLimit + Send + Sync + 'static> {
+    marker: std::marker::PhantomData<T>,
 }
 
-struct SystemLimitFile<G: AtomicGetter + Send + Sync + 'static> {
-    marker: std::marker::PhantomData<G>,
-}
-
-impl<G: AtomicGetter + Send + Sync + 'static> SystemLimitFile<G> {
+impl<T: AtomicLimit + Send + Sync + 'static> SystemLimitFile<T>
+where
+    <T::ValueType as std::str::FromStr>::Err: std::fmt::Debug,
+{
     pub fn new_node() -> impl FsNodeOps {
         BytesFile::new_node(Self { marker: Default::default() })
     }
 }
 
-impl<G: AtomicGetter + Send + Sync + 'static> BytesFileOps for SystemLimitFile<G> {
+impl<T: AtomicLimit + Send + Sync + 'static> BytesFileOps for SystemLimitFile<T>
+where
+    <T::ValueType as std::str::FromStr>::Err: std::fmt::Debug,
+{
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
             return error!(EPERM);
         }
-        let value = fs_args::parse::<usize>(FsString::from(data).as_ref())?;
-        G::get_atomic(current_task).store(value, Ordering::Relaxed);
+        let value = fs_args::parse(FsString::from(data).as_ref())?;
+        T::store(current_task, value);
         Ok(())
     }
 
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(G::get_atomic(current_task).load(Ordering::Relaxed).to_string().into_bytes().into())
+        Ok(T::load(current_task).to_string().into_bytes().into())
     }
 }
 
-type PipeMaxSizeFile = SystemLimitFile<PipeMaxSizeGetter>;
+struct PipeMaxSizeLimit;
+impl AtomicLimit for PipeMaxSizeLimit {
+    type ValueType = usize;
+
+    fn load(current_task: &CurrentTask) -> usize {
+        current_task.kernel().system_limits.pipe_max_size.load(Ordering::Relaxed)
+    }
+    fn store(current_task: &CurrentTask, value: usize) {
+        current_task.kernel().system_limits.pipe_max_size.store(value, Ordering::Relaxed);
+    }
+}
+type PipeMaxSizeFile = SystemLimitFile<PipeMaxSizeLimit>;
+
+struct SocketMaxConnectionsLimit;
+impl AtomicLimit for SocketMaxConnectionsLimit {
+    type ValueType = i32;
+
+    fn load(current_task: &CurrentTask) -> i32 {
+        current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed)
+    }
+    fn store(current_task: &CurrentTask, value: i32) {
+        current_task.kernel().system_limits.socket.max_connections.store(value, Ordering::Relaxed);
+    }
+}
+type SoMaxConnFile = SystemLimitFile<SocketMaxConnectionsLimit>;

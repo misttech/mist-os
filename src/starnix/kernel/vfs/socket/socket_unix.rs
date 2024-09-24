@@ -978,7 +978,7 @@ mod tests {
         socket
             .bind(&current_task, SocketAddress::Unix(b"\0".into()))
             .expect("Failed to bind socket.");
-        socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
+        socket.listen(&current_task, 10).expect("Failed to listen.");
         let connecting_socket = Socket::new(
             &current_task,
             SocketDomain::Unix,

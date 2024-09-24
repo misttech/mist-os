@@ -46,6 +46,7 @@ use std::collections::VecDeque;
 use std::ffi::CStr;
 use std::mem::size_of;
 use std::net::IpAddr;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use zerocopy::{FromBytes as _, IntoBytes};
 
@@ -735,7 +736,11 @@ impl Socket {
         self.ops.connect(self, current_task, peer)
     }
 
-    pub fn listen(&self, backlog: i32, credentials: ucred) -> Result<(), Errno> {
+    pub fn listen(&self, current_task: &CurrentTask, backlog: i32) -> Result<(), Errno> {
+        let max_connections =
+            current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
+        let backlog = std::cmp::min(backlog, max_connections);
+        let credentials = current_task.as_ucred();
         self.ops.listen(self, backlog, credentials)
     }
 
