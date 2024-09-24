@@ -475,7 +475,7 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #   * deps, test_deps
 #     - Optional: See llvm_libc_group().
 #
-#   * defines, include_dirs, visibility
+#   * defines, include_dirs, public_configs, visibility
 #     - Optional: See source_set().
 #
 template("llvm_libc_source_set") {
@@ -523,6 +523,7 @@ template("llvm_libc_source_set") {
                              "non_test_deps",
                              "non_test_vars",
                              "public",
+                             "public_configs",
                              "sources",
                              "testonly_deps",
                              "undefined_symbols",
