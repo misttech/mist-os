@@ -566,6 +566,13 @@
             to: "#sshd-host",
         },
 
+        // Suspend Control
+        {
+            service: [ "fuchsia.hardware.suspend.SuspendService" ],
+            from: "parent",
+            to: "#sshd-host",
+        },
+
         // Others
         {
             protocol: [

@@ -20,9 +20,9 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.virtcon.Disable" ],
             from: "parent",
             to: "#console-launcher",
-            config: [ "fuchsia.virtcon.Disable" ],
             availability: "optional",
         },
 
@@ -289,6 +289,11 @@
                 "#console",
                 "#console-launcher",
             ],
+        },
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "#boot-drivers",
+            to: "#console-launcher",
         },
         {
             protocol: [ "fuchsia.tpm.cr50.Cr50" ],

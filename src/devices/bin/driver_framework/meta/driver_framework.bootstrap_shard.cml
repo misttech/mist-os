@@ -376,6 +376,7 @@
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
+                "fuchsia.hardware.suspend.SuspendService",
             ],
             from: "#boot-drivers",
         },

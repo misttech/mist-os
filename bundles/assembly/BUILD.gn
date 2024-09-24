@@ -517,6 +517,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/registers/bin/register-util:bootfs",
     "//src/devices/spi/bin/spiutil:bootfs",
     "//src/devices/spmi/bin/spmi-ctl:bootfs",
+    "//src/devices/suspend/bin/suspendctl:bootfs",
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
