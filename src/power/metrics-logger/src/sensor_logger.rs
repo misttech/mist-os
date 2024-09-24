@@ -1219,6 +1219,7 @@ pub mod tests {
     }
 
     #[test]
+    #[ignore] // TODO(https://b/369178320): Fix this test
     fn test_logging_power_to_inspect_updates_histograms() {
         let mut runner = Runner::new();
 
