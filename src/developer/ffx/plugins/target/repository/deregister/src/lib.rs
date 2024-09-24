@@ -2,15 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_deregister_args::DeregisterCommand;
-use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fho::{
+    bug, daemon_protocol, moniker, return_bug, return_user_error, user_error, FfxContext, FfxMain,
+    FfxTool, Result, SimpleWriter,
+};
+use fidl_fuchsia_developer_ffx::{
+    RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
+};
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
+use fidl_fuchsia_pkg::RepositoryManagerProxy;
+use fidl_fuchsia_pkg_rewrite::EngineProxy;
+use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
+use fuchsia_zircon_status::Status;
+use pkg::{PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
 
+const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 #[derive(FfxTool)]
 pub struct DeregisterTool {
     #[command]
@@ -18,6 +28,10 @@ pub struct DeregisterTool {
     #[with(daemon_protocol())]
     repos: RepositoryRegistryProxy,
     context: EnvironmentContext,
+    #[with(moniker(REPOSITORY_MANAGER_MONIKER))]
+    repo_proxy: RepositoryManagerProxy,
+    #[with(moniker(REPOSITORY_MANAGER_MONIKER))]
+    engine_proxy: EngineProxy,
 }
 
 fho::embedded_plugin!(DeregisterTool);
@@ -26,44 +40,114 @@ fho::embedded_plugin!(DeregisterTool);
 impl FfxMain for DeregisterTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        deregister(
-            ffx_target::get_target_specifier(&self.context)
-                .await
-                .user_message("Failed to get target specifier from config")?,
-            self.cmd,
-            self.repos,
-        )
-        .await?;
+        // Get the repository that should be registered.
+        let instance_root = self
+            .context
+            .get("repository.process_dir")
+            .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
+        let mgr = PkgServerInstances::new(instance_root);
+
+        let repo_name = if let Some(name) = &self.cmd.repository {
+            Some(name.to_string())
+        } else {
+            pkg::config::get_default_repository().await?
+        }
+        .ok_or_else(|| {
+            user_error!(
+                "A repository must be specfied via the --repository flag or \
+            configured using 'ffx repository default set'"
+            )
+        })?;
+
+        let pkg_server_info = mgr.get_instance(repo_name.clone())?;
+
+        let target_spec = ffx_target::get_target_specifier(&self.context)
+            .await
+            .user_message("getting target specifier from config")?;
+
+        if let Some(server_info) = pkg_server_info {
+            if server_info.server_mode == ServerMode::Daemon {
+                deregister_daemon(
+                    &server_info.name,
+                    target_spec,
+                    self.repos.clone(),
+                    self.engine_proxy,
+                )
+                .await?
+            } else {
+                deregister_standalone(&server_info.name, self.repo_proxy, self.engine_proxy).await?
+            }
+        } else {
+            let deamon_repos = list_repositories(self.repos.clone()).await?;
+            if deamon_repos.iter().any(|repo| repo.name == repo_name) {
+                deregister_daemon(&repo_name, target_spec, self.repos.clone(), self.engine_proxy)
+                    .await?
+            } else {
+                deregister_standalone(&repo_name, self.repo_proxy, self.engine_proxy).await?
+            }
+        }
         Ok(())
     }
 }
 
-async fn deregister(
-    target_str: Option<String>,
-    cmd: DeregisterCommand,
-    repos: RepositoryRegistryProxy,
+async fn list_repositories(repos_proxy: RepositoryRegistryProxy) -> Result<Vec<RepositoryConfig>> {
+    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
+    repos_proxy.list_repositories(server).map_err(|e| bug!("error listing repositories: {e}"))?;
+    let client =
+        client.into_proxy().map_err(|e| bug!("error creating repository iterator proxy: {e}"))?;
+
+    let mut repos = vec![];
+    loop {
+        let batch = client
+            .next()
+            .await
+            .map_err(|e| bug!("error fetching next batch of repositories: {e}"))?;
+        if batch.is_empty() {
+            break;
+        }
+
+        for repo in batch {
+            repos
+                .push(repo.try_into().map_err(|e| bug!("error converting repository config {e}"))?);
+        }
+    }
+    Ok(repos)
+}
+
+async fn deregister_standalone(
+    repo_name: &str,
+    repo_proxy: RepositoryManagerProxy,
+    rewrite_proxy: EngineProxy,
 ) -> Result<()> {
-    let repo_name = if let Some(repo_name) = cmd.repository {
-        repo_name
-    } else {
-        if let Some(repo_name) = pkg::config::get_default_repository().await? {
-            repo_name
-        } else {
-            ffx_bail!(
-                "Either a default repository must be set, or the --repository flag must be provided.\n\
-                You can set a default repository using:\n\
-                $ ffx repository default set <name>"
-            )
+    let repo_url = format!("fuchsia-pkg://{repo_name}");
+    match repo_proxy.remove(&repo_url).await {
+        Ok(Ok(())) => (),
+        Ok(Err(err)) => {
+            tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
+            return_bug!("failed to add config: {err:?}");
+        }
+        Err(err) => {
+            tracing::error!("failed to add config due to communication error: {:#?}", err);
+            return_bug!("failed to add config due to communication error: {err:?}");
         }
     };
+    // Remove any alias rules.
+    remove_aliases(repo_name, rewrite_proxy).await
+}
 
+async fn deregister_daemon(
+    repo_name: &str,
+    target_str: Option<String>,
+    repos: RepositoryRegistryProxy,
+    rewrite_proxy: EngineProxy,
+) -> Result<()> {
     match repos
-        .deregister_target(&repo_name, target_str.as_deref())
+        .deregister_target(repo_name, target_str.as_deref())
         .await
-        .context("communicating with daemon")?
+        .map_err(|e| bug!("{e}"))?
         .map_err(RepositoryError::from)
     {
-        Ok(()) => Ok(()),
+        Ok(()) => (),
         Err(err @ RepositoryError::TargetCommunicationFailure) => {
             ffx_bail!(
                 "Error while deregistering repository: {}\n\
@@ -73,26 +157,119 @@ async fn deregister(
             )
         }
         Err(RepositoryError::ServerNotRunning) => {
-            ffx_bail!(
+            return_user_error!(
                 "Failed to deregister repository: {:#}",
                 pkg::config::determine_why_repository_server_is_not_running().await
             )
         }
         Err(err) => {
-            ffx_bail!("Failed to deregister repository: {}", err)
+            return_user_error!("Failed to deregister repository: {}", err)
         }
-    }
+    };
+    // Remove any alias rules.
+    let repo_url = format!("fuchsia-pkg://{repo_name}");
+    remove_aliases(&repo_url, rewrite_proxy).await
+}
+
+async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()> {
+    // Check flag here for "overwrite" style
+    do_transaction(&rewrite_proxy, |transaction| async {
+        // Prepend the alias rules to the front so they take priority.
+        let mut rules: Vec<Rule> = vec![];
+
+        // These are rules to re-evaluate...
+        let repo_rules_state = transaction.list_dynamic().await?;
+        rules.extend(repo_rules_state);
+
+        // Clear the list, since we'll be adding it back later.
+        transaction.reset_all()?;
+
+        // Keep rules that do not match the repo being removed.
+        rules.retain(|r| r.host_replacement() != repo_url);
+
+        // Add the rules back into the transaction. We do it in reverse, because `.add()`
+        // always inserts rules into the front of the list.
+        for rule in rules.into_iter().rev() {
+            transaction.add(rule).await?
+        }
+
+        Ok(transaction)
+    })
+    .await
+    .map_err(|err| {
+        tracing::warn!("failed to create transactions: {:#?}", err);
+        bug!("Failed to create transaction for aliases: {err}")
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
-    use fuchsia_async as fasync;
+    use ffx_config::ConfigLevel;
+    use fho::TestBuffers;
+    use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_developer_ffx::{
+        FileSystemRepositorySpec, PmRepositorySpec, RepositoryError, RepositoryIteratorRequest,
+        RepositoryRegistryRequest, RepositorySpec,
+    };
+    use fidl_fuchsia_pkg_ext::{
+        RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+    };
+    use fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest};
     use futures::channel::oneshot::{channel, Receiver};
+    use futures::StreamExt;
+    use pkg::PkgServerInfo;
+    use std::net::Ipv4Addr;
+    use std::path::PathBuf;
+    use std::process;
 
     const REPO_NAME: &str = "some-name";
     const TARGET_NAME: &str = "some-target";
+
+    fn fake_repo_list_handler(iterator: fidl::endpoints::ServerEnd<RepositoryIteratorMarker>) {
+        fuchsia_async::Task::spawn(async move {
+            let mut sent = false;
+            let mut iterator = iterator.into_stream().unwrap();
+            while let Some(Ok(req)) = iterator.next().await {
+                match req {
+                    RepositoryIteratorRequest::Next { responder } => {
+                        if !sent {
+                            sent = true;
+                            responder
+                                .send(&[
+                                    RepositoryConfig {
+                                        name: "Test1".to_owned(),
+                                        spec: RepositorySpec::FileSystem(
+                                            FileSystemRepositorySpec {
+                                                metadata_repo_path: Some("a/b/meta".to_owned()),
+                                                blob_repo_path: Some("a/b/blobs".to_owned()),
+                                                ..Default::default()
+                                            },
+                                        ),
+                                    },
+                                    RepositoryConfig {
+                                        name: "Test2".to_owned(),
+                                        spec: RepositorySpec::Pm(PmRepositorySpec {
+                                            path: Some("c/d".to_owned()),
+                                            aliases: Some(vec![
+                                                "example.com".into(),
+                                                "fuchsia.com".into(),
+                                            ]),
+                                            ..Default::default()
+                                        }),
+                                    },
+                                ])
+                                .unwrap()
+                        } else {
+                            responder.send(&[]).unwrap()
+                        }
+                    }
+                }
+            }
+        })
+        .detach();
+    }
 
     async fn setup_fake_server() -> (RepositoryRegistryProxy, Receiver<(String, Option<String>)>) {
         let (sender, receiver) = channel();
@@ -106,43 +283,198 @@ mod test {
                 sender.take().unwrap().send((repository_name, target_identifier)).unwrap();
                 responder.send(Ok(())).unwrap();
             }
+            RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
+                fake_repo_list_handler(iterator);
+            }
             other => panic!("Unexpected request: {:?}", other),
         });
         (repos, receiver)
     }
 
-    #[fasync::run_singlethreaded(test)]
+    async fn setup_fake_repo_manager_server(
+    ) -> (RepositoryManagerProxy, Receiver<(String, Option<String>)>) {
+        let (_sender, receiver) = channel();
+        let repos = fho::testing::fake_proxy(move |req| match req {
+            fidl_fuchsia_pkg::RepositoryManagerRequest::Remove { responder, .. } => {
+                responder.send(Ok(())).unwrap();
+            }
+            other => panic!("Unexpected request: {:?}", other),
+        });
+        (repos, receiver)
+    }
+
+    fn make_server_instance(
+        server_mode: ServerMode,
+        name: String,
+        context: &EnvironmentContext,
+    ) -> Result<()> {
+        let instance_root = context.get("repository.process_dir").expect("instance dir");
+        let mgr = PkgServerInstances::new(instance_root);
+
+        let address = (Ipv4Addr::LOCALHOST, 1234).into();
+
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{name}").parse().unwrap()).build();
+
+        mgr.write_instance(&PkgServerInfo {
+            name,
+            address,
+            repo_path: PathBuf::from("/somewhere").as_path().into(),
+            registration_aliases: vec![],
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            server_mode,
+            pid: process::id(),
+            repo_config,
+        })
+        .map_err(Into::into)
+    }
+
+    macro_rules! rule {
+        ($host_match:expr => $host_replacement:expr,
+         $path_prefix_match:expr => $path_prefix_replacement:expr) => {
+            Rule::new($host_match, $host_replacement, $path_prefix_match, $path_prefix_replacement)
+                .unwrap()
+        };
+    }
+
+    fn handle_edit_transaction(
+        transaction: ServerEnd<fidl_fuchsia_pkg_rewrite::EditTransactionMarker>,
+    ) {
+        fuchsia_async::Task::spawn(async move {
+            let mut tx_stream = transaction.into_stream().unwrap();
+
+            while let Some(Ok(req)) = tx_stream.next().await {
+                match req {
+                    EditTransactionRequest::ResetAll { control_handle: _ } => {}
+                    EditTransactionRequest::ListDynamic { iterator, control_handle: _ } => {
+                        let mut stream = iterator.into_stream().unwrap();
+
+                        let mut rules = vec![
+                            rule!("fuchsia.com" => "example.com", "/" => "/"),
+                            rule!("fuchsia.com" => "mycorp.com", "/" => "/"),
+                        ]
+                        .into_iter();
+
+                        while let Some(Ok(req)) = stream.next().await {
+                            let RuleIteratorRequest::Next { responder } = req;
+
+                            if let Some(rule) = rules.next() {
+                                responder.send(&[rule.into()]).unwrap();
+                            } else {
+                                responder.send(&[]).unwrap();
+                            }
+                        }
+                    }
+                    EditTransactionRequest::Add { responder, .. } => {
+                        responder.send(Ok(())).unwrap();
+                    }
+                    EditTransactionRequest::Commit { responder } => {
+                        responder.send(Ok(())).unwrap();
+                    }
+                }
+            }
+        })
+        .detach()
+    }
+
+    fn setup_fake_engine_server() -> EngineProxy {
+        let engine = fho::testing::fake_proxy(move |req| match req {
+            EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
+                handle_edit_transaction(transaction);
+            }
+            other => panic!("Unexpected request: {:?}", other),
+        });
+        engine
+    }
+
+    #[fuchsia::test]
     async fn test_deregister() {
         let (repos, receiver) = setup_fake_server().await;
-
-        deregister(
-            Some(TARGET_NAME.to_string()),
-            DeregisterCommand { repository: Some(REPO_NAME.to_string()) },
-            repos,
-        )
-        .await
-        .unwrap();
+        let engine = setup_fake_engine_server();
+        deregister_daemon(REPO_NAME, Some(TARGET_NAME.to_string()), repos, engine).await.unwrap();
         let got = receiver.await.unwrap();
         assert_eq!(got, (REPO_NAME.to_string(), Some(TARGET_NAME.to_string()),));
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn test_deregister_default_repository() {
-        let _env = ffx_config::test_init().await.unwrap();
+    #[fuchsia::test]
+    async fn test_deregister_default_repository_standalone() {
+        let env = ffx_config::test_init().await.unwrap();
 
         let default_repo_name = "default-repo";
         pkg::config::set_default_repository(default_repo_name).await.unwrap();
-
-        let (repos, receiver) = setup_fake_server().await;
-
-        deregister(Some(TARGET_NAME.to_string()), DeregisterCommand { repository: None }, repos)
+        env.context
+            .query("target.default")
+            .level(Some(ConfigLevel::User))
+            .set("some-target".into())
             .await
-            .unwrap();
-        let got = receiver.await.unwrap();
-        assert_eq!(got, (default_repo_name.to_string(), Some(TARGET_NAME.to_string()),));
+            .expect("Setting default target");
+
+        let (repos, _) = setup_fake_server().await;
+        let (repo_mgr, _) = setup_fake_repo_manager_server().await;
+
+        make_server_instance(ServerMode::Foreground, default_repo_name.to_string(), &env.context)
+            .expect("creating test server");
+
+        let tool = DeregisterTool {
+            cmd: DeregisterCommand { repository: None },
+            repos,
+            context: env.context.clone(),
+            repo_proxy: repo_mgr,
+            engine_proxy: setup_fake_engine_server(),
+        };
+
+        let buffers = TestBuffers::default();
+        let writer = SimpleWriter::new_test(&buffers);
+
+        let res = tool.main(writer).await;
+        assert!(res.is_ok(), "Expected result to be OK. Got: {res:?}");
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
+    async fn test_deregister_default_repository_deamon() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let default_repo_name = "default-repo";
+        pkg::config::set_default_repository(default_repo_name).await.unwrap();
+        env.context
+            .query("target.default")
+            .level(Some(ConfigLevel::User))
+            .set("some-target".into())
+            .await
+            .expect("Setting default target");
+
+        let (repos, receiver) = setup_fake_server().await;
+        let (repo_mgr, _) = setup_fake_repo_manager_server().await;
+
+        make_server_instance(ServerMode::Daemon, default_repo_name.to_string(), &env.context)
+            .expect("creating test server");
+
+        let tool = DeregisterTool {
+            cmd: DeregisterCommand { repository: None },
+            repos,
+            context: env.context.clone(),
+            repo_proxy: repo_mgr,
+            engine_proxy: setup_fake_engine_server(),
+        };
+
+        let buffers = TestBuffers::default();
+        let writer = SimpleWriter::new_test(&buffers);
+
+        let res = tool.main(writer).await;
+        assert!(res.is_ok(), "Expected result to be OK. Got: {res:?}");
+
+        let got = receiver.await;
+        match got {
+            Ok((got_repo_name, got_target_name)) => assert_eq!(
+                (got_repo_name, got_target_name),
+                (default_repo_name.to_string(), Some(TARGET_NAME.to_string()),)
+            ),
+            Err(_e) => assert!(got.is_ok(), "Expected OK result, got {got:?}"),
+        };
+    }
+
+    #[fuchsia::test]
     async fn test_deregister_returns_error() {
         let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::DeregisterTarget {
@@ -155,12 +487,10 @@ mod test {
             other => panic!("Unexpected request: {:?}", other),
         });
 
-        assert!(deregister(
-            Some(TARGET_NAME.to_string()),
-            DeregisterCommand { repository: Some(REPO_NAME.to_string()) },
-            repos,
-        )
-        .await
-        .is_err());
+        let engine = setup_fake_engine_server();
+
+        assert!(deregister_daemon(REPO_NAME, Some(TARGET_NAME.to_string()), repos, engine)
+            .await
+            .is_err());
     }
 }
