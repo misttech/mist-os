@@ -50,13 +50,13 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CounterContext,
-    CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
-    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InstantBindingsTypes,
-    IpDeviceAddr, IpExt, LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
-    ReferenceNotifiersExt as _, RemoveResourceResult, RngContext, Segment, SeqNum,
-    StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
-    WeakDeviceIdentifier, ZonedAddressError,
+    trace_duration, AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext,
+    CounterContext, CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId,
+    ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt,
+    InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mss,
+    OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
+    RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
+    TimerBindingsTypes, TimerContext, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
@@ -3093,6 +3093,10 @@ where
                         timer,
                     }) => {
                         if !shutdown_send {
+                            // TODO(https://fxbug.dev/42063684): Instead of
+                            // inferring the state in Bindings, we can have Core
+                            // shutdown the read side by closing the receive
+                            // buffer.
                             return Ok((true, None));
                         }
                         fn do_shutdown<SockI, WireI, CC, BC>(
@@ -3571,6 +3575,7 @@ where
             None => return,
         };
         let (core_ctx, bindings_ctx) = self.contexts();
+        trace_duration!(bindings_ctx, c"tcp::handle_timer");
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
         let bindings_ctx_alias = &mut *bindings_ctx;
@@ -4291,6 +4296,40 @@ where
                     }
                 }
             });
+        })
+    }
+
+    /// Calls the callback with mutable access to the send buffer, if one is
+    /// instantiated.
+    ///
+    /// If no buffer is instantiated returns `None`.
+    pub fn with_send_buffer<
+        R,
+        F: FnOnce(&mut <C::BindingsContext as TcpBindingsTypes>::SendBuffer) -> R,
+    >(
+        &mut self,
+        id: &TcpApiSocketId<I, C>,
+        f: F,
+    ) -> Option<R> {
+        self.core_ctx().with_socket_mut_and_converter(id, |state, converter| {
+            get_buffers_mut::<_, C::CoreContext, _>(state, converter).into_send_buffer().map(f)
+        })
+    }
+
+    /// Calls the callback with mutable access to the receive buffer, if one is
+    /// instantiated.
+    ///
+    /// If no buffer is instantiated returns `None`.
+    pub fn with_receive_buffer<
+        R,
+        F: FnOnce(&mut <C::BindingsContext as TcpBindingsTypes>::ReceiveBuffer) -> R,
+    >(
+        &mut self,
+        id: &TcpApiSocketId<I, C>,
+        f: F,
+    ) -> Option<R> {
+        self.core_ctx().with_socket_mut_and_converter(id, |state, converter| {
+            get_buffers_mut::<_, C::CoreContext, _>(state, converter).into_receive_buffer().map(f)
         })
     }
 }

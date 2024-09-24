@@ -158,7 +158,7 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
 
     type Spawner = ();
 
-    fn handle_request(
+    async fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,

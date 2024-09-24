@@ -60,12 +60,15 @@ pub trait ReceiveBuffer: Buffer {
 
     /// Marks `count` bytes available for the application to read.
     ///
+    /// `has_outstanding` informs the buffer if any bytes past `count` may have
+    /// been populated by out of order segments.
+    ///
     /// # Panics
     ///
     /// Panics if the caller attempts to make more bytes readable than the
-    /// buffer has capacity for. That is, this method panics if
-    /// `self.len() + count > self.cap()`
-    fn make_readable(&mut self, count: usize);
+    /// buffer has capacity for. That is, this method panics if `self.len() +
+    /// count > self.cap()`
+    fn make_readable(&mut self, count: usize, has_outstanding: bool);
 }
 
 /// A buffer supporting TCP sending operations.
@@ -94,6 +97,7 @@ pub trait SendBuffer: Buffer {
 }
 
 /// Information about the number of bytes in a [`Buffer`].
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub struct BufferLimits {
     /// The total number of bytes that the buffer can hold.
     pub capacity: usize,
@@ -382,7 +386,7 @@ impl ReceiveBuffer for RingBuffer {
         to_write
     }
 
-    fn make_readable(&mut self, count: usize) {
+    fn make_readable(&mut self, count: usize, _has_outstanding: bool) {
         let BufferLimits { capacity, len } = self.limits();
         debug_assert!(count <= capacity - len);
         self.len += count;
@@ -478,6 +482,11 @@ impl Assembler {
         } else {
             0
         }
+    }
+
+    pub(super) fn has_outstanding(&self) -> bool {
+        let Self { outstanding, nxt: _ } = self;
+        !outstanding.is_empty()
     }
 
     fn insert_inner(&mut self, Range { mut start, mut end }: Range<SeqNum>) {
@@ -589,7 +598,7 @@ pub(crate) mod testutil {
         /// Returns the number of bytes actually queued.
         pub(crate) fn enqueue_data(&mut self, data: &[u8]) -> usize {
             let nwritten = self.write_at(0, &data);
-            self.make_readable(nwritten);
+            self.make_readable(nwritten, false);
             nwritten
         }
     }
@@ -617,8 +626,8 @@ pub(crate) mod testutil {
             self.lock().write_at(offset, data)
         }
 
-        fn make_readable(&mut self, count: usize) {
-            self.lock().make_readable(count)
+        fn make_readable(&mut self, count: usize, has_outstanding: bool) {
+            self.lock().make_readable(count, has_outstanding)
         }
     }
 
@@ -859,7 +868,7 @@ mod test {
             let old_head = rb.head;
             let old_len = rb.limits().len;
             let old_shrink = rb.shrink;
-            rb.make_readable(avail);
+            rb.make_readable(avail, false);
             // Assert that length is updated but everything else is unchanged.
             let RingBuffer { storage, head, len, shrink } = rb;
             prop_assert_eq!(len, old_len + avail);
@@ -1056,7 +1065,7 @@ mod test {
         let mut rb = RingBuffer::new(16);
         assert_eq!(rb.write_at(5, &"World".as_bytes()), 5);
         assert_eq!(rb.write_at(0, &"Hello".as_bytes()), 5);
-        rb.make_readable(10);
+        rb.make_readable(10, false);
         assert_eq!(
             rb.read_with(|readable| {
                 assert_eq!(readable, &["HelloWorld".as_bytes()]);
@@ -1072,7 +1081,7 @@ mod test {
             5
         );
         assert_eq!(rb.write_at(0, &"HelloWorld".as_bytes()), 10);
-        rb.make_readable(10);
+        rb.make_readable(10, false);
         assert_eq!(
             rb.read_with(|readable| {
                 assert_eq!(readable, &["HelloW".as_bytes(), "orld".as_bytes()]);
@@ -1192,7 +1201,7 @@ mod test {
                     // Fill the RingBuffer with the data.
                     let mut rb = RingBuffer { storage: vec![0; cap], head, len: 0, shrink };
                     assert_eq!(rb.write_at(0, &&data[..]), len);
-                    rb.make_readable(len);
+                    rb.make_readable(len, false);
                     (Just(rb), Just(data), 0..=len)
                 })
             })

@@ -231,7 +231,7 @@ impl worker::SocketWorkerHandler for BindingData {
     type SetupArgs = ();
     type Spawner = ();
 
-    fn handle_request(
+    async fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,

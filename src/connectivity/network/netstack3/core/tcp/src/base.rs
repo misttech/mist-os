@@ -201,6 +201,22 @@ pub(crate) enum BuffersRefMut<'a, R, S> {
     RecvOnly(&'a mut R),
 }
 
+impl<'a, R, S> BuffersRefMut<'a, R, S> {
+    pub(crate) fn into_send_buffer(self) -> Option<&'a mut S> {
+        match self {
+            Self::NoBuffers | Self::Sizes(_) | Self::RecvOnly(_) => None,
+            Self::Both { send, recv: _ } | Self::SendOnly(send) => Some(send),
+        }
+    }
+
+    pub(crate) fn into_receive_buffer(self) -> Option<&'a mut R> {
+        match self {
+            Self::NoBuffers | Self::Sizes(_) | Self::SendOnly(_) => None,
+            Self::Both { send: _, recv } | Self::RecvOnly(recv) => Some(recv),
+        }
+    }
+}
+
 /// TCP socket options.
 ///
 /// This only stores options that are trivial to get and set.

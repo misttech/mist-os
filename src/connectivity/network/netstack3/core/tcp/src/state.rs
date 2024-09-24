@@ -2115,7 +2115,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             });
                         let nwritten = rcv.buffer.write_at(offset, &data);
                         let readable = rcv.assembler.insert(seg_seq..seg_seq + nwritten);
-                        rcv.buffer.make_readable(readable);
+                        rcv.buffer.make_readable(readable, rcv.assembler.has_outstanding());
                         rcv_nxt = rcv.nxt();
                     }
                     // Per RFC 5681 Section 4.2:
@@ -2855,7 +2855,7 @@ mod test {
             let mut buffer = RingBuffer::new(cap);
             let nwritten = buffer.write_at(0, &data);
             assert_eq!(nwritten, data.len());
-            buffer.make_readable(nwritten);
+            buffer.make_readable(nwritten, false);
             buffer
         }
     }
@@ -2885,8 +2885,9 @@ mod test {
             0
         }
 
-        fn make_readable(&mut self, count: usize) {
+        fn make_readable(&mut self, count: usize, has_outstanding: bool) {
             assert_eq!(count, 0);
+            assert_eq!(has_outstanding, false);
         }
     }
 
