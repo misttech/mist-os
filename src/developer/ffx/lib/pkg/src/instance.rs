@@ -301,9 +301,8 @@ pub async fn write_instance_info(
 
 #[cfg(test)]
 mod tests {
-    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
-
     use super::*;
+    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use std::net::Ipv6Addr;
     use std::os::unix::fs::PermissionsExt as _;
     use std::process;
@@ -604,7 +603,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
 
-        let got = mgr.get_instance("some_instance".into()).expect("get_instance");
+        let got = mgr.get_instance("some-instance".into()).expect("get_instance");
         assert!(got.is_none());
     }
 
@@ -613,7 +612,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().into());
 
-        let got = mgr.get_instance("some_instance".into()).expect("get_instance");
+        let got = mgr.get_instance("some-instance".into()).expect("get_instance");
         assert!(got.is_none());
     }
 
@@ -647,7 +646,7 @@ mod tests {
     fn test_remove_dir_not_exist() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
 
         mgr.remove_instance(instance_name.into()).expect("remove OK");
     }

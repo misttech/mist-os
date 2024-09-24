@@ -12,7 +12,7 @@ use std::{fmt, mem};
 
 /// Convenience wrapper for the FIDL RepositoryStorageType.
 #[derive(
-    Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+    Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum RepositoryStorageType {

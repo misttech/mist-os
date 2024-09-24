@@ -553,7 +553,6 @@ pub async fn serve_impl<W: Write + 'static>(
                 let repo_config = repo_client
                     .get_config(repo_url, mirror_url, storage_type.clone())
                     .map_err(|e| bug!("{e}"))?;
-
                 repo_manager.add(&repo_name, repo_client);
 
                 if let Err(e) = write_instance_info(
