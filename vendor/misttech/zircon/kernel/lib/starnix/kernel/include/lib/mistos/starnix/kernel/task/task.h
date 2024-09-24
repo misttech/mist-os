@@ -244,7 +244,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   //
   // Some tasks lack an underlying Zircon thread. These tasks are used internally by the
   // Starnix kernel to track background work, typically on a `kthread`.
-  mutable ktl::optional<RwLock<fbl::RefPtr<ThreadDispatcher>>> thread;
+  mutable RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>> thread;
 
   // The file descriptor table for this task.
   //

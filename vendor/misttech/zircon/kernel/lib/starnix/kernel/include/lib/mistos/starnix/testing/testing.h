@@ -61,6 +61,9 @@ class AutoReleasableTask {
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_bootfs();
 
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+create_kernel_task_and_unlocked_with_bootfs_current_zbi();
+
 /// An old way of creating a task for testing
 ///
 /// This way of creating a task has problems because the test isn't actually run with that task

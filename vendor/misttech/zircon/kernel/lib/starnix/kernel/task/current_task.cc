@@ -41,6 +41,8 @@
 #include <kernel/mutex.h>
 #include <ktl/string_view.h>
 #include <lockdep/guard.h>
+#include <object/handle.h>
+#include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
 
 #include "../kernel_priv.h"
@@ -87,6 +89,26 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
   return create_task_with_pid(kernel, pids, pid, initial_name, fs, task_info_factory);
 }
 
+fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPtr<Kernel>& kernel,
+                                                                fbl::RefPtr<FsContext> fs) {
+  auto builder = CurrentTask::create_task(
+      kernel, "[kthreadd]", fs,
+      [kernel](pid_t pid, fbl::RefPtr<ProcessGroup> process_group) -> fit::result<Errno, TaskInfo> {
+        KernelHandle<ProcessDispatcher> process;
+        auto memory_manager = fbl::RefPtr(MemoryManager::new_empty());
+        auto thread_group = ThreadGroup::New(kernel, ktl::move(process), {}, pid, process_group);
+
+        return fit::ok(
+            TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
+      });
+
+  if (builder.is_error()) {
+    return builder.take_error();
+  }
+
+  return fit::ok(starnix::CurrentTask::From(builder.value()));
+}
+
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
     const fbl::RefPtr<Kernel>& kernel, const ktl::string_view& initial_name) {
   LTRACE;
@@ -124,6 +146,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   DEBUG_ASSERT(pids->get_task(pid).Lock() == nullptr);
 
   fbl::RefPtr<ProcessGroup> process_group = ProcessGroup::New(pid, {});
+  pids->add_process_group(process_group);
   /*auto job_or_error =
       create_job(0).map_error([](auto status) { return errno(from_status_like_fdio(status)); });
 
@@ -131,7 +154,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
     return job_or_error.take_error();
   }
   process_group->job = ktl::move(job_or_error.value());*/
-  pids->add_process_group(process_group);
 
   auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
 
@@ -542,46 +564,6 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     self.set_command_name(basename);
   */
   return fit::ok();
-}
-
-// This is a temporary code while we do not support file system.
-// We just return the "file" VMO
-fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const ktl::string_view& path) {
-  // LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
-#if 0
-  ktl::array<zx_handle_t, userloader::kHandleCount> handles = ExtractHandles(userloader::gHandles);
-
-  zx::unowned_vmar vmar_self = zx::vmar::root_self();
-
-  auto [power, vmex] = CreateResources({}, handles);
-
-  // Locate the ZBI_TYPE_STORAGE_BOOTFS item and decompress it. This will be used to load
-  // the binary referenced by userboot.next, as well as libc. Bootfs will be fully parsed
-  // and hosted under '/boot' either by bootsvc or component manager.
-  const zx::unowned_vmo zbi{handles[userloader::kZbi]};
-
-  auto get_bootfs_result = zbi_parser::GetBootfsFromZbi(*vmar_self, *zbi, false);
-  if (get_bootfs_result.is_error()) {
-    return fit::error(errno(from_status_like_fdio(get_bootfs_result.error_value())));
-  }
-
-  zx::vmo bootfs_vmo = ktl::move(get_bootfs_result.value());
-  zbi_parser::Bootfs bootfs{vmar_self->borrow(), ktl::move(bootfs_vmo), ktl::move(vmex)};
-
-  auto open_result = bootfs.Open("", path, "CurrentTask::open_file");
-  if (open_result.is_error()) {
-    return fit::error(errno(from_status_like_fdio(open_result.error_value())));
-  }
-
-  fbl::AllocChecker ac;
-  auto fh = fbl::MakeRefCountedChecked<FileObject>(&ac, ktl::move(open_result.value()));
-  if (!ac.check()) {
-    return fit::error(errno(from_status_like_fdio(ZX_ERR_NO_MEMORY)));
-  }
-
-  return fit::ok(ktl::move(fh));
-#endif
-  return fit::error(errno(from_status_like_fdio(ZX_ERR_NO_MEMORY)));
 }
 
 CurrentTask CurrentTask::From(const TaskBuilder& builder) { return ktl::move(builder.task); }

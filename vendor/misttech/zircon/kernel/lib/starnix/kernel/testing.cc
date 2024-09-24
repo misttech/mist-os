@@ -21,6 +21,7 @@
 #include <lib/starnix/bootfs/tests/zbi_file.h>
 
 #include <fbl/ref_ptr.h>
+#include <phys/handoff.h>
 
 using namespace starnix;
 
@@ -67,9 +68,19 @@ FileSystemHandle create_bootfs(const fbl::RefPtr<Kernel>& kernel) {
   return BootFs::new_fs(kernel, HandleOwner(ktl::move(zbi).Finish()));
 }
 
+FileSystemHandle create_bootfs_current_zbi(const fbl::RefPtr<Kernel>& kernel) {
+  HandoffEnd end = EndHandoff();
+  return BootFs::new_fs(kernel, ktl::move(end.zbi));
+}
+
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_bootfs() {
   return create_kernel_task_and_unlocked_with_fs_and_selinux(create_bootfs);
+}
+
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+create_kernel_task_and_unlocked_with_bootfs_current_zbi() {
+  return create_kernel_task_and_unlocked_with_fs_and_selinux(create_bootfs_current_zbi);
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
