@@ -23,7 +23,7 @@ async fn launch_example_and_read_hello_world() {
     let mut logs = pin!(logs);
 
     let (next, new_next) = (logs.next().await.unwrap(), new_logs.next().await.unwrap());
-    assert_eq!(Severity::try_from(next.severity).unwrap(), Severity::Info);
+    assert_eq!(Severity::from(next.severity), Severity::Info);
     assert_eq!(next.tags, vec!["logs_example"]);
     assert_eq!(next.msg, "should print");
     assert_ne!(next.pid, 0);
@@ -40,7 +40,7 @@ async fn launch_example_and_read_hello_world() {
     });
 
     let (next, new_next) = (logs.next().await.unwrap(), new_logs.next().await.unwrap());
-    assert_eq!(Severity::try_from(next.severity).unwrap(), Severity::Info);
+    assert_eq!(Severity::from(next.severity), Severity::Info);
     assert_eq!(next.tags, vec!["logs_example"]);
     assert_eq!(next.msg, "hello, world! bar=baz foo=1");
     assert_ne!(next.pid, 0);

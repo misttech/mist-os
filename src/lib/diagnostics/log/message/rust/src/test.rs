@@ -21,13 +21,6 @@ static TEST_IDENTITY: LazyLock<Arc<MonikerWithUrl>> = LazyLock::new(|| {
     })
 });
 
-fn clear_raw_severity(data: &mut LogsData) {
-    data.payload_message_mut()
-        .unwrap()
-        .properties
-        .retain(|p| !matches!(p, LogsProperty::Int(LogsField::RawSeverity, _)));
-}
-
 #[repr(C, packed)]
 struct fx_log_metadata_t_packed {
     pid: zx::sys::zx_koid_t,
@@ -431,84 +424,55 @@ fn message_severity() {
 #[fuchsia::test]
 fn legacy_message_severity() {
     let mut packet = test_packet();
-    // raw_severity where raw_severity=10
-    packet.metadata.severity = LogLevelFilter::Info as i32 - 10;
     packet.data[0] = 0; // tag size
     packet.data[1] = 0; // null terminated
 
+    let expected_message = |severity: Severity, raw_severity: Option<u8>| {
+        let mut expected_message = LogsDataBuilder::new(BuilderArgs {
+            timestamp: zx::BootTime::from_nanos(3).into(),
+            component_url: Some(TEST_IDENTITY.url.clone()),
+            moniker: TEST_IDENTITY.moniker.clone(),
+            severity,
+        })
+        .set_dropped(packet.metadata.dropped_logs as u64)
+        .set_pid(1)
+        .set_tid(2)
+        .set_message("".to_string());
+
+        if let Some(raw_severity) = raw_severity {
+            expected_message = expected_message.set_raw_severity(raw_severity);
+        }
+
+        expected_message.build()
+    };
+
+    packet.metadata.severity = LogLevelFilter::Info as i32 - 1;
     let mut buffer = &packet.as_bytes()[..METADATA_SIZE + 2]; // tag size + null
     let logger_message = LoggerMessage::try_from(buffer).unwrap();
     assert_eq!(logger_message.size_bytes, METADATA_SIZE + 1);
     let mut parsed = crate::from_logger(get_test_identity(), logger_message);
-    let mut expected_message = LogsDataBuilder::new(BuilderArgs {
-        timestamp: zx::BootTime::from_nanos(3).into(),
-        component_url: Some(TEST_IDENTITY.url.clone()),
-        moniker: TEST_IDENTITY.moniker.clone(),
-        severity: Severity::Debug,
-    })
-    .set_dropped(packet.metadata.dropped_logs as u64)
-    .set_pid(1)
-    .set_tid(2)
-    .set_message("".to_string())
-    .build();
-    clear_raw_severity(&mut expected_message);
-    expected_message.set_raw_severity(10);
+    let expected = expected_message(Severity::Debug, Some(0x30 - 1));
+    assert_eq!(parsed, expected);
 
-    assert_eq!(parsed, expected_message);
-
-    // raw_severity where raw_severity=2
     packet.metadata.severity = LogLevelFilter::Info as i32 - 2;
     buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
     parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    clear_raw_severity(&mut expected_message);
-    expected_message.set_raw_severity(2);
+    let expected = expected_message(Severity::Debug, Some(0x30 - 2));
+    assert_eq!(parsed, expected);
 
-    assert_eq!(parsed, expected_message);
-
-    // raw_severity where raw_severity=1
-    packet.metadata.severity = LogLevelFilter::Info as i32 - 1;
+    packet.metadata.severity = LogLevelFilter::Info as i32 + 1;
     buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
     parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    clear_raw_severity(&mut expected_message);
-    expected_message.set_raw_severity(1);
-
-    assert_eq!(parsed, expected_message);
-
-    packet.metadata.severity = 0; // legacy severity
-    buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
-    parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    clear_raw_severity(&mut expected_message);
-    expected_message.metadata.severity = Severity::Info;
-
-    assert_eq!(parsed, expected_message);
-
-    packet.metadata.severity = 1; // legacy severity
-    buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
-    parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    expected_message.metadata.severity = Severity::Warn;
-
-    assert_eq!(parsed, expected_message);
-
-    packet.metadata.severity = 2; // legacy severity
-    buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
-    parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    expected_message.metadata.severity = Severity::Error;
-
-    assert_eq!(parsed, expected_message);
-
-    packet.metadata.severity = 3; // legacy severity
-    buffer = &packet.as_bytes()[..METADATA_SIZE + 2];
-    parsed = crate::from_logger(get_test_identity(), LoggerMessage::try_from(buffer).unwrap());
-    expected_message.metadata.severity = Severity::Fatal;
-
-    assert_eq!(parsed, expected_message);
+    let expected = expected_message(Severity::Warn, Some(0x30 + 1));
+    assert_eq!(parsed, expected);
 }
 
 #[fuchsia::test]
 fn test_raw_severity_parsing_and_conversions() {
+    let raw_severity: u8 = 0x30 - 2; // INFO-2=DEBUG
     let record = Record {
         timestamp: 72,
-        severity: 0x30 - 2, // INFO-2
+        severity: raw_severity,
         arguments: vec![
             Argument {
                 name: FILE_PATH_LABEL.to_string(),
@@ -539,6 +503,7 @@ fn test_raw_severity_parsing_and_conversions() {
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,
         })
+        .set_raw_severity(raw_severity)
         .set_dropped(2)
         .set_file("some_file.cc".to_string())
         .set_line(420)
@@ -546,18 +511,16 @@ fn test_raw_severity_parsing_and_conversions() {
         .set_tid(912u64)
         .add_tag("tag")
         .set_message("msg".to_string())
-        .override_raw_severity(2)
         .add_key(LogsProperty::Int(LogsField::Other("arg1".to_string()), -23i64))
         .add_key(LogsProperty::Bool(LogsField::Other("arg2".to_string()), true))
         .build()
     );
 
-    let severity: i32 = 0x30 - 2; // INFO-2
     let message: LogMessage = parsed.into();
     assert_eq!(
         message,
         LogMessage {
-            severity,
+            severity: raw_severity as i32,
             time: 72,
             dropped_logs: 2,
             pid: 43,
@@ -613,7 +576,7 @@ fn test_from_structured() {
         .add_key(LogsProperty::Bool(LogsField::Other("arg2".to_string()), true))
         .build()
     );
-    let severity: i32 = LegacySeverity::Error.into();
+    let severity = i32::from(Severity::Error as u8);
     let message: LogMessage = parsed.into();
     assert_eq!(
         message,

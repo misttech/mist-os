@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use super::ListenerError;
-use diagnostics_data::{LegacySeverity, LogsData};
-use diagnostics_message::fx_log_severity_t;
+use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter};
 use std::collections::HashSet;
 
@@ -12,7 +11,7 @@ use std::collections::HashSet;
 #[derive(Default)]
 pub(super) struct MessageFilter {
     /// Only send messages of greater or equal severity to this value.
-    min_severity: Option<LegacySeverity>,
+    min_severity: Option<Severity>,
 
     /// Only send messages that purport to come from this PID.
     pid: Option<u64>,
@@ -62,9 +61,9 @@ impl MessageFilter {
                         - (options.verbosity as i32
                             * fidl_fuchsia_logger::LOG_VERBOSITY_STEP_SIZE as i32),
                 );
-                this.min_severity = Some(LegacySeverity::try_from(raw_level)?);
+                this.min_severity = Some(Severity::from(raw_level));
             } else if options.min_severity != LogLevelFilter::None {
-                this.min_severity = Some(LegacySeverity::try_from(options.min_severity as i32)?);
+                this.min_severity = Some(Severity::from(options.min_severity.into_primitive()));
             }
         }
 
@@ -76,12 +75,8 @@ impl MessageFilter {
     pub fn should_send(&self, log_message: &LogsData) -> bool {
         let reject_pid = self.pid.map(|p| log_message.pid() != Some(p)).unwrap_or(false);
         let reject_tid = self.tid.map(|t| log_message.tid() != Some(t)).unwrap_or(false);
-        let reject_severity = self
-            .min_severity
-            .map(|m| {
-                fx_log_severity_t::from(m) > fx_log_severity_t::from(log_message.legacy_severity())
-            })
-            .unwrap_or(false);
+        let reject_severity =
+            self.min_severity.map(|m| m > log_message.severity()).unwrap_or(false);
         let reject_tags = if self.tags.is_empty() {
             false
         } else if log_message.tags().map(|t| t.is_empty()).unwrap_or(true) {
@@ -143,34 +138,51 @@ mod tests {
     #[fuchsia::test]
     fn should_send_verbose() {
         let mut message = test_message();
-        let mut filter = MessageFilter {
-            min_severity: Some(LegacySeverity::RawSeverity(15)),
-            ..MessageFilter::default()
-        };
+        let mut filter = MessageFilter::new(Some(Box::new(LogFilterOptions {
+            filter_by_pid: false,
+            pid: 0,
+            filter_by_tid: false,
+            tid: 0,
+            verbosity: 15,
+            min_severity: LogLevelFilter::Info,
+            tags: vec![],
+        })))
+        .unwrap();
         for raw_severity in 1..15 {
-            message.set_raw_severity(raw_severity);
-            assert!(filter.should_send(&message));
+            let raw = (Severity::Debug as u8) + raw_severity;
+            message.set_raw_severity(raw);
+            assert!(
+                filter.should_send(&message),
+                "got false on should_send with raw_severity={} and level filter with verbosity=15",
+                raw
+            );
         }
 
-        filter.min_severity = Some(LegacySeverity::Debug);
-        message.set_raw_severity(1);
+        filter.min_severity = Some(Severity::Debug);
+        message.set_raw_severity((Severity::Debug as u8) + 1);
         assert!(filter.should_send(&message));
     }
 
     #[fuchsia::test]
     fn should_reject_verbose() {
         let mut message = test_message();
-        let mut filter = MessageFilter {
-            min_severity: Some(LegacySeverity::RawSeverity(1)),
-            ..MessageFilter::default()
-        };
+        let mut filter = MessageFilter::new(Some(Box::new(LogFilterOptions {
+            filter_by_pid: false,
+            pid: 0,
+            filter_by_tid: false,
+            tid: 0,
+            verbosity: 1,
+            min_severity: LogLevelFilter::Info,
+            tags: vec![],
+        })))
+        .unwrap();
 
         for raw_severity in 2..15 {
             message.set_raw_severity(raw_severity);
             assert!(!filter.should_send(&message));
         }
 
-        filter.min_severity = Some(LegacySeverity::Info);
+        filter.min_severity = Some(Severity::Info);
         message.set_raw_severity(1);
         assert!(!filter.should_send(&message));
     }
@@ -179,12 +191,12 @@ mod tests {
     fn should_send_info() {
         let mut message = test_message();
         let mut filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Info), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Info), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Info;
         assert!(filter.should_send(&message));
 
-        filter.min_severity = Some(LegacySeverity::Debug);
+        filter.min_severity = Some(Severity::Debug);
         message.metadata.severity = Severity::Info;
         assert!(filter.should_send(&message));
     }
@@ -193,7 +205,7 @@ mod tests {
     fn should_reject_info() {
         let mut message = test_message();
         let filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Warn), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Warn), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Info;
         assert!(!filter.should_send(&message));
@@ -203,12 +215,12 @@ mod tests {
     fn should_send_warn() {
         let mut message = test_message();
         let mut filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Warn), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Warn), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Warn;
         assert!(filter.should_send(&message));
 
-        filter.min_severity = Some(LegacySeverity::Info);
+        filter.min_severity = Some(Severity::Info);
         message.metadata.severity = Severity::Warn;
         assert!(filter.should_send(&message));
     }
@@ -217,7 +229,7 @@ mod tests {
     fn should_reject_warn() {
         let mut message = test_message();
         let filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Error), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Error), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Warn;
         assert!(!filter.should_send(&message));
@@ -227,12 +239,12 @@ mod tests {
     fn should_send_error() {
         let mut message = test_message();
         let mut filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Error), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Error), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Error;
         assert!(filter.should_send(&message));
 
-        filter.min_severity = Some(LegacySeverity::Warn);
+        filter.min_severity = Some(Severity::Warn);
         message.metadata.severity = Severity::Error;
         assert!(filter.should_send(&message));
     }
@@ -241,7 +253,7 @@ mod tests {
     fn should_reject_error() {
         let mut message = test_message();
         let filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Fatal), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Fatal), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Error;
         assert!(!filter.should_send(&message));
@@ -251,12 +263,12 @@ mod tests {
     fn should_send_debug() {
         let mut message = test_message();
         let mut filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Debug), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Debug), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Debug;
         assert!(filter.should_send(&message));
 
-        filter.min_severity = Some(LegacySeverity::Trace);
+        filter.min_severity = Some(Severity::Trace);
         message.metadata.severity = Severity::Debug;
         assert!(filter.should_send(&message));
     }
@@ -265,7 +277,7 @@ mod tests {
     fn should_reject_debug() {
         let mut message = test_message();
         let filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Info), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Info), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Debug;
         assert!(!filter.should_send(&message));
@@ -275,7 +287,7 @@ mod tests {
     fn should_send_trace() {
         let mut message = test_message();
         let filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Trace), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Trace), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Trace;
         assert!(filter.should_send(&message));
@@ -285,7 +297,7 @@ mod tests {
     fn should_reject_trace() {
         let mut message = test_message();
         let filter =
-            MessageFilter { min_severity: Some(LegacySeverity::Debug), ..MessageFilter::default() };
+            MessageFilter { min_severity: Some(Severity::Debug), ..MessageFilter::default() };
 
         message.metadata.severity = Severity::Trace;
         assert!(!filter.should_send(&message));

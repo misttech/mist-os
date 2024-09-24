@@ -5,8 +5,8 @@
 use crate::error::MessageError;
 use byteorder::{ByteOrder, LittleEndian};
 use diagnostics_data::{
-    BuilderArgs, ExtendedMoniker, LegacySeverity, LogsData, LogsDataBuilder, LogsField,
-    LogsProperty, Severity, Timestamp,
+    BuilderArgs, ExtendedMoniker, LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity,
+    Timestamp,
 };
 use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
 use flyweights::FlyStr;
@@ -31,24 +31,24 @@ pub struct MonikerWithUrl {
 /// Transforms the given legacy log message (already parsed) into a `LogsData` containing the
 /// given identity information.
 pub fn from_logger(source: MonikerWithUrl, msg: LoggerMessage) -> LogsData {
+    let (raw_severity, severity) = Severity::parse_exact(msg.raw_severity);
     let mut builder = LogsDataBuilder::new(BuilderArgs {
         timestamp: msg.timestamp.into(),
         component_url: Some(source.url),
         moniker: source.moniker,
-        severity: msg.severity,
+        severity,
     })
     .set_pid(msg.pid)
     .set_tid(msg.tid)
     .set_dropped(msg.dropped_logs)
     .set_message(msg.message);
+    if let Some(raw_severity) = raw_severity {
+        builder = builder.set_raw_severity(raw_severity);
+    }
     for tag in &msg.tags {
         builder = builder.add_tag(tag.as_ref());
     }
-    let mut result = builder.build();
-    if let Some(verbosity) = msg.verbosity {
-        result.set_raw_severity(verbosity);
-    }
-    result
+    builder.build()
 }
 
 /// Constructs a `LogsData` from the provided bytes, assuming the bytes
@@ -57,18 +57,19 @@ pub fn from_logger(source: MonikerWithUrl, msg: LoggerMessage) -> LogsData {
 /// [log encoding] https://fuchsia.dev/fuchsia-src/development/logs/encodings
 pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData, MessageError> {
     let (record, _) = diagnostics_log_encoding::parse::parse_record(bytes)?;
+    let (raw_severity, severity) = Severity::parse_exact(record.severity);
 
     let mut builder = LogsDataBuilder::new(BuilderArgs {
         timestamp: Timestamp::from_nanos(record.timestamp),
         component_url: Some(source.url),
         moniker: source.moniker,
-        // NOTE: this severity is not final. Severity will be set after parsing the
-        // record.arguments
-        severity: Severity::Info,
+        severity,
     });
+    if let Some(raw_severity) = raw_severity {
+        builder = builder.set_raw_severity(raw_severity);
+    }
 
     // Raw value from the client that we don't trust (not yet sanitized)
-    let mut severity_untrusted = None;
     for Argument { name, value } in record.arguments {
         let label = LogsField::from(name);
         match (value, label) {
@@ -86,12 +87,6 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
             }
             (Value::Text(t), LogsField::Dropped) => {
                 return Err(MessageError::ExpectedInteger { value: t, found: "text" });
-            }
-            (Value::SignedInt(v), LogsField::RawSeverity) => {
-                severity_untrusted = Some(v);
-            }
-            (_, LogsField::RawSeverity) => {
-                return Err(MessageError::ExpectedInteger { value: "".into(), found: "other" });
             }
             (Value::Text(text), LogsField::Tag) => {
                 builder = builder.add_tag(text);
@@ -126,31 +121,13 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
             }
         }
     }
-
-    let raw_severity = if severity_untrusted.is_some() {
-        let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
-        LegacySeverity::try_from(transcoded_i32)?
-    } else {
-        // Cast from the u8 to i8 since verbosity is signed
-        let transcoded_i32 = i8::from_le_bytes(record.severity.to_le_bytes()) as i32;
-        LegacySeverity::try_from(transcoded_i32)?
-    };
-    let (severity, verbosity) = raw_severity.for_structured();
-    builder = builder.set_severity(severity);
-
-    let mut result = builder.build();
-
-    if verbosity.is_some() {
-        result.set_raw_severity(verbosity.unwrap())
-    }
-    Ok(result)
+    Ok(builder.build())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoggerMessage {
     pub timestamp: zx::BootTime,
-    pub severity: Severity,
-    pub verbosity: Option<i8>,
+    pub raw_severity: u8,
     pub pid: u64,
     pub tid: u64,
     pub size_bytes: usize,
@@ -183,8 +160,13 @@ impl TryFrom<&[u8]> for LoggerMessage {
         let timestamp = zx::BootTime::from_nanos(LittleEndian::read_i64(&bytes[16..24]));
 
         let raw_severity = LittleEndian::read_i32(&bytes[24..28]);
-        let severity = LegacySeverity::try_from(raw_severity)?;
-
+        let raw_severity = if raw_severity > (u8::MAX as i32) {
+            u8::MAX
+        } else if raw_severity < 0 {
+            0
+        } else {
+            u8::try_from(raw_severity).unwrap()
+        };
         let dropped_logs = LittleEndian::read_u32(&bytes[28..METADATA_SIZE]) as u64;
 
         // start reading tags after the header
@@ -222,11 +204,9 @@ impl TryFrom<&[u8]> for LoggerMessage {
             }
             let message = String::from_utf8_lossy(&bytes[msg_start..msg_end]).into_owned();
             let message_len = message.len();
-            let (severity, verbosity) = severity.for_structured();
             let result = LoggerMessage {
                 timestamp,
-                severity,
-                verbosity,
+                raw_severity,
                 message: message.into_boxed_str(),
                 pid,
                 tid,

@@ -4,171 +4,19 @@
 
 #![cfg(target_os = "fuchsia")]
 
-use crate::{Data, Logs, Severity};
-use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
+use crate::{Data, Logs};
+use fidl_fuchsia_logger::LogMessage;
+use fuchsia_zircon as zx;
 use std::fmt::Write;
-use std::os::raw::c_int;
-use thiserror::Error;
-use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
-
-/// The legacy severity representation.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[repr(i8)]
-pub enum LegacySeverity {
-    Trace,
-    Debug,
-    RawSeverity(i8),
-    Info,
-    Warn,
-    Error,
-    Fatal,
-}
-
-impl LegacySeverity {
-    /// Splits this legacy value into a severity and an optional raw_severity.
-    pub fn for_structured(self) -> (Severity, Option<i8>) {
-        match self {
-            LegacySeverity::Trace => (Severity::Trace, None),
-            LegacySeverity::Debug => (Severity::Debug, None),
-            LegacySeverity::Info => (Severity::Info, None),
-            LegacySeverity::Warn => (Severity::Warn, None),
-            LegacySeverity::Error => (Severity::Error, None),
-            LegacySeverity::Fatal => (Severity::Fatal, None),
-            LegacySeverity::RawSeverity(v) => (Severity::Debug, Some(v)),
-        }
-    }
-}
-
-impl From<Severity> for LegacySeverity {
-    fn from(severity: Severity) -> Self {
-        match severity {
-            Severity::Trace => Self::Trace,
-            Severity::Debug => Self::Debug,
-            Severity::Info => Self::Info,
-            Severity::Warn => Self::Warn,
-            Severity::Error => Self::Error,
-            Severity::Fatal => Self::Fatal,
-        }
-    }
-}
-
-impl From<fdiagnostics::Severity> for LegacySeverity {
-    fn from(fidl_severity: fdiagnostics::Severity) -> Self {
-        match fidl_severity {
-            fdiagnostics::Severity::Trace => Self::Trace,
-            fdiagnostics::Severity::Debug => Self::Debug,
-            fdiagnostics::Severity::Info => Self::Info,
-            fdiagnostics::Severity::Warn => Self::Warn,
-            fdiagnostics::Severity::Error => Self::Error,
-            fdiagnostics::Severity::Fatal => Self::Fatal,
-        }
-    }
-}
-
-impl From<LegacySeverity> for Severity {
-    fn from(severity: LegacySeverity) -> Severity {
-        match severity {
-            LegacySeverity::Trace => Severity::Trace,
-            LegacySeverity::Debug => Severity::Debug,
-            LegacySeverity::Info => Severity::Info,
-            LegacySeverity::Warn => Severity::Warn,
-            LegacySeverity::Error => Severity::Error,
-            LegacySeverity::Fatal => Severity::Fatal,
-            LegacySeverity::RawSeverity(v) => match v {
-                0 => Severity::Info,
-                v => {
-                    let severity = fdiagnostics::Severity::Info
-                        .into_primitive()
-                        .saturating_sub(v.try_into().unwrap_or(0));
-                    if severity < fdiagnostics::Severity::Info.into_primitive() {
-                        return Severity::Trace;
-                    }
-                    Severity::Debug
-                }
-            },
-        }
-    }
-}
-
-impl From<LegacySeverity> for c_int {
-    fn from(severity: LegacySeverity) -> c_int {
-        match severity {
-            LegacySeverity::Trace => LogLevelFilter::Trace as _,
-            LegacySeverity::Debug => LogLevelFilter::Debug as _,
-            LegacySeverity::Info => LogLevelFilter::Info as _,
-            LegacySeverity::Warn => LogLevelFilter::Warn as _,
-            LegacySeverity::Error => LogLevelFilter::Error as _,
-            LegacySeverity::Fatal => LogLevelFilter::Fatal as _,
-            LegacySeverity::RawSeverity(v) => (LogLevelFilter::Info as i8 - v) as _,
-        }
-    }
-}
-
-/// Error that can happen when converting an integer to a [`LegacySeverity`].
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
-pub enum SeverityError {
-    /// The number provided doesn't have a direct mapping to a [`LegacySeverity`].
-    #[error("invalid or corrupt severity received: {provided}")]
-    Invalid { provided: c_int },
-}
-
-impl TryFrom<c_int> for LegacySeverity {
-    type Error = SeverityError;
-
-    fn try_from(raw: c_int) -> Result<LegacySeverity, SeverityError> {
-        // Handle legacy/deprecated level filter values.
-        if -10 <= raw && raw <= -3 {
-            Ok(LegacySeverity::RawSeverity(-raw as i8))
-        } else if raw == -2 {
-            // legacy values from trace raw_severity
-            Ok(LegacySeverity::Trace)
-        } else if raw == -1 {
-            // legacy value from debug raw_severity
-            Ok(LegacySeverity::Debug)
-        } else if raw == 0 {
-            // legacy value for INFO
-            Ok(LegacySeverity::Info)
-        } else if raw == 1 {
-            // legacy value for WARNING
-            Ok(LegacySeverity::Warn)
-        } else if raw == 2 {
-            // legacy value for ERROR
-            Ok(LegacySeverity::Error)
-        } else if raw == 3 {
-            // legacy value for FATAL
-            Ok(LegacySeverity::Fatal)
-        } else if raw < LogLevelFilter::Info as i32 && raw > LogLevelFilter::Debug as i32 {
-            // raw_severity scale exists as incremental steps between INFO & DEBUG
-            Ok(LegacySeverity::RawSeverity(LogLevelFilter::Info as i8 - raw as i8))
-        } else if let Some(level) = LogLevelFilter::from_primitive(raw as i8) {
-            // Handle current level filter values.
-            match level {
-                // Match defined severities at their given filter level.
-                LogLevelFilter::Trace => Ok(LegacySeverity::Trace),
-                LogLevelFilter::Debug => Ok(LegacySeverity::Debug),
-                LogLevelFilter::Info => Ok(LegacySeverity::Info),
-                LogLevelFilter::Warn => Ok(LegacySeverity::Warn),
-                LogLevelFilter::Error => Ok(LegacySeverity::Error),
-                LogLevelFilter::Fatal => Ok(LegacySeverity::Fatal),
-                _ => Err(SeverityError::Invalid { provided: raw }),
-            }
-        } else {
-            Err(SeverityError::Invalid { provided: raw })
-        }
-    }
-}
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
 impl Into<LogMessage> for &Data<Logs> {
     fn into(self) -> LogMessage {
         let mut msg = self.msg().unwrap_or("").to_string();
 
-        for property in self.non_legacy_contents() {
-            match property {
-                other => {
-                    write!(&mut msg, " {}", other)
-                        .expect("allocations have to fail for this to fail");
-                }
+        if let Some(payload) = self.payload_keys() {
+            for property in payload.properties.iter() {
+                write!(&mut msg, " {property}").expect("allocations have to fail for this to fail");
             }
         }
         let file = self.metadata.file.as_ref();
@@ -187,7 +35,7 @@ impl Into<LogMessage> for &Data<Logs> {
             pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             time: self.metadata.timestamp.into_nanos(),
-            severity: self.legacy_severity().into(),
+            severity: self.metadata.raw_severity() as i32,
             dropped_logs: self.dropped_logs().unwrap_or(0) as _,
             tags,
             msg,
@@ -200,12 +48,9 @@ impl Into<LogMessage> for Data<Logs> {
     fn into(self) -> LogMessage {
         let mut msg = self.msg().unwrap_or("").to_string();
 
-        for property in self.non_legacy_contents() {
-            match property {
-                other => {
-                    write!(&mut msg, " {}", other)
-                        .expect("allocations have to fail for this to fail");
-                }
+        if let Some(payload) = self.payload_keys() {
+            for property in payload.properties.iter() {
+                write!(&mut msg, " {property}").expect("allocations have to fail for this to fail");
             }
         }
         let file = self.metadata.file.as_ref();
@@ -218,7 +63,7 @@ impl Into<LogMessage> for Data<Logs> {
             pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             time: self.metadata.timestamp.into_nanos(),
-            severity: self.legacy_severity().into(),
+            severity: self.metadata.raw_severity() as i32,
             dropped_logs: self.dropped_logs().unwrap_or(0) as _,
             tags: match self.metadata.tags {
                 Some(tags) => tags,
@@ -232,32 +77,29 @@ impl Into<LogMessage> for Data<Logs> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{BuilderArgs, LogsDataBuilder, Timestamp};
+    use crate::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
+    use fidl_fuchsia_diagnostics as fdiagnostics;
 
     const TEST_URL: &'static str = "fuchsia-pkg://test";
     const TEST_MONIKER: &'static str = "fake-test/moniker";
 
     macro_rules! severity_roundtrip_test {
         ($raw:expr, $expected:expr) => {
-            let legacy = LegacySeverity::try_from(i32::from($raw)).unwrap();
-            let (severity, raw_severity) = legacy.for_structured();
-            let mut msg = LogsDataBuilder::new(BuilderArgs {
+            let severity = Severity::from(u8::from($raw));
+            let msg = LogsDataBuilder::new(BuilderArgs {
                 timestamp: Timestamp::from_nanos(0),
                 component_url: Some(TEST_URL.into()),
                 moniker: moniker::ExtendedMoniker::parse_str(TEST_MONIKER).unwrap(),
                 severity,
             })
             .build();
-            if let Some(v) = raw_severity {
-                msg.set_raw_severity(v);
-            }
 
             let legacy_msg: LogMessage = (&msg).into();
             assert_eq!(
                 legacy_msg.severity,
                 i32::from($expected),
                 "failed to round trip severity for {:?} (raw {}), intermediates: {:#?}\n{:#?}",
-                legacy,
+                severity,
                 $raw,
                 msg,
                 legacy_msg
@@ -266,87 +108,98 @@ mod test {
     }
 
     #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_v10() {
-        severity_roundtrip_test!(-10, fdiagnostics::Severity::Info.into_primitive() - 10);
-    }
-
-    #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_v5() {
-        severity_roundtrip_test!(-5, fdiagnostics::Severity::Info.into_primitive() - 5);
-    }
-
-    #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_v4() {
-        severity_roundtrip_test!(-4, fdiagnostics::Severity::Info.into_primitive() - 4);
-    }
-
-    #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_v3() {
-        severity_roundtrip_test!(-3, fdiagnostics::Severity::Info.into_primitive() - 3);
-    }
-
-    #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_v2() {
-        severity_roundtrip_test!(-2, fdiagnostics::Severity::Trace.into_primitive());
-    }
-
-    #[fuchsia::test]
-    fn severity_roundtrip_legacy_v1() {
-        severity_roundtrip_test!(-1, fdiagnostics::Severity::Debug.into_primitive());
-    }
-
-    #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_v0() {
-        severity_roundtrip_test!(0, fdiagnostics::Severity::Info.into_primitive());
-    }
-
-    #[fuchsia::test]
-    fn severity_roundtrip_legacy_warn() {
-        severity_roundtrip_test!(1, fdiagnostics::Severity::Warn.into_primitive());
-    }
-
-    #[fuchsia::test]
-    fn raw_severity_roundtrip_legacy_error() {
-        severity_roundtrip_test!(2, fdiagnostics::Severity::Error.into_primitive());
-    }
-
-    #[fuchsia::test]
-    fn severity_roundtrip_trace() {
+    fn raw_severity_roundtrip_trace() {
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Trace.into_primitive() - 1,
+            fdiagnostics::Severity::Trace.into_primitive()
+        );
         severity_roundtrip_test!(
             fdiagnostics::Severity::Trace.into_primitive(),
             fdiagnostics::Severity::Trace.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Trace.into_primitive() + 1,
+            fdiagnostics::Severity::Debug.into_primitive()
         );
     }
 
     #[fuchsia::test]
     fn severity_roundtrip_debug() {
         severity_roundtrip_test!(
+            fdiagnostics::Severity::Debug.into_primitive() - 1,
+            fdiagnostics::Severity::Debug.into_primitive()
+        );
+        severity_roundtrip_test!(
             fdiagnostics::Severity::Debug.into_primitive(),
             fdiagnostics::Severity::Debug.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Debug.into_primitive() + 1,
+            fdiagnostics::Severity::Info.into_primitive()
         );
     }
 
     #[fuchsia::test]
     fn severity_roundtrip_info() {
         severity_roundtrip_test!(
+            fdiagnostics::Severity::Info.into_primitive() - 1,
+            fdiagnostics::Severity::Info.into_primitive()
+        );
+        severity_roundtrip_test!(
             fdiagnostics::Severity::Info.into_primitive(),
             fdiagnostics::Severity::Info.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Info.into_primitive() + 1,
+            fdiagnostics::Severity::Warn.into_primitive()
         );
     }
 
     #[fuchsia::test]
     fn severity_roundtrip_warn() {
         severity_roundtrip_test!(
+            fdiagnostics::Severity::Warn.into_primitive() - 1,
+            fdiagnostics::Severity::Warn.into_primitive()
+        );
+        severity_roundtrip_test!(
             fdiagnostics::Severity::Warn.into_primitive(),
             fdiagnostics::Severity::Warn.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Warn.into_primitive() + 1,
+            fdiagnostics::Severity::Error.into_primitive()
         );
     }
 
     #[fuchsia::test]
     fn severity_roundtrip_error() {
         severity_roundtrip_test!(
+            fdiagnostics::Severity::Error.into_primitive() - 1,
+            fdiagnostics::Severity::Error.into_primitive()
+        );
+        severity_roundtrip_test!(
             fdiagnostics::Severity::Error.into_primitive(),
             fdiagnostics::Severity::Error.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Error.into_primitive() + 1,
+            fdiagnostics::Severity::Fatal.into_primitive()
+        );
+    }
+
+    #[fuchsia::test]
+    fn severity_roundtrip_fatal() {
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Fatal.into_primitive() - 1,
+            fdiagnostics::Severity::Fatal.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Fatal.into_primitive(),
+            fdiagnostics::Severity::Fatal.into_primitive()
+        );
+        severity_roundtrip_test!(
+            fdiagnostics::Severity::Fatal.into_primitive() + 1,
+            fdiagnostics::Severity::Fatal.into_primitive()
         );
     }
 }

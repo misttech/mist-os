@@ -6,7 +6,7 @@ use crate::identity::ComponentIdentity;
 use crate::logs::stats::LogStreamStats;
 use anyhow::Result;
 use bstr::{BStr, ByteSlice};
-use diagnostics_data::{LegacySeverity, LogsData, Severity};
+use diagnostics_data::{LogsData, Severity};
 use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
 };
@@ -29,19 +29,12 @@ pub struct StoredMessage {
 impl StoredMessage {
     pub fn new(buf: Box<[u8]>, stats: &Arc<LogStreamStats>) -> Option<Self> {
         match diagnostics_log_encoding::parse::basic_info(&buf) {
-            Ok((timestamp, severity)) => {
-                let transcoded_i32 = i8::from_le_bytes(severity.to_le_bytes()) as i32;
-                let Ok(severity) = LegacySeverity::try_from(transcoded_i32) else {
-                    stats.increment_invalid(buf.len());
-                    return None;
-                };
-                Some(StoredMessage {
-                    bytes: buf,
-                    severity: severity.into(),
-                    timestamp,
-                    stats: Arc::clone(stats),
-                })
-            }
+            Ok((timestamp, severity)) => Some(StoredMessage {
+                bytes: buf,
+                severity: severity.into(),
+                timestamp,
+                stats: Arc::clone(stats),
+            }),
             _ => {
                 stats.increment_invalid(buf.len());
                 None
@@ -52,8 +45,7 @@ impl StoredMessage {
     pub fn from_legacy(buf: Box<[u8]>, stats: &Arc<LogStreamStats>) -> Option<Self> {
         let Ok(LoggerMessage {
             timestamp,
-            severity,
-            verbosity,
+            raw_severity,
             message,
             pid,
             tid,
@@ -65,15 +57,10 @@ impl StoredMessage {
             stats.increment_invalid(buf.len());
             return None;
         };
-        let severity = verbosity.and_then(get_severity_from_verbosity).unwrap_or(severity);
         let mut encoder =
             Encoder::new(Cursor::new([0u8; MAX_DATAGRAM_LEN_BYTES as _]), EncoderOpts::default());
         let _ = encoder.write_event(WriteEventParams {
-            event: LegacyMessageRecord {
-                severity: fdiagnostics::Severity::from(severity).into_primitive(),
-                data: &message,
-                timestamp,
-            },
+            event: LegacyMessageRecord { severity: raw_severity, data: &message, timestamp },
             tags: &tags,
             metatags: std::iter::empty(),
             pid: zx::Koid::from_raw(pid),
@@ -85,7 +72,7 @@ impl StoredMessage {
         let buf = cursor.get_ref();
         Some(Self {
             timestamp,
-            severity,
+            severity: Severity::from(raw_severity),
             bytes: Box::from(&buf[..position]),
             stats: Arc::clone(stats),
         })
@@ -169,22 +156,17 @@ impl StoredMessage {
     }
 
     pub fn parse(&self, source: &ComponentIdentity) -> Result<LogsData> {
-        let data = diagnostics_message::from_structured(source.into(), &self.bytes)?;
+        let mut data = diagnostics_message::from_structured(source.into(), &self.bytes)?;
+        // TODO(https://fxbug.dev/368426475): fix chromium, then remove. The problematic logs are
+        // being ingested as sturctured logs. Not a legacy logs too.
+        match i8::from_le_bytes(data.metadata.raw_severity().to_le_bytes()) {
+            -1 => data.set_severity(Severity::Debug),
+            -2 => data.set_severity(Severity::Trace),
+            0 => data.set_severity(Severity::Info),
+            _ => {}
+        }
         Ok(data)
     }
-}
-
-fn get_severity_from_verbosity(verbosity: i8) -> Option<Severity> {
-    if verbosity == 0 {
-        return None;
-    }
-    let severity = fdiagnostics::Severity::Info
-        .into_primitive()
-        .saturating_sub(verbosity.try_into().unwrap_or(0));
-    if severity < fdiagnostics::Severity::Info.into_primitive() {
-        return Some(Severity::Trace);
-    }
-    Some(Severity::Debug)
 }
 
 impl Drop for StoredMessage {

@@ -35,9 +35,6 @@ pub use moniker::ExtendedMoniker;
 #[cfg(target_os = "fuchsia")]
 mod logs_legacy;
 
-#[cfg(target_os = "fuchsia")]
-pub use crate::logs_legacy::*;
-
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
 const ROOT_MONIKER_REPR: &str = "<root>";
@@ -299,6 +296,11 @@ pub struct LogsMetadata {
     /// Severity of the message.
     pub severity: Severity,
 
+    /// Raw severity if any. This will typically be unset unless the log message carries a severity
+    /// that differs from the standard values of each severity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw_severity: Option<u8>,
+
     /// Tags to add at the beginning of the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
@@ -337,48 +339,107 @@ impl LogsMetadata {
     pub fn component_url(&self) -> Option<&str> {
         self.component_url.as_ref().map(|s| s.as_str())
     }
+
+    /// Returns the raw severity of this log.
+    pub fn raw_severity(&self) -> u8 {
+        match self.raw_severity {
+            Some(s) => s,
+            None => self.severity as u8,
+        }
+    }
 }
 
 /// Severities a log message can have, often called the log's "level".
 // NOTE: this is only duplicated because we can't get Serialize/Deserialize on the FIDL type
 // LINT.IfChange
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[repr(u8)]
 pub enum Severity {
     /// Trace records include detailed information about program execution.
     #[serde(rename = "TRACE", alias = "Trace", alias = "trace")]
-    Trace,
+    Trace = 0x10,
 
     /// Debug records include development-facing information about program execution.
     #[serde(rename = "DEBUG", alias = "Debug", alias = "debug")]
-    Debug,
+    Debug = 0x20,
 
     /// Info records include general information about program execution. (default)
     #[serde(rename = "INFO", alias = "Info", alias = "info")]
-    Info,
+    Info = 0x30,
 
     /// Warning records include information about potentially problematic operations.
     #[serde(rename = "WARN", alias = "Warn", alias = "warn")]
-    Warn,
+    Warn = 0x40,
 
     /// Error records include information about failed operations.
     #[serde(rename = "ERROR", alias = "Error", alias = "error")]
-    Error,
+    Error = 0x50,
 
     /// Fatal records convey information about operations which cause a program's termination.
     #[serde(rename = "FATAL", alias = "Fatal", alias = "fatal")]
-    Fatal,
+    Fatal = 0x60,
 }
 // LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
 
-impl TryFrom<i32> for Severity {
-    type Error = anyhow::Error;
+impl Severity {
+    /// Returns a severity and also the raw severity if it's  not an exact match of a severity value.
+    pub fn parse_exact(raw_severity: u8) -> (Option<u8>, Severity) {
+        if raw_severity == Severity::Trace as u8 {
+            (None, Severity::Trace)
+        } else if raw_severity == Severity::Debug as u8 {
+            (None, Severity::Debug)
+        } else if raw_severity == Severity::Info as u8 {
+            (None, Severity::Info)
+        } else if raw_severity == Severity::Warn as u8 {
+            (None, Severity::Warn)
+        } else if raw_severity == Severity::Error as u8 {
+            (None, Severity::Error)
+        } else if raw_severity == Severity::Fatal as u8 {
+            (None, Severity::Fatal)
+        } else {
+            (Some(raw_severity), Severity::from(raw_severity))
+        }
+    }
+}
 
-    fn try_from(value: i32) -> Result<Self, anyhow::Error> {
-        u8::try_from(value)
-            .ok()
-            .and_then(|num| FidlSeverity::from_primitive(num))
-            .map(|s| Severity::from(s))
-            .ok_or(format_err!("invalid severity number: {}", value))
+impl From<u8> for Severity {
+    fn from(value: u8) -> Severity {
+        match value {
+            0x00..=0x10 => Severity::Trace,
+            0x11..=0x20 => Severity::Debug,
+            0x21..=0x30 => Severity::Info,
+            0x31..=0x40 => Severity::Warn,
+            0x41..=0x50 => Severity::Error,
+            0x51.. => Severity::Fatal,
+        }
+    }
+}
+
+impl From<i8> for Severity {
+    fn from(value: i8) -> Severity {
+        match value {
+            0x00..=0x10 => Severity::Trace,
+            0x11..=0x20 => Severity::Debug,
+            0x21..=0x30 => Severity::Info,
+            0x31..=0x40 => Severity::Warn,
+            0x41..=0x50 => Severity::Error,
+            0x51.. => Severity::Fatal,
+            _ => Severity::Trace,
+        }
+    }
+}
+
+impl From<i32> for Severity {
+    fn from(value: i32) -> Severity {
+        match value {
+            0x00..=0x10 => Severity::Trace,
+            0x11..=0x20 => Severity::Debug,
+            0x21..=0x30 => Severity::Info,
+            0x31..=0x40 => Severity::Warn,
+            0x41..=0x50 => Severity::Error,
+            0x51.. => Severity::Fatal,
+            _ => Severity::Trace,
+        }
     }
 }
 
@@ -653,8 +714,8 @@ pub struct LogsDataBuilder {
     args: BuilderArgs,
     /// List of KVPs from the user
     keys: Vec<Property<LogsField>>,
-    /// The message verbosity
-    raw_severity: Option<i64>,
+    /// Raw severity.
+    raw_severity: Option<u8>,
 }
 
 /// Arguments used to create a new [`LogsDataBuilder`].
@@ -710,6 +771,12 @@ impl LogsDataBuilder {
         self
     }
 
+    /// Overrides the severity set through the args with a raw severity.
+    pub fn set_raw_severity(mut self, severity: u8) -> Self {
+        self.raw_severity = Some(severity);
+        self
+    }
+
     /// Sets the number of rolled out messages.
     /// If value is greater than zero, a RolledOutLogs error
     /// will also be added to the list of errors or updated if
@@ -734,9 +801,10 @@ impl LogsDataBuilder {
         self
     }
 
-    /// Sets the severity of the log.
+    /// Sets the severity of the log. This will unset the raw severity.
     pub fn set_severity(mut self, severity: Severity) -> Self {
         self.args.severity = severity;
+        self.raw_severity = None;
         self
     }
 
@@ -744,13 +812,6 @@ impl LogsDataBuilder {
     #[must_use = "You must call build on your builder to consume its result"]
     pub fn set_pid(mut self, value: u64) -> Self {
         self.pid = Some(value);
-        self
-    }
-
-    /// Sets the raw severity level
-    #[must_use = "You must call build on your builder to consume its result"]
-    pub fn override_raw_severity(mut self, value: i64) -> Self {
-        self.raw_severity = Some(value);
         self
     }
 
@@ -767,9 +828,6 @@ impl LogsDataBuilder {
         if let Some(msg) = self.msg {
             args.push(LogsProperty::String(LogsField::MsgStructured, msg));
         }
-        if let Some(raw_severity) = self.raw_severity {
-            args.push(LogsProperty::Int(LogsField::RawSeverity, raw_severity));
-        }
         let mut payload_fields = vec![DiagnosticsHierarchy::new("message", args, vec![])];
         if !self.keys.is_empty() {
             let val = DiagnosticsHierarchy::new("keys", self.keys, vec![]);
@@ -777,14 +835,17 @@ impl LogsDataBuilder {
         }
         let mut payload = LogsHierarchy::new("root", vec![], payload_fields);
         payload.sort();
+        let (raw_severity, severity) =
+            self.raw_severity.map(Severity::parse_exact).unwrap_or((None, self.args.severity));
         let mut ret = LogsData::for_logs(
             self.args.moniker,
             Some(payload),
             self.args.timestamp,
             self.args.component_url,
-            self.args.severity,
+            severity,
             self.errors,
         );
+        ret.metadata.raw_severity = raw_severity;
         ret.metadata.file = self.file;
         ret.metadata.line = self.line;
         ret.metadata.pid = self.pid;
@@ -857,6 +918,7 @@ impl Data<Logs> {
                 timestamp: timestamp.into(),
                 component_url: component_url,
                 severity: severity.into(),
+                raw_severity: None,
                 errors,
                 file: None,
                 line: None,
@@ -867,6 +929,19 @@ impl Data<Logs> {
                 size_bytes: None,
             },
         }
+    }
+
+    /// Sets the severity from a raw severity number. Overrides the severity to match the raw
+    /// severity.
+    pub fn set_raw_severity(&mut self, raw_severity: u8) {
+        self.metadata.raw_severity = Some(raw_severity);
+        self.metadata.severity = Severity::from(raw_severity);
+    }
+
+    /// Sets the severity of the log. This will unset the raw severity.
+    pub fn set_severity(&mut self, severity: Severity) {
+        self.metadata.severity = severity;
+        self.metadata.raw_severity = None;
     }
 
     /// Returns the string log associated with the message, if one exists.
@@ -910,7 +985,6 @@ impl Data<Logs> {
                 LogsProperty::String(LogsField::Tag, _tag) => None,
                 LogsProperty::String(LogsField::ProcessId, _tag) => None,
                 LogsProperty::String(LogsField::ThreadId, _tag) => None,
-                LogsProperty::String(LogsField::RawSeverity, _tag) => None,
                 LogsProperty::String(LogsField::Dropped, _tag) => None,
                 LogsProperty::String(LogsField::Msg, _tag) => None,
                 LogsProperty::String(LogsField::FilePath, _tag) => None,
@@ -995,23 +1069,6 @@ impl Data<Logs> {
         self.metadata.tags.as_ref()
     }
 
-    /// The message's severity.
-    #[cfg(target_os = "fuchsia")]
-    pub fn legacy_severity(&self) -> LegacySeverity {
-        if let Some(raw_severity) = self.raw_severity() {
-            LegacySeverity::RawSeverity(raw_severity)
-        } else {
-            match self.metadata.severity {
-                Severity::Trace => LegacySeverity::Trace,
-                Severity::Debug => LegacySeverity::Debug,
-                Severity::Info => LegacySeverity::Info,
-                Severity::Warn => LegacySeverity::Warn,
-                Severity::Error => LegacySeverity::Error,
-                Severity::Fatal => LegacySeverity::Fatal,
-            }
-        }
-    }
-
     /// Returns the severity level of this log.
     pub fn severity(&self) -> Severity {
         self.metadata.severity
@@ -1043,37 +1100,6 @@ impl Data<Logs> {
                 })
             })
             .flatten()
-    }
-
-    /// If the log has a raw severity, returns its value.
-    pub fn raw_severity(&self) -> Option<i8> {
-        self.payload_message().and_then(|payload| {
-            payload
-                .properties
-                .iter()
-                .filter_map(|property| match property {
-                    LogsProperty::Int(LogsField::RawSeverity, verbosity) => Some(*verbosity as i8),
-                    _ => None,
-                })
-                .next()
-        })
-    }
-
-    /// Sets the raw severity of a log.
-    pub fn set_raw_severity(&mut self, raw_severity: i8) {
-        if let Some(payload_message) = self.payload_message_mut() {
-            payload_message
-                .properties
-                .push(LogsProperty::Int(LogsField::RawSeverity, raw_severity.into()));
-        }
-    }
-
-    #[cfg(target_os = "fuchsia")]
-    pub(crate) fn non_legacy_contents(&self) -> Box<dyn Iterator<Item = &LogsProperty> + '_> {
-        match self.payload_keys() {
-            None => Box::new(std::iter::empty()),
-            Some(payload) => Box::new(payload.properties.iter()),
-        }
     }
 
     /// Returns the component nam. This only makes sense for v1 components.
@@ -1383,7 +1409,6 @@ pub enum LogsField {
     ThreadId,
     Dropped,
     Tag,
-    RawSeverity,
     Msg,
     MsgStructured,
     FilePath,
@@ -1398,7 +1423,6 @@ impl fmt::Display for LogsField {
             LogsField::ThreadId => write!(f, "tid"),
             LogsField::Dropped => write!(f, "num_dropped"),
             LogsField::Tag => write!(f, "tag"),
-            LogsField::RawSeverity => write!(f, "raw_severity"),
             LogsField::Msg => write!(f, "message"),
             LogsField::MsgStructured => write!(f, "value"),
             LogsField::FilePath => write!(f, "file_path"),
@@ -1422,27 +1446,10 @@ pub const TAG_LABEL: &str = "tag";
 pub const MESSAGE_LABEL_STRUCTURED: &str = "value";
 /// The label for the message in the log payload.
 pub const MESSAGE_LABEL: &str = "message";
-/// The label for the raw severity of a log.
-pub const RAW_SEVERITY_LABEL: &str = "raw_severity";
 /// The label for the file associated with a log line.
 pub const FILE_PATH_LABEL: &str = "file";
 /// The label for the line number in the file associated with a log line.
 pub const LINE_NUMBER_LABEL: &str = "line";
-
-impl LogsField {
-    /// Whether the logs field is legacy or not.
-    pub fn is_legacy(&self) -> bool {
-        matches!(
-            self,
-            LogsField::ProcessId
-                | LogsField::ThreadId
-                | LogsField::Dropped
-                | LogsField::Tag
-                | LogsField::Msg
-                | LogsField::RawSeverity
-        )
-    }
-}
 
 impl AsRef<str> for LogsField {
     fn as_ref(&self) -> &str {
@@ -1452,7 +1459,6 @@ impl AsRef<str> for LogsField {
             Self::Dropped => DROPPED_LABEL,
             Self::Tag => TAG_LABEL,
             Self::Msg => MESSAGE_LABEL,
-            Self::RawSeverity => RAW_SEVERITY_LABEL,
             Self::FilePath => FILE_PATH_LABEL,
             Self::LineNumber => LINE_NUMBER_LABEL,
             Self::MsgStructured => MESSAGE_LABEL_STRUCTURED,
@@ -1471,7 +1477,6 @@ where
             PID_LABEL => Self::ProcessId,
             TID_LABEL => Self::ThreadId,
             DROPPED_LABEL => Self::Dropped,
-            RAW_SEVERITY_LABEL => Self::RawSeverity,
             TAG_LABEL => Self::Tag,
             MESSAGE_LABEL => Self::Msg,
             FILE_PATH_LABEL => Self::FilePath,
