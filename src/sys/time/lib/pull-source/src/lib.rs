@@ -272,13 +272,15 @@ mod test {
         );
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_property_updates_sent_to_update_algorithm() {
         let (harness, client) = TestHarness::new();
 
         client.update_device_properties(&Properties::default()).unwrap();
-        // Sleep here to allow the executor to run the task servicing the request.
-        fasync::Timer::new(fasync::Time::after(zx::Duration::from_nanos(1000))).await;
+
+        // Allow tasks to service the request before checking the properties.
+        let _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+
         assert_eq!(harness.get_device_properties().await, vec![Properties::default()]);
     }
 }
