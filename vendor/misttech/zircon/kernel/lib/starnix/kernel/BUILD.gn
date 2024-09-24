@@ -17,6 +17,7 @@ zx_library("starnix_core") {
     "fs/mistos/syslog.cc",
     "fs/mistos/tree_builder.cc",
     "fs/tmpfs.cc",
+    "loader.cc",
     "logging/logging.cc",
     "mm/memory.cc",
     "mm/memory_accessor.cc",
@@ -69,6 +70,12 @@ zx_library("starnix_core") {
     # <lib/userabi/rodso.h> has #include <object/handle.h>.
     "//zircon/kernel/object",
   ]
+
+  deps = [
+    "//zircon/kernel/lib/crypto",
+    "//zircon/kernel/phys:handoff",
+    "//zircon/system/ulib/explicit-memory",
+  ]
 }
 
 zx_library("starnix_runner") {
@@ -80,6 +87,7 @@ zx_library("starnix_runner") {
   deps = [
     ":starnix_core",
     "//zircon/kernel/lib/console",
+    "//zircon/kernel/phys:handoff",
   ]
 }
 
