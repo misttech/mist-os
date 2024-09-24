@@ -196,12 +196,7 @@ impl FileSystem {
     ///
     /// Panics if this file system does not have a root directory.
     pub fn root(&self) -> &DirEntryHandle {
-        self.root.get().unwrap_or_else(|| panic!("FileSystem {} has no root", self.name()))
-    }
-
-    /// The root directory entry of this `FileSystem`, if it has one.
-    pub fn maybe_root(&self) -> Option<&DirEntryHandle> {
-        self.root.get()
+        self.root.get().unwrap()
     }
 
     /// Prepare a node for insertion in the node cache.

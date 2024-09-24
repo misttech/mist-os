@@ -86,12 +86,6 @@ impl<T> Borrow<PtrKey<T>> for WeakKey<T> {
     }
 }
 
-impl<T: std::fmt::Debug> std::fmt::Debug for WeakKey<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
 pub struct PtrKey<T>(*const T);
 impl<T> From<*const T> for PtrKey<T> {
     fn from(ptr: *const T) -> Self {
@@ -111,9 +105,3 @@ impl<T> Hash for PtrKey<T> {
 }
 unsafe impl<T> Sync for PtrKey<T> {}
 unsafe impl<T> Send for PtrKey<T> {}
-
-impl<T: std::fmt::Debug> std::fmt::Debug for PtrKey<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}

@@ -59,7 +59,7 @@ pub fn check_exec_access(
         (state.current_sid, state.exec_sid)
     };
 
-    let executable_sid = fs_node_effective_sid(executable_node);
+    let executable_sid = fs_node_effective_sid(security_server, current_task, executable_node);
 
     let new_sid = if let Some(exec_sid) = exec_sid {
         // Use the proc exec SID if set.
