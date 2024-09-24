@@ -406,8 +406,9 @@ where
         this.with_filter_state(|state| {
             let conn = match metadata.take_conntrack_connection() {
                 Some(c) => Some(c),
-                // If packet reassembly happened, then there won't be a
-                // connection in the metadata.
+                // It's possible that there won't be a connection in the metadata by this point;
+                // this could be, for example, because the packet is for a protocol not tracked
+                // by conntrack.
                 None => {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
@@ -535,8 +536,9 @@ where
             this.with_filter_state(|state| {
                 let conn = match metadata.take_conntrack_connection() {
                     Some(c) => Some(c),
-                    // If packet reassembly happened, then there won't be a
-                    // connection in the metadata.
+                    // It's possible that there won't be a connection in the metadata by this point;
+                    // this could be, for example, because the packet is for a protocol not tracked
+                    // by conntrack.
                     None => {
                         match state
                             .conntrack
