@@ -1,0 +1,59 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/components/fuchsia_unittest_package.gni")
+import("//build/packages/sdk_fuchsia_package.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  output_name = "memory-monitor2"
+  with_unit_tests = true
+
+  edition = "2021"
+  sources = [
+    "src/attribution_client.rs",
+    "src/common.rs",
+    "src/main.rs",
+    "src/resources.rs",
+    "src/snapshot.rs",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
+    "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-sync",
+    "//src/lib/mapped-vmo",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/lib/zircon/rust/fuchsia-zircon-types",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/performance/memory/attribution/server",
+    "//third_party/rust_crates:futures",
+  ]
+}
+
+fuchsia_package_with_single_component("monitor") {
+  package_name = "memory_monitor2"
+  manifest = "meta/memory_monitor2.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_unittest_package("tests") {
+  package_name = "memory-monitor2-tests"
+  deps = [ ":bin_test" ]
+}

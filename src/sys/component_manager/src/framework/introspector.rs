@@ -117,7 +117,7 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
     ) -> Box<dyn CapabilityProvider> {
         lazy_static! {
             static ref MEMORY_MONITOR: Moniker =
-                Moniker::parse_str("/core/memory_monitor").unwrap();
+                Moniker::parse_str("/core/memory_monitor2").unwrap();
             /// Moniker for integration tests.
             static ref RECEIVER: Moniker =
                 Moniker::parse_str("/receiver").unwrap();

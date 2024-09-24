@@ -130,6 +130,7 @@
                     "/bootstrap/console-launcher",
                     "/bootstrap/netsvc",
                     "/core/memory_monitor",
+                    "/core/memory_monitor2",
                 ],
             },
             {
