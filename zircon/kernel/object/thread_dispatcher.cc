@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/counters.h>
+#if __mist_os__
+#include <lib/starnix_zircon/task_wrapper.h>
+#endif
 #include <platform.h>
 #include <string.h>
 #include <trace.h>
