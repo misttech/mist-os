@@ -1290,7 +1290,7 @@ pub(crate) fn reassemble_fragmented_packet<
 
     // We know the call to `unwrap` will not fail because we just copied the header
     // bytes into `bytes`.
-    let mut header = Ref::<_, FixedHeader>::unaligned_from_prefix(bytes).unwrap().0;
+    let mut header = Ref::<_, FixedHeader>::from_prefix(bytes).unwrap().0;
 
     // Update the payload length field.
     header.payload_len.set(u16::try_from(payload_length).unwrap());

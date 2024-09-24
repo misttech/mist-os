@@ -60,7 +60,7 @@ impl<B: SplitByteSlice + Clone> BufferView<B> for BufferViewWrapper<B> {
 
     fn take_front(&mut self, n: usize) -> Option<B> {
         if self.len() >= n {
-            let (ret, next) = self.0.clone().split_at(n);
+            let (ret, next) = self.0.clone().split_at(n).ok().unwrap();
             self.0 = next;
             Some(ret)
         } else {

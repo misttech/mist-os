@@ -56,7 +56,7 @@ where
     fn truncate_null(self) -> (Self, B) {
         let Self(bytes) = self;
         let split = find_null_termination(&bytes).unwrap_or(bytes.as_ref().len());
-        let (bytes, rest) = bytes.split_at(split);
+        let (bytes, rest) = bytes.split_at(split).ok().unwrap();
         (Self(bytes), rest)
     }
 
@@ -81,7 +81,7 @@ where
         let eos = find_null_termination(&v).ok_or(ValidStrError::NoNullTermination)?;
         // Unwrap is safe, we just found null termination above.
         let bytes = buffer.take_front(eos + 1).unwrap();
-        let (bytes, null_char) = bytes.split_at(eos);
+        let (bytes, null_char) = bytes.split_at(eos).ok().unwrap();
         // TODO(https://github.com/rust-lang/rust/issues/82775): Use
         // debug_assert_matches from std when available.
         debug_assert!(

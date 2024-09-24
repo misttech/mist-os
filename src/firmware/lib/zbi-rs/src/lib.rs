@@ -65,7 +65,7 @@ const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelRiscv64;
 /// * [`ZbiError::TooBig`] - returned if there is not enough space to align the slice
 pub fn align_buffer<B: SplitByteSlice>(buffer: B) -> ZbiResult<B> {
     let tail_offset = get_align_buffer_offset(&buffer[..])?;
-    let (_, aligned_buffer) = buffer.split_at(tail_offset);
+    let (_, aligned_buffer) = buffer.split_at(tail_offset).ok().unwrap();
     Ok(aligned_buffer)
 }
 
@@ -132,7 +132,7 @@ impl<B: SplitByteSlice + PartialEq> ZbiItem<B> {
             return Err(ZbiError::TooBig);
         }
 
-        let (item_payload, tail) = payload.split_at(item_payload_len);
+        let (item_payload, tail) = payload.split_at(item_payload_len).ok().unwrap();
         let item = ZbiItem { header: hdr, payload: item_payload };
         Ok((item, tail))
     }
@@ -234,7 +234,7 @@ impl<B: SplitByteSliceMut + PartialEq> ZbiItem<B> {
 
         // It is safe to do split because we checked if input buffer big enough to contain header
         // and requested payload size.
-        let (payload, tail) = item_tail.split_at(payload_len);
+        let (payload, tail) = item_tail.split_at(payload_len).ok().unwrap();
 
         Ok((ZbiItem { header, payload }, tail))
     }

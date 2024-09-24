@@ -917,7 +917,7 @@ mod tests {
     fn get_empty_tuple_mut_ref<'a>() -> &'a mut () {
         // This is a hack since `&mut ()` is invalid.
         let bytes: &mut [u8] = &mut [];
-        zerocopy::Ref::into_mut(zerocopy::Ref::<_, ()>::unaligned_from_bytes(bytes).unwrap())
+        zerocopy::Ref::into_mut(zerocopy::Ref::<_, ()>::from_bytes(bytes).unwrap())
     }
 
     #[derive(Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]

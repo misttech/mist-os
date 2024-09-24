@@ -241,7 +241,7 @@ utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
 which = "4.0.2"
-zerocopy = { version = "0.8.0-alpha.21", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.0-alpha.25", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
@@ -1012,8 +1012,15 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.0-alpha.21"]
-rustflags = [ "--cfg=zerocopy_generic_bounds_in_const_fn", "--cfg=zerocopy_aarch64_simd", "--cfg=zerocopy_panic_in_const" ]
+[gn.package.zerocopy."0.8.0-alpha.25"]
+rustflags = [
+  "--cfg=zerocopy_core_error",
+  "--cfg=zerocopy_diagnostic_on_unimplemented",
+  "--cfg=zerocopy_generic_bounds_in_const_fn",
+  "--cfg=zerocopy_target_has_atomics",
+  "--cfg=zerocopy_aarch64_simd",
+  "--cfg=zerocopy_panic_in_const_and_vec_try_reserve"
+]
 
 [gn.package.zstd-safe."5.0.2+zstd.1.5.2"]
 rustflags = []

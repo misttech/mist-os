@@ -154,7 +154,7 @@ mod tests {
     fn fixed_fields_dst_addr() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         let mut fc = FrameControl(0);
         fc.set_to_ds(true);
@@ -169,7 +169,7 @@ mod tests {
     fn fixed_fields_src_addr() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false
@@ -201,9 +201,8 @@ mod tests {
     #[test]
     fn fixed_fields_ta() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
-        let (fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
-                .expect("invalid data header");
+        let (fixed_fields, _) = Ref::<_, FixedDataHdrFields>::from_prefix(&mut fixed_fields[..])
+            .expect("invalid data header");
         assert_eq!(
             data_transmitter_addr(&fixed_fields),
             MacAddr::from([4; 6]) // Addr2
@@ -213,9 +212,8 @@ mod tests {
     #[test]
     fn fixed_fields_ra() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
-        let (fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
-                .expect("invalid data header");
+        let (fixed_fields, _) = Ref::<_, FixedDataHdrFields>::from_prefix(&mut fixed_fields[..])
+            .expect("invalid data header");
         assert_eq!(data_receiver_addr(&fixed_fields), MacAddr::from([3; 6])); // Addr2
     }
 
@@ -223,7 +221,7 @@ mod tests {
     fn fixed_fields_bssid() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false

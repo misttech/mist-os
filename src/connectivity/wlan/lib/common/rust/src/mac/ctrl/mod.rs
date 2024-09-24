@@ -19,7 +19,7 @@ impl<B: SplitByteSlice> CtrlBody<B> {
     pub fn parse(subtype: CtrlSubtype, bytes: B) -> Option<Self> {
         match subtype {
             CtrlSubtype::PS_POLL => {
-                let (ps_poll, _) = Ref::unaligned_from_prefix(bytes).ok()?;
+                let (ps_poll, _) = Ref::from_prefix(bytes).ok()?;
                 Some(CtrlBody::PsPoll { ps_poll })
             }
             subtype => Some(CtrlBody::Unsupported { subtype }),

@@ -1532,7 +1532,7 @@ mod tests {
             .unwrap_b();
 
         // Set all three reserved bits and update the checksum.
-        let mut hdr_prefix = Ref::<_, HeaderPrefix>::unaligned_from_bytes(buffer.as_mut()).unwrap();
+        let mut hdr_prefix = Ref::<_, HeaderPrefix>::from_bytes(buffer.as_mut()).unwrap();
         let old_checksum = hdr_prefix.checksum;
         let old_data_offset_reserved_flags = hdr_prefix.data_offset_reserved_flags;
         hdr_prefix.data_offset_reserved_flags.as_mut_bytes()[0] |= 0b00000111;

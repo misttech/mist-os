@@ -365,8 +365,9 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(
     // a single Ipv4Address
     let long_message =
         bytes.len() > (core::mem::size_of::<HeaderPrefix>() + core::mem::size_of::<Ipv4Addr>());
-    let (header, _) = Ref::<_, HeaderPrefix>::unaligned_from_prefix(bytes)
-        .map_err(|_| debug_err!(ParseError::Format, "too few bytes for header"))?;
+    let (header, _) = Ref::<_, HeaderPrefix>::from_prefix(bytes).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| debug_err!(ParseError::Format, "too few bytes for header"),
+    )?;
     let msg_type = MessageType::try_from(header.msg_type).map_err(|_| {
         debug_err!(ParseError::NotSupported, "unrecognized message type: {:x}", header.msg_type,)
     })?;

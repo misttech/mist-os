@@ -119,8 +119,9 @@ impl Header {
 pub fn peek_arp_types<B: SplitByteSlice>(
     bytes: B,
 ) -> ParseResult<(ArpHardwareType, ArpNetworkType)> {
-    let (header, _) = Ref::<B, Header>::unaligned_from_prefix(bytes)
-        .map_err(|_| debug_err!(ParseError::Format, "too few bytes for header"))?;
+    let (header, _) = Ref::<B, Header>::from_prefix(bytes).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| debug_err!(ParseError::Format, "too few bytes for header"),
+    )?;
 
     let hw = ArpHardwareType::try_from(header.htype.get()).ok().ok_or_else(debug_err_fn!(
         ParseError::NotSupported,
@@ -465,7 +466,7 @@ mod tests {
         // Assert that parsing a particular header results in an error.
         fn assert_header_err(header: Header, err: ParseError) {
             let mut buf = [0; ARP_ETHERNET_IPV4_PACKET_LEN];
-            *Ref::<_, Header>::unaligned_from_prefix(&mut buf[..]).unwrap().0 = header;
+            *Ref::<_, Header>::from_prefix(&mut buf[..]).unwrap().0 = header;
             assert_err(&buf[..], err);
         }
 

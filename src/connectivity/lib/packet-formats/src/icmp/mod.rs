@@ -82,8 +82,9 @@ impl HeaderPrefix {
 /// and so `peek_message_type` succeeding does not guarantee that a subsequent
 /// call to `parse` will also succeed.
 pub fn peek_message_type<MessageType: TryFrom<u8>>(bytes: &[u8]) -> ParseResult<MessageType> {
-    let (hdr_pfx, _) = Ref::<_, HeaderPrefix>::unaligned_from_prefix(bytes)
-        .map_err(|_| debug_err!(ParseError::Format, "too few bytes for header"))?;
+    let (hdr_pfx, _) = Ref::<_, HeaderPrefix>::from_prefix(bytes).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| debug_err!(ParseError::Format, "too few bytes for header"),
+    )?;
     MessageType::try_from(hdr_pfx.msg_type).map_err(|_| {
         debug_err!(ParseError::NotSupported, "unrecognized message type: {:x}", hdr_pfx.msg_type,)
     })
@@ -157,8 +158,7 @@ impl IcmpIpExt for Ipv4 {
         if bytes.len() < ipv4::IPV4_MIN_HDR_LEN {
             return bytes.len();
         }
-        let (header_prefix, _) =
-            Ref::<_, ipv4::HeaderPrefix>::unaligned_from_prefix(bytes).unwrap();
+        let (header_prefix, _) = Ref::<_, ipv4::HeaderPrefix>::from_prefix(bytes).unwrap();
         cmp::min(header_prefix.ihl() as usize * 4, bytes.len())
     }
 

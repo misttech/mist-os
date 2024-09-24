@@ -385,8 +385,9 @@ where
 }
 
 fn verify_packet<I: IpExt>(addr: I::SockAddr, packet: &[u8]) -> Result<PingData<I>, PingError> {
-    let (reply, body): (zerocopy::Ref<_, IcmpHeader>, _) =
-        zerocopy::Ref::unaligned_from_prefix(packet).map_err(|_| PingError::Parse)?;
+    let (reply, body): (zerocopy::Ref<_, IcmpHeader>, _) = zerocopy::Ref::from_prefix(packet)
+        .map_err(Into::into)
+        .map_err(|_: zerocopy::SizeError<_, _>| PingError::Parse)?;
 
     // The identifier cannot be verified, since ICMP socket implementations rewrites the field on
     // send and uses its value to demultiplex packets for delivery to sockets on receive.
@@ -482,9 +483,9 @@ mod test {
                 .copied()
                 .collect::<Vec<u8>>();
             let (mut header, _): (zerocopy::Ref<_, IcmpHeader>, _) =
-                match zerocopy::Ref::unaligned_from_prefix(&mut buf[..]) {
+                match zerocopy::Ref::from_prefix(&mut buf[..]).map_err(Into::into) {
                     Ok(layout_verified) => layout_verified,
-                    Err(_) => {
+                    Err(zerocopy::SizeError { .. }) => {
                         return Poll::Ready(Err(std::io::Error::new(
                             std::io::ErrorKind::InvalidInput,
                             "failed to parse ICMP header from provided bytes",

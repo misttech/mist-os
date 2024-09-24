@@ -30,7 +30,7 @@ pub struct EthernetFrame<B: SplitByteSlice> {
 
 impl<B: SplitByteSlice> EthernetFrame<B> {
     pub fn parse(bytes: B) -> Option<Self> {
-        let (hdr, body) = Ref::unaligned_from_prefix(bytes).ok()?;
+        let (hdr, body) = Ref::from_prefix(bytes).ok()?;
         Some(Self { hdr, body })
     }
 }
@@ -47,7 +47,7 @@ mod tests {
             13, 14, // ether_type
             99, 99, // trailing bytes
         ];
-        let (mut hdr, body) = Ref::<_, EthernetIIHdr>::unaligned_from_prefix(&mut bytes[..])
+        let (mut hdr, body) = Ref::<_, EthernetIIHdr>::from_prefix(&mut bytes[..])
             .expect("cannot create ethernet header.");
         assert_eq!(hdr.da, MacAddr::from([1u8, 2, 3, 4, 5, 6]));
         assert_eq!(hdr.sa, MacAddr::from([7u8, 8, 9, 10, 11, 12]));

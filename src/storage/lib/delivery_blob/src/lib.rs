@@ -191,7 +191,7 @@ impl DeliveryBlobHeader {
     /// header of a delivery blob are required to be present in `data`.
     pub fn parse(data: &[u8]) -> Result<Option<DeliveryBlobHeader>, DeliveryBlobError> {
         let Ok((serialized_header, _metadata_and_payload)) =
-            Ref::<_, format::SerializedHeader>::unaligned_from_prefix(data)
+            Ref::<_, format::SerializedHeader>::from_prefix(data)
         else {
             return Ok(None);
         };
@@ -318,8 +318,7 @@ impl Type1Blob {
     /// **WARNING**: This function does not verify that the payload is complete. Only the full
     /// header and metadata portion of a delivery blob are required to be present in `data`.
     pub fn parse(data: &[u8]) -> Result<Option<(Type1Blob, &[u8])>, DeliveryBlobError> {
-        let Ok((serialized_header, payload)) =
-            Ref::<_, SerializedType1Blob>::unaligned_from_prefix(data)
+        let Ok((serialized_header, payload)) = Ref::<_, SerializedType1Blob>::from_prefix(data)
         else {
             return Ok(None);
         };

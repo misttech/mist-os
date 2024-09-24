@@ -34,7 +34,7 @@ pub trait Append {
         T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
         let bytes = self.append_bytes_zeroed(size_of::<T>())?;
-        Ok(Ref::unaligned_from_bytes(bytes).unwrap())
+        Ok(Ref::from_bytes(bytes).unwrap())
     }
 
     fn append_array_zeroed<T>(
@@ -45,7 +45,7 @@ pub trait Append {
         T: FromBytes + Immutable + Unaligned,
     {
         let bytes = self.append_bytes_zeroed(size_of::<T>() * num_elems)?;
-        Ok(Ref::unaligned_from_bytes(bytes).unwrap())
+        Ok(Ref::from_bytes(bytes).unwrap())
     }
 }
 

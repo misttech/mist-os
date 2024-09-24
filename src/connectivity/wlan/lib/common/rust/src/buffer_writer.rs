@@ -24,7 +24,7 @@ impl<B: SplitByteSliceMut> BufferWriter<B> {
     }
 
     pub fn into_written(self) -> B {
-        let (written, _remaining) = self.buffer.split_at(self.written);
+        let (written, _remaining) = self.buffer.split_at(self.written).ok().unwrap();
         written
     }
 

@@ -62,7 +62,7 @@ pub fn parse_supported_rates<B: SplitByteSlice>(
     // the number of rates to improve interoperability.
     validate!(!raw_body.is_empty(), "Empty Supported Rates IE");
     // unwrap() is OK because sizeof(SupportedRate) is 1, and any slice length is a multiple of 1
-    Ok(Ref::unaligned_from_bytes(raw_body).unwrap())
+    Ok(Ref::from_bytes(raw_body).unwrap())
 }
 
 pub fn parse_extended_supported_rates<B: SplitByteSlice>(
@@ -73,13 +73,15 @@ pub fn parse_extended_supported_rates<B: SplitByteSlice>(
     // maximum number of bytes in an IE. Therefore, there is no need to check the max length
     // of the extended supported rates IE body.
     // unwrap() is OK because sizeof(SupportedRate) is 1, and any slice length is a multiple of 1
-    Ok(Ref::unaligned_from_bytes(raw_body).unwrap())
+    Ok(Ref::from_bytes(raw_body).unwrap())
 }
 
 pub fn parse_tim<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<TimView<B>> {
-    let (header, bitmap) = Ref::<B, TimHeader>::unaligned_from_prefix(raw_body).map_err(|_| {
-        FrameParseError(format!("Element body is too short to include a TIM header"))
-    })?;
+    let (header, bitmap) = Ref::<B, TimHeader>::from_prefix(raw_body).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| {
+            FrameParseError(format!("Element body is too short to include a TIM header"))
+        },
+    )?;
     validate!(!bitmap.is_empty(), "Bitmap in TIM is empty");
     validate!(bitmap.len() <= TIM_MAX_BITMAP_LEN, "Bitmap in TIM is too long");
     Ok(TimView { header: *header, bitmap })
@@ -197,11 +199,11 @@ pub fn parse_vendor_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<Vendo
                 Some(wpa::VENDOR_SPECIFIC_TYPE) => {
                     // We already know from our peek_byte that at least one byte remains, so this
                     // split will not panic.
-                    let (_type, body) = reader.into_remaining().split_at(1);
+                    let (_type, body) = reader.into_remaining().split_at(1).ok().unwrap();
                     VendorIe::MsftLegacyWpa(body)
                 }
                 Some(wsc::VENDOR_SPECIFIC_TYPE) => {
-                    let (_type, body) = reader.into_remaining().split_at(1);
+                    let (_type, body) = reader.into_remaining().split_at(1).ok().unwrap();
                     VendorIe::Wsc(body)
                 }
                 // The first three bytes after OUI are OUI type, OUI subtype, and version.
@@ -216,8 +218,10 @@ pub fn parse_vendor_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<Vendo
                     match subtype {
                         // Safe to split because we already checked that there are at least 3
                         // bytes remaining.
-                        WMM_INFO_OUI_SUBTYPE => VendorIe::WmmInfo(body.split_at(3).1),
-                        WMM_PARAM_OUI_SUBTYPE => VendorIe::WmmParam(body.split_at(3).1),
+                        WMM_INFO_OUI_SUBTYPE => VendorIe::WmmInfo(body.split_at(3).ok().unwrap().1),
+                        WMM_PARAM_OUI_SUBTYPE => {
+                            VendorIe::WmmParam(body.split_at(3).ok().unwrap().1)
+                        }
                         _ => VendorIe::Unknown { oui, body },
                     }
                 }

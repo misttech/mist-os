@@ -495,7 +495,7 @@ mod tests {
         // Create a buffer describing an ADDBA request body and read the management action byte.
         let (n, body) = addba_req_body(1);
         let body = &body[..n];
-        let (_, body) = Ref::<_, mac::ActionHdr>::unaligned_from_prefix(body).unwrap();
+        let (_, body) = Ref::<_, mac::ActionHdr>::from_prefix(body).unwrap();
 
         let mut station = Station::Up;
         let state = BlockAckState::from(State::new(Closed));
@@ -515,7 +515,7 @@ mod tests {
         // Create a buffer describing a DELBA body and read the management action byte.
         let (n, body) = delba_body(true, fidl_ieee80211::ReasonCode::UnspecifiedReason.into());
         let body = &body[..n];
-        let (_, body) = Ref::<_, mac::ActionHdr>::unaligned_from_prefix(body).unwrap();
+        let (_, body) = Ref::<_, mac::ActionHdr>::from_prefix(body).unwrap();
 
         let mut station = Station::Up;
         let state = BlockAckState::from(statemachine::testing::new_state(Established {

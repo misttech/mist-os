@@ -37,7 +37,7 @@ impl<B> LlcFrame<B> {
     {
         // An LLC frame is only valid if it contains enough bytes for the header and one or more
         // bytes for the body.
-        let (hdr, body) = Ref::unaligned_from_prefix(bytes).ok()?;
+        let (hdr, body) = Ref::from_prefix(bytes).ok()?;
         if body.is_empty() {
             None
         } else {

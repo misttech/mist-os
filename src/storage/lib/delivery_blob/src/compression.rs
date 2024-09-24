@@ -53,9 +53,9 @@ pub fn decode_archive(
     data: &[u8],
     archive_length: usize,
 ) -> Result<Option<(Vec<ChunkInfo>, /*archive_data*/ &[u8])>, ChunkedArchiveError> {
-    match Ref::<_, ChunkedArchiveHeader>::unaligned_from_prefix(data) {
+    match Ref::<_, ChunkedArchiveHeader>::from_prefix(data).map_err(Into::into) {
         Ok((header, data)) => header.decode_seek_table(data, archive_length as u64),
-        Err(_) => Ok(None), // Not enough data.
+        Err(zerocopy::SizeError { .. }) => Ok(None), // Not enough data.
     }
 }
 
@@ -159,7 +159,7 @@ impl ChunkedArchiveHeader {
         // Deserialize seek table.
         let num_entries = self.num_entries.get() as usize;
         let Ok((entries, chunk_data)) =
-            Ref::<_, [SeekTableEntry]>::unaligned_from_prefix_with_elems(data, num_entries)
+            Ref::<_, [SeekTableEntry]>::from_prefix_with_elems(data, num_entries)
         else {
             return Ok(None);
         };

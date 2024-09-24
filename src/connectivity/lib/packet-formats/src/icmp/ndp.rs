@@ -1058,8 +1058,9 @@ pub mod options {
                     // As per RFC 8106 section 5.1, the list of addresses immediately
                     // follows the lifetime field.
                     let addresses = Ref::into_ref(
-                        Ref::<_, [Ipv6Addr]>::unaligned_from_bytes(data)
-                            .map_err(|_| OptionParseErr)?,
+                        Ref::<_, [Ipv6Addr]>::from_bytes(data)
+                            .map_err(Into::into)
+                            .map_err(|_: zerocopy::SizeError<_, _>| OptionParseErr)?,
                     );
 
                     // As per RFC 8106 section 5.3.1, the addresses should all be unicast.

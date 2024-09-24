@@ -1284,7 +1284,7 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
     where
         T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
-        Some(Ref::into_ref(Ref::<_, T>::unaligned_from_prefix((&*self).as_ref()).ok()?.0))
+        Some(Ref::into_ref(Ref::<_, T>::from_prefix((&*self).as_ref()).ok()?.0))
     }
 
     /// Takes an object from the front of the buffer's body.
@@ -1301,7 +1301,7 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
     {
         let bytes = self.take_front(mem::size_of::<T>())?;
         // unaligned_from_bytes only returns None if there aren't enough bytes
-        Some(Ref::unaligned_from_bytes(bytes).unwrap())
+        Some(Ref::from_bytes(bytes).unwrap())
     }
 
     /// Takes a slice of objects from the front of the buffer's body.
@@ -1323,7 +1323,7 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
         let bytes = self.take_front(n * mem::size_of::<T>())?;
         // `unaligned_from_bytes` will return `None` only if `bytes.len()` is
         // not a multiple of `mem::size_of::<T>()`.
-        Some(Ref::unaligned_from_bytes(bytes).unwrap())
+        Some(Ref::from_bytes(bytes).unwrap())
     }
 
     /// Peeks at an object at the back of the buffer's body.
@@ -1336,7 +1336,7 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
     where
         T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
-        Some(Ref::into_ref(Ref::<_, T>::unaligned_from_suffix((&*self).as_ref()).ok()?.1))
+        Some(Ref::into_ref(Ref::<_, T>::from_suffix((&*self).as_ref()).ok()?.1))
     }
 
     /// Takes an object from the back of the buffer's body.
@@ -1353,7 +1353,7 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
     {
         let bytes = self.take_back(mem::size_of::<T>())?;
         // unaligned_from_bytes only returns None if there aren't enough bytes
-        Some(Ref::unaligned_from_bytes(bytes).unwrap())
+        Some(Ref::from_bytes(bytes).unwrap())
     }
 
     /// Takes a slice of objects from the back of the buffer's body.
@@ -1375,7 +1375,7 @@ pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
         let bytes = self.take_back(n * mem::size_of::<T>())?;
         // `unaligned_from_bytes` will return `None` only if `bytes.len()` is
         // not a multiple of `mem::size_of::<T>()`.
-        Some(Ref::unaligned_from_bytes(bytes).unwrap())
+        Some(Ref::from_bytes(bytes).unwrap())
     }
 }
 
@@ -1460,7 +1460,7 @@ pub trait BufferViewMut<B: SplitByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     {
         let bytes = self.take_front(mem::size_of::<T>())?;
         // unaligned_from_bytes only returns None if there aren't enough bytes
-        let mut obj: Ref<_, _> = Ref::unaligned_from_bytes(bytes).unwrap();
+        let mut obj: Ref<_, _> = Ref::from_bytes(bytes).unwrap();
         Ref::bytes_mut(&mut obj).zero();
         Some(obj)
     }
@@ -1477,7 +1477,7 @@ pub trait BufferViewMut<B: SplitByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     {
         let bytes = self.take_back(mem::size_of::<T>())?;
         // unaligned_from_bytes only returns None if there aren't enough bytes
-        let mut obj: Ref<_, _> = Ref::unaligned_from_bytes(bytes).unwrap();
+        let mut obj: Ref<_, _> = Ref::from_bytes(bytes).unwrap();
         Ref::bytes_mut(&mut obj).zero();
         Some(obj)
     }

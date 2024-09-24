@@ -153,7 +153,7 @@ impl<B: Debug + SplitByteSlice + PartialEq> ParseStrategy for ByRef<B> {
     fn parse<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         self,
     ) -> Option<(Self::Output<T>, Self)> {
-        let (output, tail) = Ref::unaligned_from_prefix(self.tail).ok()?;
+        let (output, tail) = Ref::from_prefix(self.tail).ok()?;
         Some((output, Self { input: self.input, tail }))
     }
 
@@ -163,7 +163,7 @@ impl<B: Debug + SplitByteSlice + PartialEq> ParseStrategy for ByRef<B> {
         self,
         num: usize,
     ) -> Option<(Self::Slice<T>, Self)> {
-        let (slice, tail) = Ref::unaligned_from_prefix_with_elems(self.tail, num).ok()?;
+        let (slice, tail) = Ref::from_prefix_with_elems(self.tail, num).ok()?;
         Some((slice, Self { input: self.input, tail }))
     }
 

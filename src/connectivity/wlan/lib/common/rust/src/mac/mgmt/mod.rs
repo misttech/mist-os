@@ -147,7 +147,7 @@ where
     B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::unaligned_from_prefix(bytes)
+        Ref::from_prefix(bytes)
             .ok()
             .map(|(action_hdr, elements)| ActionBody { action_hdr, elements })
     }
@@ -167,7 +167,7 @@ where
     B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::unaligned_from_prefix(bytes)
+        Ref::from_prefix(bytes)
             .ok()
             .map(|(assoc_req_hdr, elements)| AssocReqFrame { assoc_req_hdr, elements })
     }
@@ -191,7 +191,7 @@ where
     B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::unaligned_from_prefix(bytes)
+        Ref::from_prefix(bytes)
             .ok()
             .map(|(assoc_resp_hdr, elements)| AssocRespFrame { assoc_resp_hdr, elements })
     }
@@ -220,9 +220,7 @@ where
     B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::unaligned_from_prefix(bytes)
-            .ok()
-            .map(|(auth_hdr, elements)| AuthFrame { auth_hdr, elements })
+        Ref::from_prefix(bytes).ok().map(|(auth_hdr, elements)| AuthFrame { auth_hdr, elements })
     }
 
     pub fn into_auth_body(self) -> (Ref<B, AuthHdr>, B) {
@@ -269,23 +267,23 @@ impl<B: SplitByteSlice> MgmtBody<B> {
     pub fn parse(subtype: MgmtSubtype, bytes: B) -> Option<Self> {
         match subtype {
             MgmtSubtype::BEACON => {
-                let (bcn_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
+                let (bcn_hdr, elements) = Ref::from_prefix(bytes).ok()?;
                 Some(MgmtBody::Beacon { bcn_hdr, elements })
             }
             MgmtSubtype::PROBE_REQ => ProbeReqFrame::parse(bytes).map(From::from),
             MgmtSubtype::PROBE_RESP => {
-                let (probe_resp_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
+                let (probe_resp_hdr, elements) = Ref::from_prefix(bytes).ok()?;
                 Some(MgmtBody::ProbeResp { probe_resp_hdr, elements })
             }
             MgmtSubtype::AUTH => AuthFrame::parse(bytes).map(From::from),
             MgmtSubtype::ASSOC_REQ => AssocReqFrame::parse(bytes).map(From::from),
             MgmtSubtype::ASSOC_RESP => AssocRespFrame::parse(bytes).map(From::from),
             MgmtSubtype::DEAUTH => {
-                let (deauth_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
+                let (deauth_hdr, elements) = Ref::from_prefix(bytes).ok()?;
                 Some(MgmtBody::Deauthentication { deauth_hdr, elements })
             }
             MgmtSubtype::DISASSOC => {
-                let (disassoc_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
+                let (disassoc_hdr, elements) = Ref::from_prefix(bytes).ok()?;
                 Some(MgmtBody::Disassociation { disassoc_hdr, elements })
             }
             MgmtSubtype::ACTION => {

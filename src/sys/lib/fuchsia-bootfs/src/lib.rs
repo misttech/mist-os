@@ -78,8 +78,9 @@ struct ZbiBootfsDirent<B: SplitByteSlice> {
 }
 impl<B: SplitByteSlice> ZbiBootfsDirent<B> {
     pub fn parse(bytes: B) -> Result<ZbiBootfsDirent<B>, BootfsParserError> {
-        let (header, name_bytes) = Ref::<B, zbi_bootfs_dirent_t>::unaligned_from_prefix(bytes)
-            .map_err(|_| BootfsParserError::FailedToParseDirEntry)?;
+        let (header, name_bytes) = Ref::<B, zbi_bootfs_dirent_t>::from_prefix(bytes)
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| BootfsParserError::FailedToParseDirEntry)?;
 
         Ok(ZbiBootfsDirent { header, name_bytes })
     }
@@ -122,8 +123,9 @@ impl BootfsParser {
         vmo.read(&mut header_bytes, 0)
             .map_err(|status| BootfsParserError::FailedToReadPayload { status })?;
 
-        let header = Ref::<_, zbi_bootfs_header_t>::unaligned_from_bytes(&header_bytes[..])
-            .map_err(|_| BootfsParserError::FailedToParseHeader)?;
+        let header = Ref::<_, zbi_bootfs_header_t>::from_bytes(&header_bytes[..])
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| BootfsParserError::FailedToParseHeader)?;
         if header.magic.get() == ZBI_BOOTFS_MAGIC {
             Ok(Self { vmo, dirsize: header.dirsize.get() })
         } else {

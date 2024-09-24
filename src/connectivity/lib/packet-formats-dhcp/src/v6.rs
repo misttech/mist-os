@@ -352,8 +352,10 @@ impl<'a, B: SplitByteSlice> IanaData<B> {
     /// Constructs a new `IanaData` from a `ByteSlice`.
     fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::unaligned_from_prefix(buf)
-            .map_err(|_| ParseError::InvalidOpLen(OptionCode::Iana, buf_len))?;
+        let (header, options) =
+            Ref::from_prefix(buf).map_err(Into::into).map_err(|_: zerocopy::SizeError<_, _>| {
+                ParseError::InvalidOpLen(OptionCode::Iana, buf_len)
+            })?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IanaData { header, options })
     }
@@ -411,8 +413,10 @@ impl<'a, B: SplitByteSlice> IaAddrData<B> {
     /// Constructs a new `IaAddrData` from a `ByteSlice`.
     pub fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::unaligned_from_prefix(buf)
-            .map_err(|_| ParseError::InvalidOpLen(OptionCode::IaAddr, buf_len))?;
+        let (header, options) =
+            Ref::from_prefix(buf).map_err(Into::into).map_err(|_: zerocopy::SizeError<_, _>| {
+                ParseError::InvalidOpLen(OptionCode::IaAddr, buf_len)
+            })?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaAddrData { header, options })
     }
@@ -483,8 +487,10 @@ impl<'a, B: SplitByteSlice> IaPdData<B> {
     /// Constructs a new `IaPdData` from a `ByteSlice`.
     fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::unaligned_from_prefix(buf)
-            .map_err(|_| ParseError::InvalidOpLen(OptionCode::IaPd, buf_len))?;
+        let (header, options) =
+            Ref::from_prefix(buf).map_err(Into::into).map_err(|_: zerocopy::SizeError<_, _>| {
+                ParseError::InvalidOpLen(OptionCode::IaPd, buf_len)
+            })?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaPdData { header, options })
     }
@@ -545,8 +551,10 @@ impl<'a, B: SplitByteSlice> IaPrefixData<B> {
     /// Constructs a new `IaPrefixData` from a `ByteSlice`.
     pub fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::unaligned_from_prefix(buf)
-            .map_err(|_| ParseError::InvalidOpLen(OptionCode::IaPrefix, buf_len))?;
+        let (header, options) =
+            Ref::from_prefix(buf).map_err(Into::into).map_err(|_: zerocopy::SizeError<_, _>| {
+                ParseError::InvalidOpLen(OptionCode::IaPrefix, buf_len)
+            })?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaPrefixData { header, options })
     }

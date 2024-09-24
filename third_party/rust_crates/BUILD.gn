@@ -1169,7 +1169,7 @@ group("xml-rs") {
 }
 
 group("zerocopy") {
-  public_deps = [ ":zerocopy-v0_8_0-alpha_21" ]
+  public_deps = [ ":zerocopy-v0_8_0-alpha_25" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -18301,26 +18301,26 @@ rust_library("zerocopy-v0_7_15") {
   applicable_licenses = [ ":zerocopy-v0_7_15.license" ]
 }
 
-license("zerocopy-v0_8_0-alpha_21.license") {
+license("zerocopy-v0_8_0-alpha_25.license") {
   public_package_name = "zerocopy"
   license_files = [
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.25/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.25/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.25/LICENSE-MIT",
   ]
 }
 
-rust_library("zerocopy-v0_8_0-alpha_21") {
+rust_library("zerocopy-v0_8_0-alpha_25") {
   crate_name = "zerocopy"
   crate_root =
-      "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/src/lib.rs"
-  output_name = "zerocopy-c09c656f5efde163"
+      "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.25/src/lib.rs"
+  output_name = "zerocopy-fadb44f9969694bb"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zerocopy-derive-v0_8_0-alpha_21($host_toolchain)" ]
+  deps += [ ":zerocopy-derive-v0_8_0-alpha_25($host_toolchain)" ]
   if (true) {
-    deps += [ ":zerocopy-derive-v0_8_0-alpha_21($host_toolchain)" ]
+    deps += [ ":zerocopy-derive-v0_8_0-alpha_25($host_toolchain)" ]
   }
 
   rustenv = []
@@ -18328,19 +18328,22 @@ rust_library("zerocopy-v0_8_0-alpha_21") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=c09c656f5efde163",
-    "-Cextra-filename=-c09c656f5efde163",
+    "-Cmetadata=fadb44f9969694bb",
+    "-Cextra-filename=-fadb44f9969694bb",
     "--cfg=feature=\"derive\"",
     "--cfg=feature=\"simd\"",
     "--cfg=feature=\"zerocopy-derive\"",
+    "--cfg=zerocopy_core_error",
+    "--cfg=zerocopy_diagnostic_on_unimplemented",
     "--cfg=zerocopy_generic_bounds_in_const_fn",
+    "--cfg=zerocopy_target_has_atomics",
     "--cfg=zerocopy_aarch64_simd",
-    "--cfg=zerocopy_panic_in_const",
+    "--cfg=zerocopy_panic_in_const_and_vec_try_reserve",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-v0_8_0-alpha_21.license" ]
+  applicable_licenses = [ ":zerocopy-v0_8_0-alpha_25.license" ]
 }
 
 license("zerocopy-derive-v0_7_15.license") {
@@ -18378,19 +18381,19 @@ rust_proc_macro("zerocopy-derive-v0_7_15") {
   applicable_licenses = [ ":zerocopy-derive-v0_7_15.license" ]
 }
 
-license("zerocopy-derive-v0_8_0-alpha_21.license") {
+license("zerocopy-derive-v0_8_0-alpha_25.license") {
   public_package_name = "zerocopy_derive"
   license_files = [
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.21/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.21/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.21/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.25/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.25/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.25/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("zerocopy-derive-v0_8_0-alpha_21") {
+rust_proc_macro("zerocopy-derive-v0_8_0-alpha_25") {
   crate_name = "zerocopy_derive"
-  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.21/src/lib.rs"
-  output_name = "zerocopy_derive-f3d541e3ecbc54d0"
+  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.25/src/lib.rs"
+  output_name = "zerocopy_derive-3c0f564014d99a03"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18403,13 +18406,13 @@ rust_proc_macro("zerocopy-derive-v0_8_0-alpha_21") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=f3d541e3ecbc54d0",
-    "-Cextra-filename=-f3d541e3ecbc54d0",
+    "-Cmetadata=3c0f564014d99a03",
+    "-Cextra-filename=-3c0f564014d99a03",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-derive-v0_8_0-alpha_21.license" ]
+  applicable_licenses = [ ":zerocopy-derive-v0_8_0-alpha_25.license" ]
 }
 
 license("zeroize-v1_6_0.license") {

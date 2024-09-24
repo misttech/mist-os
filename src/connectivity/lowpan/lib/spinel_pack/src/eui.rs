@@ -36,7 +36,10 @@ impl<'a> std::convert::TryInto<&'a EUI64> for &'a [u8] {
     type Error = WrongSize;
 
     fn try_into(self) -> Result<&'a EUI64, Self::Error> {
-        Ref::<_, EUI64>::unaligned_from_bytes(self).map_err(|_| WrongSize).map(Ref::into_ref)
+        Ref::<_, EUI64>::from_bytes(self)
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| WrongSize)
+            .map(Ref::into_ref)
     }
 }
 
@@ -61,6 +64,9 @@ impl<'a> std::convert::TryInto<&'a EUI48> for &'a [u8] {
     type Error = WrongSize;
 
     fn try_into(self) -> Result<&'a EUI48, Self::Error> {
-        Ref::<_, EUI48>::unaligned_from_bytes(self).map_err(|_| WrongSize).map(Ref::into_ref)
+        Ref::<_, EUI48>::from_bytes(self)
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| WrongSize)
+            .map(Ref::into_ref)
     }
 }

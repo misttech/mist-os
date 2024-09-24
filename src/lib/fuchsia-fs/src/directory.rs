@@ -955,7 +955,7 @@ pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentErr
     let mut entries = vec![];
 
     while !buf.is_empty() {
-        let Ok((dirent, rest)) = Ref::<_, Dirent>::unaligned_from_prefix(buf) else {
+        let Ok((dirent, rest)) = Ref::<_, Dirent>::from_prefix(buf) else {
             entries.push(Err(DecodeDirentError::BufferOverrun));
             return entries;
         };
