@@ -42,10 +42,7 @@
     offer: [
         // Routes from boostrap realm.  These are all offered from "parent".
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "parent",
             to: "#ui",
         },
@@ -96,8 +93,6 @@
             to: "#ui",
         },
         {
-            from: "parent",
-            to: [ "#ui" ],
             config: [
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.scenic.DisplayComposition",
@@ -119,6 +114,8 @@
                 "fuchsia.ui.SupportedInputDevices",
                 "fuchsia.ui.ViewingDistance",
             ],
+            from: "parent",
+            to: [ "#ui" ],
         },
         {
             protocol: [ "fuchsia.vulkan.loader.Loader" ],

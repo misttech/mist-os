@@ -49,7 +49,6 @@
                 "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",
-                "fuchsia.logger.LogSink",
                 "fuchsia.media.Audio",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
