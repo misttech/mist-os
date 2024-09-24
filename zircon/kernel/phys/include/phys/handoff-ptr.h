@@ -141,6 +141,10 @@ class PhysHandoffSpan {
 
   PhysHandoffSpan& operator=(PhysHandoffSpan&&) noexcept = default;
 
+  size_t size() const { return size_; }
+
+  bool empty() const { return size() == 0; }
+
 #if HANDOFF_PTR_DEREF
   cpp20::span<T> get() const { return {ptr_.get(), size_}; }
 

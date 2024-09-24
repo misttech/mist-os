@@ -132,11 +132,19 @@ if (toolchain_environment == "userboot") {
       "//zircon/system/ulib/zx",
     ]
 
+    outputs = [ "$root_out_dir/userboot" ]
+
     # This ensures that the userboot binary is never installed into filesystem
     # images since it's materialized at runtime by the kernel.
     metadata = {
       distribution_entries_barrier = []
-      distribution_entries = []
+      distribution_entries = [
+        {
+          source = rebase_path(outputs[0], root_build_dir)
+          destination = "userboot"
+          label = get_label_info(":$target_name", "label_with_toolchain")
+        },
+      ]
     }
   }
 

@@ -54,6 +54,10 @@ std::string_view ToString(Type type) {
       return "data ZBI"sv;
     case Type::kTemporaryPhysHandoff:
       return "phys hand-off data (temporary)"sv;
+    case Type::kVdso:
+      return "vDSO"sv;
+    case Type::kUserboot:
+      return "userboot"sv;
     case Type::kTrampolineStagingKernel:
       return "trampoline staging kernel image"sv;
     case Type::kTrampolineStagingDataZbi:

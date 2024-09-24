@@ -767,8 +767,13 @@ if (is_kernel) {
       ]
     }
 
-    # Embed the version-string.txt file directly in the package subdirectory.
-    deps += [ "//zircon/kernel/lib/version:version-string.txt" ]
+    # Embed userboot, the vDSO, and the version-string.txt file in the package
+    # subdirectory.
+    deps += [
+      "//zircon/kernel/lib/userabi/userboot",
+      "//zircon/kernel/lib/userabi/vdso",
+      "//zircon/kernel/lib/version:version-string.txt",
+    ]
   }
 
   # The final kernel ZBI combines physboot with that kernel storage payload.

@@ -46,7 +46,7 @@ enum HandleIndex : uint32_t {
   kZbi,
 
   kFirstVdso,
-  kLastVdso = kFirstVdso + static_cast<uint32_t>(VdsoVariant::COUNT) - 1,
+  kLastVdso = kFirstVdso + kNumVdsoVariants - 1,
 
   // These get passed along to userland to be recognized by ZX_PROP_NAME.
   // The remainder are VMO handles that userboot doesn't care about.

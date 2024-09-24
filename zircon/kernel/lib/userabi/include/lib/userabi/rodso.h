@@ -13,9 +13,6 @@
 #include <object/handle.h>
 #include <object/vm_object_dispatcher.h>
 
-// Returns a VMO that describes a page-aligned file embedded in the kernel.
-fbl::RefPtr<VmObject> GetEmbeddedVmo(const void* image, size_t size, ktl::string_view name);
-
 // An RoDso object describes one DSO image built with the rodso.ld layout.
 class RoDso {
  public:

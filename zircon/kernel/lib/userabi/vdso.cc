@@ -31,10 +31,6 @@
 
 #define LOCAL_TRACE 0
 
-// This is defined in assembly via RODSO_IMAGE (see rodso-asm.h);
-// vdso-code.h gives details about the image's size and layout.
-extern "C" const char vdso_image[];
-
 namespace {
 
 class VDsoMutator {
@@ -347,11 +343,11 @@ VDso::VDso(fbl::RefPtr<VmObject> next) : RoDso(ktl::move(next), VDSO_CODE_END, V
 
 // This is called exactly once, at boot time.
 const VDso* VDso::Create(
+    fbl::RefPtr<VmObject> next,
     ktl::span<KernelHandle<VmObjectDispatcher>, userboot::kNumVdsoVariants> vmo_kernel_handles,
     KernelHandle<VmObjectDispatcher>* time_values_handle) {
   ASSERT(!instance_);
 
-  fbl::RefPtr<VmObject> next = GetEmbeddedVmo(vdso_image, VDSO_CODE_END, "vdso/next");
   fbl::AllocChecker ac;
   VDso* vdso = new (&ac) VDso(ktl::move(next));
   ASSERT(ac.check());

@@ -69,6 +69,12 @@ enum class Type : uint64_t {
   // phase.
   kTemporaryPhysHandoff,
 
+  // A vDSO memory image.
+  kVdso,
+
+  // The userboot memory image.
+  kUserboot,
+
   // The intermediate kernel memory image used to trampoline into the same image
   // loaded at a fixed address (i.e., as used by TrampolineBoot).
   kTrampolineStagingKernel,

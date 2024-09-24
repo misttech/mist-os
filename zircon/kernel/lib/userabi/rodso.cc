@@ -15,22 +15,8 @@
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
-#include <vm/vm_object_paged.h>
 
 #include <ktl/enforce.h>
-
-fbl::RefPtr<VmObject> GetEmbeddedVmo(const void* image, size_t size, ktl::string_view name) {
-  ASSERT(IS_PAGE_ALIGNED(size));
-
-  // Create VMO out of rodata mapped in kernel space.
-  fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::CreateFromWiredPages(image, size, true, &vmo);
-  ASSERT(status == ZX_OK);
-
-  status = vmo->set_name(name.data(), name.size());
-  ASSERT(status == ZX_OK);
-  return vmo;
-}
 
 // Map one segment from our VM object.
 zx_status_t RoDso::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar, bool code,

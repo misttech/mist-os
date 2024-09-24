@@ -100,6 +100,8 @@ struct PhysHandoff {
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPhysLog:
+      case memalloc::Type::kUserboot:
+      case memalloc::Type::kVdso:
         return true;
       default:
         break;
@@ -128,6 +130,12 @@ struct PhysHandoff {
 
   // The data ZBI.
   PhysVmo zbi;
+
+  // The vDSO.
+  PhysVmo vdso;
+
+  // Userboot.
+  PhysVmo userboot;
 
   // Entropy gleaned from ZBI Items such as 'ZBI_TYPE_SECURE_ENTROPY' and/or command line.
   std::optional<crypto::EntropyPool> entropy_pool;
@@ -192,7 +200,11 @@ extern "C" [[noreturn]] void PhysbootHandoff(PhysHandoff* handoff);
 
 #include <stddef.h>
 
+#include <fbl/ref_ptr.h>
 #include <object/handle.h>
+
+// Forward declaration; defined in <vm/vm_object.h>
+class VmObject;
 
 // Called as soon as the physmap is available to set the gPhysHandoff pointer.
 void HandoffFromPhys(paddr_t handoff_paddr);
@@ -206,6 +218,9 @@ void HandoffFromPhys(paddr_t handoff_paddr);
 struct HandoffEnd {
   // The data ZBI.
   HandleOwner zbi;
+
+  fbl::RefPtr<VmObject> vdso;
+  fbl::RefPtr<VmObject> userboot;
 
   // The VMOs deriving from the phys environment. As returned by EndHandoff(),
   // the entirety of the array will be populated by real handles (if only by

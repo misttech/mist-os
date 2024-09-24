@@ -726,6 +726,9 @@ source_set("handoff") {
     public_deps += [
       # handoff.h has #include <object/handle.h>
       "//zircon/kernel/object:headers",
+
+      # handoff.h has #include <fbl/ref_ptr.h>
+      "//zircon/system/ulib/fbl:headers",
     ]
   }
 

@@ -168,8 +168,8 @@ class HandoffPrep {
   BootOptions& SetBootOptions(const BootOptions& boot_options);
 
   // Fetch things to be handed off from other files in the kernel package.
-  void UsePackageFiles(const KernelStorage::Bootfs& kernel_package);
-  void SetVersionString(KernelStorage::Bootfs kernel_package);
+  void UsePackageFiles(KernelStorage::Bootfs kernel_package);
+  void SetVersionString(ktl::string_view version);
 
   // Summarizes the provided data ZBI's miscellaneous simple items for the
   // kernel, filling in corresponding handoff()->item fields.  Certain fields,

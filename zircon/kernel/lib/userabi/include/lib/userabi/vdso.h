@@ -26,6 +26,7 @@ class VDso : public RoDso {
   // The RoDso VMO is created in vmo_kernel_handles[Variant::NEXT]
   // with the VDso variants in the other slots.
   static const VDso* Create(
+      fbl::RefPtr<VmObject> next,
       ktl::span<KernelHandle<VmObjectDispatcher>, userboot::kNumVdsoVariants> vmo_kernel_handles,
       KernelHandle<VmObjectDispatcher>* time_values_handle);
 

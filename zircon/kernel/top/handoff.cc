@@ -174,6 +174,8 @@ HandoffEnd EndHandoff() {
   HandoffEnd end{
       // Userboot expects the ZBI as writable.
       .zbi = CreatePhysVmoHandle(gPhysHandoff->zbi, /*writable=*/true),
+      .vdso = CreatePhysVmo(gPhysHandoff->vdso),
+      .userboot = CreatePhysVmo(gPhysHandoff->userboot),
   };
 
   // If the number of extra VMOs from physboot is less than the number of VMOs
