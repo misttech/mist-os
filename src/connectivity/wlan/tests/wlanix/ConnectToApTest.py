@@ -24,6 +24,7 @@ from antlion.controllers.ap_lib.hostapd_constants import (
     AP_SSID_LENGTH_2G,
 )
 from antlion.controllers.ap_lib.hostapd_security import Security, SecurityMode
+from antlion.controllers.ap_lib.hostapd_utils import generate_random_password
 from fuchsia_controller_py import Channel
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import base_test, signals, test_runner
@@ -32,10 +33,28 @@ from wlanix_testing import base_test
 
 
 class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
+    def pre_run(self) -> None:
+        self.generate_tests(
+            test_logic=self._test_logic,
+            name_func=self.name_func,
+            arg_sets=[
+                (Security(security_mode=SecurityMode.OPEN),),
+                (
+                    Security(
+                        security_mode=SecurityMode.WPA2,
+                        password=generate_random_password(),
+                    ),
+                ),
+            ],
+        )
+
+    def name_func(self, security: Security) -> str:
+        return f"test_successfully_connect_to_ap_{security.security_mode}"
+
     @asyncmethod
-    async def test_connect_to_open_ap(self) -> None:
+    async def _test_logic(self, security: Security) -> None:
         ssid = utils.rand_ascii_str(AP_SSID_LENGTH_2G)
-        security = Security(security_mode=SecurityMode.OPEN)
+        password = getattr(security, "password", None)
 
         setup_ap(
             access_point=self.access_point(),
@@ -119,6 +138,10 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
 
             fidl_ssid = fidl_ieee80211.Ssid(list(ssid.encode("ascii")))
             supplicant_sta_network_proxy.set_ssid(ssid=fidl_ssid)
+            if password:
+                supplicant_sta_network_proxy.set_psk_passphrase(
+                    passphrase=list(password.encode("ascii"))
+                )
 
             try:
                 (await supplicant_sta_network_proxy.select()).unwrap()
