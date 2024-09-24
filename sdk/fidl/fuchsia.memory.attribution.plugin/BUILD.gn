@@ -3,10 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/fidl/fidl.gni")
-import("//tools/fidl/measure-tape/measure_tape.gni")
-
-import("//build/fidl/fidl.gni")
-import("//tools/fidl/measure-tape/measure_tape.gni")
 
 fidl("fuchsia.memory.attribution.plugin") {
   sources = [ "plugin.fidl" ]
