@@ -34,12 +34,17 @@
 namespace starnix {
 
 fbl::RefPtr<Namespace> Namespace::New(FileSystemHandle fs) {
+  return Namespace::new_with_flags(fs, MountFlags::empty());
+}
+
+fbl::RefPtr<Namespace> Namespace::new_with_flags(FileSystemHandle fs, MountFlags flags) {
   auto kernel = fs->kernel().Lock();
   ASSERT_MSG(kernel, "can't create namespace without a kernel");
 
   fbl::AllocChecker ac;
   auto handle = fbl::AdoptRef(new (&ac) Namespace(
-      Mount::New({WhatToMountEnum::Fs, fs}, MountFlags::empty()), kernel->get_next_namespace_id()));
+      Mount::New({.type = WhatToMountEnum::Fs, .what = fs}, MountFlags::empty()),
+      kernel->get_next_namespace_id()));
   ZX_ASSERT(ac.check());
   return handle;
 }

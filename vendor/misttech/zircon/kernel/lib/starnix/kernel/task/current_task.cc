@@ -292,7 +292,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     if (clone_thread) {
       auto thread_group = (*this)->thread_group;
       auto memory_manager = (*this)->mm();
-      return fit::ok(TaskInfo{{}, thread_group, memory_manager});
+      return fit::ok(
+          TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
     } else {
       // Drop the lock on this task before entering `create_zircon_process`, because it will
       // take a lock on the new thread group, and locks on thread groups have a higher
@@ -410,7 +411,7 @@ starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
 fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::string_view& path,
                                      const fbl::Vector<ktl::string_view>& argv,
                                      const fbl::Vector<ktl::string_view>& environ) {
-  // LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+  LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.size()), path.data());
 
   // Executable must be a regular file
   /*
@@ -431,6 +432,7 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
   auto resolved_elf =
       resolve_executable(*this, executable, path, argv, environ /*,elf_selinux_state*/);
   if (resolved_elf.is_error()) {
+    TRACEF("error in resolve_executable: %u\n", resolved_elf.error_value().error_code());
     return resolved_elf.take_error();
   }
 
@@ -461,7 +463,8 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
 
 fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
                                             const ResolvedElf& resolved_elf) {
-  // LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+  LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.size()), path.data());
+
   //  Now that the exec will definitely finish (or crash), notify owners of
   //  locked futexes for the current process, which will be impossible to
   //  update after process image is replaced.  See get_robust_list(2).
@@ -812,11 +815,11 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   bool in_root = resolve_flags.contains(ResolveFlagsEnum::IN_ROOT);
 
   if (!beneath && !in_root) /*(false, false)*/ {
-    resolve_base = {ResolveBaseType::None, NamespaceNode()};
+    resolve_base = {.type = ResolveBaseType::None, .node = NamespaceNode()};
   } else if (beneath && !in_root) /*(true, false)*/ {
-    resolve_base = {ResolveBaseType::Beneath, dir};
+    resolve_base = {.type = ResolveBaseType::Beneath, .node = dir};
   } else if (!beneath && in_root) /* (false, true)*/ {
-    resolve_base = {ResolveBaseType::InRoot, dir};
+    resolve_base = {.type = ResolveBaseType::InRoot, .node = dir};
   } else {
     // Both flags are true, return error
     return fit::error(errno(EINVAL));
@@ -831,8 +834,11 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   }
 
   auto context = LookupContext{
-      symlink_mode,  MAX_SYMLINK_FOLLOWS, flags.contains(OpenFlagsEnum::DIRECTORY),
-      resolve_flags, resolve_base,
+      .symlink_mode = symlink_mode,
+      .remaining_follows = MAX_SYMLINK_FOLLOWS,
+      .must_be_directory = flags.contains(OpenFlagsEnum::DIRECTORY),
+      .resolve_flags = resolve_flags,
+      .resolve_base = resolve_base,
   };
 
   auto result = resolve_open_path(context, dir, path, mode, flags);
