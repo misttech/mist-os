@@ -173,9 +173,7 @@ fit::result<Errno, UserAddress> Vmars::map(DesiredAddress addr, fbl::RefPtr<Memo
   auto vmar_flags = mflags.prot_flags().to_vmar_flags() | ZX_VM_ALLOW_FAULTS | vmar_extra_flags |
                     vmar_maybe_map_range;
 
-  auto map_result = memory->map_in_vmar(vmar, vmar_offset, &memory_offset, length,
-                                        MappingFlags::from_bits_retain(vmar_flags));
-
+  auto map_result = memory->map_in_vmar(vmar, vmar_offset, &memory_offset, length, vmar_flags);
   if (map_result.is_error()) {
     auto offset = vmar_offset + vmar_info.base;
     if (offset < LOWER_4GB_LIMIT.ptr() && offset + length > LOWER_4GB_LIMIT.ptr()) {
@@ -235,7 +233,7 @@ util::Range<UserAddress> Vmars::address_range() const {
 
 fit::result<zx_status_t, size_t> Vmars::raw_map(fbl::RefPtr<MemoryObject> memory,
                                                 size_t vmar_offset, uint64_t memory_offset,
-                                                size_t len, MappingFlags flags) {
+                                                size_t len, zx_vm_option_t flags) {
   return memory->map_in_vmar(
       this->vmar_for_addr(UserAddress::from_ptr(vmar_offset + this->vmar_info.base)), vmar_offset,
       &memory_offset, len, flags);
