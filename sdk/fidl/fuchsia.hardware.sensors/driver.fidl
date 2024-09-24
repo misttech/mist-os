@@ -28,6 +28,10 @@ type ConfigureSensorRateError = flexible enum : uint32 {
     INVALID_CONFIG = 2;
 };
 
+service Service {
+    driver client_end:Driver;
+};
+
 /// Implemented by drivers which talk to one or more pieces of sensor hardware.
 @discoverable
 protocol Driver {
