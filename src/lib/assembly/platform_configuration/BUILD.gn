@@ -57,6 +57,7 @@ rustc_library("platform_configuration") {
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//src/developer/ffx/config:lib",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_rust",
     "//src/diagnostics/lib/sampler-config",
     "//src/lib/assembly/component_id_index",
     "//src/lib/assembly/component_manager_config",
