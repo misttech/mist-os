@@ -9,6 +9,15 @@ from unittest.mock import call, mock_open, patch
 
 from mobly_driver.driver import common, infra
 
+_HONEYDEW_CONFIG: dict[str, Any] = {
+    "transports": {
+        "ffx": {
+            "path": "/ffx/path",
+            "subtools_search_path": "subtools/search/path",
+        }
+    }
+}
+
 
 class InfraMoblyDriverTest(unittest.TestCase):
     """Infra Driver tests"""
@@ -27,7 +36,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for successful config generation"""
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             params_path="params/path",
             output_path="",
@@ -53,7 +62,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for successful config without params generation"""
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="",
         )
@@ -74,7 +83,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for exception being raised on invalid JSON content"""
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="",
         )
@@ -92,7 +101,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for exception being raised on invalid YAML content"""
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             params_path="params/path",
             output_path="",
@@ -109,7 +118,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for exception being raised on invalid testbed JSON path"""
         driver = infra.InfraDriver(
             tb_json_path="/does/not/exist",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="",
         )
@@ -125,7 +134,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for exception being raised on invalid params YAML path"""
         driver = infra.InfraDriver(
             tb_json_path="/does/not/exist",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             params_path="params/path",
             output_path="",
@@ -151,7 +160,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for teardown"""
         driver = infra.InfraDriver(
             tb_json_path="",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="",
         )
@@ -173,7 +182,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         """Test case for teardown succeeding despite missing results"""
         driver = infra.InfraDriver(
             tb_json_path="",
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="",
         )

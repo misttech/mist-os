@@ -30,32 +30,29 @@ class InfraDriver(base.BaseDriver):
     def __init__(
         self,
         tb_json_path: str,
-        ffx_path: str,
+        honeydew_config: dict[str, Any],
         transport: str,
         output_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ssh_path: Optional[str] = None,
-        ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
 
         Args:
           tb_json_path: absolute path to the testbed definition JSON file.
-          ffx_path: absolute path to the FFX binary.
+          honeydew_config: Honeydew configuration.
           transport: host->target transport type to use.
           output_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
-          ffx_subtools_search_path: absolute path to where to search for FFX plugins.
 
         Raises:
           KeyError if required environment variables not found.
         """
         super().__init__(
-            ffx_path=ffx_path,
+            honeydew_config=honeydew_config,
             transport=transport,
             output_path=output_path,
             params_path=params_path,
-            ffx_subtools_search_path=ffx_subtools_search_path,
         )
         self._tb_json_path = tb_json_path
         self._ssh_path = ssh_path
@@ -102,12 +99,11 @@ class InfraDriver(base.BaseDriver):
             config = api_mobly.new_testbed_config(
                 testbed_name=self._TESTBED_NAME,
                 output_path=self._output_path,
-                ffx_path=self._ffx_path,
+                honeydew_config=self._honeydew_config,
                 transport=self._transport,
                 mobly_controllers=tb_config,
                 test_params_dict=test_params,
                 botanist_honeydew_map=botanist_honeydew_translation_map,
-                ffx_subtools_search_path=self._ffx_subtools_search_path,
                 ssh_path=self._ssh_path,
             )
             return yaml.dump(config)

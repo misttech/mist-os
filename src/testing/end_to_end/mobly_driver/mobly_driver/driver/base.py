@@ -21,24 +21,22 @@ class BaseDriver(ABC):
 
     def __init__(
         self,
-        ffx_path: str,
+        honeydew_config: dict[str, Any],
         transport: str,
         output_path: Optional[str] = None,
         params_path: Optional[str] = None,
-        ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
 
         Args:
-          ffx_path: absolute path to the FFX binary.
+          honeydew_config: Honeydew configuration.
           transport: host->target transport type to use.
           output_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
-          ffx_subtools_search_path: absolute path to where to search for FFX plugins.
         Raises:
           KeyError if required environment variables not found.
         """
-        self._ffx_path = ffx_path
+        self._honeydew_config = honeydew_config
         self._transport = transport
         self._params_path = params_path
         self._output_path = (
@@ -46,7 +44,6 @@ class BaseDriver(ABC):
             if output_path is not None
             else os.environ[TEST_OUTDIR_ENV]
         )
-        self._ffx_subtools_search_path = ffx_subtools_search_path
 
     @abstractmethod
     def generate_test_config(self) -> str:

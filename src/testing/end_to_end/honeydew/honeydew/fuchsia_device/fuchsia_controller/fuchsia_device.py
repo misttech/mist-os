@@ -127,6 +127,40 @@ class FuchsiaDevice(
     Args:
         device_info: Fuchsia device information.
         ffx_config: Config that need to be used while running FFX commands.
+        config: Honeydew device configuration, if any.
+            Format:
+                {
+                    "transports": {
+                        <transport_name>: {
+                            <key>: <value>,
+                            ...
+                        },
+                        ...
+                    },
+                    "affordances": {
+                        <affordance_name>: {
+                            <key>: <value>,
+                            ...
+                        },
+                        ...
+                    },
+                }
+            Example:
+                {
+                    "transports": {
+                        "fuchsia_controller": {
+                            "timeout": 30,
+                        }
+                    },
+                    "affordances": {
+                        "bluetooth": {
+                            "implementation": "fuchsia-controller",
+                        },
+                        "wlan": {
+                            "implementation": "sl4f",
+                        }
+                    },
+                }
 
     Raises:
         errors.FFXCommandError: if FFX connection check fails.
@@ -137,6 +171,8 @@ class FuchsiaDevice(
         self,
         device_info: custom_types.DeviceInfo,
         ffx_config: custom_types.FFXConfig,
+        # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
+        config: dict[str, Any] | None = None,
     ) -> None:
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
 
@@ -146,6 +182,8 @@ class FuchsiaDevice(
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
         self._on_device_close_fns: list[Callable[[], None]] = []
+
+        self._config: dict[str, Any] | None = config
 
         self.health_check()
 

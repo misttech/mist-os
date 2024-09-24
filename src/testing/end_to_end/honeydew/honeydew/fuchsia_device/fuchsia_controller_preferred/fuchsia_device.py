@@ -6,6 +6,7 @@ preferred transport."""
 
 import ipaddress
 import logging
+from typing import Any
 
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_sl4f,
@@ -46,6 +47,40 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
     Args:
         device_info: Fuchsia device information.
         ffx_config: Config that need to be used while running FFX commands.
+        config: Honeydew device configuration, if any.
+            Format:
+                {
+                    "transports": {
+                        <transport_name>: {
+                            <key>: <value>,
+                            ...
+                        },
+                        ...
+                    },
+                    "affordances": {
+                        <affordance_name>: {
+                            <key>: <value>,
+                            ...
+                        },
+                        ...
+                    },
+                }
+            Example:
+                {
+                    "transports": {
+                        "fuchsia_controller": {
+                            "timeout": 30,
+                        }
+                    },
+                    "affordances": {
+                        "bluetooth": {
+                            "implementation": "fuchsia-controller",
+                        },
+                        "wlan": {
+                            "implementation": "sl4f",
+                        }
+                    },
+                }
 
     Raises:
         errors.FFXCommandError: if FFX connection check fails.
@@ -57,6 +92,8 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         self,
         device_info: custom_types.DeviceInfo,
         ffx_config: custom_types.FFXConfig,
+        # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
+        config: dict[str, Any] | None = None,
     ) -> None:
         _LOGGER.debug(
             "Initializing Fuchsia-Controller-Preferred based FuchsiaDevice"
@@ -65,6 +102,7 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         super().__init__(
             device_info,
             ffx_config,
+            config,
         )
 
         _LOGGER.debug(

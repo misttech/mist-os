@@ -21,37 +21,36 @@ class LocalDriver(base.BaseDriver):
 
     def __init__(
         self,
-        ffx_path: str,
+        honeydew_config: dict[str, Any],
         transport: str,
         multi_device: bool = False,
         output_path: Optional[str] = None,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
-        ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
 
         Args:
-          ffx_path: absolute path to the FFX binary.
+          honeydew_config: Honeydew configuration.
           transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
           output_path: absolute path to directory for storing Mobly test output.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly test params file.
-          ffx_subtools_search_path: absolute path to where to search for FFX plugins.
         Raises:
           KeyError if required environment variables not found.
         """
         super().__init__(
-            ffx_path=ffx_path,
+            honeydew_config=honeydew_config,
             transport=transport,
             output_path=output_path,
             params_path=params_path,
-            ffx_subtools_search_path=ffx_subtools_search_path,
         )
         self._multi_device = multi_device
         self._config_path = config_path
-        self._ffx_client = api_ffx.FfxClient(ffx_path)
+        self._ffx_client = api_ffx.FfxClient(
+            ffx_path=honeydew_config["transports"]["ffx"]["path"]
+        )
 
     def _get_test_targets(self) -> List[str]:
         """Returns Fuchsia target names to use in Mobly test.
@@ -132,12 +131,11 @@ class LocalDriver(base.BaseDriver):
         config = api_mobly.new_testbed_config(
             testbed_name="GeneratedLocalTestbed",
             output_path=self._output_path,
-            ffx_path=self._ffx_path,
+            honeydew_config=self._honeydew_config,
             transport=self._transport,
             mobly_controllers=mobly_controllers,
             test_params_dict={},
             botanist_honeydew_map={},
-            ffx_subtools_search_path=self._ffx_subtools_search_path,
         )
         return config
 
@@ -189,12 +187,9 @@ class LocalDriver(base.BaseDriver):
                 config = common.read_yaml_from_file(self._config_path)
             except (IOError, OSError) as e:
                 raise common.DriverException(f"Local config parse failed: {e}")
-            api_mobly.set_ffx_path(config, self._ffx_path)
+            # Add the "honeydew_config" field for every Fuchsia device, if exists.
+            api_mobly.set_honeydew_config(config, self._honeydew_config)
             api_mobly.set_transport(config, self._transport)
-            if self._ffx_subtools_search_path:
-                api_mobly.set_ffx_subtools_search_path(
-                    config, self._ffx_subtools_search_path
-                )
 
         if self._params_path:
             test_params = common.read_yaml_from_file(self._params_path)

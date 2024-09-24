@@ -17,13 +17,12 @@ LATEST_RES_SYMLINK_NAME: str = "latest"
 # https://osscs.corp.google.com/fuchsia/fuchsia/+/main:src/testing/end_to_end/mobly_controller/fuchsia_device.py
 MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = "FuchsiaDevice"
 TRANSPORT_KEY: str = "transport"
-FFX_PATH_KEY: str = "ffx_path"
-FFX_SUBTOOLS_SEARCH_PATH_KEY: str = "ffx_subtools_search_path"
 SSH_PATH_KEY: str = "ssh_binary_path"
 SSH_CONFIG_KEY: str = "ssh_config"
 SSH_HOST_KEY: str = "host"
 SSH_USER_KEY: str = "user"
 SSH_IDENTITY_FILE_KEY: str = "identity_file"
+HONEYDEW_CONFIG_KEY: str = "honeydew_config"
 
 
 MoblyConfigComponent = dict[str, Any]
@@ -85,12 +84,11 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
 def new_testbed_config(
     testbed_name: str,
     output_path: str,
-    ffx_path: str,
+    honeydew_config: dict[str, Any],
     transport: str,
     mobly_controllers: list[dict[str, Any]],
     test_params_dict: MoblyConfigComponent,
     botanist_honeydew_map: dict[str, str],
-    ffx_subtools_search_path: str | None,
     ssh_path: str | None = None,
 ) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
@@ -134,9 +132,15 @@ def new_testbed_config(
                     "ipv4":"192.168.42.112",
                     "ipv6":"",
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
-                    "ffx_path":"/path/to/ffx",
                     "transport":"fuchsia-controller",
-                    "ffx_subtools_search_path":"/path/to/ffx/subtools"
+                    "config": {
+                      "transports": {
+                        "ffx": {
+                          "path":"/path/to/ffx",
+                          "subtools_search_path":"/path/to/ffx/subtools",
+                        }
+                      }
+                    }
                   }
                 ],
                 "AccessPoint": [
@@ -166,13 +170,12 @@ def new_testbed_config(
     Args:
         testbed_name: Mobly testbed name to use.
         output_path: absolute path to Mobly's top-level output directory.
-        ffx_path: absolute path to the FFX binary.
+        honeydew_config: Honeydew configuration.
         transport: host->device transport type to use.
         mobly_controllers: List of Mobly controller objects.
         test_params_dict: Mobly testbed params dictionary.
         botanist_honeydew_map: Dictionary that maps Botanist config names to
                                Honeydew config names.
-        ffx_subtools_search_path: absolute path to where to search for FFX plugins.
         ssh_path: absolute path to the SSH binary or None for local test case.
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
@@ -182,8 +185,8 @@ def new_testbed_config(
         controller_type = controller["type"]
         del controller["type"]
         if api_infra.FUCHSIA_DEVICE == controller_type:
-            # Add the "ffx_path" field for every Fuchsia device.
-            controller[FFX_PATH_KEY] = ffx_path
+            # Add the "honeydew_config" field for every Fuchsia device, if exists.
+            controller[HONEYDEW_CONFIG_KEY] = honeydew_config
             # Add the "transport" field for every Fuchsia device.
             controller[TRANSPORT_KEY] = transport
             # Convert botanist key names to relative Honeydew key names for
@@ -192,11 +195,6 @@ def new_testbed_config(
             for botanist_key, honeydew_key in botanist_honeydew_map.items():
                 if botanist_key in controller:
                     controller[honeydew_key] = controller.pop(botanist_key)
-            # Add ffx subtools search path.
-            if ffx_subtools_search_path:
-                controller[
-                    FFX_SUBTOOLS_SEARCH_PATH_KEY
-                ] = ffx_subtools_search_path
         elif api_infra.ACCESS_POINT == controller_type:
             controller[SSH_CONFIG_KEY] = {
                 SSH_PATH_KEY: ssh_path,
@@ -263,32 +261,18 @@ def set_transport(mobly_config: MoblyConfigComponent, transport: str) -> None:
     _set_per_device_config(mobly_config, TRANSPORT_KEY, transport)
 
 
-def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str) -> None:
-    """Updates all fuchsia device configs to use the specified ffx_path.
-
-    Overwrites the existing value if the key already exists.
-
-    Args:
-      mobly_config: Mobly config object to update.
-      ffx_path: FFX path to set on fuchsia devices in the Mobly config.
-    """
-    _set_per_device_config(mobly_config, FFX_PATH_KEY, ffx_path)
-
-
-def set_ffx_subtools_search_path(
-    mobly_config: MoblyConfigComponent, subtools_search_path: str
+def set_honeydew_config(
+    mobly_config: MoblyConfigComponent, honeydew_config: dict[str, Any]
 ) -> None:
-    """Updates all fuchsia device configs to use the specified ffx_path.
+    """Updates all fuchsia device configs to use the specified honeydew config.
 
     Overwrites the existing value if the key already exists.
 
     Args:
       mobly_config: Mobly config object to update.
-      subtools_search_path: absolute path to where to search for FFX plugins..
+      honeydew_config: Honeydew config to set on fuchsia devices in the Mobly config.
     """
-    _set_per_device_config(
-        mobly_config, FFX_SUBTOOLS_SEARCH_PATH_KEY, subtools_search_path
-    )
+    _set_per_device_config(mobly_config, HONEYDEW_CONFIG_KEY, honeydew_config)
 
 
 def _set_per_device_config(

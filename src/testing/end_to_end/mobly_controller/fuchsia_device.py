@@ -40,7 +40,6 @@ def create(
             * name - Device name returned by `ffx target list`.
             * transport - Transport to be used to perform the host-target
                 interactions.
-            * ffx_path - Absolute path to FFX binary to use for the device.
     Returns:
         A list of FuchsiaDevice objects.
     """
@@ -91,6 +90,7 @@ def create(
                 ),
                 transport=device_config["transport"],
                 ffx_config=_FFX_CONFIG_OBJ.get_config(),
+                config=device_config["honeydew_config"],
             )
         )
     return fuchsia_devices
@@ -210,6 +210,9 @@ def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     if "transport" not in config:
         raise RuntimeError("Missing transport field in the config")
 
+    if "honeydew_config" not in config:
+        raise RuntimeError("Missing Honeydew config field in the config")
+
     device_config: dict[str, Any] = {}
 
     for config_key, config_value in config.items():
@@ -273,8 +276,12 @@ def _get_ffx_path(configs: list[dict[str, Any]]) -> str:
     # FFX CLI is currently global and not localized to the individual devices so
     # just return the the first "ffx_path" encountered.
     for config in configs:
-        if "ffx_path" in config:
-            return config["ffx_path"]
+        try:
+            return config["honeydew_config"]["transports"]["ffx"]["path"]
+        except KeyError as err:
+            raise RuntimeError(
+                "No FFX path found in any device config"
+            ) from err
     raise RuntimeError("No FFX path found in any device config")
 
 
@@ -291,6 +298,10 @@ def _get_ffx_subtools_search_path(configs: list[dict[str, Any]]) -> str | None:
     # FFX CLI is currently global and not localized to the individual devices so
     # just return the the first "ffx_path" encountered.
     for config in configs:
-        if "ffx_subtools_search_path" in config:
-            return config["ffx_subtools_search_path"]
+        try:
+            return config["honeydew_config"]["transports"]["ffx"][
+                "subtools_search_path"
+            ]
+        except KeyError:
+            return None
     return None
