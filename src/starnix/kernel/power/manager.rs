@@ -434,7 +434,7 @@ impl SuspendResumeManager {
     /// Returns the supported suspend states.
     pub fn suspend_states(&self) -> HashSet<SuspendState> {
         // TODO(b/326470421): Remove the hardcoded supported state.
-        HashSet::from([SuspendState::Ram, SuspendState::Idle])
+        HashSet::from([SuspendState::Idle])
     }
 
     /// Sets the power level to `level`.
@@ -510,7 +510,7 @@ impl SuspendResumeManager {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
             node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
-            node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_str());
+            node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
         });
 
         let waiter = SuspendWaiter::new();

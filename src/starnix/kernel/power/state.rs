@@ -5,7 +5,6 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
-use itertools::Itertools;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
@@ -43,28 +42,14 @@ pub enum SuspendState {
     Idle,
 }
 
-impl SuspendState {
-    pub fn to_str(&self) -> &'static str {
+impl std::fmt::Display for SuspendState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SuspendState::Disk => "disk",
-            SuspendState::Ram => "mem",
-            SuspendState::Idle => "freeze",
-            SuspendState::Standby => "standby",
+            SuspendState::Disk => write!(f, "disk"),
+            SuspendState::Ram => write!(f, "ram"),
+            SuspendState::Standby => write!(f, "standby"),
+            SuspendState::Idle => write!(f, "freeze"),
         }
-    }
-}
-
-impl TryFrom<&str> for SuspendState {
-    type Error = Errno;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(match value {
-            "disk" => SuspendState::Disk,
-            "mem" => SuspendState::Ram,
-            "standby" => SuspendState::Standby,
-            "freeze" => SuspendState::Idle,
-            _ => return error!(EINVAL),
-        })
     }
 }
 
@@ -91,7 +76,14 @@ impl BytesFileOps for PowerStateFile {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let clean_state_str = state_str.split('\n').next().unwrap_or("");
-        let state: SuspendState = clean_state_str.try_into()?;
+        let state = match clean_state_str {
+            "disk" => SuspendState::Disk,
+            "standby" => SuspendState::Standby,
+            // TODO(https://fxbug.dev/368394556): Check on mem_file to see what suspend state
+            // "mem" represents
+            "freeze" | "mem" => SuspendState::Idle,
+            _ => return error!(EINVAL),
+        };
 
         let power_manager = &current_task.kernel().suspend_resume_manager;
         let supported_states = power_manager.suspend_states();
@@ -149,7 +141,12 @@ impl BytesFileOps for PowerStateFile {
 
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let states = current_task.kernel().suspend_resume_manager.suspend_states();
-        let content = states.iter().map(SuspendState::to_str).join(" ") + "\n";
+        let mut states_array: Vec<String> = states.iter().map(SuspendState::to_string).collect();
+        // TODO(https://fxbug.dev/368394556): The “mem” string is interpreted in accordance with
+        // the contents of the mem_sleep file.
+        states_array.push("mem".to_string());
+        states_array.sort();
+        let content = states_array.join(" ") + "\n";
         Ok(content.as_bytes().to_owned().into())
     }
 }
