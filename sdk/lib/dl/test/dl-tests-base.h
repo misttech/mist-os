@@ -40,17 +40,14 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture's implementation supports `RTLD_GLOBAL`
   static constexpr bool kSupportsGlobalMode = true;
 
-  // TODO(https://fxbug.dev/338229987): Remove this flag when DlImplTests
-  // can supports this feature.
-  static constexpr bool kCanReuseLoadedDeps = true;
-
   // Whether the test fixture will always prioritize a loaded module in symbol
   // resolution, regardless of whether it is a global module.
   static constexpr bool kStrictLoadOrderPriority = false;
 
   // TODO(https://fxbug.dev/354786114): Remove this flag when DlImplTests can
-  // test DlSym with dependencies.
-  static constexpr bool kDlSymSupportsDeps = true;
+  // call dlsym() to lookup a symbol in a module that was first loaded as a
+  // dependency of another module.
+  static constexpr bool kDepModuleHasDepTree = true;
 
   // Whether the test fixture supports TLS.
   static constexpr bool kSupportsTls = true;

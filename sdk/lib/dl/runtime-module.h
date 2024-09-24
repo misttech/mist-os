@@ -106,6 +106,17 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
 
+  // This is the breadth-first ordered list of module references, representing
+  // this module's tree of modules. A reference to this module (the root) is
+  // always the first in this list. The other modules in this list are
+  // non-owning references to modules that were explicitly linked with this
+  // module; global modules that may have been used for relocations, but are not
+  // a DT_NEEDED of any dependency, are not included in this list.
+  // This list is set when dlopen() is called on this module.
+  constexpr const ModuleRefList& module_tree() const { return module_tree_; }
+
+  void set_module_tree(ModuleRefList module_tree) { module_tree_ = std::move(module_tree); }
+
  private:
   // A RuntimeModule can only be created with Module::Create...).
   RuntimeModule() = default;
@@ -115,6 +126,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   Soname name_;
   AbiModule abi_module_;
   size_type static_tls_bias_ = 0;
+  ModuleRefList module_tree_;
 };
 
 }  // namespace dl

@@ -30,12 +30,11 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsNoLoadMode = false;
   // TODO(https://fxbug.dev/338233824): Implement RTLD_GLOBAL
   static constexpr bool kSupportsGlobalMode = false;
-  // TODO(https://fxbug.dev/338229987): Reuse loaded modules for dependencies.
-  static constexpr bool kCanReuseLoadedDeps = false;
-  // TODO(https://fxbug.dev/354786114): dlsym should lookup symbols in deps.
-  static constexpr bool kDlSymSupportsDeps = false;
   // TODO(https://fxbug.dev/342480690): Support TLS
   static constexpr bool kSupportsTls = false;
+  // TODO(https://fxbug.dev/354786114): Update the dependency tree for a module
+  // that was loaded as a dependency of another module.
+  static constexpr bool kDepModuleHasDepTree = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
@@ -63,7 +62,8 @@ class DlImplTests : public Base {
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
-    return dynamic_linker_.LookupSymbol(static_cast<RuntimeModule*>(module), ref);
+    const RuntimeModule* root = static_cast<RuntimeModule*>(module);
+    return dynamic_linker_.LookupSymbol(*root, ref);
   }
 
   // TODO(https://fxbug.dev/354043838): Remove these when these functions can
