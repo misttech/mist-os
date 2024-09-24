@@ -1391,8 +1391,12 @@ impl MemoryManagerState {
             };
 
             // Find the private, anonymous mapping that will get its head cut off by this unmap call.
+            // A mapping that starts exactly at `end_addr` is excluded since it is not affected by
+            // the unmapping.
             let truncated_tail = match self.mappings.get(&end_addr) {
-                Some((range, mapping)) if range.end != end_addr && mapping.private_anonymous() => {
+                Some((range, mapping))
+                    if range.start != end_addr && mapping.private_anonymous() =>
+                {
                     Some((end_addr..range.end, mapping.clone()))
                 }
                 _ => None,
@@ -4667,6 +4671,76 @@ mod tests {
                     assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
                     assert_eq!(original_memory.get_koid(), backing.memory.get_koid());
                 }
+            }
+        }
+    }
+
+    /// Maps two pages in separate mappings next to each other, then unmaps the first page.
+    /// The second page should not be modified.
+    #[::fuchsia::test]
+    async fn test_map_two_unmap_one() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        // reserve memory for both pages
+        let addr_reserve =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let addr1 = map_memory_with_flags(
+            &mut locked,
+            &current_task,
+            addr_reserve,
+            *PAGE_SIZE,
+            MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
+        );
+        let addr2 = map_memory_with_flags(
+            &mut locked,
+            &current_task,
+            addr_reserve + *PAGE_SIZE,
+            *PAGE_SIZE,
+            MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
+        );
+        let state = mm.state.read();
+        let (range1, _) = state.mappings.get(&addr1).expect("mapping");
+        assert_eq!(range1.start, addr1);
+        assert_eq!(range1.end, addr1 + *PAGE_SIZE);
+        let (range2, mapping2) = state.mappings.get(&addr2).expect("mapping");
+        assert_eq!(range2.start, addr2);
+        assert_eq!(range2.end, addr2 + *PAGE_SIZE);
+        #[cfg(feature = "alternate_anon_allocs")]
+        let _ = mapping2;
+        #[cfg(not(feature = "alternate_anon_allocs"))]
+        let original_memory2 = {
+            match &mapping2.backing {
+                MappingBacking::Memory(backing) => {
+                    assert_eq!(backing.base, addr2);
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
+                    backing.memory.clone()
+                }
+            }
+        };
+        std::mem::drop(state);
+
+        assert_eq!(mm.unmap(addr1, *PAGE_SIZE as usize), Ok(()));
+
+        let state = mm.state.read();
+
+        // The first page should be unmapped.
+        assert!(state.mappings.get(&addr1).is_none());
+
+        // The second page should remain unchanged.
+        let (range2, mapping2) = state.mappings.get(&addr2).expect("second page");
+        assert_eq!(range2.start, addr2);
+        assert_eq!(range2.end, addr2 + *PAGE_SIZE);
+        #[cfg(feature = "alternate_anon_allocs")]
+        let _ = mapping2;
+        #[cfg(not(feature = "alternate_anon_allocs"))]
+        match &mapping2.backing {
+            MappingBacking::Memory(backing) => {
+                assert_eq!(backing.base, addr2);
+                assert_eq!(backing.memory_offset, 0);
+                assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
+                assert_eq!(original_memory2.get_koid(), backing.memory.get_koid());
             }
         }
     }
