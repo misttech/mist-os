@@ -137,6 +137,14 @@ declare_args() {
   # the //:default target
   additional_default_targets = []
 
+  # These labels are added as dependencies of '//:default' transitively via
+  # '//:build_only'.  These are used to add targets that need to be built
+  # but aren't part of any product, board, etc.
+  #
+  # These also serve as an alternative to '//:default' for sub-builds that
+  # only want to build and define a small subset of the tree.
+  build_only_labels = []
+
   # Labels for product bundles to assemble in addition to the main product bundle.
   product_bundle_labels = []
 }
@@ -1730,6 +1738,7 @@ group("vnames_config.metadata") {
 group("default") {
   testonly = true
   deps = [
+    "//:build_only",
     "//:host",
     "//:product_bundles.check",
     "//:test-list",
@@ -1739,7 +1748,6 @@ group("default") {
     # TODO(https://fxbug.dev/42067746) has_board check not working
     "//build/images:default-images",
     "//build/images/updates:packages",
-    "//build/input:build_only",
     "//bundles/boot_tests",
     "//sdk",
   ]
@@ -1754,6 +1762,15 @@ group("default") {
 
   # Add any additional targets from the product.
   deps += additional_default_targets
+}
+
+###
+# The build-only group.  These are additional targets to add to the build but
+# are not part of a product, board, or host tools.  This group also serves as
+# an alternative to '//:default' when performing sub-builds.
+group("build_only") {
+  testonly = true
+  deps = build_only_labels
 }
 
 ###

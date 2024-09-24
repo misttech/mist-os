@@ -26,7 +26,7 @@ compilation_mode = "opt"
 cxx_rbe_enable = {cxx_rbe_enable}
 link_rbe_enable = {link_rbe_enable}
 rust_rbe_enable = {rust_rbe_enable}
-universe_package_labels = [{sdk_labels_list}]
+build_only_labels = [{sdk_labels_list}]
 """
 
 
@@ -144,7 +144,7 @@ def run_checked_command(
     return False
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdk-id", help="The version name value for this IDK.")
     parser.add_argument(
@@ -325,7 +325,7 @@ def main():
             [
                 gn_path,
                 "--root=%s" % fuchsia_dir.resolve(),
-                "--root-pattern=//:developer_universe_packages",
+                "--root-pattern=//:build_only",
                 "gen",
                 str(build_dir),
             ],
