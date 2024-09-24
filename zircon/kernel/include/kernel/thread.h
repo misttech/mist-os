@@ -246,9 +246,6 @@ class WaitQueueCollection {
     // If blocked, a pointer to the WaitQueue the Thread is on.
     WaitQueue* blocking_wait_queue_ = nullptr;
 
-    // A list of the WaitQueues currently owned by this Thread.
-    fbl::DoublyLinkedList<OwnedWaitQueue*> owned_wait_queues_;
-
     // Node state for existing in WaitQueueCollection::threads_
     fbl::WAVLTreeNodeState<Thread*> blocked_threads_tree_node_;
 
@@ -1804,6 +1801,7 @@ struct Thread : public ChainLockable {
   SchedulerState scheduler_state_ TA_GUARDED(get_lock());
   SchedulerQueueState scheduler_queue_state_ TA_GUARDED(scheduler_variable_lock_);
   WaitQueueCollection::ThreadState wait_queue_state_ TA_GUARDED(get_lock());
+  fbl::DoublyLinkedList<OwnedWaitQueue*> owned_wait_queues_ TA_GUARDED(get_lock());
   TaskState task_state_;
   PreemptionState preemption_state_;
   MemoryAllocationState memory_allocation_state_;

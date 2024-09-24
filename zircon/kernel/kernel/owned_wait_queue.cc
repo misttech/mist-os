@@ -178,17 +178,32 @@ void OwnedWaitQueue::DisownAllQueues(Thread* t) {
     DEBUG_ASSERT(t->scheduler_state().state() == THREAD_RUNNING);
     DEBUG_ASSERT(t->wait_queue_state_.blocking_wait_queue_ == nullptr);
 
-    while (!t->wait_queue_state_.owned_wait_queues_.is_empty()) {
-      OwnedWaitQueue& queue = t->wait_queue_state_.owned_wait_queues_.front();
+    while (!t->owned_wait_queues_.is_empty()) {
+      OwnedWaitQueue& queue = t->owned_wait_queues_.front();
 
       if (!queue.get_lock().AcquireOrBackoff()) {
         return ChainLockTransaction::Action::Backoff;
       }
 
-      t->wait_queue_state_.owned_wait_queues_.pop_front();
-      queue.owner_ = nullptr;
+      queue.ResetOwner(*t);
       queue.get_lock().Release();
     }
+
+    // Finalization is a bit strange here.  Typically, we obtain all of the
+    // locks we will need for an operation, finalize our transaction, and then
+    // actually perform the operation.  In other words, aside from gathering our
+    // locks, we are doing no work in the pre-finalization stage.
+    //
+    // In this case, we are unlinking |t| from all of the queues is currently
+    // owns; obtaining each queue lock as we go, doing the actual work of
+    // unlinking the queue, and then dropping the queue lock before proceeding
+    // to the next.  So, we are doing actual work in what would have otherwise
+    // been the "pre-finalization" stage of things.
+    //
+    // So, when looking at lock contention statistics for this transaction,
+    // users need to take into account that contention times include all of the
+    // actual work done in the operation, not just the lock collection phase.
+    ChainLockTransaction::Finalize();
 
     return ChainLockTransaction::Done;
   };
@@ -355,7 +370,7 @@ void OwnedWaitQueue::ApplyIpvDeltaToThread(const SchedulerState::InheritedProfil
     if ((old_ipv != nullptr) && (old_ipv->min_deadline <= thread_ipv.min_deadline)) {
       SchedDuration new_min_deadline{SchedDuration::Max()};
 
-      for (auto& other_queue : thread.wait_queue_state().owned_wait_queues_) {
+      for (auto& other_queue : thread.owned_wait_queues_) {
         AssertOwnsWaitQueue(thread, other_queue);
         if (!other_queue.IsEmpty()) {
           DEBUG_ASSERT(other_queue.inherited_scheduler_state_storage_ != nullptr);
@@ -433,21 +448,9 @@ void OwnedWaitQueue::BeginPropagate(OwnedWaitQueue& upstream_node, Thread& downs
   static_assert(OpType != PropagateOp::BaseProfileChanged);
 
   if constexpr (OpType == PropagateOp::AddSingleEdge) {
-    // If we are adding an owner to this OWQ, we should be able to assert that
-    // it does not currently have one.
-    DEBUG_ASSERT(upstream_node.owner_ == nullptr);
-    DEBUG_ASSERT(!upstream_node.InContainer());
-
-    upstream_node.owner_ = &downstream_node;
-    downstream_node.wait_queue_state().owned_wait_queues_.push_back(&upstream_node);
+    upstream_node.SetOwner(downstream_node);
   } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
-    // If we are removing the owner of this OWQ, or we are updating the base
-    // profile of the immediately upstream thread, we should be able to assert
-    // that the owq's current owner is the thread passed to this method.
-    DEBUG_ASSERT(upstream_node.owner_ == &downstream_node);
-    DEBUG_ASSERT(upstream_node.InContainer());
-    downstream_node.wait_queue_state().owned_wait_queues_.erase(upstream_node);
-    upstream_node.owner_ = nullptr;
+    upstream_node.ResetOwner(downstream_node);
   }
 
   // If the OWQ we are starting from has no active waiters, then there are no
@@ -1700,14 +1703,15 @@ void OwnedWaitQueue::ResetOwnerIfNoWaiters() {
     // We have an owner, but no waiters behind us.  We need to lock our owner in
     // order to clear out its bookkeeping, but there is nothing to propagate
     // down the PI chain since we are not inheriting anything.
-    if (!owner_->get_lock().AcquireOrBackoff()) {
+    Thread* owner = owner_;
+    if (!owner->get_lock().AcquireOrBackoff()) {
       return ChainLockTransaction::Action::Backoff;
     }
 
     ChainLockTransaction::Finalize();
-    owner_->wait_queue_state_.owned_wait_queues_.erase(*this);
-    owner_->get_lock().Release();
-    owner_ = nullptr;
+
+    ResetOwner(*owner);
+    owner->get_lock().Release();
 
     return ChainLockTransaction::Done;
   };

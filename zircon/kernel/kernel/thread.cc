@@ -147,13 +147,7 @@ void WaitQueueCollection::ThreadState::Unsleep(Thread* thread, zx_status_t statu
   Scheduler::Unblock(thread);
 }
 
-WaitQueueCollection::ThreadState::~ThreadState() {
-  DEBUG_ASSERT(blocking_wait_queue_ == nullptr);
-
-  // owned_wait_queues_ is a fbl:: list of unmanaged pointers.  It will debug
-  // assert if it is not empty when it destructs; we do not need to do so
-  // here.
-}
+WaitQueueCollection::ThreadState::~ThreadState() { DEBUG_ASSERT(blocking_wait_queue_ == nullptr); }
 
 // Default constructor/destructor.
 Thread::Thread() {}
@@ -163,6 +157,10 @@ Thread::~Thread() {
   // list.
   DEBUG_ASSERT(!thread_list_node_.InContainer());
   DEBUG_ASSERT(!migrate_list_node_.InContainer());
+
+  // owned_wait_queues_ is a fbl:: list of unmanaged pointers.  It will debug
+  // assert if it is not empty when it destructs; we do not need to do so
+  // here.
 }
 
 void Thread::set_name(ktl::string_view name) {
@@ -2156,7 +2154,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
     dprintf(INFO, "\twait queue %p, blocked_status %d, interruptible %s, wait queues owned %s\n",
             t->wait_queue_state().blocking_wait_queue_, t->wait_queue_state().blocked_status_,
             t->wait_queue_state().interruptible_ == Interruptible::Yes ? "yes" : "no",
-            t->wait_queue_state().owned_wait_queues_.is_empty() ? "no" : "yes");
+            t->owned_wait_queues_.is_empty() ? "no" : "yes");
 
     dprintf(INFO, "\taspace %p\n", t->GetAspaceRefLocked().get());
     dprintf(INFO, "\tuser_thread %p, pid %" PRIu64 ", tid %" PRIu64 "\n", t->user_thread_.get(),
@@ -2164,8 +2162,8 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
     arch_dump_thread(t);
   } else {
     printf("thr %p st %4s owq %d %s pid %" PRIu64 " tid %" PRIu64 " (%s:%s)\n", t,
-           thread_state_to_str(t->state()), !t->wait_queue_state().owned_wait_queues_.is_empty(),
-           profile_str, t->pid(), t->tid(), oname, t->name());
+           thread_state_to_str(t->state()), !t->owned_wait_queues_.is_empty(), profile_str,
+           t->pid(), t->tid(), oname, t->name());
   }
 }
 
