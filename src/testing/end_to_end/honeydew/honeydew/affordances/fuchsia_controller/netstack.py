@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 import fidl.fuchsia_net_interfaces as f_net_interfaces
+import fidl.fuchsia_net_root as f_net_root
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
@@ -18,6 +19,7 @@ from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
 from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.netstack import InterfaceProperties
+from honeydew.typing.wlan import MacAddress
 
 # List of required FIDLs for this affordance.
 _REQUIRED_CAPABILITIES = [
@@ -29,6 +31,9 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 # Fuchsia Controller proxies
 _STATE_PROXY = FidlEndpoint(
     "core/network/netstack", "fuchsia.net.interfaces.State"
+)
+_INTERFACES_PROXY = FidlEndpoint(
+    "core/network/netstack", "fuchsia.net.root.Interfaces"
 )
 
 
@@ -90,6 +95,9 @@ class Netstack(AsyncAdapter, netstack.Netstack):
         self._state_proxy = f_net_interfaces.State.Client(
             self._fc_transport.connect_device_proxy(_STATE_PROXY)
         )
+        self._interfaces_proxy = f_net_root.Interfaces.Client(
+            self._fc_transport.connect_device_proxy(_INTERFACES_PROXY)
+        )
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -131,7 +139,33 @@ class Netstack(AsyncAdapter, netstack.Netstack):
 
             event = resp.event
             if event.existing:
-                properties.append(InterfaceProperties.from_fidl(event.existing))
+                try:
+                    res = await self._interfaces_proxy.get_mac(
+                        id=event.existing.id
+                    )
+
+                    if res.err:
+                        _LOGGER.debug(
+                            'Failed to find the MAC of interface "%s" (%s); '
+                            "it no longer exists",
+                            event.existing.name,
+                            event.existing.id,
+                        )
+                        continue  # this is fine and sometimes even expected
+
+                    mac = (
+                        MacAddress.from_bytes(bytes(res.response.mac.octets))
+                        if res.response.mac
+                        else None
+                    )
+                except ZxStatus as status:
+                    raise errors.HoneydewNetstackError(
+                        f"Interfaces.GetMac() error {status}"
+                    )
+
+                properties.append(
+                    InterfaceProperties.from_fidl(event.existing, mac)
+                )
             elif event.idle:
                 # No more information readily available.
                 break

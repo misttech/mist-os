@@ -12,6 +12,8 @@ from ipaddress import IPv4Address, IPv6Address
 import fidl.fuchsia_net as f_net
 import fidl.fuchsia_net_interfaces as f_net_interfaces
 
+from honeydew.typing.wlan import MacAddress
+
 
 # Not all fields of fuchsia.net.interfaces/Properties are added below.
 #
@@ -28,6 +30,9 @@ class InterfaceProperties:
     name: str
     """The name of the interface."""
 
+    mac: MacAddress | None
+    """The MAC address of the interface, if there is one."""
+
     ipv4_addresses: list[IPv4Address]
     """IPv4 addresses currently installed on the interface."""
 
@@ -38,8 +43,15 @@ class InterfaceProperties:
     """The port class of the interface."""
 
     @staticmethod
-    def from_fidl(fidl: f_net_interfaces.Properties) -> "InterfaceProperties":
-        """Create an InterfaceProperties from the FIDL equivalent."""
+    def from_fidl(
+        fidl: f_net_interfaces.Properties, mac: MacAddress | None
+    ) -> "InterfaceProperties":
+        """Create an InterfaceProperties from the FIDL equivalent.
+
+        `mac` is necessary since fuchsia.net.interface/Properties does not
+        include a MAC address. It has to be fetched separately using
+        fuchsia.net.root/Interfaces.GetMac()
+        """
         ipv4_addresses: list[IPv4Address] = []
         ipv6_addresses: list[IPv6Address] = []
 
@@ -63,6 +75,7 @@ class InterfaceProperties:
         return InterfaceProperties(
             id=fidl.id,
             name=fidl.name,
+            mac=mac,
             ipv4_addresses=ipv4_addresses,
             ipv6_addresses=ipv6_addresses,
             port_class=port_class,

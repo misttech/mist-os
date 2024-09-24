@@ -6,9 +6,12 @@
 import asyncio
 import unittest
 from ipaddress import IPv4Address, IPv6Address
+from typing import TypeVar
 from unittest import mock
 
+import fidl.fuchsia_net as f_net
 import fidl.fuchsia_net_interfaces as f_net_interfaces
+import fidl.fuchsia_net_root as f_net_root
 from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew.affordances.fuchsia_controller import netstack
@@ -17,6 +20,15 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing.netstack import InterfaceProperties, PortClass
+from honeydew.typing.wlan import MacAddress
+
+_TEST_MAC: MacAddress = MacAddress("12:34:56:78:90:ab")
+
+_T = TypeVar("_T")
+
+
+async def _async_response(response: _T) -> _T:
+    return response
 
 
 # pylint: disable=protected-access
@@ -51,6 +63,11 @@ class NetstackFCTests(unittest.TestCase):
         )
 
         self.watcher: asyncio.Task[None] | None = None
+
+    def tearDown(self) -> None:
+        self.netstack_obj.loop().stop()
+        self.netstack_obj.loop().run_forever()  # Handle pending tasks
+        self.netstack_obj.loop().close()
 
     def test_verify_supported(self) -> None:
         """Test if _verify_supported works."""
@@ -91,6 +108,7 @@ class NetstackFCTests(unittest.TestCase):
                     InterfaceProperties(
                         1,
                         "lo",
+                        mac=_TEST_MAC,
                         ipv4_addresses=[IPv4Address("127.0.0.1")],
                         ipv6_addresses=[IPv6Address("fe80::1")],
                         port_class=PortClass.LOOPBACK,
@@ -98,6 +116,7 @@ class NetstackFCTests(unittest.TestCase):
                     InterfaceProperties(
                         2,
                         "eth1",
+                        mac=_TEST_MAC,
                         ipv4_addresses=[IPv4Address("192.168.42.1")],
                         ipv6_addresses=[],
                         port_class=PortClass.ETHERNET,
@@ -105,6 +124,7 @@ class NetstackFCTests(unittest.TestCase):
                     InterfaceProperties(
                         3,
                         "wlan1",
+                        mac=_TEST_MAC,
                         ipv4_addresses=[],
                         ipv6_addresses=[],
                         port_class=PortClass.WLAN_CLIENT,
@@ -117,12 +137,30 @@ class NetstackFCTests(unittest.TestCase):
             wraps=get_watcher,
         )
 
+        self.netstack_obj._interfaces_proxy = mock.MagicMock(
+            spec=f_net_root.Interfaces.Client
+        )
+
+        mac_result = f_net_root.InterfacesGetMacResult()
+        mac_result.response = f_net_root.InterfacesGetMacResponse(
+            mac=f_net.MacAddress(
+                octets=list(_TEST_MAC.bytes()),
+            ),
+        )
+
+        self.netstack_obj._interfaces_proxy.get_mac.side_effect = [
+            _async_response(mac_result),
+            _async_response(mac_result),
+            _async_response(mac_result),
+        ]
+
         self.assertEqual(
             self.netstack_obj.list_interfaces(),
             [
                 InterfaceProperties(
                     1,
                     "lo",
+                    mac=_TEST_MAC,
                     ipv4_addresses=[IPv4Address("127.0.0.1")],
                     ipv6_addresses=[IPv6Address("fe80::1")],
                     port_class=PortClass.LOOPBACK,
@@ -130,6 +168,7 @@ class NetstackFCTests(unittest.TestCase):
                 InterfaceProperties(
                     2,
                     "eth1",
+                    mac=_TEST_MAC,
                     ipv4_addresses=[IPv4Address("192.168.42.1")],
                     ipv6_addresses=[],
                     port_class=PortClass.ETHERNET,
@@ -137,6 +176,7 @@ class NetstackFCTests(unittest.TestCase):
                 InterfaceProperties(
                     3,
                     "wlan1",
+                    mac=_TEST_MAC,
                     ipv4_addresses=[],
                     ipv6_addresses=[],
                     port_class=PortClass.WLAN_CLIENT,
