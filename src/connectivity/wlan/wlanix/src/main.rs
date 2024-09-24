@@ -775,6 +775,8 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
             info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
             if let Some(callback) = payload.callback {
                 sta_iface_state.lock().callbacks.push(callback.into_proxy()?);
+            } else {
+                warn!("Empty callback field in received RegisterCallback request.")
             }
         }
         fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork { payload, .. } => {
@@ -783,7 +785,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 let supplicant_sta_network_stream = supplicant_sta_network
                     .into_stream()
                     .context("create SupplicantStaNetwork stream")?;
-                // TODO(b/316035436): Should we return NetworkAdded event?
+                // TODO(https://fxbug.dev/316035436): Should we return NetworkAdded event?
                 serve_supplicant_sta_network(
                     telemetry_sender,
                     supplicant_sta_network_stream,
@@ -934,6 +936,7 @@ fn build_nl80211_ack() -> fidl_wlanix::Nl80211Message {
 }
 
 fn build_nl80211_err() -> fidl_wlanix::Nl80211Message {
+    // TODO(https://fxbug.dev/369154198): This should probably contain an error value.
     fidl_wlanix::Nl80211Message {
         message_type: Some(fidl_wlanix::Nl80211MessageType::Error),
         payload: None,

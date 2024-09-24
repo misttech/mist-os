@@ -277,6 +277,7 @@ impl ClientIface for SmeClientIface {
         bssid: Option<Bssid>,
     ) -> Result<ConnectResult, Error> {
         let last_scan_results = self.last_scan_results.lock().clone();
+        info!("Checking for network in last scan: {} access points", last_scan_results.len());
         let mut scan_results = last_scan_results
             .iter()
             .filter_map(|r| {
