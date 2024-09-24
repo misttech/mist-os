@@ -349,6 +349,97 @@ void ClearBootloaderFiles() { zbi_file_is_initialized = false; }
 
 cpp20::span<uint8_t> GetZbiFiles() { return zbi_files; }
 
+zx::result<cpp20::span<zbi_mem_range_t>> CollectPeripheralMemoryItems(
+    const ZbiContext* context, cpp20::span<zbi_mem_range_t>& out) {
+  if (!context) {
+    return zx::ok(out.first(0));
+  }
+
+  auto current_zbi = out.begin();
+  if (context->uart_mmio_phys) {
+    if (current_zbi == out.end()) {
+      printf("Insufficient memory to add memory items\n");
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    *current_zbi++ = {
+        .paddr = context->uart_mmio_phys.value(),
+        .length = ZX_PAGE_SIZE,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
+    };
+  }
+
+  if (context->gic_driver) {
+    if (const auto* v2_driver =
+            std::get_if<zbi_dcfg_arm_gic_v2_driver_t>(&context->gic_driver.value())) {
+      // This memory range must encompass the GICC and GICD register ranges.
+      // Each of these generally encompass a page, but some systems like QEMU
+      // allocate 64K to make it easier when working with 64kb pages. Since we
+      // use 4K pages, we allocate 16 pages here just to be safe.
+      constexpr uint64_t entry_length = 16 * ZX_PAGE_SIZE;
+      if (current_zbi == out.end()) {
+        printf("Insufficient memory to add memory items\n");
+        return zx::error(ZX_ERR_NO_MEMORY);
+      }
+
+      *current_zbi++ = {
+          .paddr = v2_driver->mmio_phys,
+          .length = entry_length,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
+      };
+
+      if (current_zbi == out.end()) {
+        printf("Insufficient memory to add memory items\n");
+        return zx::error(ZX_ERR_NO_MEMORY);
+      }
+
+      *current_zbi++ = {
+          .paddr = v2_driver->mmio_phys + v2_driver->gicd_offset + v2_driver->gicc_offset,
+          .length = entry_length,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
+      };
+
+      if (v2_driver->use_msi) {
+        if (current_zbi == out.end()) {
+          printf("Insufficient memory to add memory items\n");
+          return zx::error(ZX_ERR_NO_MEMORY);
+        }
+
+        *current_zbi++ = {
+            .paddr = v2_driver->msi_frame_phys,
+            .length = entry_length,
+            .type = ZBI_MEM_TYPE_PERIPHERAL,
+        };
+      }
+    } else if (const auto* v3_driver =
+                   std::get_if<zbi_dcfg_arm_gic_v3_driver_t>(&context->gic_driver.value())) {
+      // We should never have a GICv3 system with less than one core.
+      if (context->num_cpu_nodes < 1) {
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+
+      if (current_zbi == out.end()) {
+        printf("Insufficient memory to add memory items\n");
+        return zx::error(ZX_ERR_NO_MEMORY);
+      }
+
+      // This memory range must encompass the GICD and GICR register ranges.
+      uint64_t gic_mem_size = 0x10000;  // GICD size.
+      gic_mem_size += v3_driver->gicr_offset + v3_driver->gicd_offset;
+      // Add the GICR size. Each GICR in GICv3 consists of 2 adjacent 64 KiB frames.
+      gic_mem_size += static_cast<uint64_t>(context->num_cpu_nodes) * 0x20000;
+      // Add any padding between GICRs on multi-core systems.
+      gic_mem_size += (context->num_cpu_nodes - 1) * v3_driver->gicr_stride;
+      *current_zbi++ = {
+          .paddr = v3_driver->mmio_phys,
+          .length = gic_mem_size,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
+      };
+    }
+  }
+
+  return zx::ok(out.first(current_zbi - out.begin()));
+}
+
 // Add memory related zbi items.
 //
 // Returns memory map key on success, which will be used for ExitBootService.
@@ -393,88 +484,12 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
     };
   }
 
-  if (context) {
-    if (context->uart_mmio_phys) {
-      if (current_zbi == zbi_mem.end()) {
-        printf("Insufficient memory to add memory items\n");
-        return zx::error(ZX_ERR_NO_MEMORY);
-      }
-      *current_zbi++ = {
-          .paddr = context->uart_mmio_phys.value(),
-          .length = ZX_PAGE_SIZE,
-          .type = ZBI_MEM_TYPE_PERIPHERAL,
-      };
-    }
-
-    if (context->gic_driver) {
-      if (const auto* v2_driver =
-              std::get_if<zbi_dcfg_arm_gic_v2_driver_t>(&context->gic_driver.value())) {
-        // This memory range must encompass the GICC and GICD register ranges.
-        // Each of these generally encompass a page, but some systems like QEMU
-        // allocate 64K to make it easier when working with 64kb pages. Since we
-        // use 4K pages, we allocate 16 pages here just to be safe.
-        constexpr uint64_t entry_length = 16 * ZX_PAGE_SIZE;
-        if (current_zbi == zbi_mem.end()) {
-          printf("Insufficient memory to add memory items\n");
-          return zx::error(ZX_ERR_NO_MEMORY);
-        }
-
-        *current_zbi++ = {
-            .paddr = v2_driver->mmio_phys,
-            .length = entry_length,
-            .type = ZBI_MEM_TYPE_PERIPHERAL,
-        };
-
-        if (current_zbi == zbi_mem.end()) {
-          printf("Insufficient memory to add memory items\n");
-          return zx::error(ZX_ERR_NO_MEMORY);
-        }
-
-        *current_zbi++ = {
-            .paddr = v2_driver->mmio_phys + v2_driver->gicd_offset + v2_driver->gicc_offset,
-            .length = entry_length,
-            .type = ZBI_MEM_TYPE_PERIPHERAL,
-        };
-
-        if (v2_driver->use_msi) {
-          if (current_zbi == zbi_mem.end()) {
-            printf("Insufficient memory to add memory items\n");
-            return zx::error(ZX_ERR_NO_MEMORY);
-          }
-
-          *current_zbi++ = {
-              .paddr = v2_driver->msi_frame_phys,
-              .length = entry_length,
-              .type = ZBI_MEM_TYPE_PERIPHERAL,
-          };
-        }
-      } else if (const auto* v3_driver =
-                     std::get_if<zbi_dcfg_arm_gic_v3_driver_t>(&context->gic_driver.value())) {
-        // We should never have a GICv3 system with less than one core.
-        if (context->num_cpu_nodes < 1) {
-          return zx::error(ZX_ERR_INTERNAL);
-        }
-
-        if (current_zbi == zbi_mem.end()) {
-          printf("Insufficient memory to add memory items\n");
-          return zx::error(ZX_ERR_NO_MEMORY);
-        }
-
-        // This memory range must encompass the GICD and GICR register ranges.
-        uint64_t gic_mem_size = 0x10000;  // GICD size.
-        gic_mem_size += v3_driver->gicr_offset + v3_driver->gicd_offset;
-        // Add the GICR size. Each GICR in GICv3 consists of 2 adjacent 64 KiB frames.
-        gic_mem_size += static_cast<uint64_t>(context->num_cpu_nodes) * 0x20000;
-        // Add any padding between GICRs on multi-core systems.
-        gic_mem_size += (context->num_cpu_nodes - 1) * v3_driver->gicr_stride;
-        *current_zbi++ = {
-            .paddr = v3_driver->mmio_phys,
-            .length = gic_mem_size,
-            .type = ZBI_MEM_TYPE_PERIPHERAL,
-        };
-      }
-    }
+  cpp20::span<zbi_mem_range_t> peripheral_mems = cpp20::span{current_zbi, zbi_mem.end()};
+  auto res = CollectPeripheralMemoryItems(context, peripheral_mems);
+  if (res.is_error()) {
+    return res.take_error();
   }
+  current_zbi += (*res).size();
 
   size_t payload_size = (current_zbi - zbi_mem.begin()) * sizeof(*current_zbi);
   zbi_result_t result = zbi_create_entry_with_payload(zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0,

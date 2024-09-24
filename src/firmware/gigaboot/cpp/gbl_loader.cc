@@ -8,6 +8,9 @@
 
 #include <phys/efi/main.h>
 
+#include "backends.h"
+#include "boot_zbi_items.h"
+#include "input.h"
 #include "utils.h"
 
 namespace gigaboot {
@@ -34,11 +37,21 @@ EFIAPI efi_status ConAndSerialOutputString(struct efi_simple_text_output_protoco
   self->OutputString = ConAndSerialOutputString;
   return EFI_SUCCESS;
 }
+
+const efi_guid kEfiDtbTableGuid = {
+    0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}};
+
 }  // namespace
+
+cpp20::span<uint8_t> GblFdt();
+cpp20::span<uint8_t> GblFdtZbiBlob();
+cpp20::span<uint8_t> GblFdtPermAttr();
+cpp20::span<uint8_t> GblFdtPermAttrHash();
+cpp20::span<uint8_t> GblFdtStopInFastboot();
 
 const cpp20::span<const uint8_t> GetGblEfiApp();
 
-zx::result<> LaunchGbl() {
+zx::result<> LaunchGbl(bool stop_in_fastboot) {
   const cpp20::span<const uint8_t> app = GetGblEfiApp();
 
   // Allocates boot buffer and copies over the embedded GBL EFI app blob. This is because
@@ -58,6 +71,82 @@ zx::result<> LaunchGbl() {
       false, gEfiImageHandle, nullptr, reinterpret_cast<void*>(addr), app.size(), &app_handle);
   if (status != EFI_SUCCESS) {
     printf("Failed to load image: %s\n", EfiStatusToString(status));
+    return zx::error(static_cast<int>(status));
+  }
+
+  // Passes board specific data via a device tree in the EFI configuration table.
+
+  // Prepares device ZBI items
+  // Constructs the ZBI at an aligned address as required by the APIs.
+  uintptr_t fdt_zbi_blob_addr = reinterpret_cast<uintptr_t>(GblFdtZbiBlob().data());
+  size_t zbi_alignment = size_t{ZBI_ALIGNMENT};
+  uintptr_t aligned_addr = DivideRoundUp(fdt_zbi_blob_addr, zbi_alignment) * zbi_alignment;
+  cpp20::span<uint8_t> aligned = GblFdtZbiBlob().subspan(aligned_addr - fdt_zbi_blob_addr);
+  zbi_header_t* zbi = reinterpret_cast<zbi_header_t*>(aligned.data());
+  size_t capacity = aligned.size();
+  if (zbi_result_t res = zbi_init(zbi, capacity); res != ZBI_RESULT_OK) {
+    printf("Failed to init ZBI container: %d\n", res);
+    return zx::error(static_cast<int>(res));
+  }
+
+  ZbiContext context = {};
+  if (!AddGigabootZbiItems(zbi, capacity, nullptr, &context)) {
+    printf("Failed to add ZBI items\n");
+    return zx::error(1);
+  }
+
+  // Constructs a ZBI_TYPE_MEM_CONFIG ZBI item that contains only ZBI_MEM_TYPE_PERIPHERAL type
+  // memory ranges derived from the ACPI table. GBL is responsible for updating this item with other
+  // ZBI_MEM_TYPE_RAM/ZBI_MEM_TYPE_RESERVED memory ranges from the EFI memory map upon calling
+  // ExitBootService().
+  void* mem_payload = nullptr;
+  uint32_t payload_len = 0;
+  if (zbi_result_t res = zbi_get_next_entry_payload(zbi, capacity, &mem_payload, &payload_len);
+      res != ZBI_RESULT_OK) {
+    printf("Failed to get payload buffer for peripheral memory ZBI items: %d\n", res);
+    return zx::error(static_cast<int>(res));
+  }
+
+  auto mems = cpp20::span{reinterpret_cast<zbi_mem_range_t*>(mem_payload),
+                          payload_len / sizeof(zbi_mem_range_t)};
+  auto collected = CollectPeripheralMemoryItems(&context, mems);
+  if (collected.is_error()) {
+    printf("Failed to collect peripheral memory ZBI items: %d\n", collected.error_value());
+    return collected.take_error();
+  } else if (collected->size()) {
+    for (auto ele : *collected) {
+      printf("Peripheral memory. paddr = %zu, length = %zu\n", size_t{ele.paddr},
+             size_t{ele.length});
+    }
+
+    if (zbi_result_t res = zbi_create_entry_with_payload(
+            zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0, (*collected).data(),
+            (*collected).size() * sizeof(zbi_mem_range_t));
+        res != ZBI_RESULT_OK) {
+      printf("Failed to add peripheral memory ZBI items: %d\n", res);
+      return zx::error(static_cast<int>(res));
+    }
+  }
+
+  printf("Board ZBI items size: %zu\n", sizeof(zbi_header_t) + zbi->length);
+  memmove(GblFdtZbiBlob().data(), zbi, capacity);
+
+  // Prepares permanent attributes.
+  ZX_ASSERT(GblFdtPermAttr().size() >= GetPermanentAttributes().size());
+  memcpy(GblFdtPermAttr().data(), GetPermanentAttributes().data(), GetPermanentAttributes().size());
+  // Prepares permanent attributes hash.
+  ZX_ASSERT(GblFdtPermAttrHash().size() >= GetPermanentAttributesHash().size());
+  memcpy(GblFdtPermAttrHash().data(), GetPermanentAttributesHash().data(),
+         GetPermanentAttributesHash().size());
+
+  // Sets `stop-in-fastboot` value.
+  GblFdtStopInFastboot()[0] = stop_in_fastboot ? 1 : 0;
+
+  // Installs device tree.
+  status =
+      gEfiSystemTable->BootServices->InstallConfigurationTable(&kEfiDtbTableGuid, GblFdt().data());
+  if (status != EFI_SUCCESS) {
+    printf("Failed to load device tree: %s\n", EfiStatusToString(status));
     return zx::error(static_cast<int>(status));
   }
 

@@ -128,6 +128,14 @@ gigaboot::RebootMode LoadRebootMode() {
   return reboot_mode;
 }
 
+bool CheckFastbootKey() {
+  constexpr zx::duration timeout = zx::sec(2);
+  gigaboot::InputReceiver receiver(gEfiSystemTable);
+  printf("Press f to enter fastboot.\n");
+  std::optional<char> key = receiver.GetKeyPrompt("f", timeout, "Auto boot in");
+  return key == 'f';
+}
+
 }  // namespace
 
 // Main routine for gigaboot.
@@ -159,11 +167,7 @@ int gigaboot_main(int argc, char** argv) {
     printf(
         "Your BIOS or ABR instructed Gigaboot to enter fastboot directly and skip normal boot.\n");
   } else {
-    constexpr zx::duration timeout = zx::sec(2);
-    gigaboot::InputReceiver receiver(gEfiSystemTable);
-    printf("Press f to enter fastboot.\n");
-    std::optional<char> key = receiver.GetKeyPrompt("f", timeout, "Auto boot in");
-    enter_fastboot = key == 'f';
+    enter_fastboot = CheckFastbootKey();
   }
 
   if (enter_fastboot) {
@@ -193,7 +197,9 @@ int gigaboot_main(int argc, char** argv) {
 // Main routine for booting embedded GBL.
 int gbl_main(int argc, char** argv) {
   printf("Preparing to boot Generic Bootloader(GBL)...\n");
-  if (gigaboot::LaunchGbl().is_error()) {
+  auto mode = gigaboot::GetCommandlineRebootMode(IsQemu()).value_or(gigaboot::RebootMode::kNormal);
+  if (gigaboot::LaunchGbl(mode == gigaboot::RebootMode::kBootloader || CheckFastbootKey())
+          .is_error()) {
     printf("Failed to boot GBL\n");
   }
   return 1;

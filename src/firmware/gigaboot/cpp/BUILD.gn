@@ -25,6 +25,7 @@ source_set("lib") {
     "efi_variables.h",
     "fastboot.cc",
     "fastboot.h",
+    "gbl_dt.cc",
     "gbl_loader.cc",
     "gbl_loader.h",
     "gpt.cc",
