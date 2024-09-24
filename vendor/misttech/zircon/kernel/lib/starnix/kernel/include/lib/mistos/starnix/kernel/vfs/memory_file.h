@@ -7,6 +7,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_MEMORY_FILE_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/vfs/falloc.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
@@ -17,8 +18,6 @@
 #include <lib/mistos/starnix_uapi/seal_flags.h>
 
 #include <fbl/ref_ptr.h>
-
-#include "lib/mistos/starnix/kernel/mm/memory.h"
 
 class VmObjectDispatcher;
 
@@ -65,18 +64,18 @@ class MemoryFileNode : public FsNodeOps {
   fileops_impl_seekable();                                                                   \
                                                                                              \
   fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask&, size_t offset, \
-                                  OutputBuffer* data) {                                      \
-    return MemoryFileObject::read(*memory.get(), file, offset, data);                         \
+                                  OutputBuffer* data) final {                                \
+    return MemoryFileObject::read(*memory.get(), file, offset, data);                        \
   }                                                                                          \
                                                                                              \
   fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,  \
-                                   size_t offset, InputBuffer* data) {                       \
-    return MemoryFileObject::write(*memory.get(), file, current_task, offset, data);          \
+                                   size_t offset, InputBuffer* data) final {                 \
+    return MemoryFileObject::write(*memory.get(), file, current_task, offset, data);         \
   }                                                                                          \
                                                                                              \
   fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(                                  \
       const FileObject& file, const CurrentTask& current_task, ktl::optional<size_t>,        \
-      ProtectionFlags prot) {                                                                \
+      ProtectionFlags prot) final {                                                          \
     return MemoryFileObject::get_memory(memory, file, current_task, prot);                   \
   }                                                                                          \
   using __fileops_impl_memory_force_semicolon = int

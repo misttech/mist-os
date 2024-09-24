@@ -6,6 +6,8 @@
 #include "lib/mistos/starnix/kernel/vfs/memory_file.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/logging/logging.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
@@ -18,14 +20,12 @@
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/math.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/span.h>
 #include <object/vm_object_dispatcher.h>
-
-#include "lib/mistos/starnix/kernel/logging/logging.h"
-#include "lib/mistos/starnix/kernel/mm/memory.h"
 
 #include <ktl/enforce.h>
 
@@ -214,16 +214,18 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
       }
       update_content_size = true;
     }
-    /*auto status = vmo->vmo()->Write(buf.data(), offset, want_write);
-    if (status != ZX_OK) {
+
+    auto status = memory.write(ktl::span<const uint8_t>{buf.data(), want_write}, offset);
+    if (status.is_error()) {
       return fit::error(errno(EIO));
-    }*/
+    }
 
     if (update_content_size) {
       info.size = write_end;
     }
-    if (auto result = data->advance(want_write); result.is_error())
+    if (auto result = data->advance(want_write); result.is_error()) {
       return result.take_error();
+    }
 
     return fit::ok(want_write);
   };
@@ -232,8 +234,34 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
 }
 
 fit::result<Errno, fbl::RefPtr<MemoryObject>> MemoryFileObject::get_memory(
-    const fbl::RefPtr<MemoryObject>&, const FileObject&, const CurrentTask&, ProtectionFlags prot) {
-  return fit::error(errno(ENOTSUP));
+    const fbl::RefPtr<MemoryObject>& memory, const FileObject& file, const CurrentTask&,
+    ProtectionFlags prot) {
+  // In MemoryFileNode::create_file_ops, we downscoped the rights
+  // on the VMO to match the rights on the file object. If the caller
+  // wants more rights than exist on the file object, return an error
+  // instead of returning a MemoryObject that does not conform to
+  // the FileOps::get_memory contract.
+  if (prot.contains(ProtectionFlagsEnum::READ) && !file.can_read()) {
+    return fit::error(errno(EACCES));
+  }
+  if (prot.contains(ProtectionFlagsEnum::WRITE) && !file.can_write()) {
+    return fit::error(errno(EACCES));
+  }
+
+  auto mem = memory;
+  if (prot.contains(ProtectionFlagsEnum::EXEC)) {
+    auto dup = mem->duplicate_handle(ZX_RIGHT_SAME_RIGHTS);
+    if (dup.is_error()) {
+      return fit::error(impossible_error(dup.error_value()));
+    }
+    dup = dup->replace_as_executable();
+    if (dup.is_error()) {
+      return fit::error(impossible_error(dup.error_value()));
+    }
+    mem = dup.value();
+  }
+
+  return fit::ok(mem);
 }
 
 fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsString name,
