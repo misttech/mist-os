@@ -37,7 +37,11 @@ const SUSPEND_FAILED_AT string = "failed_at_ns";
 /// The duration of time last spent in suspend.
 const SUSPEND_LAST_TIMESTAMP string = "last_time_in_suspend_ns";
 
-/// The duration of time last spent in suspend.
+/// The duration of time last spent in operations leading to suspend,
+/// excluding the time actually spent suspended.
+///
+/// TODO: b/354239403 - make this string also end with `_ns` to be consistent
+/// with the conventions above.
 const SUSPEND_LAST_DURATION string = "last_time_in_suspend_operations";
 
 /// The requested future system state.
