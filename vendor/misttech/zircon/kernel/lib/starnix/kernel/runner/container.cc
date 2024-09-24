@@ -6,13 +6,17 @@
 #include "lib/mistos/starnix/kernel/runner/container.h"
 
 #include <lib/fit/result.h>
-// #include <lib/mistos/starnix/kernel/execution/executor.h>
-// #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
+#include <lib/mistos/starnix/kernel/execution/executor.h>
+#include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <trace.h>
 #include <zircon/assert.h>
@@ -20,6 +24,8 @@
 
 #include <fbl/ref_ptr.h>
 #include <ktl/algorithm.h>
+#include <object/process_dispatcher.h>
+#include <phys/handoff.h>
 
 #include "../kernel_priv.h"
 
@@ -38,19 +44,30 @@ fit::result<Errno, Container> create_container(const Config& config) {
   ASSERT_MSG(kernel, "creating Kernel: %s\n", config.name.data());
 
   fbl::RefPtr<FsContext> fs_context;
-#if 0
   if (auto result = create_fs_context(kernel, config); result.is_error()) {
     LTRACEF("creating FsContext: %d\n", result.error_value());
     return fit::error(errno(from_status_like_fdio(result.error_value())));
   } else {
     fs_context = result.value();
   }
-#endif
 
   auto init_pid = kernel->pids.Write()->allocate_pid();
-  ASSERT(init_pid == 1);
+  // Lots of software assumes that the pid for the init process is 1.
+  DEBUG_ASSERT(init_pid == 1);
 
+  auto system_task = CurrentTask::create_system_task(
+                         /*kernel.kthreads.unlocked_for_async().deref_mut(),*/ kernel, fs_context)
+                         .value();
+
+  // The system task gives pid 2. This value is less critical than giving
+  // pid 1 to init, but this value matches what is supposed to happen.
+  DEBUG_ASSERT(system_task->id == 2);
+
+  // Register common devices and add them in sysfs and devtmpfs.
+  // init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task);
+  // register_common_file_systems(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel);
   /*
+
   mount_filesystems(locked, &system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;
   */
@@ -71,7 +88,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
     return ktl::move(argv);
   }();
 
-  auto executable = CurrentTask::open_file_bootfs(argv[0] /*, OpenFlags::RDONLY*/);
+  auto executable = system_task.open_file(argv[0], OpenFlags(OpenFlagsEnum::RDONLY));
   if (executable.is_error())
     return executable.take_error();
 
@@ -80,36 +97,39 @@ fit::result<Errno, Container> create_container(const Config& config) {
     initial_name = config.init[0];
   }
 
+  // let rlimits = parse_rlimits(&config.rlimits)?;
   auto init_task = CurrentTask::create_init_process(kernel, init_pid, initial_name, fs_context);
   if (init_task.is_error())
     return init_task.take_error();
 
   if (LOCAL_TRACE) {
-    printf("creating init task: ");
+    TRACEF("creating init task: ");
     for (auto arg : config.init) {
-      printf("%s ", arg.data());
+      TRACEF("%s ", arg.data());
     }
-    printf("\n");
+    TRACEF("\n");
   }
 
-#if 0
   auto pre_run = [&](CurrentTask& init_task) -> fit::result<Errno> {
-    return init_task.exec(executable.value(), argv[0], ktl::move(argv), fbl::Vector<fbl::String>());
+    return init_task.exec(executable.value(), argv[0], ktl::move(argv),
+                          fbl::Vector<ktl::string_view>());
   };
 
-  auto task_complete = []() -> void { LTRACEF("Finished running init process.\n"); };
+  auto task_complete = [](fit::result<zx_status_t>) -> void {
+    LTRACEF("Finished running init process.\n");
+  };
 
   execute_task_with_prerun_result(init_task.value(), pre_run, task_complete);
-#endif
 
   return fit::ok(Container{kernel});
 }
 
-#if 0
 fit::result<zx_status_t, fbl::RefPtr<FsContext>> create_fs_context(
     const fbl::RefPtr<Kernel>& kernel, const Config& config) {
-  return fit::ok(ktl::move(FsContext::New(TmpFs::new_fs(kernel))));
+  HandoffEnd end = EndHandoff();
+
+  auto rootfs = BootFs::new_fs(kernel, ktl::move(end.zbi));
+  return fit::ok(ktl::move(FsContext::New(Namespace::new_with_flags(rootfs, MountFlags::empty()))));
 }
-#endif
 
 }  // namespace starnix
