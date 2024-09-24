@@ -26,10 +26,14 @@ use starnix_logging::{
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::futex_address::FutexAddress;
 use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::range_ext::RangeExt;
 use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::restricted_aspace::{
+    RESTRICTED_ASPACE_BASE, RESTRICTED_ASPACE_HIGHEST_ADDRESS, RESTRICTED_ASPACE_SIZE,
+};
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
@@ -68,28 +72,6 @@ pub fn init_usercopy() {
     let _ = usercopy();
 }
 
-// From //zircon/kernel/arch/x86/include/arch/kernel_aspace.h
-#[cfg(target_arch = "x86_64")]
-const USER_ASPACE_BASE: usize = 0x0000000000200000;
-#[cfg(target_arch = "x86_64")]
-const USER_RESTRICTED_ASPACE_SIZE: usize = (1 << 46) - USER_ASPACE_BASE;
-
-// From //zircon/kernel/arch/arm64/include/arch/kernel_aspace.h
-#[cfg(target_arch = "aarch64")]
-const USER_ASPACE_BASE: usize = 0x0000000000200000;
-#[cfg(target_arch = "aarch64")]
-const USER_RESTRICTED_ASPACE_SIZE: usize = (1 << 47) - USER_ASPACE_BASE;
-
-// From //zircon/kernel/arch/riscv64/include/arch/kernel_aspace.h
-#[cfg(target_arch = "riscv64")]
-const USER_ASPACE_BASE: usize = 0x0000000000200000;
-#[cfg(target_arch = "riscv64")]
-const USER_RESTRICTED_ASPACE_SIZE: usize = (1 << 37) - USER_ASPACE_BASE;
-
-// From //zircon/kernel/object/process_dispatcher.cc
-const PRIVATE_ASPACE_BASE: usize = USER_ASPACE_BASE;
-const PRIVATE_ASPACE_SIZE: usize = USER_RESTRICTED_ASPACE_SIZE;
-
 fn usercopy() -> Option<&'static usercopy::Usercopy> {
     static USERCOPY: Lazy<Option<usercopy::Usercopy>> = Lazy::new(|| {
         // We do not create shared processes in unit tests.
@@ -97,10 +79,8 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
             // ASUMPTION: All Starnix managed Linux processes have the same
             // restricted mode address range.
             Some(
-                usercopy::Usercopy::new(
-                    PRIVATE_ASPACE_BASE..PRIVATE_ASPACE_BASE + PRIVATE_ASPACE_SIZE,
-                )
-                .unwrap(),
+                usercopy::Usercopy::new(RESTRICTED_ASPACE_BASE..RESTRICTED_ASPACE_HIGHEST_ADDRESS)
+                    .unwrap(),
             )
         } else {
             None
@@ -2792,8 +2772,8 @@ impl MemoryManager {
         let user_vmar = create_user_vmar(&root_vmar, &info)?;
         let user_vmar_info = user_vmar.info()?;
 
-        debug_assert_eq!(PRIVATE_ASPACE_BASE, user_vmar_info.base);
-        debug_assert_eq!(PRIVATE_ASPACE_SIZE, user_vmar_info.len);
+        debug_assert_eq!(RESTRICTED_ASPACE_BASE, user_vmar_info.base);
+        debug_assert_eq!(RESTRICTED_ASPACE_SIZE, user_vmar_info.len);
 
         Ok(Self::from_vmar(root_vmar, user_vmar, user_vmar_info))
     }
@@ -3725,15 +3705,15 @@ impl MemoryManager {
         Ok(result)
     }
 
-    pub fn atomic_load_u32_relaxed(&self, addr: UserAddress) -> Result<u32, Errno> {
+    pub fn atomic_load_u32_relaxed(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
         if let Some(usercopy) = usercopy() {
-            usercopy.atomic_load_u32_relaxed(addr.ptr()).map_err(|_| errno!(EFAULT))
+            usercopy.atomic_load_u32_relaxed(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
         } else {
             // SAFETY: `self.state.read().read_memory` only returns `Ok` if all
             // bytes were read to.
             let buf = unsafe {
                 read_to_array(|buf| {
-                    self.state.read().read_memory(addr, buf).map(|bytes_read| {
+                    self.state.read().read_memory(futex_addr.into(), buf).map(|bytes_read| {
                         debug_assert_eq!(bytes_read.len(), std::mem::size_of::<u32>())
                     })
                 })
@@ -3742,11 +3722,15 @@ impl MemoryManager {
         }
     }
 
-    pub fn atomic_store_u32_relaxed(&self, addr: UserAddress, value: u32) -> Result<(), Errno> {
+    pub fn atomic_store_u32_relaxed(
+        &self,
+        futex_addr: FutexAddress,
+        value: u32,
+    ) -> Result<(), Errno> {
         if let Some(usercopy) = usercopy() {
-            usercopy.atomic_store_u32_relaxed(addr.ptr(), value).map_err(|_| errno!(EFAULT))
+            usercopy.atomic_store_u32_relaxed(futex_addr.ptr(), value).map_err(|_| errno!(EFAULT))
         } else {
-            self.state.read().write_memory(addr, value.as_bytes())?;
+            self.state.read().write_memory(futex_addr.into(), value.as_bytes())?;
             Ok(())
         }
     }
@@ -3756,7 +3740,7 @@ impl MemoryManager {
         if self.root_vmar.is_invalid_handle() {
             return None;
         }
-        Some(VmarInfo { base: USER_ASPACE_BASE, len: USER_RESTRICTED_ASPACE_SIZE })
+        Some(VmarInfo { base: RESTRICTED_ASPACE_BASE, len: RESTRICTED_ASPACE_SIZE })
     }
 }
 

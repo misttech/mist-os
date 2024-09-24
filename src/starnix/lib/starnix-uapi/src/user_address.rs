@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::errors::{error, Errno};
+use super::futex_address::FutexAddress;
 use super::math::round_up_to_increment;
 use super::uapi;
 use super::user_buffer::UserBuffer;
@@ -84,6 +85,12 @@ impl From<uapi::uaddr> for UserAddress {
 impl From<UserAddress> for uapi::uaddr {
     fn from(value: UserAddress) -> Self {
         Self { addr: value.0 }
+    }
+}
+
+impl From<FutexAddress> for UserAddress {
+    fn from(value: FutexAddress) -> Self {
+        Self(value.ptr() as u64)
     }
 }
 

@@ -10,6 +10,7 @@ use futures::channel::oneshot;
 use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, Mutex};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::futex_address::FutexAddress;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{errno, error, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK, FUTEX_WAITERS};
 use std::collections::hash_map::Entry;
@@ -48,9 +49,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         mask: u32,
         deadline: zx::MonotonicTime,
     ) -> Result<(), Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
+        let addr = FutexAddress::try_from(addr)?;
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
@@ -82,9 +81,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         count: usize,
         mask: u32,
     ) -> Result<usize, Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
+        let addr = FutexAddress::try_from(addr)?;
         let key = Key::get_key(task, addr)?;
         Ok(self.state.lock().wake(key, count, mask))
     }
@@ -101,9 +98,8 @@ impl<Key: FutexKey> FutexTable<Key> {
         new_addr: UserAddress,
         expected_value: Option<u32>,
     ) -> Result<usize, Errno> {
-        if !addr.is_aligned(4) || !new_addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
+        let addr = FutexAddress::try_from(addr)?;
+        let new_addr = FutexAddress::try_from(new_addr)?;
         let key = Key::get_key(current_task, addr)?;
         let new_key = Key::get_key(current_task, new_addr)?;
         let mut state = self.state.lock();
@@ -148,9 +144,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         addr: UserAddress,
         deadline: zx::MonotonicTime,
     ) -> Result<(), Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
+        let addr = FutexAddress::try_from(addr)?;
         let mut state = self.state.lock();
         // As the state is locked, no unlock can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex unlock.
@@ -226,9 +220,7 @@ impl<Key: FutexKey> FutexTable<Key> {
     ///
     /// See FUTEX_UNLOCK_PI.
     pub fn unlock_pi(&self, current_task: &CurrentTask, addr: UserAddress) -> Result<(), Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
+        let addr = FutexAddress::try_from(addr)?;
         let mut state = self.state.lock();
         let tid = current_task.get_tid() as u32;
 
@@ -298,7 +290,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         Ok(())
     }
 
-    fn load_futex_value(current_task: &CurrentTask, addr: UserAddress) -> Result<u32, Errno> {
+    fn load_futex_value(current_task: &CurrentTask, addr: FutexAddress) -> Result<u32, Errno> {
         current_task.mm().atomic_load_u32_relaxed(addr)
     }
 }
@@ -428,11 +420,11 @@ impl Drop for FutexOperandMapping {
 }
 
 pub trait FutexKey: Sized + Ord + Hash + Clone {
-    fn get_key(task: &Task, addr: UserAddress) -> Result<Self, Errno>;
+    fn get_key(task: &Task, addr: FutexAddress) -> Result<Self, Errno>;
 
     fn get_operand_and_key(
         task: &Task,
-        addr: UserAddress,
+        addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
 
@@ -441,23 +433,20 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct PrivateFutexKey {
-    addr: UserAddress,
+    addr: FutexAddress,
 }
 
 impl FutexKey for PrivateFutexKey {
-    fn get_key(_task: &Task, addr: UserAddress) -> Result<Self, Errno> {
+    fn get_key(_task: &Task, addr: FutexAddress) -> Result<Self, Errno> {
         Ok(PrivateFutexKey { addr })
     }
 
     fn get_operand_and_key(
         task: &Task,
-        addr: UserAddress,
+        addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
-        let (memory, offset) = task.mm().get_mapping_memory(addr, perms)?;
+        let (memory, offset) = task.mm().get_mapping_memory(addr.into(), perms)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { memory, offset }, key))
     }
@@ -476,19 +465,16 @@ pub struct SharedFutexKey {
 }
 
 impl FutexKey for SharedFutexKey {
-    fn get_key(task: &Task, addr: UserAddress) -> Result<Self, Errno> {
+    fn get_key(task: &Task, addr: FutexAddress) -> Result<Self, Errno> {
         Self::get_operand_and_key(task, addr, ProtectionFlags::READ).map(|(_, key)| key)
     }
 
     fn get_operand_and_key(
         task: &Task,
-        addr: UserAddress,
+        addr: FutexAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno> {
-        if !addr.is_aligned(4) {
-            return error!(EINVAL);
-        }
-        let (memory, offset) = task.mm().get_mapping_memory(addr, perms)?;
+        let (memory, offset) = task.mm().get_mapping_memory(addr.into(), perms)?;
         let key = SharedFutexKey::new(&memory, offset)?;
         Ok((FutexOperand { memory, offset }, key))
     }
