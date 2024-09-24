@@ -19,12 +19,12 @@
 //! 2. Use one of the `decode_*` methods to decode the message body.
 //!
 
-pub use fidl::encoding::{decode_transaction_header, Decode, DynamicFlags, TransactionHeader};
+pub use fidl::encoding::{decode_transaction_header, DynamicFlags, TransactionHeader};
 
 use fidl::encoding::{
     Decoder, EmptyStruct, Encode, Encoder, Flexible, FlexibleResult, FlexibleResultType,
-    FlexibleType, FrameworkErr, NoHandleResourceDialect, ResultType, TransactionMessage,
-    TransactionMessageType, TypeMarker, ValueTypeMarker,
+    FlexibleType, FrameworkErr, ResultType, TransactionMessage, TransactionMessageType, TypeMarker,
+    ValueTypeMarker,
 };
 use fidl::{new_empty, Error, HandleDisposition};
 
@@ -43,11 +43,7 @@ pub use fidl::for_fidl_message_crate::ErrorType;
 /// - use `encode_response_result` if the method has error syntax (strict or flexible).
 /// - use `encode_response_flexible` if the method is flexible (no error syntax).
 /// - use this method otherwise.
-pub fn encode_message<T: Body>(header: TransactionHeader, body: T) -> Result<Vec<u8>, Error>
-where
-    for<'a> <<T as Body>::MarkerAtTopLevel as ValueTypeMarker>::Borrowed<'a>:
-        Encode<T::MarkerAtTopLevel, NoHandleResourceDialect>,
-{
+pub fn encode_message<T: Body>(header: TransactionHeader, body: T) -> Result<Vec<u8>, Error> {
     encode::<T::MarkerAtTopLevel>(header, T::MarkerAtTopLevel::borrow(&body))
 }
 
@@ -56,13 +52,7 @@ where
 pub fn encode_response_result<T: Body, E: ErrorType>(
     header: TransactionHeader,
     result: Result<T, E>,
-) -> Result<Vec<u8>, Error>
-where
-    for<'a> <<T as Body>::MarkerInResultUnion as ValueTypeMarker>::Borrowed<'a>:
-        Encode<T::MarkerInResultUnion, NoHandleResourceDialect>,
-    for<'a> <<E as ErrorType>::Marker as ValueTypeMarker>::Borrowed<'a>:
-        Encode<E::Marker, NoHandleResourceDialect>,
-{
+) -> Result<Vec<u8>, Error> {
     encode::<FlexibleResultType<T::MarkerInResultUnion, E::Marker>>(
         header,
         FlexibleResult::new(match result {
@@ -77,11 +67,7 @@ where
 pub fn encode_response_flexible<T: Body>(
     header: TransactionHeader,
     body: T,
-) -> Result<Vec<u8>, Error>
-where
-    for<'a> <<T as Body>::MarkerInResultUnion as ValueTypeMarker>::Borrowed<'a>:
-        Encode<T::MarkerInResultUnion, NoHandleResourceDialect>,
-{
+) -> Result<Vec<u8>, Error> {
     encode::<FlexibleType<T::MarkerInResultUnion>>(
         header,
         Flexible::Ok(T::MarkerInResultUnion::borrow(&body)),
@@ -105,11 +91,7 @@ pub fn encode_response_flexible_unknown(header: TransactionHeader) -> Result<Vec
 /// - use `decode_response_flexible_result` if the method is flexible and has error syntax.
 /// - use `decode_response_flexible` if the method is flexible (no error syntax).
 /// - use this method otherwise.
-pub fn decode_message<T: Body>(header: TransactionHeader, body: &[u8]) -> Result<T, Error>
-where
-    <T::MarkerAtTopLevel as TypeMarker>::Owned:
-        Decode<T::MarkerAtTopLevel, NoHandleResourceDialect>,
-{
+pub fn decode_message<T: Body>(header: TransactionHeader, body: &[u8]) -> Result<T, Error> {
     decode::<T::MarkerAtTopLevel>(header, body)
 }
 
@@ -118,11 +100,7 @@ where
 pub fn decode_response_strict_result<T: Body, E: ErrorType>(
     header: TransactionHeader,
     body: &[u8],
-) -> Result<Result<T, E>, Error>
-where
-    <T::MarkerInResultUnion as TypeMarker>::Owned:
-        Decode<T::MarkerInResultUnion, NoHandleResourceDialect>,
-{
+) -> Result<Result<T, E>, Error> {
     decode::<ResultType<T::MarkerInResultUnion, E::Marker>>(header, body)
 }
 
@@ -139,11 +117,7 @@ pub enum MaybeUnknown<T> {
 pub fn decode_response_flexible<T: Body>(
     header: TransactionHeader,
     body: &[u8],
-) -> Result<MaybeUnknown<T>, Error>
-where
-    <T::MarkerInResultUnion as TypeMarker>::Owned:
-        Decode<T::MarkerInResultUnion, NoHandleResourceDialect>,
-{
+) -> Result<MaybeUnknown<T>, Error> {
     match decode::<FlexibleType<T::MarkerInResultUnion>>(header, body)? {
         Flexible::Ok(value) => Ok(MaybeUnknown::Known(value)),
         Flexible::FrameworkErr(err) => match err {
@@ -157,11 +131,7 @@ where
 pub fn decode_response_flexible_result<T: Body, E: ErrorType>(
     header: TransactionHeader,
     body: &[u8],
-) -> Result<MaybeUnknown<Result<T, E>>, Error>
-where
-    <T::MarkerInResultUnion as TypeMarker>::Owned:
-        Decode<T::MarkerInResultUnion, NoHandleResourceDialect>,
-{
+) -> Result<MaybeUnknown<Result<T, E>>, Error> {
     match decode::<FlexibleResultType<T::MarkerInResultUnion, E::Marker>>(header, body)? {
         FlexibleResult::Ok(value) => Ok(MaybeUnknown::Known(Ok(value))),
         FlexibleResult::DomainErr(err) => Ok(MaybeUnknown::Known(Err(err))),
@@ -173,7 +143,7 @@ where
 
 fn encode<T: TypeMarker>(
     header: TransactionHeader,
-    body: impl Encode<T, NoHandleResourceDialect>,
+    body: impl Encode<T>,
 ) -> Result<Vec<u8>, Error> {
     let msg = TransactionMessage { header, body };
     let mut combined_bytes = Vec::<u8>::new();
@@ -183,10 +153,7 @@ fn encode<T: TypeMarker>(
     Ok(combined_bytes)
 }
 
-fn decode<T: TypeMarker>(header: TransactionHeader, body: &[u8]) -> Result<T::Owned, Error>
-where
-    T::Owned: Decode<T, NoHandleResourceDialect>,
-{
+fn decode<T: TypeMarker>(header: TransactionHeader, body: &[u8]) -> Result<T::Owned, Error> {
     let mut output = new_empty!(T);
     Decoder::decode_into::<T>(&header, body, &mut [], &mut output)?;
     Ok(output)

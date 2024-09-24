@@ -5,11 +5,15 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use bitflags::bitflags;
-use fidl::client::QueryResponseFut;
-use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
-use futures::future::{self, MaybeDone, TryFutureExt};
+use {
+    bitflags::bitflags,
+    fidl::{
+        client::QueryResponseFut,
+        endpoints::{ControlHandle as _, Responder as _},
+    },
+    fuchsia_zircon_status as zx_status,
+    futures::future::{self, MaybeDone, TryFutureExt},
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -98,16 +102,18 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for ObjType {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
             *value
         }
     }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for ObjType {
+    unsafe impl fidl::encoding::Encode<Self> for ObjType {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -117,7 +123,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ObjType {
+    impl fidl::encoding::Decode<Self> for ObjType {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::None
@@ -126,7 +132,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -135,15 +141,6 @@ mod internal {
 
             *self = Self::from_primitive(prim).ok_or(fidl::Error::InvalidEnumValue)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ResourceTypeMarker for ExampleOfUseOfAliases {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
         }
     }
 
@@ -160,24 +157,26 @@ mod internal {
             88
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for ExampleOfUseOfAliases {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<ExampleOfUseOfAliases, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut ExampleOfUseOfAliases
-    {
+    unsafe impl fidl::encoding::Encode<ExampleOfUseOfAliases> for &mut ExampleOfUseOfAliases {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ExampleOfUseOfAliases>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ExampleOfUseOfAliases, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
+            fidl::encoding::Encode::<ExampleOfUseOfAliases>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.field_of_u32),
                     <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString> as fidl::encoding::ValueTypeMarker>::borrow(&self.field_of_vec_of_strings),
@@ -193,22 +192,14 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u32, fidl::encoding::DefaultFuchsiaResourceDialect>,
+            T0: fidl::encoding::Encode<u32>,
             T1: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T2: fidl::encoding::Encode<
-                fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
-            T3: fidl::encoding::Encode<
-                fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            T2: fidl::encoding::Encode<fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>>,
+            T3: fidl::encoding::Encode<fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>>,
             T4: fidl::encoding::Encode<
                 fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T5: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -216,7 +207,6 @@ mod internal {
                     { fidl::ObjectType::CHANNEL.into_raw() },
                     2147483648,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T6: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -224,7 +214,6 @@ mod internal {
                     { fidl::ObjectType::CHANNEL.into_raw() },
                     2147483648,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T7: fidl::encoding::Encode<
                 fidl::encoding::Optional<
@@ -234,19 +223,13 @@ mod internal {
                         2147483648,
                     >,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-        >
-        fidl::encoding::Encode<ExampleOfUseOfAliases, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for (T0, T1, T2, T3, T4, T5, T6, T7)
+        > fidl::encoding::Encode<ExampleOfUseOfAliases> for (T0, T1, T2, T3, T4, T5, T6, T7)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -274,22 +257,19 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for ExampleOfUseOfAliases
-    {
+    impl fidl::encoding::Decode<Self> for ExampleOfUseOfAliases {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                field_of_u32: fidl::new_empty!(u32, fidl::encoding::DefaultFuchsiaResourceDialect),
+                field_of_u32: fidl::new_empty!(u32),
                 field_of_vec_of_strings: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
                 ),
-                field_of_vec_of_strings_at_most_nine: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>, fidl::encoding::DefaultFuchsiaResourceDialect),
-                field_of_vec_of_strings_at_most_5: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>, fidl::encoding::DefaultFuchsiaResourceDialect),
-                field_of_vec_of_ref_me_at_most_5: fidl::new_empty!(fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>, fidl::encoding::DefaultFuchsiaResourceDialect),
-                field_of_channel: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
-                field_of_client_end: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                field_of_vec_of_strings_at_most_nine: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>),
+                field_of_vec_of_strings_at_most_5: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>),
+                field_of_vec_of_ref_me_at_most_5: fidl::new_empty!(fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>),
+                field_of_channel: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>),
+                field_of_client_end: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>),
                 field_of_nullable_client_end: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::HandleType<
@@ -297,8 +277,7 @@ mod internal {
                             { fidl::ObjectType::CHANNEL.into_raw() },
                             2147483648,
                         >,
-                    >,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    >
                 ),
             }
         }
@@ -306,10 +285,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -333,27 +309,19 @@ mod internal {
                     padding_start: offset + 80 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(
-                u32,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-                &mut self.field_of_u32,
-                decoder,
-                offset + 0,
-                _depth
-            )?;
+            fidl::decode!(u32, &mut self.field_of_u32, decoder, offset + 0, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.field_of_vec_of_strings,
                 decoder,
                 offset + 8,
                 _depth
             )?;
-            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.field_of_vec_of_strings_at_most_nine, decoder, offset + 24, _depth)?;
-            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.field_of_vec_of_strings_at_most_5, decoder, offset + 40, _depth)?;
-            fidl::decode!(fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.field_of_vec_of_ref_me_at_most_5, decoder, offset + 56, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.field_of_channel, decoder, offset + 72, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.field_of_client_end, decoder, offset + 76, _depth)?;
+            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>, &mut self.field_of_vec_of_strings_at_most_nine, decoder, offset + 24, _depth)?;
+            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>, &mut self.field_of_vec_of_strings_at_most_5, decoder, offset + 40, _depth)?;
+            fidl::decode!(fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>, &mut self.field_of_vec_of_ref_me_at_most_5, decoder, offset + 56, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.field_of_channel, decoder, offset + 72, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.field_of_client_end, decoder, offset + 76, _depth)?;
             fidl::decode!(
                 fidl::encoding::Optional<
                     fidl::encoding::HandleType<
@@ -362,7 +330,6 @@ mod internal {
                         2147483648,
                     >,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.field_of_nullable_client_end,
                 decoder,
                 offset + 80,

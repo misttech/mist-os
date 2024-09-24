@@ -12,7 +12,10 @@ pub fn decode_fidl<T: fidl::Persistable>(bytes: &mut [u8]) -> Result<T, Error> {
 }
 
 /// Encode a FIDL type into some bytes
-pub fn encode_fidl<'a, T: fidl::Persistable>(value: &'a mut T) -> Result<Vec<u8>, Error> {
+pub fn encode_fidl<'a, T: fidl::Persistable>(value: &'a mut T) -> Result<Vec<u8>, Error>
+where
+    &'a T: fidl::encoding::Encode<T>,
+{
     fidl::persist(value).map_err(Into::into)
 }
 

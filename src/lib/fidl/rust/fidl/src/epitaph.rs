@@ -5,8 +5,7 @@
 //! Epitaph support for Channel and AsyncChannel.
 
 use crate::encoding::{
-    self, DefaultFuchsiaResourceDialect, DynamicFlags, EpitaphBody, TransactionHeader,
-    TransactionMessage, TransactionMessageType,
+    self, DynamicFlags, EpitaphBody, TransactionHeader, TransactionMessage, TransactionMessageType,
 };
 use crate::error::Error;
 use crate::{AsyncChannel, Channel, HandleDisposition};
@@ -66,12 +65,10 @@ pub(crate) fn write_epitaph_impl<T: ChannelLike>(
         header: TransactionHeader::new(0, encoding::EPITAPH_ORDINAL, DynamicFlags::empty()),
         body: &EpitaphBody { error: status },
     };
-    encoding::with_tls_encoded::<
-        TransactionMessageType<EpitaphBody>,
-        DefaultFuchsiaResourceDialect,
-        (),
-    >(msg, |bytes, handles| match channel.write_etc(bytes, handles) {
-        Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-        Err(e) => Err(Error::ServerEpitaphWrite(e)),
+    encoding::with_tls_encoded::<TransactionMessageType<EpitaphBody>, ()>(msg, |bytes, handles| {
+        match channel.write_etc(bytes, handles) {
+            Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
+            Err(e) => Err(Error::ServerEpitaphWrite(e)),
+        }
     })
 }

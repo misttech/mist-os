@@ -5,11 +5,15 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use bitflags::bitflags;
-use fidl::client::QueryResponseFut;
-use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
-use futures::future::{self, MaybeDone, TryFutureExt};
+use {
+    bitflags::bitflags,
+    fidl::{
+        client::QueryResponseFut,
+        endpoints::{ControlHandle as _, Responder as _},
+    },
+    fuchsia_zircon_status as zx_status,
+    futures::future::{self, MaybeDone, TryFutureExt},
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -95,13 +99,6 @@ impl fidl::Persistable for UnionSmallArray {}
 mod internal {
     use super::*;
 
-    impl fidl::encoding::ValueTypeMarker for StructLargeArray {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for StructLargeArray {
         type Owned = Self;
 
@@ -124,14 +121,20 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for StructLargeArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StructLargeArray, D>
-        for &StructLargeArray
-    {
+    unsafe impl fidl::encoding::Encode<StructLargeArray> for &StructLargeArray {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -147,15 +150,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<fidl::encoding::Array<u32, 100>, D>,
-        > fidl::encoding::Encode<StructLargeArray, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::Array<u32, 100>>>
+        fidl::encoding::Encode<StructLargeArray> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -168,16 +169,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StructLargeArray {
+    impl fidl::encoding::Decode<Self> for StructLargeArray {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(fidl::encoding::Array<u32, 100>, D) }
+            Self { a: fidl::new_empty!(fidl::encoding::Array<u32, 100>) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -189,13 +190,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 400);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for StructSmallArray {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -221,14 +215,20 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for StructSmallArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StructSmallArray, D>
-        for &StructSmallArray
-    {
+    unsafe impl fidl::encoding::Encode<StructSmallArray> for &StructSmallArray {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -244,15 +244,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<fidl::encoding::Array<u32, 2>, D>,
-        > fidl::encoding::Encode<StructSmallArray, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::Array<u32, 2>>>
+        fidl::encoding::Encode<StructSmallArray> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -265,16 +263,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StructSmallArray {
+    impl fidl::encoding::Decode<Self> for StructSmallArray {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(fidl::encoding::Array<u32, 2>, D) }
+            Self { a: fidl::new_empty!(fidl::encoding::Array<u32, 2>) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -299,13 +297,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for TableLargeArray {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for TableLargeArray {
         type Owned = Self;
 
@@ -319,13 +310,19 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for TableLargeArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<TableLargeArray, D>
-        for &TableLargeArray
-    {
+    unsafe impl fidl::encoding::Encode<TableLargeArray> for &TableLargeArray {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -359,7 +356,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<fidl::encoding::Array<u32, 100>, D>(
+            fidl::encoding::encode_in_envelope_optional::<fidl::encoding::Array<u32, 100>>(
                 self.a.as_ref().map(
                     <fidl::encoding::Array<u32, 100> as fidl::encoding::ValueTypeMarker>::borrow,
                 ),
@@ -374,7 +371,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for TableLargeArray {
+    impl fidl::encoding::Decode<Self> for TableLargeArray {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -382,7 +379,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -436,10 +433,9 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self
-                    .a
-                    .get_or_insert_with(|| fidl::new_empty!(fidl::encoding::Array<u32, 100>, D));
-                fidl::decode!(fidl::encoding::Array<u32, 100>, D, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref =
+                    self.a.get_or_insert_with(|| fidl::new_empty!(fidl::encoding::Array<u32, 100>));
+                fidl::decode!(fidl::encoding::Array<u32, 100>, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -472,13 +468,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for TableSmallArray {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for TableSmallArray {
         type Owned = Self;
 
@@ -492,13 +481,19 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for TableSmallArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<TableSmallArray, D>
-        for &TableSmallArray
-    {
+    unsafe impl fidl::encoding::Encode<TableSmallArray> for &TableSmallArray {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -532,7 +527,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<fidl::encoding::Array<u32, 2>, D>(
+            fidl::encoding::encode_in_envelope_optional::<fidl::encoding::Array<u32, 2>>(
                 self.a.as_ref().map(
                     <fidl::encoding::Array<u32, 2> as fidl::encoding::ValueTypeMarker>::borrow,
                 ),
@@ -547,7 +542,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for TableSmallArray {
+    impl fidl::encoding::Decode<Self> for TableSmallArray {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -555,7 +550,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -609,10 +604,9 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self
-                    .a
-                    .get_or_insert_with(|| fidl::new_empty!(fidl::encoding::Array<u32, 2>, D));
-                fidl::decode!(fidl::encoding::Array<u32, 2>, D, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref =
+                    self.a.get_or_insert_with(|| fidl::new_empty!(fidl::encoding::Array<u32, 2>));
+                fidl::decode!(fidl::encoding::Array<u32, 2>, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -635,13 +629,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for UnionLargeArray {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for UnionLargeArray {
         type Owned = Self;
 
@@ -655,14 +642,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for UnionLargeArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionLargeArray, D>
-        for &UnionLargeArray
-    {
+    unsafe impl fidl::encoding::Encode<UnionLargeArray> for &UnionLargeArray {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -671,7 +664,6 @@ mod internal {
             match self {
                 UnionLargeArray::A(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::Array<u32, 100>,
-                    D,
                 >(
                     <fidl::encoding::Array<u32, 100> as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -684,16 +676,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionLargeArray {
+    impl fidl::encoding::Decode<Self> for UnionLargeArray {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::A(fidl::new_empty!(fidl::encoding::Array<u32, 100>, D))
+            Self::A(fidl::new_empty!(fidl::encoding::Array<u32, 100>))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -729,13 +721,12 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = UnionLargeArray::A(
-                            fidl::new_empty!(fidl::encoding::Array<u32, 100>, D),
-                        );
+                        *self =
+                            UnionLargeArray::A(fidl::new_empty!(fidl::encoding::Array<u32, 100>));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionLargeArray::A(ref mut val) = self {
-                        fidl::decode!(fidl::encoding::Array<u32, 100>, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(fidl::encoding::Array<u32, 100>, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -752,13 +743,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for UnionSmallArray {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for UnionSmallArray {
         type Owned = Self;
 
@@ -772,14 +756,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for UnionSmallArray {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionSmallArray, D>
-        for &UnionSmallArray
-    {
+    unsafe impl fidl::encoding::Encode<UnionSmallArray> for &UnionSmallArray {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -788,7 +778,6 @@ mod internal {
             match self {
                 UnionSmallArray::A(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::Array<u32, 2>,
-                    D,
                 >(
                     <fidl::encoding::Array<u32, 2> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
@@ -799,16 +788,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionSmallArray {
+    impl fidl::encoding::Decode<Self> for UnionSmallArray {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::A(fidl::new_empty!(fidl::encoding::Array<u32, 2>, D))
+            Self::A(fidl::new_empty!(fidl::encoding::Array<u32, 2>))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -844,12 +833,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            UnionSmallArray::A(fidl::new_empty!(fidl::encoding::Array<u32, 2>, D));
+                        *self = UnionSmallArray::A(fidl::new_empty!(fidl::encoding::Array<u32, 2>));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionSmallArray::A(ref mut val) = self {
-                        fidl::decode!(fidl::encoding::Array<u32, 2>, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(fidl::encoding::Array<u32, 2>, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

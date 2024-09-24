@@ -23,9 +23,6 @@ use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 // Traits
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Describes how a given transport encodes resources like handles.
-pub trait ResourceDialect: 'static + Sized {}
-
 /// A FIDL type marker.
 ///
 /// This trait is only used for compile time dispatch. For example, we can
@@ -50,7 +47,7 @@ pub trait ResourceDialect: 'static + Sized {}
 ///   bytes starting at that address.
 pub unsafe trait TypeMarker: 'static + Sized {
     /// The owned Rust type which this FIDL type decodes into.
-    type Owned;
+    type Owned: Decode<Self>;
 
     /// Returns the minimum required alignment of the inline portion of the
     /// encoded object. It must be a (nonzero) power of two.
@@ -92,7 +89,7 @@ pub trait ValueTypeMarker: TypeMarker {
     /// - Special cases such as `&[T]` for vectors.
     /// - For primitives, bits, and enums, it is `Owned`.
     /// - Otherwise, it is `&Owned`.
-    type Borrowed<'a>;
+    type Borrowed<'a>: Encode<Self>;
 
     /// Cheaply converts from `&Self::Owned` to `Self::Borrowed`.
     fn borrow(value: &Self::Owned) -> Self::Borrowed<'_>;
@@ -109,7 +106,7 @@ pub trait ResourceTypeMarker: TypeMarker {
     /// - Special cases such as `&mut [T]` for vectors.
     /// - When `Owned: HandleBased`, it is `Owned`.
     /// - Otherwise, it is `&mut Owned`.
-    type Borrowed<'a>;
+    type Borrowed<'a>: Encode<Self>;
 
     /// Cheaply converts from `&mut Self::Owned` to `Self::Borrowed`. For
     /// `HandleBased` types this is "take" (it returns an owned handle and
@@ -125,7 +122,7 @@ pub trait ResourceTypeMarker: TypeMarker {
 /// Implementations of `encode` must write every byte in
 /// `encoder.buf[offset..offset + T::inline_size(encoder.context)]` unless
 /// returning an `Err` value.
-pub unsafe trait Encode<T: TypeMarker, D: ResourceDialect>: Sized {
+pub unsafe trait Encode<T: TypeMarker>: Sized {
     /// Encodes the object into the encoder's buffers. Any handles stored in the
     /// object are swapped for `Handle::INVALID`.
     ///
@@ -135,12 +132,11 @@ pub unsafe trait Encode<T: TypeMarker, D: ResourceDialect>: Sized {
     ///
     /// Callers must ensure `offset` is a multiple of `T::inline_align` and
     /// `encoder.buf` has room for writing `T::inline_size` bytes at `offset`.
-    unsafe fn encode(self, encoder: &mut Encoder<'_, D>, offset: usize, depth: Depth)
-        -> Result<()>;
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()>;
 }
 
 /// A Rust type that can be decoded from the FIDL type `T`.
-pub trait Decode<T: TypeMarker, D: ResourceDialect>: 'static + Sized {
+pub trait Decode<T: TypeMarker>: 'static + Sized {
     /// Creates a valid instance of `Self`. The specific value does not matter,
     /// since it will be overwritten by `decode`.
     // TODO(https://fxbug.dev/42069855): Take context parameter to discourage using this.
@@ -159,24 +155,11 @@ pub trait Decode<T: TypeMarker, D: ResourceDialect>: 'static + Sized {
     /// `decoder.buf` has room for reading `T::inline_size` bytes at `offset`.
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         depth: Depth,
     ) -> Result<()>;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// Resource Dialects
-////////////////////////////////////////////////////////////////////////////////
-
-/// The default [`ResourceDialect`]. Encodes everything into a channel
-/// MessageBuf for sending via channels between Fuchsia services.
-pub struct DefaultFuchsiaResourceDialect;
-impl ResourceDialect for DefaultFuchsiaResourceDialect {}
-
-/// A resource dialect which doesn't support handles at all.
-pub struct NoHandleResourceDialect;
-impl ResourceDialect for NoHandleResourceDialect {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -281,10 +264,7 @@ impl Depth {
 #[macro_export]
 macro_rules! new_empty {
     ($ty:ty) => {
-        <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty, _>>::new_empty()
-    };
-    ($ty:ty, $d:path) => {
-        <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty, $d>>::new_empty()
+        <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty>>::new_empty()
     };
 }
 
@@ -293,12 +273,7 @@ macro_rules! new_empty {
 #[macro_export]
 macro_rules! decode {
     ($ty:ty, $out_value:expr, $decoder:expr, $offset:expr, $depth:expr) => {
-        <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty, _>>::decode(
-            $out_value, $decoder, $offset, $depth,
-        )
-    };
-    ($ty:ty, $d:path, $out_value:expr, $decoder:expr, $offset:expr, $depth:expr) => {
-        <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty, $d>>::decode(
+        <<$ty as $crate::encoding::TypeMarker>::Owned as $crate::encoding::Decode<$ty>>::decode(
             $out_value, $decoder, $offset, $depth,
         )
     };
@@ -345,7 +320,7 @@ impl Context {
 
 /// Encoding state
 #[derive(Debug)]
-pub struct Encoder<'a, D: ResourceDialect> {
+pub struct Encoder<'a> {
     /// Encoding context.
     pub context: Context,
 
@@ -354,9 +329,6 @@ pub struct Encoder<'a, D: ResourceDialect> {
 
     /// Buffer to write output handles into.
     handles: &'a mut Vec<HandleDisposition<'static>>,
-
-    /// Phantom data for `D`, which is here to provide types not values.
-    _dialect: PhantomData<D>,
 }
 
 /// The default context for encoding.
@@ -365,13 +337,13 @@ fn default_encode_context() -> Context {
     Context { wire_format_version: WireFormatVersion::V2 }
 }
 
-impl<'a, D: ResourceDialect> Encoder<'a, D> {
+impl<'a> Encoder<'a> {
     /// FIDL-encodes `x` into the provided data and handle buffers.
     #[inline]
     pub fn encode<T: TypeMarker>(
         buf: &'a mut Vec<u8>,
         handles: &'a mut Vec<HandleDisposition<'static>>,
-        x: impl Encode<T, D>,
+        x: impl Encode<T>,
     ) -> Result<()> {
         let context = default_encode_context();
         Self::encode_with_context::<T>(context, buf, handles, x)
@@ -388,14 +360,14 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
         context: Context,
         buf: &'a mut Vec<u8>,
         handles: &'a mut Vec<HandleDisposition<'static>>,
-        x: impl Encode<T, D>,
+        x: impl Encode<T>,
     ) -> Result<()> {
-        fn prepare_for_encoding<'a, D: ResourceDialect>(
+        fn prepare_for_encoding<'a>(
             context: Context,
             buf: &'a mut Vec<u8>,
             handles: &'a mut Vec<HandleDisposition<'static>>,
             ty_inline_size: usize,
-        ) -> Encoder<'a, D> {
+        ) -> Encoder<'a> {
             // An empty response can have size zero.
             // This if statement is needed to not break the padding write below.
             if ty_inline_size != 0 {
@@ -411,7 +383,7 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
                 }
             }
             handles.truncate(0);
-            Encoder { buf, handles, context, _dialect: PhantomData }
+            Encoder { buf, handles, context }
         }
         let mut encoder = prepare_for_encoding(context, buf, handles, T::inline_size(context));
         // Safety: We reserve `T::inline_size` bytes in `encoder.buf` above.
@@ -488,7 +460,7 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
 
 /// Decoding state
 #[derive(Debug)]
-pub struct Decoder<'a, D: ResourceDialect> {
+pub struct Decoder<'a> {
     /// Decoding context.
     pub context: Context,
 
@@ -503,12 +475,9 @@ pub struct Decoder<'a, D: ResourceDialect> {
 
     /// Index of the next handle to read from the handle array
     next_handle: usize,
-
-    /// The dialect determines how we encode resources.
-    _dialect: PhantomData<D>,
 }
 
-impl<'a, D: ResourceDialect> Decoder<'a, D> {
+impl<'a> Decoder<'a> {
     /// Decodes a value of FIDL type `T` into the Rust type `T::Owned` from the
     /// provided data and handle buffers. Assumes the buffers came from inside a
     /// transaction message wrapped by `header`.
@@ -518,10 +487,7 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
         buf: &'a [u8],
         handles: &'a mut [HandleInfo],
         value: &mut T::Owned,
-    ) -> Result<()>
-    where
-        T::Owned: Decode<T, D>,
-    {
+    ) -> Result<()> {
         Self::decode_with_context::<T>(header.decoding_context(), buf, handles, value)
     }
 
@@ -537,23 +503,13 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
         buf: &'a [u8],
         handles: &'a mut [HandleInfo],
         value: &mut T::Owned,
-    ) -> Result<()>
-    where
-        T::Owned: Decode<T, D>,
-    {
+    ) -> Result<()> {
         let inline_size = T::inline_size(context);
         let next_out_of_line = round_up_to_align(inline_size, 8);
         if next_out_of_line > buf.len() {
             return Err(Error::OutOfRange);
         }
-        let mut decoder = Decoder {
-            next_out_of_line,
-            buf,
-            handles,
-            next_handle: 0,
-            context,
-            _dialect: PhantomData,
-        };
+        let mut decoder = Decoder { next_out_of_line, buf, handles, next_handle: 0, context };
         // Safety: buf.len() >= inline_size based on the check above.
         unsafe {
             value.decode(&mut decoder, 0, Depth(0))?;
@@ -824,10 +780,6 @@ pub struct Ambiguous2;
 /// Can be replaced by `!` once that is stable.
 pub enum AmbiguousNever {}
 
-/// Placeholder resource dialect.
-pub struct AmbiguousResourceDialect;
-impl ResourceDialect for AmbiguousResourceDialect {}
-
 macro_rules! impl_ambiguous {
     ($ambiguous:ident) => {
         unsafe impl TypeMarker for $ambiguous {
@@ -844,26 +796,22 @@ macro_rules! impl_ambiguous {
 
         impl ValueTypeMarker for $ambiguous {
             type Borrowed<'a> = AmbiguousNever;
-
-            fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
                 match *value {}
             }
         }
 
         impl ResourceTypeMarker for $ambiguous {
             type Borrowed<'a> = AmbiguousNever;
-            fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_>
-            where
-                Self: TypeMarker,
-            {
+            fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
                 match *value {}
             }
         }
 
-        unsafe impl<T, D: ResourceDialect> Encode<$ambiguous, D> for T {
+        unsafe impl<T> Encode<$ambiguous> for T {
             unsafe fn encode(
                 self,
-                _encoder: &mut Encoder<'_, D>,
+                _encoder: &mut Encoder<'_>,
                 _offset: usize,
                 _depth: Depth,
             ) -> Result<()> {
@@ -873,14 +821,14 @@ macro_rules! impl_ambiguous {
 
         // TODO(https://fxbug.dev/42069855): impl for `T: 'static` this once user code has
         // migrated off new_empty(), which is meant to be internal.
-        impl<D: ResourceDialect> Decode<$ambiguous, D> for AmbiguousNever {
+        impl Decode<$ambiguous> for AmbiguousNever {
             fn new_empty() -> Self {
                 panic!("reached code for fake ambiguous type");
             }
 
             unsafe fn decode(
                 &mut self,
-                _decoder: &mut Decoder<'_, D>,
+                _decoder: &mut Decoder<'_>,
                 _offset: usize,
                 _depth: Depth,
             ) -> Result<()> {
@@ -902,6 +850,7 @@ pub struct EmptyPayload;
 
 unsafe impl TypeMarker for EmptyPayload {
     type Owned = ();
+
     #[inline(always)]
     fn inline_align(_context: Context) -> usize {
         1
@@ -921,11 +870,11 @@ impl ValueTypeMarker for EmptyPayload {
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<EmptyPayload, D> for () {
+unsafe impl Encode<EmptyPayload> for () {
     #[inline(always)]
     unsafe fn encode(
         self,
-        _encoder: &mut Encoder<'_, D>,
+        _encoder: &mut Encoder<'_>,
         _offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -933,14 +882,14 @@ unsafe impl<D: ResourceDialect> Encode<EmptyPayload, D> for () {
     }
 }
 
-impl<D: ResourceDialect> Decode<EmptyPayload, D> for () {
+impl Decode<EmptyPayload> for () {
     #[inline(always)]
     fn new_empty() -> Self {}
 
     #[inline(always)]
     unsafe fn decode(
         &mut self,
-        _decoder: &mut Decoder<'_, D>,
+        _decoder: &mut Decoder<'_>,
         _offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -954,6 +903,7 @@ pub struct EmptyStruct;
 
 unsafe impl TypeMarker for EmptyStruct {
     type Owned = ();
+
     #[inline(always)]
     fn inline_align(_context: Context) -> usize {
         1
@@ -973,28 +923,23 @@ impl ValueTypeMarker for EmptyStruct {
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<EmptyStruct, D> for () {
+unsafe impl Encode<EmptyStruct> for () {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<EmptyStruct>(offset);
         encoder.write_num(0u8, offset);
         Ok(())
     }
 }
 
-impl<D: ResourceDialect> Decode<EmptyStruct, D> for () {
+impl Decode<EmptyStruct> for () {
     #[inline(always)]
     fn new_empty() -> Self {}
 
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -1025,6 +970,7 @@ mod numeric {
 
             unsafe impl TypeMarker for $numeric_ty {
                 type Owned = $numeric_ty;
+
                 #[inline(always)]
                 fn inline_align(_context: Context) -> usize {
                     mem::align_of::<$numeric_ty>()
@@ -1050,16 +996,16 @@ mod numeric {
                 type Borrowed<'a> = $numeric_ty;
 
                 #[inline(always)]
-                fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+                fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
                     *value
                 }
             }
 
-            unsafe impl<D: ResourceDialect> Encode<$numeric_ty, D> for $numeric_ty {
+            unsafe impl Encode<$numeric_ty> for $numeric_ty {
                 #[inline(always)]
                 unsafe fn encode(
                     self,
-                    encoder: &mut Encoder<'_, D>,
+                    encoder: &mut Encoder<'_>,
                     offset: usize,
                     _depth: Depth,
                 ) -> Result<()> {
@@ -1069,7 +1015,7 @@ mod numeric {
                 }
             }
 
-            impl<D: ResourceDialect> Decode<$numeric_ty, D> for $numeric_ty {
+            impl Decode<$numeric_ty> for $numeric_ty {
                 #[inline(always)]
                 fn new_empty() -> Self {
                     0 as $numeric_ty
@@ -1078,7 +1024,7 @@ mod numeric {
                 #[inline(always)]
                 unsafe fn decode(
                     &mut self,
-                    decoder: &mut Decoder<'_, D>,
+                    decoder: &mut Decoder<'_>,
                     offset: usize,
                     _depth: Depth,
                 ) -> Result<()> {
@@ -1133,19 +1079,14 @@ impl ValueTypeMarker for bool {
     type Borrowed<'a> = bool;
 
     #[inline(always)]
-    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<bool, D> for bool {
+unsafe impl Encode<bool> for bool {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<bool>(offset);
         // From https://doc.rust-lang.org/std/primitive.bool.html: "If you
         // cast a bool into an integer, true will be 1 and false will be 0."
@@ -1154,7 +1095,7 @@ unsafe impl<D: ResourceDialect> Encode<bool, D> for bool {
     }
 }
 
-impl<D: ResourceDialect> Decode<bool, D> for bool {
+impl Decode<bool> for bool {
     #[inline(always)]
     fn new_empty() -> Self {
         false
@@ -1163,7 +1104,7 @@ impl<D: ResourceDialect> Decode<bool, D> for bool {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -1187,6 +1128,7 @@ pub struct Array<T: TypeMarker, const N: usize>(PhantomData<T>);
 
 unsafe impl<T: TypeMarker, const N: usize> TypeMarker for Array<T, N> {
     type Owned = [T::Owned; N];
+
     #[inline(always)]
     fn inline_align(context: Context) -> usize {
         T::inline_align(context)
@@ -1219,49 +1161,30 @@ impl<T: ValueTypeMarker, const N: usize> ValueTypeMarker for Array<T, N> {
 impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Array<T, N> {
     type Borrowed<'a> = &'a mut [T::Owned; N];
     #[inline(always)]
-    fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
 
-unsafe impl<'a, T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
-    for &'a [T::Owned; N]
-where
-    for<'q> T::Borrowed<'q>: Encode<T, D>,
-{
+unsafe impl<'a, T: ValueTypeMarker, const N: usize> Encode<Array<T, N>> for &'a [T::Owned; N] {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Array<T, N>>(offset);
-        encode_array_value::<T, D>(self, encoder, offset, depth)
+        encode_array_value::<T>(self, encoder, offset, depth)
     }
 }
 
-unsafe impl<'a, T: ResourceTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
-    for &'a mut [<T as TypeMarker>::Owned; N]
-where
-    for<'q> T::Borrowed<'q>: Encode<T, D>,
+unsafe impl<'a, T: ResourceTypeMarker, const N: usize> Encode<Array<T, N>>
+    for &'a mut [T::Owned; N]
 {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Array<T, N>>(offset);
-        encode_array_resource::<T, D>(self, encoder, offset, depth)
+        encode_array_resource::<T>(self, encoder, offset, depth)
     }
 }
 
-impl<T: TypeMarker, const N: usize, D: ResourceDialect> Decode<Array<T, N>, D> for [T::Owned; N]
-where
-    T::Owned: Decode<T, D>,
-{
+impl<T: TypeMarker, const N: usize> Decode<Array<T, N>> for [T::Owned; N] {
     #[inline]
     fn new_empty() -> Self {
         let mut arr = mem::MaybeUninit::<[T::Owned; N]>::uninit();
@@ -1277,25 +1200,22 @@ where
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Array<T, N>>(offset);
-        decode_array::<T, D>(self, decoder, offset, depth)
+        decode_array::<T>(self, decoder, offset, depth)
     }
 }
 
 #[inline]
-unsafe fn encode_array_value<T: ValueTypeMarker, D: ResourceDialect>(
+unsafe fn encode_array_value<T: ValueTypeMarker>(
     slice: &[T::Owned],
-    encoder: &mut Encoder<'_, D>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     depth: Depth,
-) -> Result<()>
-where
-    for<'a> T::Borrowed<'a>: Encode<T, D>,
-{
+) -> Result<()> {
     let stride = T::inline_size(encoder.context);
     let len = slice.len();
     // Not a safety requirement, but len should be nonzero since FIDL does not allow empty arrays.
@@ -1324,15 +1244,12 @@ where
 }
 
 #[inline]
-unsafe fn encode_array_resource<T: ResourceTypeMarker + TypeMarker, D: ResourceDialect>(
+unsafe fn encode_array_resource<T: ResourceTypeMarker>(
     slice: &mut [T::Owned],
-    encoder: &mut Encoder<'_, D>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     depth: Depth,
-) -> Result<()>
-where
-    for<'a> T::Borrowed<'a>: Encode<T, D>,
-{
+) -> Result<()> {
     let stride = T::inline_size(encoder.context);
     let len = slice.len();
     // Not a safety requirement, but len should be nonzero since FIDL does not allow empty arrays.
@@ -1361,15 +1278,12 @@ where
 }
 
 #[inline]
-unsafe fn decode_array<T: TypeMarker, D: ResourceDialect>(
+unsafe fn decode_array<T: TypeMarker>(
     slice: &mut [T::Owned],
-    decoder: &mut Decoder<'_, D>,
+    decoder: &mut Decoder<'_>,
     offset: usize,
     depth: Depth,
-) -> Result<()>
-where
-    T::Owned: Decode<T, D>,
-{
+) -> Result<()> {
     let stride = T::inline_size(decoder.context);
     let len = slice.len();
     // Not a safety requirement, but len should be nonzero since FIDL does not allow empty arrays.
@@ -1435,49 +1349,30 @@ impl<T: ValueTypeMarker, const N: usize> ValueTypeMarker for Vector<T, N> {
 impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Vector<T, N> {
     type Borrowed<'a> = &'a mut [T::Owned];
     #[inline(always)]
-    fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
-        value.as_mut_slice()
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
+        value
     }
 }
 
-unsafe impl<'a, T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Vector<T, N>, D>
-    for &'a [<T as TypeMarker>::Owned]
-where
-    for<'q> T::Borrowed<'q>: Encode<T, D>,
+unsafe impl<'a, T: ValueTypeMarker, const N: usize> Encode<Vector<T, N>> for &'a [T::Owned] {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
+        encoder.debug_check_bounds::<Vector<T, N>>(offset);
+        encode_vector_value::<T>(self, N, check_vector_length, encoder, offset, depth)
+    }
+}
+
+unsafe impl<'a, T: ResourceTypeMarker, const N: usize> Encode<Vector<T, N>>
+    for &'a mut [T::Owned]
 {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Vector<T, N>>(offset);
-        encode_vector_value::<T, D>(self, N, check_vector_length, encoder, offset, depth)
+        encode_vector_resource::<T>(self, N, encoder, offset, depth)
     }
 }
 
-unsafe impl<'a, T: ResourceTypeMarker + TypeMarker, const N: usize, D: ResourceDialect>
-    Encode<Vector<T, N>, D> for &'a mut [<T as TypeMarker>::Owned]
-where
-    for<'q> T::Borrowed<'q>: Encode<T, D>,
-{
-    #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
-        encoder.debug_check_bounds::<Vector<T, N>>(offset);
-        encode_vector_resource::<T, D>(self, N, encoder, offset, depth)
-    }
-}
-
-impl<T: TypeMarker, const N: usize, D: ResourceDialect> Decode<Vector<T, N>, D> for Vec<T::Owned>
-where
-    T::Owned: Decode<T, D>,
-{
+impl<T: TypeMarker, const N: usize> Decode<Vector<T, N>> for Vec<T::Owned> {
     #[inline(always)]
     fn new_empty() -> Self {
         Vec::new()
@@ -1486,27 +1381,24 @@ where
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Vector<T, N>>(offset);
-        decode_vector::<T, D>(self, N, decoder, offset, depth)
+        decode_vector::<T>(self, N, decoder, offset, depth)
     }
 }
 
 #[inline]
-unsafe fn encode_vector_value<T: ValueTypeMarker, D: ResourceDialect>(
-    slice: &[<T as TypeMarker>::Owned],
+unsafe fn encode_vector_value<T: ValueTypeMarker>(
+    slice: &[T::Owned],
     max_length: usize,
     check_length: impl Fn(usize, usize) -> Result<()>,
-    encoder: &mut Encoder<'_, D>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     mut depth: Depth,
-) -> Result<()>
-where
-    for<'a> T::Borrowed<'a>: Encode<T, D>,
-{
+) -> Result<()> {
     encoder.write_num(slice.len() as u64, offset);
     encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
     // Calling encoder.out_of_line_offset(0) is not allowed.
@@ -1517,20 +1409,17 @@ where
     depth.increment()?;
     let bytes_len = slice.len() * T::inline_size(encoder.context);
     let offset = encoder.out_of_line_offset(bytes_len);
-    encode_array_value::<T, D>(slice, encoder, offset, depth)
+    encode_array_value::<T>(slice, encoder, offset, depth)
 }
 
 #[inline]
-unsafe fn encode_vector_resource<T: ResourceTypeMarker + TypeMarker, D: ResourceDialect>(
+unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
     slice: &mut [T::Owned],
     max_length: usize,
-    encoder: &mut Encoder<'_, D>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     mut depth: Depth,
-) -> Result<()>
-where
-    for<'a> T::Borrowed<'a>: Encode<T, D>,
-{
+) -> Result<()> {
     encoder.write_num(slice.len() as u64, offset);
     encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
     // Calling encoder.out_of_line_offset(0) is not allowed.
@@ -1541,20 +1430,17 @@ where
     depth.increment()?;
     let bytes_len = slice.len() * T::inline_size(encoder.context);
     let offset = encoder.out_of_line_offset(bytes_len);
-    encode_array_resource::<T, D>(slice, encoder, offset, depth)
+    encode_array_resource::<T>(slice, encoder, offset, depth)
 }
 
 #[inline]
-unsafe fn decode_vector<T: TypeMarker, D: ResourceDialect>(
+unsafe fn decode_vector<T: TypeMarker>(
     vec: &mut Vec<T::Owned>,
     max_length: usize,
-    decoder: &mut Decoder<'_, D>,
+    decoder: &mut Decoder<'_>,
     offset: usize,
     mut depth: Depth,
-) -> Result<()>
-where
-    T::Owned: Decode<T, D>,
-{
+) -> Result<()> {
     let Some(len) = decode_vector_header(decoder, offset)? else {
         return Err(Error::NotNullable);
     };
@@ -1576,7 +1462,7 @@ where
         vec.resize_with(len, T::Owned::new_empty);
     }
     // Safety: `vec` has `len` elements based on the above code.
-    decode_array::<T, D>(vec, decoder, offset, depth)?;
+    decode_array::<T>(vec, decoder, offset, depth)?;
     Ok(())
 }
 
@@ -1584,10 +1470,7 @@ where
 /// the vector is present (including empty vectors), otherwise `None`.
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline]
-pub fn decode_vector_header<D: ResourceDialect>(
-    decoder: &mut Decoder<'_, D>,
-    offset: usize,
-) -> Result<Option<usize>> {
+pub fn decode_vector_header(decoder: &mut Decoder<'_>, offset: usize) -> Result<Option<usize>> {
     let len = decoder.read_num::<u64>(offset) as usize;
     match decoder.read_num::<u64>(offset + 8) {
         ALLOC_PRESENT_U64 => {
@@ -1651,27 +1534,15 @@ impl<const N: usize> ValueTypeMarker for BoundedString<N> {
     }
 }
 
-unsafe impl<'a, const N: usize, D: ResourceDialect> Encode<BoundedString<N>, D> for &'a str {
+unsafe impl<'a, const N: usize> Encode<BoundedString<N>> for &'a str {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<BoundedString<N>>(offset);
-        encode_vector_value::<u8, D>(
-            self.as_bytes(),
-            N,
-            check_string_length,
-            encoder,
-            offset,
-            depth,
-        )
+        encode_vector_value::<u8>(self.as_bytes(), N, check_string_length, encoder, offset, depth)
     }
 }
 
-impl<const N: usize, D: ResourceDialect> Decode<BoundedString<N>, D> for String {
+impl<const N: usize> Decode<BoundedString<N>> for String {
     #[inline(always)]
     fn new_empty() -> Self {
         String::new()
@@ -1680,7 +1551,7 @@ impl<const N: usize, D: ResourceDialect> Decode<BoundedString<N>, D> for String 
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         depth: Depth,
     ) -> Result<()> {
@@ -1690,10 +1561,10 @@ impl<const N: usize, D: ResourceDialect> Decode<BoundedString<N>, D> for String 
 }
 
 #[inline]
-fn decode_string<D: ResourceDialect>(
+fn decode_string(
     string: &mut String,
     max_length: usize,
-    decoder: &mut Decoder<'_, D>,
+    decoder: &mut Decoder<'_>,
     offset: usize,
     mut depth: Depth,
 ) -> Result<()> {
@@ -1760,21 +1631,16 @@ impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32> Resour
 {
     type Borrowed<'a> = T;
     #[inline(always)]
-    fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         mem::replace(value, Handle::invalid().into())
     }
 }
 
 unsafe impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
-    Encode<HandleType<T, OBJECT_TYPE, RIGHTS>, DefaultFuchsiaResourceDialect> for T
+    Encode<HandleType<T, OBJECT_TYPE, RIGHTS>> for T
 {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, DefaultFuchsiaResourceDialect>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<HandleType<T, OBJECT_TYPE, RIGHTS>>(offset);
         encode_handle(
             self.into(),
@@ -1787,7 +1653,7 @@ unsafe impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
 }
 
 impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
-    Decode<HandleType<T, OBJECT_TYPE, RIGHTS>, DefaultFuchsiaResourceDialect> for T
+    Decode<HandleType<T, OBJECT_TYPE, RIGHTS>> for T
 {
     #[inline(always)]
     fn new_empty() -> Self {
@@ -1797,7 +1663,7 @@ impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, DefaultFuchsiaResourceDialect>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -1818,7 +1684,7 @@ unsafe fn encode_handle(
     handle: Handle,
     object_type: ObjectType,
     rights: Rights,
-    encoder: &mut Encoder<'_, DefaultFuchsiaResourceDialect>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
 ) -> Result<()> {
     if handle.is_invalid() {
@@ -1838,7 +1704,7 @@ unsafe fn encode_handle(
 unsafe fn decode_handle(
     object_type: ObjectType,
     rights: Rights,
-    decoder: &mut Decoder<'_, DefaultFuchsiaResourceDialect>,
+    decoder: &mut Decoder<'_>,
     offset: usize,
 ) -> Result<Handle> {
     match decoder.read_num::<u32>(offset) {
@@ -1906,7 +1772,6 @@ unsafe impl<T: TypeMarker> TypeMarker for Boxed<T> {
 
 impl<T: ValueTypeMarker> ValueTypeMarker for Optional<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
-
     #[inline(always)]
     fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value.as_ref().map(T::borrow)
@@ -1915,7 +1780,6 @@ impl<T: ValueTypeMarker> ValueTypeMarker for Optional<T> {
 
 impl<T: ValueTypeMarker> ValueTypeMarker for OptionalUnion<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
-
     #[inline(always)]
     fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref().map(T::borrow)
@@ -1924,72 +1788,57 @@ impl<T: ValueTypeMarker> ValueTypeMarker for OptionalUnion<T> {
 
 impl<T: ValueTypeMarker> ValueTypeMarker for Boxed<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
-
     #[inline(always)]
     fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref().map(T::borrow)
     }
 }
 
-impl<T: ResourceTypeMarker + TypeMarker> ResourceTypeMarker for Optional<T> {
+impl<T: ResourceTypeMarker> ResourceTypeMarker for Optional<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value.as_mut().map(T::take_or_borrow)
     }
 }
 
-impl<T: ResourceTypeMarker + TypeMarker> ResourceTypeMarker for OptionalUnion<T> {
+impl<T: ResourceTypeMarker> ResourceTypeMarker for OptionalUnion<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref_mut().map(T::take_or_borrow)
     }
 }
 
-impl<T: ResourceTypeMarker + TypeMarker> ResourceTypeMarker for Boxed<T> {
+impl<T: ResourceTypeMarker> ResourceTypeMarker for Boxed<T> {
     type Borrowed<'a> = Option<T::Borrowed<'a>>;
     #[inline(always)]
-    fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn take_or_borrow(value: &mut Self::Owned) -> Self::Borrowed<'_> {
         value.as_deref_mut().map(T::take_or_borrow)
     }
 }
 
-unsafe impl<T: TypeMarker, E: Encode<T, D>, D: ResourceDialect> Encode<Optional<T>, D>
-    for Option<E>
-{
+unsafe impl<T: TypeMarker, E: Encode<T>> Encode<Optional<T>> for Option<E> {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Optional<T>>(offset);
-        encode_naturally_optional::<T, E, D>(self, encoder, offset, depth)
+        encode_naturally_optional::<T, E>(self, encoder, offset, depth)
     }
 }
 
-unsafe impl<T: TypeMarker, E: Encode<T, D>, D: ResourceDialect> Encode<OptionalUnion<T>, D>
-    for Option<E>
-{
+unsafe impl<T: TypeMarker, E: Encode<T>> Encode<OptionalUnion<T>> for Option<E> {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<OptionalUnion<T>>(offset);
-        encode_naturally_optional::<T, E, D>(self, encoder, offset, depth)
+        encode_naturally_optional::<T, E>(self, encoder, offset, depth)
     }
 }
 
-unsafe impl<T: TypeMarker, E: Encode<T, D>, D: ResourceDialect> Encode<Boxed<T>, D> for Option<E> {
+unsafe impl<T: TypeMarker, E: Encode<T>> Encode<Boxed<T>> for Option<E> {
     #[inline]
     unsafe fn encode(
         self,
-        encoder: &mut Encoder<'_, D>,
+        encoder: &mut Encoder<'_>,
         offset: usize,
         mut depth: Depth,
     ) -> Result<()> {
@@ -2007,10 +1856,7 @@ unsafe impl<T: TypeMarker, E: Encode<T, D>, D: ResourceDialect> Encode<Boxed<T>,
     }
 }
 
-impl<T: TypeMarker, D: ResourceDialect> Decode<Optional<T>, D> for Option<T::Owned>
-where
-    T::Owned: Decode<T, D>,
-{
+impl<T: TypeMarker> Decode<Optional<T>> for Option<T::Owned> {
     #[inline(always)]
     fn new_empty() -> Self {
         None
@@ -2019,7 +1865,7 @@ where
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         depth: Depth,
     ) -> Result<()> {
@@ -2035,10 +1881,7 @@ where
     }
 }
 
-impl<T: TypeMarker, D: ResourceDialect> Decode<OptionalUnion<T>, D> for Option<Box<T::Owned>>
-where
-    T::Owned: Decode<T, D>,
-{
+impl<T: TypeMarker> Decode<OptionalUnion<T>> for Option<Box<T::Owned>> {
     #[inline(always)]
     fn new_empty() -> Self {
         None
@@ -2047,7 +1890,7 @@ where
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         depth: Depth,
     ) -> Result<()> {
@@ -2069,10 +1912,7 @@ where
     }
 }
 
-impl<T: TypeMarker, D: ResourceDialect> Decode<Boxed<T>, D> for Option<Box<T::Owned>>
-where
-    T::Owned: Decode<T, D>,
-{
+impl<T: TypeMarker> Decode<Boxed<T>> for Option<Box<T::Owned>> {
     #[inline(always)]
     fn new_empty() -> Self {
         None
@@ -2081,7 +1921,7 @@ where
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         mut depth: Depth,
     ) -> Result<()> {
@@ -2111,9 +1951,9 @@ where
 /// Encodes a "naturally optional" value, i.e. one where absence is represented
 /// by a run of 0x00 bytes matching the type's inline size.
 #[inline]
-unsafe fn encode_naturally_optional<T: TypeMarker, E: Encode<T, D>, D: ResourceDialect>(
+unsafe fn encode_naturally_optional<T: TypeMarker, E: Encode<T>>(
     value: Option<E>,
-    encoder: &mut Encoder<'_, D>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     depth: Depth,
 ) -> Result<()> {
@@ -2128,11 +1968,7 @@ unsafe fn encode_naturally_optional<T: TypeMarker, E: Encode<T, D>, D: ResourceD
 /// indicators should always be entirely zeros. Like `Decode::decode`, the
 /// caller is responsible for bounds checks.
 #[inline]
-fn check_for_presence<D: ResourceDialect>(
-    decoder: &Decoder<'_, D>,
-    offset: usize,
-    inline_size: usize,
-) -> bool {
+fn check_for_presence(decoder: &Decoder<'_>, offset: usize, inline_size: usize) -> bool {
     debug_assert!(offset + inline_size <= decoder.buf.len());
     let range = unsafe { decoder.buf.get_unchecked(offset..offset + inline_size) };
     range.iter().any(|byte| *byte != 0)
@@ -2144,9 +1980,9 @@ fn check_for_presence<D: ResourceDialect>(
 
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline]
-pub unsafe fn encode_in_envelope<T: TypeMarker, D: ResourceDialect>(
-    val: impl Encode<T, D>,
-    encoder: &mut Encoder<'_, D>,
+pub unsafe fn encode_in_envelope<T: TypeMarker>(
+    val: impl Encode<T>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     mut depth: Depth,
 ) -> Result<()> {
@@ -2174,9 +2010,9 @@ pub unsafe fn encode_in_envelope<T: TypeMarker, D: ResourceDialect>(
 
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline]
-pub unsafe fn encode_in_envelope_optional<T: TypeMarker, D: ResourceDialect>(
-    val: Option<impl Encode<T, D>>,
-    encoder: &mut Encoder<'_, D>,
+pub unsafe fn encode_in_envelope_optional<T: TypeMarker>(
+    val: Option<impl Encode<T>>,
+    encoder: &mut Encoder<'_>,
     offset: usize,
     depth: Depth,
 ) -> Result<()> {
@@ -2191,8 +2027,8 @@ pub unsafe fn encode_in_envelope_optional<T: TypeMarker, D: ResourceDialect>(
 /// `Some((inlined, num_bytes, num_handles))` if present.
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline(always)]
-pub unsafe fn decode_envelope_header<D: ResourceDialect>(
-    decoder: &mut Decoder<'_, D>,
+pub unsafe fn decode_envelope_header(
+    decoder: &mut Decoder<'_>,
     offset: usize,
 ) -> Result<Option<(bool, u32, u32)>> {
     let num_bytes = decoder.read_num::<u32>(offset);
@@ -2210,8 +2046,8 @@ pub unsafe fn decode_envelope_header<D: ResourceDialect>(
 /// Decodes a FIDL envelope and skips over any out-of-line bytes and handles.
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline]
-pub unsafe fn decode_unknown_envelope<D: ResourceDialect>(
-    decoder: &mut Decoder<'_, D>,
+pub unsafe fn decode_unknown_envelope(
+    decoder: &mut Decoder<'_>,
     offset: usize,
     mut depth: Depth,
 ) -> Result<()> {
@@ -2240,8 +2076,8 @@ pub unsafe fn decode_unknown_envelope<D: ResourceDialect>(
 /// Returns `(ordinal, inlined, num_bytes, num_handles)`.
 #[doc(hidden)] // only exported for use in macros or generated code
 #[inline]
-pub unsafe fn decode_union_inline_portion<D: ResourceDialect>(
-    decoder: &mut Decoder<'_, D>,
+pub unsafe fn decode_union_inline_portion(
+    decoder: &mut Decoder<'_>,
     offset: usize,
 ) -> Result<(u64, bool, u32, u32)> {
     let ordinal = decoder.read_num::<u64>(offset);
@@ -2306,6 +2142,7 @@ impl FrameworkErr {
 
 unsafe impl TypeMarker for FrameworkErr {
     type Owned = Self;
+
     #[inline(always)]
     fn inline_align(_context: Context) -> usize {
         std::mem::align_of::<i32>()
@@ -2330,26 +2167,21 @@ unsafe impl TypeMarker for FrameworkErr {
 impl ValueTypeMarker for FrameworkErr {
     type Borrowed<'a> = Self;
     #[inline(always)]
-    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<Self, D> for FrameworkErr {
+unsafe impl Encode<Self> for FrameworkErr {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
         encoder.write_num(self.into_primitive(), offset);
         Ok(())
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for FrameworkErr {
+impl Decode<Self> for FrameworkErr {
     #[inline(always)]
     fn new_empty() -> Self {
         Self::UnknownMethod
@@ -2358,7 +2190,7 @@ impl<D: ResourceDialect> Decode<Self, D> for FrameworkErr {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -2439,34 +2271,32 @@ macro_rules! impl_result_union {
             }
         }
 
-        unsafe impl<D: ResourceDialect, $($type_param: TypeMarker, $encode_param: Encode<$type_param, D>),*> Encode<$ty, D> for $encode {
+        unsafe impl<$($type_param: TypeMarker, $encode_param: Encode<$type_param>),*> Encode<$ty> for $encode {
             #[inline]
-            unsafe fn encode(self, encoder: &mut Encoder<'_, D>, offset: usize, depth: Depth) -> Result<()> {
+            unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
                 encoder.debug_check_bounds::<$ty>(offset);
                 match self {
                     $(
                         $($member_ctor)*(val) => {
                             encoder.write_num::<u64>($member_ordinal, offset);
-                            encode_in_envelope::<$member_ty, D>(val, encoder, offset + 8, depth)
+                            encode_in_envelope::<$member_ty>(val, encoder, offset + 8, depth)
                         }
                     )*
                 }
             }
         }
 
-        impl<D: ResourceDialect, $($type_param: TypeMarker),*> Decode<$ty, D> for $owned
-        where $($type_param::Owned: Decode<$type_param, D>),*
-        {
+        impl<$($type_param: TypeMarker),*> Decode<$ty> for $owned {
             #[inline(always)]
             fn new_empty() -> Self {
                 #![allow(unreachable_code)]
                 $(
-                    return $($member_ctor)*(new_empty!($member_ty, D));
+                    return $($member_ctor)*(new_empty!($member_ty));
                 )*
             }
 
             #[inline]
-            unsafe fn decode(&mut self, decoder: &mut Decoder<'_, D>, offset: usize, mut depth: Depth) -> Result<()> {
+            unsafe fn decode(&mut self, decoder: &mut Decoder<'_>, offset: usize, mut depth: Depth) -> Result<()> {
                 decoder.debug_check_bounds::<$ty>(offset);
                 let next_out_of_line = decoder.next_out_of_line();
                 let handles_before = decoder.remaining_handles();
@@ -2496,11 +2326,11 @@ macro_rules! impl_result_union {
                                 // Do nothing, read the value into the object
                             } else {
                                 // Initialize `self` to the right variant
-                                *self = $($member_ctor)*(new_empty!($member_ty, D));
+                                *self = $($member_ctor)*(new_empty!($member_ty));
                             }
                             #[allow(irrefutable_let_patterns)]
                             if let $($member_ctor)*(ref mut val) = self {
-                                decode!($member_ty, D, val, decoder, inner_offset, depth)?;
+                                decode!($member_ty, val, decoder, inner_offset, depth)?;
                             } else {
                                 unreachable!()
                             }
@@ -2581,27 +2411,21 @@ unsafe impl TypeMarker for EpitaphBody {
 
 impl ValueTypeMarker for EpitaphBody {
     type Borrowed<'a> = &'a Self;
-
-    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<EpitaphBody, D> for &EpitaphBody {
+unsafe impl Encode<EpitaphBody> for &EpitaphBody {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<EpitaphBody>(offset);
         encoder.write_num::<i32>(self.error.into_raw(), offset);
         Ok(())
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for EpitaphBody {
+impl Decode<Self> for EpitaphBody {
     #[inline(always)]
     fn new_empty() -> Self {
         Self { error: zx_status::Status::from_raw(0) }
@@ -2610,7 +2434,7 @@ impl<D: ResourceDialect> Decode<Self, D> for EpitaphBody {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -2640,27 +2464,21 @@ unsafe impl TypeMarker for ObjectType {
 
 impl ValueTypeMarker for ObjectType {
     type Borrowed<'a> = Self;
-
-    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<ObjectType, D> for ObjectType {
+unsafe impl Encode<ObjectType> for ObjectType {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
         encoder.write_num(self.into_raw(), offset);
         Ok(())
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for ObjectType {
+impl Decode<Self> for ObjectType {
     #[inline(always)]
     fn new_empty() -> Self {
         ObjectType::NONE
@@ -2669,7 +2487,7 @@ impl<D: ResourceDialect> Decode<Self, D> for ObjectType {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -2695,20 +2513,14 @@ unsafe impl TypeMarker for Rights {
 
 impl ValueTypeMarker for Rights {
     type Borrowed<'a> = Self;
-
-    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<Rights, D> for Rights {
+unsafe impl Encode<Rights> for Rights {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
         if self.bits() & Self::all().bits() != self.bits() {
             return Err(Error::InvalidBitsValue);
@@ -2718,7 +2530,7 @@ unsafe impl<D: ResourceDialect> Encode<Rights, D> for Rights {
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for Rights {
+impl Decode<Self> for Rights {
     #[inline(always)]
     fn new_empty() -> Self {
         Rights::empty()
@@ -2727,7 +2539,7 @@ impl<D: ResourceDialect> Decode<Self, D> for Rights {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -2773,34 +2585,25 @@ unsafe impl<H: ValueTypeMarker, T: TypeMarker> TypeMarker for GenericMessageType
     }
 }
 
-unsafe impl<H: ValueTypeMarker, T: TypeMarker, E: Encode<T, D>, D: ResourceDialect>
-    Encode<GenericMessageType<H, T>, D> for GenericMessage<<H as TypeMarker>::Owned, E>
-where
-    for<'a> H::Borrowed<'a>: Encode<H, D>,
+unsafe impl<H: ValueTypeMarker, T: TypeMarker, E: Encode<T>> Encode<GenericMessageType<H, T>>
+    for GenericMessage<H::Owned, E>
 {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<GenericMessageType<H, T>>(offset);
         H::borrow(&self.header).encode(encoder, offset, depth)?;
         self.body.encode(encoder, offset + H::inline_size(encoder.context), depth)
     }
 }
 
-impl<H: ValueTypeMarker, T: TypeMarker, D: ResourceDialect> Decode<GenericMessageType<H, T>, D>
-    for GenericMessageOwned
-{
+impl<H: ValueTypeMarker, T: TypeMarker> Decode<GenericMessageType<H, T>> for GenericMessageOwned {
     fn new_empty() -> Self {
         panic!("cannot create GenericMessageOwned");
     }
 
     unsafe fn decode(
         &mut self,
-        _decoder: &mut Decoder<'_, D>,
+        _decoder: &mut Decoder<'_>,
         _offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -2960,20 +2763,15 @@ impl TransactionHeader {
 /// Decodes the transaction header from a message.
 /// Returns the header and a reference to the tail of the message.
 pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u8])> {
-    let mut header = new_empty!(TransactionHeader, NoHandleResourceDialect);
+    let mut header = new_empty!(TransactionHeader);
     let context = Context { wire_format_version: WireFormatVersion::V2 };
     let header_len = <TransactionHeader as TypeMarker>::inline_size(context);
     if bytes.len() < header_len {
         return Err(Error::OutOfRange);
     }
     let (header_bytes, body_bytes) = bytes.split_at(header_len);
-    Decoder::<NoHandleResourceDialect>::decode_with_context::<TransactionHeader>(
-        context,
-        header_bytes,
-        &mut [],
-        &mut header,
-    )
-    .map_err(|_| Error::InvalidHeader)?;
+    Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, &mut [], &mut header)
+        .map_err(|_| Error::InvalidHeader)?;
     header.validate_wire_format()?;
     Ok((header, body_bytes))
 }
@@ -2994,20 +2792,14 @@ unsafe impl TypeMarker for TransactionHeader {
 
 impl ValueTypeMarker for TransactionHeader {
     type Borrowed<'a> = &'a Self;
-
-    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
         value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<TransactionHeader, D> for &TransactionHeader {
+unsafe impl Encode<TransactionHeader> for &TransactionHeader {
     #[inline]
-    unsafe fn encode(
-        self,
-        encoder: &mut Encoder<'_, D>,
-        offset: usize,
-        _depth: Depth,
-    ) -> Result<()> {
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<TransactionHeader>(offset);
         unsafe {
             let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
@@ -3017,7 +2809,7 @@ unsafe impl<D: ResourceDialect> Encode<TransactionHeader, D> for &TransactionHea
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for TransactionHeader {
+impl Decode<Self> for TransactionHeader {
     #[inline(always)]
     fn new_empty() -> Self {
         Self { tx_id: 0, at_rest_flags: [0; 2], dynamic_flags: 0, magic_number: 0, ordinal: 0 }
@@ -3026,7 +2818,7 @@ impl<D: ResourceDialect> Decode<Self, D> for TransactionHeader {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, D>,
+        decoder: &mut Decoder<'_>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
@@ -3100,8 +2892,8 @@ pub fn with_tls_decode_buf<R>(f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>)
 ///
 /// This function may not be called recursively.
 #[inline]
-pub fn with_tls_encoded<T: TypeMarker, D: ResourceDialect, Out>(
-    val: impl Encode<T, D>,
+pub fn with_tls_encoded<T: TypeMarker, Out>(
+    val: impl Encode<T>,
     f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> Result<Out>,
 ) -> Result<Out> {
     with_tls_encode_buf(|bytes, handles| {
@@ -3138,31 +2930,20 @@ mod test {
     }
 
     #[track_caller]
-    pub fn encode_decode<T: TypeMarker>(
-        ctx: Context,
-        start: impl Encode<T, DefaultFuchsiaResourceDialect>,
-    ) -> T::Owned
-    where
-        T::Owned: Decode<T, DefaultFuchsiaResourceDialect>,
-    {
+    pub fn encode_decode<T: TypeMarker>(ctx: Context, start: impl Encode<T>) -> T::Owned {
         let buf = &mut Vec::new();
         let handle_buf = &mut Vec::new();
         Encoder::encode_with_context::<T>(ctx, buf, handle_buf, start).expect("Encoding failed");
         let mut out = T::Owned::new_empty();
-        Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<T>(
-            ctx,
-            buf,
-            &mut to_infos(handle_buf),
-            &mut out,
-        )
-        .expect("Decoding failed");
+        Decoder::decode_with_context::<T>(ctx, buf, &mut to_infos(handle_buf), &mut out)
+            .expect("Decoding failed");
         out
     }
 
     #[track_caller]
     fn encode_assert_bytes<T: TypeMarker>(
         ctx: Context,
-        data: impl Encode<T, DefaultFuchsiaResourceDialect>,
+        data: impl Encode<T>,
         encoded_bytes: &[u8],
     ) {
         let buf = &mut Vec::new();
@@ -3175,8 +2956,7 @@ mod test {
     fn identity<T>(data: &T::Owned)
     where
         T: ValueTypeMarker,
-        T::Owned: fmt::Debug + PartialEq + Decode<T, DefaultFuchsiaResourceDialect>,
-        for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
+        T::Owned: fmt::Debug + PartialEq,
     {
         for ctx in CONTEXTS {
             assert_eq!(*data, encode_decode(ctx, T::borrow(data)));
@@ -3187,8 +2967,7 @@ mod test {
     fn identities<T>(values: &[T::Owned])
     where
         T: ValueTypeMarker,
-        T::Owned: fmt::Debug + PartialEq + Decode<T, DefaultFuchsiaResourceDialect>,
-        for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
+        T::Owned: fmt::Debug + PartialEq,
     {
         for value in values {
             identity::<T>(value);
@@ -3248,8 +3027,7 @@ mod test {
     fn slice_identity<T>(start: &[T::Owned])
     where
         T: ValueTypeMarker,
-        T::Owned: fmt::Debug + PartialEq + Decode<T, DefaultFuchsiaResourceDialect>,
-        for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
+        T::Owned: fmt::Debug + PartialEq,
     {
         for ctx in CONTEXTS {
             let decoded = encode_decode::<UnboundedVector<T>>(ctx, start);
@@ -3303,7 +3081,7 @@ mod test {
     #[test]
     fn result_decode_empty_ok_value() {
         let mut result = Err(0);
-        Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<ResultType<EmptyStruct, u32>>(
+        Decoder::decode_with_context::<ResultType<EmptyStruct, u32>>(
             Context { wire_format_version: WireFormatVersion::V2 },
             &[
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // success ordinal
@@ -3337,14 +3115,9 @@ mod test {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // present
                     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // number
                 ];
-                let mut out = new_empty!(Res, DefaultFuchsiaResourceDialect);
+                let mut out = new_empty!(Res);
                 assert_matches!(
-                    Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<Res>(
-                        ctx,
-                        &bytes,
-                        &mut [],
-                        &mut out
-                    ),
+                    Decoder::decode_with_context::<Res>(ctx, &bytes, &mut [], &mut out),
                     Err(Error::InvalidNumBytesInEnvelope)
                 );
             }
@@ -3363,14 +3136,9 @@ mod test {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // present
                     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // number
                 ];
-                let mut out = new_empty!(Res, DefaultFuchsiaResourceDialect);
+                let mut out = new_empty!(Res);
                 assert_matches!(
-                    Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<Res>(
-                        ctx,
-                        &bytes,
-                        &mut [],
-                        &mut out
-                    ),
+                    Decoder::decode_with_context::<Res>(ctx, &bytes, &mut [], &mut out),
                     Err(Error::InvalidNumHandlesInEnvelope)
                 );
             }
@@ -3390,10 +3158,8 @@ mod test {
         ];
         let handle_buf = &mut Vec::<HandleInfo>::new();
 
-        let mut out = new_empty!(Res, DefaultFuchsiaResourceDialect);
-        let res = Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<Res>(
-            ctx, bytes, handle_buf, &mut out,
-        );
+        let mut out = new_empty!(Res);
+        let res = Decoder::decode_with_context::<Res>(ctx, bytes, handle_buf, &mut out);
         assert_matches!(res, Err(Error::UnknownUnionTag));
     }
 
@@ -3410,10 +3176,8 @@ mod test {
         ];
         let handle_buf = &mut Vec::<HandleInfo>::new();
 
-        let mut out = new_empty!(Res, DefaultFuchsiaResourceDialect);
-        let res = Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<Res>(
-            ctx, bytes, handle_buf, &mut out,
-        );
+        let mut out = new_empty!(Res);
+        let res = Decoder::decode_with_context::<Res>(ctx, bytes, handle_buf, &mut out);
         assert_matches!(res, Err(Error::Invalid));
     }
 
@@ -3434,9 +3198,9 @@ mod test {
 
             let buf = &mut Vec::new();
             let handle_buf = &mut Vec::new();
-            Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<
-                TransactionMessageType<Body>,
-            >(ctx, buf, handle_buf, start)
+            Encoder::encode_with_context::<TransactionMessageType<Body>>(
+                ctx, buf, handle_buf, start,
+            )
             .expect("Encoding failed");
 
             let (out_header, out_buf) =
@@ -3444,7 +3208,7 @@ mod test {
             assert_eq!(header, out_header);
 
             let mut body_out = String::new();
-            Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<Body>(
+            Decoder::decode_into::<Body>(
                 &header,
                 out_buf,
                 &mut to_infos(handle_buf),
@@ -3489,14 +3253,9 @@ mod test {
         };
 
         for ctx in CONTEXTS {
-            let mut out = new_empty!(TransactionHeader, DefaultFuchsiaResourceDialect);
-            Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<TransactionHeader>(
-                ctx,
-                bytes,
-                &mut [],
-                &mut out,
-            )
-            .expect("Decoding failed");
+            let mut out = new_empty!(TransactionHeader);
+            Decoder::decode_with_context::<TransactionHeader>(ctx, bytes, &mut [], &mut out)
+                .expect("Decoding failed");
             assert_eq!(out, header);
         }
     }
@@ -3535,14 +3294,9 @@ mod test {
         };
 
         for ctx in CONTEXTS {
-            let mut out = new_empty!(TransactionHeader, DefaultFuchsiaResourceDialect);
-            Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<TransactionHeader>(
-                ctx,
-                bytes,
-                &mut [],
-                &mut out,
-            )
-            .expect("Decoding failed");
+            let mut out = new_empty!(TransactionHeader);
+            Decoder::decode_with_context::<TransactionHeader>(ctx, bytes, &mut [], &mut out)
+                .expect("Decoding failed");
             assert_eq!(out, header);
         }
     }
@@ -3551,16 +3305,11 @@ mod test {
     fn extra_data_is_disallowed() {
         for ctx in CONTEXTS {
             assert_matches!(
-                Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<EmptyPayload>(
-                    ctx,
-                    &[0],
-                    &mut [],
-                    &mut ()
-                ),
+                Decoder::decode_with_context::<EmptyPayload>(ctx, &[0], &mut [], &mut ()),
                 Err(Error::ExtraBytes)
             );
             assert_matches!(
-                Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<EmptyPayload>(
+                Decoder::decode_with_context::<EmptyPayload>(
                     ctx,
                     &[],
                     &mut [HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE,)],
@@ -3574,8 +3323,7 @@ mod test {
     #[test]
     fn encode_default_context() {
         let buf = &mut Vec::new();
-        Encoder::<DefaultFuchsiaResourceDialect>::encode::<u8>(buf, &mut Vec::new(), 1u8)
-            .expect("Encoding failed");
+        Encoder::encode::<u8>(buf, &mut Vec::new(), 1u8).expect("Encoding failed");
         assert_eq!(buf, &[1u8, 0, 0, 0, 0, 0, 0, 0]);
     }
 
@@ -3587,23 +3335,16 @@ mod test {
             let raw_handle = handle.raw_handle();
             let buf = &mut Vec::new();
             let handle_buf = &mut Vec::new();
-            Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<T>(
-                ctx, buf, handle_buf, handle,
-            )
-            .expect("Encoding failed");
+            Encoder::encode_with_context::<T>(ctx, buf, handle_buf, handle)
+                .expect("Encoding failed");
 
             assert_eq!(handle_buf.len(), 1);
             assert!(handle_buf[0].is_move());
             assert_eq!(handle_buf[0].raw_handle(), raw_handle);
 
             let mut handle_out = new_empty!(T);
-            Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<T>(
-                ctx,
-                buf,
-                &mut to_infos(handle_buf),
-                &mut handle_out,
-            )
-            .expect("Decoding failed");
+            Decoder::decode_with_context::<T>(ctx, buf, &mut to_infos(handle_buf), &mut handle_out)
+                .expect("Decoding failed");
             assert_eq!(
                 handle_out.raw_handle(),
                 raw_handle,
@@ -3619,12 +3360,7 @@ mod test {
             let bytes: &[u8] = &[0xff; 8];
             let handle_buf = &mut Vec::new();
             let mut handle_out = Handle::invalid();
-            let res = Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<T>(
-                ctx,
-                bytes,
-                handle_buf,
-                &mut handle_out,
-            );
+            let res = Decoder::decode_with_context::<T>(ctx, bytes, handle_buf, &mut handle_out);
             assert_matches!(res, Err(Error::OutOfRange));
         }
     }
@@ -3634,7 +3370,7 @@ mod test {
         for ctx in CONTEXTS {
             let buf = &mut Vec::new();
             let handle_buf = &mut Vec::new();
-            Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<EpitaphBody>(
+            Encoder::encode_with_context::<EpitaphBody>(
                 ctx,
                 buf,
                 handle_buf,
@@ -3643,8 +3379,8 @@ mod test {
             .expect("encoding failed");
             assert_eq!(buf, &[0xe4, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00]);
 
-            let mut out = new_empty!(EpitaphBody, DefaultFuchsiaResourceDialect);
-            Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<EpitaphBody>(
+            let mut out = new_empty!(EpitaphBody);
+            Decoder::decode_with_context::<EpitaphBody>(
                 ctx,
                 buf,
                 &mut to_infos(handle_buf),

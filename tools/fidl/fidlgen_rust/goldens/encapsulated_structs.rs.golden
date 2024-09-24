@@ -5,11 +5,15 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use bitflags::bitflags;
-use fidl::client::QueryResponseFut;
-use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
-use futures::future::{self, MaybeDone, TryFutureExt};
+use {
+    bitflags::bitflags,
+    fidl::{
+        client::QueryResponseFut,
+        endpoints::{ControlHandle as _, Responder as _},
+    },
+    fuchsia_zircon_status as zx_status,
+    futures::future::{self, MaybeDone, TryFutureExt},
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -69,13 +73,6 @@ impl fidl::Standalone for TopLevelStruct {}
 mod internal {
     use super::*;
 
-    impl fidl::encoding::ValueTypeMarker for ArrayInt16Int8 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for ArrayInt16Int8 {
         type Owned = Self;
 
@@ -89,14 +86,20 @@ mod internal {
             12
         }
     }
+    impl fidl::encoding::ValueTypeMarker for ArrayInt16Int8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ArrayInt16Int8, D>
-        for &ArrayInt16Int8
-    {
+    unsafe impl fidl::encoding::Encode<ArrayInt16Int8> for &ArrayInt16Int8 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -121,15 +124,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<fidl::encoding::Array<Int16Int8, 3>, D>,
-        > fidl::encoding::Encode<ArrayInt16Int8, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::Array<Int16Int8, 3>>>
+        fidl::encoding::Encode<ArrayInt16Int8> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -142,16 +143,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ArrayInt16Int8 {
+    impl fidl::encoding::Decode<Self> for ArrayInt16Int8 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { arr: fidl::new_empty!(fidl::encoding::Array<Int16Int8, 3>, D) }
+            Self { arr: fidl::new_empty!(fidl::encoding::Array<Int16Int8, 3>) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -193,13 +194,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for Int16Int8 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for Int16Int8 {
         type Owned = Self;
 
@@ -213,14 +207,20 @@ mod internal {
             4
         }
     }
+    impl fidl::encoding::ValueTypeMarker for Int16Int8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Int16Int8, D>
-        for &Int16Int8
-    {
+    unsafe impl fidl::encoding::Encode<Int16Int8> for &Int16Int8 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -238,16 +238,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<i16, D>,
-            T1: fidl::encoding::Encode<i8, D>,
-        > fidl::encoding::Encode<Int16Int8, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<i16>, T1: fidl::encoding::Encode<i8>>
+        fidl::encoding::Encode<Int16Int8> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -265,16 +262,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Int16Int8 {
+    impl fidl::encoding::Decode<Self> for Int16Int8 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(i16, D), b: fidl::new_empty!(i8, D) }
+            Self { a: fidl::new_empty!(i16), b: fidl::new_empty!(i8) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -298,13 +295,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for Int8Int32 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for Int8Int32 {
         type Owned = Self;
 
@@ -318,14 +308,20 @@ mod internal {
             8
         }
     }
+    impl fidl::encoding::ValueTypeMarker for Int8Int32 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Int8Int32, D>
-        for &Int8Int32
-    {
+    unsafe impl fidl::encoding::Encode<Int8Int32> for &Int8Int32 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -343,16 +339,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<i8, D>,
-            T1: fidl::encoding::Encode<i32, D>,
-        > fidl::encoding::Encode<Int8Int32, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<i8>, T1: fidl::encoding::Encode<i32>>
+        fidl::encoding::Encode<Int8Int32> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -370,16 +363,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Int8Int32 {
+    impl fidl::encoding::Decode<Self> for Int8Int32 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(i8, D), b: fidl::new_empty!(i32, D) }
+            Self { a: fidl::new_empty!(i8), b: fidl::new_empty!(i32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -403,15 +396,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ResourceTypeMarker for NonInlineStructTestStruct {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for NonInlineStructTestStruct {
         type Owned = Self;
 
@@ -425,29 +409,26 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for NonInlineStructTestStruct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<
-            NonInlineStructTestStruct,
-            fidl::encoding::DefaultFuchsiaResourceDialect,
-        > for &mut NonInlineStructTestStruct
-    {
+    unsafe impl fidl::encoding::Encode<NonInlineStructTestStruct> for &mut NonInlineStructTestStruct {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<NonInlineStructTestStruct>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<
-                NonInlineStructTestStruct,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >::encode(
+            fidl::encoding::Encode::<NonInlineStructTestStruct>::encode(
                 (
                     <fidl::encoding::Boxed<Int16Int8> as fidl::encoding::ValueTypeMarker>::borrow(
                         &self.element,
@@ -467,31 +448,20 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<
-                fidl::encoding::Boxed<Int16Int8>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            T0: fidl::encoding::Encode<fidl::encoding::Boxed<Int16Int8>>,
             T1: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
                     fidl::Handle,
                     { fidl::ObjectType::NONE.into_raw() },
                     2147483648,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-        >
-        fidl::encoding::Encode<
-            NonInlineStructTestStruct,
-            fidl::encoding::DefaultFuchsiaResourceDialect,
-        > for (T0, T1)
+        > fidl::encoding::Encode<NonInlineStructTestStruct> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -509,27 +479,19 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for NonInlineStructTestStruct
-    {
+    impl fidl::encoding::Decode<Self> for NonInlineStructTestStruct {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                element: fidl::new_empty!(
-                    fidl::encoding::Boxed<Int16Int8>,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                ),
-                h: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                element: fidl::new_empty!(fidl::encoding::Boxed<Int16Int8>),
+                h: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -546,21 +508,13 @@ mod internal {
             }
             fidl::decode!(
                 fidl::encoding::Boxed<Int16Int8>,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.element,
                 decoder,
                 offset + 0,
                 _depth
             )?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.h, decoder, offset + 8, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.h, decoder, offset + 8, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for StructPaddingTestStruct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -577,14 +531,20 @@ mod internal {
             24
         }
     }
+    impl fidl::encoding::ValueTypeMarker for StructPaddingTestStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<StructPaddingTestStruct, D> for &StructPaddingTestStruct
-    {
+    unsafe impl fidl::encoding::Encode<StructPaddingTestStruct> for &StructPaddingTestStruct {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -616,16 +576,15 @@ mod internal {
         }
     }
     unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<Int16Int8, D>,
-            T1: fidl::encoding::Encode<Int8Int32, D>,
-            T2: fidl::encoding::Encode<ArrayInt16Int8, D>,
-        > fidl::encoding::Encode<StructPaddingTestStruct, D> for (T0, T1, T2)
+            T0: fidl::encoding::Encode<Int16Int8>,
+            T1: fidl::encoding::Encode<Int8Int32>,
+            T2: fidl::encoding::Encode<ArrayInt16Int8>,
+        > fidl::encoding::Encode<StructPaddingTestStruct> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -640,22 +599,20 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for StructPaddingTestStruct
-    {
+    impl fidl::encoding::Decode<Self> for StructPaddingTestStruct {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                trailing: fidl::new_empty!(Int16Int8, D),
-                inner: fidl::new_empty!(Int8Int32, D),
-                array: fidl::new_empty!(ArrayInt16Int8, D),
+                trailing: fidl::new_empty!(Int16Int8),
+                inner: fidl::new_empty!(Int8Int32),
+                array: fidl::new_empty!(ArrayInt16Int8),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -715,15 +672,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ResourceTypeMarker for TopLevelStruct {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for TopLevelStruct {
         type Owned = Self;
 
@@ -737,24 +685,26 @@ mod internal {
             40
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for TopLevelStruct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<TopLevelStruct, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut TopLevelStruct
-    {
+    unsafe impl fidl::encoding::Encode<TopLevelStruct> for &mut TopLevelStruct {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<TopLevelStruct>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<TopLevelStruct, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
+            fidl::encoding::Encode::<TopLevelStruct>::encode(
                 (
                     <StructPaddingTestStruct as fidl::encoding::ValueTypeMarker>::borrow(&self.a),
                     <NonInlineStructTestStruct as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.b),
@@ -764,24 +714,14 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<
-                StructPaddingTestStruct,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
-            T1: fidl::encoding::Encode<
-                NonInlineStructTestStruct,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
-        > fidl::encoding::Encode<TopLevelStruct, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for (T0, T1)
+            T0: fidl::encoding::Encode<StructPaddingTestStruct>,
+            T1: fidl::encoding::Encode<NonInlineStructTestStruct>,
+        > fidl::encoding::Encode<TopLevelStruct> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -795,51 +735,26 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for TopLevelStruct
-    {
+    impl fidl::encoding::Decode<Self> for TopLevelStruct {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                a: fidl::new_empty!(
-                    StructPaddingTestStruct,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                ),
-                b: fidl::new_empty!(
-                    NonInlineStructTestStruct,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                ),
+                a: fidl::new_empty!(StructPaddingTestStruct),
+                b: fidl::new_empty!(NonInlineStructTestStruct),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(
-                StructPaddingTestStruct,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-                &mut self.a,
-                decoder,
-                offset + 0,
-                _depth
-            )?;
-            fidl::decode!(
-                NonInlineStructTestStruct,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-                &mut self.b,
-                decoder,
-                offset + 24,
-                _depth
-            )?;
+            fidl::decode!(StructPaddingTestStruct, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(NonInlineStructTestStruct, &mut self.b, decoder, offset + 24, _depth)?;
             Ok(())
         }
     }

@@ -1194,42 +1194,47 @@ impl MainProtocolEvent {
         match tx_header.ordinal {
             0x7fa8a0bf08128a0b => {
                 let mut out = fidl::new_empty!(
-                    fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest
                 );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                fidl::encoding::Decoder::decode_into::<
+                    fidl_test_protocollayouts_imported::ComposedProtocolOnAnonComposedRequest,
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnAnonComposed { payload: out }))
             }
             0x5e68f92a5b28cdea => {
-                let mut out = fidl::new_empty!(
+                let mut out =
+                    fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
+                fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocollayouts_imported::ImportUnionPayload,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportUnionPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnNamedComposed { payload: out }))
             }
             0x5b61e3156b09acd0 => {
-                let mut out = fidl::new_empty!(
+                let mut out =
+                    fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
+                fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocollayouts_imported::ImportUnionPayload,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportUnionPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnImport { payload: out }))
             }
             0x3a46c48153f0437c => {
-                let mut out = fidl::new_empty!(
-                    LocalUnionPayload,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalUnionPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(LocalUnionPayload);
+                fidl::encoding::Decoder::decode_into::<LocalUnionPayload>(
+                    &tx_header,
+                    _body_bytes,
+                    _handles,
+                    &mut out,
+                )?;
                 Ok((MainProtocolEvent::OnLocal { payload: out }))
             }
             0x64f7b1ec1ba0810b => {
-                let mut out = fidl::new_empty!(
-                    MainProtocolOnAnonRequest,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolOnAnonRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(MainProtocolOnAnonRequest);
+                fidl::encoding::Decoder::decode_into::<MainProtocolOnAnonRequest>(
+                    &tx_header,
+                    _body_bytes,
+                    _handles,
+                    &mut out,
+                )?;
                 Ok((MainProtocolEvent::OnAnon { payload: out }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
@@ -1309,15 +1314,15 @@ impl futures::Stream for MainProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x67da05e1ae3f5e1 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolOneWayAnonComposedRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayAnonComposed { payload: req, control_handle })
                 }
                 0x16afa17ea70d3370 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayAnonComposed {
                         payload: req,
@@ -1329,8 +1334,8 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x2ed33746b7bb119d => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayAnonComposedWithError {
                         payload: req,
@@ -1342,21 +1347,21 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x5d78ce13958eee58 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportTablePayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayNamedComposed { payload: req, control_handle })
                 }
                 0xf67f27cae663810 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportUnionPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportUnionPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayNamedComposed {
                         payload: req,
@@ -1368,11 +1373,11 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x30dac4182813ef7f => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportTablePayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayNamedComposedWithError {
                         payload: req,
@@ -1384,21 +1389,21 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x530db65f2691d3b => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportTablePayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayImport { payload: req, control_handle })
                 }
                 0x2bf680c8f0d40604 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportUnionPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportUnionPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportUnionPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayImport {
                         payload: req,
@@ -1410,11 +1415,11 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x432093586084ff0a => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportTablePayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportTablePayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportTablePayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayImportWithError {
                         payload: req,
@@ -1426,21 +1431,25 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x54759b55efd60f43 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalTablePayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalTablePayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(LocalTablePayload);
+                    fidl::encoding::Decoder::decode_into::<LocalTablePayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayLocal { payload: req, control_handle })
                 }
                 0x6bbeeb18f39c539b => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalUnionPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalUnionPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(LocalUnionPayload);
+                    fidl::encoding::Decoder::decode_into::<LocalUnionPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayLocal {
                         payload: req,
@@ -1452,11 +1461,13 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x4dd8e7287c4c9b57 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalTablePayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalTablePayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(LocalTablePayload);
+                    fidl::encoding::Decoder::decode_into::<LocalTablePayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayLocalWithError {
                         payload: req,
@@ -1468,21 +1479,25 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x3a552f30c77c76ec => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolOneWayAnonRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolOneWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(MainProtocolOneWayAnonRequest);
+                    fidl::encoding::Decoder::decode_into::<MainProtocolOneWayAnonRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayAnon { payload: req, control_handle })
                 }
                 0x672eb5e71efdabcf => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolTwoWayAnonRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(MainProtocolTwoWayAnonRequest);
+                    fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayAnon {
                         payload: req,
@@ -1494,11 +1509,13 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x6bd5fcf6f7b46df1 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolTwoWayAnonWithErrorRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(MainProtocolTwoWayAnonWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayAnonWithError {
                         payload: req,
@@ -3058,18 +3075,20 @@ impl OpenProtocolEvent {
         match tx_header.ordinal {
             0x7f038af71aad17d4 => {
                 let mut out = fidl::new_empty!(
-                    fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest
                 );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                fidl::encoding::Decoder::decode_into::<
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest,
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((OpenProtocolEvent::FlexibleEvent { value: out.value }))
             }
             0x366a73eb0b37159d => {
                 let mut out = fidl::new_empty!(
-                    fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest
                 );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                fidl::encoding::Decoder::decode_into::<
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest,
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((OpenProtocolEvent::StrictEvent { value: out.value }))
             }
             _ if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
@@ -3152,15 +3171,15 @@ impl futures::Stream for OpenProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x30ce1cc0e7e88521 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::FlexibleOneWay { value: req.value, control_handle })
                 }
                 0x4d5655754da320d8 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::FlexibleTwoWayNoError {
                         value: req.value,
@@ -3173,8 +3192,8 @@ impl futures::Stream for OpenProtocolRequestStream {
                 }
                 0x30a12dd4f7823782 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::FlexibleTwoWayWithError {
                         value: req.value,
@@ -3188,17 +3207,18 @@ impl futures::Stream for OpenProtocolRequestStream {
                 0x79fce2c7f5b1bfa7 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(
-                        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
+                        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest
                     );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest>(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<
+                        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest,
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::StrictOneWay { value: req.value, control_handle })
                 }
                 0x3338d68165132184 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::StrictTwoWayNoError {
                         value: req.value,
@@ -3211,8 +3231,8 @@ impl futures::Stream for OpenProtocolRequestStream {
                 }
                 0x4a72f997c7db5037 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::StrictTwoWayWithError {
                         value: req.value,
@@ -3225,11 +3245,11 @@ impl futures::Stream for OpenProtocolRequestStream {
                 }
                 0x152c0b4acb5c0570 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocollayouts_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocollayouts_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
                     Ok(OpenProtocolRequest::FlexibleOneWayNamedPayload {
                         value: req.value,
@@ -3732,13 +3752,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for LocalTablePayload {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for LocalTablePayload {
         type Owned = Self;
 
@@ -3752,13 +3765,19 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for LocalTablePayload {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<LocalTablePayload, D>
-        for &LocalTablePayload
-    {
+    unsafe impl fidl::encoding::Encode<LocalTablePayload> for &LocalTablePayload {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3792,7 +3811,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u16, D>(
+            fidl::encoding::encode_in_envelope_optional::<u16>(
                 self.a.as_ref().map(<u16 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3805,7 +3824,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for LocalTablePayload {
+    impl fidl::encoding::Decode<Self> for LocalTablePayload {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -3813,7 +3832,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3865,8 +3884,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16, D));
-                fidl::decode!(u16, D, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16));
+                fidl::decode!(u16, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3899,13 +3918,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for MainProtocolOneWayAnonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for MainProtocolOneWayAnonRequest {
         type Owned = Self;
 
@@ -3919,14 +3931,21 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolOneWayAnonRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolOneWayAnonRequest, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolOneWayAnonRequest>
         for &MainProtocolOneWayAnonRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3960,7 +3979,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u16, D>(
+            fidl::encoding::encode_in_envelope_optional::<u16>(
                 self.a.as_ref().map(<u16 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3973,9 +3992,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolOneWayAnonRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolOneWayAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -3983,7 +4000,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4035,8 +4052,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16, D));
-                fidl::decode!(u16, D, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16));
+                fidl::decode!(u16, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4069,13 +4086,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for MainProtocolTwoWayAnonResponse {
         type Owned = Self;
 
@@ -4089,14 +4099,21 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonResponse, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonResponse>
         for &MainProtocolTwoWayAnonResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4130,7 +4147,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u16, D>(
+            fidl::encoding::encode_in_envelope_optional::<u16>(
                 self.a.as_ref().map(<u16 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -4143,9 +4160,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonResponse
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonResponse {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -4153,7 +4168,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4205,8 +4220,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16, D));
-                fidl::decode!(u16, D, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16));
+                fidl::decode!(u16, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4239,13 +4254,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for MainProtocolTwoWayAnonWithErrorRequest {
         type Owned = Self;
 
@@ -4259,14 +4267,21 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorRequest, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorRequest>
         for &MainProtocolTwoWayAnonWithErrorRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4300,7 +4315,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u16, D>(
+            fidl::encoding::encode_in_envelope_optional::<u16>(
                 self.a.as_ref().map(<u16 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -4313,9 +4328,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonWithErrorRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorRequest {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -4323,7 +4336,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4375,8 +4388,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16, D));
-                fidl::decode!(u16, D, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.a.get_or_insert_with(|| fidl::new_empty!(u16));
+                fidl::decode!(u16, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4399,13 +4412,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for LocalUnionPayload {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for LocalUnionPayload {
         type Owned = Self;
 
@@ -4419,21 +4425,27 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for LocalUnionPayload {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<LocalUnionPayload, D>
-        for &LocalUnionPayload
-    {
+    unsafe impl fidl::encoding::Encode<LocalUnionPayload> for &LocalUnionPayload {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<LocalUnionPayload>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                LocalUnionPayload::B(ref val) => fidl::encoding::encode_in_envelope::<bool, D>(
+                LocalUnionPayload::B(ref val) => fidl::encoding::encode_in_envelope::<bool>(
                     <bool as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -4444,7 +4456,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for LocalUnionPayload {
+    impl fidl::encoding::Decode<Self> for LocalUnionPayload {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -4453,7 +4465,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4488,11 +4500,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = LocalUnionPayload::B(fidl::new_empty!(bool, D));
+                        *self = LocalUnionPayload::B(fidl::new_empty!(bool));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let LocalUnionPayload::B(ref mut val) = self {
-                        fidl::decode!(bool, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(bool, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4515,13 +4527,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for MainProtocolOnAnonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for MainProtocolOnAnonRequest {
         type Owned = Self;
 
@@ -4535,14 +4540,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolOnAnonRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolOnAnonRequest, D> for &MainProtocolOnAnonRequest
-    {
+    unsafe impl fidl::encoding::Encode<MainProtocolOnAnonRequest> for &MainProtocolOnAnonRequest {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4550,7 +4561,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 MainProtocolOnAnonRequest::B(ref val) => {
-                    fidl::encoding::encode_in_envelope::<bool, D>(
+                    fidl::encoding::encode_in_envelope::<bool>(
                         <bool as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -4564,9 +4575,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolOnAnonRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolOnAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -4575,7 +4584,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4610,11 +4619,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = MainProtocolOnAnonRequest::B(fidl::new_empty!(bool, D));
+                        *self = MainProtocolOnAnonRequest::B(fidl::new_empty!(bool));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let MainProtocolOnAnonRequest::B(ref mut val) = self {
-                        fidl::decode!(bool, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(bool, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4638,13 +4647,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for MainProtocolTwoWayAnonRequest {
         type Owned = Self;
 
@@ -4658,15 +4660,22 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonRequest, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonRequest>
         for &MainProtocolTwoWayAnonRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4674,7 +4683,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 MainProtocolTwoWayAnonRequest::B(ref val) => {
-                    fidl::encoding::encode_in_envelope::<bool, D>(
+                    fidl::encoding::encode_in_envelope::<bool>(
                         <bool as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -4688,9 +4697,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -4699,7 +4706,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4734,11 +4741,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = MainProtocolTwoWayAnonRequest::B(fidl::new_empty!(bool, D));
+                        *self = MainProtocolTwoWayAnonRequest::B(fidl::new_empty!(bool));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let MainProtocolTwoWayAnonRequest::B(ref mut val) = self {
-                        fidl::decode!(bool, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(bool, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4763,13 +4770,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for MainProtocolTwoWayAnonWithErrorResponse {
         type Owned = Self;
 
@@ -4783,15 +4783,22 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorResponse, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorResponse>
         for &MainProtocolTwoWayAnonWithErrorResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4799,7 +4806,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 MainProtocolTwoWayAnonWithErrorResponse::B(ref val) => {
-                    fidl::encoding::encode_in_envelope::<bool, D>(
+                    fidl::encoding::encode_in_envelope::<bool>(
                         <bool as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -4813,9 +4820,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonWithErrorResponse
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorResponse {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -4824,7 +4829,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4859,12 +4864,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            MainProtocolTwoWayAnonWithErrorResponse::B(fidl::new_empty!(bool, D));
+                        *self = MainProtocolTwoWayAnonWithErrorResponse::B(fidl::new_empty!(bool));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let MainProtocolTwoWayAnonWithErrorResponse::B(ref mut val) = self {
-                        fidl::decode!(bool, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(bool, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

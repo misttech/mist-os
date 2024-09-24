@@ -5,11 +5,15 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use bitflags::bitflags;
-use fidl::client::QueryResponseFut;
-use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
-use futures::future::{self, MaybeDone, TryFutureExt};
+use {
+    bitflags::bitflags,
+    fidl::{
+        client::QueryResponseFut,
+        endpoints::{ControlHandle as _, Responder as _},
+    },
+    fuchsia_zircon_status as zx_status,
+    futures::future::{self, MaybeDone, TryFutureExt},
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -150,13 +154,6 @@ impl fidl::Persistable for UnionSize8Alignment4 {}
 mod internal {
     use super::*;
 
-    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize12Alignment4 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for SandwichUnionSize12Alignment4 {
         type Owned = Self;
 
@@ -170,21 +167,28 @@ mod internal {
             32
         }
     }
+    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize12Alignment4 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<SandwichUnionSize12Alignment4, D>
+    unsafe impl fidl::encoding::Encode<SandwichUnionSize12Alignment4>
         for &SandwichUnionSize12Alignment4
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<SandwichUnionSize12Alignment4>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<SandwichUnionSize12Alignment4, D>::encode(
+            fidl::encoding::Encode::<SandwichUnionSize12Alignment4>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.before),
                     <UnionSize12Alignment4 as fidl::encoding::ValueTypeMarker>::borrow(&self.union),
@@ -197,16 +201,15 @@ mod internal {
         }
     }
     unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<UnionSize12Alignment4, D>,
-            T2: fidl::encoding::Encode<i32, D>,
-        > fidl::encoding::Encode<SandwichUnionSize12Alignment4, D> for (T0, T1, T2)
+            T0: fidl::encoding::Encode<u32>,
+            T1: fidl::encoding::Encode<UnionSize12Alignment4>,
+            T2: fidl::encoding::Encode<i32>,
+        > fidl::encoding::Encode<SandwichUnionSize12Alignment4> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -229,22 +232,20 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for SandwichUnionSize12Alignment4
-    {
+    impl fidl::encoding::Decode<Self> for SandwichUnionSize12Alignment4 {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                before: fidl::new_empty!(u32, D),
-                union: fidl::new_empty!(UnionSize12Alignment4, D),
-                after: fidl::new_empty!(i32, D),
+                before: fidl::new_empty!(u32),
+                union: fidl::new_empty!(UnionSize12Alignment4),
+                after: fidl::new_empty!(i32),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -268,17 +269,10 @@ mod internal {
                     padding_start: offset + 24 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u32, D, &mut self.before, decoder, offset + 0, _depth)?;
-            fidl::decode!(UnionSize12Alignment4, D, &mut self.union, decoder, offset + 8, _depth)?;
-            fidl::decode!(i32, D, &mut self.after, decoder, offset + 24, _depth)?;
+            fidl::decode!(u32, &mut self.before, decoder, offset + 0, _depth)?;
+            fidl::decode!(UnionSize12Alignment4, &mut self.union, decoder, offset + 8, _depth)?;
+            fidl::decode!(i32, &mut self.after, decoder, offset + 24, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize24Alignment8 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -295,21 +289,28 @@ mod internal {
             32
         }
     }
+    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize24Alignment8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<SandwichUnionSize24Alignment8, D>
+    unsafe impl fidl::encoding::Encode<SandwichUnionSize24Alignment8>
         for &SandwichUnionSize24Alignment8
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<SandwichUnionSize24Alignment8>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<SandwichUnionSize24Alignment8, D>::encode(
+            fidl::encoding::Encode::<SandwichUnionSize24Alignment8>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.before),
                     <UnionSize24Alignment8 as fidl::encoding::ValueTypeMarker>::borrow(&self.union),
@@ -322,16 +323,15 @@ mod internal {
         }
     }
     unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<UnionSize24Alignment8, D>,
-            T2: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<SandwichUnionSize24Alignment8, D> for (T0, T1, T2)
+            T0: fidl::encoding::Encode<u32>,
+            T1: fidl::encoding::Encode<UnionSize24Alignment8>,
+            T2: fidl::encoding::Encode<u32>,
+        > fidl::encoding::Encode<SandwichUnionSize24Alignment8> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -354,22 +354,20 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for SandwichUnionSize24Alignment8
-    {
+    impl fidl::encoding::Decode<Self> for SandwichUnionSize24Alignment8 {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                before: fidl::new_empty!(u32, D),
-                union: fidl::new_empty!(UnionSize24Alignment8, D),
-                after: fidl::new_empty!(u32, D),
+                before: fidl::new_empty!(u32),
+                union: fidl::new_empty!(UnionSize24Alignment8),
+                after: fidl::new_empty!(u32),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -393,17 +391,10 @@ mod internal {
                     padding_start: offset + 24 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u32, D, &mut self.before, decoder, offset + 0, _depth)?;
-            fidl::decode!(UnionSize24Alignment8, D, &mut self.union, decoder, offset + 8, _depth)?;
-            fidl::decode!(u32, D, &mut self.after, decoder, offset + 24, _depth)?;
+            fidl::decode!(u32, &mut self.before, decoder, offset + 0, _depth)?;
+            fidl::decode!(UnionSize24Alignment8, &mut self.union, decoder, offset + 8, _depth)?;
+            fidl::decode!(u32, &mut self.after, decoder, offset + 24, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize36Alignment4 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -420,21 +411,28 @@ mod internal {
             32
         }
     }
+    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize36Alignment4 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<SandwichUnionSize36Alignment4, D>
+    unsafe impl fidl::encoding::Encode<SandwichUnionSize36Alignment4>
         for &SandwichUnionSize36Alignment4
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<SandwichUnionSize36Alignment4>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<SandwichUnionSize36Alignment4, D>::encode(
+            fidl::encoding::Encode::<SandwichUnionSize36Alignment4>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.before),
                     <UnionSize36Alignment4 as fidl::encoding::ValueTypeMarker>::borrow(&self.union),
@@ -447,16 +445,15 @@ mod internal {
         }
     }
     unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<UnionSize36Alignment4, D>,
-            T2: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<SandwichUnionSize36Alignment4, D> for (T0, T1, T2)
+            T0: fidl::encoding::Encode<u32>,
+            T1: fidl::encoding::Encode<UnionSize36Alignment4>,
+            T2: fidl::encoding::Encode<u32>,
+        > fidl::encoding::Encode<SandwichUnionSize36Alignment4> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -479,22 +476,20 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for SandwichUnionSize36Alignment4
-    {
+    impl fidl::encoding::Decode<Self> for SandwichUnionSize36Alignment4 {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                before: fidl::new_empty!(u32, D),
-                union: fidl::new_empty!(UnionSize36Alignment4, D),
-                after: fidl::new_empty!(u32, D),
+                before: fidl::new_empty!(u32),
+                union: fidl::new_empty!(UnionSize36Alignment4),
+                after: fidl::new_empty!(u32),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -518,17 +513,10 @@ mod internal {
                     padding_start: offset + 24 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u32, D, &mut self.before, decoder, offset + 0, _depth)?;
-            fidl::decode!(UnionSize36Alignment4, D, &mut self.union, decoder, offset + 8, _depth)?;
-            fidl::decode!(u32, D, &mut self.after, decoder, offset + 24, _depth)?;
+            fidl::decode!(u32, &mut self.before, decoder, offset + 0, _depth)?;
+            fidl::decode!(UnionSize36Alignment4, &mut self.union, decoder, offset + 8, _depth)?;
+            fidl::decode!(u32, &mut self.after, decoder, offset + 24, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize8Alignment4 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -545,20 +533,26 @@ mod internal {
             32
         }
     }
+    impl fidl::encoding::ValueTypeMarker for SandwichUnionSize8Alignment4 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<SandwichUnionSize8Alignment4, D> for &SandwichUnionSize8Alignment4
-    {
+    unsafe impl fidl::encoding::Encode<SandwichUnionSize8Alignment4> for &SandwichUnionSize8Alignment4 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<SandwichUnionSize8Alignment4>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<SandwichUnionSize8Alignment4, D>::encode(
+            fidl::encoding::Encode::<SandwichUnionSize8Alignment4>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.before),
                     <UnionSize8Alignment4 as fidl::encoding::ValueTypeMarker>::borrow(&self.union),
@@ -571,16 +565,15 @@ mod internal {
         }
     }
     unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<UnionSize8Alignment4, D>,
-            T2: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<SandwichUnionSize8Alignment4, D> for (T0, T1, T2)
+            T0: fidl::encoding::Encode<u32>,
+            T1: fidl::encoding::Encode<UnionSize8Alignment4>,
+            T2: fidl::encoding::Encode<u32>,
+        > fidl::encoding::Encode<SandwichUnionSize8Alignment4> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -603,22 +596,20 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for SandwichUnionSize8Alignment4
-    {
+    impl fidl::encoding::Decode<Self> for SandwichUnionSize8Alignment4 {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                before: fidl::new_empty!(u32, D),
-                union: fidl::new_empty!(UnionSize8Alignment4, D),
-                after: fidl::new_empty!(u32, D),
+                before: fidl::new_empty!(u32),
+                union: fidl::new_empty!(UnionSize8Alignment4),
+                after: fidl::new_empty!(u32),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -642,17 +633,10 @@ mod internal {
                     padding_start: offset + 24 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u32, D, &mut self.before, decoder, offset + 0, _depth)?;
-            fidl::decode!(UnionSize8Alignment4, D, &mut self.union, decoder, offset + 8, _depth)?;
-            fidl::decode!(u32, D, &mut self.after, decoder, offset + 24, _depth)?;
+            fidl::decode!(u32, &mut self.before, decoder, offset + 0, _depth)?;
+            fidl::decode!(UnionSize8Alignment4, &mut self.union, decoder, offset + 8, _depth)?;
+            fidl::decode!(u32, &mut self.after, decoder, offset + 24, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for StructSize16Alignment8 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -678,14 +662,20 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for StructSize16Alignment8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<StructSize16Alignment8, D> for &StructSize16Alignment8
-    {
+    unsafe impl fidl::encoding::Encode<StructSize16Alignment8> for &StructSize16Alignment8 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -701,16 +691,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u64, D>,
-            T1: fidl::encoding::Encode<u64, D>,
-        > fidl::encoding::Encode<StructSize16Alignment8, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u64>, T1: fidl::encoding::Encode<u64>>
+        fidl::encoding::Encode<StructSize16Alignment8> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -724,18 +711,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for StructSize16Alignment8
-    {
+    impl fidl::encoding::Decode<Self> for StructSize16Alignment8 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { f1: fidl::new_empty!(u64, D), f2: fidl::new_empty!(u64, D) }
+            Self { f1: fidl::new_empty!(u64), f2: fidl::new_empty!(u64) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -747,13 +732,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 16);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for UnionSize12Alignment4 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -770,14 +748,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for UnionSize12Alignment4 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionSize12Alignment4, D>
-        for &UnionSize12Alignment4
-    {
+    unsafe impl fidl::encoding::Encode<UnionSize12Alignment4> for &UnionSize12Alignment4 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -786,7 +770,6 @@ mod internal {
             match self {
                 UnionSize12Alignment4::Variant(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::Array<u8, 6>,
-                    D,
                 >(
                     <fidl::encoding::Array<u8, 6> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
@@ -797,16 +780,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionSize12Alignment4 {
+    impl fidl::encoding::Decode<Self> for UnionSize12Alignment4 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Variant(fidl::new_empty!(fidl::encoding::Array<u8, 6>, D))
+            Self::Variant(fidl::new_empty!(fidl::encoding::Array<u8, 6>))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -843,12 +826,12 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnionSize12Alignment4::Variant(
-                            fidl::new_empty!(fidl::encoding::Array<u8, 6>, D),
+                            fidl::new_empty!(fidl::encoding::Array<u8, 6>),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionSize12Alignment4::Variant(ref mut val) = self {
-                        fidl::decode!(fidl::encoding::Array<u8, 6>, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(fidl::encoding::Array<u8, 6>, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -865,13 +848,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for UnionSize24Alignment8 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for UnionSize24Alignment8 {
         type Owned = Self;
 
@@ -885,14 +861,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for UnionSize24Alignment8 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionSize24Alignment8, D>
-        for &UnionSize24Alignment8
-    {
+    unsafe impl fidl::encoding::Encode<UnionSize24Alignment8> for &UnionSize24Alignment8 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -900,7 +882,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnionSize24Alignment8::Variant(ref val) => {
-                    fidl::encoding::encode_in_envelope::<StructSize16Alignment8, D>(
+                    fidl::encoding::encode_in_envelope::<StructSize16Alignment8>(
                         <StructSize16Alignment8 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -911,16 +893,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionSize24Alignment8 {
+    impl fidl::encoding::Decode<Self> for UnionSize24Alignment8 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Variant(fidl::new_empty!(StructSize16Alignment8, D))
+            Self::Variant(fidl::new_empty!(StructSize16Alignment8))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -957,20 +939,12 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnionSize24Alignment8::Variant(fidl::new_empty!(
-                            StructSize16Alignment8,
-                            D
+                            StructSize16Alignment8
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionSize24Alignment8::Variant(ref mut val) = self {
-                        fidl::decode!(
-                            StructSize16Alignment8,
-                            D,
-                            val,
-                            decoder,
-                            _inner_offset,
-                            depth
-                        )?;
+                        fidl::decode!(StructSize16Alignment8, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -987,13 +961,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for UnionSize36Alignment4 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for UnionSize36Alignment4 {
         type Owned = Self;
 
@@ -1007,14 +974,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for UnionSize36Alignment4 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionSize36Alignment4, D>
-        for &UnionSize36Alignment4
-    {
+    unsafe impl fidl::encoding::Encode<UnionSize36Alignment4> for &UnionSize36Alignment4 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1023,7 +996,6 @@ mod internal {
             match self {
                 UnionSize36Alignment4::Variant(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::Array<u8, 32>,
-                    D,
                 >(
                     <fidl::encoding::Array<u8, 32> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
@@ -1034,16 +1006,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionSize36Alignment4 {
+    impl fidl::encoding::Decode<Self> for UnionSize36Alignment4 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Variant(fidl::new_empty!(fidl::encoding::Array<u8, 32>, D))
+            Self::Variant(fidl::new_empty!(fidl::encoding::Array<u8, 32>))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1080,12 +1052,12 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnionSize36Alignment4::Variant(
-                            fidl::new_empty!(fidl::encoding::Array<u8, 32>, D),
+                            fidl::new_empty!(fidl::encoding::Array<u8, 32>),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionSize36Alignment4::Variant(ref mut val) = self {
-                        fidl::decode!(fidl::encoding::Array<u8, 32>, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(fidl::encoding::Array<u8, 32>, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -1102,13 +1074,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for UnionSize8Alignment4 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for UnionSize8Alignment4 {
         type Owned = Self;
 
@@ -1122,14 +1087,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for UnionSize8Alignment4 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionSize8Alignment4, D>
-        for &UnionSize8Alignment4
-    {
+    unsafe impl fidl::encoding::Encode<UnionSize8Alignment4> for &UnionSize8Alignment4 {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1137,7 +1108,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnionSize8Alignment4::Variant(ref val) => {
-                    fidl::encoding::encode_in_envelope::<u32, D>(
+                    fidl::encoding::encode_in_envelope::<u32>(
                         <u32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -1148,16 +1119,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionSize8Alignment4 {
+    impl fidl::encoding::Decode<Self> for UnionSize8Alignment4 {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Variant(fidl::new_empty!(u32, D))
+            Self::Variant(fidl::new_empty!(u32))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1191,11 +1162,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = UnionSize8Alignment4::Variant(fidl::new_empty!(u32, D));
+                        *self = UnionSize8Alignment4::Variant(fidl::new_empty!(u32));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionSize8Alignment4::Variant(ref mut val) = self {
-                        fidl::decode!(u32, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(u32, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

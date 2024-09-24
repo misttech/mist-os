@@ -205,13 +205,7 @@ impl FDomainCodec {
         tx_id: NonZeroU32,
         ordinal: u64,
         body: Result<T, E>,
-    ) -> fidl::Result<()>
-where
-    for<'a> <<T as fidl_message::Body>::MarkerInResultUnion as fidl::encoding::ValueTypeMarker>::Borrowed<'a>:
-        fidl::encoding::Encode<T::MarkerInResultUnion, fidl::encoding::NoHandleResourceDialect>,
-    for<'a> <<E as fidl_message::ErrorType>::Marker as fidl::encoding::ValueTypeMarker>::Borrowed<'a>:
-        fidl::encoding::Encode<E::Marker, fidl::encoding::NoHandleResourceDialect>,
-    {
+    ) -> fidl::Result<()> {
         let header = fidl_message::TransactionHeader::new(
             tx_id.into(),
             ordinal,
@@ -225,12 +219,7 @@ where
     /// Encode and enqueue an event message to the client. The `ordinal` field
     /// should correspond correctly to the type of message given by the type
     /// argument.
-    fn send_event<T: fidl_message::Body>(&mut self, ordinal: u64, body: T) -> fidl::Result<()>
-    where
-        for<'a> <<T as fidl_message::Body>::MarkerAtTopLevel as fidl::encoding::ValueTypeMarker>::Borrowed<
-            'a,
-        >: fidl::encoding::Encode<T::MarkerAtTopLevel, fidl::encoding::NoHandleResourceDialect>,
-    {
+    fn send_event<T: fidl_message::Body>(&mut self, ordinal: u64, body: T) -> fidl::Result<()> {
         let header =
             fidl_message::TransactionHeader::new(0, ordinal, fidl_message::DynamicFlags::empty());
         self.enqueue_outgoing(fidl_message::encode_message(header, body)?);

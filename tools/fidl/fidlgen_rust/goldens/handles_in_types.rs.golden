@@ -5,11 +5,15 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use bitflags::bitflags;
-use fidl::client::QueryResponseFut;
-use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
-use futures::future::{self, MaybeDone, TryFutureExt};
+use {
+    bitflags::bitflags,
+    fidl::{
+        client::QueryResponseFut,
+        endpoints::{ControlHandle as _, Responder as _},
+    },
+    fuchsia_zircon_status as zx_status,
+    futures::future::{self, MaybeDone, TryFutureExt},
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -204,16 +208,18 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for ObjType {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
             *value
         }
     }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for ObjType {
+    unsafe impl fidl::encoding::Encode<Self> for ObjType {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -223,7 +229,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ObjType {
+    impl fidl::encoding::Decode<Self> for ObjType {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::None
@@ -232,7 +238,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -241,15 +247,6 @@ mod internal {
 
             *self = Self::from_primitive(prim).ok_or(fidl::Error::InvalidEnumValue)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ResourceTypeMarker for EmptyResourceStruct {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
         }
     }
 
@@ -266,18 +263,20 @@ mod internal {
             1
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for EmptyResourceStruct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<EmptyResourceStruct, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut EmptyResourceStruct
-    {
+    unsafe impl fidl::encoding::Encode<EmptyResourceStruct> for &mut EmptyResourceStruct {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -287,9 +286,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for EmptyResourceStruct
-    {
+    impl fidl::encoding::Decode<Self> for EmptyResourceStruct {
         #[inline(always)]
         fn new_empty() -> Self {
             Self
@@ -298,10 +295,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -310,15 +304,6 @@ mod internal {
                 0 => Ok(()),
                 _ => Err(fidl::Error::Invalid),
             }
-        }
-    }
-
-    impl fidl::encoding::ResourceTypeMarker for HandlesInTypes {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
         }
     }
 
@@ -335,33 +320,75 @@ mod internal {
             96
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for HandlesInTypes {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<HandlesInTypes, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut HandlesInTypes
-    {
+    unsafe impl fidl::encoding::Encode<HandlesInTypes> for &mut HandlesInTypes {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<HandlesInTypes>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<HandlesInTypes, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
+            fidl::encoding::Encode::<HandlesInTypes>::encode(
                 (
-                    <fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.normal_handle),
-                    <fidl::encoding::UnboundedVector<fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.handle_in_vec),
-                    <fidl::encoding::Array<fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, 5> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.handle_in_array),
-                    <fidl::encoding::UnboundedVector<fidl::encoding::Array<fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, 5>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.handle_in_mixed_vec_array),
-                    <TableWithHandle as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.table_with_handle),
-                    <UnionWithHandle as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.union_with_handle),
+                    <fidl::encoding::HandleType<
+                        fidl::Vmo,
+                        { fidl::ObjectType::VMO.into_raw() },
+                        2147483648,
+                    > as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.normal_handle,
+                    ),
+                    <fidl::encoding::UnboundedVector<
+                        fidl::encoding::HandleType<
+                            fidl::Vmo,
+                            { fidl::ObjectType::VMO.into_raw() },
+                            2147483648,
+                        >,
+                    > as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.handle_in_vec,
+                    ),
+                    <fidl::encoding::Array<
+                        fidl::encoding::HandleType<
+                            fidl::Vmo,
+                            { fidl::ObjectType::VMO.into_raw() },
+                            2147483648,
+                        >,
+                        5,
+                    > as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.handle_in_array,
+                    ),
+                    <fidl::encoding::UnboundedVector<
+                        fidl::encoding::Array<
+                            fidl::encoding::HandleType<
+                                fidl::Vmo,
+                                { fidl::ObjectType::VMO.into_raw() },
+                                2147483648,
+                            >,
+                            5,
+                        >,
+                    > as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.handle_in_mixed_vec_array,
+                    ),
+                    <TableWithHandle as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.table_with_handle,
+                    ),
+                    <UnionWithHandle as fidl::encoding::ResourceTypeMarker>::take_or_borrow(
+                        &mut self.union_with_handle,
+                    ),
                 ),
-                encoder, offset, _depth
+                encoder,
+                offset,
+                _depth,
             )
         }
     }
@@ -372,7 +399,6 @@ mod internal {
                     { fidl::ObjectType::VMO.into_raw() },
                     2147483648,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T1: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
@@ -382,7 +408,6 @@ mod internal {
                         2147483648,
                     >,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T2: fidl::encoding::Encode<
                 fidl::encoding::Array<
@@ -393,7 +418,6 @@ mod internal {
                     >,
                     5,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T3: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
@@ -406,20 +430,15 @@ mod internal {
                         5,
                     >,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T4: fidl::encoding::Encode<TableWithHandle, fidl::encoding::DefaultFuchsiaResourceDialect>,
-            T5: fidl::encoding::Encode<UnionWithHandle, fidl::encoding::DefaultFuchsiaResourceDialect>,
-        > fidl::encoding::Encode<HandlesInTypes, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for (T0, T1, T2, T3, T4, T5)
+            T4: fidl::encoding::Encode<TableWithHandle>,
+            T5: fidl::encoding::Encode<UnionWithHandle>,
+        > fidl::encoding::Encode<HandlesInTypes> for (T0, T1, T2, T3, T4, T5)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -445,13 +464,11 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for HandlesInTypes
-    {
+    impl fidl::encoding::Decode<Self> for HandlesInTypes {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                normal_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                normal_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
                 handle_in_vec: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::HandleType<
@@ -459,8 +476,7 @@ mod internal {
                             { fidl::ObjectType::VMO.into_raw() },
                             2147483648,
                         >,
-                    >,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    >
                 ),
                 handle_in_array: fidl::new_empty!(
                     fidl::encoding::Array<
@@ -470,8 +486,7 @@ mod internal {
                             2147483648,
                         >,
                         5,
-                    >,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    >
                 ),
                 handle_in_mixed_vec_array: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
@@ -483,27 +498,17 @@ mod internal {
                             >,
                             5,
                         >,
-                    >,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
+                    >
                 ),
-                table_with_handle: fidl::new_empty!(
-                    TableWithHandle,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                ),
-                union_with_handle: fidl::new_empty!(
-                    UnionWithHandle,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                ),
+                table_with_handle: fidl::new_empty!(TableWithHandle),
+                union_with_handle: fidl::new_empty!(UnionWithHandle),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -527,7 +532,7 @@ mod internal {
                     padding_start: offset + 40 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.normal_handle, decoder, offset + 0, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, &mut self.normal_handle, decoder, offset + 0, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::HandleType<
@@ -536,7 +541,6 @@ mod internal {
                         2147483648,
                     >,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.handle_in_vec,
                 decoder,
                 offset + 8,
@@ -551,7 +555,6 @@ mod internal {
                     >,
                     5,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.handle_in_array,
                 decoder,
                 offset + 24,
@@ -568,7 +571,6 @@ mod internal {
                         5,
                     >,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.handle_in_mixed_vec_array,
                 decoder,
                 offset + 48,
@@ -576,7 +578,6 @@ mod internal {
             )?;
             fidl::decode!(
                 TableWithHandle,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.table_with_handle,
                 decoder,
                 offset + 64,
@@ -584,7 +585,6 @@ mod internal {
             )?;
             fidl::decode!(
                 UnionWithHandle,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.union_with_handle,
                 decoder,
                 offset + 80,
@@ -601,15 +601,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ResourceTypeMarker for EmptyResourceTable {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for EmptyResourceTable {
         type Owned = Self;
 
@@ -623,17 +614,19 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for EmptyResourceTable {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<EmptyResourceTable, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut EmptyResourceTable
-    {
+    unsafe impl fidl::encoding::Encode<EmptyResourceTable> for &mut EmptyResourceTable {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -657,9 +650,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for EmptyResourceTable
-    {
+    impl fidl::encoding::Decode<Self> for EmptyResourceTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -667,10 +658,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -713,15 +701,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ResourceTypeMarker for TableWithHandle {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for TableWithHandle {
         type Owned = Self;
 
@@ -735,17 +714,19 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for TableWithHandle {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<TableWithHandle, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut TableWithHandle
-    {
+    unsafe impl fidl::encoding::Encode<TableWithHandle> for &mut TableWithHandle {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -785,7 +766,6 @@ mod internal {
                     { fidl::ObjectType::VMO.into_raw() },
                     2147483648,
                 >,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
             >(
                 self.h.as_mut().map(
                     <fidl::encoding::HandleType<
@@ -805,9 +785,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for TableWithHandle
-    {
+    impl fidl::encoding::Decode<Self> for TableWithHandle {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -815,10 +793,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -876,8 +851,8 @@ mod internal {
                     inner_depth.increment()?;
                 }
                 let val_ref =
-                self.h.get_or_insert_with(|| fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect));
-                fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, val_ref, decoder, inner_offset, inner_depth)?;
+                self.h.get_or_insert_with(|| fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>));
+                fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -900,15 +875,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ResourceTypeMarker for EmptyResourceUnion {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for EmptyResourceUnion {
         type Owned = Self;
 
@@ -922,18 +888,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for EmptyResourceUnion {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<EmptyResourceUnion, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut EmptyResourceUnion
-    {
+    unsafe impl fidl::encoding::Encode<EmptyResourceUnion> for &mut EmptyResourceUnion {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -945,9 +913,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for EmptyResourceUnion
-    {
+    impl fidl::encoding::Decode<Self> for EmptyResourceUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -956,10 +922,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1005,15 +968,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ResourceTypeMarker for UnionWithHandle {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for UnionWithHandle {
         type Owned = Self;
 
@@ -1027,18 +981,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ResourceTypeMarker for UnionWithHandle {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl
-        fidl::encoding::Encode<UnionWithHandle, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for &mut UnionWithHandle
-    {
+    unsafe impl fidl::encoding::Encode<UnionWithHandle> for &mut UnionWithHandle {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1051,7 +1007,6 @@ mod internal {
                         { fidl::ObjectType::VMO.into_raw() },
                         2147483648,
                     >,
-                    fidl::encoding::DefaultFuchsiaResourceDialect,
                 >(
                     <fidl::encoding::HandleType<
                         fidl::Vmo,
@@ -1069,9 +1024,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
-        for UnionWithHandle
-    {
+    impl fidl::encoding::Decode<Self> for UnionWithHandle {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -1080,10 +1033,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<
-                '_,
-                fidl::encoding::DefaultFuchsiaResourceDialect,
-            >,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1123,12 +1073,12 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnionWithHandle::H(
-                            fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                            fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionWithHandle::H(ref mut val) = self {
-                        fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

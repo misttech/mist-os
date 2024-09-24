@@ -90,26 +90,6 @@ impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ 
 {{- end }}
 
 {{- define "UnionInternal" }}
-{{ $resourceDialectName := "D" }}
-{{ $resourceDialectGeneric := "<D: fidl::encoding::ResourceDialect>" }}
-{{- if .IsResourceType }}
-{{ $resourceDialectName = ResourceDialect }}
-{{ $resourceDialectGeneric = "" }}
-impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
-    type Borrowed<'a> = &'a mut Self;
-    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-        value
-    }
-}
-{{- else }}
-impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
-    type Borrowed<'a> = &'a Self;
-    fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-        value
-    }
-}
-{{- end }}
-
 unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     type Owned = Self;
 
@@ -124,19 +104,35 @@ unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     }
 }
 
-unsafe impl{{ $resourceDialectGeneric }} fidl::encoding::Encode<{{ .Name }}, {{ $resourceDialectName }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
+{{- if .IsResourceType }}
+impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a mut Self;
+    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+{{- else }}
+impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a Self;
+    fn borrow<'a>(value: &'a <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+{{- end }}
+
+unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
     #[inline]
-    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_, {{ $resourceDialectName }}>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
         encoder.debug_check_bounds::<{{ .Name }}>(offset);
         encoder.write_num::<u64>(self.ordinal(), offset);
         match self {
             {{- range .Members }}
             {{ $.Name }}::{{ .Name }}(ref {{ if .Type.IsResourceType }}mut {{ end }}val) => {
-                fidl::encoding::encode_in_envelope::<{{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}>(
+                fidl::encoding::encode_in_envelope::<{{ .Type.Fidl }}>(
                     {{- if .Type.IsResourceType }}
-                    <{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow(val),
+                    <{{ .Type.Fidl }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow(val),
                     {{- else }}
-                    <{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::ValueTypeMarker>::borrow(val),
+                    <{{ .Type.Fidl }} as fidl::encoding::ValueTypeMarker>::borrow(val),
                     {{- end }}
                     encoder, offset + 8, _depth
                 )
@@ -149,18 +145,18 @@ unsafe impl{{ $resourceDialectGeneric }} fidl::encoding::Encode<{{ .Name }}, {{ 
     }
 }
 
-impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDialectName }}> for {{ .Name }} {
+impl fidl::encoding::Decode<Self> for {{ .Name }} {
     #[inline(always)]
     fn new_empty() -> Self {
         {{- if .IsFlexible }}
         Self::__SourceBreaking { unknown_ordinal: 0 }
         {{- else }}
-        Self::{{ (index .Members 0).Name }}(fidl::new_empty!({{ (index .Members 0).Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}))
+        Self::{{ (index .Members 0).Name }}(fidl::new_empty!({{ (index .Members 0).Type.Fidl }}))
         {{- end }}
     }
 
     #[inline]
-    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_, {{ $resourceDialectName }}>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
         #[allow(unused_variables)]
         let next_out_of_line = decoder.next_out_of_line();
@@ -169,7 +165,7 @@ impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDiale
 
         let member_inline_size = match ordinal {
             {{- range .Members }}
-            {{ .Ordinal }} => <{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::TypeMarker>::inline_size(decoder.context),
+            {{ .Ordinal }} => <{{ .Type.Fidl }} as fidl::encoding::TypeMarker>::inline_size(decoder.context),
             {{- end }}
             {{- if .IsFlexible }}
             0 => return Err(fidl::Error::UnknownUnionTag),
@@ -198,11 +194,11 @@ impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDiale
                     // Do nothing, read the value into the object
                 } else {
                     // Initialize `self` to the right variant
-                    *self ={{ $.Name }}::{{ .Name }}(fidl::new_empty!({{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}));
+                    *self ={{ $.Name }}::{{ .Name }}(fidl::new_empty!({{ .Type.Fidl }}));
                 }
                 #[allow(irrefutable_let_patterns)]
                 if let {{ $.Name }}::{{ .Name }}(ref mut val) = self {
-                    fidl::decode!({{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}, val, decoder, _inner_offset, depth)?;
+                    fidl::decode!({{ .Type.Fidl }}, val, decoder, _inner_offset, depth)?;
                 } else {
                     unreachable!()
                 }

@@ -444,11 +444,10 @@ impl futures::Stream for ProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x9b8c7d3d118df13 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req = fidl::new_empty!(ProtocolRequestStrictResponseFlexibleRequest);
+                    fidl::encoding::Decoder::decode_into::<
                         ProtocolRequestStrictResponseFlexibleRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ProtocolRequestStrictResponseFlexibleRequest>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::RequestStrictResponseFlexible {
                         s: req.s,
@@ -461,11 +460,10 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x480c77690533acb7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req = fidl::new_empty!(ProtocolRequestFlexibleResponseStrictRequest);
+                    fidl::encoding::Decoder::decode_into::<
                         ProtocolRequestFlexibleResponseStrictRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ProtocolRequestFlexibleResponseStrictRequest>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::RequestFlexibleResponseStrict {
                         s: req.s,
@@ -697,13 +695,6 @@ impl ProtocolRequestFlexibleResponseStrictResponder {
 mod internal {
     use super::*;
 
-    impl fidl::encoding::ValueTypeMarker for ProtocolRequestFlexibleResponseStrictRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for ProtocolRequestFlexibleResponseStrictRequest {
         type Owned = Self;
 
@@ -717,21 +708,28 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestFlexibleResponseStrictRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictRequest, D>
+    unsafe impl fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictRequest>
         for &ProtocolRequestFlexibleResponseStrictRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ProtocolRequestFlexibleResponseStrictRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ProtocolRequestFlexibleResponseStrictRequest, D>::encode(
+            fidl::encoding::Encode::<ProtocolRequestFlexibleResponseStrictRequest>::encode(
                 (<FlexibleFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.s),),
                 encoder,
                 offset,
@@ -739,13 +737,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<FlexibleFoo, D>>
-        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictRequest, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<FlexibleFoo>>
+        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictRequest> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -758,32 +756,23 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for ProtocolRequestFlexibleResponseStrictRequest
-    {
+    impl fidl::encoding::Decode<Self> for ProtocolRequestFlexibleResponseStrictRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { s: fidl::new_empty!(FlexibleFoo, D) }
+            Self { s: fidl::new_empty!(FlexibleFoo) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(FlexibleFoo, D, &mut self.s, decoder, offset + 0, _depth)?;
+            fidl::decode!(FlexibleFoo, &mut self.s, decoder, offset + 0, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for ProtocolRequestFlexibleResponseStrictResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -800,21 +789,28 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestFlexibleResponseStrictResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictResponse, D>
+    unsafe impl fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictResponse>
         for &ProtocolRequestFlexibleResponseStrictResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ProtocolRequestFlexibleResponseStrictResponse>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ProtocolRequestFlexibleResponseStrictResponse, D>::encode(
+            fidl::encoding::Encode::<ProtocolRequestFlexibleResponseStrictResponse>::encode(
                 (<StrictFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.f),),
                 encoder,
                 offset,
@@ -822,13 +818,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<StrictFoo, D>>
-        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictResponse, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<StrictFoo>>
+        fidl::encoding::Encode<ProtocolRequestFlexibleResponseStrictResponse> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -841,32 +837,23 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for ProtocolRequestFlexibleResponseStrictResponse
-    {
+    impl fidl::encoding::Decode<Self> for ProtocolRequestFlexibleResponseStrictResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { f: fidl::new_empty!(StrictFoo, D) }
+            Self { f: fidl::new_empty!(StrictFoo) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(StrictFoo, D, &mut self.f, decoder, offset + 0, _depth)?;
+            fidl::decode!(StrictFoo, &mut self.f, decoder, offset + 0, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for ProtocolRequestStrictResponseFlexibleRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -883,21 +870,28 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestStrictResponseFlexibleRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleRequest, D>
+    unsafe impl fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleRequest>
         for &ProtocolRequestStrictResponseFlexibleRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ProtocolRequestStrictResponseFlexibleRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ProtocolRequestStrictResponseFlexibleRequest, D>::encode(
+            fidl::encoding::Encode::<ProtocolRequestStrictResponseFlexibleRequest>::encode(
                 (<StrictFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.s),),
                 encoder,
                 offset,
@@ -905,13 +899,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<StrictFoo, D>>
-        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleRequest, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<StrictFoo>>
+        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleRequest> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -924,32 +918,23 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for ProtocolRequestStrictResponseFlexibleRequest
-    {
+    impl fidl::encoding::Decode<Self> for ProtocolRequestStrictResponseFlexibleRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { s: fidl::new_empty!(StrictFoo, D) }
+            Self { s: fidl::new_empty!(StrictFoo) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(StrictFoo, D, &mut self.s, decoder, offset + 0, _depth)?;
+            fidl::decode!(StrictFoo, &mut self.s, decoder, offset + 0, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for ProtocolRequestStrictResponseFlexibleResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -966,21 +951,28 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for ProtocolRequestStrictResponseFlexibleResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleResponse, D>
+    unsafe impl fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleResponse>
         for &ProtocolRequestStrictResponseFlexibleResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ProtocolRequestStrictResponseFlexibleResponse>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ProtocolRequestStrictResponseFlexibleResponse, D>::encode(
+            fidl::encoding::Encode::<ProtocolRequestStrictResponseFlexibleResponse>::encode(
                 (<FlexibleFoo as fidl::encoding::ValueTypeMarker>::borrow(&self.f),),
                 encoder,
                 offset,
@@ -988,13 +980,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<FlexibleFoo, D>>
-        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleResponse, D> for (T0,)
+    unsafe impl<T0: fidl::encoding::Encode<FlexibleFoo>>
+        fidl::encoding::Encode<ProtocolRequestStrictResponseFlexibleResponse> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1007,32 +999,23 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for ProtocolRequestStrictResponseFlexibleResponse
-    {
+    impl fidl::encoding::Decode<Self> for ProtocolRequestStrictResponseFlexibleResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { f: fidl::new_empty!(FlexibleFoo, D) }
+            Self { f: fidl::new_empty!(FlexibleFoo) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(FlexibleFoo, D, &mut self.f, decoder, offset + 0, _depth)?;
+            fidl::decode!(FlexibleFoo, &mut self.f, decoder, offset + 0, _depth)?;
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for FlexibleFoo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -1049,14 +1032,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for FlexibleFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<FlexibleFoo, D>
-        for &FlexibleFoo
-    {
+    unsafe impl fidl::encoding::Encode<FlexibleFoo> for &FlexibleFoo {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1065,7 +1054,6 @@ mod internal {
             match self {
                 FlexibleFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
-                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -1074,7 +1062,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                FlexibleFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
+                FlexibleFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -1085,7 +1073,7 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for FlexibleFoo {
+    impl fidl::encoding::Decode<Self> for FlexibleFoo {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -1094,7 +1082,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1132,14 +1120,12 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            FlexibleFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString, D));
+                        *self = FlexibleFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleFoo::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
-                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -1155,11 +1141,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FlexibleFoo::I(fidl::new_empty!(i32, D));
+                        *self = FlexibleFoo::I(fidl::new_empty!(i32));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleFoo::I(ref mut val) = self {
-                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -1182,13 +1168,6 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::ValueTypeMarker for StrictFoo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for StrictFoo {
         type Owned = Self;
 
@@ -1202,14 +1181,20 @@ mod internal {
             16
         }
     }
+    impl fidl::encoding::ValueTypeMarker for StrictFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StrictFoo, D>
-        for &StrictFoo
-    {
+    unsafe impl fidl::encoding::Encode<StrictFoo> for &StrictFoo {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1218,7 +1203,6 @@ mod internal {
             match self {
                 StrictFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
-                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -1227,7 +1211,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                StrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
+                StrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -1237,16 +1221,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StrictFoo {
+    impl fidl::encoding::Decode<Self> for StrictFoo {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::S(fidl::new_empty!(fidl::encoding::UnboundedString, D))
+            Self::S(fidl::new_empty!(fidl::encoding::UnboundedString))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1283,13 +1267,12 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString, D));
+                        *self = StrictFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictFoo::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
-                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -1305,11 +1288,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictFoo::I(fidl::new_empty!(i32, D));
+                        *self = StrictFoo::I(fidl::new_empty!(i32));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictFoo::I(ref mut val) = self {
-                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

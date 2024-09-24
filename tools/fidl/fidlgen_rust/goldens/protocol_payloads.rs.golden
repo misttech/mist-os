@@ -747,35 +747,39 @@ impl MainProtocolEvent {
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
             0x19fbe2b2f6f9273a => {
-                let mut out = fidl::new_empty!(
+                let mut out =
+                    fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnComposed { a: out.a }))
             }
             0x4745f7438cd80819 => {
-                let mut out = fidl::new_empty!(
-                    LocalStructPayload,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(LocalStructPayload);
+                fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
+                    &tx_header,
+                    _body_bytes,
+                    _handles,
+                    &mut out,
+                )?;
                 Ok((MainProtocolEvent::OnLocal { a: out.a, b: out.b }))
             }
             0x1bb4f4c30b6f8909 => {
-                let mut out = fidl::new_empty!(
+                let mut out =
+                    fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                fidl::encoding::Decoder::decode_into::<
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((MainProtocolEvent::OnImport { a: out.a }))
             }
             0x42d321dacc4df000 => {
-                let mut out = fidl::new_empty!(
-                    MainProtocolOnAnonRequest,
-                    fidl::encoding::DefaultFuchsiaResourceDialect
-                );
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolOnAnonRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(MainProtocolOnAnonRequest);
+                fidl::encoding::Decoder::decode_into::<MainProtocolOnAnonRequest>(
+                    &tx_header,
+                    _body_bytes,
+                    _handles,
+                    &mut out,
+                )?;
                 Ok((MainProtocolEvent::OnAnon { a: out.a, b: out.b }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
@@ -855,21 +859,21 @@ impl futures::Stream for MainProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x241e4384443ccb10 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayComposed { a: req.a, control_handle })
                 }
                 0x2348a1331ca4cfb0 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayComposed {
                         a: req.a,
@@ -882,11 +886,11 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x6a9be48b574d1557 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayComposedWithError {
                         a: req.a,
@@ -899,21 +903,25 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x6b9feaf9305b0715 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(LocalStructPayload);
+                    fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayLocal { a: req.a, b: req.b, control_handle })
                 }
                 0x743776548de3af0f => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(LocalStructPayload);
+                    fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayLocal {
                         a: req.a,
@@ -927,11 +935,13 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x2839c029915cb8fc => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(LocalStructPayload);
+                    fidl::encoding::Decoder::decode_into::<LocalStructPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayLocalWithError {
                         a: req.a,
@@ -945,21 +955,21 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x2e6b091ae4cee40c => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayImport { a: req.a, control_handle })
                 }
                 0x20f4a8f65ff69473 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayImport {
                         a: req.a,
@@ -972,11 +982,11 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x3b7b706d42eb9bbd => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocolpayloads_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
                         fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                    >(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayImportWithError {
                         a: req.a,
@@ -989,21 +999,25 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0xb43565c01ab54ac => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolOneWayAnonRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolOneWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(MainProtocolOneWayAnonRequest);
+                    fidl::encoding::Decoder::decode_into::<MainProtocolOneWayAnonRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::OneWayAnon { a: req.a, b: req.b, control_handle })
                 }
                 0x8bdc969ff7dd759 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolTwoWayAnonRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(MainProtocolTwoWayAnonRequest);
+                    fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayAnon {
                         a: req.a,
@@ -1017,11 +1031,13 @@ impl futures::Stream for MainProtocolRequestStream {
                 }
                 0x5862bf8170c87a36 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolTwoWayAnonWithErrorRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(MainProtocolTwoWayAnonWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
                     Ok(MainProtocolRequest::TwoWayAnonWithError {
                         a: req.a,
@@ -1788,13 +1804,6 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
 mod internal {
     use super::*;
 
-    impl fidl::encoding::ValueTypeMarker for LocalStructPayload {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
     unsafe impl fidl::encoding::TypeMarker for LocalStructPayload {
         type Owned = Self;
 
@@ -1817,14 +1826,20 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for LocalStructPayload {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<LocalStructPayload, D>
-        for &LocalStructPayload
-    {
+    unsafe impl fidl::encoding::Encode<LocalStructPayload> for &LocalStructPayload {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1840,16 +1855,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<LocalStructPayload, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<LocalStructPayload> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1863,16 +1875,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for LocalStructPayload {
+    impl fidl::encoding::Decode<Self> for LocalStructPayload {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1884,13 +1896,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for MainProtocolOnAnonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -1916,14 +1921,20 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolOnAnonRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolOnAnonRequest, D> for &MainProtocolOnAnonRequest
-    {
+    unsafe impl fidl::encoding::Encode<MainProtocolOnAnonRequest> for &MainProtocolOnAnonRequest {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1939,16 +1950,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<MainProtocolOnAnonRequest, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<MainProtocolOnAnonRequest> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1962,18 +1970,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolOnAnonRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolOnAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1985,13 +1991,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for MainProtocolOneWayAnonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -2017,15 +2016,22 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolOneWayAnonRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolOneWayAnonRequest, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolOneWayAnonRequest>
         for &MainProtocolOneWayAnonRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2041,16 +2047,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<MainProtocolOneWayAnonRequest, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<MainProtocolOneWayAnonRequest> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2064,18 +2067,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolOneWayAnonRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolOneWayAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2087,13 +2088,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -2119,15 +2113,22 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonRequest, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonRequest>
         for &MainProtocolTwoWayAnonRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2143,16 +2144,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<MainProtocolTwoWayAnonRequest, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<MainProtocolTwoWayAnonRequest> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2166,18 +2164,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2189,13 +2185,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -2221,15 +2210,22 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonResponse, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonResponse>
         for &MainProtocolTwoWayAnonResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2245,16 +2241,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<MainProtocolTwoWayAnonResponse, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<MainProtocolTwoWayAnonResponse> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2268,18 +2261,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonResponse
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2291,13 +2282,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -2323,15 +2307,22 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorRequest, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorRequest>
         for &MainProtocolTwoWayAnonWithErrorRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2348,16 +2339,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorRequest, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorRequest> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2371,18 +2359,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonWithErrorRequest
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2394,13 +2380,6 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 8);
             }
             Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
         }
     }
 
@@ -2426,15 +2405,22 @@ mod internal {
             true
         }
     }
+    impl fidl::encoding::ValueTypeMarker for MainProtocolTwoWayAnonWithErrorResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow<'a>(
+            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorResponse, D>
+    unsafe impl fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorResponse>
         for &MainProtocolTwoWayAnonWithErrorResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2451,16 +2437,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<
-            D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<u32, D>,
-            T1: fidl::encoding::Encode<u32, D>,
-        > fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorResponse, D> for (T0, T1)
+    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u32>>
+        fidl::encoding::Encode<MainProtocolTwoWayAnonWithErrorResponse> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            encoder: &mut fidl::encoding::Encoder<'_>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2474,18 +2457,16 @@ mod internal {
         }
     }
 
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for MainProtocolTwoWayAnonWithErrorResponse
-    {
+    impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u32, D) }
+            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u32) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            decoder: &mut fidl::encoding::Decoder<'_>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
