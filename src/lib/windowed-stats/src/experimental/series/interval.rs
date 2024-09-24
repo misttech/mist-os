@@ -455,11 +455,10 @@ mod tests {
         let sampling_interval = SamplingInterval::new(120, 6, Duration::from_seconds(10));
         let mut last = ObservationTime {
             last_update_timestamp: Timestamp::from_nanos(71_000_000_000),
-            last_sample_timestamp: Timestamp::from_nanos(-1),
+            last_sample_timestamp: None,
         };
 
         // Tick in the same sampling period that did not have a sample.
-        // (last sample at -1 nano)
         let tick = last.tick(Timestamp::from_nanos(75_000_000_000), true).unwrap();
         let expirations: Vec<_> =
             sampling_interval.fold_and_get_expirations(tick, SAMPLE).collect();
