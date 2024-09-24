@@ -18,34 +18,6 @@
 
 namespace device_enumeration {
 
-void RecursiveWaitForDevfs(const std::string& full_path, size_t slash_index,
-                           fit::function<void()> callback,
-                           std::vector<std::unique_ptr<fsl::DeviceWatcher>>& watchers,
-                           async_dispatcher_t* dispatcher) {
-  if (slash_index == full_path.size()) {
-    fprintf(stderr, "Found %s \n", full_path.c_str());
-    callback();
-    return;
-  }
-
-  const std::string dir_path = full_path.substr(0, slash_index);
-  size_t next_slash = full_path.find('/', slash_index + 1);
-  if (next_slash == std::string::npos) {
-    next_slash = full_path.size();
-  }
-  const std::string file_name = full_path.substr(slash_index + 1, next_slash - (slash_index + 1));
-
-  watchers.push_back(fsl::DeviceWatcher::Create(
-      dir_path,
-      [file_name, full_path, next_slash, callback = std::move(callback), &watchers, dispatcher](
-          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name) mutable {
-        if (name == file_name) {
-          RecursiveWaitForDevfs(full_path, next_slash, std::move(callback), watchers, dispatcher);
-        }
-      },
-      dispatcher));
-}
-
 void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count) {
   async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
 
