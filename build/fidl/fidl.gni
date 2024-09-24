@@ -139,10 +139,12 @@ import("//build/testing/host_test_data.gni")
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
 #
-#   stable (optional flag, default to false)
+#   stable (optional flag)
 #     Whether this library is stabilized.
 #     When true, `versioned` defaults to "fuchsia" and an .api file is
 #     generated. When false, the atom is marked as unstable in the final IDK.
+#     Must be specified when `sdk_category` is defined and not "internal";
+#     otherwise, must not be specified.
 #
 #   applicable_licenses
 #   public_deps

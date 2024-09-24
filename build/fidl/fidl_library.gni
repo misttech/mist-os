@@ -162,6 +162,10 @@ template("fidl_library") {
           (category_allowlist_deps != []),
       "Libraries that require compatibility tests or are publishable in an IDK must be in an allowlist to ensure they are compatibility tested and included in the IDK.")
 
+  assert(
+      requires_compatibility_tests == defined(invoker.stable),
+      "`stable` must be set if and only if the category ('${sdk_category_string_for_assert}') requires compatibility tests.")
+
   stable = defined(invoker.stable) && invoker.stable
 
   # All stable libraries must be included in an SDK [category] and require

@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.metadata") {
   sdk_category = "partner"
+  stable = false
   sdk_area = "Driver SDK"
   sources = [ "fuchsia.driver.metadata.fidl" ]
 
