@@ -17,6 +17,8 @@ impl CompIdent {
     }
 
     /// Returns the library of the identifier.
+    /// TODO(b/369406218): Remove when used
+    #[allow(dead_code)]
     pub fn library(&self) -> &str {
         self.split().0
     }
