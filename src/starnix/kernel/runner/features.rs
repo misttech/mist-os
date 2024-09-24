@@ -111,6 +111,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
             ("enable_suid", _) => features.kernel.enable_suid = true,
+            ("io_uring", _) => features.kernel.io_uring = true,
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }

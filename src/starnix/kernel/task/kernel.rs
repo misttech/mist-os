@@ -69,6 +69,11 @@ pub struct KernelFeatures {
     /// Enabling this feature is potentially a security risk because they allow privilege
     /// escalation.
     pub enable_suid: bool,
+
+    /// Whether io_uring is enabled.
+    ///
+    /// TODO(https://fxbug.dev/297431387): Enabled by default once the feature is completed.
+    pub io_uring: bool,
 }
 
 /// The shared, mutable state for the entire Starnix kernel.
