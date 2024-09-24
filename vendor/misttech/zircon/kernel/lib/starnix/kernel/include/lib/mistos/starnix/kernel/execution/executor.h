@@ -10,6 +10,7 @@
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/types.h>
@@ -102,6 +103,26 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRunFn&& pre_ru
         return fit::ok();
       },
       ktl::move(task_complete));
+}
+
+template <typename E, typename T>
+starnix_syscalls::SyscallResult SyscallResultProxy(fit::result<E, T> result) {
+  return starnix_syscalls::SyscallResult::From(result.value());
+}
+
+template <typename E>
+starnix_syscalls::SyscallResult SyscallResultProxy(fit::result<E> result) {
+  return starnix_syscalls::SyscallResult::From(starnix_syscalls::SUCCESS);
+}
+
+template <typename SyscallFn, typename... Args>
+uint64_t execute_syscall(SyscallFn&& syscall, Args&&... args) {
+  // profile_duration!("ExecuteSyscall");
+  auto result = syscall(std::forward<Args>(args)...);
+  if (result.is_error()) {
+    return result.error_value().return_value();
+  }
+  return SyscallResultProxy(result).value();
 }
 
 }  // namespace starnix
