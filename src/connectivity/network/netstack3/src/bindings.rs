@@ -21,6 +21,7 @@ mod multicast_admin;
 mod name_worker;
 mod neighbor_worker;
 mod netdevice_worker;
+mod power;
 mod resource_removal;
 mod root_fidl_worker;
 mod routes;
@@ -142,11 +143,13 @@ mod ctx {
 
     impl Ctx {
         fn new(
+            config: GlobalConfig,
             routes_change_sink: routes::ChangeSink,
             resource_removal: ResourceRemovalSink,
             multicast_admin: MulticastAdminEventSinks,
         ) -> Self {
             let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(
+                config,
                 routes_change_sink,
                 resource_removal,
                 multicast_admin,
@@ -207,15 +210,16 @@ mod ctx {
         pub(crate) multicast_admin_workers: MulticastAdminWorkers,
     }
 
-    impl Default for NetstackSeed {
-        fn default() -> Self {
+    impl NetstackSeed {
+        pub(crate) fn new(config: GlobalConfig) -> Self {
             let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
                 interfaces_watcher::Worker::new();
             let (routes_change_sink, routes_change_runner) = routes::create_sink_and_runner();
             let (resource_removal_worker, resource_removal_sink) = ResourceRemovalWorker::new();
             let (multicast_admin_workers, multicast_admin_sinks) =
                 multicast_admin::new_workers_and_sinks();
-            let ctx = Ctx::new(routes_change_sink, resource_removal_sink, multicast_admin_sinks);
+            let ctx =
+                Ctx::new(config, routes_change_sink, resource_removal_sink, multicast_admin_sinks);
             let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
                 neighbor_worker::new_worker();
             Self {
@@ -228,6 +232,12 @@ mod ctx {
                 resource_removal_worker,
                 multicast_admin_workers,
             }
+        }
+    }
+
+    impl Default for NetstackSeed {
+        fn default() -> Self {
+            Self::new(Default::default())
         }
     }
 }
@@ -301,16 +311,24 @@ const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
 /// The value is currently kept in sync with the Netstack2 implementation.
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
+/// Global stack configuration.
+#[derive(Debug, Default)]
+pub(crate) struct GlobalConfig {
+    pub(crate) suspend_enabled: bool,
+}
+
 pub(crate) struct BindingsCtxInner {
     timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
     resource_removal: ResourceRemovalSink,
     multicast_admin: MulticastAdminEventSinks,
+    config: GlobalConfig,
 }
 
 impl BindingsCtxInner {
     fn new(
+        config: GlobalConfig,
         routes_change_sink: routes::ChangeSink,
         resource_removal: ResourceRemovalSink,
         multicast_admin: MulticastAdminEventSinks,
@@ -321,6 +339,7 @@ impl BindingsCtxInner {
             routes: routes_change_sink,
             resource_removal,
             multicast_admin,
+            config,
         }
     }
 }

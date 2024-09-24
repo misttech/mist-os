@@ -12,7 +12,7 @@ use super::DeviceIdExt;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use futures::future::FusedFuture;
-use futures::{FutureExt as _, StreamExt as _};
+use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use net_types::ethernet::Mac;
 use net_types::ip::{IpAddr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
@@ -28,6 +28,7 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon as zx,
 };
 
+use crate::bindings::power::TransmitSuspensionHandler;
 use crate::bindings::util::NeedsDataNotifier;
 use crate::bindings::{interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx};
 
@@ -289,16 +290,41 @@ pub(crate) async fn tx_task(
 ) -> Result<(), TxTaskError> {
     let mut yield_fut = futures::future::OptionFuture::default();
     let mut task_state = TxTaskState::default();
+    let mut suspension_handler = TransmitSuspensionHandler::new(&ctx, device_id.clone()).await;
     loop {
+        enum Action<S> {
+            TxAvailable,
+            Suspension(S),
+        }
         // Loop while we are woken up to handle enqueued TX packets.
-        let r = futures::select! {
-            w = watcher.next().fuse() => w,
-            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
+        let action = futures::select_biased! {
+            s = suspension_handler.wait().fuse() => Action::Suspension(s),
+            w = watcher.next().fuse() => match w {
+                Some(()) => Action::TxAvailable,
+                // Notifying watcher is closed, ok to break.
+                None => break Ok(()),
+            },
+            y = yield_fut => {
+                let () = y.expect("OptionFuture is only selected when non-empty");
+                Action::TxAvailable
+            }
         };
 
-        let device_id = match r.and_then(|()| device_id.upgrade()) {
-            Some(d) => d,
-            None => break Ok(()),
+        let device_id = match action {
+            Action::TxAvailable => match device_id.upgrade() {
+                Some(d) => d,
+                // Device was removed from the stack, ok to break.
+                None => break Ok(()),
+            },
+            Action::Suspension(s) => {
+                match futures::future::ready(s).and_then(|s| s.handle_suspension()).await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        suspension_handler.disable(e);
+                    }
+                }
+                continue;
+            }
         };
 
         let batch_size = match device_id.external_state() {

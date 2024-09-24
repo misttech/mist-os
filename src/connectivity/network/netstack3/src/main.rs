@@ -14,7 +14,7 @@ use std::num::NonZeroU8;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use log::info;
 
-use bindings::{InspectPublisher, NetstackSeed, Service};
+use bindings::{GlobalConfig, InspectPublisher, NetstackSeed, Service};
 
 /// Runs Netstack3.
 pub fn main() {
@@ -35,9 +35,6 @@ pub fn main() {
     diagnostics_log::initialize(log_options).expect("failed to initialize log");
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-
-    // TODO(https://fxbug.dev/367333990): Wire up suspend enablement.
-    let _ = suspend_enabled;
 
     info!("starting netstack3 with {config:?}");
 
@@ -81,7 +78,7 @@ pub fn main() {
         .add_fidl_service(Service::NeighborController)
         .add_fidl_service(Service::Verifier);
 
-    let seed = NetstackSeed::default();
+    let seed = NetstackSeed::new(GlobalConfig { suspend_enabled: *suspend_enabled });
 
     let inspect_publisher = InspectPublisher::new();
     inspect_publisher

@@ -71,6 +71,13 @@ tests = [
     package_deps = [ "//src/sys/stash:stash_secure_v2" ]
   },
   {
+    label = "power"
+    package_deps = [
+      "//src/power/broker:component",
+      "//src/power/system-activity-governor/fake:component",
+    ]
+  },
+  {
     label = "product-flow"
     err_logs = true
     package_deps = [

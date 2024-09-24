@@ -18,6 +18,8 @@ fidl("fuchsia.power.broker") {
     "//sdk/fidl/fuchsia.power.topology.test/*:*",
     "//sdk/fidl/fuchsia.session.power/*:*",
     "//sdk/lib/driver/power/cpp/*:*",
+    "//src/connectivity/network/netstack3:*",
+    "//src/connectivity/network/tests/integration/power:*",
     "//src/developer/forensics/*:*",
     "//src/devices/block/drivers/aml-sdmmc/*:*",
     "//src/devices/block/drivers/sdmmc/*:*",
