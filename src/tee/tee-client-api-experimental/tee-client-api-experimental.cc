@@ -22,7 +22,7 @@
 #include <cstring>
 #include <mutex>
 #include <string_view>
-#include <type_traits>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -78,7 +78,6 @@ struct UuidEqualityComparator {
 // that backs the context implementation.
 class AppContainer {
  public:
-  using App = fidl::ClientEnd<fuchsia_tee::Application>;
   using Uuid = fuchsia_tee::wire::Uuid;
 
   static void InitInContext(TEEC_Context& context) {
@@ -89,22 +88,20 @@ class AppContainer {
     return reinterpret_cast<AppContainer*>(context.imp.uuid_to_channel);
   }
 
-  void Insert(const Uuid& uuid, App app) {
-    std::lock_guard lock(m_);
-    ZX_DEBUG_ASSERT(!apps_.contains(uuid));
-    apps_[uuid] = std::move(app);
-  }
+  [[nodiscard]] std::lock_guard<std::mutex> lock() FIT_ACQUIRE(m_) { return std::lock_guard{m_}; }
 
-  // A callback callable on `const App*` is expected, which will have the
-  // associated application endpoint passed to it if it exists (or nullptr
-  // otherwise).
-  template <typename ContainerCallback>
-  auto Get(const Uuid& uuid, ContainerCallback&& cb)
-      -> std::decay_t<decltype(cb(std::declval<const App*>()))> {
-    static_assert(std::is_invocable_v<ContainerCallback, const App*>);
-    std::lock_guard lock(m_);
+  // Attempts to connect to the associated app.
+  zx::result<fidl::UnownedClientEnd<fuchsia_tee::Application>> Connect(const Uuid& uuid)
+      FIT_REQUIRES(m_) {
     auto it = apps_.find(uuid);
-    return cb(it == apps_.end() ? nullptr : &it->second);
+    if (it == apps_.end()) {
+      auto result = component::Connect<fuchsia_tee::Application>(AppConnectionPath(uuid));
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      std::tie(it, std::ignore) = apps_.emplace(uuid, std::move(result).value());
+    }
+    return zx::ok(it->second.borrow());
   }
 
   void Delete(const Uuid& uuid) {
@@ -115,20 +112,21 @@ class AppContainer {
   }
 
  private:
+  static std::string AppConnectionPath(const Uuid& uuid) {
+    constexpr const char* kPathFormat = "/ta/%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x/%s";
+
+    return fxl::StringPrintf(kPathFormat, uuid.time_low, uuid.time_mid, uuid.time_hi_and_version,
+                             uuid.clock_seq_and_node[0], uuid.clock_seq_and_node[1],
+                             uuid.clock_seq_and_node[2], uuid.clock_seq_and_node[3],
+                             uuid.clock_seq_and_node[4], uuid.clock_seq_and_node[5],
+                             uuid.clock_seq_and_node[6], uuid.clock_seq_and_node[7],
+                             fidl::DiscoverableProtocolName<fuchsia_tee::Application>);
+  }
   std::mutex m_;
-  std::unordered_map<Uuid, App, std::hash<Uuid>, UuidEqualityComparator> apps_ FIT_GUARDED(m_);
+  std::unordered_map<Uuid, fidl::ClientEnd<fuchsia_tee::Application>, std::hash<Uuid>,
+                     UuidEqualityComparator>
+      apps_ FIT_GUARDED(m_);
 };
-
-std::string GetApplicationDirectoryPath(const fuchsia_tee::wire::Uuid& app_uuid) {
-  constexpr const char* kPathFormat = "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x";
-
-  return fxl::StringPrintf(kPathFormat, app_uuid.time_low, app_uuid.time_mid,
-                           app_uuid.time_hi_and_version, app_uuid.clock_seq_and_node[0],
-                           app_uuid.clock_seq_and_node[1], app_uuid.clock_seq_and_node[2],
-                           app_uuid.clock_seq_and_node[3], app_uuid.clock_seq_and_node[4],
-                           app_uuid.clock_seq_and_node[5], app_uuid.clock_seq_and_node[6],
-                           app_uuid.clock_seq_and_node[7]);
-}
 
 constexpr uint32_t GetParamTypeForIndex(uint32_t param_types, size_t index) {
   constexpr uint32_t kBitsPerParamType = 4;
@@ -674,25 +672,6 @@ fidl::UnownedClientEnd<fuchsia_tee::Application> GetApplicationFromSession(TEEC_
   return fidl::UnownedClientEnd<fuchsia_tee::Application>(session->imp.application_channel);
 }
 
-// Opens a connection to a `fuchsia.tee.Application` via the directory.
-TEEC_Result ConnectApplicationViaDirectory(const fuchsia_tee::wire::Uuid& app_uuid,
-                                           fidl::ClientEnd<fuchsia_tee::Application>* out_app) {
-  ZX_DEBUG_ASSERT(out_app);
-
-  std::string connection_path_base = "/ta/" + GetApplicationDirectoryPath(app_uuid);
-
-  std::string connection_path =
-      connection_path_base + "/" + fidl::DiscoverableProtocolName<fuchsia_tee::Application>;
-
-  auto application = component::Connect<fuchsia_tee::Application>(connection_path);
-  if (!application.is_ok()) {
-    return TEEC_ERROR_COMMUNICATION;
-  }
-
-  *out_app = std::move(application.value());
-  return TEEC_SUCCESS;
-}
-
 TEEC_Result ConnectApplication(const fuchsia_tee::wire::Uuid& uuid, TEEC_Context* context,
                                fidl::UnownedClientEnd<fuchsia_tee::Application>* out_app) {
   ZX_DEBUG_ASSERT(context);
@@ -703,30 +682,12 @@ TEEC_Result ConnectApplication(const fuchsia_tee::wire::Uuid& uuid, TEEC_Context
     return TEEC_ERROR_BAD_PARAMETERS;
   }
 
-  auto connect_to_existing = [out_app](const auto* app) -> bool {
-    if (app) {
-      *out_app = app->borrow();
-    }
-    return app;
-  };
-  if (apps->Get(uuid, connect_to_existing)) {
-    return TEEC_SUCCESS;
+  std::lock_guard lock = apps->lock();
+  zx::result result = apps->Connect(uuid);
+  if (result.is_error()) {
+    return TEEC_ERROR_COMMUNICATION;
   }
-
-  // This is a new connection to this application, so a new connection must be made.
-  fidl::ClientEnd<fuchsia_tee::Application> app_owned;
-
-  TEEC_Result result = ConnectApplicationViaDirectory(uuid, &app_owned);
-
-  if (result != TEEC_SUCCESS) {
-    return result;
-  }
-
-  *out_app = app_owned.borrow();
-
-  // Stash the client end into the `uuid_to_app` for ownership and future use.
-  apps->Insert(uuid, std::move(app_owned));
-
+  *out_app = result.value();
   return TEEC_SUCCESS;
 }
 
