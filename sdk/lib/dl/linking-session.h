@@ -10,6 +10,8 @@
 #include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
 
+#include <ranges>
+
 #include "diagnostics.h"
 #include "runtime-module.h"
 
@@ -34,7 +36,21 @@ class LinkingSession {
 
   template <typename RetrieveFile>
   bool Link(Diagnostics& diag, Soname soname, RetrieveFile&& retrieve_file) {
-    return Load(diag, soname, std::forward<RetrieveFile>(retrieve_file)) && Relocate(diag);
+    if (!Load(diag, soname, std::forward<RetrieveFile>(retrieve_file))) {
+      return false;
+    }
+    // The root module for the dlopen-ed file is always the first module
+    // enqueued in this list.
+    const RuntimeModule& root_module = runtime_modules_.front();
+    // Traverse the root module's dependency graph to construct the BFS-ordered
+    // resolution list used for relocations. On success, persist the list to
+    // the root module for future lookups by dlsym(), etc.
+    if (auto resolution_list = TraverseDeps(diag, root_module)) {
+      // TODO(https://fxbug.dev/354786114): Persist the root_module's dependency
+      // list.
+      return Relocate(diag, *resolution_list);
+    }
+    return false;
   }
 
   // The caller calls Commit() to finalize the LinkingSession after it has
@@ -118,20 +134,17 @@ class LinkingSession {
   }
 
   bool EnqueueModule(Diagnostics& diag, Soname soname) {
-    if (std::find(session_modules_.begin(), session_modules_.end(), soname) !=
+    if (std::ranges::find(session_modules_, soname, &SessionModule::name) !=
         session_modules_.end()) {
       // The module was already added to session_modules_ in this LinkingSession.
       return true;
     }
 
-    // TODO(https://fxbug.dev/333573264): Check if the module was already
-    // loaded by a previous dlopen call or at startup and use that reference
-    // instead.
-
-    // TODO(https://fxbug.dev/338229987): This is just to make sure we're not
-    // exercising deps from modules already loaded yet.
-    assert(std::find(loaded_modules_.begin(), loaded_modules_.end(), soname) ==
-           loaded_modules_.end());
+    if (std::ranges::find(loaded_modules_, soname, &RuntimeModule::name) != loaded_modules_.end()) {
+      // The module was already loaded at startup or by a LinkingSession from a
+      // previous dlopen() call.
+      return true;
+    }
 
     fbl::AllocChecker module_ac;
     auto module = RuntimeModule::Create(module_ac, soname);
@@ -152,16 +165,97 @@ class LinkingSession {
     return true;
   }
 
-  // TODO(https://fxbug.dev/324136831): Include global modules.
+  // Traverse the root module's dependencies in a breadth-first order, and
+  // return an ordered list of traversed modules to the caller. A reference to
+  // the root module is the first element in the returned list.
+  std::optional<ModuleRefList> TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module) {
+    ModuleRefList ordered_queue;
+
+    auto enqueue = [&diag, &ordered_queue](const RuntimeModule& module) -> bool {
+      // Skip if the module has already been enqueued, preventing circular
+      // dependencies.
+      if (std::ranges::find(ordered_queue, module.name(), &RuntimeModule::name) !=
+          ordered_queue.end()) {
+        return true;
+      }
+      return ordered_queue.push_back(diag, "module dependencies list", &module);
+    };
+
+    if (!enqueue(root_module)) {
+      return {};
+    }
+
+    // Enqueue the dependencies of the `current_module`.
+    auto enqueue_deps = [this, &enqueue](const RuntimeModule& current_module) -> bool {
+      auto enqueue_session_deps = [&](const SessionModule& session_module) {
+        for (Soname dep_name : session_module.dep_names()) {
+          // If the dep was created in this LinkingSession, enqueue its
+          // RuntimeModule reference taken from the LinkingSession.
+          if (auto it = std::ranges::find(runtime_modules_, dep_name, &RuntimeModule::name);
+              it != runtime_modules_.end()) {
+            if (!enqueue(*it)) {
+              return false;
+            }
+            continue;
+          }
+
+          // If there is not a SessionModule for this `dep_name`, then the dep
+          // must already be loaded. Locate the RuntimeModule for `dep_name`
+          // from `loaded_modules_` to enqueue onto the BFS ordered list.
+          auto it = std::ranges::find(loaded_modules_, dep_name, &RuntimeModule::name);
+          assert(it != loaded_modules_.end());
+          if (!enqueue(*it)) {
+            return false;
+          }
+        }
+        return true;
+      };
+
+      // If `current_module` was created by this LinkingSession, enqueue the
+      // RuntimeModule of each DT_NEEDED entry.
+      if (auto it =
+              std::ranges::find(session_modules_, current_module.name(), &SessionModule::name);
+          it != session_modules_.end()) {
+        return enqueue_session_deps(*it);
+      }
+
+      // TODO(https://fxbug.dev/354786114): If the current_module was already
+      // loaded, enqueue the module's immediate dependencies.
+      // Note: We cannot enqueue all of the current_module's dependencies, only
+      // the dependencies that belong to the first level of the dep tree (i.e.
+      // its immediate deps) so that we can preserve the BFS shape of the
+      // tree. For now, return true, until we delineate the top-level subset of
+      // the module's dependency tree.
+      return true;
+    };
+
+    // Build the BFS-ordered queue: an indexed-for-loop iterates over the list
+    // since it can be invalidated as modules are enqueued.
+    for (size_t i = 0; i < ordered_queue.size(); ++i) {
+      if (!enqueue_deps(*ordered_queue[i])) {
+        return {};
+      }
+    }
+
+    return std::move(ordered_queue);
+  }
+
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
-  bool Relocate(Diagnostics& diag) {
-    auto relocate_and_relro = [&](auto& session_module) -> bool {
+  bool Relocate(Diagnostics& diag, const ModuleRefList& resolution_list) {
+    // TODO(https://fxbug.dev/324136831): Include global modules.
+    // Relocate() expects a container of references.
+    auto resolution_list_view = std::views::transform(
+        resolution_list,
+        [](const RuntimeModule* module) -> const RuntimeModule& { return *module; });
+
+    auto relocate_and_relro = [&](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, session_modules_) && session_module.ProtectRelro(diag);
+      return session_module.Relocate(diag, resolution_list_view) &&
+             session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
                        relocate_and_relro);
@@ -289,10 +383,11 @@ class LinkingSession<Loader>::SessionModule
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // ordered list of modules as needed.
-  bool Relocate(Diagnostics& diag, const SessionModuleList& ordered_modules) {
+  bool Relocate(Diagnostics& diag, const auto& ordered_modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
-    auto resolver = elfldltl::MakeSymbolResolver(*this, ordered_modules, diag, kNoTlsDesc);
+    auto resolver =
+        elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag, kNoTlsDesc);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
            elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
                                       resolver);
@@ -302,6 +397,8 @@ class LinkingSession<Loader>::SessionModule
   bool ProtectRelro(Diagnostics& diag) { return std::move(relro_).Commit(diag); }
 
   const Vector<Soname>& dep_names() const { return dep_names_; }
+
+  const RuntimeModule& runtime_module() const { return runtime_module_; }
 
  private:
   // A SessionModule can only be created with SessionModule::Create...).

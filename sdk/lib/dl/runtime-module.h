@@ -8,6 +8,7 @@
 #include <lib/elfldltl/alloc-checker-container.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/ld/abi.h>
 #include <lib/ld/load.h>  // For ld::AbiModule
 
 #include <fbl/alloc_checker.h>
@@ -30,6 +31,9 @@ using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<RuntimeModule>>;
 // return a boolean value to signify allocation success or failure.
 template <typename T>
 using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
+
+// A list of valid non-owning references to RuntimeModules.
+using ModuleRefList = Vector<const RuntimeModule*>;
 
 // TODO(https://fxbug.dev/324136831): comment on how RuntimeModule relates to
 // startup modules when the latter is supported.
@@ -56,6 +60,8 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   using Addr = Elf::Addr;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
   using AbiModule = ld::AbiModule<>;
+  using TlsModule = ld::abi::Abi<>::TlsModule;
+  using size_type = Elf::size_type;
 
   // Not copyable, but movable.
   RuntimeModule(const RuntimeModule&) = delete;
@@ -94,6 +100,12 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
 
+  size_type tls_module_id() const { return abi_module_.tls_modid; }
+
+  constexpr bool uses_static_tls() const { return ld::ModuleUsesStaticTls(abi_module_); }
+
+  constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+
  private:
   // A RuntimeModule can only be created with Module::Create...).
   RuntimeModule() = default;
@@ -102,6 +114,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   Soname name_;
   AbiModule abi_module_;
+  size_type static_tls_bias_ = 0;
 };
 
 }  // namespace dl

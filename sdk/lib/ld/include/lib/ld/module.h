@@ -222,6 +222,12 @@ constexpr Writer& ModuleSymbolizerContext(
   return writer;
 }
 
+template <class Module>
+constexpr bool ModuleUsesStaticTls(const Module& module) {
+  return (module.symbols.flags() & elfldltl::ElfDynFlags::kStaticTls) ||
+         (module.symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
+}
+
 }  // namespace ld
 
 #endif  // LIB_LD_MODULE_H_

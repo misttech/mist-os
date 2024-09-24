@@ -251,10 +251,7 @@ class LoadModule {
     return module().link_map.addr;
   }
 
-  constexpr bool uses_static_tls() const {
-    return (module().symbols.flags() & elfldltl::ElfDynFlags::kStaticTls) ||
-           (module().symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
-  }
+  constexpr bool uses_static_tls() const { return ld::ModuleUsesStaticTls(module()); }
 
   // This is only provided when Decoded is mutable.  In that case, SetTls
   // installs the actual TLS module ID and this will return it.  When Decoded
