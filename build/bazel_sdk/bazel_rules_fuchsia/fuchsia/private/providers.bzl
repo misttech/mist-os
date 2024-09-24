@@ -26,6 +26,7 @@ FuchsiaComponentInfo = provider(
         "name": "name of the component",
         "manifest": "A file representing the compiled component manifest file",
         "resources": "any additional resources the component needs",
+        "moniker": "The moniker to run the non-driver, non-test, non-session component in",
         "is_driver": "True if this is a driver",
         "is_test": "True if this is a test component",
         "run_tag": "A tag used to identify the component when put in a package to be later used by the run command",
