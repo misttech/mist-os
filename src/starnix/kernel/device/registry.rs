@@ -31,11 +31,15 @@ const BLKDEV_MINOR_MAX: u32 = 2u32.pow(20);
 /// The mode or category of the device driver.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub enum DeviceMode {
+    /// This device is a character device.
     Char,
+
+    /// This device is a block device.
     Block,
 }
 
 impl DeviceMode {
+    /// The number of minor device numbers available for this device mode.
     fn minor_count(&self) -> u32 {
         match self {
             Self::Char => CHRDEV_MINOR_MAX,
@@ -43,12 +47,17 @@ impl DeviceMode {
         }
     }
 
+    /// The range of minor device numbers available for this device mode.
     pub fn minor_range(&self) -> Range<u32> {
         0..self.minor_count()
     }
 }
 
 pub trait DeviceOps: DynClone + Send + Sync + 'static {
+    /// Instantiate a FileOps for this device.
+    ///
+    /// This function is called when userspace opens a file with a `DeviceType`
+    /// assigned to this device.
     fn open(
         &self,
         _locked: &mut Locked<'_, DeviceOpen>,
@@ -123,8 +132,14 @@ pub trait DeviceListener: Send + Sync {
     fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext);
 }
 
+/// An entry in the `DeviceRegistry`.
 struct DeviceEntry {
+    /// The name of the device.
+    ///
+    /// This name is the same as the name of the KObject for the device.
     name: FsString,
+
+    /// The ops used to open the device.
     ops: Arc<dyn DeviceOps>,
 }
 
@@ -134,13 +149,31 @@ impl DeviceEntry {
     }
 }
 
+/// The devices registered for a given `DeviceMode`.
+///
+/// Each `DeviceMode` has its own namespace of registered devices.
 #[derive(Default)]
 struct RegisteredDevices {
+    /// The major devices registered for this device mode.
+    ///
+    /// Typically the devices registered here will add and remove individual devices using the
+    /// `add_device` and `remove_device` functions on `DeviceRegistry`.
+    ///
+    /// A major device registration shadows any minor device registrations for the same major
+    /// device number. We might need to reconsider this choice in the future in order to make
+    /// the /proc/devices file correctly list major devices such as `misc`.
     majors: BTreeMap<u32, DeviceEntry>,
+
+    /// Individually registered minor devices.
+    ///
+    /// These devices are registered using the `register_device` function on `DeviceRegistry`.
     minors: BTreeMap<DeviceType, DeviceEntry>,
 }
 
 impl RegisteredDevices {
+    /// Register a major device.
+    ///
+    /// Returns `EINVAL` if the major device is already registered.
     fn register_major(&mut self, major: u32, entry: DeviceEntry) -> Result<(), Errno> {
         if let Entry::Vacant(slot) = self.majors.entry(major) {
             slot.insert(entry);
@@ -150,10 +183,19 @@ impl RegisteredDevices {
         }
     }
 
+    /// Register a minor device.
+    ///
+    /// Overwrites any existing minor device registered with the given `DeviceType`.
     fn register_minor(&mut self, device_type: DeviceType, entry: DeviceEntry) {
         self.minors.insert(device_type, entry);
     }
 
+    /// Get the ops for a given `DeviceType`.
+    ///
+    /// If there is a major device registered with the major device number of the
+    /// `DeviceType`, the ops for that major device will be returned. Otherwise,
+    /// if there is a minor device registered, the ops for that minor device will be
+    /// returned. Otherwise, returns `ENODEV`.
     fn get(&self, device_type: DeviceType) -> Result<Arc<dyn DeviceOps>, Errno> {
         if let Some(major_device) = self.majors.get(&device_type.major()) {
             Ok(Arc::clone(&major_device.ops))
@@ -164,10 +206,12 @@ impl RegisteredDevices {
         }
     }
 
+    /// Returns a list of the registered major device numbers and their names.
     fn list_major_devices(&self) -> Vec<(u32, FsString)> {
         self.majors.iter().map(|(major, entry)| (*major, entry.name.clone())).collect()
     }
 
+    /// Returns a list of the registered minor devices and their names.
     fn list_minor_devices(&self, range: Range<DeviceType>) -> Vec<(DeviceType, FsString)> {
         self.minors
             .range(range)
@@ -176,23 +220,56 @@ impl RegisteredDevices {
     }
 }
 
+/// The registry for devices.
+///
+/// Devices are specified in file systems with major and minor device numbers, together referred to
+/// as a `DeviceType`. When userspace opens one of those files, we look up the `DeviceType` in the
+/// device registry to instantiate a file for that device.
+///
+/// The `DeviceRegistry` also manages the `KObjectStore`, which provides metadata for devices via
+/// the sysfs file system, typically mounted at /sys.
 pub struct DeviceRegistry {
+    /// The KObjects for registered devices.
     pub objects: KObjectStore,
+
+    /// Mutable state for the device registry.
     state: Mutex<DeviceRegistryState>,
 }
 struct DeviceRegistryState {
+    /// The registered character devices.
     char_devices: RegisteredDevices,
+
+    /// The registered block devices.
     block_devices: RegisteredDevices,
 
+    /// Some of the misc devices (devices with the `MISC_MAJOR` major number) are dynamically
+    /// allocated. This allocator keeps track of which device numbers have been allocated to
+    /// such devices.
     misc_chardev_allocator: DeviceTypeAllocator,
+
+    /// A range of large major device numbers are reserved for other dynamically allocated
+    /// devices. This allocator keeps track of which device numbers have been allocated to
+    /// such devices.
     dyn_chardev_allocator: DeviceTypeAllocator,
+
+    /// The next anonymous device number to assign to a file system.
     next_anon_minor: u32,
+
+    /// Listeners registered to learn about new devices being added to the registry.
+    ///
+    /// These listeners generate uevents for those devices, which populates /dev on some
+    /// systems.
     listeners: BTreeMap<u64, Box<dyn DeviceListener>>,
+
+    /// The next identifier to use for a listener.
     next_listener_id: u64,
+
+    /// The next event identifier to use when notifying listeners.
     next_event_id: u64,
 }
 
 impl DeviceRegistry {
+    /// Notify devfs and listeners that a device has been added to the registry.
     fn notify_device<L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -207,6 +284,52 @@ impl DeviceRegistry {
         self.dispatch_uevent(UEventAction::Add, device);
     }
 
+    /// Register a device with the `DeviceRegistry`.
+    ///
+    /// If you are registering a device that exists in other systems, please check the metadata
+    /// for that device in /sys and make sure you use the same properties when calling this
+    /// function because these value are visible to userspace.
+    ///
+    /// For example, a typical device will appear in sysfs at a path like:
+    ///
+    ///   `/sys/devices/{bus}/{class}/{name}`
+    ///
+    /// Many common classes have convenient accessors on `DeviceRegistry::objects`.
+    ///
+    /// To fill out the `DeviceMetadata`, look at the `uevent` file:
+    ///
+    ///   `/sys/devices/{bus}/{class}/{name}/uevent`
+    ///
+    /// which as the following format:
+    ///
+    /// ```
+    ///   MAJOR={major-number}
+    ///   MINOR={minor-number}
+    ///   DEVNAME={devname}
+    ///   DEVMODE={devmode}
+    /// ```
+    ///
+    /// Often, the `{name}` and the `{devname}` are the same, but if they are not the same,
+    /// please take care to use the correct string in the correct field.
+    ///
+    /// If the `{major-number}` is 10 and the `{minor-number}` is in the range 52..128, please use
+    /// `register_misc_device` instead because these device numbers are dynamically allocated.
+    ///
+    /// If the `{major-number}` is in the range 234..255, please use `register_dyn_device` instead
+    /// because these device are also dynamically allocated.
+    ///
+    /// If you are unsure which device numbers to use, consult devices.txt:
+    ///
+    ///   https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
+    ///
+    /// If you are still unsure, please ask an experienced Starnix contributor rather than make up
+    /// a device number.
+    ///
+    /// For most devices, the `create_device_sysfs_ops` parameter should be
+    /// `DeviceDirectory::new`, but some devices have custom directories in sysfs.
+    ///
+    /// Finally, the `dev_ops` parameter is where you provide the callback for instantiating
+    /// your device.
     pub fn register_device<F, N, L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -229,6 +352,13 @@ impl DeviceRegistry {
         device
     }
 
+    /// Register a dynamic device in the `MISC_MAJOR` major device number.
+    ///
+    /// MISC devices (major number 10) with minor numbers in the range 52..128 are dynamically
+    /// assigned. Rather than hardcoding registrations with these device numbers, use this
+    /// function instead to register the device.
+    ///
+    /// See `register_device` for an explanation of the parameters.
     pub fn register_misc_device<L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -252,6 +382,16 @@ impl DeviceRegistry {
         ))
     }
 
+    /// Register a dynamic device with major numbers 234..255.
+    ///
+    /// Majors device numbers 234..255 are dynamically assigned. Rather than hardcoding
+    /// registrations with these device numbers, use this function instead to register the device.
+    ///
+    /// Note: We do not currently allocate from this entire range because we have mistakenly
+    /// hardcoded some device registrations from the dynamic range. Once we fix these regirations
+    /// to be dynamic, we should expand to using the full dynamic range.
+    ///
+    /// See `register_device` for an explanation of the parameters.
     pub fn register_dyn_device<F, N, L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -279,6 +419,13 @@ impl DeviceRegistry {
         ))
     }
 
+    /// Directly add a device to the KObjectStore.
+    ///
+    /// This function should be used only by device that have registered an entire major device
+    /// number. If you want to add a single minor device, use the `register_device` function
+    /// instead.
+    ///
+    /// See `register_device` for an explanation of the parameters.
     pub fn add_device<F, N, L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -299,6 +446,10 @@ impl DeviceRegistry {
         device
     }
 
+    /// Remove a device directly added with `add_device`.
+    ///
+    /// This function should be used only by device that have registered an entire major device
+    /// number. Individually registered minor device cannot be removed at this time.
     pub fn remove_device<L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -317,10 +468,13 @@ impl DeviceRegistry {
         }
     }
 
+    /// Returns a list of the registered major device numbers for the given `DeviceMode` and their
+    /// names.
     pub fn list_major_devices(&self, mode: DeviceMode) -> Vec<(u32, FsString)> {
         self.devices(mode).list_major_devices()
     }
 
+    /// Returns a list of the registered minor devices for the given `DeviceMode` and their names.
     pub fn list_minor_devices(
         &self,
         mode: DeviceMode,
@@ -329,6 +483,7 @@ impl DeviceRegistry {
         self.devices(mode).list_minor_devices(range)
     }
 
+    /// The `RegisteredDevice` object for the given `DeviceMode`.
     fn devices(&self, mode: DeviceMode) -> MappedMutexGuard<'_, RegisteredDevices> {
         MutexGuard::map(self.state.lock(), |state| match mode {
             DeviceMode::Char => &mut state.char_devices,
@@ -336,6 +491,11 @@ impl DeviceRegistry {
         })
     }
 
+    /// Register an entire major device number.
+    ///
+    /// If you register an entire major device, use `add_device` and `remove_device` to manage the
+    /// sysfs entiries for your device rather than trying to register and unregister individual
+    /// minor devices.
     pub fn register_major(
         &self,
         name: FsString,
@@ -347,6 +507,7 @@ impl DeviceRegistry {
         self.devices(mode).register_major(major, entry)
     }
 
+    /// Allocate an anonymous device identifier.
     pub fn next_anonymous_dev_id(&self) -> DeviceType {
         let mut state = self.state.lock();
         let id = DeviceType::new(0, state.next_anon_minor);
@@ -381,7 +542,9 @@ impl DeviceRegistry {
         }
     }
 
-    /// Opens a device file corresponding to the device identifier `dev`.
+    /// Instantiate a file for the specified device.
+    ///
+    /// The device will be looked up in the device registry by `DeviceMode` and `DeviceType`.
     pub fn open_device<L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -421,6 +584,7 @@ impl Default for DeviceRegistry {
     }
 }
 
+/// An allocator for `DeviceType`
 struct DeviceTypeAllocator {
     /// The available ranges of device types to allocate.
     ///
@@ -437,6 +601,9 @@ impl DeviceTypeAllocator {
         Self { freelist: available }
     }
 
+    /// Allocate a `DeviceType`.
+    ///
+    /// Once allocated, there is no mechanism for freeing a `DeviceType`.
     fn allocate(&mut self) -> Result<DeviceType, Errno> {
         let Some(range) = self.freelist.pop() else {
             return error!(ENOMEM);
