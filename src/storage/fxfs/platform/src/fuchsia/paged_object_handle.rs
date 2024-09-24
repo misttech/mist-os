@@ -15,7 +15,7 @@ use fxfs::object_store::allocator::{Allocator, Reservation, ReservationOwner};
 use fxfs::object_store::transaction::{
     lock_keys, LockKey, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
-use fxfs::object_store::{DataObjectHandle, ObjectStore, StoreObjectHandle, Timestamp};
+use fxfs::object_store::{DataObjectHandle, ObjectStore, RangeType, StoreObjectHandle, Timestamp};
 use fxfs::range::RangeExt;
 use fxfs::round::{how_many, round_up};
 use scopeguard::ScopeGuard;
@@ -296,8 +296,17 @@ impl PagedObjectHandle {
             page_range.report_failure(zx::Status::BAD_STATE);
             return Err(zx::Status::BAD_STATE);
         }
+        let mut pages_added = 0;
+        for subrange in self.handle.overwrite_ranges_overlap(page_range.range()) {
+            // Check the overwrite ranges we have recorded for this file. We only add to the
+            // reservation if the range is not one of our overwrite ranges, since overwrite ranges
+            // are already allocated.
+            if let RangeType::Cow(cow_range) = subrange {
+                pages_added += page_count(cow_range);
+            }
+        }
         let new_inner = Inner {
-            dirty_page_count: inner.dirty_page_count + page_count(page_range.range()),
+            dirty_page_count: inner.dirty_page_count + pages_added,
             spare: SPARE_SIZE,
             ..*inner
         };
@@ -376,7 +385,10 @@ impl PagedObjectHandle {
 
     /// Queries for the ranges that need to be flushed and splits the ranges into batches that will
     /// each fit into a single transaction.
-    fn collect_flush_batches(&self, content_size: u64) -> Result<FlushBatches, Error> {
+    fn collect_flush_batches(
+        &self,
+        content_size: u64,
+    ) -> Result<(Vec<FlushBatch>, u64, u64), Error> {
         let page_aligned_content_size = round_up(content_size, zx::system_get_page_size()).unwrap();
         let modified_ranges =
             self.collect_modified_ranges().context("collect_modified_ranges failed")?;
@@ -392,6 +404,12 @@ impl PagedObjectHandle {
                 modified_range.range().split(page_aligned_content_size);
 
             if let Some(past_content_size_page_range) = past_content_size_page_range {
+                // For now, any data past the end of the content size won't be pre-allocated, so we
+                // don't need to consider it when calculating the reservation size. This might
+                // change if we support fallocate with the KEEP_SIZE mode which allows for
+                // allocations past the end of a file. We also won't be in the middle of an
+                // allocation that may have been split into multiple transactions because allocate
+                // takes the flush lock.
                 if !modified_range.is_zero_range() {
                     // If the range is not zero then space should have been reserved for it that
                     // should continue to be reserved after this flush.
@@ -403,13 +421,24 @@ impl PagedObjectHandle {
                 // Ranges must be returned in order.
                 assert!(range.start >= last_end);
                 last_end = range.end;
-                let mode =
-                    if modified_range.is_zero_range() { BatchMode::Zero } else { BatchMode::Cow };
-                flush_batches.add_range(range, mode);
+                for range_chunk in self.uncached_handle().overwrite_ranges_overlap(range) {
+                    let (range, mode) = match range_chunk {
+                        RangeType::Cow(range) => (
+                            range,
+                            if modified_range.is_zero_range() {
+                                BatchMode::Zero
+                            } else {
+                                BatchMode::Cow
+                            },
+                        ),
+                        RangeType::Overwrite(range) => (range, BatchMode::Overwrite),
+                    };
+                    flush_batches.add_range(range, mode);
+                }
             }
         }
 
-        Ok(flush_batches)
+        Ok(flush_batches.consume())
     }
 
     async fn add_metadata_to_transaction<'a>(
@@ -435,15 +464,13 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    /// Flushes only the metadata of the file by borrowing metadata space. If set, `flush_batch`
-    /// must only contain ranges that need to be zeroed.
+    /// Flushes only the metadata of the file by borrowing metadata space.
     async fn flush_metadata(
         &self,
         content_size: u64,
         previous_content_size: u64,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
-        zero_batch: Option<FlushBatch>,
     ) -> Result<(), Error> {
         let mut transaction = self.new_transaction(None).await?;
         self.add_metadata_to_transaction(
@@ -454,18 +481,7 @@ impl PagedObjectHandle {
             mtime,
         )
         .await?;
-
-        if let Some(batch) = zero_batch.as_ref() {
-            assert!(batch.dirty_byte_count == 0);
-            batch.writeback_begin(self.vmo(), self.pager());
-            batch
-                .add_to_transaction(&mut transaction, &self.vmo, &self.handle, content_size)
-                .await?;
-        }
         transaction.commit().await.context("Failed to commit transaction")?;
-        if let Some(batch) = zero_batch {
-            batch.writeback_end(self.vmo(), self.pager());
-        }
         Ok(())
     }
 
@@ -477,7 +493,6 @@ impl PagedObjectHandle {
         mut previous_content_size: u64,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
-        zero_batch: Option<FlushBatch>,
         flush_batches: Vec<FlushBatch>,
     ) -> Result<(), Error> {
         let pager = self.pager();
@@ -488,7 +503,11 @@ impl PagedObjectHandle {
             let first_batch = i == 0;
             let last_batch = i == last_batch_index;
 
-            let mut transaction = self.new_transaction(Some(&reservation)).await?;
+            let mut transaction = match batch.mode {
+                BatchMode::Zero => self.new_transaction(None).await?,
+                BatchMode::Cow => self.new_transaction(Some(&reservation)).await?,
+                BatchMode::Overwrite => self.new_transaction(None).await?,
+            };
             batch.writeback_begin(vmo, pager);
 
             let size = if last_batch {
@@ -531,25 +550,17 @@ impl PagedObjectHandle {
                 .await
                 .context("batch add_to_transaction failed")?;
             transaction.commit().await.context("Failed to commit transaction")?;
-            *reservation_guard -= batch.page_count();
+            if batch.mode == BatchMode::Cow {
+                *reservation_guard -= batch.page_count();
+            }
             if first_batch {
                 self.inner.lock().unwrap().end_flush();
             }
 
             batch.writeback_end(vmo, pager);
-            self.owner().report_pager_clean(batch.dirty_byte_count);
-        }
-
-        if let Some(zero_batch) = zero_batch {
-            assert!(zero_batch.dirty_byte_count == 0);
-            let mut transaction = self.new_transaction(None).await?;
-            zero_batch.writeback_begin(vmo, pager);
-            zero_batch
-                .add_to_transaction(&mut transaction, vmo, &self.handle, content_size)
-                .await
-                .context("zero batch add_to_transaction failed")?;
-            transaction.commit().await.context("failed to commit for zero batch")?;
-            zero_batch.writeback_end(vmo, pager);
+            if batch.mode == BatchMode::Cow {
+                self.owner().report_pager_clean(batch.dirty_byte_count);
+            }
         }
 
         // Before releasing the reservation, mark those pages as cleaned, since they weren't used.
@@ -613,43 +624,39 @@ impl PagedObjectHandle {
 
         let content_size = self.vmo().get_stream_size().context("get_stream_size failed")?;
         let previous_content_size = self.handle.get_size();
-        let FlushBatches {
-            batches: flush_batches,
-            dirty_page_count: pages_to_flush,
-            skipped_dirty_page_count: mut pages_not_flushed,
-            zero_batch,
-        } = self.collect_flush_batches(content_size)?;
+        let (flush_batches, required_reserved_pages, mut pages_not_flushed) =
+            self.collect_flush_batches(content_size)?;
 
         // If pages were dirtied between getting the reservation and collecting the dirty ranges
         // then we might need to update the reservation.
-        if pages_to_flush > dirty_pages {
+        if required_reserved_pages > dirty_pages {
             // This potentially takes more reservation than might be necessary.  We could perhaps
             // optimize this to take only what might be required.
             let new_dirty_pages = self.inner.lock().unwrap().move_to(&reservation);
 
             // Make sure we account for pages we might not flush to ensure we keep them reserved.
-            pages_not_flushed = dirty_pages + new_dirty_pages - pages_to_flush;
+            pages_not_flushed = dirty_pages + new_dirty_pages - required_reserved_pages;
 
             // Make sure we return the new dirty pages on failure.
             *reservation_guard += new_dirty_pages;
 
             assert!(
-                reservation.amount() >= reservation_needed(pages_to_flush),
+                reservation.amount() >= reservation_needed(required_reserved_pages),
                 "reservation: {}, needed: {}, dirty_pages: {}, pages_to_flush: {}",
                 reservation.amount(),
-                reservation_needed(pages_to_flush),
+                reservation_needed(required_reserved_pages),
                 dirty_pages,
-                pages_to_flush
+                required_reserved_pages
             );
         } else {
             // The reservation we have is sufficient for pages_to_flush, but it might not be enough
             // for pages_not_flushed as well.
-            pages_not_flushed = std::cmp::min(dirty_pages - pages_to_flush, pages_not_flushed);
+            pages_not_flushed =
+                std::cmp::min(dirty_pages - required_reserved_pages, pages_not_flushed);
         }
 
-        if pages_to_flush == 0 {
-            self.flush_metadata(content_size, previous_content_size, crtime, mtime, zero_batch)
-                .await?;
+        if flush_batches.is_empty() {
+            self.flush_metadata(content_size, previous_content_size, crtime, mtime).await?;
             dismiss_scopeguard(reservation_guard);
             self.inner.lock().unwrap().end_flush();
         } else {
@@ -660,7 +667,6 @@ impl PagedObjectHandle {
                 previous_content_size,
                 crtime,
                 mtime,
-                zero_batch,
                 flush_batches,
             )
             .await?
@@ -864,6 +870,18 @@ impl PagedObjectHandle {
             }
         }
     }
+
+    /// Pre-allocate a region of this file on-disk.
+    #[cfg(test)]
+    pub async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
+        // Flushing relies on the allocated ranges to determine flush batching, so we grab the same
+        // lock as flushing to make sure they are mutually exclusive.
+        let store = self.store();
+        let fs = store.filesystem();
+        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+        let _flush_guard = fs.lock_manager().write_lock(keys).await;
+        self.handle.allocate(range).await
+    }
 }
 
 impl Drop for PagedObjectHandle {
@@ -895,47 +913,73 @@ impl ObjectHandle for PagedObjectHandle {
 enum BatchMode {
     Zero,
     Cow,
+    Overwrite,
 }
 
+/// Manages the batching of pages to flush per transaction, making sure that each batch stays below
+/// FLUSH_BATCH_SIZE, the number of bytes that should be flushed in a single transaction. This
+/// prevents transactions from growing larger than can be handled at once.
+///
+/// This also splits the batches between ranges which should be written using CoW semantics and
+/// ranges which should be written using Overwrite semantics, because the transaction options are
+/// different.
 #[derive(Default, Debug)]
 struct FlushBatches {
     batches: Vec<FlushBatch>,
+    working_cow_batch: Option<FlushBatch>,
+    working_overwrite_batch: Option<FlushBatch>,
 
-    /// The number of dirty pages spanned by `batches`, excluding zero ranges.
-    dirty_page_count: u64,
+    /// The number of new pages to be written spanned by the `batches`, which will use the running
+    /// reservation. This does not include zero ranges or writes to ranges that are already
+    /// allocated.
+    dirty_reserved_count: u64,
 
     /// The number of pages that were marked dirty but are not included in `batches` because they
     /// don't need to be flushed. These are pages that were beyond the VMO's stream size.
     skipped_dirty_page_count: u64,
 
-    /// Any zero ranges get put into their own batch, so we can account for them with pager
-    /// writeback while still allowing us to shortcut a full data flush if we aren't actually
-    /// writing any data. Zero ranges don't actually add any metadata at the moment (and will error
-    /// if they do) so we don't need to split them up.
+    /// Any zero ranges get put into their own batch. Zero ranges don't actually add any metadata
+    /// at the moment (and will error if they do) so we don't need to split them up.
     zero_batch: Option<FlushBatch>,
 }
 
 impl FlushBatches {
     fn add_range(&mut self, range: Range<u64>, mode: BatchMode) {
-        if mode == BatchMode::Zero {
-            let zero_batch = self.zero_batch.get_or_insert_with(|| FlushBatch::new(mode));
-            zero_batch.add_range(range);
-            return;
+        let working_batch_ref = match mode {
+            BatchMode::Zero => {
+                self.zero_batch.get_or_insert_with(|| FlushBatch::new(mode)).add_range(range);
+                return;
+            }
+            BatchMode::Cow => &mut self.working_cow_batch,
+            BatchMode::Overwrite => &mut self.working_overwrite_batch,
+        };
+        let mut working_batch = working_batch_ref.get_or_insert_with(|| FlushBatch::new(mode));
+        if mode == BatchMode::Cow {
+            self.dirty_reserved_count += page_count(range.clone());
         }
-        if self.batches.is_empty() {
-            self.batches.push(FlushBatch::new(mode));
-        }
-        self.dirty_page_count += how_many(range.end - range.start, zx::system_get_page_size());
-        let mut remaining = self.batches.last_mut().unwrap().add_range(range);
+        let mut remaining = working_batch.add_range(range);
         while let Some(range) = remaining {
-            let mut batch = FlushBatch::new(mode);
-            remaining = batch.add_range(range);
-            self.batches.push(batch);
+            self.batches.push(working_batch_ref.take().unwrap());
+            working_batch = working_batch_ref.get_or_insert_with(|| FlushBatch::new(mode));
+            remaining = working_batch.add_range(range);
         }
     }
 
     fn skip_range(&mut self, range: Range<u64>) {
         self.skipped_dirty_page_count += page_count(range);
+    }
+
+    fn consume(mut self) -> (Vec<FlushBatch>, u64, u64) {
+        if let Some(batch) = self.working_cow_batch {
+            self.batches.push(batch);
+        }
+        if let Some(batch) = self.working_overwrite_batch {
+            self.batches.push(batch);
+        }
+        if let Some(batch) = self.zero_batch {
+            self.batches.push(batch)
+        }
+        (self.batches, self.dirty_reserved_count, self.skipped_dirty_page_count)
     }
 }
 
@@ -944,9 +988,10 @@ struct FlushBatch {
     /// The ranges to be flushed in this batch.
     ranges: Vec<Range<u64>>,
 
-    /// The number of bytes spanned by `ranges`, excluding zero ranges.
+    /// The number of bytes spanned by `ranges`, excluding zero ranges if this is a CoW batch.
     dirty_byte_count: u64,
 
+    /// The mode of this batch.
     mode: BatchMode,
 }
 
@@ -982,7 +1027,7 @@ impl FlushBatch {
     fn writeback_begin(&self, vmo: &zx::Vmo, pager: &Pager) {
         let options = match self.mode {
             BatchMode::Zero => zx::PagerWritebackBeginOptions::DIRTY_RANGE_IS_ZERO,
-            BatchMode::Cow => zx::PagerWritebackBeginOptions::empty(),
+            BatchMode::Cow | BatchMode::Overwrite => zx::PagerWritebackBeginOptions::empty(),
         };
         for range in &self.ranges {
             pager.writeback_begin(vmo, range.clone(), options);
@@ -1035,10 +1080,17 @@ impl FlushBatch {
                 }
                 dirty_ranges.push(range);
             }
-            handle
-                .multi_write(transaction, 0, &dirty_ranges, buffer.as_mut())
-                .await
-                .context("multi_write failed")?;
+            match self.mode {
+                BatchMode::Zero => unreachable!(),
+                BatchMode::Cow => handle
+                    .multi_write(transaction, 0, &dirty_ranges, buffer.as_mut())
+                    .await
+                    .context("multi_write failed")?,
+                BatchMode::Overwrite => handle
+                    .multi_overwrite(transaction, 0, &dirty_ranges, buffer.as_mut())
+                    .await
+                    .context("multi_overwrite failed")?,
+            }
         }
 
         Ok(())
@@ -1568,9 +1620,11 @@ mod tests {
     fn test_flush_batches_add_range_huge_range() {
         let mut batches = FlushBatches::default();
         batches.add_range(0..(FLUSH_BATCH_SIZE * 2 + 8192), BatchMode::Cow);
-        assert_eq!(batches.dirty_page_count, 258);
+        let (batches, dirty_reserved_count, skipped_dirty_page_count) = batches.consume();
+        assert_eq!(dirty_reserved_count, 258);
+        assert_eq!(skipped_dirty_page_count, 0);
         assert_eq!(
-            batches.batches,
+            batches,
             vec![
                 FlushBatch {
                     ranges: vec![0..FLUSH_BATCH_SIZE],
@@ -1599,49 +1653,51 @@ mod tests {
         batches.add_range(page_size..(page_size * 3), BatchMode::Zero);
         batches.add_range((page_size * 7)..(page_size * 150), BatchMode::Cow);
         batches.add_range((page_size * 200)..(page_size * 500), BatchMode::Zero);
-        batches.add_range((page_size * 500)..(page_size * 650), BatchMode::Cow);
+        batches.add_range((page_size * 500)..(page_size * 650), BatchMode::Overwrite);
 
-        assert_eq!(batches.dirty_page_count, 294);
+        let (batches, dirty_reserved_count, skipped_dirty_page_count) = batches.consume();
+        assert_eq!(dirty_reserved_count, 144);
+        assert_eq!(skipped_dirty_page_count, 0);
         assert_eq!(
-            batches.batches,
+            batches,
             vec![
                 FlushBatch {
-                    ranges: vec![0..page_size, (page_size * 7)..(page_size * 134),],
+                    ranges: vec![0..page_size, (page_size * 7)..(page_size * 134)],
                     dirty_byte_count: FLUSH_BATCH_SIZE,
                     mode: BatchMode::Cow,
                 },
                 FlushBatch {
-                    ranges: vec![
-                        (page_size * 134)..(page_size * 150),
-                        (page_size * 500)..(page_size * 612),
-                    ],
+                    ranges: vec![(page_size * 500)..(page_size * 628)],
                     dirty_byte_count: FLUSH_BATCH_SIZE,
+                    mode: BatchMode::Overwrite,
+                },
+                FlushBatch {
+                    ranges: vec![(page_size * 134)..(page_size * 150),],
+                    dirty_byte_count: 16 * page_size,
                     mode: BatchMode::Cow,
                 },
                 FlushBatch {
-                    ranges: vec![(page_size * 612)..(page_size * 650)],
-                    dirty_byte_count: 38 * page_size,
-                    mode: BatchMode::Cow,
-                }
+                    ranges: vec![(page_size * 628)..(page_size * 650),],
+                    dirty_byte_count: 22 * page_size,
+                    mode: BatchMode::Overwrite,
+                },
+                FlushBatch {
+                    ranges: vec![page_size..(page_size * 3), (page_size * 200)..(page_size * 500)],
+                    dirty_byte_count: 0,
+                    mode: BatchMode::Zero,
+                },
             ]
         );
-        assert_eq!(
-            batches.zero_batch,
-            Some(FlushBatch {
-                ranges: vec![page_size..(page_size * 3), (page_size * 200)..(page_size * 500),],
-                dirty_byte_count: 0,
-                mode: BatchMode::Zero,
-            })
-        )
     }
 
     #[test]
     fn test_flush_batches_skip_range() {
         let mut batches = FlushBatches::default();
         batches.skip_range(0..8192);
-        assert_eq!(batches.dirty_page_count, 0);
-        assert!(batches.batches.is_empty());
-        assert_eq!(batches.skipped_dirty_page_count, 2);
+        let (batches, dirty_reserved_count, skipped_dirty_page_count) = batches.consume();
+        assert_eq!(dirty_reserved_count, 0);
+        assert_eq!(batches, Vec::new());
+        assert_eq!(skipped_dirty_page_count, 2);
     }
 
     #[fuchsia::test]
@@ -2308,6 +2364,156 @@ mod tests {
 
         // https://fxbug.dev/318434279 - the dirty pages beyond the end of the file cause shutdown
         // to stall forever, waiting for an infinitely looping flush attempt.
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_allocate() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file::write(&file, &vec![1, 2, 3, 4]).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.allocate(0, page_size, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let data = file.read_at(4, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(data, vec![1, 2, 3, 4]);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_allocate_write() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        file::write(&file, &vec![1, 2, 3, 4]).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data = file.read_at(4, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(data, vec![1, 2, 3, 4]);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_allocate_write_mixed() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(page_size, page_size, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize * 2).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, 2048).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            page_size * 2
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let data =
+            file.read_at(page_size * 2, 2048).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(data, write_data);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_allocate_write_disk_full() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        // Fill up the disk with data.
+        loop {
+            match file.write(&write_data).await.unwrap().map_err(zx::Status::from_raw) {
+                Ok(len) => assert_eq!(len, page_size),
+                Err(status) => {
+                    assert_eq!(status, zx::Status::NO_SPACE);
+                    break;
+                }
+            }
+            file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        }
+
+        // Writing outside the allocated range fails.
+        assert_eq!(
+            file.write_at(&write_data, page_size).await.unwrap().map_err(zx::Status::from_raw),
+            Err(zx::Status::NO_SPACE)
+        );
+
+        for _ in 0..100 {
+            // Writing inside the allocated range succeeds indefinitely.
+            assert_eq!(
+                file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+                page_size
+            );
+            assert_eq!(
+                file.write_at(&write_data, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+                page_size
+            );
+            file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        }
+
+        // Writing outside the allocated range still fails.
+        assert_eq!(
+            file.write_at(&write_data, page_size).await.unwrap().map_err(zx::Status::from_raw),
+            Err(zx::Status::NO_SPACE)
+        );
+
         fixture.close().await;
     }
 }

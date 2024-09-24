@@ -449,6 +449,16 @@ impl File for FxFile {
         self.handle.store_handle().remove_extended_attribute(name).await.map_err(map_to_status)
     }
 
+    #[cfg(test)]
+    async fn allocate(
+        &self,
+        offset: u64,
+        length: u64,
+        _mode: fio::AllocateMode,
+    ) -> Result<(), Status> {
+        self.handle.allocate(offset..(offset + length)).await.map_err(map_to_status)
+    }
+
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {
         self.handle.flush().await.map_err(map_to_status)?;
 

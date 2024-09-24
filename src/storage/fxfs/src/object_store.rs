@@ -21,7 +21,9 @@ mod tree;
 mod tree_cache;
 pub mod volume;
 
-pub use data_object_handle::{DataObjectHandle, DirectWriter, FsverityState, FsverityStateInner};
+pub use data_object_handle::{
+    DataObjectHandle, DirectWriter, FsverityState, FsverityStateInner, RangeType,
+};
 pub use directory::Directory;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{
@@ -66,7 +68,7 @@ use storage_device::Device;
 use uuid::Uuid;
 
 pub use extent_record::{
-    ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
+    ExtentKey, ExtentMode, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
     FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
 pub use object_record::{
@@ -812,44 +814,92 @@ impl ObjectStore {
     /// dropped when a handle is dropped, which will impact any other handles for the same object.
     pub async fn open_object<S: HandleOwner>(
         owner: &Arc<S>,
-        object_id: u64,
+        obj_id: u64,
         options: HandleOptions,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         let mut fsverity_descriptor = None;
+        let mut overwrite_ranges = Vec::new();
         let item = store
             .tree
-            .find(&ObjectKey::attribute(
-                object_id,
-                DEFAULT_DATA_ATTRIBUTE_ID,
-                AttributeKey::Attribute,
-            ))
+            .find(&ObjectKey::attribute(obj_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute))
             .await?
             .ok_or(FxfsError::NotFound)?;
 
-        let size = match item.value {
-            ObjectValue::Attribute { size, .. } => size,
+        let (size, track_overwrite_extents) = match item.value {
+            ObjectValue::Attribute { size, has_overwrite_extents } => (size, has_overwrite_extents),
             ObjectValue::VerifiedAttribute { size, fsverity_metadata } => {
                 fsverity_descriptor = Some(fsverity_metadata);
-                size
+                // We only track the overwrite extents in memory for writes, reads handle them
+                // implicitly, which means verified files (where the data won't change anymore)
+                // don't need to track them.
+                (size, false)
             }
-            _ => bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attribute")),
+            _ => bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attibute")),
         };
 
         ensure!(size <= MAX_FILE_SIZE, FxfsError::Inconsistent);
+
+        if track_overwrite_extents {
+            let layer_set = store.tree.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = merger
+                .query(Query::FullRange(&ObjectKey::attribute(
+                    obj_id,
+                    DEFAULT_DATA_ATTRIBUTE_ID,
+                    AttributeKey::Extent(ExtentKey::search_key_from_offset(0)),
+                )))
+                .await?;
+            loop {
+                match iter.get() {
+                    Some(ItemRef {
+                        key:
+                            ObjectKey {
+                                object_id,
+                                data:
+                                    ObjectKeyData::Attribute(
+                                        attribute_id,
+                                        AttributeKey::Extent(ExtentKey { range }),
+                                    ),
+                            },
+                        value,
+                        ..
+                    }) if *object_id == obj_id && *attribute_id == DEFAULT_DATA_ATTRIBUTE_ID => {
+                        match value {
+                            ObjectValue::Extent(ExtentValue::None)
+                            | ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::Raw,
+                                ..
+                            })
+                            | ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::Cow(_),
+                                ..
+                            }) => (),
+                            ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::OverwritePartial(_),
+                                ..
+                            })
+                            | ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::Overwrite,
+                                ..
+                            }) => overwrite_ranges.push(range.clone()),
+                            _ => bail!(anyhow!(FxfsError::Inconsistent)
+                                .context("open_object: Expected extent")),
+                        }
+                        iter.advance().await?;
+                    }
+                    _ => break,
+                }
+            }
+        }
 
         // If a crypt service has been specified, it needs to be a permanent key because cached
         // keys can only use the store's crypt service.
         let permanent = if let Some(crypt) = crypt {
             store
                 .key_manager
-                .get_or_insert(
-                    object_id,
-                    crypt,
-                    store.get_keys(object_id),
-                    /* permanent: */ true,
-                )
+                .get_or_insert(obj_id, crypt, store.get_keys(obj_id), /* permanent: */ true)
                 .await?;
             true
         } else {
@@ -857,13 +907,14 @@ impl ObjectStore {
         };
         let data_object_handle = DataObjectHandle::new(
             owner.clone(),
-            object_id,
+            obj_id,
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             size,
             FsverityState::None,
             options,
             false,
+            overwrite_ranges,
         );
         if let Some(descriptor) = fsverity_descriptor {
             match data_object_handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await? {
@@ -936,6 +987,7 @@ impl ObjectStore {
             FsverityState::None,
             options,
             false,
+            Vec::new(),
         ))
     }
 
