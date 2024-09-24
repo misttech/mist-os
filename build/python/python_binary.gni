@@ -62,7 +62,7 @@
 #   enable_mypy (optional)
 #     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
-#     Default: False
+#     Default: true
 #
 #   unbuffered_output (optional)
 #     If true, run the Python interpreter in unbuffered mode (-u) by default.
@@ -170,7 +170,7 @@ template("python_binary") {
         invoker.data_package_name,
       ]
     }
-    if (defined(invoker.enable_mypy) && invoker.enable_mypy) {
+    if (!(defined(invoker.enable_mypy) && !invoker.enable_mypy)) {
       args += [ "--enable_mypy" ]
     }
     if (defined(invoker.unbuffered_output) && invoker.unbuffered_output) {
