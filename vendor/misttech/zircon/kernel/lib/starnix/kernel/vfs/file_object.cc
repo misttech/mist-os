@@ -5,6 +5,7 @@
 
 #include "lib/mistos/starnix/kernel/vfs/file_object.h"
 
+#include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/task/module.h>
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
@@ -44,9 +45,6 @@ fit::result<Errno, long> default_ioctl(const FileObject&, const CurrentTask&, ui
                                        long arg) {
   return fit::error(errno(ENOTSUP));
 }
-
-FileObject::FileObject(fbl::RefPtr<VmObject> vmo)
-    : offset(0), flags_(OpenFlags::empty()), vmo(ktl::move(vmo)) {}
 
 FileObject::FileObject(WeakFileHandle _weak_handle, FileObjectId _id, NamespaceNode _name,
                        FileSystemHandle _fs, ktl::unique_ptr<FileOps> _ops, OpenFlags _flags)
@@ -227,6 +225,18 @@ fit::result<Errno, off_t> FileObject::seek(const CurrentTask& current_task,
   auto new_offset = seek_result.value();
   *offset_guard = new_offset;
   return fit::ok(new_offset);
+}
+
+fit::result<Errno, fbl::RefPtr<MemoryObject>> FileObject::get_memory(
+    const CurrentTask& current_task, ktl::optional<size_t> length, ProtectionFlags prot) const {
+  if (prot.contains(ProtectionFlagsEnum::READ) && !can_read()) {
+    return fit::error(errno(EACCES));
+  }
+  if (prot.contains(ProtectionFlagsEnum::WRITE) && !can_write()) {
+    return fit::error(errno(EACCES));
+  }
+  // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
+  return ops_().get_memory(*this, current_task, length, prot);
 }
 
 fit::result<Errno, off_t> default_eof_offset(const FileObject& file,

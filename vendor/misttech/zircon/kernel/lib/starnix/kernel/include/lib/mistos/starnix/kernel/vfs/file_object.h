@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
@@ -17,6 +18,7 @@
 
 #include <fbl/ref_ptr.h>
 #include <ktl/functional.h>
+#include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
 
 class VmObject;
@@ -95,12 +97,6 @@ class FileObject : public fbl::RefCounted<FileObject> {
   // async_owner: Mutex<FileAsyncOwner>,
 
   //_file_write_guard: Option<FileWriteGuard>,
-
- public:
-  // (FIXME: Herrera) This ctor to handle VMO must be deleted soon.
-  FileObject(fbl::RefPtr<VmObject> vmo);
-
-  fbl::RefPtr<VmObject> vmo;
 
  public:
   /// Create a FileObject that is not mounted in a namespace.
@@ -198,6 +194,10 @@ class FileObject : public fbl::RefCounted<FileObject> {
                                       InputBuffer* data) const;
 
   fit::result<Errno, off_t> seek(const CurrentTask& current_task, SeekTarget target) const;
+
+  fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(const CurrentTask& current_task,
+                                                           ktl::optional<size_t> length,
+                                                           ProtectionFlags prot) const;
 
   ~FileObject();
 
