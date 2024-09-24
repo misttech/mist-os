@@ -90,17 +90,17 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   DesiredAddress daddr;
   if (addr == 0) {
     if (cond1 == false && cond2 == false) {
-      daddr = {DesiredAddressType::Any, 0};
+      daddr = {.type=DesiredAddressType::Any, .address=0};
     } else if (cond1 == true || cond2 == true) {
       return fit::error(errno(EINVAL));
     }
   } else {
     if (cond1 == false && cond2 == false) {
-      daddr = {DesiredAddressType::Hint, addr};
+      daddr = {.type=DesiredAddressType::Hint, .address=addr};
     } else if (cond2) {
-      daddr = {DesiredAddressType::Fixed, addr};
+      daddr = {.type=DesiredAddressType::Fixed, .address=addr};
     } else if (cond1 == true && cond2 == false) {
-      daddr = {DesiredAddressType::FixedOverwrite, addr};
+      daddr = {.type=DesiredAddressType::FixedOverwrite, .address=addr};
     }
   }
 
@@ -128,7 +128,7 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
 
   if ((flags & MAP_ANONYMOUS) != 0) {
     return current_task->mm()->map_anonymous(daddr, length, prot_flags.value(), options,
-                                             {MappingNameType::None});
+                                             {.type=MappingNameType::None});
   } else {
     /*
     // TODO(tbodt): maximize protection flags so that mprotect works
