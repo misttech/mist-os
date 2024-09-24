@@ -4,6 +4,7 @@
 """FuchsiaDevice abstract base class implementation using Fuchsia-Controller."""
 
 import asyncio
+import ipaddress
 import logging
 import os
 from collections.abc import Callable
@@ -39,6 +40,14 @@ from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
 from honeydew.affordances.fuchsia_controller.wlan import (
     wlan_policy as wlan_policy_fc,
 )
+from honeydew.affordances.sl4f.bluetooth.profiles import (
+    bluetooth_avrcp as bluetooth_avrcp_sl4f,
+)
+from honeydew.affordances.sl4f.bluetooth.profiles import (
+    bluetooth_gap as bluetooth_gap_sl4f,
+)
+from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
+from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.affordances.starnix import (
     system_power_state_controller as system_power_state_controller_starnix,
 )
@@ -82,8 +91,9 @@ from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.transports import serial_using_unix_socket
+from honeydew.transports import sl4f as sl4f_transport
 from honeydew.typing import custom_types
-from honeydew.utils import properties
+from honeydew.utils import common, properties
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
     "BuildInfo": custom_types.FidlEndpoint(
@@ -171,6 +181,7 @@ class FuchsiaDevice(
         self,
         device_info: custom_types.DeviceInfo,
         ffx_config: custom_types.FFXConfig,
+        transport: custom_types.TRANSPORT,
         # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
         config: dict[str, Any] | None = None,
     ) -> None:
@@ -179,6 +190,8 @@ class FuchsiaDevice(
         self._device_info: custom_types.DeviceInfo = device_info
 
         self._ffx_config: custom_types.FFXConfig = ffx_config
+
+        self._transport: custom_types.TRANSPORT = transport
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
         self._on_device_close_fns: list[Callable[[], None]] = []
@@ -366,7 +379,16 @@ class FuchsiaDevice(
         Raises:
             errors.Sl4fError: Failed to instantiate.
         """
-        raise NotImplementedError
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
+        if self._device_info.ip_port:
+            device_ip = self._device_info.ip_port.ip
+
+        sl4f_obj: sl4f_transport_interface.SL4F = sl4f_transport.SL4F(
+            device_name=self.device_name,
+            device_ip=device_ip,
+            ffx_transport=self.ffx,
+        )
+        return sl4f_obj
 
     # List all the affordances
     @properties.Affordance
@@ -451,6 +473,15 @@ class FuchsiaDevice(
         Returns:
             bluetooth_avrcp.BluetoothAvrcp object
         """
+        if (
+            self._transport
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+        ):
+            return bluetooth_avrcp_sl4f.BluetoothAvrcp(
+                device_name=self.device_name,
+                sl4f=self.sl4f,
+                reboot_affordance=self,
+            )
         raise NotImplementedError
 
     @properties.Affordance
@@ -473,11 +504,21 @@ class FuchsiaDevice(
         Returns:
             bluetooth_gap.BluetoothGap object
         """
-        return gap_fc.BluetoothGap(
-            device_name=self.device_name,
-            fuchsia_controller=self.fuchsia_controller,
-            reboot_affordance=self,
-        )
+        if (
+            self._transport
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+        ):
+            return bluetooth_gap_sl4f.BluetoothGap(
+                device_name=self.device_name,
+                sl4f=self.sl4f,
+                reboot_affordance=self,
+            )
+        else:
+            return gap_fc.BluetoothGap(
+                device_name=self.device_name,
+                fuchsia_controller=self.fuchsia_controller,
+                reboot_affordance=self,
+            )
 
     @properties.Affordance
     def wlan_policy(self) -> wlan_policy.WlanPolicy:
@@ -486,13 +527,21 @@ class FuchsiaDevice(
         Returns:
             wlan_policy.WlanPolicy object
         """
-        return wlan_policy_fc.WlanPolicy(
-            device_name=self.device_name,
-            ffx=self.ffx,
-            fuchsia_controller=self.fuchsia_controller,
-            reboot_affordance=self,
-            fuchsia_device_close=self,
-        )
+        if (
+            self._transport
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+        ):
+            return wlan_policy_sl4f.WlanPolicy(
+                device_name=self.device_name, sl4f=self.sl4f
+            )
+        else:
+            return wlan_policy_fc.WlanPolicy(
+                device_name=self.device_name,
+                ffx=self.ffx,
+                fuchsia_controller=self.fuchsia_controller,
+                reboot_affordance=self,
+                fuchsia_device_close=self,
+            )
 
     @properties.Affordance
     def wlan(self) -> wlan.Wlan:
@@ -501,12 +550,18 @@ class FuchsiaDevice(
         Returns:
             wlan.Wlan object
         """
-        return wlan_fc.Wlan(
-            device_name=self.device_name,
-            ffx=self.ffx,
-            fuchsia_controller=self.fuchsia_controller,
-            reboot_affordance=self,
-        )
+        if (
+            self._transport
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+        ):
+            return wlan_sl4f.Wlan(device_name=self.device_name, sl4f=self.sl4f)
+        else:
+            return wlan_fc.Wlan(
+                device_name=self.device_name,
+                ffx=self.ffx,
+                fuchsia_controller=self.fuchsia_controller,
+                reboot_affordance=self,
+            )
 
     @properties.Affordance
     def inspect(self) -> inspect_interface.Inspect:
@@ -551,6 +606,11 @@ class FuchsiaDevice(
         # Note - FFX need to be invoked first before FC as FC depends on the daemon that will be created by FFX
         self.ffx.check_connection()
         self.fuchsia_controller.check_connection()
+        if (
+            self._transport
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+        ):
+            self.sl4f.check_connection()
 
     def log_message_to_device(
         self, message: str, level: custom_types.LEVEL
@@ -576,6 +636,13 @@ class FuchsiaDevice(
             errors.FuchsiaControllerError: On communications failure.
             errors.Sl4FError: On communications failure.
         """
+        # Restart the SL4F server on device boot up.
+        if (
+            self._transport
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+        ):
+            common.retry(fn=self.sl4f.start_server, wait_time=5)
+
         # Create a new Fuchsia controller context for new device connection.
         self.fuchsia_controller.create_context()
 

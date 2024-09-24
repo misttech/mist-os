@@ -10,12 +10,6 @@ import tempfile
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew.fuchsia_device.fuchsia_controller import (
-    fuchsia_device as fc_fuchsia_device,
-)
-from honeydew.fuchsia_device.fuchsia_controller_preferred import (
-    fuchsia_device as fc_preferred_fuchsia_device,
-)
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
@@ -59,20 +53,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device: fuchsia_device_interface.FuchsiaDevice = (
             self.fuchsia_devices[0]
         )
-
-    def test_device_instance(self) -> None:
-        """Test case to make sure DUT is a FuchsiaDevice"""
-        if (
-            self._get_transport_from_device_config(self.device)
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER
-        ):
-            asserts.assert_is_instance(
-                self.device, fc_fuchsia_device.FuchsiaDevice
-            )
-        else:  # FUCHSIA_CONTROLLER_PREFERRED
-            asserts.assert_is_instance(
-                self.device, fc_preferred_fuchsia_device.FuchsiaDevice
-            )
 
     def test_board(self) -> None:
         """Test case for board"""

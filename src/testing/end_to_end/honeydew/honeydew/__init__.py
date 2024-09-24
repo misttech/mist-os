@@ -7,12 +7,7 @@ import logging
 from typing import Any
 
 from honeydew import errors
-from honeydew.fuchsia_device.fuchsia_controller import (
-    fuchsia_device as fc_fuchsia_device,
-)
-from honeydew.fuchsia_device.fuchsia_controller_preferred import (
-    fuchsia_device as fc_preferred_fuchsia_device,
-)
+from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
@@ -92,18 +87,12 @@ def create_device(
                 device_info.ip_port,
             )
 
-        if transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER:
-            return fc_fuchsia_device.FuchsiaDevice(
-                device_info,
-                ffx_config,
-                config,
-            )
-        else:  # transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED:
-            return fc_preferred_fuchsia_device.FuchsiaDevice(
-                device_info,
-                ffx_config,
-                config,
-            )
+        return fuchsia_device.FuchsiaDevice(
+            device_info,
+            ffx_config,
+            transport,
+            config,
+        )
     except errors.HoneydewError as err:
         raise errors.FuchsiaDeviceError(
             f"Failed to create device for '{device_info.name}': {err}"
