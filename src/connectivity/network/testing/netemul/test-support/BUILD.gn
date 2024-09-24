@@ -22,6 +22,7 @@ rustc_binary("bin") {
   name = "counter"
   edition = "2021"
   deps = [
+    ":config_lib",
     ":fidl_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
@@ -39,10 +40,18 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+fuchsia_component_manifest("counter_manifest") {
+  component_name = "counter"
+  manifest = "meta/counter.cml"
+}
+
 fuchsia_component("counter") {
   testonly = true
-  manifest = "meta/counter.cml"
-  deps = [ ":bin" ]
+  cm_label = ":counter_manifest"
+  deps = [
+    ":bin",
+    ":config_values",
+  ]
 }
 
 fuchsia_component("devfs-subdir-user") {
@@ -55,4 +64,18 @@ fuchsia_component("counter-without-program") {
   testonly = true
   manifest = "meta/counter-without-program.cml"
   deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_values("config_values") {
+  cm_label = ":counter_manifest"
+  values = {
+    routed_config = false
+    starting_value = 0
+  }
+  visibility = [ ":*" ]
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  name = "counter_config"
+  cm_label = ":counter_manifest"
 }

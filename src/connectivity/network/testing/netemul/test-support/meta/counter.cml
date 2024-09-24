@@ -37,7 +37,7 @@
         },
         {
             config: "fuchsia.netemul.test.Config",
-            key: "config",
+            key: "routed_config",
             availability: "optional",
             type: "bool",
             default: false,
@@ -59,4 +59,8 @@
             as: "fuchsia.netemul.test.CounterB",
         },
     ],
+    config: {
+        // The value to start the counter at.
+        starting_value: { type: "uint32" },
+    },
 }

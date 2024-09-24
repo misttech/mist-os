@@ -4,6 +4,7 @@
 library fuchsia.netemul;
 
 using fuchsia.component;
+using fuchsia.component.decl;
 using fuchsia.io;
 using fuchsia.netemul.network;
 using fuchsia.url;
@@ -157,6 +158,17 @@ closed protocol Sandbox {
                 ///
                 /// If not set, interpreted as false.
                 6: eager bool;
+                /// Structured configuration values to *override* when launching
+                /// the child.
+                ///
+                /// If not set, interpereted as an empty vector.
+                7: config_values vector<@generated_name("ChildConfigValue") struct {
+                    /// The configuration key to override.
+                    key fuchsia.component.decl.ConfigKey;
+                    /// The configuration value to use instead of the one loaded
+                    /// from the package.
+                    value fuchsia.component.decl.ConfigValue;
+                }>:MAX;
             }>:MAX;
         };
     });
