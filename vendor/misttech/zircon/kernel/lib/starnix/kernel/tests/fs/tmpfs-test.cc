@@ -146,12 +146,12 @@ bool test_data() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
-  auto fs =
-      TmpFs::new_fs_with_options(kernel, {
-                                             "",
-                                             MountFlags::empty(),
-                                             MountParams::parse("mode=0123,uid=42,gid=84").value(),
-                                         });
+  auto fs = TmpFs::new_fs_with_options(
+      kernel, {
+                  .source = "",
+                  .flags = MountFlags::empty(),
+                  .params = MountParams::parse("mode=0123,uid=42,gid=84").value(),
+              });
   EXPECT_TRUE(fs.is_ok(), "new_fs");
 
   auto info = fs.value()->root()->node_->info();
