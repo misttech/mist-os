@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -170,6 +166,13 @@ impl fidl::Persistable for Padding7ByteMiddle {}
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for Padding1ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding1ByteEnd {
         type Owned = Self;
 
@@ -183,20 +186,14 @@ mod internal {
             4
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding1ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding1ByteEnd> for &Padding1ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding1ByteEnd, D>
+        for &Padding1ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -215,13 +212,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u16>, T1: fidl::encoding::Encode<u8>>
-        fidl::encoding::Encode<Padding1ByteEnd> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u16, D>,
+            T1: fidl::encoding::Encode<u8, D>,
+        > fidl::encoding::Encode<Padding1ByteEnd, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -239,16 +239,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding1ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding1ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u16), b: fidl::new_empty!(u8) }
+            Self { a: fidl::new_empty!(u16, D), b: fidl::new_empty!(u8, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -272,6 +272,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding1ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding1ByteMiddle {
         type Owned = Self;
 
@@ -285,20 +292,14 @@ mod internal {
             4
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding1ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding1ByteMiddle> for &Padding1ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding1ByteMiddle, D>
+        for &Padding1ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -317,13 +318,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u8>, T1: fidl::encoding::Encode<u16>>
-        fidl::encoding::Encode<Padding1ByteMiddle> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u8, D>,
+            T1: fidl::encoding::Encode<u16, D>,
+        > fidl::encoding::Encode<Padding1ByteMiddle, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -341,16 +345,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding1ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding1ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u8), b: fidl::new_empty!(u16) }
+            Self { a: fidl::new_empty!(u8, D), b: fidl::new_empty!(u16, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -374,6 +378,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding2ByteAlignmentLength6 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding2ByteAlignmentLength6 {
         type Owned = Self;
 
@@ -387,20 +398,14 @@ mod internal {
             6
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding2ByteAlignmentLength6 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding2ByteAlignmentLength6> for &Padding2ByteAlignmentLength6 {
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<Padding2ByteAlignmentLength6, D> for &Padding2ByteAlignmentLength6
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -423,15 +428,16 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u8>,
-            T1: fidl::encoding::Encode<u16>,
-            T2: fidl::encoding::Encode<u8>,
-        > fidl::encoding::Encode<Padding2ByteAlignmentLength6> for (T0, T1, T2)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u8, D>,
+            T1: fidl::encoding::Encode<u16, D>,
+            T2: fidl::encoding::Encode<u8, D>,
+        > fidl::encoding::Encode<Padding2ByteAlignmentLength6, D> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -454,16 +460,22 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding2ByteAlignmentLength6 {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for Padding2ByteAlignmentLength6
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u8), b: fidl::new_empty!(u16), c: fidl::new_empty!(u8) }
+            Self {
+                a: fidl::new_empty!(u8, D),
+                b: fidl::new_empty!(u16, D),
+                c: fidl::new_empty!(u8, D),
+            }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -496,6 +508,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding2ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding2ByteEnd {
         type Owned = Self;
 
@@ -509,20 +528,14 @@ mod internal {
             8
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding2ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding2ByteEnd> for &Padding2ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding2ByteEnd, D>
+        for &Padding2ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -541,13 +554,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u16>>
-        fidl::encoding::Encode<Padding2ByteEnd> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u32, D>,
+            T1: fidl::encoding::Encode<u16, D>,
+        > fidl::encoding::Encode<Padding2ByteEnd, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -565,16 +581,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding2ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding2ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u16) }
+            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u16, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -598,6 +614,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding2ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding2ByteMiddle {
         type Owned = Self;
 
@@ -611,20 +634,14 @@ mod internal {
             8
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding2ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding2ByteMiddle> for &Padding2ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding2ByteMiddle, D>
+        for &Padding2ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -643,13 +660,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u16>, T1: fidl::encoding::Encode<u32>>
-        fidl::encoding::Encode<Padding2ByteMiddle> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u16, D>,
+            T1: fidl::encoding::Encode<u32, D>,
+        > fidl::encoding::Encode<Padding2ByteMiddle, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -667,16 +687,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding2ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding2ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u16), b: fidl::new_empty!(u32) }
+            Self { a: fidl::new_empty!(u16, D), b: fidl::new_empty!(u32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -700,6 +720,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding3ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding3ByteEnd {
         type Owned = Self;
 
@@ -713,20 +740,14 @@ mod internal {
             8
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding3ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding3ByteEnd> for &Padding3ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding3ByteEnd, D>
+        for &Padding3ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -745,13 +766,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u8>>
-        fidl::encoding::Encode<Padding3ByteEnd> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u32, D>,
+            T1: fidl::encoding::Encode<u8, D>,
+        > fidl::encoding::Encode<Padding3ByteEnd, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -769,16 +793,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding3ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding3ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u8) }
+            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u8, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -802,6 +826,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding3ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding3ByteMiddle {
         type Owned = Self;
 
@@ -815,20 +846,14 @@ mod internal {
             8
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding3ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding3ByteMiddle> for &Padding3ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding3ByteMiddle, D>
+        for &Padding3ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -847,13 +872,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u8>, T1: fidl::encoding::Encode<u32>>
-        fidl::encoding::Encode<Padding3ByteMiddle> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u8, D>,
+            T1: fidl::encoding::Encode<u32, D>,
+        > fidl::encoding::Encode<Padding3ByteMiddle, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -871,16 +899,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding3ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding3ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u8), b: fidl::new_empty!(u32) }
+            Self { a: fidl::new_empty!(u8, D), b: fidl::new_empty!(u32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -904,6 +932,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding4ByteAlignmentLength12 {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding4ByteAlignmentLength12 {
         type Owned = Self;
 
@@ -917,22 +952,15 @@ mod internal {
             12
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding4ByteAlignmentLength12 {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding4ByteAlignmentLength12>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<Padding4ByteAlignmentLength12, D>
         for &Padding4ByteAlignmentLength12
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -955,16 +983,17 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u32>,
-            T1: fidl::encoding::Encode<u8>,
-            T2: fidl::encoding::Encode<u16>,
-            T3: fidl::encoding::Encode<u16>,
-        > fidl::encoding::Encode<Padding4ByteAlignmentLength12> for (T0, T1, T2, T3)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u32, D>,
+            T1: fidl::encoding::Encode<u8, D>,
+            T2: fidl::encoding::Encode<u16, D>,
+            T3: fidl::encoding::Encode<u16, D>,
+        > fidl::encoding::Encode<Padding4ByteAlignmentLength12, D> for (T0, T1, T2, T3)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -988,21 +1017,23 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding4ByteAlignmentLength12 {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for Padding4ByteAlignmentLength12
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                a: fidl::new_empty!(u32),
-                b: fidl::new_empty!(u8),
-                c: fidl::new_empty!(u16),
-                d: fidl::new_empty!(u16),
+                a: fidl::new_empty!(u32, D),
+                b: fidl::new_empty!(u8, D),
+                c: fidl::new_empty!(u16, D),
+                d: fidl::new_empty!(u16, D),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1035,6 +1066,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding4ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding4ByteEnd {
         type Owned = Self;
 
@@ -1048,20 +1086,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding4ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding4ByteEnd> for &Padding4ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding4ByteEnd, D>
+        for &Padding4ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1080,13 +1112,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u64>, T1: fidl::encoding::Encode<u32>>
-        fidl::encoding::Encode<Padding4ByteEnd> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u64, D>,
+            T1: fidl::encoding::Encode<u32, D>,
+        > fidl::encoding::Encode<Padding4ByteEnd, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1104,16 +1139,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding4ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding4ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u64), b: fidl::new_empty!(u32) }
+            Self { a: fidl::new_empty!(u64, D), b: fidl::new_empty!(u32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1137,6 +1172,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding4ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding4ByteMiddle {
         type Owned = Self;
 
@@ -1150,20 +1192,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding4ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding4ByteMiddle> for &Padding4ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding4ByteMiddle, D>
+        for &Padding4ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1182,13 +1218,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u32>, T1: fidl::encoding::Encode<u64>>
-        fidl::encoding::Encode<Padding4ByteMiddle> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u32, D>,
+            T1: fidl::encoding::Encode<u64, D>,
+        > fidl::encoding::Encode<Padding4ByteMiddle, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1206,16 +1245,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding4ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding4ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u32), b: fidl::new_empty!(u64) }
+            Self { a: fidl::new_empty!(u32, D), b: fidl::new_empty!(u64, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1239,6 +1278,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding5ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding5ByteEnd {
         type Owned = Self;
 
@@ -1252,20 +1298,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding5ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding5ByteEnd> for &Padding5ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding5ByteEnd, D>
+        for &Padding5ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1285,15 +1325,16 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u64>,
-            T1: fidl::encoding::Encode<u16>,
-            T2: fidl::encoding::Encode<u8>,
-        > fidl::encoding::Encode<Padding5ByteEnd> for (T0, T1, T2)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u64, D>,
+            T1: fidl::encoding::Encode<u16, D>,
+            T2: fidl::encoding::Encode<u8, D>,
+        > fidl::encoding::Encode<Padding5ByteEnd, D> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1312,16 +1353,20 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding5ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding5ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u64), b: fidl::new_empty!(u16), c: fidl::new_empty!(u8) }
+            Self {
+                a: fidl::new_empty!(u64, D),
+                b: fidl::new_empty!(u16, D),
+                c: fidl::new_empty!(u8, D),
+            }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1345,6 +1390,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding5ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding5ByteMiddle {
         type Owned = Self;
 
@@ -1358,20 +1410,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding5ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding5ByteMiddle> for &Padding5ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding5ByteMiddle, D>
+        for &Padding5ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1391,15 +1437,16 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u16>,
-            T1: fidl::encoding::Encode<u8>,
-            T2: fidl::encoding::Encode<u64>,
-        > fidl::encoding::Encode<Padding5ByteMiddle> for (T0, T1, T2)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u16, D>,
+            T1: fidl::encoding::Encode<u8, D>,
+            T2: fidl::encoding::Encode<u64, D>,
+        > fidl::encoding::Encode<Padding5ByteMiddle, D> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1418,16 +1465,20 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding5ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding5ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u16), b: fidl::new_empty!(u8), c: fidl::new_empty!(u64) }
+            Self {
+                a: fidl::new_empty!(u16, D),
+                b: fidl::new_empty!(u8, D),
+                c: fidl::new_empty!(u64, D),
+            }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1451,6 +1502,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding6ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding6ByteEnd {
         type Owned = Self;
 
@@ -1464,20 +1522,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding6ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding6ByteEnd> for &Padding6ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding6ByteEnd, D>
+        for &Padding6ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1496,13 +1548,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u64>, T1: fidl::encoding::Encode<u16>>
-        fidl::encoding::Encode<Padding6ByteEnd> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u64, D>,
+            T1: fidl::encoding::Encode<u16, D>,
+        > fidl::encoding::Encode<Padding6ByteEnd, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1520,16 +1575,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding6ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding6ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u64), b: fidl::new_empty!(u16) }
+            Self { a: fidl::new_empty!(u64, D), b: fidl::new_empty!(u16, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1553,6 +1608,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding6ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding6ByteMiddle {
         type Owned = Self;
 
@@ -1566,20 +1628,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding6ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding6ByteMiddle> for &Padding6ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding6ByteMiddle, D>
+        for &Padding6ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1598,13 +1654,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u16>, T1: fidl::encoding::Encode<u64>>
-        fidl::encoding::Encode<Padding6ByteMiddle> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u16, D>,
+            T1: fidl::encoding::Encode<u64, D>,
+        > fidl::encoding::Encode<Padding6ByteMiddle, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1622,16 +1681,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding6ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding6ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u16), b: fidl::new_empty!(u64) }
+            Self { a: fidl::new_empty!(u16, D), b: fidl::new_empty!(u64, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1655,6 +1714,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding7ByteEnd {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding7ByteEnd {
         type Owned = Self;
 
@@ -1668,20 +1734,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding7ByteEnd {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding7ByteEnd> for &Padding7ByteEnd {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding7ByteEnd, D>
+        for &Padding7ByteEnd
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1700,13 +1760,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u64>, T1: fidl::encoding::Encode<u8>>
-        fidl::encoding::Encode<Padding7ByteEnd> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u64, D>,
+            T1: fidl::encoding::Encode<u8, D>,
+        > fidl::encoding::Encode<Padding7ByteEnd, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1724,16 +1787,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding7ByteEnd {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding7ByteEnd {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u64), b: fidl::new_empty!(u8) }
+            Self { a: fidl::new_empty!(u64, D), b: fidl::new_empty!(u8, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1757,6 +1820,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Padding7ByteMiddle {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Padding7ByteMiddle {
         type Owned = Self;
 
@@ -1770,20 +1840,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Padding7ByteMiddle {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Padding7ByteMiddle> for &Padding7ByteMiddle {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Padding7ByteMiddle, D>
+        for &Padding7ByteMiddle
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1802,13 +1866,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u8>, T1: fidl::encoding::Encode<u64>>
-        fidl::encoding::Encode<Padding7ByteMiddle> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u8, D>,
+            T1: fidl::encoding::Encode<u64, D>,
+        > fidl::encoding::Encode<Padding7ByteMiddle, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1826,16 +1893,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Padding7ByteMiddle {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Padding7ByteMiddle {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(u8), b: fidl::new_empty!(u64) }
+            Self { a: fidl::new_empty!(u8, D), b: fidl::new_empty!(u64, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

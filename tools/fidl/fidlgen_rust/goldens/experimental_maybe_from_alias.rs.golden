@@ -336,6 +336,15 @@ impl MyProtocolControlHandle {}
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ResourceTypeMarker for Testing {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Testing {
         type Owned = Self;
 
@@ -349,26 +358,23 @@ mod internal {
             704
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for Testing {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Testing> for &mut Testing {
+    unsafe impl fidl::encoding::Encode<Testing, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut Testing
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Testing>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Testing>::encode(
+            fidl::encoding::Encode::<Testing, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
                 (
                     <u64 as fidl::encoding::ValueTypeMarker>::borrow(&self.u1),
                     <fidl::encoding::Vector<u64, 1> as fidl::encoding::ValueTypeMarker>::borrow(&self.u2),
@@ -404,32 +410,65 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u64>,
-            T1: fidl::encoding::Encode<fidl::encoding::Vector<u64, 1>>,
-            T2: fidl::encoding::Encode<fidl::encoding::Array<u64, 1>>,
-            T3: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>>,
-            T4: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>>,
-            T5: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>>,
-            T6: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>>,
-            T7: fidl::encoding::Encode<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>>,
+            T0: fidl::encoding::Encode<u64, fidl::encoding::DefaultFuchsiaResourceDialect>,
+            T1: fidl::encoding::Encode<
+                fidl::encoding::Vector<u64, 1>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T2: fidl::encoding::Encode<
+                fidl::encoding::Array<u64, 1>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T3: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T4: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T5: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T6: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T7: fidl::encoding::Encode<
+                fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             T8: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T9: fidl::encoding::Encode<
                 fidl::encoding::Array<
                     fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
                     4,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T10: fidl::encoding::Encode<fidl::encoding::Array<u64, 1>>,
-            T11: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>>,
-            T12: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>>,
+            T10: fidl::encoding::Encode<
+                fidl::encoding::Array<u64, 1>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T11: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T12: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             T13: fidl::encoding::Encode<
                 fidl::encoding::Optional<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T14: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
@@ -437,6 +476,7 @@ mod internal {
                         fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T15: fidl::encoding::Encode<
                 fidl::encoding::Array<
@@ -445,24 +485,57 @@ mod internal {
                     >,
                     4,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T16: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u8>>,
+            T16: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<u8>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             T17: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T18: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>>,
-            T19: fidl::encoding::Encode<fidl::encoding::UnboundedString>,
+            T18: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T19: fidl::encoding::Encode<
+                fidl::encoding::UnboundedString,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             T20: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T21: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedString, 4>>,
-            T22: fidl::encoding::Encode<fidl::encoding::Vector<u64, 2>>,
-            T23: fidl::encoding::Encode<fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>>,
-            T24: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>>,
-            T25: fidl::encoding::Encode<fidl::encoding::Array<u64, 2>>,
-            T26: fidl::encoding::Encode<fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>>,
-            T27: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>>,
-        > fidl::encoding::Encode<Testing>
+            T21: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::UnboundedString, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T22: fidl::encoding::Encode<
+                fidl::encoding::Vector<u64, 2>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T23: fidl::encoding::Encode<
+                fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T24: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T25: fidl::encoding::Encode<
+                fidl::encoding::Array<u64, 2>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T26: fidl::encoding::Encode<
+                fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T27: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+        > fidl::encoding::Encode<Testing, fidl::encoding::DefaultFuchsiaResourceDialect>
         for (
             T0,
             T1,
@@ -497,7 +570,10 @@ mod internal {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -541,51 +617,68 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Testing {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for Testing {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                u1: fidl::new_empty!(u64),
-                u2: fidl::new_empty!(fidl::encoding::Vector<u64, 1>),
-                u3: fidl::new_empty!(fidl::encoding::Array<u64, 1>),
+                u1: fidl::new_empty!(u64, fidl::encoding::DefaultFuchsiaResourceDialect),
+                u2: fidl::new_empty!(fidl::encoding::Vector<u64, 1>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                u3: fidl::new_empty!(fidl::encoding::Array<u64, 1>, fidl::encoding::DefaultFuchsiaResourceDialect),
                 u4: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 u5: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                u6: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>),
-                u7: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>),
+                u6: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                u7: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
                 v1: fidl::new_empty!(
-                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 v2: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 v3: fidl::new_empty!(
                     fidl::encoding::Array<
                         fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
                         4,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                a1: fidl::new_empty!(fidl::encoding::Array<u64, 1>),
+                a1: fidl::new_empty!(fidl::encoding::Array<u64, 1>, fidl::encoding::DefaultFuchsiaResourceDialect),
                 a2: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                a3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>),
+                a3: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
                 r1: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 r2: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::Optional<
                             fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
                         >,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 r3: fidl::new_empty!(
                     fidl::encoding::Array<
@@ -593,31 +686,58 @@ mod internal {
                             fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
                         >,
                         4,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                b1: fidl::new_empty!(fidl::encoding::UnboundedVector<u8>),
+                b1: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<u8>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
                 b2: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                b3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>),
-                s1: fidl::new_empty!(fidl::encoding::UnboundedString),
+                b3: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                s1: fidl::new_empty!(
+                    fidl::encoding::UnboundedString,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
                 s2: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                s3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedString, 4>),
-                vv1: fidl::new_empty!(fidl::encoding::Vector<u64, 2>),
-                vv2: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>),
-                vv3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>),
-                aa1: fidl::new_empty!(fidl::encoding::Array<u64, 2>),
-                aa2: fidl::new_empty!(fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>),
-                aa3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>),
+                s3: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedString, 4>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                vv1: fidl::new_empty!(fidl::encoding::Vector<u64, 2>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                vv2: fidl::new_empty!(
+                    fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                vv3: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                aa1: fidl::new_empty!(fidl::encoding::Array<u64, 2>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                aa2: fidl::new_empty!(
+                    fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                aa3: fidl::new_empty!(
+                    fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -632,11 +752,19 @@ mod internal {
                     padding_start: offset + 312 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u64, &mut self.u1, decoder, offset + 0, _depth)?;
-            fidl::decode!(fidl::encoding::Vector<u64, 1>, &mut self.u2, decoder, offset + 8, _depth)?;
-            fidl::decode!(fidl::encoding::Array<u64, 1>, &mut self.u3, decoder, offset + 24, _depth)?;
+            fidl::decode!(
+                u64,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                &mut self.u1,
+                decoder,
+                offset + 0,
+                _depth
+            )?;
+            fidl::decode!(fidl::encoding::Vector<u64, 1>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.u2, decoder, offset + 8, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u64, 1>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.u3, decoder, offset + 24, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::Vector<u64, 1>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.u4,
                 decoder,
                 offset + 32,
@@ -644,6 +772,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.u5,
                 decoder,
                 offset + 48,
@@ -651,6 +780,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Vector<u64, 1>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.u6,
                 decoder,
                 offset + 64,
@@ -658,6 +788,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.u7,
                 decoder,
                 offset + 128,
@@ -665,6 +796,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.v1,
                 decoder,
                 offset + 160,
@@ -674,6 +806,7 @@ mod internal {
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.v2,
                 decoder,
                 offset + 176,
@@ -684,14 +817,16 @@ mod internal {
                     fidl::encoding::Optional<fidl::encoding::UnboundedVector<u64>>,
                     4,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.v3,
                 decoder,
                 offset + 192,
                 _depth
             )?;
-            fidl::decode!(fidl::encoding::Array<u64, 1>, &mut self.a1, decoder, offset + 256, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u64, 1>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.a1, decoder, offset + 256, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::Array<u64, 1>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.a2,
                 decoder,
                 offset + 264,
@@ -699,6 +834,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Array<u64, 1>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.a3,
                 decoder,
                 offset + 280,
@@ -708,6 +844,7 @@ mod internal {
                 fidl::encoding::Optional<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.r1,
                 decoder,
                 offset + 312,
@@ -719,6 +856,7 @@ mod internal {
                         fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<MyProtocolMarker>>,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.r2,
                 decoder,
                 offset + 320,
@@ -731,6 +869,7 @@ mod internal {
                     >,
                     4,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.r3,
                 decoder,
                 offset + 336,
@@ -738,6 +877,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<u8>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.b1,
                 decoder,
                 offset + 352,
@@ -745,6 +885,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.b2,
                 decoder,
                 offset + 368,
@@ -752,6 +893,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 4>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.b3,
                 decoder,
                 offset + 384,
@@ -759,6 +901,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedString,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.s1,
                 decoder,
                 offset + 448,
@@ -766,15 +909,17 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.s2,
                 decoder,
                 offset + 464,
                 _depth
             )?;
-            fidl::decode!(fidl::encoding::Array<fidl::encoding::UnboundedString, 4>, &mut self.s3, decoder, offset + 480, _depth)?;
-            fidl::decode!(fidl::encoding::Vector<u64, 2>, &mut self.vv1, decoder, offset + 544, _depth)?;
+            fidl::decode!(fidl::encoding::Array<fidl::encoding::UnboundedString, 4>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.s3, decoder, offset + 480, _depth)?;
+            fidl::decode!(fidl::encoding::Vector<u64, 2>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.vv1, decoder, offset + 544, _depth)?;
             fidl::decode!(
                 fidl::encoding::Vector<fidl::encoding::Vector<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vv2,
                 decoder,
                 offset + 560,
@@ -782,14 +927,16 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Vector<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vv3,
                 decoder,
                 offset + 576,
                 _depth
             )?;
-            fidl::decode!(fidl::encoding::Array<u64, 2>, &mut self.aa1, decoder, offset + 624, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u64, 2>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.aa1, decoder, offset + 624, _depth)?;
             fidl::decode!(
                 fidl::encoding::Vector<fidl::encoding::Array<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.aa2,
                 decoder,
                 offset + 640,
@@ -797,6 +944,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Array<u64, 2>, 3>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.aa3,
                 decoder,
                 offset + 656,

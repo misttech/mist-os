@@ -364,8 +364,8 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x3179cf8f46814221 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest);
-                    fidl::encoding::Decoder::decode_into::<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ExampleUseOfErrorSyntaxControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -379,8 +379,8 @@ impl futures::Stream for ExampleUseOfErrorSyntaxRequestStream {
                 }
                 0x3424ff83ce3004a2 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(ExampleUseOfErrorSyntaxCallWhichMayFailRequest);
-                    fidl::encoding::Decoder::decode_into::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(ExampleUseOfErrorSyntaxCallWhichMayFailRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ExampleUseOfErrorSyntaxControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -617,6 +617,13 @@ impl ExampleUseOfErrorSyntaxCallWhichMayFailResponder {
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
         type Owned = Self;
 
@@ -630,28 +637,21 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailRequest, D>
         for &ExampleUseOfErrorSyntaxCallWhichMayFailRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>::encode(
+            fidl::encoding::Encode::<ExampleUseOfErrorSyntaxCallWhichMayFailRequest, D>::encode(
                 (<fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                     &self.s,
                 ),),
@@ -661,13 +661,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::UnboundedString>>
-        fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailRequest> for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::UnboundedString, D>,
+        > fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -680,16 +682,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { s: fidl::new_empty!(fidl::encoding::UnboundedString) }
+            Self { s: fidl::new_empty!(fidl::encoding::UnboundedString, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -697,12 +701,20 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::UnboundedString,
+                D,
                 &mut self.s,
                 decoder,
                 offset + 0,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -728,22 +740,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, D>
         for &ExampleUseOfErrorSyntaxCallWhichMayFailResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -760,13 +765,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i64>>
-        fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i64, D>>
+        fidl::encoding::Encode<ExampleUseOfErrorSyntaxCallWhichMayFailResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -779,16 +784,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for ExampleUseOfErrorSyntaxCallWhichMayFailResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { value: fidl::new_empty!(i64) }
+            Self { value: fidl::new_empty!(i64, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

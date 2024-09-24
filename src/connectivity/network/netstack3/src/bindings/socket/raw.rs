@@ -5,7 +5,6 @@
 use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
-use fidl::encoding::Decode as _;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker, RequestStream};
 use futures::StreamExt as _;
 use log::error;
@@ -660,12 +659,7 @@ fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
         I::SocketAddress::new(src_addr, RAW_IP_PORT_NUM).into_sock_addr()
     });
 
-    Ok(RecvMsgResponse {
-        src_addr,
-        data,
-        control: fposix_socket::NetworkSocketRecvControlData::new_empty(),
-        truncated_bytes,
-    })
+    Ok(RecvMsgResponse { src_addr, data, control: Default::default(), truncated_bytes })
 }
 
 /// Handler for a [`fpraw::SocketRequest::SendMsg`] request.

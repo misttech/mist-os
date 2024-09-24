@@ -5,8 +5,9 @@
 //! An implementation of a client for a fidl interface.
 
 use crate::encoding::{
-    decode_transaction_header, Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody,
-    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
+    decode_transaction_header, Decode, Decoder, DefaultFuchsiaResourceDialect, DynamicFlags,
+    Encode, Encoder, EpitaphBody, TransactionHeader, TransactionMessage, TransactionMessageType,
+    TypeMarker,
 };
 use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
 use crate::Error;
@@ -28,14 +29,22 @@ use std::task::{RawWaker, RawWakerVTable};
 #[doc(hidden)] // only exported for use in macros or generated code
 pub fn decode_transaction_body<T: TypeMarker, const EXPECTED_ORDINAL: u64>(
     mut buf: MessageBufEtc,
-) -> Result<T::Owned, Error> {
+) -> Result<T::Owned, Error>
+where
+    T::Owned: Decode<T, DefaultFuchsiaResourceDialect>,
+{
     let (bytes, handles) = buf.split_mut();
     let (header, body_bytes) = decode_transaction_header(bytes)?;
     if header.ordinal != EXPECTED_ORDINAL {
         return Err(Error::InvalidResponseOrdinal);
     }
-    let mut output = Decode::<T>::new_empty();
-    Decoder::decode_into::<T>(&header, body_bytes, handles, &mut output)?;
+    let mut output = Decode::<T, DefaultFuchsiaResourceDialect>::new_empty();
+    Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<T>(
+        &header,
+        body_bytes,
+        handles,
+        &mut output,
+    )?;
     Ok(output)
 }
 
@@ -188,23 +197,27 @@ impl Client {
     /// Encodes and sends a request without expecting a response.
     pub fn send<T: TypeMarker>(
         &self,
-        body: impl Encode<T>,
+        body: impl Encode<T, DefaultFuchsiaResourceDialect>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
     ) -> Result<(), Error> {
         let msg =
             TransactionMessage { header: TransactionHeader::new(0, ordinal, dynamic_flags), body };
-        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, ()>(msg, |bytes, handles| {
-            self.send_raw(bytes, handles)
-        })
+        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, _, ()>(
+            msg,
+            |bytes, handles| self.send_raw(bytes, handles),
+        )
     }
 
     /// Encodes and sends a request. Returns a future that decodes the response.
     pub fn send_query<Request: TypeMarker, Response: TypeMarker, const ORDINAL: u64>(
         &self,
-        body: impl Encode<Request>,
+        body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
         dynamic_flags: DynamicFlags,
-    ) -> QueryResponseFut<Response::Owned> {
+    ) -> QueryResponseFut<Response::Owned>
+    where
+        Response::Owned: Decode<Response, DefaultFuchsiaResourceDialect>,
+    {
         self.send_query_and_decode::<Request, Response::Owned>(
             body,
             ORDINAL,
@@ -217,7 +230,7 @@ impl Client {
     /// using the given `decode` function.
     pub fn send_query_and_decode<Request: TypeMarker, Output>(
         &self,
-        body: impl Encode<Request>,
+        body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
         decode: fn(Result<MessageBufEtc, Error>) -> Result<Output, Error>,
@@ -661,8 +674,9 @@ impl ClientInner {
             if header.is_epitaph() {
                 // Received an epitaph. Record this so that everyone receives the same epitaph.
                 let handles = &mut [];
-                let mut epitaph_body = Decode::<EpitaphBody>::new_empty();
-                Decoder::decode_into::<EpitaphBody>(
+                let mut epitaph_body =
+                    Decode::<EpitaphBody, DefaultFuchsiaResourceDialect>::new_empty();
+                Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<EpitaphBody>(
                     &header,
                     body_bytes,
                     handles,
@@ -840,7 +854,7 @@ pub mod sync {
         /// Send a new message.
         pub fn send<T: TypeMarker>(
             &self,
-            body: impl Encode<T>,
+            body: impl Encode<T, DefaultFuchsiaResourceDialect>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
         ) -> Result<(), Error> {
@@ -864,11 +878,14 @@ pub mod sync {
         /// Send a new message expecting a response.
         pub fn send_query<Request: TypeMarker, Response: TypeMarker>(
             &self,
-            body: impl Encode<Request>,
+            body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
             deadline: zx::MonotonicTime,
-        ) -> Result<Response::Owned, Error> {
+        ) -> Result<Response::Owned, Error>
+        where
+            Response::Owned: Decode<Response, DefaultFuchsiaResourceDialect>,
+        {
             let mut write_bytes = Vec::new();
             let mut write_handles = Vec::new();
 
@@ -901,8 +918,13 @@ pub mod sync {
             if header.ordinal != ordinal {
                 return Err(Error::InvalidResponseOrdinal);
             }
-            let mut output = Decode::<Response>::new_empty();
-            Decoder::decode_into::<Response>(&header, body_bytes, handles_out, &mut output)?;
+            let mut output = Decode::<Response, DefaultFuchsiaResourceDialect>::new_empty();
+            Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<Response>(
+                &header,
+                body_bytes,
+                handles_out,
+                &mut output,
+            )?;
             Ok(output)
         }
 
@@ -1010,8 +1032,10 @@ mod tests {
         handles: &mut Vec<zx::HandleDisposition<'static>>,
     ) {
         let event = TransactionMessage { header, body: SEND_DATA };
-        Encoder::encode::<TransactionMessageType<u8>>(bytes, handles, event)
-            .expect("Encoding failure");
+        Encoder::<DefaultFuchsiaResourceDialect>::encode::<TransactionMessageType<u8>>(
+            bytes, handles, event,
+        )
+        .expect("Encoding failure");
     }
 
     #[test]

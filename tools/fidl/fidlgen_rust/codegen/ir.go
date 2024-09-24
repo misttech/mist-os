@@ -30,13 +30,17 @@ type Type struct {
 	DeclType         fidlgen.DeclType
 
 	// The marker type that implements fidl::encoding::Type.
-	Fidl string
+	FidlTemplate string
 	// The associated type fidl::encoding::Type::Owned.
 	Owned string
 	// The type to use when this occurs as a method parameter.
 	// TODO(https://fxbug.dev/42073194): Once the transition to the new types if complete,
 	// document this as being {Value,Resource}Type::Borrowed.
 	Param string
+}
+
+func (t *Type) Fidl(dialect string) string {
+	return strings.Replace(t.FidlTemplate, "#DIALECT", dialect, -1)
 }
 
 type Alias struct {
@@ -209,7 +213,7 @@ type Payload struct {
 	// The fidl::encoding::Type type. It can be fidl::encoding::EmptyPayload,
 	// a struct, table, or union, or (only for two-way responses) one of
 	// fidl::encoding::{Result,Flexible,FlexibleResult}Type.
-	FidlType string
+	FidlTypeTemplate string
 	// Equivalent to <FidlType as fidl::encoding::Type>::Owned.
 	OwnedType string
 	// The user-facing owned type. This is derived from OwnedType by removing
@@ -239,6 +243,10 @@ type Payload struct {
 	//     "result: v.map(|x| x.param1),"
 	// TODO(https://fxbug.dev/42073194): Remove.
 	ConvertToFields func(string) string
+}
+
+func (p *Payload) FidlType(dialect string) string {
+	return strings.Replace(p.FidlTypeTemplate, "#DIALECT", dialect, -1)
 }
 
 // A parameter in a method request or response.
@@ -779,13 +787,13 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 	switch val.Kind {
 	case fidlgen.PrimitiveType:
 		s := compilePrimitiveSubtype(val.PrimitiveSubtype)
-		t.Fidl = s
+		t.FidlTemplate = s
 		t.Owned = s
 		t.Param = s
 	case fidlgen.ArrayType:
 		el := c.compileType(*val.ElementType)
 		t.ElementType = &el
-		t.Fidl = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.Fidl, *val.ElementCount)
+		t.FidlTemplate = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.FidlTemplate, *val.ElementCount)
 		t.Owned = fmt.Sprintf("[%s; %d]", el.Owned, *val.ElementCount)
 		if el.IsResourceType() {
 			t.Param = t.Owned
@@ -796,9 +804,9 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		el := c.compileType(*val.ElementType)
 		t.ElementType = &el
 		if val.ElementCount == nil {
-			t.Fidl = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.Fidl)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.FidlTemplate)
 		} else {
-			t.Fidl = fmt.Sprintf("fidl::encoding::Vector<%s, %d>", el.Fidl, *val.ElementCount)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Vector<%s, %d>", el.FidlTemplate, *val.ElementCount)
 		}
 		t.Owned = fmt.Sprintf("Vec<%s>", el.Owned)
 		if el.IsResourceType() {
@@ -807,41 +815,41 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = fmt.Sprintf("&[%s]", el.Owned)
 		}
 		if val.Nullable {
-			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
 			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.StringType:
 		if val.ElementCount == nil {
-			t.Fidl = "fidl::encoding::UnboundedString"
+			t.FidlTemplate = "fidl::encoding::UnboundedString"
 		} else {
-			t.Fidl = fmt.Sprintf("fidl::encoding::BoundedString<%d>", *val.ElementCount)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::BoundedString<%d>", *val.ElementCount)
 		}
 		t.Owned = "String"
 		t.Param = "&str"
 		if val.Nullable {
-			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
 			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.HandleType:
 		s := compileHandleSubtype(val.HandleSubtype)
 		objType := compileObjectTypeConst(val.HandleSubtype)
-		t.Fidl = fmt.Sprintf("fidl::encoding::HandleType<%s, { %s.into_raw() }, %d>", s, objType, val.HandleRights)
+		t.FidlTemplate = fmt.Sprintf("fidl::encoding::HandleType<%s, { %s.into_raw() }, %d>", s, objType, val.HandleRights)
 		t.Owned = s
 		t.Param = s
 		if val.Nullable {
-			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
 			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.RequestType:
 		s := fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
-		t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+		t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 		t.Owned = s
 		t.Param = s
 		if val.Nullable {
-			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
 			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
@@ -851,11 +859,11 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		t.DeclType = declInfo.Type
 		switch declInfo.Type {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
-			t.Fidl = name
+			t.FidlTemplate = name
 			t.Owned = name
 			t.Param = name
 		case fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
-			t.Fidl = name
+			t.FidlTemplate = name
 			t.Owned = name
 			if t.IsResourceType() {
 				t.Param = name
@@ -865,9 +873,9 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			if val.Nullable {
 				switch declInfo.Type {
 				case fidlgen.StructDeclType:
-					t.Fidl = fmt.Sprintf("fidl::encoding::Boxed<%s>", t.Fidl)
+					t.FidlTemplate = fmt.Sprintf("fidl::encoding::Boxed<%s>", t.FidlTemplate)
 				case fidlgen.UnionDeclType:
-					t.Fidl = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.Fidl)
+					t.FidlTemplate = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.FidlTemplate)
 				default:
 					panic(fmt.Sprintf("unexpected type: %s", declInfo.Type))
 				}
@@ -880,11 +888,11 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			}
 		case fidlgen.ProtocolDeclType:
 			s := fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
-			t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 			t.Owned = s
 			t.Param = s
 			if val.Nullable {
-				t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+				t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
 				t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
 				t.Param = fmt.Sprintf("Option<%s>", t.Param)
 			}
@@ -895,7 +903,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		switch val.InternalSubtype {
 		case fidlgen.FrameworkErr:
 			s := "fidl::encoding::FrameworkErr"
-			t.Fidl = s
+			t.FidlTemplate = s
 			t.Owned = s
 			t.Param = s
 		default:
@@ -1167,12 +1175,12 @@ func fmtOneOrTuple(items []string) string {
 
 func emptyPayload(fidlType string) Payload {
 	return Payload{
-		FidlType:        fidlType,
-		OwnedType:       "()",
-		TupleType:       "()",
-		EncodeExpr:      "()",
-		ConvertToTuple:  func(owned string) string { return owned },
-		ConvertToFields: func(owned string) string { return "" },
+		FidlTypeTemplate: fidlType,
+		OwnedType:        "()",
+		TupleType:        "()",
+		EncodeExpr:       "()",
+		ConvertToTuple:   func(owned string) string { return owned },
+		ConvertToFields:  func(owned string) string { return "" },
 	}
 }
 
@@ -1184,9 +1192,9 @@ func (c *compiler) payloadForType(payloadType Type) Payload {
 	if !ok {
 		paramName := "payload"
 		return Payload{
-			FidlType:  typeName,
-			OwnedType: typeName,
-			TupleType: typeName,
+			FidlTypeTemplate: typeName,
+			OwnedType:        typeName,
+			TupleType:        typeName,
 			Parameters: []Parameter{{
 				Name:      paramName,
 				Type:      payloadType.Param,
@@ -1219,11 +1227,11 @@ func (c *compiler) payloadForType(payloadType Type) Payload {
 		encodeExprs = append(encodeExprs, convertParamToEncodeExpr(paramName, typ))
 	}
 	return Payload{
-		FidlType:   typeName,
-		OwnedType:  typeName,
-		TupleType:  fmtOneOrTuple(ownedTypes),
-		Parameters: parameters,
-		EncodeExpr: fmtTuple(encodeExprs),
+		FidlTypeTemplate: typeName,
+		OwnedType:        typeName,
+		TupleType:        fmtOneOrTuple(ownedTypes),
+		Parameters:       parameters,
+		EncodeExpr:       fmtTuple(encodeExprs),
 		ConvertToTuple: func(owned string) string {
 			var exprs []string
 			for _, param := range parameters {
@@ -1279,13 +1287,13 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 
 	// Set FidlType and OwnedType, which are different for each of the 3 cases.
 	if m.HasFrameworkError() && m.HasError {
-		p.FidlType = fmt.Sprintf("fidl::encoding::FlexibleResultType<%s, %s>", inner.FidlType, errType.Fidl)
+		p.FidlTypeTemplate = fmt.Sprintf("fidl::encoding::FlexibleResultType<%s, %s>", inner.FidlTypeTemplate, errType.FidlTemplate)
 		p.OwnedType = fmt.Sprintf("fidl::encoding::FlexibleResult<%s, %s>", inner.OwnedType, errType.Owned)
 	} else if m.HasFrameworkError() {
-		p.FidlType = fmt.Sprintf("fidl::encoding::FlexibleType<%s>", inner.FidlType)
+		p.FidlTypeTemplate = fmt.Sprintf("fidl::encoding::FlexibleType<%s>", inner.FidlTypeTemplate)
 		p.OwnedType = fmt.Sprintf("fidl::encoding::Flexible<%s>", inner.OwnedType)
 	} else if m.HasError {
-		p.FidlType = fmt.Sprintf("fidl::encoding::ResultType<%s, %s>", inner.FidlType, errType.Fidl)
+		p.FidlTypeTemplate = fmt.Sprintf("fidl::encoding::ResultType<%s, %s>", inner.FidlTypeTemplate, errType.FidlTemplate)
 		p.OwnedType = fmt.Sprintf("Result<%s, %s>", inner.OwnedType, errType.Owned)
 	} else {
 		panic("should have returned earlier")

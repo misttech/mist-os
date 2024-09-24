@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -34,6 +30,13 @@ impl fidl::Persistable for MyStruct {}
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for MyStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for MyStruct {
         type Owned = Self;
 
@@ -47,20 +50,12 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for MyStruct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<MyStruct> for &MyStruct {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<MyStruct, D> for &MyStruct {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -70,7 +65,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for MyStruct {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for MyStruct {
         #[inline(always)]
         fn new_empty() -> Self {
             Self
@@ -79,7 +74,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

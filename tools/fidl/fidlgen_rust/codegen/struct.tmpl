@@ -26,6 +26,28 @@ impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ 
 {{- end }}
 
 {{- define "StructInternal" }}
+{{- $resourceDialectName := "D"}}
+{{- $resourceDialectGeneric := "<D: fidl::encoding::ResourceDialect>"}}
+{{- $resourceDialectGenericPart := "D: fidl::encoding::ResourceDialect, "}}
+{{- if .IsResourceType }}
+{{- $resourceDialectName = ResourceDialect}}
+{{- $resourceDialectGeneric = ""}}
+{{- $resourceDialectGenericPart = ""}}
+impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a mut Self;
+    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+{{- else }}
+impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a Self;
+    fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        value
+    }
+}
+{{- end }}
+
 unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     type Owned = Self;
 
@@ -52,25 +74,10 @@ unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     {{- end }}
 }
 
-{{- if .IsResourceType }}
-impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
-    type Borrowed<'a> = &'a mut Self;
-    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-        value
-    }
-}
-{{- else }}
-impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
-    type Borrowed<'a> = &'a Self;
-    fn borrow<'a>(value: &'a <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-        value
-    }
-}
-{{- end }}
 
-unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
+unsafe impl{{ $resourceDialectGeneric }} fidl::encoding::Encode<{{ .Name }}, {{ $resourceDialectName }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
     #[inline]
-    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_, {{ $resourceDialectName }}>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
         encoder.debug_check_bounds::<{{ .Name }}>(offset);
         {{- if not .Members }}
             {{- /* Case #1: Empty struct */}}
@@ -94,13 +101,13 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
         {{- else }}
             {{- /* Case #3: General case */}}
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<{{ .Name }}>::encode(
+            fidl::encoding::Encode::<{{ .Name }}, {{ $resourceDialectName }}>::encode(
                 (
                     {{- range .Members }}
                     {{- if .Type.IsResourceType }}
-                    <{{ .Type.Fidl }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.{{ .Name }}),
+                    <{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.{{ .Name }}),
                     {{- else }}
-                    <{{ .Type.Fidl }} as fidl::encoding::ValueTypeMarker>::borrow(&self.{{ .Name }}),
+                    <{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::ValueTypeMarker>::borrow(&self.{{ .Name }}),
                     {{- end }}
                     {{- end }}
                 ),
@@ -111,11 +118,11 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
 }
 
 {{- if .Members }}
-unsafe impl<{{ range $i, $member := .Members }} T{{ $i }}: fidl::encoding::Encode<{{ $member.Type.Fidl }}>,{{ end }}>
-    fidl::encoding::Encode<{{ .Name }}> for ({{ range $i, $member := .Members }} T{{ $i }},{{ end }})
+unsafe impl<{{ $resourceDialectGenericPart }}{{ range $i, $member := .Members }} T{{ $i }}: fidl::encoding::Encode<{{ $member.Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}>,{{ end }}>
+    fidl::encoding::Encode<{{ .Name }}, {{ $resourceDialectName }}> for ({{ range $i, $member := .Members }} T{{ $i }},{{ end }})
 {
     #[inline]
-    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_, {{ $resourceDialectName }}>, offset: usize, depth: fidl::encoding::Depth) -> fidl::Result<()> {
         encoder.debug_check_bounds::<{{ .Name }}>(offset);
         // Zero out padding regions. There's no need to apply masks
         // because the unmasked parts will be overwritten by fields.
@@ -134,19 +141,19 @@ unsafe impl<{{ range $i, $member := .Members }} T{{ $i }}: fidl::encoding::Encod
 }
 {{- end }}
 
-impl fidl::encoding::Decode<Self> for {{ .Name }} {
+impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDialectName }}> for {{ .Name }} {
     #[inline(always)]
     fn new_empty() -> Self {
         Self {{ if .Members -}} {
             {{- range .Members}}
-            {{ .Name }}: fidl::new_empty!({{ .Type.Fidl }}),
+            {{ .Name }}: fidl::new_empty!({{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}),
             {{- end }}
         }
         {{- end }}
     }
 
     #[inline]
-    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_, {{ $resourceDialectName }}>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
         {{- if not .Members }}
             {{- /* Case #1: Empty struct */}}
@@ -189,7 +196,7 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
             }
             {{- end }}
             {{- range .Members }}
-            fidl::decode!({{ .Type.Fidl }}, &mut self.{{ .Name }}, decoder, offset + {{ .OffsetV2 }}, _depth)?;
+            fidl::decode!({{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}, &mut self.{{ .Name }}, decoder, offset + {{ .OffsetV2 }}, _depth)?;
             {{- end }}
             Ok(())
         {{- end }}
