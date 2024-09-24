@@ -11,7 +11,9 @@ use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::power::create_proxy_for_wake_events;
+use starnix_core::power::{
+    create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
+};
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 use starnix_logging::log_warn;
@@ -237,7 +239,7 @@ impl InputDevice {
         loop {
             let next_event_future = local_listener_stream.next();
 
-            let (clear_mask, set_mask) = (zx::Signals::EVENT_SIGNALED, zx::Signals::empty());
+            let (clear_mask, set_mask) = (RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL);
             local_resume_event.as_ref().map(|e| {
                 let _ = e.signal_peer(clear_mask, set_mask);
             });

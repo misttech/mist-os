@@ -8,8 +8,11 @@ use fidl_fuchsia_ui_pointer::{
     TouchEvent as FidlTouchEvent, TouchPointerSample, TouchResponse as FidlTouchResponse,
     TouchResponseType, {self as fuipointer},
 };
+use fuchsia_async as fasync;
 use fuchsia_zircon::Peered;
-use starnix_core::power::create_proxy_for_wake_events;
+use starnix_core::power::{
+    create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
+};
 use starnix_core::task::Kernel;
 use starnix_logging::log_warn;
 use starnix_sync::Mutex;
@@ -17,7 +20,6 @@ use starnix_uapi::uapi;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub enum EventProxyMode {
     /// Don't proxy input events at all.
@@ -145,7 +147,7 @@ impl InputEventsRelay {
                 // .. until the event that we passed to the runner has been cleared. This prevents
                 // the container from suspending between calls to `watch`.
                 let (clear_mask, set_mask) =
-                    (zx::Signals::EVENT_SIGNALED, zx::Signals::empty());
+                        (RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL);
                 resume_event.as_ref().map(|e| {
                     // The proxy may have dropped the signal peer by now, so disregard errors.
                     // In the future we may need a better way to check that this is expected.

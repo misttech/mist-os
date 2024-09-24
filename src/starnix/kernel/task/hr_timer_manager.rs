@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::Proxy;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef, Peered};
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
@@ -15,7 +15,9 @@ use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Weak};
 
-use crate::power::{create_proxy_for_wake_events, OnWakeOps};
+use crate::power::{
+    create_proxy_for_wake_events, OnWakeOps, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
+};
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
@@ -114,9 +116,12 @@ impl HrTimerManagerState {
     /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
     fn reset_wake_event(&mut self) {
         self.wake_event.as_ref().map(|e| {
-            e.as_handle_ref()
-                .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::empty())
-                .expect("Failed to clear signal on timer event")
+            match e.signal_peer(RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL) {
+                Ok(_) => {}
+                Err(e) => {
+                    log_warn!("Failed to reset wake event state {:?}", e);
+                }
+            }
         });
     }
 }
