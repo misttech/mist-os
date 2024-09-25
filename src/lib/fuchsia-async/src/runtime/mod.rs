@@ -19,7 +19,7 @@ use self::stub as implementation;
 
 // Exports common to all target os.
 pub use implementation::executor::{Duration, LocalExecutor, SendExecutor, TestExecutor, Time};
-pub use implementation::task::{unblock, Task};
+pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
 #[cfg(not(target_arch = "wasm32"))]

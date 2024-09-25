@@ -16,10 +16,20 @@ pub mod task {
     use super::LOCAL_EXECUTOR;
     use core::task::{Context, Poll};
     use std::future::Future;
+    use std::mem::ManuallyDrop;
     use std::pin::Pin;
     use tokio::task::AbortHandle;
 
     use futures::FutureExt;
+
+    // NOTE: This isn't quite API equivalent to Fuchsia's JoinHandle.
+    pub use tokio::task::JoinHandle;
+
+    impl<T> From<JoinHandle<T>> for Task<T> {
+        fn from(task: JoinHandle<T>) -> Self {
+            Self { task, abort_on_drop: true }
+        }
+    }
 
     /// A handle to a task.
     ///
@@ -29,8 +39,17 @@ pub mod task {
     /// retaining the Task handle, call the detach() method.
     #[derive(Debug)]
     pub struct Task<T> {
-        task: tokio::task::JoinHandle<T>,
+        task: JoinHandle<T>,
         abort_on_drop: bool,
+    }
+
+    impl<T> Task<T> {
+        /// Returns a `JoinHandle` which will have detach-on-drop semantics.
+        pub fn detach_on_drop(self) -> JoinHandle<T> {
+            let this = ManuallyDrop::new(self);
+            // SAFETY: We are bypassing our drop implementation.
+            unsafe { std::ptr::read(&this.task) }
+        }
     }
 
     impl<T: 'static> Task<T> {

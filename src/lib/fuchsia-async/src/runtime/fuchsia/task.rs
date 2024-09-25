@@ -2,33 +2,99 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::atomic_future::AtomicFuture;
 use crate::scope::ScopeRef;
 use crate::EHandle;
 use futures::prelude::*;
 use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 /// A handle to a future that is owned and polled by the executor.
 ///
-/// Once a task is created, the executor will poll it until done,
-/// even if the task handle itself is not polled.
+/// Once a task is created, the executor will poll it until done, even if the task handle itself is
+/// not polled.
 ///
-/// When a task is dropped its future will no longer be polled by the
-/// executor. See [`Task::cancel`] for cancellation semantics.
+/// NOTE: When a JoinHandle is dropped, its future will be detached.
 ///
-/// Polling (or attempting to extract the value from) a task after the
-/// executor is dropped may trigger a panic.
-#[must_use]
+/// Polling (or attempting to extract the value from) a task after the executor is dropped may
+/// trigger a panic.
 #[derive(Debug)]
-pub struct Task<T> {
+// LINT.IfChange
+pub struct JoinHandle<T> {
     scope: ScopeRef,
     task_id: usize,
     phantom: PhantomData<T>,
 }
+// LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 
-impl<T> Unpin for Task<T> {}
+impl<T> Unpin for JoinHandle<T> {}
+
+impl<T> JoinHandle<T> {
+    pub(crate) fn new(scope: ScopeRef, task_id: usize) -> Self {
+        Self { scope, task_id, phantom: PhantomData }
+    }
+
+    /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
+    /// future can be ignored in which case the task will still be cancelled.
+    pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
+        // SAFETY: We spawned the task so the return type should be correct.
+        let result = unsafe { self.scope.cancel(self.task_id) };
+        async move {
+            match result {
+                Some(output) => Some(output),
+                None => {
+                    // If we are dropped from here, we'll end up calling `cancel_and_detach`.
+                    let result = std::future::poll_fn(|cx| {
+                        // SAFETY: We spawned the task so the return type should be correct.
+                        unsafe { self.scope.poll_cancelled(self.task_id, cx) }
+                    })
+                    .await;
+                    self.task_id = 0;
+                    result
+                }
+            }
+        }
+    }
+}
+
+impl<T> Drop for JoinHandle<T> {
+    fn drop(&mut self) {
+        if self.task_id != 0 {
+            self.scope.detach(self.task_id);
+        }
+    }
+}
+
+impl<T: 'static> Future for JoinHandle<T> {
+    type Output = T;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // SAFETY: We spawned the task so the return type should be correct.
+        let result = unsafe { self.scope.poll_join_result(self.task_id, cx) };
+        if result.is_ready() {
+            self.task_id = 0;
+        }
+        result
+    }
+}
+
+/// This is the same as a JoinHandle, except that the future will be cancelled when the task is
+/// dropped.
+#[must_use]
+#[repr(transparent)]
+#[derive(Debug)]
+// LINT.IfChange
+pub struct Task<T>(JoinHandle<T>);
+// LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+
+impl<T> Task<T> {
+    /// Returns a `JoinHandle` which will have detach-on-drop semantics.
+    pub fn detach_on_drop(self) -> JoinHandle<T> {
+        let this = ManuallyDrop::new(self);
+        // SAFETY: We are bypassing our drop implementation.
+        unsafe { std::ptr::read(&this.0) }
+    }
+}
 
 impl Task<()> {
     /// Detach this task so that it can run independently in the background.
@@ -56,8 +122,8 @@ impl Task<()> {
     ///
     /// can meet your needs.
     pub fn detach(mut self) {
-        self.scope.detach(self.task_id);
-        self.task_id = 0;
+        self.0.scope.detach(self.0.task_id);
+        self.0.task_id = 0;
     }
 }
 
@@ -79,15 +145,7 @@ impl<T: Send + 'static> Task<T> {
         let executor = EHandle::local();
         let scope = executor.root_scope();
         let task_id = executor.spawn(scope, future);
-        Task { scope: scope.clone(), task_id, phantom: PhantomData }
-    }
-
-    pub(crate) fn spawn_on(
-        scope: ScopeRef,
-        future: impl Future<Output = T> + Send + 'static,
-    ) -> Task<T> {
-        let task_id = scope.executor().spawn(&scope, AtomicFuture::new(future, false));
-        Task { scope, task_id, phantom: PhantomData }
+        Task(JoinHandle::new(scope.clone(), task_id))
     }
 }
 
@@ -109,40 +167,15 @@ impl<T: 'static> Task<T> {
         let executor = EHandle::local();
         let scope = executor.root_scope();
         let task_id = executor.spawn_local(scope, future);
-        Task { scope: scope.clone(), task_id, phantom: PhantomData }
+        Task(JoinHandle::new(scope.clone(), task_id))
     }
 }
 
 impl<T: 'static> Task<T> {
     /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
     /// future can be ignored in which case the task will still be cancelled.
-    pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
-        // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.scope.cancel(self.task_id) };
-        async move {
-            match result {
-                Some(output) => Some(output),
-                None => {
-                    // If we are dropped from here, we'll end up calling `cancel_and_detach` (see
-                    // below).
-                    let result = std::future::poll_fn(|cx| {
-                        // SAFETY: We spawned the task so the return type should be correct.
-                        unsafe { self.scope.poll_cancelled(self.task_id, cx) }
-                    })
-                    .await;
-                    self.task_id = 0;
-                    result
-                }
-            }
-        }
-    }
-}
-
-impl<T> Drop for Task<T> {
-    fn drop(&mut self) {
-        if self.task_id != 0 {
-            self.scope.cancel_and_detach(self.task_id);
-        }
+    pub fn cancel(self) -> impl Future<Output = Option<T>> {
+        self.detach_on_drop().cancel()
     }
 }
 
@@ -150,11 +183,26 @@ impl<T: 'static> Future for Task<T> {
     type Output = T;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.scope.poll_join_result(self.task_id, cx) };
+        let result = unsafe { self.0.scope.poll_join_result(self.0.task_id, cx) };
         if result.is_ready() {
-            self.task_id = 0;
+            self.0.task_id = 0;
         }
         result
+    }
+}
+
+impl<T> Drop for Task<T> {
+    fn drop(&mut self) {
+        if self.0.task_id != 0 {
+            self.0.scope.cancel_and_detach(self.0.task_id);
+            self.0.task_id = 0;
+        }
+    }
+}
+
+impl<T> From<JoinHandle<T>> for Task<T> {
+    fn from(value: JoinHandle<T>) -> Self {
+        Self(value)
     }
 }
 
