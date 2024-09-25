@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! The `channel` module contains the implementation for reading the `channel_config.json`
+//! configuration file.
+
 use channel_config::ChannelConfigs;
 use serde::Deserialize;
 use std::{fs, io};
 
 const CHANNEL_CONFIG_PATH: &str = "/config/data/channel_config.json";
-
-/// The `channel` module contains the implementation for reading the `channel_config.json`
-/// configuration file.
 
 /// Wrapper for deserializing channel configurations to the on-disk JSON format.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
