@@ -42,7 +42,7 @@ use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
     FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
 };
-use cm_types::{Name, RelativePath};
+use cm_types::{Name, Path};
 use config_encoder::ConfigFields;
 use errors::{
     AddChildError, AddDynamicChildError, CapabilityProviderError, ComponentProviderError,
@@ -64,7 +64,6 @@ use tracing::warn;
 use vfs::directory::entry::SubNode;
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -470,7 +469,7 @@ impl ResolvedInstanceState {
         let path = capability_decl.path().expect("must have path").to_string();
         let path = fuchsia_fs::canonicalize_path(&path);
         let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
-        let relative_path = Path::validate_and_split(path).unwrap();
+        let relative_path = vfs::path::Path::validate_and_split(path).unwrap();
         let outgoing_dir_entry = component
             .get_outgoing()
             .try_into_directory_entry()
@@ -1231,7 +1230,7 @@ impl Routable for CapabilityRequestedHook {
 
 struct ProgramRouter {
     component: WeakComponentInstance,
-    source_path: RelativePath,
+    source_path: Path,
     capability: ComponentCapability,
 }
 
@@ -1292,7 +1291,7 @@ impl Routable for ProgramRouter {
 
 fn new_program_router(
     component: WeakComponentInstance,
-    source_path: RelativePath,
+    source_path: Path,
     capability: ComponentCapability,
 ) -> Router {
     Router::new(ProgramRouter { component: component, source_path: source_path, capability })

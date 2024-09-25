@@ -1546,6 +1546,7 @@ fn create_capability_decl(
                 name,
                 source: None,
                 source_dictionary: None,
+                source_path: None,
             })
         }
         #[cfg(fuchsia_api_level_at_least = "NEXT")]

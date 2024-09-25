@@ -1155,6 +1155,7 @@ pub struct DictionaryDecl {
     pub name: Name,
     pub source: Option<DictionarySource>,
     pub source_dictionary: Option<RelativePath>,
+    pub source_path: Option<Path>,
 }
 
 #[cfg(fuchsia_api_level_at_least = "20")]
@@ -2587,9 +2588,6 @@ pub enum DictionarySource {
     Parent,
     Self_,
     Child(ChildRef),
-
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    Program,
 }
 
 impl FidlIntoNative<DictionarySource> for fdecl::Ref {
@@ -2598,10 +2596,6 @@ impl FidlIntoNative<DictionarySource> for fdecl::Ref {
             Self::Parent(_) => DictionarySource::Parent,
             Self::Self_(_) => DictionarySource::Self_,
             Self::Child(c) => DictionarySource::Child(c.fidl_into_native()),
-
-            // ProgramRef is only available at HEAD
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            Self::Program(_) => DictionarySource::Program,
             _ => panic!("invalid DictionarySource variant"),
         }
     }
@@ -2613,10 +2607,6 @@ impl NativeIntoFidl<fdecl::Ref> for DictionarySource {
             Self::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
             Self::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
             Self::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
-
-            // ProgramRef is only available at HEAD
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            Self::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         }
     }
 }
@@ -3227,8 +3217,7 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict2".to_string()),
-                        source: Some(fdecl::Ref::Program(fdecl::ProgramRef {})),
-                        source_dictionary: Some("in/other".to_string()),
+                        source_path: Some("/in/other".to_string()),
                         ..Default::default()
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
@@ -3621,16 +3610,19 @@ mod tests {
                             name: "dict1".parse().unwrap(),
                             source: Some(DictionarySource::Parent),
                             source_dictionary: Some("in/other".parse().unwrap()),
+                            source_path: None,
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict2".parse().unwrap(),
-                            source: Some(DictionarySource::Program),
-                            source_dictionary: Some("in/other".parse().unwrap()),
+                            source: None,
+                            source_dictionary: None,
+                            source_path: Some("/in/other".parse().unwrap()),
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict3".parse().unwrap(),
                             source: None,
                             source_dictionary: None,
+                            source_path: None,
                         }),
                     ],
                     children: vec![

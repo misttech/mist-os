@@ -9,10 +9,14 @@
     },
     capabilities: [
         {
-            dictionary: "dict",
+            dictionary: "dynamic",
 
             // fidl.test.components.Trigger-d is provided by the dynamic dictionary.
-            extends: "program/svc/fuchsia.component.sandbox.Router",
+            path: "/svc/fuchsia.component.sandbox.Router",
+        },
+        {
+            dictionary: "dict",
+            extends: "self/dynamic",
         },
         { protocol: "fidl.test.components.Trigger" },
     ],

@@ -466,9 +466,15 @@ impl CapabilityBuilder {
             CapabilityTypeName::Protocol
                 | CapabilityTypeName::Service
                 | CapabilityTypeName::Directory
+                | CapabilityTypeName::Dictionary
                 | CapabilityTypeName::Runner
                 | CapabilityTypeName::Resolver
         );
+        if self.type_ == CapabilityTypeName::Dictionary {
+            if self.dictionary_source.is_some() || self.source_dictionary.is_some() {
+                panic!("Dictionary path is incompatible with source_dictionary");
+            }
+        }
         self.path = Some(path.parse().unwrap());
         self
     }
@@ -487,6 +493,9 @@ impl CapabilityBuilder {
         assert_matches!(self.type_, CapabilityTypeName::Dictionary);
         self.dictionary_source = Some(source);
         self.source_dictionary = Some(source_dictionary.parse().unwrap());
+        if self.path.is_some() {
+            panic!("source_dictionary is incompatible with path");
+        }
         self
     }
 
@@ -554,6 +563,7 @@ impl CapabilityBuilder {
                     name: self.name.expect("name not set"),
                     source: self.dictionary_source,
                     source_dictionary: self.source_dictionary,
+                    source_path: self.path,
                 })
             }
             CapabilityTypeName::Storage => cm_rust::CapabilityDecl::Storage(cm_rust::StorageDecl {

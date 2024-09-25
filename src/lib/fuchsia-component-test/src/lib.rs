@@ -3342,6 +3342,7 @@ mod tests {
                 name: "my_dict".parse().unwrap(),
                 source: None,
                 source_dictionary: None,
+                source_path: None,
             }))
             .await
             .unwrap();

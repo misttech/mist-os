@@ -815,13 +815,14 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
         match capability {
             CapabilityDecl::Dictionary(DictionaryDecl {
                 name,
-                source: Some(source),
-                source_dictionary: Some(source_dictionary),
+                source,
+                source_dictionary,
+                source_path,
                 ..
             }) => {
                 let source = match source {
-                    DictionarySource::Parent => None,
-                    DictionarySource::Child(ChildRef { name, collection }) => {
+                    Some(DictionarySource::Parent) => None,
+                    Some(DictionarySource::Child(ChildRef { name, collection })) => {
                         match instance.find_child(name.as_str(), collection.as_ref()) {
                             Some(child) => Some(child.moniker.clone().into()),
                             None => {
@@ -833,17 +834,24 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
                             }
                         }
                     }
-                    DictionarySource::Self_ => {
+                    Some(DictionarySource::Self_) => {
                         let dictionary = source_dictionary
+                            .as_ref()
+                            .expect("source_dictionary must be set if source is set")
                             .iter_segments()
                             .next()
-                            .expect("must contain at least one segment");
+                            .expect("source_dictionary must contain at least one segment");
                         Some(ComponentRef::Capability(dictionary.clone()))
                     }
-                    DictionarySource::Program => Some(ComponentRef::Self_),
+                    None => None,
                 };
                 if let Some(source) = source {
                     edges.insert(source, ComponentRef::Capability(name.clone()));
+                }
+                if let Some(_) = source_path {
+                    // Dictionary is backed by the program, so there is an effective dependency
+                    // from Self.
+                    edges.insert(ComponentRef::Self_, ComponentRef::Capability(name.clone()));
                 }
             }
             CapabilityDecl::Storage(StorageDecl { name, source, .. }) => {

@@ -18,7 +18,7 @@ use ::routing::DictExt;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
 use cm_rust::{CapabilityTypeName, ComponentDecl};
-use cm_types::RelativePath;
+use cm_types::Path;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
 use moniker::{ChildName, ExtendedMoniker};
@@ -164,7 +164,7 @@ pub fn build_capability_sourced_capabilities_dictionary(
 
 pub fn new_program_router(
     component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
-    _relative_path: RelativePath,
+    _relative_path: Path,
     capability: ComponentCapability,
 ) -> Router {
     let capability_source = CapabilitySource::Component(ComponentSource {

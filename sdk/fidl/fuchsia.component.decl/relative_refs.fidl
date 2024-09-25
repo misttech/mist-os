@@ -16,8 +16,6 @@ type Ref = flexible union {
     8: void_type VoidRef;
     @available(added=HEAD)
     9: environment EnvironmentRef;
-    @available(added=HEAD)
-    10: program ProgramRef;
 };
 
 /// A reference to a component's parent instance.
@@ -25,10 +23,6 @@ type ParentRef = struct {};
 
 /// A reference to the component itself.
 type SelfRef = struct {};
-
-/// A reference to the component's program.
-@available(added=HEAD)
-type ProgramRef = struct {};
 
 /// A reference to the environment's debug capabilities.
 type DebugRef = struct {};
