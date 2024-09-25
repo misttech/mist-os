@@ -628,4 +628,9 @@ void FileCache::NotifyWriteback(PageList pages) {
   flag_cvar_.notify_all();
 }
 
+size_t FileCache::GetSize() {
+  fs::SharedLock lock(tree_lock_);
+  return page_tree_.size();
+}
+
 }  // namespace f2fs

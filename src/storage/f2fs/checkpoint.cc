@@ -515,11 +515,6 @@ zx_status_t F2fs::WriteCheckpointUnsafe(bool is_umount) {
   ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());
   FlushDirsAndNodes();
 
-  if (GetMemoryStatus(MemoryStatus::kNeedReclaim) || is_umount) {
-    node_vnode_->CleanupCache();
-    GetVCache().Shrink();
-  }
-
   // update checkpoint pack index
   // Increase the version number so that
   // SIT entries and seg summaries are written at correct place
@@ -536,6 +531,13 @@ zx_status_t F2fs::WriteCheckpointUnsafe(bool is_umount) {
   // unlock all the fs_lock[] in do_checkpoint()
   if (zx_status_t ret = DoCheckpoint(is_umount); ret != ZX_OK) {
     return ret;
+  }
+
+  // Here, we ensure that all writeback pages are written out.
+  if (GetMemoryStatus(MemoryStatus::kNeedReclaim) || is_umount) {
+    // Clear clean pages for all vnodes, and remove inactive vnodes that have no pages.
+    node_vnode_->CleanupCache();
+    GetVCache().Shrink();
   }
 
   if (is_umount && !(superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag))) {

@@ -54,10 +54,11 @@ zx_status_t VnodeCache::ForAllVnodes(VnodeCallback callback, bool evict_inactive
           continue;
         }
       } else {
-        if (evict_inactive) {
+        // Evict inactive vnodes if they have no pages.
+        if (evict_inactive && !current->GetPageCount()) {
           EvictUnsafe(current.CopyPointer());
         }
-        // It is safe to make Refptr of inactive vnodes
+        // It is safe to make Refptr of inactive vnodes.
         vnode = fbl::ImportFromRawPtr(current.CopyPointer());
         vnode->Activate();
       }
@@ -65,6 +66,9 @@ zx_status_t VnodeCache::ForAllVnodes(VnodeCallback callback, bool evict_inactive
       if (vnode->fbl::WAVLTreeContainable<VnodeF2fs*>::InContainer()) {
         ++key;
       }
+    }
+    if (!callback) {
+      continue;
     }
     zx_status_t status = callback(vnode);
     if (status == ZX_ERR_STOP) {
@@ -215,12 +219,11 @@ zx_status_t VnodeCache::RemoveDirtyUnsafe(VnodeF2fs* vnode) {
 }
 
 void VnodeCache::Shrink() {
-  ForAllVnodes(
-      [](fbl::RefPtr<VnodeF2fs>& vnode) {
-        vnode->CleanupCache();
-        return ZX_OK;
-      },
-      true);
+  ForAllVnodes([](fbl::RefPtr<VnodeF2fs>& vnode) {
+    vnode->CleanupCache();
+    return ZX_OK;
+  });
+  ForAllVnodes(nullptr, true);
 }
 
 }  // namespace f2fs

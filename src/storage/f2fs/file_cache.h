@@ -351,6 +351,8 @@ class FileCache {
   void WaitOnWriteback(Page &page) __TA_EXCLUDES(flag_lock_, tree_lock_);
   void NotifyWriteback(PageList pages) __TA_EXCLUDES(flag_lock_, tree_lock_);
 
+  size_t GetSize() __TA_EXCLUDES(tree_lock_);
+
  private:
   // Unless |page| is locked, it returns a locked |page|. If |page| is already locked,
   // it waits for |page| to be unlocked. While waiting, |tree_lock_| keeps unlocked to avoid

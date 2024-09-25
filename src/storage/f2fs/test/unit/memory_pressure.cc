@@ -66,6 +66,10 @@ TEST_F(MemoryPressureTest, Basic) {
   file.reset();
   // It should delete inactive vnodes on high memory pressure
   ASSERT_EQ(GetCachedVnodeCount(), 3U);
+  // We cannot evict inactive vnodes which have pages in FileCache
+  fs_->GetVCache().Shrink();
+  ASSERT_EQ(GetCachedVnodeCount(), 3U);
+
   fs_->WaitForAvailableMemory();
   ASSERT_EQ(GetCachedVnodeCount(), 2U);
   ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kDirtyData), 0);

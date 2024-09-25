@@ -321,6 +321,8 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetLockedPages(page_offsets);
   }
 
+  size_t GetPageCount() { return file_cache_->GetSize(); }
+
   pgoff_t Writeback(WritebackOperation &operation) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
