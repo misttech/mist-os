@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/coordinator/tests/base.h"
+#include "src/graphics/display/drivers/coordinator/testing/base.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>

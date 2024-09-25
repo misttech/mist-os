@@ -18,7 +18,7 @@
 
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
-#include "src/graphics/display/drivers/coordinator/tests/base.h"
+#include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"

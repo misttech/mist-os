@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTS_FIDL_CLIENT_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTS_FIDL_CLIENT_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_FIDL_CLIENT_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_FIDL_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
@@ -22,7 +22,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/tests/mock-coordinator-listener.h"
+#include "src/graphics/display/drivers/coordinator/testing/mock-coordinator-listener.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
@@ -137,4 +137,4 @@ class TestFidlClient {
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTS_FIDL_CLIENT_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_FIDL_CLIENT_H_

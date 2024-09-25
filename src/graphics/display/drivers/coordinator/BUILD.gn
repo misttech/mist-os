@@ -38,7 +38,7 @@ fuchsia_driver_package("package") {
   driver_components = [ ":coordinator" ]
 }
 
-# Also used by test/.
+# Also used by testing/.
 source_set("shared") {
   visibility = [
     "../fake:fake-display-stack",
@@ -117,6 +117,6 @@ group("tests") {
   testonly = true
   deps = [
     ":coordinator_bind_test",
-    "tests",
+    "testing:tests",
   ]
 }
