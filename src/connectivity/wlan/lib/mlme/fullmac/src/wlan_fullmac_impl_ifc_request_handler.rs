@@ -25,10 +25,10 @@ fn handle_one_request(
     driver_event_sink: &FullmacDriverEventSink,
 ) -> anyhow::Result<()> {
     match req {
-        fidl_fullmac::WlanFullmacImplIfcRequest::OnScanResult { result, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::OnScanResult { payload, responder } => {
             responder.send().context("Failed to respond to OnScanResult")?;
             driver_event_sink.0.send(FullmacDriverEvent::OnScanResult {
-                result: fullmac_to_mlme::convert_scan_result(result),
+                result: fullmac_to_mlme::convert_scan_result(payload),
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::OnScanEnd { end, responder } => {

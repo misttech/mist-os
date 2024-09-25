@@ -184,11 +184,13 @@ pub fn convert_set_keys_resp(
     Ok(fidl_mlme::SetKeysConfirm { results })
 }
 
-pub fn convert_scan_result(result: fidl_fullmac::WlanFullmacScanResult) -> fidl_mlme::ScanResult {
+pub fn convert_scan_result(
+    result: fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest,
+) -> fidl_mlme::ScanResult {
     fidl_mlme::ScanResult {
-        txn_id: result.txn_id,
-        timestamp_nanos: result.timestamp_nanos,
-        bss: result.bss,
+        txn_id: result.txn_id.expect("missing txn_id"),
+        timestamp_nanos: result.timestamp_nanos.expect("missing txn_id"),
+        bss: result.bss.expect("missing txn_id"),
     }
 }
 

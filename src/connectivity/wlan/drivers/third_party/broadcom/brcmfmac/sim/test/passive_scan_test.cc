@@ -43,13 +43,14 @@ class PassiveScanTestInterface : public SimInterface {
   // Add a functor that can be run on each scan result by the VerifyScanResult method.
   // This allows scan results to be inspected (e.g. with EXPECT_EQ) as they come in, rather than
   // storing scan results for analysis after the sim env run has completed.
-  void AddVerifierFunction(std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult&)>);
+  void AddVerifierFunction(
+      std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)>);
 
   // Remove any verifier functions from the object.
   void ClearVerifierFunction();
 
   // Run the verifier method (if one was added) on the given scan result.
-  void VerifyScanResult(wlan_fullmac_wire::WlanFullmacScanResult result);
+  void VerifyScanResult(wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result);
 
   void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override;
@@ -57,7 +58,7 @@ class PassiveScanTestInterface : public SimInterface {
   PassiveScanTest* test_ = nullptr;
 
  private:
-  std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult&)> verifier_fn_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)> verifier_fn_;
 };
 
 class PassiveScanTest : public SimTest {
@@ -116,13 +117,15 @@ void PassiveScanTest::StartFakeApWithErrInjBeacon(
 }
 
 void PassiveScanTestInterface::AddVerifierFunction(
-    std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult&)> verifier_fn) {
+    std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)>
+        verifier_fn) {
   verifier_fn_ = std::move(verifier_fn);
 }
 
 void PassiveScanTestInterface::ClearVerifierFunction() { verifier_fn_ = nullptr; }
 
-void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac_wire::WlanFullmacScanResult result) {
+void PassiveScanTestInterface::VerifyScanResult(
+    wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result) {
   if (verifier_fn_ != nullptr) {
     verifier_fn_(result);
   }
@@ -132,7 +135,7 @@ void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac_wire::WlanFullmacSc
 void PassiveScanTestInterface::OnScanResult(OnScanResultRequestView request,
                                             OnScanResultCompleter::Sync& completer) {
   SimInterface::OnScanResult(request, completer);
-  VerifyScanResult(request->result);
+  VerifyScanResult(request);
 }
 
 constexpr wlan_common::WlanChannel kDefaultChannel = {
@@ -156,30 +159,31 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
 
   // The lambda arg will be run on each result, inside PassiveScanTestInterface::VerifyScanResults.
   client_ifc_.AddVerifierFunction(
-      [&test_start_timestamp_nanos](const wlan_fullmac_wire::WlanFullmacScanResult& result) {
+      [&test_start_timestamp_nanos](
+          const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result) {
         // Verify timestamp is after test start
-        ASSERT_GT(result.timestamp_nanos, test_start_timestamp_nanos);
+        ASSERT_GT(result->timestamp_nanos(), test_start_timestamp_nanos);
 
         // Verify BSSID.
-        ASSERT_EQ(sizeof(result.bss.bssid.data()), sizeof(common::MacAddr::byte));
-        const common::MacAddr result_bssid(result.bss.bssid.data());
+        ASSERT_EQ(sizeof(result->bss().bssid.data()), sizeof(common::MacAddr::byte));
+        const common::MacAddr result_bssid(result->bss().bssid.data());
         EXPECT_EQ(result_bssid.Cmp(kDefaultBssid), 0);
 
         // Verify SSID.
-        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies.data(), result.bss.ies.count());
+        auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.count());
         EXPECT_EQ(ssid.size(), kDefaultSsid.len);
         ASSERT_LE(kDefaultSsid.len, kDefaultSsid.data.size());
         EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
 
         // Verify channel
-        EXPECT_EQ(result.bss.channel.primary, kDefaultChannel.primary);
-        EXPECT_EQ(result.bss.channel.cbw, kDefaultChannel.cbw);
-        EXPECT_EQ(result.bss.channel.secondary80, kDefaultChannel.secondary80);
+        EXPECT_EQ(result->bss().channel.primary, kDefaultChannel.primary);
+        EXPECT_EQ(result->bss().channel.cbw, kDefaultChannel.cbw);
+        EXPECT_EQ(result->bss().channel.secondary80, kDefaultChannel.secondary80);
 
         // Verify has RSSI value
-        ASSERT_LT(result.bss.rssi_dbm, 0);
-        ASSERT_GE(result.bss.snr_db,
-                  sim_utils::SnrDbFromSignalStrength(result.bss.rssi_dbm, simulation::kNoiseLevel));
+        ASSERT_LT(result->bss().rssi_dbm, 0);
+        ASSERT_GE(result->bss().snr_db, sim_utils::SnrDbFromSignalStrength(
+                                            result->bss().rssi_dbm, simulation::kNoiseLevel));
       });
 
   env_->Run(kDefaultTestDuration);
@@ -202,7 +206,7 @@ TEST_F(PassiveScanTest, EmptyChannelList) {
 
   // The driver should exit early and return no scan results.
   client_ifc_.AddVerifierFunction(
-      [](const wlan_fullmac_wire::WlanFullmacScanResult& result) { FAIL(); });
+      [](const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result) { FAIL(); });
 
   env_->Run(kDefaultTestDuration);
 
@@ -233,27 +237,28 @@ TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
                              kScanStartTime);
 
   client_ifc_.AddVerifierFunction(
-      [&test_start_timestamp_nanos](const wlan_fullmac_wire::WlanFullmacScanResult& result) {
+      [&test_start_timestamp_nanos](
+          const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result) {
         // Verify timestamp is after test start
-        ASSERT_GT(result.timestamp_nanos, test_start_timestamp_nanos);
+        ASSERT_GT(result->timestamp_nanos(), test_start_timestamp_nanos);
 
         // Verify BSSID.
-        ASSERT_EQ(result.bss.bssid.size(), sizeof(common::MacAddr::byte));
-        const common::MacAddr result_bssid(result.bss.bssid.data());
+        ASSERT_EQ(result->bss().bssid.size(), sizeof(common::MacAddr::byte));
+        const common::MacAddr result_bssid(result->bss().bssid.data());
         EXPECT_EQ(result_bssid.Cmp(kDefaultBssid), 0);
 
         // Verify that SSID is empty, since there was no SSID IE.
-        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies.data(), result.bss.ies.count());
+        auto ssid = brcmf_find_ssid_in_ies(result->bss().ies.data(), result->bss().ies.count());
         EXPECT_EQ(ssid.size(), 0u);
         ASSERT_LE(kDefaultSsid.len, kDefaultSsid.data.size());
 
         // Verify channel
-        EXPECT_EQ(result.bss.channel.primary, kDefaultChannel.primary);
-        EXPECT_EQ(result.bss.channel.cbw, kDefaultChannel.cbw);
-        EXPECT_EQ(result.bss.channel.secondary80, kDefaultChannel.secondary80);
+        EXPECT_EQ(result->bss().channel.primary, kDefaultChannel.primary);
+        EXPECT_EQ(result->bss().channel.cbw, kDefaultChannel.cbw);
+        EXPECT_EQ(result->bss().channel.secondary80, kDefaultChannel.secondary80);
 
         // Verify has RSSI value
-        ASSERT_LT(result.bss.rssi_dbm, 0);
+        ASSERT_LT(result->bss().rssi_dbm, 0);
       });
 
   env_->Run(kDefaultTestDuration);

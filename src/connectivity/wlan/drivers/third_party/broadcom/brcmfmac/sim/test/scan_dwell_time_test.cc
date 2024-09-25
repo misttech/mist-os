@@ -66,15 +66,16 @@ TEST_F(ScanTest, PassiveDwellTime) {
     EXPECT_EQ(*scan_result_code, wlan_fullmac_wire::WlanScanResult::kSuccess);
     auto scan_result_list = client_ifc_.ScanResultList(scan_attempt);
     EXPECT_GT(scan_result_list->size(), 0U);
-    for (const wlan_fullmac_wire::WlanFullmacScanResult& scan_result : *scan_result_list) {
-      auto& bss = scan_result.bss;
-      EXPECT_EQ(kDefaultBssid, common::MacAddr(bss.bssid.data()));
-      auto ssid = brcmf_find_ssid_in_ies(bss.ies.data(), bss.ies.count());
+    for (const fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest& scan_result :
+         *scan_result_list) {
+      auto& bss = scan_result.bss();
+      EXPECT_EQ(kDefaultBssid, common::MacAddr(bss->bssid().data()));
+      auto ssid = brcmf_find_ssid_in_ies(bss->ies().data(), bss->ies().size());
       EXPECT_EQ(kDefaultSsid.len, ssid.size());
       EXPECT_EQ(memcmp(kDefaultSsid.data.data(), ssid.data(), ssid.size()), 0);
-      EXPECT_EQ(kDefaultChannel.primary, bss.channel.primary);
-      EXPECT_EQ(kDefaultChannel.cbw, bss.channel.cbw);
-      EXPECT_GT(scan_result.timestamp_nanos, start_timestamp);
+      EXPECT_EQ(kDefaultChannel.primary, bss->channel().primary());
+      EXPECT_EQ(kDefaultChannel.cbw, bss->channel().cbw());
+      EXPECT_GT(scan_result.timestamp_nanos(), start_timestamp);
     }
   }
 }

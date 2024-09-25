@@ -81,7 +81,7 @@ class AuthInterface : public SimInterface {
  public:
   void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override {
-    on_scan_result_(&request->result);
+    on_scan_result_(request);
     completer.Reply();
   }
   void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override {
@@ -98,7 +98,8 @@ class AuthInterface : public SimInterface {
     completer.Reply();
   }
 
-  std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult*)> on_scan_result_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)>
+      on_scan_result_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacConnectConfirm*)> on_connect_confirm_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd*)> on_sae_handshake_ind_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacSaeFrame*)> on_sae_frame_;
@@ -148,7 +149,7 @@ class AuthTest : public SimTest {
   void SecErrorInject();
 
   // Event handlers
-  void OnScanResult(const wlan_fullmac_wire::WlanFullmacScanResult* result);
+  void OnScanResult(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result);
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
   void OnSaeHandshakeInd(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd* ind);
   void OnSaeFrameRx(const wlan_fullmac_wire::WlanFullmacSaeFrame* frame);
@@ -418,8 +419,9 @@ void AuthTest::SendSaeFrame(wlan_fullmac_wire::WlanFullmacSaeFrame frame) {
   EXPECT_TRUE(result.ok());
 }
 
-void AuthTest::OnScanResult(const wlan_fullmac_wire::WlanFullmacScanResult* result) {
-  EXPECT_EQ(result->bss.capability_info, (uint16_t)32);
+void AuthTest::OnScanResult(
+    const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result) {
+  EXPECT_EQ(result->bss().capability_info, (uint16_t)32);
 }
 
 void AuthTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp) {

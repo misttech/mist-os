@@ -120,22 +120,24 @@ async fn test_scan_request_success() {
         });
 
         let scan_result_list = vec![
-            fidl_fullmac::WlanFullmacScanResult {
-                txn_id,
-                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
-                bss: random_fidl_bss_description!(),
+            fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest {
+                txn_id: Some(txn_id),
+                timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
+                bss: Some(random_fidl_bss_description!()),
+                ..Default::default()
             },
-            fidl_fullmac::WlanFullmacScanResult {
-                txn_id,
-                timestamp_nanos: zx::MonotonicTime::get().into_nanos() + 1,
-                bss: random_fidl_bss_description!(),
+            fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest {
+                txn_id: Some(txn_id),
+                timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos() + 1),
+                bss: Some(random_fidl_bss_description!()),
+                ..Default::default()
             },
         ];
 
         for scan_result in &scan_result_list {
             fullmac_driver
                 .ifc_proxy
-                .on_scan_result(&scan_result)
+                .on_scan_result(scan_result)
                 .await
                 .expect("Failed to send on_scan_result");
         }
@@ -164,7 +166,7 @@ async fn test_scan_request_success() {
         // TODO(https://g-issues.fuchsia.dev/issues/42164608):  SME ignores timestamps so they
         // aren't checked here.
         // NOTE: order of returned scans is not guaranteed.
-        assert!(expected_bss_descriptions.contains(&actual.bss_description));
+        assert!(expected_bss_descriptions.contains(&Some(actual.bss_description)));
     }
 
     let scan_req = assert_variant!(&fullmac_driver.request_stream.history()[0], FullmacRequest::StartScan(req) => req);
