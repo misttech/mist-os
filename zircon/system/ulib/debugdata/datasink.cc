@@ -236,8 +236,7 @@ uint8_t* MergeCountersVersion9(uint8_t* dst, const uint8_t* src) {
   src_data_start = reinterpret_cast<const llvm_profile_data_format_v9*>(
       reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
   const llvm_profile_data_format_v9* src_data_end = src_data_start + src_header->NumData;
-  const T* src_counters_start = reinterpret_cast<const T*>(src_data_end);
-  uintptr_t src_counters_delta = src_header->CountersDelta;
+  const T* src_counters = reinterpret_cast<const T*>(src_data_end);
 
   llvm_profile_header_v9* dst_header = reinterpret_cast<llvm_profile_header_v9*>(dst);
   llvm_profile_data_format_v9* dst_data_start =
@@ -245,22 +244,12 @@ uint8_t* MergeCountersVersion9(uint8_t* dst, const uint8_t* src) {
   dst_data_start = reinterpret_cast<llvm_profile_data_format_v9*>(
       reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
   llvm_profile_data_format_v9* dst_data_end = dst_data_start + dst_header->NumData;
-  T* dst_counters_start = reinterpret_cast<T*>(dst_data_end);
-  uintptr_t dst_counters_delta = dst_header->CountersDelta;
-
-  const llvm_profile_data_format_v9* src_data = src_data_start;
-  llvm_profile_data_format_v9* dst_data = dst_data_start;
+  T* dst_counters = reinterpret_cast<T*>(dst_data_end);
 
   constexpr Op<T> op;
-  for (; src_data < src_data_end && dst_data < dst_data_end; src_data++, dst_data++) {
-    const T* src_counters =
-        src_counters_start + (src_data->CounterPtr - src_counters_delta) / sizeof(T);
-    src_counters_delta -= sizeof(*src_data);
-    T* dst_counters = dst_counters_start + (dst_data->CounterPtr - dst_counters_delta) / sizeof(T);
-    dst_counters_delta -= sizeof(*dst_data);
-    for (unsigned i = 0; i < src_data->NumCounters; i++) {
-      dst_counters[i] = op(dst_counters[i], src_counters[i]);
-    }
+  uint64_t NumCounters = src_header->NumCounters;
+  for (unsigned i = 0; i < NumCounters; i++) {
+    dst_counters[i] = op(dst_counters[i], src_counters[i]);
   }
 
   return dst;
@@ -275,8 +264,7 @@ uint8_t* MergeCounters(uint8_t* dst, const uint8_t* src) {
   src_data_start = reinterpret_cast<const __llvm_profile_data*>(
       reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
   const __llvm_profile_data* src_data_end = src_data_start + src_header->NumData;
-  const T* src_counters_start = reinterpret_cast<const T*>(src_data_end);
-  uintptr_t src_counters_delta = src_header->CountersDelta;
+  const T* src_counters = reinterpret_cast<const T*>(src_data_end);
 
   __llvm_profile_header* dst_header = reinterpret_cast<__llvm_profile_header*>(dst);
   __llvm_profile_data* dst_data_start =
@@ -284,22 +272,12 @@ uint8_t* MergeCounters(uint8_t* dst, const uint8_t* src) {
   dst_data_start = reinterpret_cast<__llvm_profile_data*>(
       reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
   __llvm_profile_data* dst_data_end = dst_data_start + dst_header->NumData;
-  T* dst_counters_start = reinterpret_cast<T*>(dst_data_end);
-  uintptr_t dst_counters_delta = dst_header->CountersDelta;
-
-  const __llvm_profile_data* src_data = src_data_start;
-  __llvm_profile_data* dst_data = dst_data_start;
+  T* dst_counters = reinterpret_cast<T*>(dst_data_end);
 
   constexpr Op<T> op;
-  for (; src_data < src_data_end && dst_data < dst_data_end; src_data++, dst_data++) {
-    const T* src_counters =
-        src_counters_start + (src_data->CounterPtr - src_counters_delta) / sizeof(T);
-    src_counters_delta -= sizeof(*src_data);
-    T* dst_counters = dst_counters_start + (dst_data->CounterPtr - dst_counters_delta) / sizeof(T);
-    dst_counters_delta -= sizeof(*dst_data);
-    for (unsigned i = 0; i < src_data->NumCounters; i++) {
-      dst_counters[i] = op(dst_counters[i], src_counters[i]);
-    }
+  uint64_t NumCounters = src_header->NumCounters;
+  for (unsigned i = 0; i < NumCounters; i++) {
+    dst_counters[i] = op(dst_counters[i], src_counters[i]);
   }
 
   return dst;
