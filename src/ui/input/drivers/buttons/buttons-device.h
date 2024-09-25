@@ -6,8 +6,9 @@
 #define SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fidl/fuchsia.input.interaction.observation/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
+#include <fidl/fuchsia.power.system/cpp/wire.h>
+#include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -34,19 +35,22 @@ constexpr uint64_t kPortKeyPollTimer = 0x1000;
 // Debounce threshold.
 constexpr uint64_t kDebounceThresholdNs = 50'000'000;
 
-// Power specific integration with Input Pipeline.
-class InputIntegration {
+// Integration with Power Framework.
+class PowerIntegration {
  public:
-  explicit InputIntegration(
-      std::optional<fidl::WireSyncClient<fuchsia_input_interaction_observation::Aggregator>>
-          aggregator_client)
-      : aggregator_client_(std::move(aggregator_client)) {}
-
-  void ReportInterrupt();
+  PowerIntegration(async_dispatcher_t* dispatcher,
+                   fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client);
+  void AcquireWakeLease();
 
  private:
-  std::optional<fidl::WireSyncClient<fuchsia_input_interaction_observation::Aggregator>>
-      aggregator_client_;
+  void ClosureHandler();
+
+  async_dispatcher_t* dispatcher_;
+  fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> sag_client_;
+
+  const zx::duration kLeaseTimeout = zx::msec(100);
+  async::TaskClosureMethod<PowerIntegration, &PowerIntegration::ClosureHandler> lease_task_{this};
+  zx::eventpair lease_;
 };
 
 class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
@@ -59,7 +63,7 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
 
   explicit ButtonsDevice(async_dispatcher_t* dispatcher,
                          fbl::Array<buttons_button_config_t> buttons, fbl::Array<Gpio> gpios,
-                         InputIntegration input_integration);
+                         fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client);
   void Notify(size_t button_index);
   void ShutDown();
 
@@ -151,7 +155,7 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
   zx::duration total_latency_ = {};
   zx::duration max_latency_ = {};
 
-  InputIntegration input_integration_;
+  PowerIntegration power_integration_;
 };
 
 }  // namespace buttons
