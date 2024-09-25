@@ -534,10 +534,12 @@ async def run_command(
         command.CommandOutput | None: The command output if it could
             be executed, None otherwise.
     """
-    id: event.Id
+    event_id: event.Id | None = None
     abort_task: asyncio.Task[None] | None = None
     if recorder is not None:
-        id = recorder.emit_program_start(name, list(args), env, parent=parent)
+        event_id = recorder.emit_program_start(
+            name, list(args), env, parent=parent
+        )
     try:
         symbolizer_args = (
             None if not symbolize else ["fx", "ffx", "debug", "symbolize"]
@@ -567,30 +569,32 @@ async def run_command(
 
         def handle_event(current_event: command.CommandEvent) -> None:
             if recorder is not None:
+                assert event_id is not None
                 if isinstance(current_event, command.StdoutEvent):
                     recorder.emit_program_output(
-                        id,
+                        event_id,
                         current_event.text.decode(errors="replace"),
                         stream=event.ProgramOutputStream.STDOUT,
                         print_verbatim=print_verbatim,
                     )
                 if isinstance(current_event, command.StderrEvent):
                     recorder.emit_program_output(
-                        id,
+                        event_id,
                         current_event.text.decode(errors="replace"),
                         stream=event.ProgramOutputStream.STDERR,
                         print_verbatim=print_verbatim,
                     )
                 if isinstance(current_event, command.TerminationEvent):
                     recorder.emit_program_termination(
-                        id, current_event.return_code
+                        event_id, current_event.return_code
                     )
 
         ret = await started.run_to_completion(callback=handle_event)
         return ret
     except command.AsyncCommandError as e:
         if recorder is not None:
-            recorder.emit_program_termination(id, -1, error=str(e))
+            assert event_id is not None
+            recorder.emit_program_termination(event_id, -1, error=str(e))
         return None
     finally:
         if abort_task is not None:
