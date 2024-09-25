@@ -182,10 +182,12 @@ class Context:
 
     def __init__(
         self,
-        config=None,
-        isolate_dir: IsolateDir = IsolateDir(),
+        config: dict[str, str] | None = None,
+        isolate_dir: IsolateDir | None = None,
         target: typing.Optional[str] = None,
     ) -> None:
+        if isolate_dir is None:
+            isolate_dir = IsolateDir()
         self._handle = fuchsia_controller_internal.context_create(
             config, isolate_dir.directory(), target
         )

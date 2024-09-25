@@ -124,7 +124,7 @@ class FfxConfig:
         atexit.register(self._atexit_callback)
 
         self._ffx_binary: str = binary_path if binary_path else _FFX_BINARY
-        self._isolate_dir: fuchsia_controller.IsolateDir = (
+        self._isolate_dir: fuchsia_controller.IsolateDir | None = (
             fuchsia_controller.IsolateDir(isolate_dir)
         )
         self._logs_dir: str = logs_dir
@@ -180,11 +180,16 @@ class FfxConfig:
             custom_types.FFXConfig
 
         Raises:
-            errors.FfxConfigError: When called before calling `FfxConfig.setup`
+            errors.FfxConfigError: When called before `FfxConfig.setup` or after
+                `FfxConfig.close`.
         """
         if self._setup_done is False:
             raise errors.FfxConfigError(
                 "get_config called before calling setup."
+            )
+        if self._isolate_dir is None:
+            raise errors.FfxConfigError(
+                "get_config called after calling close."
             )
 
         return custom_types.FFXConfig(
@@ -213,8 +218,12 @@ class FfxConfig:
             cmd: FFX command to run.
 
         Raises:
-            errors.FfxConfigError: In case of any other FFX command failure.
+            errors.FfxConfigError: In case of any other FFX command failure, or
+                when called after `FfxConfig.close`.
         """
+        if self._isolate_dir is None:
+            raise errors.FfxConfigError("_run called after calling close.")
+
         ffx_args: list[str] = []
         ffx_args.extend(["--isolate-dir", self._isolate_dir.directory()])
         ffx_cmd: list[str] = [self._ffx_binary] + ffx_args + cmd

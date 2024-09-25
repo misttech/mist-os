@@ -47,7 +47,7 @@ class Tracing(tracing.Tracing):
             f_tracingcontroller.Session.Client | None
         )
 
-        self._trace_socket: fc.Socket | None
+        self._trace_socket: AsyncSocket | None
         self._session_initialized: bool
         self._tracing_active: bool
 
