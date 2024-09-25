@@ -134,8 +134,14 @@ impl RegisterTool {
     async fn register_standalone(
         &self,
         info: &PkgServerInfo,
-        repo_target_info: RepositoryTarget,
+        mut repo_target_info: RepositoryTarget,
     ) -> Result<()> {
+        repo_target_info.aliases = match repo_target_info.aliases {
+            Some(aliases) if aliases.is_empty() => Some(info.registration_aliases.clone()),
+            None => Some(info.registration_aliases.clone()),
+            Some(aliases) => Some(aliases),
+        };
+
         let ffx_repo_target_info =
             FfxRepositoryTarget::try_from(repo_target_info).map_err(|e| bug!(e))?;
 
