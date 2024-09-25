@@ -43,7 +43,8 @@ use fidl_fuchsia_hardware_vsock::{
 };
 use fidl_fuchsia_vsock::{
     AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
-    ConnectorControlHandle, ConnectorRequest, ConnectorRequestStream, SIGNAL_STREAM_INCOMING,
+    ConnectorRequest, ConnectorRequestStream, ListenerControlHandle, ListenerRequest,
+    ListenerRequestStream, SIGNAL_STREAM_INCOMING,
 };
 use futures::channel::{mpsc, oneshot};
 use futures::{future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
@@ -138,43 +139,51 @@ fn map_driver_result(result: Result<Result<(), i32>, fidl::Error>) -> Result<(),
         .map_err(|e| Error::Driver(zx::Status::from_raw(e)))
 }
 
-struct ClientContextState {
-    queue: VecDeque<addr::Vsock>,
-    // local_port -> backlog_size
-    backlogs: HashMap<Addr, u32>,
-    control: ConnectorControlHandle,
+struct SocketContextState {
+    port: Addr,
+    accept_queue: VecDeque<addr::Vsock>,
+    backlog: Option<u32>,
+    control: ListenerControlHandle,
     signaled: bool,
 }
 
 #[derive(Clone)]
-pub struct ClientContext(Rc<RefCell<ClientContextState>>);
+pub struct SocketContext(Rc<RefCell<SocketContextState>>);
 
-impl ClientContext {
-    fn new(control: ConnectorControlHandle) -> ClientContext {
-        ClientContext(Rc::new(RefCell::new(ClientContextState {
-            queue: VecDeque::new(),
-            backlogs: HashMap::new(),
+impl SocketContext {
+    fn new(port: Addr, control: ListenerControlHandle) -> SocketContext {
+        SocketContext(Rc::new(RefCell::new(SocketContextState {
+            port,
+            accept_queue: VecDeque::new(),
+            backlog: None,
             signaled: false,
             control,
         })))
     }
 
-    fn add_port(&self, port: Addr, backlog: u32) {
-        self.0.borrow_mut().backlogs.insert(port, backlog);
-    }
-
-    fn remove_port(&self, port: Addr) {
-        self.0.borrow_mut().backlogs.remove(&port);
+    fn listen(&self, backlog: u32) -> Result<(), Error> {
+        let mut ctx = self.0.borrow_mut();
+        if ctx.backlog.is_some() {
+            return Err(Error::AlreadyBound);
+        }
+        // TODO: Update listener?
+        ctx.backlog = Some(backlog);
+        Ok(())
     }
 
     fn push_addr(&self, addr: addr::Vsock) -> bool {
         let mut ctx = self.0.borrow_mut();
-        let backlog_key = Addr(addr.remote_cid, addr.local_port);
-        if ctx.backlogs[&backlog_key] == 0 {
+        if Addr(addr.remote_cid, addr.local_port) != ctx.port {
+            panic!("request address doesn't match local socket address");
+        }
+        let Some(ref mut backlog) = ctx.backlog else {
+            panic!("pushing address when not yet bound");
+        };
+        if *backlog == 0 {
             return false;
         }
-        *ctx.backlogs.get_mut(&backlog_key).unwrap() -= 1;
-        ctx.queue.push_back(addr);
+        *backlog -= 1;
+        ctx.accept_queue.push_back(addr);
         if ctx.signaled == false {
             let _ = ctx.control.signal_peer(zx::Signals::empty(), ZXIO_SIGNAL_INCOMING);
             ctx.signaled = true
@@ -184,9 +193,12 @@ impl ClientContext {
 
     fn pop_addr(&self) -> Option<addr::Vsock> {
         let mut ctx = self.0.borrow_mut();
-        if let Some(addr) = ctx.queue.pop_front() {
-            *ctx.backlogs.get_mut(&Addr(addr.remote_cid, addr.local_port)).unwrap() += 1;
-            if ctx.queue.len() == 0 {
+        if let Some(addr) = ctx.accept_queue.pop_front() {
+            let Some(ref mut backlog) = ctx.backlog else {
+                return None;
+            };
+            *backlog += 1;
+            if ctx.accept_queue.len() == 0 {
                 let _ = ctx.control.signal_peer(ZXIO_SIGNAL_INCOMING, zx::Signals::empty());
                 ctx.signaled = false;
             }
@@ -196,14 +208,15 @@ impl ClientContext {
         }
     }
 
-    fn ports(&self) -> Vec<Addr> {
-        self.0.borrow_mut().backlogs.iter().map(|(port, _)| *port).collect()
+    fn port(&self) -> Addr {
+        self.0.borrow_mut().port
     }
 }
 
 enum Listener {
+    Bound,
     Channel(mpsc::UnboundedSender<addr::Vsock>),
-    Queue(ClientContext),
+    Queue(SocketContext),
 }
 
 struct State {
@@ -310,35 +323,24 @@ impl Vsock {
         Ok(())
     }
 
-    async fn accept(
+    // Spawns a new asynchronous task for listening for incoming connections on a port.
+    fn start_listener2(
         &self,
-        client: &ClientContext,
-        con: ConnectionTransport,
-    ) -> Result<addr::Vsock, Error> {
-        if let Some(addr) = client.pop_addr() {
-            let data = con.data;
-            let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
-            let shutdown_event = self.send_response(&addr, data)?.await?;
-            self.borrow_mut().tasks.local(
-                self.clone()
-                    .run_connection(addr.clone(), shutdown_event, con, None)
-                    .map_err(|err| tracing::warn!("Error {} whilst running connection", err))
-                    .map(|_| ()),
-            );
-            // TODO: check if we want want to return the local port for the connection or the local
-            // port which the request came over.
-            Ok(addr)
-        } else {
-            Err(Error::NoConnectionsInQueue)
-        }
+        listener: fidl::endpoints::ServerEnd<fidl_fuchsia_vsock::ListenerMarker>,
+        port: Addr,
+    ) -> Result<(), Error> {
+        let stream = listener.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
+        self.bind_port(port.clone())?;
+        self.borrow_mut().tasks.local(
+            self.clone()
+                .run_connection_listener2(stream, port)
+                .unwrap_or_else(|err| tracing::warn!("Error {} running connection listener", err)),
+        );
+        Ok(())
     }
 
     // Handles a single incoming client request.
-    async fn handle_request(
-        &self,
-        client: &ClientContext,
-        request: ConnectorRequest,
-    ) -> Result<(), Error> {
+    async fn handle_request(&self, request: ConnectorRequest) -> Result<(), Error> {
         match request {
             ConnectorRequest::Connect { remote_cid, remote_port, con, responder } => responder
                 .send(
@@ -349,15 +351,11 @@ impl Vsock {
             ConnectorRequest::Listen { local_port, acceptor, responder } => responder.send(
                 self.start_listener(acceptor, local_port).map_err(|e| e.into_status().into_raw()),
             ),
-            ConnectorRequest::Listen2 { local_port, remote_cid, backlog, responder } => responder
+            ConnectorRequest::Bind { remote_cid, local_port, listener, responder } => responder
                 .send(
-                    self.listen_port_and_queue(client, local_port, remote_cid, backlog)
+                    self.start_listener2(listener, Addr(remote_cid, local_port))
                         .map_err(|e| e.into_status().into_raw()),
                 ),
-            ConnectorRequest::Accept { con, responder } => match self.accept(client, con).await {
-                Ok(addr) => responder.send(Ok(&addr)),
-                Err(e) => responder.send(Err(e.into_status().into_raw())),
-            },
         }
         .map_err(|e| Error::ClientCommunication(e.into()))
     }
@@ -367,7 +365,6 @@ impl Vsock {
     /// Takes ownership of a `RequestStream` that is most likely created from a `ServicesServer`
     /// and processes any incoming requests on it.
     pub async fn run_client_connection(self, request: ConnectorRequestStream) {
-        let client = ClientContext::new(request.control_handle());
         let self_ref = &self;
         let fut = request
             .map_err(|err| Error::ClientCommunication(err.into()))
@@ -375,14 +372,11 @@ impl Vsock {
             // made something more sensible.
             .try_for_each_concurrent(4, |request| {
                 self_ref
-                    .handle_request(&client, request)
+                    .handle_request(request)
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
             });
         if let Err(e) = fut.await {
             tracing::info!("Failed to handle request {}", e);
-        }
-        for port in client.ports() {
-            self.deregister(Deregister::Listen(port));
         }
     }
     fn alloc_ephemeral_port(self, cid: Cid) -> Option<AllocatedPort> {
@@ -411,31 +405,18 @@ impl Vsock {
         }
     }
 
-    // Creates a queueing system.
-    // These requests come from the device via the run_callbacks future.
-    fn listen_port_and_queue(
-        &self,
-        client: &ClientContext,
-        port: u32,
-        cid: u32,
-        backlog: u32,
-    ) -> Result<(), Error> {
-        if !self.supported_cid(cid) {
-            tracing::info!("Rejecting request to listen on unsupported CID {}", cid);
+    fn bind_port(&self, port: Addr) -> Result<(), Error> {
+        if port::is_ephemeral(port.1) {
+            tracing::info!("Rejecting request to listen on ephemeral port {}", port.1);
             return Err(Error::ConnectionRefused);
         }
-        if port::is_ephemeral(port) {
-            tracing::info!("Rejecting request to listen on ephemeral port {}", port);
-            return Err(Error::ConnectionRefused);
-        }
-        match self.borrow_mut().listeners.entry(Addr(cid, port)) {
+        match self.borrow_mut().listeners.entry(port) {
             std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(Listener::Queue(client.clone()));
-                client.add_port(Addr(cid, port), backlog);
+                entry.insert(Listener::Bound);
                 Ok(())
             }
             _ => {
-                tracing::info!("Attempt to listen on already bound port {}", port);
+                tracing::info!("Attempt to listen on already bound port {:?}", port);
                 Err(Error::AlreadyBound)
             }
         }
@@ -539,6 +520,91 @@ impl Vsock {
         }
     }
 
+    fn listen(&self, socket: &SocketContext, backlog: u32) -> Result<(), Error> {
+        socket.listen(backlog)?;
+        // Replace "bound" listener with a socket accept queue.
+        match self.borrow_mut().listeners.entry(socket.port()) {
+            std::collections::hash_map::Entry::Vacant(_) => {
+                // We should be in bound state. Something went wrong if we end up here.
+                tracing::warn!("Expected listener to be in bound state, but listener not found!");
+                return Err(Error::AlreadyBound);
+            }
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                if !matches!(entry.get(), Listener::Bound) {
+                    // Listen was probably already called. The call to socket.listen should
+                    // probably already have failed in this case.
+                    tracing::warn!("Listen called multiple times.");
+                    return Err(Error::AlreadyBound);
+                }
+                entry.insert(Listener::Queue(socket.clone()));
+            }
+        };
+
+        Ok(())
+    }
+
+    async fn accept(
+        &self,
+        socket: &SocketContext,
+        con: ConnectionTransport,
+    ) -> Result<addr::Vsock, Error> {
+        if let Some(addr) = socket.pop_addr() {
+            let data = con.data;
+            let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
+            let shutdown_event = self.send_response(&addr, data)?.await?;
+            self.borrow_mut().tasks.local(
+                self.clone()
+                    .run_connection(addr.clone(), shutdown_event, con, None)
+                    .map_err(|err| tracing::warn!("Error {} whilst running connection", err))
+                    .map(|_| ()),
+            );
+            // TODO: check if we want want to return the local port for the connection or the local
+            // port which the request came over.
+            Ok(addr)
+        } else {
+            Err(Error::NoConnectionsInQueue)
+        }
+    }
+
+    // Handles a single incoming client request.
+    async fn handle_listener_request(
+        &self,
+        socket: &SocketContext,
+        request: ListenerRequest,
+    ) -> Result<(), Error> {
+        match request {
+            ListenerRequest::Listen { backlog, responder } => {
+                responder.send(self.listen(socket, backlog).map_err(|e| e.into_status().into_raw()))
+            }
+            ListenerRequest::Accept { con, responder } => match self.accept(socket, con).await {
+                Ok(addr) => responder.send(Ok(&addr)),
+                Err(e) => responder.send(Err(e.into_status().into_raw())),
+            },
+        }
+        .map_err(|e| Error::ClientCommunication(e.into()))
+    }
+
+    async fn run_connection_listener2(
+        self,
+        request: ListenerRequestStream,
+        port: Addr,
+    ) -> Result<(), Error> {
+        let socket = SocketContext::new(port, request.control_handle());
+        let self_ref = &self;
+        let fut = request
+            .map_err(|err| Error::ClientCommunication(err.into()))
+            .try_for_each_concurrent(None, |request| {
+                self_ref
+                    .handle_listener_request(&socket, request)
+                    .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
+            });
+        if let Err(e) = fut.await {
+            tracing::info!("Failed to handle request {}", e);
+        }
+        self.deregister(Deregister::Listen(socket.port()));
+        Ok(())
+    }
+
     // Waits for incoming connections on the given `ListenStream`, checks with the
     // user via the `acceptor` if it should be accepted, and if so spawns a new
     // asynchronous task to run the connection.
@@ -637,9 +703,7 @@ impl State {
                 self.events.remove(&e);
             }
             Deregister::Listen(a) => {
-                if let Some(Listener::Queue(client)) = self.listeners.remove(&a) {
-                    client.remove_port(a);
-                }
+                self.listeners.remove(&a);
             }
             Deregister::Port(p) => {
                 self.used_ports.get_mut(&p.0).unwrap().free(p.1);
@@ -690,24 +754,33 @@ impl State {
             }
             CallbacksRequest::Request { addr, control_handle: _control_handle } => {
                 let addr = addr::Vsock::from(addr);
+                let reset = |state: &mut State| {
+                    let task = state.send_rst(&addr).map(|_| ());
+                    state.tasks.local(task);
+                };
                 match self.listeners.get(&Addr(addr.remote_cid, addr.local_port)) {
+                    Some(Listener::Bound) => {
+                        tracing::warn!(
+                            "Request on port {} denied due to socket only bound, not yet listening",
+                            addr.local_port
+                        );
+                        reset(self);
+                    }
                     Some(Listener::Channel(sender)) => {
                         let _ = sender.unbounded_send(addr.clone());
                     }
-                    Some(Listener::Queue(client)) => {
-                        if client.push_addr(addr.clone()) == false {
+                    Some(Listener::Queue(socket)) => {
+                        if !socket.push_addr(addr.clone()) {
                             tracing::warn!(
                                 "Request on port {} denied due to full backlog",
                                 addr.local_port
                             );
-                            let task = self.send_rst(&addr).map(|_| ());
-                            self.tasks.local(task);
+                            reset(self);
                         }
                     }
                     None => {
                         tracing::warn!("Request on port {} with no listener", addr.local_port);
-                        let task = self.send_rst(&addr).map(|_| ());
-                        self.tasks.local(task);
+                        reset(self);
                     }
                 }
             }

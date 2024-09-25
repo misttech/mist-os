@@ -20,7 +20,7 @@ mod tests {
     };
     use fidl_fuchsia_vsock::{
         AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
-        ConnectorMarker, ConnectorProxy,
+        ConnectorMarker, ConnectorProxy, ListenerMarker,
     };
     use futures::{channel, future, FutureExt, StreamExt, TryFutureExt};
     use {fuchsia_async as fasync, fuchsia_zircon as zx};
@@ -140,30 +140,36 @@ mod tests {
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn basic_listen2() -> Result<(), anyhow::Error> {
+    async fn basic_bind_and_listen() -> Result<(), anyhow::Error> {
         let (mut driver, service) = common_setup().await?;
         let app_client = make_client(&service)?;
+        let (_, listener_remote) = endpoints::create_endpoints::<ListenerMarker>();
 
         // Should reject listening at the ephemeral port ranges.
         assert_eq!(
-            app_client.listen2(49152, VMADDR_CID_LOCAL, 1).await?,
+            app_client.bind(VMADDR_CID_LOCAL, 49152, listener_remote).await?,
             Err(zx::sys::ZX_ERR_UNAVAILABLE)
         );
 
+        let (listener_client, listener_remote) = endpoints::create_endpoints::<ListenerMarker>();
         // Listen on a reasonable value.
-        assert_eq!(app_client.listen2(8000, VMADDR_CID_LOCAL, 1).await?, Ok(()));
+        assert_eq!(app_client.bind(VMADDR_CID_LOCAL, 8000, listener_remote).await?, Ok(()));
 
         // Validate that we cannot listen twice
+        let (_, listener_remote2) = endpoints::create_endpoints::<ListenerMarker>();
         assert_eq!(
-            app_client.listen2(8000, VMADDR_CID_LOCAL, 1).await?,
+            app_client.bind(VMADDR_CID_LOCAL, 8000, listener_remote2).await?,
             Err(zx::sys::ZX_ERR_ALREADY_BOUND)
         );
+
+        let listener_client = listener_client.into_proxy().unwrap();
+        assert_eq!(listener_client.listen(1).await?, Ok(()));
 
         // Create a connection from the driver
         driver.callbacks.request(&*addr::Vsock::new(8000, 80, VMADDR_CID_LOCAL))?;
         let (_data_socket, _client_end, con) = make_con()?;
 
-        let accept_fut = app_client.accept(con);
+        let accept_fut = listener_client.accept(con);
 
         // expect a response
         let (_, _server_data_socket, responder) =

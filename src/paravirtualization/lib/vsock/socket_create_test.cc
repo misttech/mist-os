@@ -44,8 +44,6 @@ void RunServer(libsync::Completion* completion) {
   }
   completion->Signal();
 
-  // TODO(surajmalhotra): Figure out how to avoid this sleep.
-  sleep(2);
   rv = accept(server_fd.get(), nullptr, nullptr);
   if (rv < 0) {
     FX_LOGS(FATAL) << "accept failed: " << errno << ": " << strerror(errno);

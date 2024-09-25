@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.vsock/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fdio.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/socket.h>
@@ -33,11 +34,12 @@ struct UnconnectedState {};
 
 struct BoundState {
   uint32_t port;
-  uint32_t cid;
+  fidl::ClientEnd<fuchsia_vsock::Listener> listener;
 };
 
 struct ListeningState {
   uint32_t port;
+  fidl::ClientEnd<fuchsia_vsock::Listener> listener;
 };
 
 // TODO(https://fxbug.dev/361410840): In order to generate the proper errors on send/recvmsg we
@@ -87,8 +89,13 @@ zx_status_t Socket::Bind(const struct sockaddr* addr, socklen_t addrlen, int16_t
 
   std::lock_guard lock(state_lock_);
   if (std::holds_alternative<UnconnectedState>(state_)) {
-    // TODO(https://fxbug.dev/368645901): Move this state to the server.
-    state_ = BoundState{.port = port, .cid = cid};
+    auto [client, server] = fidl::Endpoints<fuchsia_vsock::Listener>::Create();
+    auto result = vsock_connector_client_->Bind({cid, port, std::move(server)});
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "vsock connector listen call failed: " << result.error_value();
+      return ZX_ERR_INTERNAL;
+    }
+    state_ = BoundState{.port = port, .listener = std::move(client)};
     *out_code = 0;
   } else {
     *out_code = EINVAL;
@@ -157,14 +164,14 @@ zx_status_t Socket::Connect(const struct sockaddr* addr, socklen_t addrlen, int1
 zx_status_t Socket::Listen(int backlog, int16_t* out_code) {
   std::lock_guard lock(state_lock_);
   if (auto state = std::get_if<BoundState>(&state_); state) {
-    auto result =
-        vsock_connector_client_->Listen2({state->port, state->cid, static_cast<uint32_t>(backlog)});
+    auto result = fidl::Call(state->listener)->Listen({static_cast<uint32_t>(backlog)});
     if (result.is_error()) {
       FX_LOGS(ERROR) << "vsock connector listen call failed: " << result.error_value();
       return ZX_ERR_INTERNAL;
     }
     state_ = ListeningState{
         .port = state->port,
+        .listener = std::move(state->listener),
     };
     *out_code = 0;
     return ZX_OK;
@@ -190,11 +197,16 @@ zx_status_t Socket::Accept(struct sockaddr* addr, socklen_t* addrlen, zxio_stora
   };
 
   std::lock_guard lock(state_lock_);
-  if (std::holds_alternative<ListeningState>(state_)) {
-    auto result = vsock_connector_client_->Accept({std::move(transport)});
+  if (auto state = std::get_if<ListeningState>(&state_); state) {
+    auto result = fidl::Call(state->listener)->Accept({std::move(transport)});
     if (result.is_error()) {
-      // TODO(https://fxbug.dev/361410840): Check if this is the right error.
-      *out_code = ECONNREFUSED;
+      if (result.error_value().is_domain_error() &&
+          result.error_value().domain_error() == ZX_ERR_SHOULD_WAIT) {
+        *out_code = EWOULDBLOCK;
+      } else {
+        // TODO(https://fxbug.dev/361410840): Check if this is the right error.
+        *out_code = ECONNREFUSED;
+      }
       return ZX_OK;
     }
 
@@ -228,8 +240,8 @@ void Socket::WaitBegin(zxio_signals_t zxio_signals, zx_handle_t* out_handle,
       std::holds_alternative<BoundState>(state_)) {
     // In this state we don't have any signals to wait on.
     *out_signals = ZX_SIGNAL_NONE;
-  } else if (std::holds_alternative<ListeningState>(state_)) {
-    *out_handle = vsock_connector_client_.client_end().channel().get();
+  } else if (auto state = std::get_if<ListeningState>(&state_); state) {
+    *out_handle = state->listener.channel().get();
     *out_signals = ZXIO_SIGNAL_PEER_CLOSED;
     if (zxio_signals & ZXIO_SIGNAL_READABLE) {
       // signal when a listening socket gets an incoming connection.

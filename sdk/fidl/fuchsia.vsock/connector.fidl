@@ -41,6 +41,25 @@ closed protocol Acceptor {
     });
 };
 
+/// Interface presented by a listener to accept connections.
+closed protocol Listener {
+    /// Registers a listener for a local port. There can only be one listener for
+    /// a single port at a time. The channel will have `SIGNAL_STREAM_INCOMING` asserted
+    /// by the server when there is a connection ready to accept.
+    strict Listen(struct {
+        /// The maximum length to which the queue of pending connections waiting to
+        /// be accepted.
+        backlog uint32;
+    }) -> () error zx.Status;
+    /// Accept a pending connection from the queue after `Listen` was invoked and
+    /// `SIGNAL_STREAM_INCOMING` was signaled.
+    strict Accept(resource struct {
+        con ConnectionTransport;
+    }) -> (struct {
+        addr fuchsia.hardware.vsock.Addr;
+    }) error zx.Status;
+};
+
 /// Exposed by a service that can act as a bridge to the underlying vsock driver and
 /// provides the ability for listeners to be multiplexed by port and manages dynamic
 /// port allocation for outbound connections.
@@ -62,20 +81,10 @@ closed protocol Connector {
         acceptor client_end:Acceptor;
     }) -> () error zx.Status;
     /// Registers a listener for a local port. There can only be one listener for
-    /// a single port at a time. The channel will have `SIGNAL_STREAM_INCOMING` asserted
-    /// by the server when there a connection ready to accept.
-    strict Listen2(struct {
-        local_port uint32;
+    /// a single port at a time.
+    strict Bind(resource struct {
         remote_cid uint32;
-        /// The maximum length to which the queue of pending connections waiting to
-        /// be accepted.
-        backlog uint32;
+        local_port uint32;
+        listener server_end:Listener;
     }) -> () error zx.Status;
-    /// Accept a pending connection from the queue after `Listen2` was invoked and
-    /// `SIGNAL_STREAM_INCOMING` was signaled.
-    strict Accept(resource struct {
-        con ConnectionTransport;
-    }) -> (struct {
-        addr fuchsia.hardware.vsock.Addr;
-    }) error zx.Status;
 };
