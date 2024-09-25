@@ -86,7 +86,13 @@ def write_mobly_config(test_bed: str, ffx: Path, target: Optional[str]) -> Path:
                             {
                                 "name": target,
                                 "transport": "fuchsia-controller",
-                                "ffx_path": str(ffx.resolve()),
+                                "honeydew_config": {
+                                    "transports": {
+                                        "ffx": {
+                                            "path": str(ffx.resolve()),
+                                        }
+                                    }
+                                },
                             }
                         ]
                     },

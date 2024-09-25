@@ -176,6 +176,7 @@ def _enable_mdns(configs: list[dict[str, Any]]) -> bool:
     return False
 
 
+# LINT.IfChange
 def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     """Validates and parses mobly configuration associated with FuchsiaDevice.
 
@@ -248,6 +249,9 @@ def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     )
 
     return device_config
+
+
+# LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/run_lacewing_test.py)
 
 
 def _get_log_directory() -> str:
