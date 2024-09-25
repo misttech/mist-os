@@ -237,7 +237,6 @@ class WlanFCTests(unittest.TestCase):
     def test_init_connect_proxy(self) -> None:
         """Test if Wlan connects to WLAN proxies."""
         self.assertIsNotNone(self.wlan_obj._device_monitor_proxy)
-        self.assertIsNotNone(self.wlan_obj._regulatory_region_configurator)
 
     def test_connect(self) -> None:
         """Test if connect works."""
@@ -522,21 +521,24 @@ class WlanFCTests(unittest.TestCase):
             ("invalid", ZxStatus.ZX_ERR_INTERNAL),
         ]:
             with self.subTest(msg=msg, zx_err=zx_err):
-                self.wlan_obj._regulatory_region_configurator = mock.MagicMock(
+                regulatory_mock = mock.MagicMock(
                     spec=f_location_namedplace.RegulatoryRegionConfigurator.Client
                 )
+                with mock.patch(
+                    "fidl.fuchsia_location_namedplace.RegulatoryRegionConfigurator",
+                    autospec=True,
+                ) as f_regulatory_mock:
+                    f_regulatory_mock.Client.return_value = regulatory_mock
 
-                if not zx_err:
-                    self.wlan_obj._regulatory_region_configurator.set_region.return_value = (
-                        None
-                    )
-                    self.wlan_obj.set_region("AT")
-                else:
-                    self.wlan_obj._regulatory_region_configurator.set_region.side_effect = ZxStatus(
-                        zx_err
-                    )
-                    with self.assertRaises(HoneydewWlanError):
+                    if not zx_err:
+                        regulatory_mock.set_region.return_value = None
                         self.wlan_obj.set_region("AT")
+                    else:
+                        regulatory_mock.set_region.side_effect = ZxStatus(
+                            zx_err
+                        )
+                        with self.assertRaises(HoneydewWlanError):
+                            self.wlan_obj.set_region("AT")
 
     def test_status(self) -> None:
         """Test if status works."""
