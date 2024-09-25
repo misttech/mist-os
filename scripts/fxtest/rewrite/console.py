@@ -207,6 +207,25 @@ class ConsoleOutput:
                 f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
             )
 
+            def print_tests(prefix: str, names: list[str]) -> None:
+                for name in names:
+                    print(statusinfo.error_highlight(f"{prefix}: {name}"))
+
+            print_tests(
+                "FAILED TO START",
+                sorted(
+                    state.test_results[event.TestSuiteStatus.FAILED_TO_START]
+                ),
+            )
+            print_tests(
+                "TIMEOUT",
+                sorted(state.test_results[event.TestSuiteStatus.TIMEOUT]),
+            )
+            print_tests(
+                "FAILED",
+                sorted(state.test_results[event.TestSuiteStatus.FAILED]),
+            )
+
         if state.end_duration is not None:
             print(
                 statusinfo.dim(
