@@ -83,13 +83,10 @@ zx::result<LockedPagesAndAddrs> VnodeF2fs::FindDataBlockAddrsAndPages(const pgof
 
   // If pages are in FileCache and up-to-date, we don't need to read that pages from the underlying
   // device.
-  auto pages_or = FindPages(start, end);
-  if (pages_or.is_error()) {
-    return pages_or.take_error();
-  }
+  auto pages = FindLockedPages(start, end);
 
   // Insert existing pages
-  for (auto &page : pages_or.value()) {
+  for (auto &page : pages) {
     auto index = page->GetKey() - start;
     addrs_and_pages.pages[index] = std::move(page);
   }
@@ -116,7 +113,7 @@ zx::result<LockedPagesAndAddrs> VnodeF2fs::FindDataBlockAddrsAndPages(const pgof
     if (addrs_or.value()[i] != kNullAddr) {
       addrs_and_pages.block_addrs[addrs_and_pages_index] = addrs_or.value()[i];
       if (!addrs_and_pages.pages[addrs_and_pages_index]) {
-        if (auto result = GrabCachePage(offsets[i], &addrs_and_pages.pages[addrs_and_pages_index]);
+        if (auto result = GrabLockedPage(offsets[i], &addrs_and_pages.pages[addrs_and_pages_index]);
             result != ZX_OK) {
           return zx::error(result);
         }
@@ -206,7 +203,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
   }
 
   LockedPage page;
-  if (zx_status_t ret = GrabCachePage(index, &page); ret != ZX_OK) {
+  if (zx_status_t ret = GrabLockedPage(index, &page); ret != ZX_OK) {
     return ret;
   }
 
@@ -387,7 +384,7 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
 
   std::vector<LockedPage> data_pages;
   data_pages.reserve(index_end - index_start);
-  auto pages_or = GrabCachePages(index_start, index_end);
+  auto pages_or = GrabLockedPages(index_start, index_end);
   if (unlikely(pages_or.is_error())) {
     return pages_or.take_error();
   }

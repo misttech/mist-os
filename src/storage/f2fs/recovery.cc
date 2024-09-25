@@ -117,7 +117,7 @@ zx::result<F2fs::FsyncInodeList> F2fs::FindFsyncDnodes() {
       entry_ptr->SetSize(LeToCpu(inode_page->GetAddress<Node>()->i.i_size));
     } else if (new_entry) {
       LockedPage ipage;
-      if (zx_status_t err = GetNodeVnode().GrabCachePage(ino, &ipage); err != ZX_OK) {
+      if (zx_status_t err = GetNodeVnode().GrabLockedPage(ino, &ipage); err != ZX_OK) {
         return zx::error(err);
       }
       entry_ptr->SetSize(LeToCpu(ipage->GetAddress<Node>()->i.i_size));
@@ -255,7 +255,7 @@ void F2fs::RecoverData(FsyncInodeList &inode_list, CursegType type) {
   while (true) {
     LockedPage page;
     // Eliminate duplicate node block reads using a meta inode cache.
-    if (zx_status_t ret = GetMetaVnode().GrabCachePage(blkaddr, &page); ret != ZX_OK) {
+    if (zx_status_t ret = GetMetaVnode().GrabLockedPage(blkaddr, &page); ret != ZX_OK) {
       return;
     }
 

@@ -233,7 +233,7 @@ TEST_F(FileTest, Truncate) {
   {
     // Check if its vmo is zeroed after |after|.
     LockedPage page;
-    test_file_ptr->GrabCachePage(after / Page::Size(), &page);
+    test_file_ptr->GrabLockedPage(after / Page::Size(), &page);
     page->Read(r_buf);
     ASSERT_EQ(std::memcmp(r_buf, w_buf, after), 0);
     ASSERT_EQ(std::memcmp(&r_buf[after], zero.data(), Page::Size() - after), 0);
@@ -260,7 +260,7 @@ TEST_F(FileTest, Truncate) {
   ASSERT_EQ(test_file_ptr->Truncate(after), ZX_OK);
   {
     LockedPage page;
-    test_file_ptr->GrabCachePage(after / Page::Size(), &page);
+    test_file_ptr->GrabLockedPage(after / Page::Size(), &page);
     page->Read(r_buf);
     ASSERT_EQ(std::memcmp(r_buf, w_buf, after), 0);
     ASSERT_EQ(std::memcmp(&r_buf[after], zero.data(), Page::Size() - after), 0);
@@ -310,7 +310,7 @@ TEST_F(FileTest, WritebackWhileTruncate) {
   file->Truncate(0);
   for (size_t i = 0; i < written_blocks; ++i) {
     LockedPage page;
-    ASSERT_EQ(file->GrabCachePage(i, &page), ZX_OK);
+    ASSERT_EQ(file->GrabLockedPage(i, &page), ZX_OK);
     ASSERT_EQ(page->GetBlockAddr(), kNullAddr);
   }
 

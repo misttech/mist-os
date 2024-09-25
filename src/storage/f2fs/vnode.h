@@ -301,20 +301,24 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->FindPage(index, out);
   }
 
-  zx::result<std::vector<LockedPage>> FindPages(pgoff_t start, pgoff_t end) {
-    return file_cache_->FindPages(start, end);
+  std::vector<LockedPage> FindLockedPages(pgoff_t start, pgoff_t end) {
+    return file_cache_->FindLockedPages(start, end);
   }
 
-  zx_status_t GrabCachePage(pgoff_t index, LockedPage *out) {
-    return file_cache_->GetPage(index, out);
+  zx_status_t GrabLockedPage(pgoff_t index, LockedPage *out) {
+    return file_cache_->GetLockedPage(index, out);
   }
 
-  zx::result<std::vector<LockedPage>> GrabCachePages(pgoff_t start, pgoff_t end) {
+  zx::result<std::vector<fbl::RefPtr<Page>>> GrabPages(pgoff_t start, pgoff_t end) {
     return file_cache_->GetPages(start, end);
   }
 
-  zx::result<std::vector<LockedPage>> GrabCachePages(const std::vector<pgoff_t> &page_offsets) {
-    return file_cache_->GetPages(page_offsets);
+  zx::result<std::vector<LockedPage>> GrabLockedPages(pgoff_t start, pgoff_t end) {
+    return file_cache_->GetLockedPages(start, end);
+  }
+
+  zx::result<std::vector<LockedPage>> GrabLockedPages(const std::vector<pgoff_t> &page_offsets) {
+    return file_cache_->GetLockedPages(page_offsets);
   }
 
   pgoff_t Writeback(WritebackOperation &operation) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());

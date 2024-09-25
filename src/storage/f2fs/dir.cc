@@ -654,7 +654,7 @@ zx::result<LockedPage> Dir::FindDataPage(pgoff_t index, bool do_read) {
   }
 
   LockedPage locked_page;
-  if (zx_status_t err = GrabCachePage(index, &locked_page); err != ZX_OK) {
+  if (zx_status_t err = GrabLockedPage(index, &locked_page); err != ZX_OK) {
     return zx::error(err);
   }
 

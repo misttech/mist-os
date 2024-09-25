@@ -216,7 +216,7 @@ TEST_F(GcTest, PageColdData) {
   ASSERT_EQ(new_blk_addr_or.value(), expected_addr);
   {
     LockedPage data_page;
-    ASSERT_EQ(file->GrabCachePage(0, &data_page), ZX_OK);
+    ASSERT_EQ(file->GrabLockedPage(0, &data_page), ZX_OK);
     ASSERT_FALSE(data_page->IsColdData());
   }
 

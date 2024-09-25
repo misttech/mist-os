@@ -1155,7 +1155,7 @@ zx::result<LockedPage> VnodeF2fs::NewInodePage() {
 // fs()->RemoveDirtyDirInode(this);
 pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
   pgoff_t nwritten = 0;
-  std::vector<fbl::RefPtr<Page>> pages = file_cache_->GetDirtyPages(operation);
+  std::vector<fbl::RefPtr<Page>> pages = file_cache_->FindDirtyPages(operation);
   pgoff_t last_key = pages.size() ? pages.back()->GetKey() : kInvalidPageOffset;
   PageList pages_to_disk;
   for (auto &page : pages) {

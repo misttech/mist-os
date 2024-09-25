@@ -7,7 +7,7 @@
 namespace f2fs {
 
 zx_status_t F2fs::GrabMetaPage(pgoff_t index, LockedPage *out) {
-  if (zx_status_t ret = GetMetaVnode().GrabCachePage(index, out); ret != ZX_OK) {
+  if (zx_status_t ret = GetMetaVnode().GrabLockedPage(index, out); ret != ZX_OK) {
     ZX_ASSERT_MSG(false, "GrabMetaPage() fails [addr: 0x%lx, ret: %d]\n", index, ret);
     return ret;
   }
@@ -19,7 +19,7 @@ zx_status_t F2fs::GrabMetaPage(pgoff_t index, LockedPage *out) {
 
 zx_status_t F2fs::GetMetaPage(pgoff_t index, LockedPage *out) {
   LockedPage page;
-  if (zx_status_t ret = GetMetaVnode().GrabCachePage(index, &page); ret != ZX_OK) {
+  if (zx_status_t ret = GetMetaVnode().GrabLockedPage(index, &page); ret != ZX_OK) {
     ZX_ASSERT_MSG(false, "GetMetaPage() fails [addr: 0x%lx, ret: %d]\n", index, ret);
     return ret;
   }

@@ -291,7 +291,7 @@ TEST_F(VnodeTest, SyncFile) {
   file_vnode = nullptr;
 }
 
-TEST_F(VnodeTest, GrabCachePages) {
+TEST_F(VnodeTest, GrabLockedPages) {
   zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
   ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
   fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
@@ -300,12 +300,12 @@ TEST_F(VnodeTest, GrabCachePages) {
   constexpr pgoff_t kEndOffset = 1000;
 
   {
-    auto pages_or = file_vnode->GrabCachePages(kStartOffset, kEndOffset);
+    auto pages_or = file_vnode->GrabLockedPages(kStartOffset, kEndOffset);
     ASSERT_TRUE(pages_or.is_ok());
     for (pgoff_t i = kStartOffset; i < kEndOffset; ++i) {
       LockedPage locked_page = std::move(pages_or.value()[i]);
       auto unlocked_page = locked_page.release();
-      ASSERT_EQ(file_vnode->GrabCachePage(i, &locked_page), ZX_OK);
+      ASSERT_EQ(file_vnode->GrabLockedPage(i, &locked_page), ZX_OK);
       ASSERT_EQ(locked_page.get(), unlocked_page.get());
     }
   }
@@ -317,7 +317,7 @@ TEST_F(VnodeTest, GrabCachePages) {
     for (size_t i = 0; i < pg_offsets.size(); i += 2) {
       pg_offsets[i] = kInvalidPageOffset;
     }
-    auto pages_or = file_vnode->GrabCachePages(pg_offsets);
+    auto pages_or = file_vnode->GrabLockedPages(pg_offsets);
     ASSERT_TRUE(pages_or.is_ok());
     for (size_t i = 0; i < pg_offsets.size(); ++i) {
       if (pg_offsets[i] == kInvalidPageOffset) {
@@ -325,7 +325,7 @@ TEST_F(VnodeTest, GrabCachePages) {
       } else {
         LockedPage locked_page = std::move(pages_or.value()[i]);
         auto unlocked_page = locked_page.release();
-        ASSERT_EQ(file_vnode->GrabCachePage(pg_offsets[i], &locked_page), ZX_OK);
+        ASSERT_EQ(file_vnode->GrabLockedPage(pg_offsets[i], &locked_page), ZX_OK);
         ASSERT_EQ(locked_page.get(), unlocked_page.get());
       }
     }

@@ -465,7 +465,7 @@ void NodeManager::TruncateNode(nid_t nid) {
 zx::result<LockedPage> NodeManager::NewNodePage(nid_t ino, nid_t nid, bool is_dir, size_t ofs) {
   NodeInfo old_ni, new_ni;
   LockedPage page;
-  if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
+  if (zx_status_t ret = fs_->GetNodeVnode().GrabLockedPage(nid, &page); ret != ZX_OK) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -503,7 +503,7 @@ zx::result<std::vector<LockedPage>> NodeManager::GetNodePages(const std::vector<
     NodeInfo ni;
     GetNodeInfo(nid, ni);
     LockedPage page;
-    if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
+    if (zx_status_t ret = fs_->GetNodeVnode().GrabLockedPage(nid, &page); ret != ZX_OK) {
       return zx::error(ret);
     }
     if (ni.blk_addr == kNullAddr) {
@@ -537,7 +537,7 @@ zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
     return ZX_ERR_NOT_FOUND;
   }
   LockedPage page;
-  if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
+  if (zx_status_t ret = fs_->GetNodeVnode().GrabLockedPage(nid, &page); ret != ZX_OK) {
     return ret;
   }
   if (page->IsUptodate() || ni.blk_addr == kNewAddr) {
@@ -775,7 +775,7 @@ zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
   NodeInfo old_node_info, new_node_info;
   LockedPage ipage;
 
-  if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(ino, &ipage); ret != ZX_OK) {
+  if (zx_status_t ret = fs_->GetNodeVnode().GrabLockedPage(ino, &ipage); ret != ZX_OK) {
     return ret;
   }
 

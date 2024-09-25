@@ -700,7 +700,7 @@ TEST_F(NodeManagerTest, NodeFooter) {
     MapTester::CheckDnodePage(*dnode_page, inode_nid);
 
     LockedPage locked_page;
-    fs_->GetNodeVnode().GrabCachePage(direct_index, &locked_page);
+    fs_->GetNodeVnode().GrabLockedPage(direct_index, &locked_page);
     NodePage *page = &locked_page.GetPage<NodePage>();
 
     // Check CopyNodeFooterFrom()
