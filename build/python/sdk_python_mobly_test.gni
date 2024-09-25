@@ -61,7 +61,7 @@ template("sdk_python_mobly_test") {
       "Minimum Python version must be defined and match in-tree's Python version")
   _sdk_name = invoker.sdk_name
 
-  if (defined(invoker.category) && invoker.category != "excluded") {
+  if (defined(invoker.category)) {
     _full_test_label = get_label_info(invoker.test_label, "label_no_toolchain")
 
     _labels = {

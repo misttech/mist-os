@@ -360,9 +360,6 @@ template("fidl_cpp_family") {
   if (enable_hlcpp) {
     library_name_slashes = string_replace(library_name, ".", "/")
   }
-  if (is_fidl_toolchain) {
-    not_needed(invoker, [ "sdk_category" ])
-  }
 
   if (enable_hlcpp) {
     #
@@ -421,7 +418,7 @@ template("fidl_cpp_family") {
   # Only define the SDK Atoms in the default toolchain.
   if (current_toolchain == default_toolchain) {
     # Set up an HLCPP SDK item for this library
-    if (defined(invoker.sdk_category) && invoker.sdk_category != "excluded") {
+    if (defined(invoker.sdk_category)) {
       # Instead of depending on the generated bindings, set up a dependency on
       # the original library.
       sdk_target_name = "${target_name}_sdk"
@@ -429,8 +426,6 @@ template("fidl_cpp_family") {
         atom = ":$sdk_target_name($fidl_toolchain)"
       }
     }
-  } else {
-    not_needed(invoker, [ "sdk_category" ])
   }
 
   #
@@ -530,7 +525,7 @@ template("fidl_cpp_family") {
 
     # SDK atoms for the new c++ bindings core and testing.
     if (current_toolchain == default_toolchain) {
-      if (defined(invoker.sdk_category) && invoker.sdk_category != "excluded") {
+      if (defined(invoker.sdk_category)) {
         sdk_atom_alias("${_cpp_target}_sdk") {
           atom = ":$sdk_target_name($fidl_toolchain)"
         }
@@ -746,4 +741,8 @@ template("fidl_cpp_family") {
       generated_sources = libfuzzer_sources
     }
   }
+
+  # This parameter is only referenced to determine if it is defined, which is
+  # insufficient to avoid "Assignment had no effect."
+  not_needed(invoker, [ "sdk_category" ])
 }

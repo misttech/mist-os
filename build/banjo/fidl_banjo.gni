@@ -266,7 +266,7 @@ template("_fidl_banjo_cpp") {
   }
 
   # Set up an SDK item for this library
-  if (defined(invoker.sdk_category) && invoker.sdk_category != "excluded") {
+  if (defined(invoker.sdk_category)) {
     # Instead of depending on the generated bindings, set up a dependency on
     # the original library.
     sdk_target_name = "${cpp_target_name}_sdk"

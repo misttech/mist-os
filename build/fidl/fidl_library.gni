@@ -96,11 +96,7 @@ template("fidl_library") {
     category = invoker.sdk_category
     sdk_category_string_for_assert = category
 
-    if (category == "excluded" || category == "experimental") {
-      assert(
-          false,
-          "SDK category '$category' is not currently supported for FIDL libraries. Please contact the Platform Versioning team to discuss your use case.")
-    } else if (category == "internal") {
+    if (category == "internal") {
       # Is not included in an IDK and has no compatibility requirements.
       category_allowlist_deps = []
     } else if (category == "cts") {

@@ -112,8 +112,7 @@ template("go_build") {
     output_dir = root_out_dir
   }
 
-  define_sdk_target = defined(invoker.sdk_category) &&
-                      invoker.sdk_category != "excluded" && !is_test
+  define_sdk_target = defined(invoker.sdk_category) && !is_test
 
   # Strip target binaries and binaries that are included in the SDK.
   use_strip = is_fuchsia || define_sdk_target
@@ -516,9 +515,17 @@ template("go_build") {
 
   if (define_sdk_target && is_host) {
     sdk_host_tool("${target_name}_sdk") {
-      forward_variables_from(invoker, "*", [ "deps" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "deps",
+                               "sdk_category",
+                             ])
       category = invoker.sdk_category
       deps = [ ":$target_name" ]
     }
+  } else {
+    # Checking whether it is defined earlier is insufficient.
+    not_needed(invoker, [ "sdk_category" ])
   }
 }
