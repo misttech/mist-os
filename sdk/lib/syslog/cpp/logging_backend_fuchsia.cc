@@ -229,6 +229,10 @@ void internal::LogState::Connect() {
   log_sink_.Bind(std::move(client_end), interest_listener_dispatcher_);
   if (interest_listener_config_ == fuchsia_logging::Enabled && !missing_dispatcher) {
     auto interest_result = log_sink_.sync()->WaitForInterestChange();
+    if (!interest_result.ok()) {
+      // Logging isn't available. Silently drop logs.
+      return;
+    }
     if (interest_result->is_ok()) {
       HandleInterest(interest_result->value()->data);
     }
