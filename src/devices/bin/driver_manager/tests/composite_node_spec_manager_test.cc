@@ -302,7 +302,7 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindEnabled) {
   fidl::Arena allocator;
 
   auto shared_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(5, 10),
+      fdf::MakeAcceptBindRule("g", 10u),
   };
   auto shared_props = std::vector{
       fdf::MakeProperty("c", 10u),
