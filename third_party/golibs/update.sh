@@ -110,3 +110,25 @@ $GO mod vendor
   --golibs-dir='.' > "${TMP}/BUILD.gn"
 mv "${TMP}/BUILD.gn" 'BUILD.gn'
 "${PREBUILT_GN}" format 'BUILD.gn'
+
+# Mimic the directory structure in a temp directory to generate BUILD.bazel
+# files with Gazelle.
+#
+# This avoids traversing files that are not under third_party/golibs.
+GAZELLE_TMP=$(mktemp -d)
+mkdir "${GAZELLE_TMP}/third_party"
+# Copy over vendored golibs to generate BUILD.bazel files.
+#
+# NOTE: Gazelle doesn't seem to walk into symlinked directories so a copy is
+# necessary here. There are not that many vendored golibs so this copy is not
+# very expensive.
+cp -R "${FUCHSIA_DIR}/third_party/golibs" "${GAZELLE_TMP}/third_party"
+
+# Install gazelle on the host machine for generating BUILD.bazel files for Go.
+#
+# TODO(http://fxbug.dev/368990524): Use prebuilt gazelle.
+BIN_TMP=$(mktemp -d)
+GOBIN="${BIN_TMP}" $GO install 'github.com/bazelbuild/bazel-gazelle/cmd/gazelle@v0.38.0'
+(cd "${GAZELLE_TMP}" && "${BIN_TMP}/gazelle" update -repo_root . -go_prefix='go.fuchsia.dev/fuchsia')
+# Copy back generated Bazel files.
+cp -Rf "${GAZELLE_TMP}/third_party/golibs" "${FUCHSIA_DIR}/third_party"
