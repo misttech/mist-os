@@ -19,6 +19,23 @@ namespace driver_manager {
 class DriverHost {
  public:
   using StartCallback = fit::callback<void(zx::result<>)>;
+
+  // Components needed to load a driver using dynamic linking.
+  struct DriverLoadArgs {
+    static zx::result<DriverLoadArgs> Create(
+        fuchsia_component_runner::wire::ComponentStartInfo start_info);
+
+    DriverLoadArgs(std::string_view driver_soname, zx::vmo driver_file,
+                   fidl::ClientEnd<fuchsia_io::Directory> lib_dir)
+        : driver_soname(driver_soname),
+          driver_file(std::move(driver_file)),
+          lib_dir(std::move(lib_dir)) {}
+
+    std::string driver_soname;
+    zx::vmo driver_file;
+    fidl::ClientEnd<fuchsia_io::Directory> lib_dir;
+  };
+
   virtual void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end,
                      std::string node_name,
                      fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
@@ -29,9 +46,8 @@ class DriverHost {
   // Loads and starts a driver using dynamic linking.
   virtual void StartWithDynamicLinker(
       fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-      std::string_view driver_soname, zx::vmo driver,
-      fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
-      fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
+      DriverLoadArgs load_args, fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
+      StartCallback cb) {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
@@ -96,8 +112,7 @@ class DynamicLinkerDriverHostComponent final
   }
 
   void StartWithDynamicLinker(fidl::ClientEnd<fuchsia_driver_framework::Node> node,
-                              std::string node_name, std::string_view driver_soname, zx::vmo driver,
-                              fidl::ClientEnd<fuchsia_io::Directory>,
+                              std::string node_name, DriverLoadArgs load_args,
                               fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
                               StartCallback cb) override;
 

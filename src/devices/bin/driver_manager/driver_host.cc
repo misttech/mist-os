@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "lib/vfs/cpp/pseudo_file.h"
+#include "src/devices/bin/driver_manager/pkg_utils.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fsl/handles/object_info.h"
 
@@ -35,7 +36,45 @@ std::unique_ptr<vfs::PseudoFile> CreateReadonlyFile(
 
   return std::make_unique<vfs::PseudoFile>(30, std::move(read_fn));
 }
+
+std::string_view GetFilename(std::string_view path) {
+  size_t index = path.rfind('/');
+  return index == std::string_view::npos ? path : path.substr(index + 1);
+}
+
 }  // namespace
+
+// static
+zx::result<DriverHost::DriverLoadArgs> DriverHost::DriverLoadArgs::Create(
+    fuchsia_component_runner::wire::ComponentStartInfo start_info) {
+  fuchsia_data::wire::Dictionary wire_program = start_info.program();
+  zx::result<std::string> binary = fdf_internal::ProgramValue(wire_program, "binary");
+  if (binary.is_error()) {
+    LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
+    return binary.take_error();
+  }
+
+  auto pkg = fdf_internal::NsValue(start_info.ns(), "/pkg");
+  if (pkg.is_error()) {
+    LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
+    return pkg.take_error();
+  }
+
+  auto driver_file = pkg_utils::OpenPkgFile(*pkg, *binary);
+  if (driver_file.is_error()) {
+    LOGF(ERROR, "Failed to open driver file: %s", driver_file.status_string());
+    return driver_file.take_error();
+  }
+
+  auto lib_dir = pkg_utils::OpenLibDir(*pkg);
+  if (lib_dir.is_error()) {
+    LOGF(ERROR, "Failed to open driver libs dir: %s", lib_dir.status_string());
+    return lib_dir.take_error();
+  }
+
+  return zx::ok(DriverHost::DriverLoadArgs(GetFilename(*binary), std::move(*driver_file),
+                                           std::move(*lib_dir)));
+}
 
 zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>& args,
                               frunner::wire::ComponentStartInfo& start_info) {
@@ -218,8 +257,8 @@ DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
 
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-    std::string_view driver_soname, zx::vmo driver, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
-    fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
+    DriverLoadArgs load_args, fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
+    StartCallback cb) {
   // TODO(https://fxbug.dev/357854682): pass this to the started driver host once
   // fuchsia_driver_host.DriverHost is implemented. Store it here for now so the node doesn't think
   // the driver host has died prematurely.
@@ -227,41 +266,44 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
 
   fidl::Arena arena;
   auto args = fuchsia_driver_loader::wire::DriverHostLoadDriverRequest::Builder(arena)
-                  .driver_soname(fidl::StringView::FromExternal(driver_soname))
-                  .driver_binary(std::move(driver))
-                  .driver_libs(std::move(lib_dir))
+                  .driver_soname(fidl::StringView::FromExternal(load_args.driver_soname))
+                  .driver_binary(std::move(load_args.driver_file))
+                  .driver_libs(std::move(load_args.lib_dir))
                   .Build();
 
-  driver_host_loader_->LoadDriver(args).ThenExactlyOnce([this,
-                                                         cb = std::move(cb)](auto& result) mutable {
-    if (!result.ok()) {
-      LOGF(ERROR, "Failed to start driver in driver host: %s", result.FormatDescription().c_str());
-      cb(zx::error(result.status()));
-      return;
-    }
-    if (result->is_error()) {
-      LOGF(ERROR, "Failed to start driver in driver host: %s",
-           zx_status_get_string(result->error_value()));
-      cb(result->take_error());
-      return;
-    }
+  std::string driver_name = std::string(load_args.driver_soname);
+  driver_host_loader_->LoadDriver(args).ThenExactlyOnce(
+      [this, node = std::move(node), node_name, load_args = std::move(load_args), driver_name,
+       cb = std::move(cb)](auto& result) mutable {
+        if (!result.ok()) {
+          LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
+               result.FormatDescription().c_str());
+          cb(zx::error(result.status()));
+          return;
+        }
+        if (result->is_error()) {
+          LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
+               zx_status_get_string(result->error_value()));
+          cb(result->take_error());
+          return;
+        }
 
-    auto driver_start_addr = result.value()->runtime_load_address();
-    // TODO(https://fxbug.dev/355291912): we should replace this with an actual protocol.
-    // Currently we are temporarily using it to send the driver's start function pointer to the
-    // driver host.
-    zx_status_t status =
-        bootstrap_sender_.write(0, &driver_start_addr, sizeof(driver_start_addr), nullptr, 0);
-    if (status != ZX_OK) {
-      cb(zx::error(status));
-      return;
-    }
+        auto driver_start_addr = result.value()->runtime_load_address();
+        // TODO(https://fxbug.dev/355291912): we should replace this with an actual protocol.
+        // Currently we are temporarily using it to send the driver's start function pointer to the
+        // driver host.
+        zx_status_t status =
+            bootstrap_sender_.write(0, &driver_start_addr, sizeof(driver_start_addr), nullptr, 0);
+        if (status != ZX_OK) {
+          cb(zx::error(status));
+          return;
+        }
 
-    // TODO(https://fxbug.dev/355233670): send node client as part of
-    // |fuchsia_driver_host::DriverHost::Start|.
+        // TODO(https://fxbug.dev/355233670): send node client and load args as part of
+        // |fuchsia_driver_host::DriverHost::Start|.
 
-    cb(zx::ok());
-  });
+        cb(zx::ok());
+      });
 }
 
 }  // namespace driver_manager
