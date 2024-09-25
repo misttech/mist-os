@@ -118,6 +118,7 @@ impl Closed<Initial> {
             delayed_ack: _,
             fin_wait2_timeout: _,
             max_syn_retries,
+            ip_options: _,
         }: &SocketOptions,
     ) -> (SynSent<I, ActiveOpen>, Segment<()>) {
         let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
@@ -936,6 +937,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             delayed_ack: _,
             fin_wait2_timeout: _,
             max_syn_retries: _,
+            ip_options: _,
         }: &SocketOptions,
     ) -> Option<Segment<S::Payload<'_>>> {
         let Self {
@@ -1700,6 +1702,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             delayed_ack,
             fin_wait2_timeout,
             max_syn_retries: _,
+            ip_options: _,
         }: &SocketOptions,
         defunct: bool,
     ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>, DataAcked)
@@ -2391,6 +2394,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             delayed_ack: _,
             fin_wait2_timeout: _,
             max_syn_retries: _,
+            ip_options: _,
         }: &SocketOptions,
     ) -> bool {
         let timed_out = match self {

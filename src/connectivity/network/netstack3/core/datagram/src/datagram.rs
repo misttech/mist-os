@@ -41,8 +41,8 @@ use netstack3_ip::socket::{
     SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use netstack3_ip::{
-    BaseTransportIpContext, HopLimits, MulticastMembershipHandler, ResolveRouteError,
-    TransportIpContext,
+    BaseTransportIpContext, HopLimits, Mark, MarkDomain, Marks, MulticastMembershipHandler,
+    ResolveRouteError, TransportIpContext,
 };
 use packet::BufferMut;
 use packet_formats::ip::{DscpAndEcn, IpProtoExt};
@@ -565,6 +565,9 @@ pub struct DatagramSocketOptions<I: IpExt, D: WeakDeviceIdentifier> {
 
     /// IPV6_TCLASS or IP_TOS option.
     pub dscp_and_ecn: DscpAndEcn,
+
+    /// Socket marks for the datagram socket.
+    pub marks: Marks,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions<I, D> {
@@ -582,6 +585,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         self.dscp_and_ecn
+    }
+
+    fn marks(&self) -> &Marks {
+        &self.marks
     }
 }
 
@@ -2615,6 +2622,7 @@ fn connect_inner<
         remote_ip,
         S::ip_proto::<WireI>(),
         ip_options.transparent(),
+        &ip_options.socket_options.marks,
     )?;
 
     let local_port = match local_port {
@@ -3529,6 +3537,7 @@ fn set_bound_device_single_stack<
                     remote_ip.clone(),
                     socket.proto(),
                     ip_options.transparent(),
+                    &ip_options.socket_options.marks,
                 )
                 .map_err(|_: IpSockCreationError| {
                     SocketError::Remote(RemoteAddressError::NoRoute)
@@ -3669,6 +3678,7 @@ fn pick_interface_for_addr<
     core_ctx: &mut CC,
     remote_addr: MulticastAddr<A>,
     source_addr: Option<SpecifiedAddr<A>>,
+    marks: &Marks,
 ) -> Result<CC::DeviceId, SetMulticastMembershipError>
 where
     A::Version: IpExt,
@@ -3692,6 +3702,7 @@ where
             let device = MulticastMembershipHandler::select_device_for_multicast_group(
                 core_ctx,
                 remote_addr,
+                marks,
             )
             .map_err(|e| match e {
                 ResolveRouteError::NoSrcAddr | ResolveRouteError::Unreachable => {
@@ -4685,7 +4696,7 @@ where
     ) -> Result<(), SetMulticastMembershipError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_socket_state_mut(id, |core_ctx, state| {
-            let (_, bound_device): (&IpOptions<_, _, _>, _) = state.get_options_device(core_ctx);
+            let (ip_options, bound_device) = state.get_options_device(core_ctx);
 
             let interface = match interface {
                 MulticastMembershipInterfaceSelector::Specified(selector) => match selector {
@@ -4696,9 +4707,14 @@ where
                             EitherDeviceId::Strong(device)
                         }
                     }
-                    MulticastInterfaceSelector::LocalAddress(addr) => EitherDeviceId::Strong(
-                        pick_interface_for_addr(core_ctx, multicast_group, Some(addr))?,
-                    ),
+                    MulticastInterfaceSelector::LocalAddress(addr) => {
+                        EitherDeviceId::Strong(pick_interface_for_addr(
+                            core_ctx,
+                            multicast_group,
+                            Some(addr),
+                            &ip_options.socket_options.marks,
+                        )?)
+                    }
                 },
                 MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute => {
                     if let Some(bound_device) = bound_device.as_ref() {
@@ -4708,6 +4724,7 @@ where
                             core_ctx,
                             multicast_group,
                             None,
+                            &ip_options.socket_options.marks,
                         )?)
                     }
                 }
@@ -4946,6 +4963,21 @@ where
         self.core_ctx().with_socket_state(id, |core_ctx, state| {
             let (options, _device) = state.get_options_device(core_ctx);
             options.transparent
+        })
+    }
+
+    /// Sets the socket mark at `domain`.
+    pub fn set_mark(&mut self, id: &DatagramApiSocketId<I, C, S>, domain: MarkDomain, mark: Mark) {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            *state.get_options_mut(core_ctx).socket_options.marks.get_mut(domain) = mark;
+        })
+    }
+
+    /// Returns the socket mark at `domain`.
+    pub fn get_mark(&mut self, id: &DatagramApiSocketId<I, C, S>, domain: MarkDomain) -> Mark {
+        self.core_ctx().with_socket_state(id, |core_ctx, state| {
+            let (options, _device) = state.get_options_device(core_ctx);
+            *options.socket_options.marks.get(domain)
         })
     }
 

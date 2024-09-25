@@ -9,11 +9,15 @@ use core::time::Duration;
 
 use const_unwrap::const_unwrap_option;
 use net_types::ip::{GenericOverIp, Ip, IpMarked};
+use net_types::SpecifiedAddr;
 use netstack3_base::{
-    Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, UnscaledWindowSize,
+    Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
     WeakDeviceIdentifier, WindowSize,
 };
+use netstack3_ip::socket::SendOptions;
+use netstack3_ip::Marks;
 use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+use packet_formats::ip::DscpAndEcn;
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
@@ -217,6 +221,35 @@ impl<'a, R, S> BuffersRefMut<'a, R, S> {
     }
 }
 
+/// The IP sock options used by TCP.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct TcpIpSockOptions {
+    /// Socket marks used for routing.
+    pub marks: Marks,
+}
+
+impl<I: IpExt> SendOptions<I> for TcpIpSockOptions {
+    fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        None
+    }
+
+    fn multicast_loop(&self) -> bool {
+        false
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        None
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        DscpAndEcn::default()
+    }
+
+    fn marks(&self) -> &Marks {
+        &self.marks
+    }
+}
+
 /// TCP socket options.
 ///
 /// This only stores options that are trivial to get and set.
@@ -236,6 +269,8 @@ pub struct SocketOptions {
     pub fin_wait2_timeout: Option<Duration>,
     /// The maximum SYN retransmissions before aborting a connection.
     pub max_syn_retries: NonZeroU8,
+    /// Ip socket options.
+    pub ip_options: TcpIpSockOptions,
 }
 
 impl Default for SocketOptions {
@@ -260,6 +295,7 @@ impl Default for SocketOptions {
             delayed_ack: false,
             fin_wait2_timeout: Some(DEFAULT_FIN_WAIT2_TIMEOUT),
             max_syn_retries: DEFAULT_MAX_SYN_RETRIES,
+            ip_options: TcpIpSockOptions::default(),
         }
     }
 }

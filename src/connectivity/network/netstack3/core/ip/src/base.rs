@@ -79,7 +79,7 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
+use crate::internal::routing::rules::{Marks, Rule, RuleAction, RuleInput, RulesTable};
 use crate::internal::routing::{
     IpRoutingDeviceContext, NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };
@@ -393,6 +393,7 @@ pub trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     fn select_device_for_multicast_group(
         &mut self,
         addr: MulticastAddr<I::Addr>,
+        marks: &Marks,
     ) -> Result<Self::DeviceId, ResolveRouteError>;
 }
 
@@ -1084,6 +1085,7 @@ pub fn resolve_output_route_to_destination<
     device: Option<&CC::DeviceId>,
     src_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     dst_ip: Option<RoutableIpAddr<I::Addr>>,
+    marks: &Marks,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
         WeakLoopback { dst_ip: A, device: D },
@@ -1159,8 +1161,10 @@ pub fn resolve_output_route_to_destination<
         });
     }
     let bound_address = src_ip_and_policy.map(|(sock_addr, _policy)| sock_addr.into_inner().get());
-    let rule_input =
-        RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device: device } };
+    let rule_input = RuleInput {
+        packet_origin: PacketOrigin::Local { bound_address, bound_device: device },
+        marks,
+    };
     core_ctx.with_rules_table(|core_ctx, rules| {
         let mut walk_rules = |rule_input, src_ip_and_policy| {
             walk_rules(
@@ -1228,6 +1232,7 @@ pub fn resolve_output_route_to_destination<
                         bound_address: Some(selected_src_addr.into()),
                         bound_device: device,
                     },
+                    marks,
                 },
                 Some((selected_src_addr, NonLocalSrcAddrPolicy::Deny)),
             ),
@@ -1279,6 +1284,7 @@ impl<
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         addr: RoutableIpAddr<I::Addr>,
         transparent: bool,
+        marks: &Marks,
     ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
         let src_ip_and_policy = local_ip.map(|local_ip| {
             (
@@ -1290,7 +1296,7 @@ impl<
                 },
             )
         });
-        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr))
+        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr), marks)
     }
 
     fn send_ip_packet<S>(
@@ -3757,6 +3763,9 @@ fn receive_ip_packet_action_common<
         *dst_ip,
         RuleInput {
             packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+            // TODO(https://fxbug.dev/337134565): packets can have marks as a result of a filtering
+            // target like `MARK`.
+            marks: &Default::default(),
         },
     ) {
         Some(dst) => {

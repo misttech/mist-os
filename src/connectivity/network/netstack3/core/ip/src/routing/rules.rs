@@ -110,6 +110,145 @@ impl<'a, I: Ip, D: DeviceWithName> Matcher<PacketOrigin<I, &'a D>> for TrafficOr
     }
 }
 
+/// A matcher to the socket mark.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkMatcher {
+    /// Matches a packet if it is unmarked.
+    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
+    #[allow(unused)]
+    Unmarked,
+    /// The packet carries a mark that is in the range after masking.
+    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
+    #[allow(unused)]
+    Marked {
+        /// The mask to apply.
+        mask: u32,
+        /// Start of the range, inclusive.
+        start: u32,
+        /// End of the range, exclusive.
+        end: u32,
+    },
+}
+
+/// A socket mark.
+///
+/// A socket mark can either be `None` or a `u32`. The mark can be carried by a
+/// socket or a packet, and `None` means the socket/packet is unmarked.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Mark(pub Option<u32>);
+
+impl Matcher<Mark> for MarkMatcher {
+    fn matches(&self, Mark(actual): &Mark) -> bool {
+        match self {
+            MarkMatcher::Unmarked => actual.is_none(),
+            MarkMatcher::Marked { mask, start, end } => {
+                actual.is_some_and(|actual| (*start..*end).contains(&(actual & *mask)))
+            }
+        }
+    }
+}
+
+const MARK_DOMAINS: usize = 2;
+
+/// The 2 marks socket can use to route traffic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Marks([Mark; MARK_DOMAINS]);
+
+impl Marks {
+    /// Unmarked marks.
+    pub const UNMARKED: Self = Marks([Mark(None), Mark(None)]);
+}
+
+impl Default for Marks {
+    fn default() -> Marks {
+        Self::UNMARKED
+    }
+}
+
+/// Mark domains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkDomain {
+    /// The first mark.
+    Mark1,
+    /// The second mark.
+    Mark2,
+}
+
+impl MarkDomain {
+    fn get<T>(self, storage: &[T; MARK_DOMAINS]) -> &T {
+        match self {
+            Self::Mark1 => &storage[0],
+            Self::Mark2 => &storage[1],
+        }
+    }
+
+    fn get_mut<T>(self, storage: &mut [T; MARK_DOMAINS]) -> &mut T {
+        match self {
+            Self::Mark1 => &mut storage[0],
+            Self::Mark2 => &mut storage[1],
+        }
+    }
+}
+
+impl Marks {
+    /// Creates [`Marks`]s from an iterator of `(MarkDomain, u32)`.
+    ///
+    /// An unspecified domain will remain unmarked.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the same domain is specified more than once.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn new(iter: impl IntoIterator<Item = (MarkDomain, u32)>) -> Self {
+        let mut marks = Self::default();
+        for (domain, mark) in iter.into_iter() {
+            assert_eq!(core::mem::replace(marks.get_mut(domain), Mark(Some(mark))), Mark(None));
+        }
+        marks
+    }
+
+    /// Gets an immutable reference to the mark at the given domain.
+    pub fn get(&self, domain: MarkDomain) -> &Mark {
+        let Self(marks) = self;
+        domain.get(marks)
+    }
+
+    /// Gets a mutable reference to the mark at the given domain.
+    pub fn get_mut(&mut self, domain: MarkDomain) -> &mut Mark {
+        let Self(marks) = self;
+        domain.get_mut(marks)
+    }
+}
+
+/// The 2 mark matchers a rule can specify. All non-none markers must match.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MarkMatchers([Option<MarkMatcher>; MARK_DOMAINS]);
+
+impl MarkMatchers {
+    /// Creates [`MarkMatcher`]s from an iterator of `(MarkDomain, MarkMatcher)`.
+    ///
+    /// An unspecified domain will not have a matcher.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the same domain is specified more than once.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn new(iter: impl IntoIterator<Item = (MarkDomain, MarkMatcher)>) -> Self {
+        let mut mark_matchers = [None; MARK_DOMAINS];
+        for (domain, matcher) in iter.into_iter() {
+            assert_eq!(core::mem::replace(domain.get_mut(&mut mark_matchers), Some(matcher)), None);
+        }
+        MarkMatchers(mark_matchers)
+    }
+}
+
+impl Matcher<Marks> for MarkMatchers {
+    fn matches(&self, Marks(actual): &Marks) -> bool {
+        let Self(matchers) = self;
+        matchers.iter().zip(actual.iter()).all(|(matcher, actual)| matcher.matches(actual))
+    }
+}
+
 /// Contains traffic matchers for a given rule.
 ///
 /// `None` fields match all packets.
@@ -124,27 +263,34 @@ pub struct RuleMatcher<I: Ip> {
     /// Matches on [`PacketOrigin`]'s bound device for a locally generated packets or the receiving
     /// device of an incoming packet.
     pub traffic_origin_matcher: Option<TrafficOriginMatcher>,
-    // TODO(https://fxbug.dev/337134565): Implement socket marks.
+    /// Matches on [`RuleInput`]'s marks.
+    pub mark_matchers: MarkMatchers,
 }
 
 impl<I: Ip> RuleMatcher<I> {
     /// Creates a rule matcher that matches all packets.
     pub fn match_all_packets() -> Self {
-        RuleMatcher { source_address_matcher: None, traffic_origin_matcher: None }
+        RuleMatcher {
+            source_address_matcher: None,
+            traffic_origin_matcher: None,
+            mark_matchers: MarkMatchers::default(),
+        }
     }
 }
 
 /// Packet properties used as input for the rules engine.
 pub struct RuleInput<'a, I: Ip, D> {
     pub(crate) packet_origin: PacketOrigin<I, &'a D>,
+    pub(crate) marks: &'a Marks,
 }
 
 impl<'a, I: Ip, D: DeviceWithName> Matcher<RuleInput<'a, I, D>> for RuleMatcher<I> {
     fn matches(&self, actual: &RuleInput<'a, I, D>) -> bool {
-        let Self { source_address_matcher, traffic_origin_matcher } = self;
-        let RuleInput { packet_origin } = actual;
+        let Self { source_address_matcher, traffic_origin_matcher, mark_matchers } = self;
+        let RuleInput { packet_origin, marks } = actual;
         source_address_matcher.matches(packet_origin)
             && traffic_origin_matcher.matches(packet_origin)
+            && mark_matchers.matches(marks)
     }
 }
 
@@ -169,16 +315,17 @@ mod test {
         bound_device: Option<MultipleDevicesId>,
     ) -> bool {
         let matcher = RuleMatcher::<I> {
-            source_address_matcher: None,
             traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
                 bound_device_matcher: device_name.map(|name| DeviceNameMatcher(name.into())),
             }),
+            ..RuleMatcher::match_all_packets()
         };
         let input = RuleInput {
             packet_origin: PacketOrigin::Local {
                 bound_address: None,
                 bound_device: bound_device.as_ref(),
             },
+            marks: &Default::default(),
         };
         matcher.matches(&input)
     }
@@ -201,10 +348,12 @@ mod test {
     ) -> bool {
         let matcher = RuleMatcher::<I> {
             source_address_matcher: source_address_subnet.map(SubnetMatcher),
-            traffic_origin_matcher: None,
+            ..RuleMatcher::match_all_packets()
         };
-        let input = RuleInput::<'static, _, FakeDeviceId> {
+        let marks = Default::default();
+        let input = RuleInput::<'_, _, FakeDeviceId> {
             packet_origin: PacketOrigin::Local { bound_address, bound_device: None },
+            marks: &marks,
         };
         matcher.matches(&input)
     }
@@ -243,8 +392,10 @@ mod test {
         traffic_origin_matcher: Option<TrafficOriginMatcher>,
         packet_origin: PacketOrigin<I, &'static FakeDeviceId>,
     ) -> bool {
-        let matcher = RuleMatcher::<I> { source_address_matcher: None, traffic_origin_matcher };
-        let input = RuleInput::<'static, _, FakeDeviceId> { packet_origin };
+        let matcher =
+            RuleMatcher::<I> { traffic_origin_matcher, ..RuleMatcher::match_all_packets() };
+        let marks = Default::default();
+        let input = RuleInput::<'_, _, FakeDeviceId> { packet_origin, marks: &marks };
         matcher.matches(&input)
     }
 
@@ -273,6 +424,7 @@ mod test {
             traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
                 bound_device_matcher: Some(DeviceNameMatcher("A".into())),
             }),
+            ..RuleMatcher::match_all_packets()
         };
 
         let packet_origin = if locally_generated {
@@ -284,7 +436,7 @@ mod test {
             PacketOrigin::NonLocal { source_address, incoming_device }
         };
 
-        let input = RuleInput { packet_origin };
+        let input = RuleInput { packet_origin, marks: &Default::default() };
 
         if ip == Some(I::TEST_ADDRS.local_ip)
             && (device == Some(&MultipleDevicesId::A))
@@ -294,5 +446,56 @@ mod test {
         } else {
             assert!(!matcher.matches(&input))
         }
+    }
+
+    #[test_case(MarkMatcher::Unmarked, Mark(None) => true)]
+    #[test_case(MarkMatcher::Unmarked, Mark(Some(0)) => false)]
+    #[test_case(MarkMatcher::Marked {
+        mask: 1,
+        start: 0,
+        end: 1,
+    }, Mark(None) => false)]
+    #[test_case(MarkMatcher::Marked {
+        mask: 1,
+        start: 0,
+        end: 1,
+    }, Mark(Some(0)) => true)]
+    #[test_case(MarkMatcher::Marked {
+        mask: 1,
+        start: 0,
+        end: 1,
+    }, Mark(Some(1)) => false)]
+    #[test_case(MarkMatcher::Marked {
+        mask: 1,
+        start: 0,
+        end: 1,
+    }, Mark(Some(2)) => true)]
+    #[test_case(MarkMatcher::Marked {
+        mask: 1,
+        start: 0,
+        end: 1,
+    }, Mark(Some(3)) => false)]
+    fn mark_matcher(matcher: MarkMatcher, mark: Mark) -> bool {
+        matcher.matches(&mark)
+    }
+
+    #[test_case(
+        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
+        Marks([Mark(None), Mark(None)]) => true
+    )]
+    #[test_case(
+        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
+        Marks([Mark(Some(1)), Mark(None)]) => false
+    )]
+    #[test_case(
+        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
+        Marks([Mark(None), Mark(Some(1))]) => false
+    )]
+    #[test_case(
+        MarkMatchers([Some(MarkMatcher::Unmarked), Some(MarkMatcher::Unmarked)]),
+        Marks([Mark(Some(1)), Mark(Some(1))]) => false
+    )]
+    fn mark_matchers(matchers: MarkMatchers, marks: Marks) -> bool {
+        matchers.matches(&marks)
     }
 }

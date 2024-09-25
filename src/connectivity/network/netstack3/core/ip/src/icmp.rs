@@ -2854,6 +2854,7 @@ mod tests {
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
+    use crate::internal::routing::rules::Marks;
     use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
@@ -3270,6 +3271,7 @@ mod tests {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,
+            marks: &Marks,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
             self.ip_socket_ctx.new_ip_socket(
                 bindings_ctx,
@@ -3278,6 +3280,7 @@ mod tests {
                 remote_ip,
                 proto,
                 transparent,
+                marks,
             )
         }
 
@@ -3301,8 +3304,9 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             socket: &IpSock<I, Self::WeakDeviceId>,
+            marks: &Marks,
         ) {
-            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket)
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, marks)
         }
     }
 

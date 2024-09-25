@@ -60,16 +60,15 @@ use netstack3_base::{
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
-    DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
-    IpSockCreationError, IpSocketHandler,
+    DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
-use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
+use netstack3_ip::{self as ip, BaseTransportIpContext, Mark, MarkDomain, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
 use crate::internal::base::{
-    BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpCounters,
+    BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpCounters, TcpIpSockOptions,
 };
 use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
@@ -3246,15 +3245,16 @@ where
         Ok(result)
     }
 
-    fn set_device_conn<WireI, CC>(
+    fn set_device_conn<SockI, WireI, CC>(
         core_ctx: &mut CC,
         bindings_ctx: &mut C::BindingsContext,
         addr: &mut ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
         demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, C::BindingsContext>,
-        ip_sock: &mut IpSock<WireI, CC::WeakDeviceId>,
+        conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, C::BindingsContext>,
         new_device: Option<CC::DeviceId>,
     ) -> Result<(), SetDeviceError>
     where
+        SockI: DualStackIpExt,
         WireI: DualStackIpExt,
         CC: TransportIpContext<WireI, C::BindingsContext>
             + TcpDemuxContext<WireI, CC::WeakDeviceId, C::BindingsContext>,
@@ -3281,6 +3281,7 @@ where
                 *remote_ip,
                 IpProto::Tcp.into(),
                 false, /* transparent */
+                &conn.socket_options.ip_options.marks,
             )
             .map_err(|_: IpSockCreationError| SetDeviceError::Unroutable)?;
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -3293,7 +3294,7 @@ where
             {
                 Ok(entry) => {
                     *addr = entry.get_addr().clone();
-                    *ip_sock = new_socket;
+                    conn.ip_sock = new_socket;
                     Ok(())
                 }
                 Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
@@ -3366,7 +3367,7 @@ where
                             let (conn, addr) = converter.convert(conn_and_addr);
                             EitherStack::ThisStack((
                                 core_ctx.as_this_stack(),
-                                &mut conn.ip_sock,
+                                conn,
                                 addr,
                                 I::into_demux_socket_id(id.clone()),
                             ))
@@ -3375,40 +3376,35 @@ where
                             match converter.convert(conn_and_addr) {
                                 EitherStack::ThisStack((conn, addr)) => EitherStack::ThisStack((
                                     core_ctx.as_this_stack(),
-                                    &mut conn.ip_sock,
+                                    conn,
                                     addr,
                                     I::into_demux_socket_id(id.clone()),
                                 )),
                                 EitherStack::OtherStack((conn, addr)) => {
                                     let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
-                                    EitherStack::OtherStack((
-                                        core_ctx,
-                                        &mut conn.ip_sock,
-                                        addr,
-                                        demux_id,
-                                    ))
+                                    EitherStack::OtherStack((core_ctx, conn, addr, demux_id))
                                 }
                             }
                         }
                     };
                     match this_or_other_stack {
-                        EitherStack::ThisStack((core_ctx, ip_sock, addr, demux_id)) => {
-                            Self::set_device_conn::<I, _>(
+                        EitherStack::ThisStack((core_ctx, conn, addr, demux_id)) => {
+                            Self::set_device_conn::<_, I, _>(
                                 core_ctx,
                                 bindings_ctx,
                                 addr,
                                 &demux_id,
-                                ip_sock,
+                                conn,
                                 new_device,
                             )
                         }
-                        EitherStack::OtherStack((core_ctx, ip_sock, addr, demux_id)) => {
-                            Self::set_device_conn::<I::OtherVersion, _>(
+                        EitherStack::OtherStack((core_ctx, conn, addr, demux_id)) => {
+                            Self::set_device_conn::<_, I::OtherVersion, _>(
                                 core_ctx,
                                 bindings_ctx,
                                 addr,
                                 &demux_id,
-                                ip_sock,
+                                conn,
                                 new_device,
                             )
                         }
@@ -3903,6 +3899,16 @@ where
                 }
             },
         )
+    }
+
+    /// Sets the socket mark for the socket domain.
+    pub fn set_mark(&mut self, id: &TcpApiSocketId<I, C>, domain: MarkDomain, mark: Mark) {
+        self.with_socket_options_mut(id, |options| *options.ip_options.marks.get_mut(domain) = mark)
+    }
+
+    /// Gets the socket mark for the socket domain.
+    pub fn get_mark(&mut self, id: &TcpApiSocketId<I, C>, domain: MarkDomain) -> Mark {
+        self.with_socket_options(id, |options| *options.ip_options.marks.get(domain))
     }
 
     /// Sets the `dual_stack_enabled` option value.
@@ -4431,8 +4437,7 @@ fn close_pending_sockets<I, CC, BC>(
                     EitherStack::ThisStack((
                         core_ctx.as_this_stack(),
                         I::into_demux_socket_id(conn_id.clone()),
-                        &mut conn.state,
-                        &conn.ip_sock,
+                        conn,
                         addr.clone(),
                     ))
                 }
@@ -4442,45 +4447,36 @@ fn close_pending_sockets<I, CC, BC>(
                     EitherStack::ThisStack((conn, addr)) => EitherStack::ThisStack((
                         core_ctx.as_this_stack(),
                         I::into_demux_socket_id(conn_id.clone()),
-                        &mut conn.state,
-                        &conn.ip_sock,
+                        conn,
                         addr.clone(),
                     )),
                     EitherStack::OtherStack((conn, addr)) => {
                         let other_demux_id = core_ctx.into_other_demux_socket_id(conn_id.clone());
-                        EitherStack::OtherStack((
-                            core_ctx,
-                            other_demux_id,
-                            &mut conn.state,
-                            &conn.ip_sock,
-                            addr.clone(),
-                        ))
+                        EitherStack::OtherStack((core_ctx, other_demux_id, conn, addr.clone()))
                     }
                 },
             };
 
             match this_or_other_stack {
-                EitherStack::ThisStack((core_ctx, demux_id, state, ip_sock, conn_addr)) => {
+                EitherStack::ThisStack((core_ctx, demux_id, conn, conn_addr)) => {
                     close_pending_socket(
                         core_ctx,
                         bindings_ctx,
                         &conn_id,
                         &demux_id,
                         timer,
-                        state,
-                        ip_sock,
+                        conn,
                         &conn_addr,
                     )
                 }
-                EitherStack::OtherStack((core_ctx, demux_id, state, ip_sock, conn_addr)) => {
+                EitherStack::OtherStack((core_ctx, demux_id, conn, conn_addr)) => {
                     close_pending_socket(
                         core_ctx,
                         bindings_ctx,
                         &conn_id,
                         &demux_id,
                         timer,
-                        state,
-                        ip_sock,
+                        conn,
                         &conn_addr,
                     )
                 }
@@ -4496,13 +4492,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     sock_id: &TcpSocketId<SockI, DC::WeakDeviceId, BC>,
     demux_id: &WireI::DemuxSocketId<DC::WeakDeviceId, BC>,
     timer: &mut BC::Timer,
-    state: &mut State<
-        BC::Instant,
-        BC::ReceiveBuffer,
-        BC::SendBuffer,
-        BC::ListenerNotifierOrProvidedBuffers,
-    >,
-    ip_sock: &IpSock<WireI, DC::WeakDeviceId>,
+    conn: &mut Connection<SockI, WireI, DC::WeakDeviceId, BC>,
     conn_addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, DC::WeakDeviceId>,
 ) where
     WireI: DualStackIpExt,
@@ -4513,7 +4503,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         + CounterContext<TcpCounters<SockI>>,
     BC: TcpBindingsContext,
 {
-    if !matches!(state, State::Closed(_)) {
+    if !matches!(conn.state, State::Closed(_)) {
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
             socketmap
                 .conns_mut()
@@ -4524,15 +4514,16 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     }
 
     debug!("aborting pending socket {sock_id:?}");
-    if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
+    if let Some(reset) = core_ctx.with_counters(|counters| conn.state.abort(counters)) {
         let ConnAddr { ip, device: _ } = conn_addr;
         send_tcp_segment(
             core_ctx,
             bindings_ctx,
             Some(sock_id),
-            Some(ip_sock),
+            Some(&conn.ip_sock),
             *ip,
             reset.into_empty(),
+            &conn.socket_options.ip_options,
         );
     }
 }
@@ -4560,6 +4551,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
             Some(&conn.ip_sock),
             addr.ip.clone(),
             seg,
+            &conn.socket_options.ip_options,
         );
     }
 
@@ -4986,6 +4978,7 @@ where
             remote_ip,
             IpProto::Tcp.into(),
             false, /* transparent */
+            &socket_options.ip_options.marks,
         )
         .map_err(|err| match err {
             IpSockCreationError::Route(_) => ConnectError::NoRoute,
@@ -5078,6 +5071,7 @@ where
             Some(&ip_sock),
             conn_addr.ip,
             syn.into_empty(),
+            &socket_options.ip_options,
         );
 
         let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
@@ -5226,6 +5220,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     ip_sock: Option<&IpSock<WireI, D>>,
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     segment: Segment<<BC::SendBuffer as SendBuffer>::Payload<'a>>,
+    ip_sock_options: &TcpIpSockOptions,
 ) where
     WireI: IpExt,
     SockI: IpExt + DualStackIpExt,
@@ -5239,7 +5234,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
         Some(ip_sock) => {
             let body = tcp_serialize_segment(segment, conn_addr);
             core_ctx
-                .send_ip_packet(bindings_ctx, ip_sock, body, None, &DefaultSendOptions)
+                .send_ip_packet(bindings_ctx, ip_sock, body, None, ip_sock_options)
                 .map_err(|err| IpSockCreateAndSendError::Send(err))
         }
         None => {
@@ -5250,7 +5245,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 IpDeviceAddr::new_from_socket_ip_addr(local_ip),
                 remote_ip,
                 IpProto::Tcp.into(),
-                &DefaultSendOptions,
+                ip_sock_options,
                 |_addr| tcp_serialize_segment(segment, conn_addr),
                 None,
                 false, /* transparent */
@@ -5314,7 +5309,7 @@ mod tests {
     use netstack3_ip::socket::{IpSockSendError, MmsError, SendOptions};
     use netstack3_ip::testutil::DualStackSendIpPacketMeta;
     use netstack3_ip::{
-        BaseTransportIpContext, HopLimits, IpTransportContext, ReceiveIpPacketMeta,
+        BaseTransportIpContext, HopLimits, IpTransportContext, Marks, ReceiveIpPacketMeta,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
@@ -5693,6 +5688,7 @@ mod tests {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,
+            marks: &Marks,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
             IpSocketHandler::<I, BC>::new_ip_socket(
                 &mut self.ip_socket_ctx,
@@ -5702,6 +5698,7 @@ mod tests {
                 remote_ip,
                 proto,
                 transparent,
+                marks,
             )
         }
 
@@ -5725,8 +5722,9 @@ mod tests {
             &mut self,
             bindings_ctx: &mut BC,
             socket: &IpSock<I, Self::WeakDeviceId>,
+            marks: &Marks,
         ) {
-            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket)
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, marks)
         }
     }
 
@@ -8672,5 +8670,72 @@ mod tests {
                 assert_eq!(all_sockets.keys().collect::<Vec<_>>(), [&server]);
             })
         })
+    }
+
+    #[ip_test(I)]
+    #[test_case::test_matrix(
+        [MarkDomain::Mark1, MarkDomain::Mark2],
+        [None, Some(0), Some(1)]
+    )]
+    fn tcp_socket_marks<I: TcpTestIpExt>(domain: MarkDomain, mark: Option<u32>)
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let socket = api.create(Default::default());
+
+        // Doesn't have a mark by default.
+        assert_eq!(api.get_mark(&socket, domain), Mark(None));
+
+        let mark = Mark(mark);
+        // We can set and get back the mark.
+        api.set_mark(&socket, domain, mark);
+        assert_eq!(api.get_mark(&socket, domain), mark);
+    }
+
+    #[ip_test(I)]
+    fn tcp_marks_for_accepted_sockets<I: TcpTestIpExt>()
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
+            I,
+            TcpBindingsCtx<FakeDeviceId>,
+            SingleStackConverter = I::SingleStackConverter,
+            DualStackConverter = I::DualStackConverter,
+        >,
+    {
+        let mut net = new_test_net::<I>();
+
+        let backlog = NonZeroUsize::new(1).unwrap();
+        let server_port = NonZeroU16::new(1234).unwrap();
+
+        let server = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let server = api.create(Default::default());
+            api.set_mark(&server, MarkDomain::Mark1, Mark(Some(1)));
+            api.bind(&server, None, Some(server_port)).expect("failed to bind the server socket");
+            api.listen(&server, backlog).expect("can listen");
+            server
+        });
+
+        let client_ends = WriteBackClientBuffers::default();
+        let _client = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(ProvidedBuffers::Buffers(client_ends.clone()));
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), server_port)
+                .expect("failed to connect");
+            socket
+        });
+        net.run_until_idle();
+        net.with_context(REMOTE, |ctx| {
+            let (accepted, _addr, _accepted_ends) =
+                ctx.tcp_api::<I>().accept(&server).expect("failed to accept");
+            assert_eq!(ctx.tcp_api::<I>().get_mark(&accepted, MarkDomain::Mark1), Mark(Some(1)));
+        });
     }
 }

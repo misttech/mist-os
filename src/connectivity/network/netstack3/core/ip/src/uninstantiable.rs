@@ -13,6 +13,7 @@ use netstack3_filter::Tuple;
 use packet::{BufferMut, Serializer};
 
 use crate::internal::base::{BaseTransportIpContext, HopLimits, IpLayerIpExt};
+use crate::internal::routing::rules::Marks;
 use crate::internal::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, MmsError,
     SendOptions,
@@ -48,6 +49,7 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         _remote_ip: SocketIpAddr<I::Addr>,
         _proto: I::Proto,
         _transparent: bool,
+        _marks: &Marks,
     ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
         self.uninstantiable_unreachable()
     }
@@ -71,6 +73,7 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         &mut self,
         _bindings_ctx: &mut C,
         _socket: &IpSock<I, Self::WeakDeviceId>,
+        _marks: &Marks,
     ) {
         self.uninstantiable_unreachable()
     }

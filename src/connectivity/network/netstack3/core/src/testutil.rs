@@ -61,7 +61,7 @@ use netstack3_ip::nud::{self, LinkResolutionContext, LinkResolutionNotifier};
 use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes};
 use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId,
-    RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    Marks, RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
@@ -317,7 +317,19 @@ where
             None,
             Some((src_ip, ip::NonLocalSrcAddrPolicy::Deny)),
             dst_ip,
+            &Default::default(),
         )
+    }
+
+    /// Resolves a route with a given mark.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn resolve_route_with_marks<I: IpExt>(
+        &mut self,
+        dst_ip: Option<RoutableIpAddr<I::Addr>>,
+        marks: &Marks,
+    ) -> Result<ResolvedRoute<I, DeviceId<BC>>, ResolveRouteError> {
+        let (core_ctx, _bindings_ctx) = self.contexts();
+        ip::resolve_output_route_to_destination(core_ctx, None, None, dst_ip, marks)
     }
 
     /// Delete a route from the forwarding table, returning `Err` if no route

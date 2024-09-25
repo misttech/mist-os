@@ -34,7 +34,9 @@ use packet_formats::tcp::{
     TcpSegmentBuilderWithOptions,
 };
 
-use crate::internal::base::{BufferSizes, ConnectionError, SocketOptions, TcpCounters};
+use crate::internal::base::{
+    BufferSizes, ConnectionError, SocketOptions, TcpCounters, TcpIpSockOptions,
+};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
     self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
@@ -392,6 +394,10 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 None,
                 conn_addr,
                 seg.into_empty(),
+                // We can't find the socket, so just use the default options.
+                // TODO(https://fxbug.dev/369133279): If the incoming packet carries marks, we
+                // should use them instead, otherwise we may send the RST on the wrong network.
+                &TcpIpSockOptions::default(),
             );
         }
     } else {
@@ -622,7 +628,9 @@ where
     });
 
     match data_acked {
-        DataAcked::Yes => core_ctx.confirm_reachable(bindings_ctx, ip_sock),
+        DataAcked::Yes => {
+            core_ctx.confirm_reachable(bindings_ctx, ip_sock, &socket_options.ip_options.marks)
+        }
         DataAcked::No => {}
     }
 
@@ -643,7 +651,7 @@ where
             if handshake_status
                 .update_if_pending(HandshakeStatus::Completed { reported: accept_queue.is_some() })
             {
-                core_ctx.confirm_reachable(bindings_ctx, ip_sock);
+                core_ctx.confirm_reachable(bindings_ctx, ip_sock, &socket_options.ip_options.marks);
             }
         }
         State::Closed(Closed { reason }) => {
@@ -687,6 +695,7 @@ where
             Some(&ip_sock),
             conn_addr.ip,
             seg.into_empty(),
+            &socket_options.ip_options,
         );
     }
 
@@ -884,6 +893,7 @@ where
         remote_ip,
         IpProto::Tcp.into(),
         false, /* transparent */
+        &socket_options.ip_options.marks,
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {
@@ -1058,6 +1068,7 @@ where
             Some(&ip_sock),
             incoming_addrs,
             seg.into_empty(),
+            &socket_options.ip_options,
         );
     }
 

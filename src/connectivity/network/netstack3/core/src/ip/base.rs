@@ -33,7 +33,7 @@ use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, FragmentContext, IpCounters, IpDeviceContext, IpLayerBindingsContext, IpLayerIpExt,
     IpPacketFragmentCache, IpRouteTablesContext, IpStateContext, IpStateInner, IpTransportContext,
-    IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
+    IpTransportDispatchContext, Marks, MulticastMembershipHandler, PmtuCache, PmtuContext,
     ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId,
     RulesTable, TransportReceiveError,
 };
@@ -109,10 +109,11 @@ where
     fn select_device_for_multicast_group(
         &mut self,
         addr: MulticastAddr<I::Addr>,
+        marks: &Marks,
     ) -> Result<Self::DeviceId, ResolveRouteError> {
         let remote_ip = SocketIpAddr::new_from_multicast(addr);
         let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
-            ip::resolve_output_route_to_destination(self, None, None, Some(remote_ip))?;
+            ip::resolve_output_route_to_destination(self, None, None, Some(remote_ip), marks)?;
         // NB: Because the original address is multicast, it cannot be assigned
         // to a local interface. Thus local delivery should never be requested.
         debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);

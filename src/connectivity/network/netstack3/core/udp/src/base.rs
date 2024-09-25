@@ -54,8 +54,8 @@ use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
 use netstack3_ip::{
-    HopLimits, IpTransportContext, MulticastMembershipHandler, ReceiveIpPacketMeta,
-    TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
+    HopLimits, IpTransportContext, Mark, MarkDomain, MulticastMembershipHandler,
+    ReceiveIpPacketMeta, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
@@ -2149,6 +2149,16 @@ where
     /// Sets the transparent option.
     pub fn set_transparent(&mut self, id: &UdpApiSocketId<I, C>, value: bool) {
         self.datagram().set_ip_transparent(id, value)
+    }
+
+    /// Gets the socket mark at the mark domain.
+    pub fn get_mark(&mut self, id: &UdpApiSocketId<I, C>, domain: MarkDomain) -> Mark {
+        self.datagram().get_mark(id, domain)
+    }
+
+    /// Sets the socket mark at the mark domain.
+    pub fn set_mark(&mut self, id: &UdpApiSocketId<I, C>, domain: MarkDomain, mark: Mark) {
+        self.datagram().set_mark(id, domain, mark)
     }
 
     /// Gets the broadcast option.
@@ -7112,5 +7122,27 @@ mod tests {
             };
             assert_eq!(api.get_dual_stack_enabled(&socket), Ok(expect_enabled));
         }
+    }
+
+    #[ip_test(I)]
+    #[test_case::test_matrix(
+        [MarkDomain::Mark1, MarkDomain::Mark2],
+        [None, Some(0), Some(1)]
+    )]
+    fn udp_socket_marks<I: TestIpExt>(domain: MarkDomain, mark: Option<u32>) {
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![I::TEST_ADDRS.local_ip],
+            vec![I::TEST_ADDRS.remote_ip],
+        ));
+        let mut api = UdpApi::<I, _>::new(ctx.as_mut());
+        let socket = api.create();
+
+        // Doesn't have a mark by default.
+        assert_eq!(api.get_mark(&socket, domain), Mark(None));
+
+        let mark = Mark(mark);
+        // We can set and get back the mark.
+        api.set_mark(&socket, domain, mark);
+        assert_eq!(api.get_mark(&socket, domain), mark);
     }
 }

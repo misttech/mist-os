@@ -23,6 +23,7 @@ use crate::internal::base::{
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
 };
+use crate::internal::routing::rules::Marks;
 use crate::internal::routing::RoutingTable;
 use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,
@@ -129,7 +130,13 @@ where
         ResolvedRoute<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ResolveRouteError,
     > {
-        base::resolve_output_route_to_destination(self.core_ctx(), None, None, destination)
+        base::resolve_output_route_to_destination(
+            self.core_ctx(),
+            None,
+            None,
+            destination,
+            &Marks::default(),
+        )
     }
 
     /// Selects the device to use for gateway routes when the device was

@@ -40,8 +40,8 @@ use netstack3_datagram::{
 use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpRxCounters};
 use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
-    IpTransportContext, MulticastMembershipHandler, ReceiveIpPacketMeta, TransportIpContext,
-    TransportReceiveError,
+    IpTransportContext, Mark, MarkDomain, MulticastMembershipHandler, ReceiveIpPacketMeta,
+    TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
@@ -908,6 +908,16 @@ where
         self.datagram().set_multicast_loop(id, value);
     }
 
+    /// Sets the socket mark for the socket domain.
+    pub fn set_mark(&mut self, id: &IcmpApiSocketId<I, C>, domain: MarkDomain, mark: Mark) {
+        self.datagram().set_mark(id, domain, mark)
+    }
+
+    /// Gets the socket mark for the socket domain.
+    pub fn get_mark(&mut self, id: &IcmpApiSocketId<I, C>, domain: MarkDomain) -> Mark {
+        self.datagram().get_mark(id, domain)
+    }
+
     /// Sends an ICMP packet through a connection.
     ///
     /// The socket must be connected in order for the operation to succeed.
@@ -1551,5 +1561,24 @@ mod tests {
         )
         .unwrap();
         assert_matches!(&bindings_ctx.state.received[..], []);
+    }
+
+    #[ip_test(I)]
+    #[test_case::test_matrix(
+        [MarkDomain::Mark1, MarkDomain::Mark2],
+        [None, Some(0), Some(1)]
+    )]
+    fn icmp_socket_marks<I: TestIpExt + IpExt>(domain: MarkDomain, mark: Option<u32>) {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
+        let socket = api.create();
+
+        // Doesn't have a mark by default.
+        assert_eq!(api.get_mark(&socket, domain), Mark(None));
+
+        let mark = Mark(mark);
+        // We can set and get back the mark.
+        api.set_mark(&socket, domain, mark);
+        assert_eq!(api.get_mark(&socket, domain), mark);
     }
 }

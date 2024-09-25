@@ -233,7 +233,9 @@ pub use internal::base::{
 };
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
-pub use internal::routing::rules::{Rule, RuleAction, RuleMatcher, RulesTable};
+pub use internal::routing::rules::{
+    Mark, MarkDomain, MarkMatcher, MarkMatchers, Marks, Rule, RuleAction, RuleMatcher, RulesTable,
+};
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
     NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,

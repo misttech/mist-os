@@ -20,8 +20,8 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
-    AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
-    ResolvedRoute, Rule, RuleAction, RuleMatcher,
+    AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, MarkDomain, MarkMatcher,
+    MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, Rule, RuleAction, RuleMatcher,
 };
 
 #[ip_test(I)]
@@ -294,7 +294,8 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
         Rule {
             matcher: RuleMatcher {
                 source_address_matcher: Some(netstack3_base::SubnetMatcher(I::TEST_ADDRS.subnet)),
-                traffic_origin_matcher: None
+                traffic_origin_matcher: None,
+                mark_matchers: Default::default(),
             },
             action: RuleAction::Lookup(second_table)
         },
@@ -354,5 +355,101 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
             SocketIpAddr::new(I::get_other_remote_ip_address(254).get())
         ),
         Ok(expected_route_no_gateway)
+    );
+}
+
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+fn route_resolution_with_marks<I: TestIpExt + netstack3_core::IpExt>() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+    // Creates a device with the given subnet address, and installs a default route
+    // in the given table.
+    let set_up_device = |ctx: &mut FakeCtx, device_addr_subnet, table| {
+        let device_id: DeviceId<_> = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: I::TEST_ADDRS.local_mac,
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        ctx.test_api().enable_device(&device_id);
+        ctx.core_api()
+            .device_ip_any()
+            .add_ip_addr_subnet(&device_id, device_addr_subnet)
+            .expect("failed to assign IP address");
+        let device_metric = ctx.core_api().device_ip::<I>().get_routing_metric(&device_id);
+
+        // default route to device 1.
+        ctx.core_api().routes::<I>().set_routes(
+            table,
+            alloc::vec![netstack3_core::routes::Entry {
+                subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap(),
+                device: device_id.clone(),
+                gateway: None,
+                metric: Metric::MetricTracksInterface(device_metric),
+            }
+            .with_generation(netstack3_ip::Generation::initial())],
+        );
+
+        device_id
+    };
+
+    let main_table = ctx.core_api().routes::<I>().main_table_id();
+    let device_id_1 = set_up_device(
+        &mut ctx,
+        AddrSubnet::new(I::TEST_ADDRS.local_ip.get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),
+        &main_table,
+    );
+    let second_table = ctx.core_api().routes::<I>().new_table();
+    let device_id_2 = set_up_device(
+        &mut ctx,
+        AddrSubnet::new(I::get_other_ip_address(254).get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),
+        &second_table,
+    );
+
+    // We setup the rule so that there is a higher priority rule pointing to the `second_table` with
+    // the given mark matchers and it will determine which device we will choose.
+    ctx.test_api().set_rules::<I>(alloc::vec![
+        Rule {
+            matcher: RuleMatcher {
+                mark_matchers: MarkMatchers::new(core::iter::once((
+                    MarkDomain::Mark1,
+                    MarkMatcher::Marked { mask: 1, start: 0, end: 1 },
+                ))),
+                ..RuleMatcher::match_all_packets()
+            },
+            action: RuleAction::Lookup(second_table)
+        },
+        Rule { matcher: RuleMatcher::match_all_packets(), action: RuleAction::Lookup(main_table) },
+    ]);
+
+    assert_eq!(
+        ctx.test_api().resolve_route_with_marks(
+            SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get()),
+            &Marks::new(core::iter::once((MarkDomain::Mark1, 0)))
+        ),
+        Ok(ResolvedRoute {
+            src_addr: IpDeviceAddr::new(I::get_other_ip_address(254).get()).unwrap(),
+            device: device_id_2,
+            local_delivery_device: None,
+            next_hop: netstack3_ip::NextHop::RemoteAsNeighbor,
+        })
+    );
+    assert_eq!(
+        ctx.test_api().resolve_route_with_marks(
+            SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get()),
+            &Marks::UNMARKED,
+        ),
+        Ok(ResolvedRoute {
+            src_addr: IpDeviceAddr::new(I::TEST_ADDRS.local_ip.get()).unwrap(),
+            device: device_id_1,
+            local_delivery_device: None,
+            next_hop: netstack3_ip::NextHop::RemoteAsNeighbor,
+        })
     );
 }
