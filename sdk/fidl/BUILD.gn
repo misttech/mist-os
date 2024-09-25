@@ -78,6 +78,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo",
   "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network",
+  "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
   "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin",
   "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl",
