@@ -28,18 +28,19 @@ async fn main() {
 
 async fn foo() {
     let scope = fasync::EHandle::local().root_scope().new_child();
-    scope.spawn(baz(7));
-    let join_handle = scope.spawn(async {
-        baz(8).await;
-    });
+    scope.spawn(baz(7)).detach();
+    scope
+        .spawn(async {
+            baz(8).await;
+        })
+        .detach();
     let child = scope.new_child();
-    child.spawn(baz(9));
+    child.spawn(baz(9)).detach();
     futures::join!(
         baz(10).boxed(),
         baz(11).boxed_local(),
         scope.into_future(),
         child.into_future(),
-        join_handle,
     );
 }
 

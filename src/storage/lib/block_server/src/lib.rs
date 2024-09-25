@@ -169,7 +169,7 @@ impl<SM: SessionManager> BlockServer<SM> {
         let scope = fasync::Scope::new();
         while let Some(request) = requests.try_next().await.unwrap() {
             if let Some(session) = self.handle_request(request).await? {
-                scope.spawn(session.map(|_| ()));
+                scope.spawn(session.map(|_| ())).detach();
             }
         }
         scope.await;

@@ -240,8 +240,10 @@ mod tests {
         // The next buffer we get should stall.
         let scope = fasync::Scope::new();
         let mut tasks: Vec<_> = repeat_with(|| {
-            let device = device.clone();
-            scope.compute(async move { device.get_buffer().await.vmo_offset() })
+            scope.spawn({
+                let device = device.clone();
+                async move { device.get_buffer().await.vmo_offset() }
+            })
         })
         .take(2)
         .collect();

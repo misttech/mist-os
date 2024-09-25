@@ -70,16 +70,7 @@ pub struct ScopeRef {
 
 impl ScopeRef {
     /// Spawns a task on the scope.
-    pub fn spawn(
-        &self,
-        future: impl Future<Output = ()> + Send + 'static,
-    ) -> crate::JoinHandle<()> {
-        self.compute(future).detach_on_drop()
-    }
-
-    /// Spawns a task on the scope, but unlink `spawn` returns a handle that will drop the future
-    /// when dropped.
-    pub fn compute<T: Send + 'static>(
+    pub fn spawn<T: Send + 'static>(
         &self,
         future: impl Future<Output = T> + Send + 'static,
     ) -> crate::Task<T> {
@@ -235,7 +226,7 @@ mod tests {
         let mut executor = TestExecutor::new();
         let scope = Scope::new();
         let _task1 = scope.spawn(std::future::ready(()));
-        let task2 = scope.compute(pending::<()>());
+        let task2 = scope.spawn(pending::<()>());
 
         executor.run_singlethreaded(async {
             let mut on_no_tasks = pin!(scope.on_no_tasks());
@@ -269,8 +260,8 @@ mod tests {
             }
         }
 
-        scope.spawn(PollCounter(poll_count.clone()));
-        scope.spawn(PollCounter(poll_count.clone()));
+        scope.spawn(PollCounter(poll_count.clone())).detach();
+        scope.spawn(PollCounter(poll_count.clone())).detach();
 
         executor.run_singlethreaded(async {
             let mut start_count = 0;
