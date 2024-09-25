@@ -125,14 +125,15 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
     declared_dictionaries: &Dict,
     new_program_router: &ProgramRouterFn<C>,
 ) {
-    let dict = Dict::new();
     let router;
+    let declared_dict;
     if let Some(source) = decl.source.as_ref() {
         // Dictionary derived from another dictionary (`extends` in cml).
         let source_path = decl
             .source_dictionary
             .as_ref()
             .expect("source_dictionary must be set if source is set");
+        let dict = Dict::new();
         router = make_dict_extending_router(
             dict.clone(),
             source,
@@ -142,28 +143,26 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
             decl,
             component_input,
         );
+        declared_dict = Some(dict);
     } else if let Some(source_path) = decl.source_path.as_ref() {
         // Dictionary backed by program's outgoing directory.
-        let source_dict_router = new_program_router(
+        router = new_program_router(
             component.as_weak(),
             source_path.clone(),
             ComponentCapability::Dictionary(decl.clone()),
         );
-        router = make_dict_extending_router_inner(
-            dict.clone(),
-            source_dict_router,
-            CapabilitySource::Component(ComponentSource {
-                capability: ComponentCapability::Dictionary(decl.clone()),
-                moniker: component.moniker().clone(),
-            }),
-        );
+        declared_dict = None;
     } else {
+        let dict = Dict::new();
         router = make_simple_dict_router(dict.clone(), component, decl);
+        declared_dict = Some(dict);
     }
-    match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
-        Ok(()) => (),
-        Err(e) => warn!("failed to add {} to declared dicts: {e:?}", decl.name),
-    };
+    if let Some(dict) = declared_dict {
+        match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
+            Ok(()) => (),
+            Err(e) => warn!("failed to add {} to declared dicts: {e:?}", decl.name),
+        };
+    }
     match program_output_dict.insert_capability(&decl.name, router.into()) {
         Ok(()) => (),
         Err(e) => warn!("failed to add {} to program output dict: {e:?}", decl.name),
