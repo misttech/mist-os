@@ -75,6 +75,14 @@ template("fidl_library") {
          "the `available` parameter is only allowed on `testonly` libraries")
 
   main_target_name = target_name
+  library_name = invoker.library_name
+
+  compilation_target_name = "${target_name}_compile"
+  verification_target_name = "${target_name}_verify"
+  lint_target_name = "${target_name}_lint"
+  lint_stamp_file = "$target_gen_dir/$target_name.linted"
+
+  is_testonly = defined(invoker.testonly) && invoker.testonly
 
   target_dir = get_label_info(main_target_name, "dir")
   is_vendor_library = string_replace(target_dir, "//vendor/", "") != target_dir
@@ -143,8 +151,6 @@ template("fidl_library") {
   is_sdk_included_publishable =
       requires_compatibility_tests && invoker.sdk_category != "partner_internal"
 
-  _is_test_only = defined(invoker.testonly) && invoker.testonly
-
   if (is_unversioned_vendor_sdk) {
     # Override the values set above to account for this special case as
     # described where the variable above was set.
@@ -162,24 +168,13 @@ template("fidl_library") {
       requires_compatibility_tests == defined(invoker.stable),
       "`stable` must be set if and only if the category ('${sdk_category_string_for_assert}') requires compatibility tests.")
 
-  stable = defined(invoker.stable) && invoker.stable
+  is_stable = defined(invoker.stable) && invoker.stable
 
   # All stable libraries must be included in an SDK [category] and require
   # compatibility tests, but the inverse is not always true.
   # For unstable libraries with `requires_compatibility_tests=true`, although
   # the build targets are created, the resulting API summery file will be empty.
-  assert(!stable || requires_compatibility_tests)
-
-  compilation_target_name = "${target_name}_compile"
-  verification_target_name = "${target_name}_verify"
-  lint_target_name = "${target_name}_lint"
-  lint_stamp_file = "$target_gen_dir/$target_name.linted"
-
-  forward_variables_from(invoker,
-                         [
-                           "library_name",
-                           "fidl_ir_json",
-                         ])
+  assert(!is_stable || requires_compatibility_tests)
 
   # Make sure  the same variables are forwarded to both fidl_ir() instances.
   invoker_variables_to_forward_to_fidl_ir = [
@@ -253,20 +248,20 @@ template("fidl_library") {
     _platform_override_name = string_split(invoker.versioned, ":")
     _platform_override_name = _platform_override_name[0]
     assert(
-        is_sdk_included_publishable || _is_test_only || _is_internal_zx_library,
+        is_sdk_included_publishable || is_testonly || _is_internal_zx_library,
         "Non-test library '$library_name' is explicitly versioned but not included in an SDK.")
     assert(
         !requires_compatibility_tests || _platform_override_name == "fuchsia",
         "Overriding `versioned` is not allowed for SDK FIDL library '$library_name', which is a Fuchsia platform API requiring compatibility tests.")
 
     fidlc_versioned_arg = invoker.versioned
-  } else if (_is_test_only) {
+  } else if (is_testonly) {
     assert(!defined(invoker.sdk_category))
     fidlc_versioned_arg = "unversioned"
   } else if (library_name ==
              "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)) {
     # It is a non-test library in the "fuchsia" namespace. Set `versioned` to appropriate default.
-    if (stable) {
+    if (is_stable) {
       fidlc_versioned_arg = "fuchsia"
     } else if (requires_compatibility_tests) {
       fidlc_versioned_arg = "fuchsia:HEAD"
@@ -319,13 +314,13 @@ template("fidl_library") {
              ])
 
   assert(
-      (fidlc_versioned_arg == "fuchsia" && stable &&
+      (fidlc_versioned_arg == "fuchsia" && is_stable &&
            requires_compatibility_tests &&
            (is_sdk_included_publishable ||
                 invoker.sdk_category == "partner_internal")) ||
-          (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !stable &&
+          (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !is_stable &&
                !requires_compatibility_tests && !is_sdk_included_publishable) ||
-          (fidlc_versioned_arg == "fuchsia:HEAD" && !stable &&
+          (fidlc_versioned_arg == "fuchsia:HEAD" && !is_stable &&
                (requires_compatibility_tests == defined(invoker.sdk_category) ||
                     (defined(invoker.sdk_category) &&
                          invoker.sdk_category == "internal" &&
@@ -334,18 +329,18 @@ template("fidl_library") {
                          invoker.sdk_category == "partner_internal"))) ||
           (fidlc_versioned_arg == "unversioned" &&
                _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
-          (fidlc_versioned_arg == "unversioned" && !stable &&
+          (fidlc_versioned_arg == "unversioned" && !is_stable &&
                !requires_compatibility_tests &&
                (!defined(invoker.sdk_category) || is_unversioned_vendor_sdk ||
                     _is_test_example_library)) ||
-          (_is_test_only && !stable && !defined(invoker.sdk_category) &&
+          (is_testonly && !is_stable && !defined(invoker.sdk_category) &&
                !requires_compatibility_tests &&
                (fidlc_versioned_arg == "unversioned" ||
                     _is_documentation_example ||
                     fidlc_versioned_arg == "test:1" ||
                     _is_test_versioned_in_fuchsia)) ||
           (_is_internal_zx_library && fidlc_versioned_arg == "fuchsia"),
-      "Library '$library_name' has an unexpected combination of stability ('$stable'), versioned ('$fidlc_versioned_arg'), SDK category ('${sdk_category_string_for_assert}'),  publishable ('$is_sdk_included_publishable'), compatibility testing requirements ('$requires_compatibility_tests'), and `testonly` ('$_is_test_only').")
+      "Library '$library_name' has an unexpected combination of stability ('$is_stable'), versioned ('$fidlc_versioned_arg'), SDK category ('${sdk_category_string_for_assert}'),  publishable ('$is_sdk_included_publishable'), compatibility testing requirements ('$requires_compatibility_tests'), and `testonly` ('$is_testonly').")
 
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
@@ -353,7 +348,7 @@ template("fidl_library") {
     fidl_target_name = main_target_name
     fidl_library_name = library_name
     gen_dir = target_gen_dir
-    json_representation = fidl_ir_json
+    json_representation = invoker.fidl_ir_json
     versioned = fidlc_versioned_arg
     if (!defined(available)) {
       available = [ "fuchsia:$fidl_target_api_levels" ]
@@ -373,7 +368,7 @@ template("fidl_library") {
       ":*",
       "//sdk/fidl:plasa",
     ]
-    fidl_ir = fidl_ir_json
+    fidl_ir = invoker.fidl_ir_json
     output_fragment_file = plasa_fragment_file
     dest = "fidl"
     deps = [ ":$compilation_target_name" ]
@@ -513,8 +508,8 @@ template("fidl_library") {
         fidl_target_name = main_target_name
         fidl_library_name = library_name
 
-        assert((fidlc_versioned_arg == "fuchsia" && stable) ||
-               (fidlc_versioned_arg == "fuchsia:HEAD" && !stable))
+        assert((fidlc_versioned_arg == "fuchsia" && is_stable) ||
+               (fidlc_versioned_arg == "fuchsia:HEAD" && !is_stable))
         versioned = fidlc_versioned_arg
 
         # `available` is only allowed for `testonly` libraries (asserted above). Defensively double
@@ -566,7 +561,7 @@ template("fidl_library") {
                              "testonly",
                            ])
     visibility = [ ":*" ]
-    data = fidl_ir_json
+    data = invoker.fidl_ir_json
     schema = "//tools/fidl/fidlc/schema.json"
     deps = [ ":$compilation_target_name" ]
   }
@@ -585,7 +580,7 @@ template("fidl_library") {
       }
 
       # Metadata to allow us to query all FIDL IR files.
-      fidl_json = [ rebase_path(fidl_ir_json, root_build_dir) ]
+      fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
       generated_sources = fidl_json
     }
 
@@ -602,7 +597,7 @@ template("fidl_library") {
 
   if (defined(invoker.sdk_category)) {
     sdk_category = invoker.sdk_category
-    if (stable) {
+    if (is_stable) {
       api_reference = "$library_name.api"
       if (defined(invoker.api)) {
         api_reference = invoker.api
@@ -668,7 +663,7 @@ template("fidl_library") {
       args += [ "--specs" ] + rebase_path(sdk_metas, root_build_dir)
       args += [ "--sources" ] + sdk_sources
 
-      if (stable) {
+      if (is_stable) {
         args += [ "--stable" ]
       }
 
@@ -696,14 +691,14 @@ template("fidl_library") {
         source = meta_file
         dest = "$file_base/meta.json"
         schema = "fidl_library"
-        stable = stable
+        stable = is_stable
       }
 
       files = all_files
 
       metadata = {
         # Metadata to allow us to query all FIDL IR and source files.
-        fidl_json = [ rebase_path(fidl_ir_json, root_build_dir) ]
+        fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
         generated_sources = fidl_json
 
         # Metadata for FIDL SDK files.
@@ -711,7 +706,7 @@ template("fidl_library") {
           sdk_fidl_json_data = [
             {
               name = library_name
-              ir = rebase_path(fidl_ir_json, root_build_dir)
+              ir = rebase_path(invoker.fidl_ir_json, root_build_dir)
               category = invoker.sdk_category
             },
           ]
