@@ -356,7 +356,7 @@ fn configure_subsystems(
 
     recovery::RecoverySubsystem::define_configuration(
         &context_base.for_subsystem("recovery"),
-        &(&platform.recovery, &platform.storage.filesystems.volume),
+        &platform.recovery,
         builder,
     )
     .context("Configuring the 'recovery' subsystem")?;

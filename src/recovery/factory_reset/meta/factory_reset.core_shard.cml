@@ -10,12 +10,6 @@
     ],
     offer: [
         {
-            from: "parent",
-            to: "#factory_reset",
-            config: [ "fuchsia.recovery.UseFxBlob" ],
-            availability: "same_as_target",
-        },
-        {
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
