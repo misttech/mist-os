@@ -306,7 +306,8 @@ template <typename T>
   const uint64_t NumData = ProfDataArray().size();
   const uint64_t PaddingBytesBeforeCounters = 0;
   const uint64_t NumCounters = ProfCountersData().size() / CountersSize();
-  const uint64_t PaddingBytesAfterCounters = 0;
+  const uint64_t PaddingBytesAfterCounters =
+      static_cast<uint64_t>(PaddingSize(ProfCountersData().size()));
   const uint64_t NumBitmapBytes = ProfBitmapData().size();
   const uint64_t PaddingBytesAfterBitmapBytes = 0;
   const uint64_t NamesSize = NamesEnd - NamesBegin;
