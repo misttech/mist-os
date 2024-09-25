@@ -45,9 +45,9 @@ class LinkingSession {
     // Traverse the root module's tree to construct the list of modules whose
     // symbols are used for relocations. On success, persist the list to the
     // root module for future lookups by dlsym(), etc.
-    if (auto resolution_list = TraverseDeps(diag, root_module)) {
-      if (Relocate(diag, *resolution_list)) {
-        root_module.set_module_tree(*std::move(resolution_list));
+    if (auto resolution_list = TraverseDeps(diag, root_module); !resolution_list.is_empty()) {
+      if (Relocate(diag, resolution_list)) {
+        root_module.set_module_tree(std::move(resolution_list));
         return true;
       }
     }
@@ -101,9 +101,21 @@ class LinkingSession {
       }
 
       if (module.Load(diag, *std::move(file))) {
-        // Create and enqueue a module for each dependency from the Load result
-        // so it can be processed and loaded in the future.
-        auto enqueue_dep = [this, &diag](const Soname& name) { return EnqueueModule(diag, name); };
+        // Create and enqueue a module for each dependency, skipping
+        // dependencies that have already been enqueued. The module that was
+        // loaded will also store a reference to the dependency's RuntimeModule
+        // in its direct_deps list.
+        auto enqueue_dep = [this, &diag, &parent_list = module.runtime_module().direct_deps()](
+                               const Soname& name) {
+          if (std::find(session_modules_.begin(), session_modules_.end(), name) !=
+              session_modules_.end()) {
+            return true;
+          }
+          if (const RuntimeModule* dep = EnqueueModule(diag, name)) {
+            return parent_list.push_back(diag, "direct dependency container", dep);
+          }
+          return false;
+        };
         if (std::all_of(module.dep_names().begin(), module.dep_names().end(), enqueue_dep)) {
           return fit::ok();
         }
@@ -134,42 +146,40 @@ class LinkingSession {
     return true;
   }
 
-  bool EnqueueModule(Diagnostics& diag, Soname soname) {
-    if (std::ranges::find(session_modules_, soname, &SessionModule::name) !=
-        session_modules_.end()) {
-      // The module was already added to session_modules_ in this LinkingSession.
-      return true;
-    }
-
-    if (std::ranges::find(loaded_modules_, soname, &RuntimeModule::name) != loaded_modules_.end()) {
-      // The module was already loaded at startup or by a LinkingSession from a
-      // previous dlopen() call.
-      return true;
+  // Create module data structures for `soname` and enqueue the modules onto
+  // this LinkingSession's bookkeeping lists.
+  const RuntimeModule* EnqueueModule(Diagnostics& diag, Soname soname) {
+    if (auto it = std::ranges::find(loaded_modules_, soname, &RuntimeModule::name);
+        it != loaded_modules_.end()) {
+      // Return a reference to the module if it was already loaded at startup or
+      // by a LinkingSession from a previous dlopen() call.
+      return &*it;
     }
 
     fbl::AllocChecker module_ac;
     auto module = RuntimeModule::Create(module_ac, soname);
     if (!module_ac.check()) [[unlikely]] {
       diag.OutOfMemory("permanent module data structure", sizeof(RuntimeModule));
-      return false;
+      return nullptr;
     }
     fbl::AllocChecker session_module_ac;
     auto session_module = SessionModule::Create(session_module_ac, *module);
     if (!session_module_ac.check()) [[unlikely]] {
       diag.OutOfMemory("temporary module data structure", sizeof(SessionModule));
-      return false;
+      return nullptr;
     }
 
     runtime_modules_.push_back(std::move(module));
     session_modules_.push_back(std::move(session_module));
 
-    return true;
+    // Return a pointer to the RuntimeModule that was just created and enqueued.
+    return &runtime_modules_.back();
   }
 
   // Traverse the root module's dependencies in a breadth-first order, and
   // return an ordered list of traversed modules to the caller. A reference to
   // the root module is the first element in the returned list.
-  std::optional<ModuleRefList> TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module) {
+  ModuleRefList TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module) {
     ModuleRefList ordered_queue;
 
     auto enqueue = [&diag, &ordered_queue](const RuntimeModule& module) -> bool {
@@ -186,59 +196,18 @@ class LinkingSession {
       return {};
     }
 
-    // Enqueue the dependencies of the `current_module`.
-    auto enqueue_deps = [this, &enqueue](const RuntimeModule& current_module) -> bool {
-      auto enqueue_session_deps = [&](const SessionModule& session_module) {
-        for (Soname dep_name : session_module.dep_names()) {
-          // If the dep was created in this LinkingSession, enqueue its
-          // RuntimeModule reference taken from the LinkingSession.
-          if (auto it = std::ranges::find(runtime_modules_, dep_name, &RuntimeModule::name);
-              it != runtime_modules_.end()) {
-            if (!enqueue(*it)) {
-              return false;
-            }
-            continue;
-          }
-
-          // If there is not a SessionModule for this `dep_name`, then the dep
-          // must already be loaded. Locate the RuntimeModule for `dep_name`
-          // from `loaded_modules_` to enqueue onto the BFS ordered list.
-          auto it = std::ranges::find(loaded_modules_, dep_name, &RuntimeModule::name);
-          assert(it != loaded_modules_.end());
-          if (!enqueue(*it)) {
-            return false;
-          }
-        }
-        return true;
-      };
-
-      // If `current_module` was created by this LinkingSession, enqueue the
-      // RuntimeModule of each DT_NEEDED entry.
-      if (auto it =
-              std::ranges::find(session_modules_, current_module.name(), &SessionModule::name);
-          it != session_modules_.end()) {
-        return enqueue_session_deps(*it);
-      }
-
-      // TODO(https://fxbug.dev/354786114): If the current_module was already
-      // loaded, enqueue the module's immediate dependencies.
-      // Note: We cannot enqueue all of the current_module's dependencies, only
-      // the dependencies that belong to the first level of the dep tree (i.e.
-      // its immediate deps) so that we can preserve the BFS shape of the
-      // tree. For now, return true, until we delineate the top-level subset of
-      // the module's dependency tree.
-      return true;
-    };
-
     // Build the BFS-ordered queue: an indexed-for-loop iterates over the list
     // since it can be invalidated as modules are enqueued.
     for (size_t i = 0; i < ordered_queue.size(); ++i) {
-      if (!enqueue_deps(*ordered_queue[i])) {
+      const RuntimeModule& module = *ordered_queue[i];
+      // Enqueue the first-level dependencies of the current module.
+      if (!std::ranges::all_of(module.direct_deps(), enqueue,
+                               [](const RuntimeModule* m) -> const RuntimeModule& { return *m; })) {
         return {};
       }
     }
 
-    return std::move(ordered_queue);
+    return ordered_queue;
   }
 
   // Perform relocations on all pending modules to be loaded. Return a boolean
@@ -247,8 +216,7 @@ class LinkingSession {
     // TODO(https://fxbug.dev/324136831): Include global modules.
     // Relocate() expects a container of references.
     auto resolution_list_view = std::views::transform(
-        resolution_list,
-        [](const RuntimeModule* module) -> const RuntimeModule& { return *module; });
+        resolution_list, [](const RuntimeModule* m) -> const RuntimeModule& { return *m; });
 
     auto relocate_and_relro = [&](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
@@ -399,7 +367,7 @@ class LinkingSession<Loader>::SessionModule
 
   const Vector<Soname>& dep_names() const { return dep_names_; }
 
-  const RuntimeModule& runtime_module() const { return runtime_module_; }
+  constexpr RuntimeModule& runtime_module() const { return runtime_module_; }
 
  private:
   // A SessionModule can only be created with SessionModule::Create...).

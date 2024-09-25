@@ -91,7 +91,6 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   }
 
   constexpr AbiModule& module() { return abi_module_; }
-
   constexpr const AbiModule& module() const { return abi_module_; }
 
   constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
@@ -106,6 +105,12 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
 
+  // This is a list of module references to this module's DT_NEEDEDs, i.e. the
+  // first level of dependencies in this module's module tree. If this list is
+  // empty, the module does not have any dependencies.
+  constexpr const ModuleRefList& direct_deps() const { return direct_deps_; }
+  constexpr ModuleRefList& direct_deps() { return direct_deps_; }
+
   // This is the breadth-first ordered list of module references, representing
   // this module's tree of modules. A reference to this module (the root) is
   // always the first in this list. The other modules in this list are
@@ -114,7 +119,6 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // a DT_NEEDED of any dependency, are not included in this list.
   // This list is set when dlopen() is called on this module.
   constexpr const ModuleRefList& module_tree() const { return module_tree_; }
-
   void set_module_tree(ModuleRefList module_tree) { module_tree_ = std::move(module_tree); }
 
  private:
@@ -126,6 +130,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   Soname name_;
   AbiModule abi_module_;
   size_type static_tls_bias_ = 0;
+  ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
 };
 
