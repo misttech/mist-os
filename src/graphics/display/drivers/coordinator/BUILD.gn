@@ -118,14 +118,14 @@ source_set("preferred-scanout-image-type") {
 test("display-coordinator-unittests") {
   configs += [ "//build/config:all_source" ]
   sources = [
-    "testing/display-info-unittest.cc",
-    "testing/display-test.cc",
-    "testing/fence-test.cc",
-    "testing/image-test.cc",
-    "testing/inspect-test.cc",
-    "testing/integration-test.cc",
-    "testing/layer-test.cc",
-    "testing/post-task-test.cc",
+    "display-info-test.cc",
+    "display-test.cc",
+    "fence-test.cc",
+    "image-test.cc",
+    "inspect-test.cc",
+    "integration-test.cc",
+    "layer-test.cc",
+    "post-task-test.cc",
   ]
   deps = [
     ":testing",
