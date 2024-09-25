@@ -106,6 +106,7 @@ _sdk_unstable_source_sets_list = [
   "//sdk/lib/driver/fake-bti/cpp",
   "//sdk/lib/driver/fake-object/cpp",
   "//sdk/lib/driver/fake-resource/cpp",
+  "//sdk/lib/driver/power/cpp",
 
   # keep-sorted: end
 ]

@@ -12,6 +12,8 @@
 #include <variant>
 #include <vector>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 namespace fdf_power {
 
 // The length of time it takes to move to a power level.
@@ -145,5 +147,7 @@ struct hash<fdf_power::ParentElement> {
 };
 
 }  // namespace std
+
+#endif
 
 #endif  // LIB_DRIVER_POWER_CPP_TYPES_H_

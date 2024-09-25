@@ -5,7 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.power.system") {
-  sdk_category = "internal"
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Power"
   sources = [ "system.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.power.broker",
