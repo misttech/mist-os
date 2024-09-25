@@ -56,6 +56,7 @@ fn main() -> Result<(), Error> {
     // Execute the Lacewing test in an external process.
     let mut command = Command::new(tempdir.path().join(PYTHON_RUNTIME_NAME));
     command
+        .current_dir(tempdir.path()) // Fuchsia Controller import hooks require its shared libs to be present in CWD.
         .arg(tempdir.path().join(LACEWING_TEST_NAME))
         .env("PYTHONPATH", tempdir.path()) // Ensure ambient Python libraries are not used.
         .env("PYTHONUNBUFFERED", "1"); // Set line-buffering for Mobly tests to flush output immediately.
