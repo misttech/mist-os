@@ -44,6 +44,7 @@
 #include <linux/if_tun.h>
 #include <linux/inotify.h>
 #include <linux/input.h>
+#include <linux/io_uring.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/kcmp.h>
