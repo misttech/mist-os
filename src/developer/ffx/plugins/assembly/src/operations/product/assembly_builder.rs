@@ -149,7 +149,7 @@ impl ImageAssemblyConfigBuilder {
 
         // Add packages specified by the developer
         for package_details in packages {
-            let set = self.map_package_set(&package_details.set);
+            let set = self.map_package_set(&package_details.set, /*is_platform=*/ true)?;
             self.add_package_from_path(package_details.package, PackageOrigin::Developer, &set)
                 .context("Adding developer-specified package")?;
         }
@@ -444,36 +444,59 @@ impl ImageAssemblyConfigBuilder {
 
     /// Remap the package sets based on the build type (for the flexible set)
     /// and the developer_only_overrides (for the 'all_packages_in_base' flag)
-    fn map_package_set(&self, set: &PackageSet) -> PackageSet {
-        match (set, &self.build_type, &self.developer_only_options) {
-            // BootFS packages are always in BootFS.
-            (&PackageSet::Bootfs, _, _) => PackageSet::Bootfs,
-            // System packages are always system packages
-            (&PackageSet::System, _, _) => PackageSet::System,
-
-            // When the all_packages_in_base developer override option is
-            // enabled, that takes precedence over all the rest on eng and userdebug
-            // build-types.
-            (
-                _,
-                BuildType::Eng,
-                Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
-            )
-            | (
-                _,
-                BuildType::UserDebug,
-                Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
-            ) => PackageSet::Base,
-
-            // The Flexible package set is in Cache for eng builds, and base
-            // for user/userdebug.
-            (&PackageSet::Flexible, BuildType::Eng, _) => PackageSet::Cache,
-            (&PackageSet::Flexible, _, _) => PackageSet::Base,
-
-            // In all other cases, packages are just in their original
-            // package set.
-            (ps, _, _) => ps.clone(),
+    fn map_package_set(&self, set: &PackageSet, is_platform: bool) -> Result<PackageSet> {
+        // Ensure that the developer didn't set `all_packages_in_base` for
+        // configurations that do not support it.
+        if let Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }) =
+            self.developer_only_options
+        {
+            if self.image_mode == FilesystemImageMode::NoImage {
+                bail!("all_packages_in_base cannot be enabled for products without a filesystem (image_mode = no_image)");
+            }
+            if self.build_type == BuildType::User {
+                bail!("all_packages_in_base cannot be enabled for user products");
+            }
         }
+
+        Ok(
+            match (
+                set,
+                &self.build_type,
+                &self.developer_only_options,
+                &self.image_mode,
+                is_platform,
+            ) {
+                // BootFS packages are always in BootFS.
+                (&PackageSet::Bootfs, _, _, _, _) => PackageSet::Bootfs,
+                // System packages are always system packages
+                (&PackageSet::System, _, _, _, _) => PackageSet::System,
+
+                // When the all_packages_in_base developer override option is
+                // enabled, that takes precedence over all the rest on eng and userdebug
+                // build-types.
+                (
+                    _,
+                    _,
+                    Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
+                    _,
+                    _,
+                ) => PackageSet::Base,
+
+                // The Flexible package set is in Cache for eng builds, and base
+                // for user/userdebug.
+                (&PackageSet::Flexible, BuildType::Eng, _, _, _) => PackageSet::Cache,
+                (&PackageSet::Flexible, _, _, _, _) => PackageSet::Base,
+
+                // For product packages with no filesystem, we move the packages to bootfs.
+                (_, _, _, &FilesystemImageMode::NoImage, /*is_platform=*/ false) => {
+                    PackageSet::Bootfs
+                }
+
+                // In all other cases, packages are just in their original
+                // package set.
+                (ps, _, _, _, _) => ps.clone(),
+            },
+        )
     }
 
     /// Add a set of packages from a bundle, resolving each path to a package
@@ -486,7 +509,7 @@ impl ImageAssemblyConfigBuilder {
         for entry in packages {
             let manifest_path: Utf8PathBuf =
                 entry.package.clone().resolve_from_dir(&bundle_path)?.into();
-            let set = self.map_package_set(&entry.set);
+            let set = self.map_package_set(&entry.set, /*is_platform=*/ true)?;
             self.add_package_from_path(manifest_path, PackageOrigin::AIB, &set)?;
         }
 
@@ -512,7 +535,6 @@ impl ImageAssemblyConfigBuilder {
     /// so that any packages that are in conflict with the platform bundles are
     /// flagged as being the issue (and not the platform being the issue).
     pub fn add_product_packages(&mut self, packages: ProductPackagesConfig) -> Result<()> {
-        // Add the config data entries to the map
         self.add_product_packages_to_set(packages.base, PackageSet::Base)?;
         self.add_product_packages_to_set(packages.cache, PackageSet::Cache)?;
         Ok(())
@@ -524,6 +546,7 @@ impl ImageAssemblyConfigBuilder {
         entries: Vec<ProductPackageDetails>,
         to_package_set: PackageSet,
     ) -> Result<()> {
+        let to_package_set = self.map_package_set(&to_package_set, /*is_platform=*/ false)?;
         for entry in entries {
             // Load the PackageManifest from the given path, in order to get the
             // package name.
@@ -532,6 +555,14 @@ impl ImageAssemblyConfigBuilder {
 
             // Add the package to the set of packages in the assembly.
             self.add_package_from_path(entry.manifest, PackageOrigin::Product, &to_package_set)?;
+
+            // Config data cannot be added for packages destinated to bootfs.
+            if to_package_set == PackageSet::Bootfs && !entry.config_data.is_empty() {
+                bail!(
+                    "Config data cannot be added to {} because it is destined for bootfs",
+                    manifest.name()
+                );
+            }
 
             // Add the config data entries to the map
             for ProductConfigData { source, destination } in entry.config_data {
@@ -1045,7 +1076,7 @@ impl PackageEntry {
                 PackageOrigin::AIB => BootfsPackageDestination::FromAIB(name),
                 PackageOrigin::Board => BootfsPackageDestination::FromBoard(name),
                 PackageOrigin::Developer => BootfsPackageDestination::FromDeveloper(name),
-                PackageOrigin::Product => bail!("Products cannot add packages to bootfs  ({path})"),
+                PackageOrigin::Product => BootfsPackageDestination::FromProduct(name),
             }),
         };
 

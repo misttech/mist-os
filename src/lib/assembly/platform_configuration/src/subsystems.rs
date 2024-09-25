@@ -467,7 +467,7 @@ fn configure_subsystems(
 
     trusted_apps::TrustedAppsSubsystem::define_configuration(
         &context_base.for_subsystem("trusted_apps"),
-        &product.trusted_apps,
+        &(&product.trusted_apps, platform.storage.filesystems.image_mode),
         builder,
     )
     .context("Configuring the 'trusted_apps' subsystem")?;
