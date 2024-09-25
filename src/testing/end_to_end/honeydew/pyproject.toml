@@ -45,9 +45,6 @@ line_length = 80
 # To enable MyPy type checking on a Python target:
 # 1. Add `enable_mypy = true` to the python build target configuration
 # 2. Run `fx build` to generate type checking results
-# Alternatively, run the following command for MyPy type checking on Honeydew directory:
-# PYTHONPATH=$FUCHSIA_DIR/third_party/pylibs/mypy/src:$FUCHSIA_DIR/third_party/pylibs/mypy_extensions/src:$FUCHSIA_DIR/third_party/pylibs/typing_extensions/src/src:$PYTHONPATH
-# fuchsia-vendored-python -S -m mypy --config-file pyproject.toml  src/testing/end_to_end/honeydew
 
 # Honeydew uses `fx format-code` to format the code.
 # `fx format-code` uses `black` underneath to format the python code, using the

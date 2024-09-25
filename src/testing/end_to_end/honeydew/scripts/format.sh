@@ -29,29 +29,7 @@ echo "Formatting the code..."
 # Format the code (using black, isort and autoflake)
 fx format-code
 
-
-echo "Running static type check using 'mypy'..."
-OLD_PYTHONPATH=$PYTHONPATH
-PYTHONPATH="$FUCHSIA_DIR"/third_party/pylibs/mypy_extensions/src:"$FUCHSIA_DIR"/third_party/pylibs/typing_extensions/src/src:"$FUCHSIA_DIR"/third_party/pylibs/mypy/src:$PYTHONPATH
-
-# Execute the Mypy command with python path
-MYPY_CMD="python3 -S -m mypy --config-file $FUCHSIA_DIR/pyproject.toml $HONEYDEW_SRC"
-$MYPY_CMD >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-    echo "Code is 'mypy' compliant"
-else
-    echo
-    echo "ERROR: Code is not 'mypy' compliant!"
-    echo "ERROR: Please run below command sequence, fix all the issues and then rerun this script"
-    echo "*************************************"
-    echo "$ source $VENV_PATH/bin/activate"
-    echo "$ PYTHONPATH=$PYTHONPATH $MYPY_CMD"
-    echo "*************************************"
-    echo
-    exit 1
-fi
-echo "Restoring environment..."
-PYTHONPATH=$OLD_PYTHONPATH
+# To perform mypy checks, build honeydew target using `fx build`
 
 echo "Running static code analysis using 'pylint'..."
 pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/honeydew/ > /dev/null 2>&1 \
