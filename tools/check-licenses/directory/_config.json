@@ -30,6 +30,7 @@
                     "Investigation in https://fxbug.dev/333576929"
                 ],
                 "paths": [
+                    "prebuilt/connectivity/bluetooth/bt-hci-virtual",
                     "prebuilt/connectivity/bluetooth/bt-host",
                     "prebuilt/drivers/msd-arm-mali-debug",
                     "prebuilt/drivers/msd-arm-mali-release"
