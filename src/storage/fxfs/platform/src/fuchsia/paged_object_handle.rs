@@ -880,6 +880,16 @@ impl PagedObjectHandle {
         let fs = store.filesystem();
         let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _flush_guard = fs.lock_manager().write_lock(keys).await;
+        // Allocate extends the file if the range is beyond the current file size, so update the
+        // stream size in that case as well.
+        if self.handle.get_size() < range.end {
+            let vmo = self.vmo.temp_clone();
+            // Similar to truncate above, this unblock is to break an executor ordering deadlock
+            // situation. Vmo::set_stream_size() may trigger a blocking call back into Fxfs on the
+            // same executor via the kernel. If all executor threads are busy, the reentrant call
+            // will queue up behind the blocking set_stream_size() call and never complete.
+            unblock(move || vmo.set_stream_size(range.end)).await?;
+        }
         self.handle.allocate(range).await
     }
 }
@@ -2391,6 +2401,54 @@ mod tests {
             .unwrap();
         let data = file.read_at(4, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
         assert_eq!(data, vec![1, 2, 3, 4]);
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_allocate_empty() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        assert_eq!(
+            file.get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+                .await
+                .unwrap()
+                .unwrap()
+                .1
+                .content_size
+                .unwrap(),
+            0,
+        );
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let data = file.read_at(page_size, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(data, vec![0; page_size as usize]);
+
+        assert_eq!(
+            file.get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+                .await
+                .unwrap()
+                .unwrap()
+                .1
+                .content_size
+                .unwrap(),
+            page_size,
+        );
 
         fixture.close().await;
     }
