@@ -59,7 +59,7 @@ impl vfs::node::Node for VmoBlob {
                     | fio::Operations::EXECUTE,
                 content_size: content_size,
                 // TODO(https://fxbug.dev/295550170): Get storage_size from fxblob.
-                storage_size: ((content_size + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE,
+                storage_size: content_size.div_ceil(BLOCK_SIZE) * BLOCK_SIZE,
             }
         ))
     }
