@@ -7,7 +7,7 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+    DirEntryHandle, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use selinux::{SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
@@ -56,8 +56,11 @@ pub fn kernel_init_security(enabled: bool) -> KernelState {
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
-pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(mount_params)? })
+pub fn file_system_init_security(
+    name: &'static FsStr,
+    mount_params: &MountParams,
+) -> Result<FileSystemState, Errno> {
+    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_params)? })
 }
 
 /// Gives the hooks subsystem an opportunity to note that the new `file_system` needs labeling, if
@@ -100,11 +103,17 @@ pub struct FsNodeSecurityXattr {
 /// this is a no-op.
 pub fn fs_node_init_with_dentry(
     current_task: &CurrentTask,
-    dir_entry: &DirEntry,
+    dir_entry: &DirEntryHandle,
 ) -> Result<(), Errno> {
-    if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::fs_node_init_with_dentry(security_server, current_task, dir_entry)
-    })
+    // TODO: https://fxbug.dev/367585803 - Don't use `if_selinux_else()` here, because the `has_policy()`
+    // check is racey, so doing non-trivial work in the "else" path is unsafe. Instead, call the SELinux
+    // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
+    // state, thereby ensuring safe ordering.
+    if let Some(state) = &current_task.kernel().security_state.state {
+        selinux_hooks::fs_node_init_with_dentry(&state.server, current_task, dir_entry)
+    } else {
+        Ok(())
+    }
 }
 
 /// Called by file-system implementations when creating the `FsNode` for a new file, to determine the

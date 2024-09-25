@@ -779,10 +779,7 @@ impl DirEntry {
         };
 
         let (child, exists) = match create_result {
-            CreationResult::Created => {
-                security::fs_node_init_with_dentry(current_task, &child)?;
-                (child, false)
-            }
+            CreationResult::Created => (child, false),
             CreationResult::Existed { create_fn } => {
                 if child.ops.revalidate(current_task, &child)? {
                     (child, true)
@@ -801,6 +798,8 @@ impl DirEntry {
                 }
             }
         };
+
+        security::fs_node_init_with_dentry(current_task, &child)?;
 
         Ok((child, exists))
     }
