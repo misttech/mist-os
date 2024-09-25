@@ -6,8 +6,10 @@ package result
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -28,6 +30,16 @@ func Initialize(c *ResultConfig) error {
 	}
 
 	Config = c
+
+	// Ensure no allowlist entries end in a "/"
+	for _, check := range c.Checks {
+		for k := range check.Allowlist {
+			if strings.HasSuffix(k, "/") {
+				return fmt.Errorf("\nAllowlist \"%s\" has an entry \"%s\" that ends with \"/\". This is not allowed.\nPlease remove the trailing slash in this allowlist entry.", check.Name, k)
+			}
+		}
+	}
+
 	return initializeTemplates()
 }
 
