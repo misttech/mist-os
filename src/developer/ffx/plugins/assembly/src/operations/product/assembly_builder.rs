@@ -973,6 +973,23 @@ impl ImageAssemblyConfigBuilder {
             devicetree,
             image_mode,
         };
+
+        if image_mode == FilesystemImageMode::NoImage {
+            anyhow::ensure!(
+                image_assembly_config.base.is_empty(),
+                format!(
+                    "Base packages are not allowed on 'no_image' products. Found: {:?}",
+                    image_assembly_config.base
+                )
+            );
+            anyhow::ensure!(
+                image_assembly_config.cache.is_empty(),
+                format!(
+                    "Cache packages are not allowed on 'no_image' products. Found: {:?}",
+                    image_assembly_config.cache
+                )
+            );
+        }
         Ok(image_assembly_config)
     }
 }
