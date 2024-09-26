@@ -18,13 +18,6 @@ load(
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
-# DEPRECATED
-PACKAGE_MODE = struct(
-    DISK = "disk",
-    EMBED_IN_ZBI = "embed-in-zbi",
-    BOOTFS = "bootfs",
-)
-
 # Base source for running ffx assembly create-system
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
 set -e
@@ -308,7 +301,6 @@ def fuchsia_product(
         name,
         board_config,
         product_config,
-        package_mode = None,
         platform_artifacts = None,
         legacy_bundle = None,
         package_validation = None,

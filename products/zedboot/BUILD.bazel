@@ -76,7 +76,6 @@ fuchsia_product_configuration(
     name = board,
     board_config = "//boards:{}".format(board),
     legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
-    package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     product_config = "//products/zedboot:zedboot",
 ) for board in [
@@ -91,7 +90,6 @@ fuchsia_product_configuration(
     name = "{}_with_fxfs".format(board),
     board_config = "//boards:{}".format(board),
     legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
-    package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     product_config = "//products/zedboot:zedboot",
 ) for board in [
@@ -105,7 +103,6 @@ fuchsia_product_configuration(
     name = "{}_with_fvm".format(board),
     board_config = "//boards:{}".format(board),
     legacy_bundle = ZEDBOOT_IMAGE_ARGS["legacy_bundle"],
-    package_mode = ZEDBOOT_IMAGE_ARGS["package_mode"],
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     product_config = "//products/zedboot:zedboot_with_fvm",
 ) for board in [
