@@ -7,12 +7,17 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("util") {
   sources = [
     "bstring.cc",
+    "cprng.cc",
     "split_string.cc",
     "third_party/icu/icu_utf.cc",
     "trim.cc",
     "utf_codecs.cc",
+    "zx_cprng_draw.cc",
     "zx_status_get_string.cc",
   ]
 
-  deps = [ "//zircon/system/ulib/explicit-memory" ]
+  deps = [
+    "//zircon/kernel/lib/crypto",
+    "//zircon/system/ulib/explicit-memory",
+  ]
 }

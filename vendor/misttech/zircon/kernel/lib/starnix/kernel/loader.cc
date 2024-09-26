@@ -38,7 +38,6 @@
 #include <numeric>
 #include <optional>
 
-#include <explicit-memory/bytes.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/static_vector.h>
@@ -80,24 +79,6 @@ size_t get_initial_stack_size(const ktl::string_view& path,
   stack_size += ((argv.size() + 1) + (environ.size() + 1)) * sizeof(const char*);
   stack_size += auxv.size() * 2 * sizeof(uint64_t);
   return stack_size;
-}
-
-constexpr size_t kMaxCPRNGDraw = ZX_CPRNG_DRAW_MAX_LEN;
-
-zx_status_t cprng_draw(void* buffer, size_t len) {
-  if (len > kMaxCPRNGDraw)
-    return ZX_ERR_INVALID_ARGS;
-
-  uint8_t kernel_buf[kMaxCPRNGDraw];
-  // Ensure we get rid of the stack copy of the random data as this function returns.
-  explicit_memory::ZeroDtor<uint8_t> zero_guard(kernel_buf, sizeof(kernel_buf));
-
-  auto prng = crypto::global_prng::GetInstance();
-  ASSERT(prng->is_thread_safe());
-  prng->Draw(kernel_buf, len);
-
-  memcpy(buffer, kernel_buf, len);
-  return ZX_OK;
 }
 
 fit::result<Errno, StackResult> populate_initial_stack(

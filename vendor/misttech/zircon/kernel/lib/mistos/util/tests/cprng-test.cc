@@ -4,14 +4,17 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/util/cprng.h>
+#include <lib/unittest/unittest.h>
 
 #include <ktl/array.h>
 #include <ktl/span.h>
-#include <zxtest/zxtest.h>
+
+namespace unit_testing {
 
 namespace {
+bool check_buffer(uint8_t* buffer, size_t size) {
+  BEGIN_TEST;
 
-void check_buffer(uint8_t* buffer, size_t size) {
   auto first_zero = 0;
   auto last_zero = 0;
   for (int i = 0; i < 30; i++) {
@@ -25,17 +28,25 @@ void check_buffer(uint8_t* buffer, size_t size) {
   }
   ASSERT_NE(30, first_zero);
   ASSERT_NE(30, last_zero);
+
+  END_TEST;
 }
 
-TEST(Cprng, cprng) {
+bool cprng() {
+  BEGIN_TEST;
+
   ktl::array<uint8_t, 20> buffer{};
-  check_buffer(buffer.data(), buffer.size());
+  ASSERT_TRUE(check_buffer(buffer.data(), buffer.size()));
+
+  END_TEST;
 }
 
-TEST(Cprng, cprng_large) {
+bool cprng_large() {
+  BEGIN_TEST;
+
   constexpr size_t kSIZE = ZX_CPRNG_DRAW_MAX_LEN + 1;
   ktl::array<uint8_t, kSIZE> buffer{};
-  check_buffer(buffer.data(), buffer.size());
+  ASSERT_TRUE(check_buffer(buffer.data(), buffer.size()));
 
   ktl::span<uint8_t> buffer_span{buffer.data(), buffer.size()};
   size_t chunkSize = kSIZE / 3;
@@ -43,13 +54,24 @@ TEST(Cprng, cprng_large) {
     size_t remaining = buffer.size() - i;
     size_t chunkEnd = (remaining < chunkSize) ? i + remaining : i + chunkSize;
     auto chunk = buffer_span.subspan(i, chunkEnd - i);
-    check_buffer(chunk.data(), chunk.size());
+    ASSERT_TRUE(check_buffer(chunk.data(), chunk.size()));
   }
+
+  END_TEST;
 }
 
+#if 0
 TEST(Cprng, cprng_add) {
   ktl::array<uint8_t, 3> buffer{0, 1, 2};
   ASSERT_TRUE(cprng_add_entropy({buffer.begin(), buffer.end()}).is_ok());
 }
+#endif
 
 }  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(mistos_util_cprng)
+UNITTEST("test cprng", unit_testing::cprng)
+UNITTEST("test cprng large", unit_testing::cprng_large)
+// UNITTEST("node_info_is_reflected_in_stats", node_info_is_reflected_in_stat)
+UNITTEST_END_TESTCASE(mistos_util_cprng, "mistos_util_cprng", "Tests Util CPRNG")

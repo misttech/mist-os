@@ -5,20 +5,20 @@
 
 #include "lib/mistos/util/zx_cprng_draw.h"
 
-#include <lib/crypto/global_prng.h>
+#include <lib/user_copy/user_ptr.h>
 
-#include <explicit-memory/bytes.h>
+#include <ktl/span.h>
 
-extern zx_status_t zx_cprng_draw_once(void* buffer, size_t len);
+extern zx_status_t sys_cprng_draw_once(user_out_ptr<void> buffer, size_t len);
 
-void zx_cprng_draw(void* buffer, size_t len) {
-  uint8_t* ptr = static_cast<uint8_t*>(buffer);
+void _zx_cprng_draw(user_out_ptr<void> buffer, size_t len) {
+  auto ptr = buffer.reinterpret<uint8_t>();
   while (len != 0) {
     size_t chunk = len;
     if (chunk > ZX_CPRNG_DRAW_MAX_LEN)
       chunk = ZX_CPRNG_DRAW_MAX_LEN;
-    zx_status_t status = zx_cprng_draw_once(ptr, chunk);
-    // zx_cprng_draw_once shouldn't fail unless given bogus arguments.
+    zx_status_t status = sys_cprng_draw_once(ptr.reinterpret<void>(), chunk);
+    //  zx_cprng_draw_once shouldn't fail unless given bogus arguments.
     if (unlikely(status != ZX_OK)) {
       // We loop around __builtin_trap in case __builtin_trap doesn't
       // actually terminate the process.
@@ -26,7 +26,7 @@ void zx_cprng_draw(void* buffer, size_t len) {
         __builtin_trap();
       }
     }
-    ptr += chunk;
+    ptr = ptr.byte_offset(chunk);
     len -= chunk;
   }
 }
