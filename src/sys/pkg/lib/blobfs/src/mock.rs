@@ -466,7 +466,7 @@ impl Blob {
 
         let length = self.expect_truncate().await;
         // divide rounding up
-        let expected_write_calls = (length + (fio::MAX_BUF - 1)) / fio::MAX_BUF;
+        let expected_write_calls = length.div_ceil(fio::MAX_BUF);
         for _ in 0..(expected_write_calls - 1) {
             self.handle_write(Status::OK).await;
         }
