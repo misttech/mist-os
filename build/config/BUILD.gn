@@ -1355,9 +1355,6 @@ config("werror") {
 
     # TODO(https://fxbug.dev/365108268) Remove blanket allow once lint is actionable.
     "-Aelided_named_lifetimes",
-
-    # TODO(https://fxbug.dev/367989368): Remove this line once toolchain rolls.
-    "-Airrefutable_let_patterns",
   ]
 
   if (deny_warnings) {
