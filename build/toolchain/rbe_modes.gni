@@ -52,6 +52,7 @@ _all_modes_defaults = {
   # cxx defaults
   cxx_exec_strategy = "remote_local_fallback"
   cxx_download_objects = true
+  cxx_minimalist_wrapper = true
 
   # link defaults
   link_exec_strategy = "remote_local_fallback"
@@ -162,6 +163,7 @@ _default_rbe_settings = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     cxx_download_objects = false
+    cxx_minimalist_wrapper = false
 
     link_enable = true
 
@@ -245,6 +247,9 @@ rbe_settings = {
   }
   if (defined(rbe_settings_overrides["cxx_download_objects"])) {
     cxx_download_objects = rbe_settings_overrides["cxx_download_objects"]
+  }
+  if (defined(rbe_settings_overrides["cxx_minimalist_wrapper"])) {
+    cxx_minimalist_wrapper = rbe_settings_overrides["cxx_minimalist_wrapper"]
   }
 
   # link overrides

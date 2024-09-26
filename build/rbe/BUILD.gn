@@ -287,6 +287,7 @@ if (current_toolchain == default_toolchain) {
         cxx_download_objects = cxx_rbe_download_obj_files
         cxx_enable = cxx_rbe_enable
         cxx_exec_strategy = cxx_rbe_exec_strategy
+        cxx_minimalist_wrapper = cxx_rbe_minimalist_wrapper
         link_download_unstripped_outputs = link_rbe_download_unstripped_outputs
         link_enable = link_rbe_enable
         link_exec_strategy = link_rbe_exec_strategy
