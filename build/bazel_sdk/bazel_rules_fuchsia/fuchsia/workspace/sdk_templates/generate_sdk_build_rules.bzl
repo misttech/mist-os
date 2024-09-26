@@ -1153,7 +1153,7 @@ def _generate_python_e2e_test_rules(
             _sdk_template_path(runtime, "prebuilt_lacewing_test"),
             {
                 "{{name}}": name,
-                "{{test_pyz}}": "%s.pyz" % name,
+                "{{test_binary}}": "%s_bin" % name,
                 "{{data}}": _get_starlark_list(runtime, files),
                 "{{deprecation}}": _api_level_deprecation_message(api_level),
             },

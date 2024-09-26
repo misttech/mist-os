@@ -44,15 +44,9 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
         required=True,
     )
     parser.add_argument(
-        "--test-pyz",
+        "--test-binary",
         type=path_arg(),
-        help="A path to the prebuilt lacewing test pyz.",
-        required=True,
-    )
-    parser.add_argument(
-        "--cwd",
-        type=path_arg("directory"),
-        help="The cwd to run the pyz under.",
+        help="A path to the prebuilt lacewing test binary.",
         required=True,
     )
     parser.add_argument(
@@ -108,29 +102,19 @@ def write_mobly_config(test_bed: str, ffx: Path, target: Optional[str]) -> Path:
 
 
 def run_lacewing_test(
-    cwd: Path,
-    test_pyz: Path,
+    test_binary: Path,
     mobly_config: Path,
     *test_args: str,
 ) -> int:
-    # Set FIDL_IR_PATH.
-    if not (cwd / "ir_root").is_dir():
-        log(
-            f"WARNING: FIDL_IR_PATH directory {str(cwd)}/ir_root does not exist."
-        )
-    env = os.environ | {"FIDL_IR_PATH": str(cwd / "ir_root")}
-
     # Run the test.
     command = [
-        sys.executable,
-        test_pyz.resolve(),
+        test_binary.resolve(),
         "-c",
         mobly_config,
         *test_args,
     ]
     log(f"DEBUG: Running subcommand: {shlex.join(map(str, command))}")
-    log(f"DEBUG: Subcommand working directory: {cwd}")
-    return subprocess.run(command, cwd=cwd, env=env).returncode
+    return subprocess.run(command).returncode
 
 
 def copy_lacewing_outputs(test_bed: str, output_path: Path) -> None:
@@ -148,8 +132,7 @@ def main() -> int:
 
     # Run the lacewing test.
     result = run_lacewing_test(
-        cwd=args.cwd.resolve(),
-        test_pyz=args.test_pyz.resolve(),
+        test_binary=args.test_binary.resolve(),
         mobly_config=mobly_config,
         *forward_args,
     )
