@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
@@ -16,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -1081,6 +1083,36 @@ TEST(Mmap, ProtExecInChild) {
     ASSERT_NE(mapped, MAP_FAILED);
   });
   ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Mmap, ChoosesSameAddress) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* addr1 = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(addr1, MAP_FAILED);
+  ASSERT_EQ(munmap(addr1, page_size), 0);
+  void* addr2 = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_EQ(addr1, addr2);
+  ASSERT_EQ(munmap(addr2, page_size), 0);
+}
+
+TEST(Mmap, AddressesAreInDescendingOrder) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  std::vector<void*> addresses;
+  auto restorer = fit::defer([&]() {
+    for (auto addr : addresses) {
+      EXPECT_EQ(munmap(addr, page_size), 0);
+    }
+  });
+
+  for (size_t i = 0; i < 10; i++) {
+    void* addr = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(addr, MAP_FAILED);
+    addresses.push_back(addr);
+  }
+
+  for (size_t i = 1; i < addresses.size(); i++) {
+    EXPECT_LT(addresses[i], addresses[i - 1]);
+  }
 }
 
 }  // namespace

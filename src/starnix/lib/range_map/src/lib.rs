@@ -275,6 +275,11 @@ where
         self.map.range(RangeStart::from_point(point)..).map(|(k, value)| (&k.range, value))
     }
 
+    /// Iterate over the ranges in the map, starting at the last range starting before or at the given point.
+    pub fn iter_ending_at(&self, point: &K) -> impl DoubleEndedIterator<Item = (&Range<K>, &V)> {
+        self.map.range(..RangeStart::from_point(point)).map(|(k, value)| (&k.range, value))
+    }
+
     /// Iterate over the ranges in the map that intersect the requested range.
     pub fn intersection<R>(&self, range: R) -> impl Iterator<Item = (&Range<K>, &V)>
     where

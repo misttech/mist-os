@@ -622,7 +622,7 @@ fn map_in_vmar(
             // be within the first 2 GB of the process address space.
             (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
         }
-        DesiredAddress::Any => (0, zx::VmarFlags::empty()),
+        DesiredAddress::Any => unreachable!(),
         DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
             (addr - base_addr, zx::VmarFlags::SPECIFIC)
         }
@@ -672,6 +672,31 @@ fn map_in_vmar(
 }
 
 impl MemoryManagerState {
+    // Find the first unused range of addresses that fits a mapping of `length` bytes, searching
+    // from `RESTRICTED_ASPACE_HIGHEST_ADDRESS` downwards.
+    fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
+        let gap = 2 << 16; // TODO(https://fxbug.dev/309452853): add a random offset instead.
+        let top = UserAddress::from_ptr(RESTRICTED_ASPACE_HIGHEST_ADDRESS - gap);
+        // Iterate over existing mappings within range, in descending order
+        let mut map_iter = self.mappings.iter_ending_at(&top);
+        // Currently considered range. Will be moved downwards if it intersects the current mapping.
+        let mut candidate = Range { start: top.checked_sub(length)?, end: top };
+
+        loop {
+            // Is there a next mapping? If not, the candidate is already good.
+            let Some((mapping, _)) = map_iter.next_back() else {
+                return Some(candidate.start);
+            };
+            // If it doesn't overlap, the gap is big enough to fit.
+            if mapping.end <= candidate.start {
+                return Some(candidate.start);
+            }
+            // If there was a mapping in the way, the next range to consider will be `length` bytes
+            // below.
+            candidate = Range { start: mapping.start.checked_sub(length)?, end: mapping.start };
+        }
+    }
+
     // Map the memory without updating `self.mappings`.
     fn map_internal(
         &self,
@@ -682,10 +707,20 @@ impl MemoryManagerState {
         flags: MappingFlags,
         populate: bool,
     ) -> Result<UserAddress, Errno> {
+        let new_addr = match addr {
+            DesiredAddress::Any if !flags.contains(MappingFlags::LOWER_32BIT) => {
+                profile_duration!("FindAddressForMmap");
+                let new_addr: UserAddress = self
+                    .find_next_unused_range(round_up_to_system_page_size(length)?)
+                    .ok_or_else(|| errno!(ENOMEM))?;
+                DesiredAddress::Fixed(new_addr)
+            }
+            _ => addr,
+        };
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            addr,
+            new_addr,
             memory,
             memory_offset,
             length,
@@ -4275,7 +4310,7 @@ mod tests {
         assert_eq!(ma.read_memory_to_vec(partial_addr_after, buf.len()), error!(EFAULT));
 
         // Verify that accessing unmapped memory is an error.
-        let unmapped_addr = addr + 10 * page_size;
+        let unmapped_addr = addr - 10 * page_size;
         assert_eq!(ma.write_memory(unmapped_addr, &buf), error!(EFAULT));
         assert_eq!(ma.read_memory_to_vec(unmapped_addr, buf.len()), error!(EFAULT));
 
@@ -4471,6 +4506,51 @@ mod tests {
     }
 
     #[::fuchsia::test]
+    async fn test_find_next_unused_range() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        let mmap_top = mm.state.read().find_next_unused_range(0).unwrap().ptr();
+        let page_size = *PAGE_SIZE as usize;
+        assert!(mmap_top <= RESTRICTED_ASPACE_HIGHEST_ADDRESS);
+
+        // No mappings - top address minus requested size is available
+        assert_eq!(
+            mm.state.read().find_next_unused_range(page_size).unwrap(),
+            UserAddress::from_ptr(mmap_top - page_size)
+        );
+
+        // Fill it.
+        let addr = UserAddress::from_ptr(mmap_top - page_size);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, *PAGE_SIZE), addr);
+
+        // The next available range is right before the new mapping.
+        assert_eq!(
+            mm.state.read().find_next_unused_range(page_size).unwrap(),
+            UserAddress::from_ptr(addr.ptr() - page_size)
+        );
+
+        // Allocate an extra page before a one-page gap.
+        let addr2 = UserAddress::from_ptr(addr.ptr() - 2 * page_size);
+        assert_eq!(map_memory(&mut locked, &current_task, addr2, *PAGE_SIZE), addr2);
+
+        // Searching for one-page range still gives the same result
+        assert_eq!(
+            mm.state.read().find_next_unused_range(page_size).unwrap(),
+            UserAddress::from_ptr(addr.ptr() - page_size)
+        );
+
+        // Searching for a bigger range results in the area before the second mapping
+        assert_eq!(
+            mm.state.read().find_next_unused_range(2 * page_size).unwrap(),
+            UserAddress::from_ptr(addr2.ptr() - 2 * page_size)
+        );
+
+        // Searching for more memory than available should fail.
+        assert_eq!(mm.state.read().find_next_unused_range(mmap_top), None);
+    }
+
+    #[::fuchsia::test]
     async fn test_unmap_returned_mappings() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
@@ -4489,7 +4569,8 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = mm.state.read().find_next_unused_range(3 * *PAGE_SIZE as usize).unwrap();
+        let addr = map_memory(&mut locked, &current_task, addr, *PAGE_SIZE);
         let _ = map_memory(&mut locked, &current_task, addr + 2 * *PAGE_SIZE, *PAGE_SIZE);
 
         let mut released_mappings = vec![];
@@ -4832,7 +4913,8 @@ mod tests {
         let mm = current_task.mm();
         let ma = current_task.deref();
 
-        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = mm.state.read().find_next_unused_range(2 * *PAGE_SIZE as usize).unwrap();
+        let addr = map_memory(&mut locked, &current_task, addr, *PAGE_SIZE);
         let second_map = map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
 
         let bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
@@ -5087,7 +5169,7 @@ mod tests {
             .unwrap();
 
         let first_mapping_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
         let second_mapping_addr = map_memory_with_flags(
             &mut locked,
             &current_task,
