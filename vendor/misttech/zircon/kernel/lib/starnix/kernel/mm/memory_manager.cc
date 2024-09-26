@@ -824,6 +824,82 @@ fit::result<Errno> MemoryManagerState::write_mapping_memory(
       mapping.backing_.variant);
 }
 
+fit::result<Errno, size_t> MemoryManagerState::write_memory_partial(
+    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
+
+  // profile_duration !("WriteMemoryPartial");
+  size_t bytes_written = 0;
+  auto vec = get_contiguous_mappings_at(addr, bytes.size());
+  if (vec.is_error()) {
+    LTRACEF_LEVEL(2, "error code %d\n", vec.error_value().error_code());
+    return vec.take_error();
+  }
+
+  for (auto& [mapping, len] : vec.value()) {
+    auto next_offset = bytes_written + len;
+    if (write_mapping_memory(addr + bytes_written, mapping,
+                             {bytes.data() + bytes_written, bytes.data() + next_offset})
+            .is_error()) {
+      break;
+    }
+    bytes_written = next_offset;
+  }
+
+  if (!bytes.empty() && (bytes_written == 0)) {
+    return fit::error(errno(EFAULT));
+  } else {
+    return fit::ok(bytes.size());
+  }
+}
+
+fit::result<Errno, size_t> MemoryManagerState::zero(UserAddress addr, size_t length) const {
+  LTRACEF("addr 0x%lx length 0x%zx\n", addr.ptr(), length);
+
+  // profile_duration!("Zero");
+  size_t bytes_written = 0;
+  auto vec = get_contiguous_mappings_at(addr, length);
+  if (vec.is_error()) {
+    LTRACEF_LEVEL(2, "error code %d\n", vec.error_value().error_code());
+    return vec.take_error();
+  }
+
+  for (auto& [mapping, len] : vec.value()) {
+    auto next_offset = bytes_written + len;
+    if (zero_mapping(addr, mapping, len).is_error()) {
+      break;
+    }
+    bytes_written = next_offset;
+  }
+
+  if (length != bytes_written) {
+    return fit::error(errno(EFAULT));
+  } else {
+    return fit::ok(length);
+  }
+}
+
+fit::result<Errno, size_t> MemoryManagerState::zero_mapping(UserAddress addr,
+                                                            const Mapping& mapping,
+                                                            size_t length) const {
+  LTRACEF("addr 0x%lx length 0x%zx\n", addr.ptr(), length);
+
+  // profile_duration!("MappingZeroMemory");
+  if (!mapping.can_write()) {
+    return fit::error(errno(EFAULT));
+  }
+
+  return ktl::visit(MappingBacking::overloaded{
+                        [](const PrivateAnonymous&) -> fit::result<Errno, size_t> {
+                          return fit::error(errno(EFAULT));
+                        },
+                        [&](const MappingBackingMemory& m) -> fit::result<Errno, size_t> {
+                          return m.zero(addr, length);
+                        },
+                    },
+                    mapping.backing_.variant);
+}
+
 fit::result<Errno, ktl::span<uint8_t>> MappingBackingMemory::read_memory(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
@@ -1383,13 +1459,6 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManager::syscall_read_memory_partia
   return state.Read()->read_memory_partial_until_null_byte(addr, bytes);
 }
 
-fit::result<Errno, size_t> MemoryManager::unified_write_memory(
-    const CurrentTask& current_task, UserAddress addr,
-    const ktl::span<const uint8_t>& bytes) const {
-  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
-  return syscall_write_memory(addr, bytes);
-}
-
 fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory_partial(
     const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const {
   DEBUG_ASSERT(has_same_address_space(current_task->mm()));
@@ -1401,9 +1470,60 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManager::syscall_read_memory_partia
   return state.Read()->read_memory_partial(addr, bytes);
 }
 
+fit::result<Errno, size_t> MemoryManager::unified_write_memory(
+    const CurrentTask& current_task, UserAddress addr,
+    const ktl::span<const uint8_t>& bytes) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+  return syscall_write_memory(addr, bytes);
+}
+
 fit::result<Errno, size_t> MemoryManager::syscall_write_memory(
     UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
   return state.Read()->write_memory(addr, bytes);
+}
+
+fit::result<Errno, size_t> MemoryManager::unified_write_memory_partial(
+    const CurrentTask& current_task, UserAddress addr,
+    const ktl::span<const uint8_t>& bytes) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+  return syscall_write_memory_partial(addr, bytes);
+}
+
+fit::result<Errno, size_t> MemoryManager::syscall_write_memory_partial(
+    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
+  return state.Read()->write_memory_partial(addr, bytes);
+}
+
+fit::result<Errno, size_t> MemoryManager::unified_zero(const CurrentTask& current_task,
+                                                       UserAddress addr, size_t length) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+
+  {
+    auto page_size = static_cast<size_t>(PAGE_SIZE);
+    // Get the page boundary immediately following `addr` if `addr` is
+    // not page aligned.
+    auto next_page_boundary = round_up_to_system_page_size(addr.ptr());
+    if (next_page_boundary.is_error()) {
+      return next_page_boundary.take_error();
+    }
+    // The number of bytes needed to zero at least a full page (not just
+    // a pages worth of bytes) starting at `addr`.
+    auto length_with_atleast_one_full_page = page_size + (next_page_boundary.value() - addr.ptr());
+    // If at least one full page is being zeroed, go through the memory object since Zircon
+    // can swap the mapped pages with the zero page which should be cheaper than zeroing
+    // out a pages worth of bytes manually.
+    //
+    // If we are not zeroing out a full page, then go through usercopy
+    // if unified aspaces is enabled.
+    if (length >= length_with_atleast_one_full_page) {
+      return syscall_zero(addr, length);
+    }
+  }
+  return syscall_zero(addr, length);
+}
+
+fit::result<Errno, size_t> MemoryManager::syscall_zero(UserAddress addr, size_t length) const {
+  return state.Read()->zero(addr, length);
 }
 
 fit::result<Errno> MemoryManager::unmap(UserAddress addr, size_t length) {
