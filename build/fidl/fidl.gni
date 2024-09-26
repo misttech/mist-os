@@ -407,11 +407,21 @@ template("fidl") {
                                      "testonly",
                                      "visibility",
                                      "public_deps",
-                                     "sdk_category",
                                    ])
         forward_variables_from(common_parameters, "*")
         enable_hlcpp = enable_hlcpp
         enable_cpp = enable_cpp
+
+        # SDK atom aliases are only relevant in the default toolchain when an
+        # the library is in an SDK category.
+        declare_sdk_atom_aliases = current_toolchain == default_toolchain &&
+                                   defined(invoker.sdk_category)
+      }
+
+      if (!is_fidl_toolchain) {
+        # Checking if the parameter is defined is insufficient to avoid
+        # "Assignment had no effect."
+        not_needed(invoker, [ "sdk_category" ])
       }
     } else {
       not_needed([ "non_go_only" ])

@@ -313,9 +313,9 @@ template("fidl_cpp_library") {
 #    - Required: The label of the target that generates the FIDL IR JSON file.
 #    - Type: label
 #
-#  * sdk_category
-#    - Optional: See //build/fidl/fidl.gni for a description.
-#    - Type: string
+#  * declare_sdk_atom_aliases
+#    - Required: Whether to declare aliases to "${target_name}_sdk".
+#    - Type: boolean
 #
 #  * enable_hlcpp
 #    - Required: See //build/fidl/fidl.gni for a description.
@@ -342,6 +342,9 @@ template("fidl_cpp_family") {
          "fidl_cpp_family(\"$target_name\") must define `fidl_ir_json`")
   assert(defined(invoker.fidl_ir_target),
          "fidl_cpp_family(\"$target_name\") must define `fidl_ir_target`")
+  assert(
+      defined(invoker.declare_sdk_atom_aliases),
+      "fidl_cpp_family(\"$target_name\") must define `declare_sdk_atom_aliases`")
   assert(defined(invoker.enable_hlcpp),
          "fidl_cpp_family(\"$target_name\") must define `enable_hlcpp`")
 
@@ -415,16 +418,13 @@ template("fidl_cpp_family") {
     }
   }
 
-  # Only define the SDK Atoms in the default toolchain.
-  if (current_toolchain == default_toolchain) {
+  if (invoker.declare_sdk_atom_aliases) {
     # Set up an HLCPP SDK item for this library
-    if (defined(invoker.sdk_category)) {
-      # Instead of depending on the generated bindings, set up a dependency on
-      # the original library.
-      sdk_target_name = "${target_name}_sdk"
-      sdk_atom_alias("${target_name}_hlcpp_sdk") {
-        atom = ":$sdk_target_name($fidl_toolchain)"
-      }
+    # Instead of depending on the generated bindings, set up a dependency on
+    # the original library.
+    sdk_target_name = "${target_name}_sdk"
+    sdk_atom_alias("${target_name}_hlcpp_sdk") {
+      atom = ":$sdk_target_name($fidl_toolchain)"
     }
   }
 
@@ -524,14 +524,12 @@ template("fidl_cpp_family") {
     }
 
     # SDK atoms for the new c++ bindings core and testing.
-    if (current_toolchain == default_toolchain) {
-      if (defined(invoker.sdk_category)) {
-        sdk_atom_alias("${_cpp_target}_sdk") {
-          atom = ":$sdk_target_name($fidl_toolchain)"
-        }
-        sdk_atom_alias("${target_name}_cpp_testing_sdk") {
-          atom = ":$sdk_target_name($fidl_toolchain)"
-        }
+    if (invoker.declare_sdk_atom_aliases) {
+      sdk_atom_alias("${_cpp_target}_sdk") {
+        atom = ":$sdk_target_name($fidl_toolchain)"
+      }
+      sdk_atom_alias("${target_name}_cpp_testing_sdk") {
+        atom = ":$sdk_target_name($fidl_toolchain)"
       }
     }
   }
@@ -741,8 +739,4 @@ template("fidl_cpp_family") {
       generated_sources = libfuzzer_sources
     }
   }
-
-  # This parameter is only referenced to determine if it is defined, which is
-  # insufficient to avoid "Assignment had no effect."
-  not_needed(invoker, [ "sdk_category" ])
 }
