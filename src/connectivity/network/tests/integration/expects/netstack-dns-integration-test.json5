@@ -11,10 +11,7 @@
         },
         {
             type: "expect_pass_with_err_logs",
-            matchers: [
-                "discovered_dhcpv6_dns_netcfg_basic_ns3",
-                "discovered_dhcpv6_dns_netcfg_advanced_ns3",
-            ],
+            matchers: [],
         },
         {
             type: "expect_failure_with_err_logs",
