@@ -7,7 +7,8 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.memory.attribution.plugin") {
   sources = [ "plugin.fidl" ]
   sdk_area = "Diagnostics"
-  sdk_category = "internal"
+  sdk_category = "partner_internal"
+  stable = false
 
   public_deps = [
     "//sdk/fidl/fuchsia.kernel",
@@ -16,6 +17,7 @@ fidl("fuchsia.memory.attribution.plugin") {
 
   # TODO: https://fxbug.dev/307580082 - This protocol is under construction.
   visibility = [
+    "//sdk/fidl:sdk_partner_internal_libs",
     "//src/developer/ffx/plugins/profile/memory/*",
     "//src/performance/memory/*",
   ]

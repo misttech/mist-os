@@ -275,6 +275,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.fs",
   "fuchsia.hardware.pty",
   "fuchsia.media2",
+  "fuchsia.memory.attribution.plugin",
   "fuchsia.memory.debug",
   "fuchsia.memory.heapdump.client",
   "fuchsia.memory.inspection",
