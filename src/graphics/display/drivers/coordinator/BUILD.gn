@@ -70,7 +70,7 @@ source_set("shared") {
     "layer.h",
     "migration-util.cc",
     "migration-util.h",
-    "post-task.h",
+    "util/post-task.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
   ]
@@ -125,7 +125,7 @@ test("display-coordinator-unittests") {
     "inspect-test.cc",
     "integration-test.cc",
     "layer-test.cc",
-    "post-task-test.cc",
+    "util/post-task-test.cc",
   ]
   deps = [
     ":testing",

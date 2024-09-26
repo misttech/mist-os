@@ -61,7 +61,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
-#include "src/graphics/display/drivers/coordinator/post-task.h"
+#include "src/graphics/display/drivers/coordinator/util/post-task.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"

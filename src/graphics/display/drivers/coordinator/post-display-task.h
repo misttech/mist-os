@@ -11,7 +11,7 @@
 #include <cstddef>
 #include <utility>
 
-#include "src/graphics/display/drivers/coordinator/post-task.h"
+#include "src/graphics/display/drivers/coordinator/util/post-task.h"
 
 namespace display {
 
