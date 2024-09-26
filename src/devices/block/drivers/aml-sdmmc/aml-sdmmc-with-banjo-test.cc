@@ -213,6 +213,8 @@ class FakeClock : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
   bool enabled_ = false;
 };
 
+// TODO(b/368634551): This class is outdated upon removal of wake-on-request support. Update it
+// to test the modified power management scheme once that's ready.
 class FakeSystemActivityGovernor
     : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
@@ -347,8 +349,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     auto lessor_impl = std::make_unique<FakeLessor>();
     if (req.element_name() == AmlSdmmc::kHardwarePowerElementName) {
       hardware_power_lessor_ = lessor_impl.get();
-    } else if (req.element_name() == AmlSdmmc::kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_lessor_ = lessor_impl.get();
     } else {
       ZX_ASSERT_MSG(0, "Unexpected power element.");
     }
@@ -365,9 +365,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     if (req.element_name() == AmlSdmmc::kHardwarePowerElementName) {
       hardware_power_current_level_ = current_level_impl.get();
       hardware_power_required_level_ = required_level_impl.get();
-    } else if (req.element_name() == AmlSdmmc::kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_current_level_ = current_level_impl.get();
-      wake_on_request_required_level_ = required_level_impl.get();
     } else {
       ZX_ASSERT_MSG(0, "Unexpected power element.");
     }
@@ -384,11 +381,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
             [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
 
-    if (wake_on_request_lessor_ && hardware_power_required_level_) {
-      wake_on_request_lessor_->AddSideEffect(
-          [&]() { hardware_power_required_level_->required_level_ = AmlSdmmc::kPowerLevelOn; });
-    }
-
     servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
@@ -401,9 +393,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   FakeLessor* hardware_power_lessor_ = nullptr;
   FakeCurrentLevel* hardware_power_current_level_ = nullptr;
   FakeRequiredLevel* hardware_power_required_level_ = nullptr;
-  FakeLessor* wake_on_request_lessor_ = nullptr;
-  FakeCurrentLevel* wake_on_request_current_level_ = nullptr;
-  FakeRequiredLevel* wake_on_request_required_level_ = nullptr;
 
  private:
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
@@ -637,64 +626,13 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
         .levels = {{off, on}},
     }};
 
-    fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
-        .child_level = AmlSdmmc::kPowerLevelOn,
-        .parent_level =
-            static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kSuspending),
-    }};
-    fuchsia_hardware_power::PowerDependency opportunistic_on_exec_state_wake_handling = {{
-        .child = AmlSdmmc::kHardwarePowerElementName,
-        .parent = fuchsia_hardware_power::ParentElement::WithSag(
-            fuchsia_hardware_power::SagElement::kExecutionState),
-        .level_deps = {{on_to_wake_handling}},
-        .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-    }};
-
     fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
-        {.element = hardware_power, .dependencies = {{opportunistic_on_exec_state_wake_handling}}}};
+        {.element = hardware_power}};
     return hardware_power_config;
   }
 
-  fuchsia_hardware_power::PowerElementConfiguration GetSystemWakeOnRequestPowerConfig() {
-    auto transitions_from_off =
-        std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
-            .target_level = AmlSdmmc::kPowerLevelOn,
-            .latency_us = 0,
-        }}};
-    auto transitions_from_on =
-        std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
-            .target_level = AmlSdmmc::kPowerLevelOff,
-            .latency_us = 0,
-        }}};
-    fuchsia_hardware_power::PowerLevel off = {
-        {.level = AmlSdmmc::kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
-    fuchsia_hardware_power::PowerLevel on = {
-        {.level = AmlSdmmc::kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
-    fuchsia_hardware_power::PowerElement wake_on_request = {{
-        .name = AmlSdmmc::kSystemWakeOnRequestPowerElementName,
-        .levels = {{off, on}},
-    }};
-
-    fuchsia_hardware_power::LevelTuple on_to_active = {{
-        .child_level = AmlSdmmc::kPowerLevelOn,
-        .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
-    }};
-    fuchsia_hardware_power::PowerDependency assertive_on_wake_handling_active = {{
-        .child = AmlSdmmc::kSystemWakeOnRequestPowerElementName,
-        .parent = fuchsia_hardware_power::ParentElement::WithSag(
-            fuchsia_hardware_power::SagElement::kWakeHandling),
-        .level_deps = {{on_to_active}},
-        .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-    }};
-
-    fuchsia_hardware_power::PowerElementConfiguration wake_on_request_config = {
-        {.element = wake_on_request, .dependencies = {{assertive_on_wake_handling_active}}}};
-    return wake_on_request_config;
-  }
-
   std::vector<fuchsia_hardware_power::PowerElementConfiguration> GetAllPowerConfigs() {
-    return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{
-        GetHardwarePowerConfig(), GetSystemWakeOnRequestPowerConfig()};
+    return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{GetHardwarePowerConfig()};
   }
 
   aml_sdmmc_desc_t* descriptors() const { return reinterpret_cast<aml_sdmmc_desc_t*>(descs_); }
@@ -2390,7 +2328,6 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
   });
 
   dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
-  dut_->ExpectInspectPropertyValue("wake_on_request_count", 0);
   EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
   EXPECT_FALSE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
@@ -2409,7 +2346,6 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
   });
 
   dut_->ExpectInspectBoolPropertyValue("power_suspended", false);
-  dut_->ExpectInspectPropertyValue("wake_on_request_count", 0);
   EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
   EXPECT_TRUE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
@@ -2428,100 +2364,9 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
   });
 
   dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
-  dut_->ExpectInspectPropertyValue("wake_on_request_count", 0);
   EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
   EXPECT_FALSE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
-}
-
-TEST_F(AmlSdmmcWithBanjoTest, WakeOnRequest) {
-  StartDriver(/*create_fake_bti_with_paddrs=*/false, /*supply_power_framework=*/true);
-
-  auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
-
-  ASSERT_OK(dut_->Init({}));
-
-  auto request_during_suspension = [&](std::optional<fit::function<void()>> request,
-                                       int wake_on_request_count) {
-    runtime_.PerformBlockingWork([&] {
-      if (request.has_value()) {
-        (*request)();
-
-        // Return driver to suspension.
-        incoming_.SyncCall([](IncomingNamespace* incoming) {
-          incoming->power_broker.hardware_power_required_level_->required_level_ =
-              AmlSdmmc::kPowerLevelOff;
-        });
-      }
-
-      bool clock_enabled;
-      do {
-        clock_enabled = incoming_.SyncCall(
-            [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-      } while (clock_enabled);
-    });
-
-    dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
-    dut_->ExpectInspectPropertyValue("wake_on_request_count", wake_on_request_count);
-    EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
-    EXPECT_FALSE(incoming_.SyncCall(
-        [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
-  };
-
-  // Initial power level is kPowerLevelOff.
-  request_during_suspension(std::nullopt, 0);
-
-  fdf::WireSyncClient<fuchsia_hardware_sdmmc::Sdmmc> client = GetClient();
-  fdf::Arena arena('SDMM');
-
-  // Issue request while power is suspended.
-  zx::vmo vmo, dup;
-  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
-  ASSERT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
-  fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffer_region{
-      .buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup)),
-      .offset = 0,
-      .size = zx_system_get_page_size(),
-  };
-  fuchsia_hardware_sdmmc::wire::SdmmcReq request{
-      .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
-      .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
-      .arg = 0x1234abcd,
-      .blocksize = 512,
-      .suppress_error_messages = false,
-      .client_id = 0,
-      .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
-          &buffer_region, 1),
-  };
-  auto requests =
-      fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>::FromExternal(&request, 1);
-  request_during_suspension([&] { EXPECT_OK(client.buffer(arena)->Request(requests)); }, 1);
-
-  // Issue SetBusWidth while power is suspended.
-  request_during_suspension(
-      [&] {
-        EXPECT_OK(
-            client.buffer(arena)->SetBusWidth(fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour));
-      },
-      2);
-
-  // Issue SetBusFreq while power is suspended.
-  request_during_suspension([&] { EXPECT_OK(client.buffer(arena)->SetBusFreq(100'000'000)); }, 3);
-
-  // Issue SetTiming while power is suspended.
-  request_during_suspension(
-      [&] {
-        EXPECT_OK(
-            client.buffer(arena)->SetTiming(fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400));
-      },
-      4);
-
-  // Issue HwReset while power is suspended.
-  request_during_suspension([&] { EXPECT_OK(client.buffer(arena)->HwReset()); }, 5);
-
-  // Issue PerformTuning while power is suspended.
-  request_during_suspension(
-      [&] { EXPECT_OK(client.buffer(arena)->PerformTuning(SD_SEND_TUNING_BLOCK)); }, 6);
 }
 
 TEST_F(AmlSdmmcWithBanjoTest, PowerTokenProvider) {

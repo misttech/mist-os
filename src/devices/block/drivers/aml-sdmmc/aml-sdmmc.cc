@@ -385,17 +385,8 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
           std::move(description.required_level_client.value()), dispatcher());
       hardware_power_assertive_token_ = std::move(description.assertive_token);
     } else if (config.element.name == kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_element_control_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(description.element_control_client.value()));
-      wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
-          std::move(description.lessor_client.value()));
-      wake_on_request_current_level_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client.value()));
-      wake_on_request_required_level_client_ =
-          fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-              std::move(description.required_level_client.value()), dispatcher());
+      // TODO(https://fxbug.dev/368409324): Remove this block once removal of this element in the
+      // device tree has rolled.
     } else {
       FDF_LOGL(ERROR, logger(), "Unexpected power element: %s", config.element.name.c_str());
       return zx::error(ZX_ERR_BAD_STATE);
@@ -414,7 +405,6 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
 
   // Start continuous monitoring of the required level and adjusting of the hardware's power level.
   WatchHardwareRequiredLevel();
-  WatchWakeOnRequestRequiredLevel();
 
   return zx::success();
 }
@@ -491,21 +481,10 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
             // Communicate to Power Broker that the hardware power level has been raised.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
 
-            const zx::duration duration = zx::clock::get_monotonic() - start;
-            inspect_.wake_on_request_latency_us.Insert(duration.to_usecs());
-
             // Serve delayed requests that were received during power suspension, if any.
             if (delayed_requests_.size()) {
               ServeDelayedRequests();
               delayed_requests_.clear();
-
-              // Drop lease on wake-on-request power element. This lets the hardware power element's
-              // required level drop to kPowerLevelOff, unless there are other entities that are
-              // raising SAG's Execution State.
-              ZX_ASSERT_MSG(wake_on_request_lease_control_client_end_.is_valid(),
-                            "Requests delayed without leasing wake-on-request power element.");
-              wake_on_request_lease_control_client_end_.channel().reset();
-              ZX_ASSERT(!wake_on_request_lease_control_client_end_.is_valid());
             }
             break;
           }
@@ -579,51 +558,6 @@ void AmlSdmmc::ServeDelayedRequests() {
   }
 }
 
-void AmlSdmmc::WatchWakeOnRequestRequiredLevel() {
-  fidl::Arena<> arena;
-  wake_on_request_required_level_client_.buffer(arena)->Watch().Then(
-      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
-        auto defer = fit::defer([&]() {
-          if (result.status() == ZX_ERR_CANCELED) {
-            FDF_LOGL(WARNING, logger(),
-                     "Watch returned canceled error. Stop monitoring required power level.");
-          } else {
-            // Recursively call self to watch the required wake-on-request power level again. The
-            // Watch() call blocks until the required power level has changed.
-            WatchWakeOnRequestRequiredLevel();
-          }
-        });
-
-        if (!result.ok()) {
-          FDF_LOGL(ERROR, logger(), "Call to Watch failed: %s", result.status_string());
-          return;
-        }
-        if (result->is_error()) {
-          switch (result->error_value()) {
-            case fuchsia_power_broker::RequiredLevelError::kInternal:
-              FDF_LOGL(ERROR, logger(), "Watch returned internal error.");
-              break;
-            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
-              FDF_LOGL(ERROR, logger(), "Watch returned not authorized error.");
-              break;
-            default:
-              FDF_LOGL(ERROR, logger(), "Watch returned unknown error.");
-              break;
-          }
-          return;
-        }
-
-        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
-        if ((required_level != kPowerLevelOn) && (required_level != kPowerLevelOff)) {
-          FDF_LOGL(ERROR, logger(), "Unexpected power level for wake-on-request power element: %u",
-                   required_level);
-          return;
-        }
-
-        UpdatePowerLevel(wake_on_request_current_level_client_, required_level);
-      });
-}
-
 void AmlSdmmc::Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request) {
   fdf::BindServer(worker_dispatcher_.get(), std::move(request), this);
 }
@@ -669,11 +603,6 @@ void AmlSdmmc::Inspect::Init(
   longest_window_adj_delay = root.CreateUint("longest_window_adj_delay", 0);
   distance_to_failing_point = root.CreateUint("distance_to_failing_point", 0);
   power_suspended = root.CreateBool("power_suspended", is_power_suspended);
-  wake_on_request_count = root.CreateUint("wake_on_request_count", 0);
-  // 14 buckets spanning from 1us to ~8ms.
-  wake_on_request_latency_us = root.CreateExponentialUintHistogram(
-      "wake_on_request_latency_us", /*floor=*/1, /*initial_step=*/1, /*step_multiplier=*/2,
-      /*buckets=*/14);
 }
 
 zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInterrupt(
@@ -795,12 +724,6 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
   std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
-    zx_status_t status = ActivateWakeOnRequest();
-    if (status != ZX_OK) {
-      completer.buffer(arena).ReplyError(status);
-      return;
-    }
-
     // Delay this request until power has been resumed.
     delayed_requests_.emplace_back(
         SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
@@ -848,12 +771,6 @@ void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
   std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
-    zx_status_t status = ActivateWakeOnRequest();
-    if (status != ZX_OK) {
-      completer.buffer(arena).ReplyError(status);
-      return;
-    }
-
     // Delay this request until power has been resumed.
     delayed_requests_.emplace_back(
         SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
@@ -992,12 +909,6 @@ void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
   std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
-    zx_status_t status = ActivateWakeOnRequest();
-    if (status != ZX_OK) {
-      completer.buffer(arena).ReplyError(status);
-      return;
-    }
-
     // Delay this request until power has been resumed.
     delayed_requests_.emplace_back(
         SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
@@ -1005,22 +916,6 @@ void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
   }
 
   DoTaskAndComplete(std::move(task), arena, completer);
-}
-
-zx_status_t AmlSdmmc::ActivateWakeOnRequest() {
-  zx_status_t status =
-      AcquireLease(wake_on_request_lessor_client_, wake_on_request_lease_control_client_end_);
-  if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
-    FDF_LOGL(ERROR, logger(), "Failed to acquire lease during wake-on-request: %s",
-             zx_status_get_string(status));
-    return status;
-  }
-
-  if (status == ZX_OK) {
-    inspect_.wake_on_request_count.Add(1);
-  }
-
-  return ZX_OK;
 }
 
 template <typename T>
@@ -1076,12 +971,6 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
   std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
-    zx_status_t status = ActivateWakeOnRequest();
-    if (status != ZX_OK) {
-      completer.buffer(arena).ReplyError(status);
-      return;
-    }
-
     // Delay this request until power has been resumed.
     delayed_requests_.emplace_back(
         SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
@@ -1579,12 +1468,6 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
   {
     std::lock_guard<std::mutex> lock(lock_);
     if (power_suspended_) {
-      zx_status_t status = ActivateWakeOnRequest();
-      if (status != ZX_OK) {
-        completer.buffer(arena).ReplyError(status);
-        return;
-      }
-
       // Delay this request until power has been resumed.
       delayed_requests_.emplace_back(
           SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
@@ -1807,12 +1690,6 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
   std::lock_guard<std::mutex> lock(lock_);
 
   if (power_suspended_) {
-    zx_status_t status = ActivateWakeOnRequest();
-    if (status != ZX_OK) {
-      completer.buffer(arena).ReplyError(status);
-      return;
-    }
-
     // TODO(b/340925051): Resource handles (e.g., VMOs) will close once this function returns. As a
     // workaround, convert reqs to natural type, which maintains the lifetime of resource handles.
     // Remove this workaround once b/340925051 is resolved.

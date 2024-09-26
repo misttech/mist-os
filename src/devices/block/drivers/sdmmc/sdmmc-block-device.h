@@ -91,8 +91,8 @@ struct ReadWriteMetadata {
 class SdmmcBlockDevice {
  public:
   static constexpr char kHardwarePowerElementName[] = "sdmmc-hardware";
-  static constexpr char kSystemWakeOnRequestPowerElementName[] = "sdmmc-system-wake-on-request";
-  // Common to hardware power and wake-on-request power elements.
+
+  // Power levels for the sdmmc-hardware element.
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
 
@@ -203,11 +203,6 @@ class SdmmcBlockDevice {
   // transitions to the Power Broker.
   void WatchHardwareRequiredLevel();
 
-  // Watches the required wake-on-request power level and replies to the Power Broker accordingly.
-  // Does not directly effect any real power level change of storage hardware. (That happens in
-  // WatchHardwareRequiredLevel().)
-  void WatchWakeOnRequestRequiredLevel();
-
   SdmmcRootDevice* const parent_;
   // Only accessed by ProbeSd, ProbeMmc, SuspendPower, ResumePower, and WorkerLoop.
   std::unique_ptr<SdmmcDevice> sdmmc_;
@@ -249,12 +244,6 @@ class SdmmcBlockDevice {
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
 
-  fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
-      wake_on_request_element_control_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
-
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
 
   block_info_t block_info_{};
@@ -282,9 +271,6 @@ class SdmmcBlockDevice {
     inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
     inspect::BoolProperty using_fidl_;                   // Set once by the init thread.
     inspect::BoolProperty power_suspended_;              // Updated whenever power state changes.
-    inspect::UintProperty wake_on_request_count_;        // Updated whenever wake-on-request occurs.
-    inspect::ExponentialUintHistogram
-        wake_on_request_latency_us_;  // Updated whenever wake-on-request occurs.
   } properties_;
 
   std::string_view block_name_;
