@@ -79,22 +79,22 @@
     ],
     offer: [
         {
-            from: "self",
-            to: "#driver-index",
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
                 "fuchsia.driver.EnableDriverLoadFuzzer",
                 "fuchsia.driver.EnableEphemeralDrivers",
             ],
+            from: "self",
+            to: "#driver-index",
         },
         {
-            from: "void",
-            to: "#driver_manager",
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
             ],
+            from: "void",
+            to: "#driver_manager",
             availability: "optional",
         },
         {
@@ -111,6 +111,12 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
             to: "#driver_manager",
+        },
+        {
+            config: [ "fuchsia.usb.PeripheralConfig.Functions" ],
+            from: "void",
+            to: "#boot-drivers",
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],

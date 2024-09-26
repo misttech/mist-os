@@ -63,13 +63,6 @@ fuchsia_structured_config_cpp_elf_lib("usb-peripheral-config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("default_values") {
-  cm_label = ":manifest"
-  values = {
-    functions = []
-  }
-}
-
 fuchsia_driver_component("driver") {
   info = "meta/usb-peripheral-info.json"
   cm_label = ":manifest"
@@ -77,16 +70,12 @@ fuchsia_driver_component("driver") {
 }
 
 group("usb-peripheral") {
-  deps = [
-    ":default_values",
-    ":driver",
-  ]
+  deps = [ ":driver" ]
 }
 
 fuchsia_driver_package("package") {
   package_name = "usb-peripheral"
   driver_components = [ ":driver" ]
-  deps = [ ":default_values" ]
 }
 
 test("usb-peripheral-unittest-bin") {
