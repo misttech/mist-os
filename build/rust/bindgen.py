@@ -59,6 +59,10 @@ class Bindgen:
         self.opaque_types = []
         # Clang: Include directories (`-I`)
         self.include_dirs = []
+        # Generate implementations for standard traits when not auto-derivable (`--impl-foo`)
+        self.std_impls = []
+        # Standard derivations (`--with-derive-foo`)
+        self.std_derives = []
         # Add extra traits to derive on generated structs/unions.
         # Only applies to `pub struct`/`pub union` that already have a #[derive()] line.
         self.auto_derive_traits = []
@@ -112,7 +116,6 @@ class Bindgen:
         args = [
             BINDGEN_PATH,
             "--no-layout-tests",
-            "--with-derive-default",
             "--explicit-padding",
             "--raw-line",
             raw_lines,
@@ -139,6 +142,8 @@ class Bindgen:
         args += ["--no-debug=" + x for x in self.no_debug_types]
         args += ["--no-copy=" + x for x in self.no_copy_types]
         args += ["--no-default=" + x for x in self.no_default_types]
+        args += ["--impl-" + x for x in self.std_impls]
+        args += ["--with-derive-" + x for x in self.std_derives]
 
         args += self.additional_bindgen_flags
 
@@ -165,7 +170,8 @@ class Bindgen:
         args += self.additional_clang_flags
 
         subprocess.check_call(
-            args, env={"RUSTFMT": os.path.abspath(RUSTFMT_PATH)}
+            args,
+            env={"RUSTFMT": os.path.abspath(RUSTFMT_PATH)},
         )
 
     def get_auto_derive_traits(self, line):
@@ -177,7 +183,7 @@ class Bindgen:
             return None
 
         # The third word (after the "pub struct") is the type name.
-        split = re.split("[ <\(]", line)
+        split = re.split(r"[ <\(]", line)
         if len(split) < 3:
             return None
         type_name = split[2]
@@ -196,7 +202,7 @@ class Bindgen:
                 if extra_traits:
                     # Parse existing traits, if any.
                     if len(output_lines) > 0 and output_lines[-1].startswith(
-                        "#[derive("
+                        "#[derive(",
                     ):
                         traits = output_lines[-1][9:-3].split(", ")
                         traits.extend(
@@ -206,7 +212,7 @@ class Bindgen:
                     else:
                         traits = extra_traits
                     output_lines.append(
-                        "#[derive(" + ", ".join(traits) + ")]\n"
+                        "#[derive(" + ", ".join(traits) + ")]\n",
                     )
                 output_lines.append(line)
 

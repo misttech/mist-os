@@ -67,6 +67,10 @@ INCLUDE_DIRS = [
     "src/starnix/lib/linux_uapi/stub",
 ]
 
+STD_DERIVES = [
+    "default",
+]
+
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
     (
@@ -254,6 +258,7 @@ ARCH_INFO = [
 
 bindgen = Bindgen()
 bindgen.opaque_types = OPAQUE_TYPES
+bindgen.std_derives = STD_DERIVES
 bindgen.set_auto_derive_traits(AUTO_DERIVE_TRAITS)
 bindgen.set_replacements(REPLACEMENTS)
 bindgen.ignore_functions = True

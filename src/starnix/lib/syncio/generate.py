@@ -36,6 +36,10 @@ use zerocopy::{AsBytes, FromBytes, NoCell, FromZeros};
 """
 )
 
+bindgen.std_derives = [
+    "default",
+]
+
 bindgen.include_dirs = [
     "sdk/lib/zxio/include",
     "zircon/third_party/ulib/musl/include",
@@ -85,16 +89,17 @@ bindgen.set_auto_derive_traits(
         ),
         (r"timespec", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
         (r"timeval", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
-    ]
+    ],
 )
 
 bindgen.set_replacements(
     [
         # Remove __bindgen_missing from the start of constants defined in missing_includes.h
         (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
-    ]
+    ],
 )
 
 bindgen.run(
-    "src/starnix/lib/syncio/wrapper.h", "src/starnix/lib/syncio/src/zxio.rs"
+    "src/starnix/lib/syncio/wrapper.h",
+    "src/starnix/lib/syncio/src/zxio.rs",
 )
