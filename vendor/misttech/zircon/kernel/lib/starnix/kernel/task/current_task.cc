@@ -27,6 +27,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/user_copy/user_ptr.h>
@@ -424,8 +425,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
 starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
     uint64_t flags, ktl::optional<Signal> exit_signal) {
-  auto result =
-      clone_task(flags, exit_signal, UserRef<pid_t>(UserAddress()), UserRef<pid_t>(UserAddress()));
+  auto result = clone_task(flags, exit_signal, mtl::DefaultConstruct<UserRef<pid_t>>(),
+                           mtl::DefaultConstruct<UserRef<pid_t>>());
   ASSERT_MSG(result.is_ok(), "failed to create task in test");
   return starnix::testing::AutoReleasableTask::From(result.value());
 }
