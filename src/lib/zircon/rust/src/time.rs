@@ -132,6 +132,11 @@ impl BootTime {
         // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
         unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
     }
+
+    /// Compute a deadline for the time in the future that is the given `Duration` away.
+    pub fn after(duration: Duration) -> Self {
+        Self::from_nanos(Self::get().into_nanos().saturating_add(duration.0))
+    }
 }
 
 impl<T: Timeline> Time<T> {
@@ -346,7 +351,7 @@ impl Duration<NsUnit> {
 
     /// Sleep for the given amount of time.
     pub fn sleep(self) {
-        Time::after(self).sleep()
+        MonotonicTime::after(self).sleep()
     }
 
     /// Returns the number of nanoseconds contained by this `Duration`.
@@ -624,12 +629,12 @@ mod tests {
 
         // Should not signal yet.
         assert_eq!(
-            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicTime::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
 
         // Set it, and soon it should signal.
-        assert_eq!(timer.set(Time::after(five_secs), slack), Ok(()));
+        assert_eq!(timer.set(MonotonicTime::after(five_secs), slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Time::INFINITE),
             Ok(Signals::TIMER_SIGNALED)
@@ -638,7 +643,7 @@ mod tests {
         // Cancel it, and it should stop signalling.
         assert_eq!(timer.cancel(), Ok(()));
         assert_eq!(
-            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicTime::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
     }
@@ -654,7 +659,7 @@ mod tests {
 
         // Should not signal yet.
         assert_eq!(
-            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicTime::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
 
@@ -668,7 +673,7 @@ mod tests {
         // Cancel it, and it should stop signalling.
         assert_eq!(timer.cancel(), Ok(()));
         assert_eq!(
-            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicTime::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
     }
