@@ -357,8 +357,6 @@ template("fidl") {
     }
   }
 
-  not_needed(invoker, [ "sources" ])
-
   if (is_go_toolchain) {
     # Only import the fidl_go() template when in the Go toolchain.
     import("//build/go/fidl_go.gni")
@@ -377,17 +375,13 @@ template("fidl") {
     }
     not_needed(invoker,
                [
+                 "contains_drivers",
+                 "fuzzers",
+                 "golden_fuzzer",
                  "sdk_category",
-                 "sdk_area",
-                 "sources",
                ])
   }
 
-  non_go_only = [
-    "contains_drivers",
-    "fuzzers",
-    "golden_fuzzer",
-  ]
   if (is_fidl_toolchain || toolchain_variant.supports_cpp ||
       toolchain_variant.supports_rust) {
     # The C, C++, and Rust bindings are compiled in their own toolchain, from
@@ -402,12 +396,15 @@ template("fidl") {
       # Define the cpp bindings.
       fidl_cpp_family(target_name) {
         forward_variables_from(invoker,
-                               non_go_only + [
-                                     "applicable_licenses",
-                                     "testonly",
-                                     "visibility",
-                                     "public_deps",
-                                   ])
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                                 "contains_drivers",
+                                 "fuzzers",
+                                 "golden_fuzzer",
+                               ])
         forward_variables_from(common_parameters, "*")
         enable_hlcpp = enable_hlcpp
         enable_cpp = enable_cpp
@@ -423,8 +420,6 @@ template("fidl") {
         # "Assignment had no effect."
         not_needed(invoker, [ "sdk_category" ])
       }
-    } else {
-      not_needed([ "non_go_only" ])
     }
 
     if (enable_rust && (is_fidl_toolchain || toolchain_variant.supports_rust)) {
@@ -463,8 +458,6 @@ template("fidl") {
         }
         fidl_gen_dir += "/rust"
       }
-    } else {
-      not_needed(invoker, [ "disable_rustdoc" ])
     }
 
     if (enable_rust_next &&
@@ -547,10 +540,9 @@ template("fidl") {
       not_needed(invoker, [ "sources" ])
     }
   } else {
-    not_needed(invoker,
-               non_go_only + [
-                     "sources",
-                     "disable_rustdoc",
-                   ])
+    if (!is_fidl_toolchain) {
+      not_needed(invoker, [ "sources" ])
+    }
+    not_needed(invoker, [ "disable_rustdoc" ])
   }
 }

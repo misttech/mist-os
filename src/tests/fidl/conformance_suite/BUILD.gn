@@ -44,6 +44,4 @@ fidl("conformance_fidl") {
   ]
 
   public_deps = [ "//zircon/vdso/zx" ]
-
-  fuzzers = []
 }
