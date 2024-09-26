@@ -23,7 +23,7 @@ Task(id = 0)
       └─ async_rust::main::func::λ • async_rust.rs:??
          └─ fuchsia_async::Task(id = 4)
 Task(id = 3)
-└─ async_rust::baz • async_rust.rs:55
+└─ async_rust::baz • async_rust.rs:??
    └─ fuchsia_async::runtime::fuchsia::timer::Timer
 Task(id = 4)
 └─ async_rust::baz (Unresumed) • async_rust.rs:??
