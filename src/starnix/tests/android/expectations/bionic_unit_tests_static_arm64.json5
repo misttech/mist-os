@@ -18,6 +18,8 @@
         {
             type: "skip",
             matchers: [
+                "cpu_target_features.has_expected_aarch64_compiler_values",
+
                 // This test is a benchmark of the clock() function which runs too slowly sometimes on the
                 // arm64 qemu bots.
                 "time.clock",
