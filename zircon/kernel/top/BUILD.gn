@@ -37,8 +37,6 @@ source_set("top") {
     "//zircon/kernel/platform",
   ]
   if (is_mistos) {
-    deps -= [ "//zircon/kernel/lib/userabi" ]
-    deps += [ "//vendor/misttech/zircon/kernel/lib/userabi" ]
     deps += [ "//vendor/misttech/zircon/kernel/lib/starnix" ]
   }
 

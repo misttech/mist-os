@@ -145,11 +145,6 @@ group("public") {
     "//zircon/kernel/lib/userabi/vdso/*",
     "//zircon/public/sysroot/*",
   ]
-  if (is_mistos) {
-    visibility -= [ "//zircon/kernel/lib/userabi/vdso/*" ]
-    visibility += [ "//vendor/misttech/zircon/kernel/lib/userabi/vdso/*" ]
-    visibility += [ "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls/*" ]
-  }
   public_deps = [ ":zx_zither.legacy_syscall_cdecl" ]
   metadata = barrier_metadata
 }
@@ -162,11 +157,6 @@ group("private") {
     "//zircon/kernel/lib/userabi/*",
     "//zircon/system/ulib/syscalls-headers/*",
   ]
-  if (is_mistos) {
-    visibility -= [ "//zircon/kernel/lib/userabi/*" ]
-    visibility += [ "//vendor/misttech/zircon/kernel/lib/userabi/*" ]
-    visibility += [ "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls/*" ]
-  }
   public_deps = [ ":zx_zither.kernel" ]
   metadata = barrier_metadata
 }

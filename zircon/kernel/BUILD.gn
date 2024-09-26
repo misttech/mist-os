@@ -925,12 +925,6 @@ if (!is_efi_toolchain) {
       "phys:boot_tests",
       "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
     ]
-    if (is_mistos) {
-      deps -= [ "//zircon/kernel/lib/userabi/userboot/tests:boot_tests" ]
-      deps += [
-        "//vendor/misttech/zircon/kernel/lib/userabi/userboot/tests:boot_tests",
-      ]
-    }
     if (all_cpu_kernel_boot_tests) {
       foreach(cpu, standard_fuchsia_cpus) {
         deps += [ ":boot_tests.$cpu" ]

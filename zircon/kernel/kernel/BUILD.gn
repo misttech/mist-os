@@ -65,11 +65,6 @@ source_set("kernel") {
     "//zircon/system/ulib/zx",
   ]
 
-  if (is_mistos) {
-    deps -= [ "//zircon/kernel/lib/userabi" ]
-    deps += [ "//vendor/misttech/zircon/kernel/lib/userabi" ]
-  }
-
   # TODO(https://fxbug.dev/42101573): This dependency is conditional because when built
   # with GCC the kernel uses function scoped statics requiring dynamic
   # initialization. Once https://fxbug.dev/42101573 is fixed, this dependency can be made

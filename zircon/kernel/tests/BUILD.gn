@@ -137,8 +137,6 @@ if (toolchain_environment == "kernel") {
       sources += [ "userboot_tests.cc" ]
       deps += [ "//zircon/kernel/lib/userabi" ]
       if (is_mistos) {
-        deps -= [ "//zircon/kernel/lib/userabi" ]
-        deps += [ "//vendor/misttech/zircon/kernel/lib/userabi" ]
         deps += [ "//vendor/misttech/zircon/kernel/lib/starnix:tests" ]
         deps += [ "//vendor/misttech/zircon/kernel/lib/mistos/util/tests" ]
       }
