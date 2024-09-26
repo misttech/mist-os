@@ -63,6 +63,15 @@ class StackVmo : public starnix::MemoryAccessor {
     return fit::ok(bytes.size());
   }
 
+  fit::result<Errno, size_t> write_memory_partial(
+      UserAddress addr, const ktl::span<const uint8_t>& bytes) const final {
+    PANIC("not yet implemented");
+  }
+
+  fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final {
+    PANIC("not yet implemented");
+  }
+
  private:
   Vmo vmo_;
 };
@@ -155,6 +164,6 @@ bool test_snapshot_hello_starnix() {
 
 UNITTEST_START_TESTCASE(starnix_loader)
 UNITTEST("test trivial initial stack", unit_testing::test_trivial_initial_stack)
-//UNITTEST("test load hello starnix", unit_testing::test_load_hello_starnix)
-//UNITTEST("test snapshot hello starnix", unit_testing::test_snapshot_hello_starnix)
+// UNITTEST("test load hello starnix", unit_testing::test_load_hello_starnix)
+// UNITTEST("test snapshot hello starnix", unit_testing::test_snapshot_hello_starnix)
 UNITTEST_END_TESTCASE(starnix_loader, "starnix_loader", "Tests for Loader")

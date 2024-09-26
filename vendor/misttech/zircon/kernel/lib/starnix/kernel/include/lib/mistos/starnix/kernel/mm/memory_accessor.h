@@ -155,13 +155,13 @@ class MemoryAccessor {
   /// # Parameters
   /// - `addr`: The address to write to.
   /// - `bytes`: The bytes to write from.
-  // virtual fit::result<Errno, size_t> write_memory_partial(
-  //     UserAddress addr, const ktl::span<const uint8_t>& bytes) = 0;
+  virtual fit::result<Errno, size_t> write_memory_partial(
+      UserAddress addr, const ktl::span<const uint8_t>& bytes) const = 0;
 
   /// Writes zeros starting at `addr` and continuing for `length` bytes.
   ///
   /// Returns the number of bytes that were zeroed.
-  // virtual fit::result<Errno, size_t> zero(UserAddress addr, size_t length) = 0;
+  virtual fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const = 0;
 
   virtual ~MemoryAccessor() = default;
 };
