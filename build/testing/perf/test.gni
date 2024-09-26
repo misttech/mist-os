@@ -138,6 +138,7 @@ template("python_perf_test") {
                                "params_source",
                                "test_data_deps",
                                "timeout_secs",
+                               "honeydew_config",
                              ])
       data_sources = _data_sources
       data_package_name = _data_package_name
