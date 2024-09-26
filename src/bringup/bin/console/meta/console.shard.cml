@@ -70,7 +70,7 @@
         {
             protocol: [
                 "fuchsia.dash.Launcher",
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
             ],
             from: "parent",
             to: [ "#console-launcher" ],

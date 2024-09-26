@@ -607,7 +607,6 @@
         },
         {
             protocol: [
-                "fuchsia.tracing.controller.Controller",
                 "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.controller.Session",
                 "fuchsia.tracing.perfetto.ProducerConnector",

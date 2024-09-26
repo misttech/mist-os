@@ -112,7 +112,9 @@
             to: "#test_manager",
         },
         {
-            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            protocol: [
+                "fuchsia.tracing.controller.Provisioner",
+            ],
             from: "#trace_manager",
             to: "#test_manager",
             source_availability: "unknown",

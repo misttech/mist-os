@@ -280,7 +280,7 @@
         // product and non-eng builds of any product.
         {
             protocol: [
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "#core",
