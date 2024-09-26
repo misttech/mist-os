@@ -5,7 +5,6 @@
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
-    "PACKAGE_MODE",
     "fuchsia_legacy_bundle",
     "fuchsia_product",
     "fuchsia_product_bundle",
@@ -20,11 +19,6 @@ fuchsia_product_configuration(
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
-            "storage": {
-                "filesystems": {
-                    "image_mode": "no_image",
-                },
-            },
             "power": {
                 "suspend_enabled": True,
                 "testing_sag_enabled": True,
@@ -42,7 +36,6 @@ fuchsia_product(
     name = "image.power_testing_msd_arm_mali_vim3",
     board_config = "//src/power/testing/system-integration/msd-arm-mali/custom-board:power_testing_msd_arm_mali_vim3",
     legacy_bundle = ":test_bundle",
-    package_mode = PACKAGE_MODE.BOOTFS,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
     product_config = ":product_config",
 )
