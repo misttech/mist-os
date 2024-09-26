@@ -92,7 +92,7 @@ build_metadata_opts=()
 [[ "${{BUILDBUCKET_ID-NOT_SET}}" == "NOT_SET" ]] || {{
   build_metadata_opts+=(
     "--build_metadata=BUILDBUCKET_ID=$BUILDBUCKET_ID"
-    "--build_metadata=SIBLING_BUILDS_LINK=${{siblings_link_template}}/?q=BUILDBUCKET_ID:$BUILDBUCKET_ID"
+    "--build_metadata=SIBLING_BUILDS_LINK=${{siblings_link_template}}?q=BUILDBUCKET_ID:$BUILDBUCKET_ID"
   )
   case "$BUILDBUCKET_ID" in
     */led/*)
