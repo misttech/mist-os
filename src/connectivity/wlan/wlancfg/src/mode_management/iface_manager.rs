@@ -387,7 +387,10 @@ impl IfaceManagerService {
         reason: client_types::DisconnectReason,
     ) -> BoxFuture<'static, Result<(), Error>> {
         // Cancel any ongoing network selection, since a disconnect makes it invalid.
-        self.connection_selection_futures.clear();
+        if !self.connection_selection_futures.is_empty() {
+            info!("Disconnect requested, ignoring results from ongoing connection selections.");
+            self.connection_selection_futures.clear();
+        }
 
         // Find the client interface associated with the given network config and disconnect from
         // the network.
@@ -972,7 +975,10 @@ async fn initiate_connection_selection_for_connect_request(
     };
 
     // Cancel any ongoing attempt to auto connect the previously idle iface.
-    iface_manager.connection_selection_futures.clear();
+    if !iface_manager.connection_selection_futures.is_empty() {
+        info!("Connect request received, ignoring results from ongoing connection selections.");
+        iface_manager.connection_selection_futures.clear();
+    }
     iface_manager.connection_selection_futures.push(fut.boxed());
     Ok(())
 }
