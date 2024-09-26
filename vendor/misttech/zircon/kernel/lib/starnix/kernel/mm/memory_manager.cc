@@ -17,6 +17,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/back_insert_iterator.h>
+#include <lib/mistos/util/num.h>
 #include <lib/mistos/util/range-map.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
@@ -334,12 +335,12 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_memory(
 fit::result<Errno, ktl::optional<UserAddress>> MemoryManagerState::try_remap_in_place(
     fbl::RefPtr<MemoryManager> mm, UserAddress old_addr, size_t old_length, size_t new_length,
     fbl::Vector<Mapping>& released_mappings) {
-  auto old_end_range = starnix_uapi::checked_add(old_addr.ptr(), old_length);
+  auto old_end_range = mtl::checked_add(old_addr.ptr(), old_length);
   if (!old_end_range.has_value()) {
     return fit::error(errno(EINVAL));
   }
 
-  auto new_end_range = starnix_uapi::checked_add(old_addr.ptr(), new_length);
+  auto new_end_range = mtl::checked_add(old_addr.ptr(), new_length);
   if (!new_end_range.has_value()) {
     return fit::error(errno(EINVAL));
   }
@@ -391,7 +392,7 @@ fit::result<Errno, ktl::optional<UserAddress>> MemoryManagerState::try_remap_in_
           [&](const MappingBackingMemory& backing)
               -> fit::result<Errno, ktl::optional<UserAddress>> {
             if (private_anonymous) {
-              auto new_memory_size = checked_add(backing.memory_offset_, final_length);
+              auto new_memory_size = mtl::checked_add(backing.memory_offset_, final_length);
               if (!new_memory_size.has_value()) {
                 return fit::error(errno(EINVAL));
               }
