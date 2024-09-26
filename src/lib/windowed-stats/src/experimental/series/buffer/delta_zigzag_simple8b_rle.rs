@@ -5,7 +5,17 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::io;
 
-use crate::experimental::ring_buffer::ZigzagSimple8bRleRingBuffer;
+use crate::experimental::series::buffer::encoding;
+use crate::experimental::series::buffer::zigzag_simple8b_rle::ZigzagSimple8bRleRingBuffer;
+
+#[derive(Debug)]
+pub enum Encoding {}
+
+impl<A> encoding::Encoding<A> for Encoding {
+    type Compression = encoding::compression::DeltaSimple8bRle;
+
+    const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Signed;
+}
 
 pub struct DeltaZigzagSimple8bRleRingBuffer {
     base: Option<i64>,

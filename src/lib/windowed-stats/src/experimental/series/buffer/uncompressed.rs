@@ -4,7 +4,20 @@
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::io;
+use std::marker::PhantomData;
+
+use crate::experimental::series::buffer::encoding;
+
+#[derive(Debug)]
+pub struct Encoding<A>(PhantomData<fn() -> A>, Infallible);
+
+impl encoding::Encoding<f32> for Encoding<f32> {
+    type Compression = encoding::compression::Uncompressed;
+
+    const PAYLOAD: encoding::payload::Uncompressed = encoding::payload::Uncompressed::Float32;
+}
 
 #[derive(Clone, Debug)]
 pub struct UncompressedRingBuffer<T> {

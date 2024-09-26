@@ -4,7 +4,7 @@
 
 //! Round-robin multi-resolution time series.
 
-pub(crate) mod buffer;
+mod buffer;
 mod interval;
 
 pub mod interpolation;
@@ -22,8 +22,8 @@ use crate::experimental::clock::{
     MonotonicityError, ObservationTime, Tick, TimedSample, Timestamp, TimestampExt,
 };
 use crate::experimental::series::buffer::{
-    Buffer, BufferStrategy, DeltaSimple8bRle, DeltaZigZagSimple8bRle, RingBuffer, Simple8bRle,
-    Uncompressed, ZigzagSimple8bRle,
+    encoding, Buffer, BufferStrategy, DeltaSimple8bRle, DeltaZigzagSimple8bRle, RingBuffer,
+    Simple8bRle, Uncompressed, ZigzagSimple8bRle,
 };
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
@@ -31,6 +31,7 @@ use crate::experimental::series::interpolation::{
 use crate::experimental::series::statistic::{OverflowError, PostAggregation, Statistic};
 use crate::experimental::Vec1;
 
+pub use crate::experimental::series::buffer::Capacity;
 pub use crate::experimental::series::interval::{SamplingInterval, SamplingProfile};
 
 /// Sample folding error.
@@ -147,11 +148,11 @@ impl BufferStrategy<i64, Constant> for Gauge {
 }
 
 impl BufferStrategy<i64, LastAggregation> for Gauge {
-    type Buffer = DeltaZigZagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle;
 }
 
 impl BufferStrategy<i64, LastSample> for Gauge {
-    type Buffer = DeltaZigZagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle;
 }
 
 impl BufferStrategy<u64, Constant> for Gauge {
@@ -159,11 +160,11 @@ impl BufferStrategy<u64, Constant> for Gauge {
 }
 
 impl BufferStrategy<u64, LastAggregation> for Gauge {
-    type Buffer = DeltaZigZagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle;
 }
 
 impl BufferStrategy<u64, LastSample> for Gauge {
-    type Buffer = DeltaZigZagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle;
 }
 
 impl DataSemantic for Gauge {
@@ -192,7 +193,7 @@ impl DataSemantic for BitSet {
     }
 }
 
-/// A buffer of data from a single time series.
+/// A buffer of serialized data from a time series.
 #[derive(Clone, Debug)]
 struct SerializedTimeSeries {
     interval: SamplingInterval,
@@ -483,14 +484,13 @@ where
         let created_timestamp = u32::try_from(self.created.quantize()).unwrap_or(u32::MAX);
         let end_timestamp =
             u32::try_from(self.last.last_update_timestamp.quantize()).unwrap_or(u32::MAX);
-        let ring_buffer_type = F::buffer_type();
 
         let mut buffer = vec![];
-        buffer.write_u8(1)?; // version number
-        buffer.write_u32::<LittleEndian>(created_timestamp)?;
-        buffer.write_u32::<LittleEndian>(end_timestamp)?;
-        buffer.write_u8(ring_buffer_type.type_descriptor())?;
-        buffer.write_u8(ring_buffer_type.subtype_descriptor())?;
+        buffer.write_u8(1)?; // Version number.
+        buffer.write_u32::<LittleEndian>(created_timestamp)?; // Matrix creation time.
+        buffer.write_u32::<LittleEndian>(end_timestamp)?; // Last observed or interpolated sample
+                                                          // time.
+        encoding::serialize_buffer_type_descriptors::<F, P>(&mut buffer)?; // Buffer descriptors.
 
         for series in series_buffers {
             const GRANULARITY_FIELD_LEN: usize = 2;

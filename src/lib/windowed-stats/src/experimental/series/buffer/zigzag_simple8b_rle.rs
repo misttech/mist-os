@@ -4,8 +4,19 @@
 
 use std::io;
 
-use crate::experimental::ring_buffer::simple8b_rle::{Simple8bRleBlock, Simple8bRleBufferMetadata};
-use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
+use crate::experimental::series::buffer::encoding;
+use crate::experimental::series::buffer::simple8b_rle::{
+    Simple8bRleBlock, Simple8bRleBufferMetadata, Simple8bRleRingBuffer,
+};
+
+#[derive(Debug)]
+pub enum Encoding {}
+
+impl<A> encoding::Encoding<A> for Encoding {
+    type Compression = encoding::compression::Simple8bRle;
+
+    const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Signed;
+}
 
 /// ZigzagSimple8bRleRingBuffer is a ring buffer that allows logging an i64 into a
 /// Simple8bRleRingBuffer. It does this by zigzag encoding an i64 before logging the

@@ -1,0 +1,273 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+//! Ring buffers and compression.
+
+mod delta_simple8b_rle;
+mod delta_zigzag_simple8b_rle;
+mod simple8b_rle;
+mod uncompressed;
+mod zigzag_simple8b_rle;
+
+pub mod encoding;
+
+use std::fmt::{self, Debug, Display, Formatter};
+use std::io::{self, Write};
+use std::num::NonZeroUsize;
+use tracing::warn;
+
+use crate::experimental::series::buffer::encoding::Encoding;
+use crate::experimental::series::interpolation::Interpolation;
+use crate::experimental::series::statistic::Aggregation;
+use crate::experimental::series::SamplingInterval;
+
+use Capacity::MinSamples;
+
+/// A type that can construct a [`RingBuffer`] associated with an aggregation type and
+/// interpolation.
+///
+/// [`RingBuffer`]: crate::experimental::series::buffer::RingBuffer
+pub trait BufferStrategy<A, P>
+where
+    P: Interpolation,
+{
+    type Buffer: Clone + RingBuffer<A>;
+
+    /// Constructs a ring buffer with the given fixed capacity.
+    fn buffer(interval: &SamplingInterval) -> Self::Buffer {
+        Self::Buffer::with_capacity(interval.capacity())
+    }
+}
+
+/// The associated [`RingBuffer`] type of a [`BufferStrategy`].
+///
+/// [`BufferStrategy`]: crate::experimental::series::buffer::BufferStrategy
+/// [`RingBuffer`]: crate::experimental::series::buffer::RingBuffer
+pub type Buffer<F, P> = <F as BufferStrategy<Aggregation<F>, P>>::Buffer;
+
+/// A fixed-capacity circular ring buffer.
+pub trait RingBuffer<A> {
+    /// The compression and payload of the buffer.
+    type Encoding: Encoding<A>;
+
+    fn with_capacity(capacity: Capacity) -> Self
+    where
+        Self: Sized;
+
+    fn push(&mut self, item: A);
+
+    fn serialize(&self, write: impl Write) -> io::Result<()>;
+
+    // TODO(https://fxbug.dev/369886210): Implement a durability query. This is the duration of the
+    //                                    sampling interval (`SamplingInterval::duration`)
+    //                                    multiplied by the (approximate) number of samples for
+    //                                    which the buffer has capacity.
+    //
+    // /// Gets the approximate durability of the buffer.
+    // ///
+    // /// Durability is the maximum period of time represented by the aggregations of a sampling
+    // /// interval. This is the time period for which it represents historical data.
+    // fn durability(&self) -> Duration;
+}
+
+// TODO(https://fxbug.dev/352614791): Remove this macro and any and all "null" implementations once
+//                                    buffers and implemented.
+/// Implements a "null" `RingBuffer`, which discards any and all data and writes a warning to the
+/// log when constructed.
+macro_rules! impl_null_buffer {
+    (
+        // Aggregation type and optional input type parameters.
+        $aggregation:ident $(for <$($ts:ident $(,)?)+>)?
+        // Optional bounds on aggregation type and input type parameters.
+        $(where $($bt:ident: $bb:ident $(<$($bbt:ident $(,)?)+>)? $(+ $bbs:ident $(<$($bbst:ident $(,)?)+>)?)* $(,)?)+)? =>
+        // Implementor type and optional application of input type parameters.
+        $implementor:ident $(<$($its:ident $(,)?)+>)?,
+        // `Encoding` type. Does **not** support input type parameters.
+        $encoding:ty $(,)?
+    ) => {
+        impl<$($($ts,)+)?> RingBuffer<$aggregation> for $implementor $(<$($its,)+>)?
+        $(
+        where
+            $($bt: $bb$(<$($bbt,)+>)? $(+ $bbs$(<$($bbst,)+>)?)*,)+
+        )?
+        {
+            type Encoding = $encoding;
+
+            fn with_capacity(_: Capacity) -> Self {
+                let buffer = Self::default();
+                warn!("`{:?}` buffer is unimplemented: no aggregation data will be stored", &buffer,);
+                buffer
+            }
+
+            fn push(&mut self, _: $aggregation) {}
+
+            fn serialize(&self, _: impl Write) -> io::Result<()> {
+                Ok(())
+            }
+        }
+    };
+}
+
+/// Capacity bounds of a [`RingBuffer`].
+///
+/// Because buffers may be compressed, capacity is expressed in terms of bounds rather than exact
+/// quantities.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Capacity {
+    /// A lower bound on the number of samples that a buffer stores in memory.
+    ///
+    /// Given a bound `n`, a buffer allocates enough memory for at least `n` samples, but may store
+    /// more.
+    MinSamples(NonZeroUsize),
+}
+
+impl Capacity {
+    /// Constructs a minimum samples capacity, clamping to `[1, usize::MAX]`.
+    pub fn from_min_samples(n: usize) -> Self {
+        MinSamples(NonZeroUsize::new(n).unwrap_or(NonZeroUsize::MIN))
+    }
+}
+
+impl Display for Capacity {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            MinSamples(n) => write!(formatter, "{}", n),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Uncompressed<A>(uncompressed::UncompressedRingBuffer<A>);
+
+impl RingBuffer<f32> for Uncompressed<f32> {
+    type Encoding = uncompressed::Encoding<f32>;
+
+    fn with_capacity(capacity: Capacity) -> Self {
+        Uncompressed(match capacity {
+            MinSamples(n) => uncompressed::UncompressedRingBuffer::with_min_samples(n.get()),
+        })
+    }
+
+    fn push(&mut self, item: f32) {
+        self.0.push(item);
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Simple8bRle(simple8b_rle::Simple8bRleRingBuffer);
+
+impl<A> RingBuffer<A> for Simple8bRle
+where
+    A: Into<u64>,
+{
+    type Encoding = simple8b_rle::Encoding;
+
+    fn with_capacity(capacity: Capacity) -> Self {
+        Simple8bRle(match capacity {
+            MinSamples(n) => simple8b_rle::Simple8bRleRingBuffer::with_min_samples(n.get()),
+        })
+    }
+
+    fn push(&mut self, item: A) {
+        self.0.push(item.into());
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
+    }
+}
+
+/// A ring buffer that encodes signed integer items using Zigzag, Simple8B, and RLE compression.
+#[derive(Clone, Debug)]
+pub struct ZigzagSimple8bRle(zigzag_simple8b_rle::ZigzagSimple8bRleRingBuffer);
+
+impl<A> RingBuffer<A> for ZigzagSimple8bRle
+where
+    A: Into<i64>,
+{
+    type Encoding = zigzag_simple8b_rle::Encoding;
+
+    fn with_capacity(capacity: Capacity) -> Self {
+        ZigzagSimple8bRle(match capacity {
+            MinSamples(n) => {
+                zigzag_simple8b_rle::ZigzagSimple8bRleRingBuffer::with_min_samples(n.get())
+            }
+        })
+    }
+
+    fn push(&mut self, item: A) {
+        self.0.push(item.into());
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
+    }
+}
+
+// TODO(https://fxbug.dev/352614791): Implement the `DeltaSimple8bRle` ring buffer.
+/// A ring buffer that encodes unsigned integer items using Delta, Simple8B, and RLE compression.
+#[derive(Clone, Debug, Default)]
+pub struct DeltaSimple8bRle;
+
+impl_null_buffer!(
+    A for <A> where A: Into<u64> => DeltaSimple8bRle,
+    delta_simple8b_rle::Encoding,
+);
+
+// TODO(https://fxbug.dev/352614791): Implement the `DeltaZigzagSimple8bRle` ring buffer.
+/// A ring buffer that encodes integer items using Delta, Zigzag, Simple8B, and RLE compression.
+#[derive(Clone, Debug, Default)]
+pub struct DeltaZigzagSimple8bRle;
+
+impl_null_buffer!(
+    i64 => DeltaZigzagSimple8bRle,
+    delta_zigzag_simple8b_rle::Encoding,
+);
+
+impl_null_buffer!(
+    u64 => DeltaZigzagSimple8bRle,
+    delta_zigzag_simple8b_rle::Encoding,
+);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uncompressed_buffer() {
+        let mut buffer =
+            <Uncompressed<f32> as RingBuffer<f32>>::with_capacity(Capacity::from_min_samples(2));
+        buffer.push(22f32);
+        let mut data = vec![];
+        let result = RingBuffer::<f32>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn simple8b_rle_buffer() {
+        let mut buffer =
+            <Simple8bRle as RingBuffer<u64>>::with_capacity(Capacity::from_min_samples(2));
+        buffer.push(22u64);
+        let mut data = vec![];
+        let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn zigzag_simple8b_rle_buffer() {
+        let mut buffer =
+            <ZigzagSimple8bRle as RingBuffer<i64>>::with_capacity(Capacity::from_min_samples(2));
+        buffer.push(22i64);
+        let mut data = vec![];
+        let result = RingBuffer::<i64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+}

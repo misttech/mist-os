@@ -3,10 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::bail;
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::{LittleEndian, WriteBytesExt as _};
 use std::io;
 
-use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
+use crate::experimental::series::buffer::encoding;
+use crate::experimental::series::buffer::simple8b_rle::Simple8bRleRingBuffer;
+
+#[derive(Debug)]
+pub enum Encoding {}
+
+impl<A> encoding::Encoding<A> for Encoding {
+    type Compression = encoding::compression::DeltaSimple8bRle;
+
+    const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Unsigned;
+}
 
 pub struct DeltaSimple8bRleRingBuffer {
     base: Option<u64>,

@@ -6,11 +6,20 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::VecDeque;
 use std::{io, iter};
 
-use crate::experimental::ring_buffer::zigzag_simple8b_rle::zigzag_decode;
+use crate::experimental::series::buffer::{encoding, zigzag_simple8b_rle};
 
 const SELECTORS_PER_BYTE: usize = 2;
 const BITS_PER_BYTE: usize = 8;
 const BITS_PER_SELECTOR: usize = BITS_PER_BYTE / SELECTORS_PER_BYTE;
+
+#[derive(Debug)]
+pub enum Encoding {}
+
+impl<A> encoding::Encoding<A> for Encoding {
+    type Compression = encoding::compression::Simple8bRle;
+
+    const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Unsigned;
+}
 
 /// This is a VecDeque that packs 4-bit values into a u8's; primarily intended
 /// to hold a sequence of selectors.
@@ -143,12 +152,12 @@ impl Simple8bRleBlock {
     /// If the sum would overflow, return `i64::MIN` if negative or `i64::MAX` if positive.
     pub fn saturating_sum_with_zigzag_decode(&self) -> i64 {
         if self.selector == RLE_SELECTOR {
-            let value = zigzag_decode(self.data & RLE_DATA_BITMASK);
+            let value = zigzag_simple8b_rle::zigzag_decode(self.data & RLE_DATA_BITMASK);
             value.saturating_mul(self.num_values() as i64)
         } else {
             let mut sum = 0i64;
             for item in Simple8bIter::new(*self, self.num_values()) {
-                sum += zigzag_decode(item);
+                sum += zigzag_simple8b_rle::zigzag_decode(item);
             }
             sum
         }

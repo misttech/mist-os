@@ -12,6 +12,7 @@ use std::num::NonZeroUsize;
 use std::{cmp, iter};
 
 use crate::experimental::clock::{Duration, DurationExt as _, Quanta, QuantaExt as _, Tick};
+use crate::experimental::series::buffer::Capacity;
 use crate::experimental::series::interpolation::InterpolationState;
 use crate::experimental::series::statistic::{Statistic, StatisticExt as _};
 use crate::experimental::series::Fill;
@@ -180,30 +181,22 @@ impl<T> IntervalExpiration<PhantomData<T>> {
 /// aggregations that represent a 100s period.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SamplingInterval {
-    capacity: u32,
+    capacity: Capacity,
     sampling_period_count: u32,
     max_sampling_period: Quanta,
 }
 
 impl SamplingInterval {
     pub(crate) fn new(
-        capacity: u32,
+        capacity: Capacity,
         sampling_period_count: u32,
         max_sampling_period: impl Into<Duration>,
     ) -> Self {
         SamplingInterval {
-            capacity: cmp::max(1, capacity),
+            capacity,
             sampling_period_count: cmp::max(1, sampling_period_count),
             max_sampling_period: cmp::max(1, max_sampling_period.into().into_quanta().abs()),
         }
-    }
-
-    /// Gets the durability of the interval.
-    ///
-    /// Durability is the maximum period of time represented by the aggregations of a sampling
-    /// interval. This is the time period for which it represents historical data.
-    pub fn durability(&self) -> Duration {
-        self.max_sampling_period() * (self.sampling_period_count * self.capacity)
     }
 
     /// Gets the duration of the interval (also known as the aggregation period).
@@ -216,7 +209,7 @@ impl SamplingInterval {
         Duration::from_quanta(self.max_sampling_period)
     }
 
-    pub(crate) fn capacity(&self) -> u32 {
+    pub(crate) fn capacity(&self) -> Capacity {
         self.capacity
     }
 
@@ -343,9 +336,9 @@ impl SamplingProfile {
     pub fn highly_granular() -> Self {
         SamplingProfile::from_sampling_intervals([
             // 720x1x10s
-            SamplingInterval::new(720, 1, Duration::from_seconds(10)),
+            SamplingInterval::new(Capacity::from_min_samples(720), 1, Duration::from_seconds(10)),
             // 3600x1x1m
-            SamplingInterval::new(3600, 1, Duration::from_minutes(1)),
+            SamplingInterval::new(Capacity::from_min_samples(3600), 1, Duration::from_minutes(1)),
         ])
     }
 
@@ -353,11 +346,11 @@ impl SamplingProfile {
     pub fn granular() -> Self {
         SamplingProfile::from_sampling_intervals([
             // 720x1x10s
-            SamplingInterval::new(720, 1, Duration::from_seconds(10)),
+            SamplingInterval::new(Capacity::from_min_samples(720), 1, Duration::from_seconds(10)),
             // 600x1x1m
-            SamplingInterval::new(600, 1, Duration::from_minutes(1)),
+            SamplingInterval::new(Capacity::from_min_samples(600), 1, Duration::from_minutes(1)),
             // 360x1x5m
-            SamplingInterval::new(720, 1, Duration::from_minutes(5)),
+            SamplingInterval::new(Capacity::from_min_samples(720), 1, Duration::from_minutes(5)),
         ])
     }
 
@@ -366,13 +359,13 @@ impl SamplingProfile {
     pub fn balanced() -> Self {
         SamplingProfile::from_sampling_intervals([
             // 120x1x10s
-            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
+            SamplingInterval::new(Capacity::from_min_samples(120), 1, Duration::from_seconds(10)),
             // 120x1x1m
-            SamplingInterval::new(120, 1, Duration::from_minutes(1)),
+            SamplingInterval::new(Capacity::from_min_samples(120), 1, Duration::from_minutes(1)),
             // 120x1x5m
-            SamplingInterval::new(120, 1, Duration::from_minutes(5)),
+            SamplingInterval::new(Capacity::from_min_samples(120), 1, Duration::from_minutes(5)),
             // 120x1x30m
-            SamplingInterval::new(120, 1, Duration::from_minutes(30)),
+            SamplingInterval::new(Capacity::from_min_samples(120), 1, Duration::from_minutes(30)),
         ])
     }
 
@@ -381,9 +374,9 @@ impl SamplingProfile {
         self.0.iter().map(SamplingInterval::max_sampling_period).min().unwrap()
     }
 
-    /// Gets the maximum durability of the profile.
-    pub fn durability(&self) -> Duration {
-        self.0.iter().map(SamplingInterval::durability).max().unwrap()
+    /// Gets the maximum duration of the profile.
+    pub fn duration(&self) -> Duration {
+        self.0.iter().map(SamplingInterval::duration).max().unwrap()
     }
 
     pub(crate) fn into_sampling_intervals(self) -> Vec1<SamplingInterval> {
@@ -406,7 +399,7 @@ impl Display for SamplingProfile {
             formatter,
             "{}..{}: ",
             self.granularity().into_quanta().into_nearest_unit_display(),
-            self.durability().into_quanta().into_nearest_unit_display(),
+            self.duration().into_quanta().into_nearest_unit_display(),
         )?;
         for interval in self.0.iter().with_position() {
             match interval {
@@ -447,13 +440,15 @@ mod tests {
     use std::sync::mpsc::{self, Receiver, Sender};
 
     use crate::experimental::clock::{ObservationTime, Timestamp};
+    use crate::experimental::series::buffer::Capacity;
     use crate::experimental::series::{Counter, Fill, Sampler};
 
     const SAMPLE: u64 = 1337u64;
 
     #[test]
     fn sampling_interval_fold_and_get_expirations() {
-        let sampling_interval = SamplingInterval::new(120, 6, Duration::from_seconds(10));
+        let sampling_interval =
+            SamplingInterval::new(Capacity::from_min_samples(120), 6, Duration::from_seconds(10));
         let mut last = ObservationTime {
             last_update_timestamp: Timestamp::from_nanos(71_000_000_000),
             last_sample_timestamp: None,
@@ -548,7 +543,8 @@ mod tests {
 
     #[test]
     fn sampling_interval_fold_and_get_expirations_at_time_boundary() {
-        let sampling_interval = SamplingInterval::new(120, 1, Duration::from_seconds(10));
+        let sampling_interval =
+            SamplingInterval::new(Capacity::from_min_samples(120), 1, Duration::from_seconds(10));
         let mut last = ObservationTime {
             last_update_timestamp: Timestamp::from_nanos(0),
             last_sample_timestamp: None,
