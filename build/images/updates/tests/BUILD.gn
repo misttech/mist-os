@@ -55,6 +55,7 @@ if (is_fuchsia) {
 
   assembled_system("fx_publish_test.gn_assembly") {
     testonly = true
+    include_legacy_bundle = true
     product_assembly_config_label = ":product_assembly_config"
 
     board_config_label = ":board_config"
@@ -62,7 +63,6 @@ if (is_fuchsia) {
     base_packages = []
     cache_packages = [ "//examples/hello_world/cpp:hello-world-cpp" ]
 
-    bootfs_labels = []
     generate_fvm = true
   }
 

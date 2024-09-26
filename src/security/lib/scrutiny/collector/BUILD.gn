@@ -148,6 +148,7 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
+    include_legacy_bundle = true
     bootfs_labels = [ ":bootfs" ]
     base_packages = []
     cmdline = [

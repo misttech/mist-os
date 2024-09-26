@@ -159,6 +159,7 @@ if (labels.images == "//build/images/bringup") {
   assembled_system("guest") {
     testonly = true
 
+    include_legacy_bundle = true
     generate_fvm = true
 
     namespace = "guest"
