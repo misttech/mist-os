@@ -3,12 +3,12 @@
 This page provides a list of common coding patterns and best practices specific
 to Starnix development.
 
-Starnix, which is essentially a kernel running in userspace, runs Linux programs
-on Fuchsia. This creates specific considerations for developers who need to
-ensure that their code produces the results expected by Linux programs. This
-page aims to clarify some of these patterns and provide best practices, covering
-topics like testing, managing userspace addresses, handling error messages, and
-more.
+[Starnix][starnix-concepts], which is essentially a kernel running in userspace,
+runs Linux programs on Fuchsia. This creates specific considerations for
+developers who need to ensure that their code produces the results expected by
+Linux programs. This page aims to clarify some of these patterns and provide
+best practices, covering topics like testing, managing userspace addresses,
+handling error messages, and more.
 
 The topics are:
 
@@ -271,4 +271,6 @@ from overflowing arithmetic in the kernel.
 
 <!-- Reference links -->
 
-[restricted-mode]: //docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md#running-a-linux-program-in-restricted-mode
+[starnix-concepts]: /docs/concepts/starnix/README.md
+[restricted-mode]: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md#running-a-linux-program-in-restricted-mode
+
