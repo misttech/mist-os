@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_timer_stream() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         let fut = async {
             let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
