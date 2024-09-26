@@ -3,7 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mistos/starnix/kernel/vfs/fd_numbers.h"
+#include "lib/mistos/starnix/kernel/vfs/fd_number.h"
 
 #include <linux/fcntl.h>
 
