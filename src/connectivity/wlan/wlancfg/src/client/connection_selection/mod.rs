@@ -63,7 +63,7 @@ impl ConnectionSelectionRequester {
                 reason,
                 responder: sender,
             })
-            .map_err(|e| format_err!("Failed to queue connection selection: {}", e))?;
+            .map_err(|e| format_err!("Failed to send connection selection request: {}", e))?;
         receiver.await.map_err(|e| format_err!("Error during connection selection: {:?}", e))
     }
     pub async fn do_roam_selection(
@@ -125,15 +125,15 @@ pub async fn serve_connection_selection_request_loop(
                 match request {
                     ConnectionSelectionRequest::NewConnectionSelection { network_id, reason, responder} => {
                         let selected = connection_selector.find_and_select_connection_candidate(network_id, reason).await;
-                        if responder.send(selected).is_err() {
-                            error!("Unexpected error returning selected connection candidate.");
-                        }
+                        // It's acceptable for the receiver to close the channel, preventing this
+                        // sender from responding.
+                        let _ = responder.send(selected);
                     }
                     ConnectionSelectionRequest::RoamSelection { network_id, credential, responder } => {
                         let selected = connection_selector.find_and_select_roam_candidate(network_id, &credential).await;
-                        if responder.send(selected).is_err() {
-                            error!("Unexpected error returning selected roam candidate.");
-                        }
+                        // It's acceptable for the receiver to close the channel, preventing this
+                        // sender from responding.
+                        let _ = responder.send(selected);
                     }
                 }
             }

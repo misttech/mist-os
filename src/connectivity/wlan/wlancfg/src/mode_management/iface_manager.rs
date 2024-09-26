@@ -973,7 +973,6 @@ async fn initiate_connection_selection_for_connect_request(
 
     // Cancel any ongoing attempt to auto connect the previously idle iface.
     iface_manager.connection_selection_futures.clear();
-
     iface_manager.connection_selection_futures.push(fut.boxed());
     Ok(())
 }
@@ -1417,8 +1416,8 @@ async fn serve_iface_functionality(
                         iface_manager,
                     ).await;
                 }
-                Err(..) => {
-                    error!("Connection selector unexpectedly dropped response sender.")
+                Err(e) => {
+                    error!("Error received from connection selector: {:?}", e);
                 }
             }
         },
