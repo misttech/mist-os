@@ -289,6 +289,14 @@ group("flate2") {
   public_deps = [ ":flate2-v1_0_14" ]
 }
 
+group("foreign-types") {
+  public_deps = [ ":foreign-types-v0_3_2" ]
+}
+
+group("foreign-types-shared") {
+  public_deps = [ ":foreign-types-shared-v0_1_1" ]
+}
+
 group("fragile") {
   public_deps = [ ":fragile-v1_0_0" ]
 }
@@ -5421,6 +5429,68 @@ rust_library("fnv-v1_0_7") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":fnv-v1_0_7.license" ]
+}
+
+license("foreign-types-v0_3_2.license") {
+  public_package_name = "foreign_types"
+  license_files = [
+    "//third_party/rust_crates/vendor/foreign-types-0.3.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/foreign-types-0.3.2/LICENSE-MIT",
+  ]
+}
+
+rust_library("foreign-types-v0_3_2") {
+  crate_name = "foreign_types"
+  crate_root = "//third_party/rust_crates/vendor/foreign-types-0.3.2/src/lib.rs"
+  output_name = "foreign_types-ccfef849d42313b6"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":foreign-types-shared-v0_1_1" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=ccfef849d42313b6",
+    "-Cextra-filename=-ccfef849d42313b6",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":foreign-types-v0_3_2.license" ]
+}
+
+license("foreign-types-shared-v0_1_1.license") {
+  public_package_name = "foreign_types_shared"
+  license_files = [
+    "//third_party/rust_crates/vendor/foreign-types-shared-0.1.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/foreign-types-shared-0.1.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("foreign-types-shared-v0_1_1") {
+  crate_name = "foreign_types_shared"
+  crate_root =
+      "//third_party/rust_crates/vendor/foreign-types-shared-0.1.1/src/lib.rs"
+  output_name = "foreign_types_shared-98f3a3ba065f07b2"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=98f3a3ba065f07b2",
+    "-Cextra-filename=-98f3a3ba065f07b2",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":foreign-types-shared-v0_1_1.license" ]
 }
 
 license("form_urlencoded-v1_1_0.license") {
