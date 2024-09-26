@@ -313,6 +313,11 @@ class CurrentTask : public MemoryAccessorExt {
   fit::result<Errno, size_t> write_memory(UserAddress addr,
                                           const ktl::span<const uint8_t>& bytes) const final;
 
+  fit::result<Errno, size_t> write_memory_partial(
+      UserAddress addr, const ktl::span<const uint8_t>& bytes) const final;
+
+  fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final;
+
  public:
   // C++
   ~CurrentTask();

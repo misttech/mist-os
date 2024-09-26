@@ -954,4 +954,13 @@ fit::result<Errno, size_t> CurrentTask::write_memory(UserAddress addr,
   return task->mm()->unified_write_memory(*this, addr, bytes);
 }
 
+fit::result<Errno, size_t> CurrentTask::write_memory_partial(
+    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
+  return task->mm()->unified_write_memory_partial(*this, addr, bytes);
+}
+
+fit::result<Errno, size_t> CurrentTask::zero(UserAddress addr, size_t length) const {
+  return task->mm()->unified_zero(*this, addr, length);
+}
+
 }  // namespace starnix
