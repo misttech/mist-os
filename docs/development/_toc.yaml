@@ -118,6 +118,9 @@ toc:
 - title: "Contribute source code"
   section:
   - include: /docs/development/source_code/_toc.yaml
+- title: "Starnix"
+  section:
+  - include: /docs/development/starnix/_toc.yaml
 - title: "Verifying system properties"
   section:
   - include: /docs/development/verification/_toc.yaml

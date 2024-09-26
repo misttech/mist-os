@@ -1,0 +1,4 @@
+toc:
+- title: "Best practices"
+  section:
+  - include: /docs/development/starnix/best_practices/_toc.yaml
