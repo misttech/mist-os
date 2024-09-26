@@ -1132,6 +1132,7 @@ mod tests {
                 )
                 .expect("Task")
                 .into();
+                task.mm().initialize_mmap_layout_for_test();
 
                 let remote_binder_handle =
                     RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);

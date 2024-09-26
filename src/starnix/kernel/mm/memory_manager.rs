@@ -72,6 +72,19 @@ pub fn init_usercopy() {
     let _ = usercopy();
 }
 
+#[cfg(target_arch = "x86_64")]
+const ASLR_RANDOM_BITS: usize = 27;
+
+#[cfg(target_arch = "aarch64")]
+const ASLR_RANDOM_BITS: usize = 28;
+
+#[cfg(target_arch = "riscv64")]
+const ASLR_RANDOM_BITS: usize = 18;
+
+// The biggest we expect stack to be; increase as needed
+// TODO(https://fxbug.dev/322874791): Once setting RLIMIT_STACK is implemented, we should use it.
+const MAX_STACK_SIZE: usize = 512 * 1024 * 1024;
+
 fn usercopy() -> Option<&'static usercopy::Usercopy> {
     static USERCOPY: Lazy<Option<usercopy::Usercopy>> = Lazy::new(|| {
         // We do not create shared processes in unit tests.
@@ -574,8 +587,6 @@ pub struct MemoryManagerForkableState {
     /// The namespace node that represents the executable associated with this task.
     executable_node: Option<NamespaceNode>,
 
-    /// Stack location and size
-    pub stack_base: UserAddress,
     pub stack_size: usize,
     pub stack_start: UserAddress,
     pub auxv_start: UserAddress,
@@ -587,6 +598,11 @@ pub struct MemoryManagerForkableState {
 
     /// vDSO location
     pub vdso_base: UserAddress,
+
+    /// Randomized regions:
+    pub mmap_top: UserAddress,
+    pub stack_origin: UserAddress,
+    pub brk_origin: UserAddress,
 }
 
 impl Deref for MemoryManagerState {
@@ -674,13 +690,11 @@ fn map_in_vmar(
 impl MemoryManagerState {
     // Find the first unused range of addresses that fits a mapping of `length` bytes, searching
     // from `RESTRICTED_ASPACE_HIGHEST_ADDRESS` downwards.
-    fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
-        let gap = 2 << 16; // TODO(https://fxbug.dev/309452853): add a random offset instead.
-        let top = UserAddress::from_ptr(RESTRICTED_ASPACE_HIGHEST_ADDRESS - gap);
+    pub fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
         // Iterate over existing mappings within range, in descending order
-        let mut map_iter = self.mappings.iter_ending_at(&top);
+        let mut map_iter = self.mappings.iter_ending_at(&self.mmap_top);
         // Currently considered range. Will be moved downwards if it intersects the current mapping.
-        let mut candidate = Range { start: top.checked_sub(length)?, end: top };
+        let mut candidate = Range { start: self.mmap_top.checked_sub(length)?, end: self.mmap_top };
 
         loop {
             // Is there a next mapping? If not, the candidate is already good.
@@ -2797,9 +2811,10 @@ impl MemoryManager {
                 // Map the whole program-break memory object to prevent other mappings using the
                 // range, unless they do so deliberately. Pages in this range are made writable as
                 // the caller grows the program break.
+                let origin = state.brk_origin;
                 let base = state.map_memory(
                     self,
-                    DesiredAddress::Any,
+                    DesiredAddress::Fixed(origin),
                     memory.clone(),
                     0u64,
                     PROGRAM_BREAK_LIMIT as usize,
@@ -3176,7 +3191,57 @@ impl MemoryManager {
 
             std::mem::replace(&mut state.mappings, RangeMap::new())
         };
+        self.initialize_mmap_layout()?;
         Ok(())
+    }
+
+    pub fn initialize_mmap_layout(&self) -> Result<(), Errno> {
+        let mut state = self.state.write();
+
+        // Place the stack at the end of the address space, subject to ASLR adjustment.
+        state.stack_origin = UserAddress::from_ptr(
+            RESTRICTED_ASPACE_HIGHEST_ADDRESS - MAX_STACK_SIZE - generate_random_offset_for_aslr(),
+        )
+        .round_up(*PAGE_SIZE)?;
+
+        // Set the highest address that `mmap` will assign to the allocations that don't ask for a
+        // specific address, subject to ASLR adjustment.
+        state.mmap_top = state
+            .stack_origin
+            .checked_sub(generate_random_offset_for_aslr())
+            .ok_or(errno!(EINVAL))?;
+        Ok(())
+    }
+
+    // Test tasks are not initialized by exec; simulate its behavior by initializing memory layout
+    // as if a zero-size executable was loaded.
+    pub fn initialize_mmap_layout_for_test(self: &Arc<Self>) {
+        self.initialize_mmap_layout().unwrap();
+        let fake_executable_addr = self.get_random_base_for_executable(0).unwrap();
+        self.initialize_brk_origin(fake_executable_addr).unwrap();
+    }
+
+    pub fn initialize_brk_origin(
+        self: &Arc<Self>,
+        executable_end: UserAddress,
+    ) -> Result<(), Errno> {
+        self.state.write().brk_origin =
+            executable_end.checked_add(generate_random_offset_for_aslr()).ok_or(errno!(EINVAL))?;
+        Ok(())
+    }
+
+    // Get a randomised address for loading a position-independent executable.
+    pub fn get_random_base_for_executable(&self, length: usize) -> Result<UserAddress, Errno> {
+        let state = self.state.read();
+
+        // Place it at approx. 2/3 of the available mmap space, subject to ASLR adjustment.
+        let base = round_up_to_system_page_size(2 * state.mmap_top.ptr() / 3).unwrap()
+            + generate_random_offset_for_aslr();
+        if base.checked_add(length).ok_or(errno!(EINVAL))? <= state.mmap_top.ptr() {
+            Ok(UserAddress::from_ptr(base))
+        } else {
+            Err(errno!(EINVAL))
+        }
     }
 
     pub fn executable_node(&self) -> Option<NamespaceNode> {
@@ -3265,6 +3330,22 @@ impl MemoryManager {
         std::mem::drop(released_mappings);
 
         result
+    }
+
+    pub fn map_stack(
+        self: &Arc<Self>,
+        length: usize,
+        prot_flags: ProtectionFlags,
+    ) -> Result<UserAddress, Errno> {
+        assert!(length <= MAX_STACK_SIZE);
+        let addr = self.state.read().stack_origin;
+        self.map_anonymous(
+            DesiredAddress::Fixed(addr),
+            length,
+            prot_flags,
+            MappingOptions::ANONYMOUS,
+            MappingName::Stack,
+        )
     }
 
     pub fn remap(
@@ -3601,19 +3682,6 @@ impl MemoryManager {
     pub fn get_mapping_count(&self) -> usize {
         let state = self.state.read();
         state.mappings.iter().count()
-    }
-
-    pub fn get_random_base(&self, length: usize) -> UserAddress {
-        let state = self.state.read();
-        // Allocate a vmar of the correct size, get the random location, then immediately destroy it.
-        // This randomizes the load address without loading into a sub-vmar and breaking mprotect.
-        // This is different from how Linux actually lays out the address space. We might need to
-        // rewrite it eventually.
-        let (temp_vmar, base) =
-            state.user_vmar.allocate(0, length, zx::VmarFlags::empty()).unwrap();
-        // SAFETY: This is safe because the vmar is not in the current process.
-        unsafe { temp_vmar.destroy().unwrap() };
-        UserAddress::from_ptr(base)
     }
 
     pub fn extend_growsdown_mapping_to_address(
@@ -3969,6 +4037,19 @@ pub fn create_anonymous_mapping_memory(size: u64) -> Result<Arc<MemoryObject>, E
     // TODO(https://fxbug.dev/42056890): Audit replace_as_executable usage
     memory = memory.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
     Ok(Arc::new(memory))
+}
+
+fn generate_random_offset_for_aslr() -> usize {
+    // Generate a number with ASLR_RANDOM_BITS.
+    let randomness = {
+        const MASK: usize = (1 << ASLR_RANDOM_BITS) - 1;
+        let mut bytes = [0; std::mem::size_of::<usize>()];
+        zx::cprng_draw(&mut bytes);
+        usize::from_le_bytes(bytes) & MASK
+    };
+
+    // Transform it into a page-aligned offset.
+    randomness * (*PAGE_SIZE as usize)
 }
 
 #[cfg(test)]

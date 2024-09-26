@@ -308,6 +308,22 @@ TEST_F(MMapProcTest, AdjacentFileMappings) {
   unlink(path.c_str());
 }
 
+TEST_F(MMapProcTest, OrderOfLayout) {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  static int anchor;
+  uintptr_t executable_addr = reinterpret_cast<uintptr_t>(&anchor);
+  uintptr_t program_break = reinterpret_cast<uintptr_t>(sbrk(0));
+  uintptr_t mmap_general_addr = reinterpret_cast<uintptr_t>(
+      mmap(nullptr, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  ASSERT_NE((void*)mmap_general_addr, MAP_FAILED);
+  uintptr_t stack_addr = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+
+  EXPECT_LT(executable_addr, program_break);
+  EXPECT_LT(program_break, mmap_general_addr);
+  EXPECT_LT(mmap_general_addr, stack_addr);
+  SAFE_SYSCALL(munmap((void*)mmap_general_addr, page_size));
+}
+
 class MMapProcStatmTest : public ProcTestBase, public testing::WithParamInterface<int> {
  protected:
   void ReadStatm(size_t* vm_size_out, size_t* rss_size_out) {

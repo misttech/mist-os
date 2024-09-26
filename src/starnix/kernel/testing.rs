@@ -192,6 +192,8 @@ fn create_test_init_task(
         &[],
     )
     .expect("failed to create first task");
+    init_task.mm().initialize_mmap_layout_for_test();
+
     let system_task =
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
@@ -243,6 +245,7 @@ pub fn create_task(
         None,
     )
     .expect("failed to create second task");
+    task.mm().initialize_mmap_layout_for_test();
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
