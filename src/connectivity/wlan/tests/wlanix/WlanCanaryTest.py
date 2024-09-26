@@ -3,34 +3,49 @@
 # found in the LICENSE file.
 """
 Test to get the list of WLAN PHY devices. This test will only fail if
-SL4F or wlandevicemonitor are not running.
+wlandevicemonitor is not running.
 """
 
 import logging
 
 logger = logging.getLogger(__name__)
 
+import fidl.fuchsia_wlan_device_service as fidl_wlan_device_service
 from antlion import base_test
 from antlion.controllers import fuchsia_device
-from antlion.controllers.fuchsia_device import FuchsiaDevice
-from mobly import asserts, test_runner
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
+from honeydew.typing.custom_types import FidlEndpoint
+from mobly import test_runner
+from mobly.asserts import abort_class_if
 
 
-class WlanCanaryTest(base_test.AntlionBaseTest):
+class WlanCanaryTest(AsyncAdapter, base_test.AntlionBaseTest):
     def setup_class(self) -> None:
-        self.fuchsia_devices: list[FuchsiaDevice] = self.register_controller(
-            fuchsia_device
+        fuchsia_devices = self.register_controller(fuchsia_device)
+
+        abort_class_if(
+            len(fuchsia_devices) != 1, "Requires exactly one Fuchsia device"
+        )
+        self.fuchsia_device = fuchsia_devices[0]
+        abort_class_if(
+            not hasattr(self.fuchsia_device, "honeydew_fd")
+            or self.fuchsia_device.honeydew_fd is None,
+            "Requires a Honeydew-enabled FuchsiaDevice",
         )
 
-        asserts.abort_class_if(
-            len(self.fuchsia_devices) == 0,
-            "Requires at least one Fuchsia device",
+        self.wlan_device_monitor_proxy = fidl_wlan_device_service.DeviceMonitor.Client(
+            self.fuchsia_device.honeydew_fd.fuchsia_controller.connect_device_proxy(
+                FidlEndpoint(
+                    "core/wlandevicemonitor",
+                    "fuchsia.wlan.device.service.DeviceMonitor",
+                )
+            )
         )
 
-    def test_example(self) -> None:
-        for device in self.fuchsia_devices:
-            res = device.sl4f.wlan_lib.get_phy_id_list()
-            logger.info(f"List of PHY IDs: {res}")
+    @asyncmethod
+    async def test_wlandevicemonitor_is_responsive(self) -> None:
+        phy_list = (await self.wlan_device_monitor_proxy.list_phys()).phy_list
+        logger.info(f"List of PHY IDs: {phy_list}")
 
 
 if __name__ == "__main__":
