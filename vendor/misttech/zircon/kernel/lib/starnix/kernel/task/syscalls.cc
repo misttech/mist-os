@@ -64,8 +64,8 @@ fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone
   ///
 
   auto new_task_or_error = current_task.clone_task(
-      args.flags, child_exit_signal, UserRef<pid_t>(UserAddress::from((args.parent_tid))),
-      UserRef<pid_t>(UserAddress::from((args.child_tid))));
+      args.flags, child_exit_signal, UserRef<pid_t>::New(UserAddress::from((args.parent_tid))),
+      UserRef<pid_t>::New(UserAddress::from((args.child_tid))));
   if (new_task_or_error.is_error()) {
     return new_task_or_error.take_error();
   }

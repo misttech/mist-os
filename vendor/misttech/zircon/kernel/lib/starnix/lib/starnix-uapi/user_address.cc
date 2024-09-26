@@ -7,6 +7,6 @@
 
 namespace starnix_uapi {
 
-const UserAddress UserAddress::NULL_ = UserAddress(kNullPtr);
+const UserAddress UserAddress::NULL_ = UserAddress(UserAddress::NULL_PTR);
 
 }  // namespace starnix_uapi

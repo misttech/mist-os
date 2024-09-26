@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/math.h>
+#include <lib/mistos/util/default_construct.h>
 #include <zircon/types.h>
 
 #include <optional>
@@ -19,13 +20,11 @@ namespace starnix_uapi {
 
 class UserAddress {
  private:
-  static constexpr uint64_t kNullPtr = 0;
+  // impl UserAddress
+  static constexpr uint64_t NULL_PTR = 0;
 
  public:
   static const UserAddress NULL_;
-
-  UserAddress() = default;
-  UserAddress(uint64_t address) : address_(address) {}
 
   // TODO(lindkvist): Remove this in favor of marking the From<u64> trait const once feature is
   // stabilized.
@@ -46,7 +45,7 @@ class UserAddress {
 
   bool is_aligned(uint64_t alignment) const { return address_ % alignment == 0; }
 
-  bool is_null() const { return address_ == kNullPtr; }
+  bool is_null() const { return address_ == UserAddress::NULL_PTR; }
 
   ktl::optional<UserAddress> checked_add(size_t rhs) {
     uint64_t result;
@@ -91,8 +90,13 @@ class UserAddress {
 
   static UserAddress from(uint64_t value) { return UserAddress(value); }
 
+ public:
+  // TODO (Herrera) make it private
+  UserAddress() = default;
+  UserAddress(uint64_t address) : address_(address) {}
+
  private:
-  uint64_t address_ = kNullPtr;
+  uint64_t address_ = NULL_PTR;
 };
 
 using UserCString = UserAddress;
@@ -100,20 +104,30 @@ using UserCString = UserAddress;
 template <typename T>
 class UserRef {
  public:
-  UserRef(UserAddress addr) : addr_(addr) {}
+  // impl<T> UserRef<T>
+  static UserRef<T> New(UserAddress addr) { return UserRef<T>(addr); }
 
-  UserAddress addr() { return addr_; }
+  inline UserAddress addr() { return addr_; }
 
-  UserRef<T> next() { return UserRef(addr() + sizeof(T)); }
+  inline UserRef<T> next() { return UserRef::New(addr() + sizeof(T)); }
 
-  UserRef at(size_t index) { UserRef(addr() + index * sizeof(T)); }
+  inline UserRef at(size_t index) { UserRef<T>::New(addr() + index * sizeof(T)); }
 
   template <typename S>
-  UserRef<S> cast() {
-    return UserRef<S>(addr_);
+  inline UserRef<S> cast() {
+    return UserRef<S>::New(addr_);
   }
 
+  // impl<T> From<UserAddress> for UserRef<T>
+  static UserRef<T> From(UserAddress addr) { return UserRef::New(addr); }
+
  private:
+  template <typename U>
+  friend U mtl::DefaultConstruct();
+
+  UserRef() : addr_(UserAddress::NULL_) {}
+  UserRef(UserAddress addr) : addr_(addr) {}
+
   UserAddress addr_;
 };
 

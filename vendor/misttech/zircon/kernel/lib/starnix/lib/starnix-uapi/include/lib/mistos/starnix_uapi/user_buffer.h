@@ -10,9 +10,11 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <zircon/types.h>
 
+#include <arch/defines.h>
+
 namespace starnix_uapi {
 
-// pub static MAX_RW_COUNT: Lazy<usize> = Lazy::new(|| ((1 << 31) - *PAGE_SIZE) as usize);
+static size_t MAX_RW_COUNT = static_cast<size_t>(1 << 31) - PAGE_SIZE;
 
 // Matches iovec_t.
 struct UserBuffer {
