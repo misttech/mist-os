@@ -105,4 +105,13 @@ fit::result<Errno, size_t> Task::write_memory(UserAddress addr,
   return (*mm_)->syscall_write_memory(addr, bytes);
 }
 
+fit::result<Errno, size_t> Task::write_memory_partial(UserAddress addr,
+                                                      const ktl::span<const uint8_t>& bytes) const {
+  return (*mm_)->syscall_write_memory_partial(addr, bytes);
+}
+
+fit::result<Errno, size_t> Task::zero(UserAddress addr, size_t length) const {
+  return (*mm_)->syscall_zero(addr, length);
+}
+
 }  // namespace starnix

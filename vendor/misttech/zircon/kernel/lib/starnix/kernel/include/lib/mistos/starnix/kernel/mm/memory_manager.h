@@ -495,6 +495,20 @@ struct MemoryManagerState {
   /// - `bytes`: The bytes to write to the VMO.
   fit::result<Errno> write_mapping_memory(UserAddress addr, const Mapping& mapping,
                                           const ktl::span<const uint8_t>& bytes) const;
+
+  /// Writes bytes starting at `addr`, continuing until either `bytes.len()` bytes have been
+  /// written or no more bytes can be written.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to read data from.
+  /// - `bytes`: The byte array to write from.
+  fit::result<Errno, size_t> write_memory_partial(UserAddress addr,
+                                                  const ktl::span<const uint8_t>& bytes) const;
+
+  fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const;
+
+  fit::result<Errno, size_t> zero_mapping(UserAddress addr, const Mapping& mapping,
+                                          size_t length) const;
 };
 
 class CurrentTask;
@@ -607,14 +621,12 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
       const ktl::span<const uint8_t>& bytes) const;
 
   fit::result<Errno, size_t> syscall_write_memory_partial(
-      const CurrentTask& current_task, UserAddress addr,
-      const ktl::span<const uint8_t>& bytes) const;
+      UserAddress addr, const ktl::span<const uint8_t>& bytes) const;
 
   fit::result<Errno, size_t> unified_zero(const CurrentTask& current_task, UserAddress addr,
                                           size_t length) const;
 
-  fit::result<Errno, size_t> syscall_zero(const CurrentTask& current_task, UserAddress addr,
-                                          size_t length) const;
+  fit::result<Errno, size_t> syscall_zero(UserAddress addr, size_t length) const;
 
  private:
   friend bool unit_testing::test_get_contiguous_mappings_at();
