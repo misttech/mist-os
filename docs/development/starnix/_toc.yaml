@@ -1,4 +1,3 @@
 toc:
-- title: "Best practices"
-  section:
-  - include: /docs/development/starnix/best_practices/_toc.yaml
+- title: "Common coding patterns in Starnix"
+  path: /docs/development/starnix/common-coding-patterns-in-starnix.md
