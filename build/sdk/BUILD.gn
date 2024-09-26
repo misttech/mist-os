@@ -1,6 +1,7 @@
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 
@@ -115,10 +116,16 @@ _sdk_unstable_source_sets_list = [
 # are built at all supported API levels. See https://fxbug.dev/42083950.
 group("deprecated_sdk_source_sets_to_build_at_all_supported_api_levels") {
   visibility = [ ":*" ]
-  deps = _sdk_source_sets_list + _sdk_unstable_source_sets_list
+  deps = _sdk_source_sets_list
 
-  # Some of the allowed libraries are marked testonly.
-  testonly = true
+  # Unstable atoms may only be used at "HEAD".
+  if (current_build_target_api_level == "HEAD" ||
+      current_build_target_api_level == "PLATFORM") {
+    deps += _sdk_unstable_source_sets_list
+
+    # Some of the allowed libraries are marked testonly.
+    testonly = true
+  }
 }
 
 # All `sdk_source_set()` targets depend on one of these targets to ensure that
