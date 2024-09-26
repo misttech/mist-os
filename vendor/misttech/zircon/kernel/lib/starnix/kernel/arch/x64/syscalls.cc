@@ -10,7 +10,7 @@
 #include <lib/mistos/starnix/kernel/task/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix/kernel/vfs/syscalls.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/signals.h>

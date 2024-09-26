@@ -16,12 +16,14 @@ namespace starnix {
 
 class FdNumber {
  public:
+  // impl FdNumber
   static const FdNumber _AT_FDCWD;
 
   static FdNumber from_raw(int32_t n) { return FdNumber(n); }
 
   int32_t raw() const { return number_; }
 
+  /// Parses a file descriptor number from a byte string.
   static fit::result<Errno, FdNumber> from_fs_str(const FsStr& s) {
     if (!util::IsStringUTF8(s)) {
       return fit::error(errno(EINVAL));
