@@ -56,7 +56,19 @@ impl Registry {
     }
 
     /// Returns a [RegistryDevice] that observes the device with the given `token_id`.
+    ///
+    /// Returns an error if there is no device with the given token ID.
     pub async fn observe(&self, token_id: fadevice::TokenId) -> Result<RegistryDevice, Error> {
+        self.devices_initialized.wait().await;
+
+        let info = self
+            .devices
+            .lock()
+            .await
+            .get(&token_id)
+            .cloned()
+            .ok_or_else(|| anyhow!("Device with ID {} does not exist", token_id))?;
+
         let (observer_proxy, observer_server) = create_proxy::<fadevice::ObserverMarker>().unwrap();
 
         let _ = self
@@ -70,7 +82,7 @@ impl Registry {
             .context("Failed to call CreateObserver")?
             .map_err(|err| anyhow!("failed to create device observer: {:?}", err))?;
 
-        Ok(RegistryDevice::new(observer_proxy))
+        Ok(RegistryDevice::new(info, observer_proxy))
     }
 }
 
@@ -122,6 +134,26 @@ async fn watch_devices(
 }
 
 pub struct RegistryDevice {
+    _info: DeviceInfo,
+    _proxy: fadevice::ObserverProxy,
+
+    /// If None, this device does not support signal processing.
+    pub signal_processing: Option<SignalProcessing>,
+}
+
+impl RegistryDevice {
+    pub fn new(info: DeviceInfo, proxy: fadevice::ObserverProxy) -> Self {
+        let is_signal_processing_supported = info.0.signal_processing_elements.is_some()
+            && info.0.signal_processing_topologies.is_some();
+        let signal_processing =
+            is_signal_processing_supported.then(|| SignalProcessing::new(proxy.clone()));
+
+        Self { _info: info, _proxy: proxy, signal_processing }
+    }
+}
+
+/// Client for the composed signal processing `Reader` in a `fuchsia.audio.device.Observer`.
+pub struct SignalProcessing {
     proxy: fadevice::ObserverProxy,
 
     element_states: Arc<Mutex<Option<BTreeMap<fadevice::ElementId, ElementState>>>>,
@@ -134,8 +166,8 @@ pub struct RegistryDevice {
     _watch_topology_task: Task<()>,
 }
 
-impl RegistryDevice {
-    pub fn new(proxy: fadevice::ObserverProxy) -> Self {
+impl SignalProcessing {
+    fn new(proxy: fadevice::ObserverProxy) -> Self {
         let element_states = Arc::new(Mutex::new(None));
         let topology_id = Arc::new(Mutex::new(None));
 
@@ -146,11 +178,16 @@ impl RegistryDevice {
             let proxy = proxy.clone();
             let element_states = element_states.clone();
             let element_states_initialized = element_states_initialized.clone();
-            async {
+            async move {
                 if let Err(err) =
-                    watch_element_states(proxy, element_states, element_states_initialized).await
+                    watch_element_states(proxy, element_states, element_states_initialized.clone())
+                        .await
                 {
                     error!(%err, "Failed to watch Registry element states");
+                    // Watching the element states will fail if the device does not support signal
+                    // processing. In this case, mark the states as initialized so the getter can
+                    // return the initial None value.
+                    element_states_initialized.signal();
                 }
             }
         });
@@ -159,10 +196,15 @@ impl RegistryDevice {
             let proxy = proxy.clone();
             let topology_id = topology_id.clone();
             let topology_id_initialized = topology_id_initialized.clone();
-            async {
-                if let Err(err) = watch_topology(proxy, topology_id, topology_id_initialized).await
+            async move {
+                if let Err(err) =
+                    watch_topology(proxy, topology_id, topology_id_initialized.clone()).await
                 {
                     error!(%err, "Failed to watch Registry topology");
+                    // Watching the topology ID will fail if the device does not support signal
+                    // processing. In this case, mark the ID as initialized so the getter can
+                    // return the initial None value.
+                    topology_id_initialized.signal();
                 }
             }
         });
@@ -226,8 +268,8 @@ impl RegistryDevice {
         Ok(Some(topologies))
     }
 
-    /// Returns the current signal processing topology ID, or `None` if the
-    /// device does not support signal processing.
+    /// Returns the current signal processing topology ID, or `None` if the device does not support
+    /// signal processing.
     pub async fn topology_id(&self) -> Option<fadevice::TopologyId> {
         self.topology_id_initialized.wait().await;
         *self.topology_id.lock().await
@@ -235,7 +277,7 @@ impl RegistryDevice {
 
     /// Returns the state of the signal processing element with the given `element_id`.
     ///
-    /// Returns None if there is no element with the given ID, or the device does not support
+    /// Returns None if there is no element with the given ID, or if the device does not support
     /// signal processing.
     pub async fn element_state(&self, element_id: fadevice::ElementId) -> Option<ElementState> {
         self.element_states_initialized.wait().await;
@@ -246,8 +288,8 @@ impl RegistryDevice {
             .and_then(|states| states.get(&element_id).cloned())
     }
 
-    /// Returns states of all signal processing elements, or `None` if the
-    /// device does not support signal processing.
+    /// Returns states of all signal processing elements, or `None` if the device does not support
+    /// signal processing.
     pub async fn element_states(&self) -> Option<BTreeMap<fadevice::ElementId, ElementState>> {
         self.element_states_initialized.wait().await;
         self.element_states.lock().await.clone()

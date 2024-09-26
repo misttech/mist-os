@@ -1428,18 +1428,15 @@ impl HardwareInfo {
     }
 }
 
-/// Information about a device from `fuchsia.audio.device.Registry`.
-pub struct RegistryInfo {
-    device_info: DeviceInfo,
-    gain_state: Option<GainState>,
-    plug_event: Option<PlugEvent>,
+/// Information about signal processing for a device from `fuchsia.audio.device.Registry`.
+pub struct RegistrySignalProcessingInfo {
     topologies: Option<Vec<Topology>>,
     topology_id: Option<fadevice::TopologyId>,
     elements: Option<Vec<Element>>,
     element_states: Option<BTreeMap<fadevice::ElementId, ElementState>>,
 }
 
-impl RegistryInfo {
+impl RegistrySignalProcessingInfo {
     /// Returns a vector of [ElementWithState]s that join `elements` with their
     /// corresponding `element_states`.
     fn element_with_states(&self) -> Option<Vec<ElementWithState>> {
@@ -1456,6 +1453,14 @@ impl RegistryInfo {
                 .collect()
         })
     }
+}
+
+/// Information about a device from `fuchsia.audio.device.Registry`.
+pub struct RegistryInfo {
+    device_info: DeviceInfo,
+    gain_state: Option<GainState>,
+    plug_event: Option<PlugEvent>,
+    signal_processing: Option<RegistrySignalProcessingInfo>,
 }
 
 pub enum Info {
@@ -1543,21 +1548,29 @@ impl Info {
     pub fn topologies(&self) -> Option<Vec<Topology>> {
         match self {
             Info::Hardware(hw_info) => hw_info.topologies(),
-            Info::Registry(registry_info) => registry_info.topologies.clone(),
+            Info::Registry(registry_info) => registry_info
+                .signal_processing
+                .as_ref()
+                .and_then(|sigproc| sigproc.topologies.clone()),
         }
     }
 
     pub fn topology_id(&self) -> Option<fadevice::TopologyId> {
         match self {
             Info::Hardware(hw_info) => hw_info.topology_id(),
-            Info::Registry(registry_info) => registry_info.topology_id,
+            Info::Registry(registry_info) => {
+                registry_info.signal_processing.as_ref().and_then(|sigproc| sigproc.topology_id)
+            }
         }
     }
 
     pub fn element_with_states(&self) -> Option<Vec<ElementWithState>> {
         match self {
             Info::Hardware(hw_info) => hw_info.element_with_states(),
-            Info::Registry(registry_info) => registry_info.element_with_states(),
+            Info::Registry(registry_info) => registry_info
+                .signal_processing
+                .as_ref()
+                .and_then(|sigproc| sigproc.element_with_states()),
         }
     }
 }
@@ -1692,20 +1705,23 @@ async fn get_registry_info(
     let registry_device =
         registry.observe(token_id).await.bug_context("Failed to observe registry device")?;
 
-    let elements = registry_device.elements().await?;
-    let element_states = registry_device.element_states().await;
-    let topologies = registry_device.topologies().await?;
-    let topology_id = if topologies.is_some() { registry_device.topology_id().await } else { None };
+    let signal_processing = if let Some(ref sigproc) = registry_device.signal_processing {
+        Some(RegistrySignalProcessingInfo {
+            topologies: sigproc.topologies().await?,
+            topology_id: sigproc.topology_id().await,
+            elements: sigproc.elements().await?,
+            element_states: sigproc.element_states().await,
+        })
+    } else {
+        None
+    };
 
     let registry_info = RegistryInfo {
         device_info,
         // TODO(https://fxbug.dev/329150383): Supports gain_state/plug_state/plug_time for ADR devices
         gain_state: None,
         plug_event: None,
-        topologies,
-        topology_id,
-        elements,
-        element_states,
+        signal_processing,
     };
     Ok(registry_info)
 }
