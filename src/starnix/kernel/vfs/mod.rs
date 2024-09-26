@@ -35,6 +35,7 @@ pub mod fs_args;
 pub mod fs_registry;
 pub mod fsverity;
 pub mod inotify;
+pub mod io_uring;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;

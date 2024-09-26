@@ -248,6 +248,7 @@ rustc_library("starnix_core") {
     "vfs/fs_registry.rs",
     "vfs/fsverity.rs",
     "vfs/inotify.rs",
+    "vfs/io_uring.rs",
     "vfs/memory_file.rs",
     "vfs/mod.rs",
     "vfs/namespace.rs",

@@ -12,6 +12,7 @@ use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
+use crate::vfs::io_uring::IoUringFileObject;
 use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
@@ -3064,11 +3065,18 @@ pub fn sys_io_destroy(
 
 pub fn sys_io_uring_setup(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _entries: u32,
-    _params: UserRef<io_uring_params>,
+    current_task: &CurrentTask,
+    entries: u32,
+    user_params: UserRef<io_uring_params>,
 ) -> Result<FdNumber, Errno> {
-    error!(ENOSYS)
+    if !current_task.kernel().features.io_uring {
+        return error!(ENOSYS);
+    }
+    let params = current_task.read_object(user_params)?;
+    let file = IoUringFileObject::new_file(current_task, entries, params)?;
+    // There doesn't seem to be a way to create an io_uring file descriptor with CLOEXEC, which is
+    // surprising.
+    current_task.add_file(file, FdFlags::empty())
 }
 
 pub fn sys_io_uring_enter(
