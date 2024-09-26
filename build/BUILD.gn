@@ -512,3 +512,36 @@ group("core_realm_shards_allowlist") {
   visibility +=
       [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
 }
+
+group("legacy_bundle_allowlist") {
+  visibility = []
+
+  # Owned closely by the assembly team.
+  visibility += [
+    "//build/images/*",
+    "//src/tests/assembly/assemble_image/*",
+    "//vendor/google/*",
+  ]
+
+  # These are all tests that should ideally not be using a legacy bundle.
+  visibility += [
+    "//build/testing/boot_tests:*",
+    "//src/developer/ffx/tools/power/system-activity/application-activity:*",
+    "//src/power/testing/system-integration/msd-arm-mali/custom-product:*",
+    "//src/power/testing/system-integration/storage/custom-product:*",
+    "//src/security/lib/scrutiny/collector:*",
+    "//src/security/lib/scrutiny/tests/route_verification:*",
+    "//src/security/lib/scrutiny/tests/structured_config:*",
+    "//src/security/tests/pkg_test/tests:*",
+    "//src/security/tests/scrutiny_ffx_integration:*",
+    "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
+    "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
+    "//src/tests/early-boot-coverage/*",
+    "//src/tests/limited_netsvc/image:*",
+    "//zircon/kernel/lib/userabi/userboot/tests:*",
+    "//zircon/kernel/phys/test/debugdata-propagation:*",
+    "//zircon/system/ulib/c/test:*",
+    "//zircon/system/ulib/uart/test/interrupt-test:*",
+    "//zircon/system/utest/core:*",
+  ]
+}
