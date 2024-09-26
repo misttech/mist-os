@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library zx;
 
-type statx = resource struct {};
+alias new_utsname = byte;
 
 @no_protocol_prefix
 @transport("Syscall")
@@ -143,7 +143,7 @@ closed protocol Linux {
     // STUB 38
     strict A0038Setitimer() -> () error int64;
 
-    // STUB 39
+    // #39, SYSCALL_DEFINE0(getpid)
     strict A0039Getpid() -> () error int64;
 
     // STUB 40
@@ -206,8 +206,10 @@ closed protocol Linux {
     // STUB 59
     strict A0059Execve() -> () error int64;
 
-    // STUB 60
-    strict A0060Exit() -> () error int64;
+    // #60, SYSCALL_DEFINE1(exit, int, error_code)
+    strict A0060Exit(resource struct {
+        error_code int32;
+    }) -> () error int64;
 
     // STUB 61
     strict A0061Wait4() -> () error int64;
@@ -215,8 +217,12 @@ closed protocol Linux {
     // STUB 62
     strict A0062Kill() -> () error int64;
 
-    // STUB 63
-    strict A0063Uname() -> () error int64;
+    // #63, SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
+    strict A0063Uname() -> (resource struct {
+        @voidptr
+        @out
+        name experimental_pointer<new_utsname>;
+    }) error int64;
 
     // STUB 64
     strict A0064Semget() -> () error int64;
@@ -338,7 +344,7 @@ closed protocol Linux {
     // STUB 103
     strict A0103Syslog() -> () error int64;
 
-    // STUB 104
+    // #104, SYSCALL_DEFINE0(getgid)
     strict A0104Getgid() -> () error int64;
 
     // STUB 105
@@ -350,16 +356,16 @@ closed protocol Linux {
     // STUB 107
     strict A0107Geteuid() -> () error int64;
 
-    // STUB 108
+    // #108, SYSCALL_DEFINE0(getegid)
     strict A0108Getegid() -> () error int64;
 
     // STUB 109
     strict A0109Setpgid() -> () error int64;
 
-    // STUB 110
+    // #110, SYSCALL_DEFINE0(getppid)
     strict A0110Getppid() -> () error int64;
 
-    // STUB 111
+    // #111, SYSCALL_DEFINE0(getpgrp)
     strict A0111Getpgrp() -> () error int64;
 
     // STUB 112
@@ -389,8 +395,10 @@ closed protocol Linux {
     // STUB 120
     strict A0120Getresgid() -> () error int64;
 
-    // STUB 121
-    strict A0121Getpgid() -> () error int64;
+    // #121, SYSCALL_DEFINE1(getpgid, pid_t, pid)
+    strict A0121Getpgid(resource struct {
+        pid int32;
+    }) -> () error int64;
 
     // STUB 122
     strict A0122Setfsuid() -> () error int64;
@@ -497,8 +505,14 @@ closed protocol Linux {
     // STUB (Kernel NI) 156 Not Implemented syscall
     strict A0156NotImpl() -> () error int64;
 
-    // STUB 157
-    strict A0157Prctl() -> () error int64;
+    // #157, SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5)
+    strict A0157Prctl(resource struct {
+        option int32;
+        arg2 uint64;
+        arg3 uint64;
+        arg4 uint64;
+        arg5 uint64;
+    }) -> () error int64;
 
     // STUB 158
     strict A0158ArchPrctl() -> () error int64;
@@ -584,7 +598,7 @@ closed protocol Linux {
     // STUB (Not entry point) 185
     strict A0185Security() -> () error int64;
 
-    // STUB 186
+    // #186, SYSCALL_DEFINE0(gettid)
     strict A0186Gettid() -> () error int64;
 
     // STUB 187
@@ -980,8 +994,13 @@ closed protocol Linux {
     // STUB 317
     strict A0317Seccomp() -> () error int64;
 
-    // STUB 318
-    strict A0318Getrandom() -> () error int64;
+    // #318, SYSCALL_DEFINE3(getrandom, char __user *, ubuf, size_t, len, unsigned int, flags)
+    strict A0318Getrandom(resource struct {
+        @out
+        buf experimental_pointer<uchar>;
+        len uint64;
+        flags uint32;
+    }) -> () error int64;
 
     // STUB 319
     strict A0319MemfdCreate() -> () error int64;

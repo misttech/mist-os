@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/syscalls/forward.h>
 #include <lib/syscalls/safe-syscall-argument.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 
 #include "../priv.h"
-
-// clang format off
-#include <lib/mistos/linux_uapi/typedefs.h>
-// clang format on
 
 #define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
 

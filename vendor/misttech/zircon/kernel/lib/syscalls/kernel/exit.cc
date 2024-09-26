@@ -7,14 +7,14 @@
 
 #include "../priv.h"
 
-#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
+#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
 void __NO_RETURN do_exit(long code) {
   LTRACEF_LEVEL(2, "code=0x%lx\n", code);
   ProcessDispatcher::ExitCurrent(code);
 }
 
-long sys_exit(int retcode) {
+long sys_a0060_exit(int32_t retcode) {
   do_exit((retcode & 0xff) << 8);
   /* NOTREACHED */
   return 0;

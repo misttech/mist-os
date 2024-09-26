@@ -14,12 +14,17 @@ assert(is_kernel, current_toolchain)
 source_set("linux_impl") {
   visibility = [ "//zircon/kernel/lib/syscalls:*" ]
   sources = [
+    "drivers/char/random.cc",
+    "kernel/exit.cc",
+    "kernel/sys.cc",
     "mm/mmap.cc",
     "not_implemented.cc",
     "static_assert.cc",
   ]
   deps = [
     "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix_core",
+    "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-zircon",
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/object",
   ]
