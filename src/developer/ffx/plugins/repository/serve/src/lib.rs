@@ -471,15 +471,39 @@ pub fn serve_impl_validate_args(
     let addr = cmd.address.clone();
     let duplicate = running_instances.iter().find(|instance| instance.address == addr);
     if let Some(duplicate) = duplicate {
-        if repo_name != duplicate.name {
-            return_user_error!("repository server is already running on {addr}: named \"{}\"  serving {repo_path:?}\n Use `ffx  repository server list` to list running servers", duplicate.name);
+        // if we're starting using a product bundle, the name will be different so compare the repo_path
+        // which is the path to the product bundle
+        if let Some(pb_path) = &cmd.product_bundle {
+            if pb_path.to_string() != duplicate.repo_path.to_string() {
+                return_user_error!("Repository address conflict. \
+                Cannot start a server named {repo_name} serving {repo_path:?}. \
+                Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\
+                Use `ffx  repository server list` to list running servers",
+                 duplicate.name, duplicate.repo_path.to_string());
+            }
+        } else {
+            if repo_name != duplicate.name {
+                return_user_error!("Repository address conflict. \
+                Cannot start a server named {repo_name} serving {repo_path:?}. \
+                Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\
+                Use `ffx  repository server list` to list running servers",
+                 duplicate.name, duplicate.repo_path.to_string());
+            }
         }
         return Ok(Some(duplicate.clone()));
     }
     let duplicate = running_instances.iter().find(|instance| instance.name == repo_name);
     if let Some(duplicate) = duplicate {
         if addr != duplicate.address {
-            return_user_error!("repository server named \"{repo_name}\" is already running: {} serving {repo_path:?}\n Use `ffx  repository server list` to list running servers", duplicate.address);
+            return_user_error!(
+                "Repository name conflict. \
+            Cannot start a server named {repo_name} serving {repo_path:?}. \
+            Repository server  \"{dupe_name}\" is already running on {dupe_addr} serving a different path: {dupe_path}\n\
+            Use `ffx  repository server list` to list running servers",
+                dupe_name=duplicate.name,
+                dupe_addr=duplicate.address,
+                dupe_path=duplicate.repo_path.to_string()
+            );
         }
         return Ok(Some(duplicate.clone()));
     }
@@ -1390,7 +1414,11 @@ mod test {
             refresh_metadata: false,
             auto_publish: None,
         },
-            Err(user_error!("repository server is already running on 127.0.0.1:0: named \"{instance_name}\"  serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
+            Err(user_error!("Repository address conflict. \
+            Cannot start a server named another-name serving {repo_path:?}. \
+            Repository server  \"{name}\" is already running on {addr} serving a different path: {dupe_path}\n\
+            Use `ffx  repository server list` to list running servers",
+             addr=server_info.address, name=server_info.name, dupe_path=server_info.repo_path.to_string()))
     ),
     (
         ServeCommand {
@@ -1407,7 +1435,7 @@ mod test {
            refresh_metadata: false,
            auto_publish: None,
        },
-           Ok(Some(server_info))
+           Ok(Some(server_info.clone()))
    ),
    (
     ServeCommand {
@@ -1424,8 +1452,17 @@ mod test {
        refresh_metadata: false,
        auto_publish: None,
    },
-       Err(user_error!("repository server named \"devhost\" is already running: 127.0.0.1:0 serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
-)
+       Err(user_error!(
+        "Repository name conflict. \
+    Cannot start a server named {name} serving {repo_path:?}. \
+    Repository server  \"{dupe_name}\" is already running on {addr} serving a different path: {dupe_path}\n\
+    Use `ffx  repository server list` to list running servers",
+        name=instance_name,
+        dupe_name=instance_name,
+        addr=server_info.address,
+        dupe_path=server_info.repo_path.to_string()
+       ))
+   )
     ];
 
         for (cmd, expected) in test_cases {
