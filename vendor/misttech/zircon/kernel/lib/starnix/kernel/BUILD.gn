@@ -37,7 +37,7 @@ zx_library("starnix_core") {
     "vfs/anon_node.cc",
     "vfs/buffers/io_buffers.cc",
     "vfs/dir_entry.cc",
-    "vfs/fd_numbers.cc",
+    "vfs/fd_number.cc",
     "vfs/fd_table.cc",
     "vfs/file_object.cc",
     "vfs/file_system.cc",

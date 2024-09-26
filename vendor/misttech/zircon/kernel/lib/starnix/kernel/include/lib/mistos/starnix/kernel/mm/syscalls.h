@@ -6,7 +6,7 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_MM_SYSCALLS_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 

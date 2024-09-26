@@ -8,7 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/user_address.h>

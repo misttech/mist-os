@@ -7,7 +7,7 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/bitflags.h>
 #include <lib/starnix_sync/locks.h>
