@@ -96,6 +96,16 @@ impl RepoStopTool {
             } else {
                 return_user_error!("no running server named {repo_name} is found.");
             }
+        } else if let Some(product_bundle) = &self.cmd.product_bundle {
+            if let Some(instance) =
+                instances.iter().find(|s| s.repo_path.to_string() == product_bundle.to_string())
+            {
+                return Self::stop_instance(instance, &None).await;
+            } else {
+                return_user_error!(
+                    "no running server serving a product bundle {product_bundle} is found."
+                );
+            }
         } else {
             match instances.len() {
             0 => return Ok(Some("no running servers".into())),
@@ -163,6 +173,7 @@ impl RepoStopTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use camino::Utf8PathBuf;
     use ffx_config::TestEnv;
     use fho::Format;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
@@ -186,6 +197,7 @@ mod tests {
 
     fn make_standalone_instance(
         name: String,
+        product_bundle_path: Option<Utf8PathBuf>,
         context: &EnvironmentContext,
         test_env: &TestEnv,
     ) -> Result<(PkgServerInstances, Child)> {
@@ -208,10 +220,16 @@ mod tests {
 
         let address = (Ipv4Addr::LOCALHOST, 1234).into();
 
+        let repo_path: PathBuf = if let Some(pb) = product_bundle_path {
+            pb.into()
+        } else {
+            PathBuf::from("/somewhere")
+        };
+
         mgr.write_instance(&PkgServerInfo {
             name,
             address,
-            repo_path: PathBuf::from("/somewhere").as_path().into(),
+            repo_path: repo_path.as_path().into(),
             registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
@@ -265,7 +283,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None },
+            cmd: StopCommand { all: true, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -283,8 +301,9 @@ mod tests {
     async fn test_standalone_stop() {
         let env = ffx_config::test_init().await.unwrap();
 
-        let (_mgr, _server_proc) = make_standalone_instance("default".into(), &env.context, &env)
-            .expect("test daemon instance");
+        let (_mgr, _server_proc) =
+            make_standalone_instance("default".into(), None, &env.context, &env)
+                .expect("test daemon instance");
 
         let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
 
@@ -292,7 +311,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None },
+            cmd: StopCommand { all: true, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -301,6 +320,43 @@ mod tests {
 
         let (stdout, stderr) = buffers.into_strings();
         assert_eq!(stdout, "Stopped the repository server\n");
+        assert_eq!(stderr, "");
+        assert!(res.is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_product_bundle_stop() {
+        let env = ffx_config::test_init().await.unwrap();
+
+        let product_bundle_path =
+            Utf8PathBuf::from_path_buf(env.isolate_root.path().join("pb")).expect("utf8 path");
+
+        let (_mgr, mut server_proc) = make_standalone_instance(
+            "some-pb.com".into(),
+            Some(product_bundle_path.clone()),
+            &env.context,
+            &env,
+        )
+        .expect("test daemon instance");
+
+        let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
+
+        let repos = Deferred::from_output(Ok(fake_proxy));
+
+        let tool = RepoStopTool {
+            context: env.context.clone(),
+            cmd: StopCommand { all: false, name: None, product_bundle: Some(product_bundle_path) },
+            repos,
+        };
+        let buffers = fho::TestBuffers::default();
+        let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = buffers.into_strings();
+
+        // clean up the server process, if still present
+        let _ = server_proc.kill();
+        assert!(res.is_ok(), "Expected ok, got {res:?} {stdout} {stderr}");
+        assert_eq!(stdout, "Stopped the repository server\n", "stderr: {stderr}");
         assert_eq!(stderr, "");
         assert!(res.is_ok());
     }
@@ -325,7 +381,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None },
+            cmd: StopCommand { all: true, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -355,7 +411,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None },
+            cmd: StopCommand { all: true, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -387,7 +443,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None },
+            cmd: StopCommand { all: true, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -425,7 +481,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None },
+            cmd: StopCommand { all: true, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -459,7 +515,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: None },
+            cmd: StopCommand { all: false, name: None, product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -502,7 +558,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: Some("default2".into()) },
+            cmd: StopCommand { all: false, name: Some("default2".into()), product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
@@ -541,7 +597,7 @@ mod tests {
 
         let tool = RepoStopTool {
             context: env.context.clone(),
-            cmd: StopCommand { all: false, name: Some("default2".into()) },
+            cmd: StopCommand { all: false, name: Some("default2".into()), product_bundle: None },
             repos,
         };
         let buffers = fho::TestBuffers::default();
