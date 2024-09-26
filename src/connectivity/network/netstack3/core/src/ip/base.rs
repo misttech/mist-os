@@ -86,7 +86,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IpState<I>>,
     > MulticastMembershipHandler<I, BC> for CoreCtx<'_, BC, L>
 where
-    Self: device::IpDeviceConfigurationContext<I, BC> + IpStateContext<I> + IpDeviceContext<I, BC>,
+    Self: device::IpDeviceConfigurationContext<I, BC> + IpStateContext<I> + IpDeviceContext<I>,
 {
     fn join_multicast_group(
         &mut self,

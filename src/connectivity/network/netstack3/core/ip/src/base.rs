@@ -429,7 +429,7 @@ where
 impl<
         I: IpLayerIpExt,
         BC: FilterBindingsContext,
-        CC: IpDeviceContext<I, BC>
+        CC: IpDeviceContext<I>
             + IpSocketHandler<I, BC>
             + IpStateContext<I>
             + FilterIpContext<I, BC>
@@ -784,7 +784,7 @@ pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
 }
 
 /// The IP device context provided to the IP layer.
-pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
+pub trait IpDeviceContext<I: IpLayerIpExt>: IpDeviceStateContext<I> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -804,7 +804,10 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
 
     /// Returns true iff the device has unicast forwarding enabled.
     fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
+}
 
+/// Provides the ability to check neighbor reachability via a specific device.
+pub trait IpDeviceConfirmReachableContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Confirm transport-layer forward reachability to the specified neighbor
     /// through the specified device.
     fn confirm_reachable(
@@ -883,7 +886,7 @@ pub trait IpLayerContext<
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >:
     IpStateContext<I>
-    + IpDeviceContext<I, BC>
+    + IpDeviceContext<I>
     + IpDeviceMtuContext<I>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
@@ -896,7 +899,7 @@ impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
         CC: IpStateContext<I>
-            + IpDeviceContext<I, BC>
+            + IpDeviceContext<I>
             + IpDeviceMtuContext<I>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
@@ -939,15 +942,14 @@ fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     }
 }
 
-fn get_device_with_assigned_address<A, BC, CC>(
+fn get_device_with_assigned_address<A, CC>(
     core_ctx: &mut CC,
     addr: IpDeviceAddr<A>,
 ) -> Option<CC::DeviceId>
 where
     A: IpAddress,
     A::Version: IpLayerIpExt,
-    BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
-    CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version, BC>,
+    CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version>,
 {
     core_ctx.with_address_statuses(addr.into(), |mut it| {
         it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
@@ -1077,7 +1079,7 @@ pub fn resolve_output_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpStateContext<I>
-        + IpDeviceContext<I, BC>
+        + IpDeviceContext<I>
         + IpDeviceStateContext<I>
         + device::IpDeviceConfigurationContext<I, BC>,
 >(
@@ -1271,7 +1273,8 @@ impl<
             + IpSocketBindingsContext,
         CC: IpLayerEgressContext<I, BC>
             + IpStateContext<I>
-            + IpDeviceContext<I, BC>
+            + IpDeviceContext<I>
+            + IpDeviceConfirmReachableContext<I, BC>
             + IpDeviceStateContext<I>
             + device::IpDeviceConfigurationContext<I, BC>
             + UseIpSocketContextBlanket,
@@ -1346,7 +1349,12 @@ impl<
                         return;
                     }
                 };
-                IpDeviceContext::confirm_reachable(self, bindings_ctx, &device, neighbor);
+                IpDeviceConfirmReachableContext::confirm_reachable(
+                    self,
+                    bindings_ctx,
+                    &device,
+                    neighbor,
+                );
             }
             None => {
                 debug!("can't confirm {dst:?} as reachable: no route");
