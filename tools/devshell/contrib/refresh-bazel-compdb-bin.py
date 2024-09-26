@@ -12,7 +12,7 @@ import sys
 from typing import Any, Dict, Sequence
 
 _CPP_EXTENSIONS = [".cc", ".c", ".cpp"]
-_OPT_PATTERN = re.compile("[\W]+")
+_REMOVE_QUOTES_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
@@ -166,15 +166,31 @@ def get_action_graph_from_labels(
     return collect_actions(action_graph)
 
 
+def remove_quotes(input: str) -> str:
+    return _REMOVE_QUOTES_PATTERN.sub("", input)
+
+
+def input_to_bool(input: str) -> bool:
+    return remove_quotes(input).lower() in ["true", "t", "yes", "y", "1"]
+
+
 def compilation_mode(args: Sequence[str]) -> str:
-    # sometimes the optimization is escape quoted so we clean it up.
-    opt = _OPT_PATTERN.sub("", args.optimization)
-    if opt == "debug":
-        return "--compilation_mode=dbg"
-    elif opt in ["size", "speed", "profile", "size_lto"]:
-        return "--compilation_mode=opt"
+    # This logic should match build/config/compilation_modes.gni
+
+    # sometimes the inputs are escape quoted so we clean them up.
+    compilation_mode = remove_quotes(args.compilation_mode).strip()
+    is_debug = input_to_bool(args.is_debug)
+
+    def compilation_mode_flag(mode: str) -> str:
+        return f"--compilation_mode={mode}"
+
+    if compilation_mode == "":
+        if is_debug:
+            return compilation_mode_flag("dbg")
+        else:
+            return compilation_mode_flag("opt")
     else:
-        return "--compilation_mode=fastbuild"
+        return compilation_mode_flag(compilation_mode)
 
 
 def assert_arg_label_is_fuchsia_package(args: argparse.Namespace):
@@ -267,7 +283,14 @@ def main(argv: Sequence[str]):
         are not compatible with bazel queries and will fail.""",
     )
     parser.add_argument(
-        "--optimization", required=True, help="The build level optimization"
+        "--compilation_mode",
+        required=True,
+        help="The compilation_mode as defined by GN",
+    )
+    parser.add_argument(
+        "--is_debug",
+        required=True,
+        help="The result of checking if is_debug is set. This value is a string.",
     )
     parser.add_argument(
         "-v",
