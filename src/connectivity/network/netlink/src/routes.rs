@@ -2594,11 +2594,9 @@ mod tests {
             route_clients.add_client(other_client);
             route_clients
         });
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
         let mut event_loop_fut = pin!(event_loop
             .run()
             .map(|res| match res {
-                Ok(never) => match never {},
                 Err(e) => {
                     log_debug!("event_loop_fut exiting with error {:?}", e);
                     Err::<std::convert::Infallible, _>(e)

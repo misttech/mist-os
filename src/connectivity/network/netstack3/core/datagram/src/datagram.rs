@@ -4174,7 +4174,6 @@ where
                 return Err(SendError::NotWriteable);
             }
 
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
             match operation {
                 Operation::SendToThisStack((SendParams { socket, ip, options }, core_ctx)) => {
                     let packet =
@@ -4197,7 +4196,6 @@ where
                         },
                     )
                 }
-                Operation::_Phantom((never, _)) => match never {},
             }
         })
     }
@@ -4481,7 +4479,6 @@ where
                 }
             }
 
-            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
             match operation {
                 Operation::SendToThisStack((params, core_ctx)) => {
                     DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
@@ -4496,7 +4493,6 @@ where
                         },
                     )
                 }
-                Operation::_Phantom((never, _)) => match never {},
             }
             .map_err(Either::Right)
         })
@@ -5406,7 +5402,10 @@ mod test {
     impl<T: Eq> SocketMapAddrStateSpec for AddrState<T> {
         type Id = T;
         type SharingState = Sharing;
-        type Inserter<'a> = Never where Self: 'a;
+        type Inserter<'a>
+            = Never
+        where
+            Self: 'a;
 
         fn new(_sharing: &Self::SharingState, id: Self::Id) -> Self {
             AddrState(id)

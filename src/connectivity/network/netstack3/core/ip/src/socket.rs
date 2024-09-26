@@ -176,7 +176,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         F: FnOnce(IpDeviceAddr<I::Addr>) -> S,
         O: SendOptions<I>,
     {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         self.send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
             device,
@@ -190,7 +189,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => err,
-            SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
         })
     }
 }
@@ -218,9 +216,7 @@ pub enum IpSockSendError {
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
     fn from(err: SerializeError<Infallible>) -> IpSockSendError {
-        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match err {
-            SerializeError::Alloc(err) => match err {},
             SerializeError::SizeLimitExceeded => IpSockSendError::Mtu,
         }
     }
