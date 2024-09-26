@@ -80,9 +80,6 @@
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/5",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/6",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/7",
-
-                // TODO(https://fxbug.dev/365540067)
-                "PidFdTest.PollWaitsForSecondaryThreadsToo",
             ],
         },
         {
@@ -90,6 +87,10 @@
             matchers: [
                 // TODO(https://fxbug.dev/353537391) deflake and re-enable
                 "SignalHandling.SignalDeliveryWakesOnlyOneFutex",
+
+                // TODO(https://fxbug.dev/365540067)
+                // TODO(https://fxbug.dev/365971179): deflake and re-enable
+                "PidFdTest.PollWaitsForSecondaryThreadsToo",
             ],
         },
     ],
