@@ -9,6 +9,7 @@ import("//build/test.gni")
 
 library_headers("headers") {
   headers = [
+    "lib/sched/affine.h",
     "lib/sched/run-queue.h",
     "lib/sched/thread-base.h",
   ]
@@ -39,6 +40,7 @@ group("tests") {
 
 test("sched-unittests") {
   sources = [
+    "affine-tests.cc",
     "run-queue-tests.cc",
     "thread-base-tests.cc",
   ]
