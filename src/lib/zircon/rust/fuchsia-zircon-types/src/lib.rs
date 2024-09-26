@@ -633,8 +633,6 @@ pub const ZX_STREAM_MODE_APPEND: u32 = 1 << 2;
 
 pub const ZX_STREAM_APPEND: u32 = 1 << 0;
 
-// Buffer size limits on the cprng syscalls
-pub const ZX_CPRNG_DRAW_MAX_LEN: usize = 256;
 pub const ZX_CPRNG_ADD_ENTROPY_MAX_LEN: usize = 256;
 
 // Socket flags and limits.

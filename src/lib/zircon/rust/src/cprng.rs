@@ -98,7 +98,8 @@ mod tests {
 
     #[test]
     fn cprng_large() {
-        const SIZE: usize = sys::ZX_CPRNG_DRAW_MAX_LEN + 1;
+        // The kernel currently chunks the buffer if it's larger than 256.
+        const SIZE: usize = 257;
         let mut buffer = [0; SIZE];
         check_buffer(&mut buffer);
 
