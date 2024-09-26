@@ -177,29 +177,28 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
     zx::channel channel0, channel1;
 
     // Serve up the emulated audio-composite directory
-    ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
+    auto [composite_client, composite_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(composite_dir_, std::move(composite_server)), ZX_OK);
     ASSERT_EQ(
-        vfs_.Serve(composite_dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()),
+        fdio_ns_bind(ns_, "/dev/class/audio-composite", composite_client.TakeChannel().release()),
         ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-composite", channel1.release()), ZX_OK);
 
     // Serve up the emulated audio-input directory
-    ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(input_dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()),
+    auto [input_client, input_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(input_dir_, std::move(input_server)), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-input", input_client.TakeChannel().release()),
               ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-input", channel1.release()), ZX_OK);
 
     // Serve up the emulated audio-output directory
-    ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(output_dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()),
+    auto [output_client, output_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(output_dir_, std::move(output_server)), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-output", output_client.TakeChannel().release()),
               ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-output", channel1.release()), ZX_OK);
 
     // Serve up the emulated codec directory
-    ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(codec_dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()),
-              ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/codec", channel1.release()), ZX_OK);
+    auto [codec_client, codec_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(codec_dir_, std::move(codec_server)), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/codec", codec_client.TakeChannel().release()), ZX_OK);
   }
 
   void TearDown() override {

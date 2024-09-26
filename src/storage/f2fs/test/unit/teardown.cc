@@ -94,11 +94,10 @@ TEST(Teardown, ShutdownOnNoConnections) {
   root_dir->SetMode(S_IFDIR);
 
   async::Loop clients_loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(root_endpoints.is_ok());
-  fidl::WireClient<fuchsia_io::Directory> root_client(std::move(root_endpoints->client),
+  auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fidl::WireClient<fuchsia_io::Directory> root_client(std::move(root_endpoints.client),
                                                       loop.dispatcher());
-  ASSERT_EQ(vfs_or->ServeDirectory(std::move(root_dir), std::move(root_endpoints->server)), ZX_OK);
+  ASSERT_EQ(vfs_or->ServeDirectory(std::move(root_dir), std::move(root_endpoints.server)), ZX_OK);
 
   // A) Wait for root directory sync to begin.
   root_client->Sync().Then([](auto& result) {});
@@ -112,12 +111,10 @@ TEST(Teardown, ShutdownOnNoConnections) {
   auto child_dir = fbl::AdoptRef(new AsyncTearDownVnode(fs, child_nid, child_completions));
   child_dir->SetMode(S_IFDIR);
 
-  auto child_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_TRUE(child_endpoints.is_ok());
-  fidl::WireClient<fuchsia_io::Directory> child_client(std::move(child_endpoints->client),
+  auto child_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fidl::WireClient<fuchsia_io::Directory> child_client(std::move(child_endpoints.client),
                                                        clients_loop.dispatcher());
-  ASSERT_EQ(child_dir->Open(nullptr), ZX_OK);
-  ASSERT_EQ(vfs_or->Serve(std::move(child_dir), child_endpoints->server.TakeChannel(), {}), ZX_OK);
+  ASSERT_EQ(vfs_or->ServeDirectory(std::move(child_dir), std::move(child_endpoints.server)), ZX_OK);
 
   // A) Wait for child vnode sync to begin.
   child_client->Sync().Then([](auto& result) {});

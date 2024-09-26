@@ -40,7 +40,6 @@ cc_test_executable("fsl_unittests") {
 
   deps = [
     ":fsl",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
