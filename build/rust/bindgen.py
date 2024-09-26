@@ -15,18 +15,20 @@ RUSTFMT_PATH = "prebuilt/third_party/rust/linux-x64/bin/rustfmt"
 BINDGEN_PATH = "prebuilt/third_party/rust_bindgen/linux-x64/bindgen"
 FX_PATH = "scripts/fx"
 
-GENERATED_FILE_HEADER = (
+FUCHSIA_NOTICE_HEADER = (
     """// Copyright %d The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(dead_code)]
+"""
+    % datetime.datetime.now().year
+)
+
+GENERATED_FILE_HEADER = """#![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 """
-    % datetime.datetime.now().year
-)
 
 # Replacements to add to these defined by the user.
 BASE_REPLACEMENTS = [
@@ -49,6 +51,8 @@ class Bindgen:
         self.clang_target = "x86_64-unknown-linux-gnu"
         # Use the given PREFIX before raw types instead of ::std::os::raw.
         self.c_types_prefix = ""
+        # Notice header to place at the beginning of the file.
+        self.notice_header = FUCHSIA_NOTICE_HEADER
         # Additional raw lines of Rust code to add to the beginning of the generated output.
         self.raw_lines = ""
         # Mark types as an an opaque blob of bytes with a size and alignment.
@@ -104,13 +108,14 @@ class Bindgen:
 
     def run_bindgen(self, input_file, output_file):
         # Bindgen arguments.
+        raw_lines = self.notice_header + GENERATED_FILE_HEADER + self.raw_lines
         args = [
             BINDGEN_PATH,
             "--no-layout-tests",
             "--with-derive-default",
             "--explicit-padding",
             "--raw-line",
-            GENERATED_FILE_HEADER + self.raw_lines,
+            raw_lines,
             "-o",
             output_file,
         ]
