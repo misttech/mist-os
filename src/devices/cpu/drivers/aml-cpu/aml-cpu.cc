@@ -9,6 +9,9 @@
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
+#include <lib/trace-engine/types.h>
+#include <lib/trace/event.h>
+#include <lib/trace/event_args.h>
 #include <zircon/syscalls/smc.h>
 
 #include <vector>
@@ -261,6 +264,9 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
   // Cancel any deferred unwind calls.
   reset_voltage.cancel();
   reset_frequency.cancel();
+
+  TRACE_COUNTER("dvfs", "cpu_freq", GetDomainId(), "domain", TA_INT32(GetDomainId()), "frequency",
+                TA_INT64(target_opp.freq_hz), "voltage", TA_INT64(target_opp.volt_uv));
 
   return ZX_OK;
 }
