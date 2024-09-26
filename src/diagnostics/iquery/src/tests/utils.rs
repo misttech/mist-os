@@ -7,7 +7,7 @@
 use argh::FromArgs;
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use iquery::command_line::CommandLine;
 use iquery::commands::*;
 use iquery::types::Error;
@@ -194,7 +194,10 @@ impl<'a> CommandAssertion<'a> {
                 Ok(mut result) => {
                     result = self.cleanup_unrelated_components(result);
                     let now = zx::MonotonicTime::get().into_nanos();
-                    if now >= started + self.max_retry_time_seconds.seconds().into_nanos() {
+                    if now
+                        >= started
+                            + zx::Duration::from_seconds(self.max_retry_time_seconds).into_nanos()
+                    {
                         self.assert_result(&result, &self.expected);
                         break;
                     }
@@ -204,12 +207,15 @@ impl<'a> CommandAssertion<'a> {
                 }
                 Err(e) => {
                     let now = zx::MonotonicTime::get().into_nanos();
-                    if now >= started + self.max_retry_time_seconds.seconds().into_nanos() {
+                    if now
+                        >= started
+                            + zx::Duration::from_seconds(self.max_retry_time_seconds).into_nanos()
+                    {
                         assert!(false, "Error: {:?}", e);
                     }
                 }
             }
-            fasync::Timer::new(fasync::Time::after(100.millis())).await;
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
         }
     }
 

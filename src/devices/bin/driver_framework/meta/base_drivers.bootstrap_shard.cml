@@ -91,6 +91,7 @@
     expose: [
         {
             service: [
+                "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
             ],

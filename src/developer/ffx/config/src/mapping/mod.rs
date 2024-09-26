@@ -11,7 +11,7 @@ mod build;
 mod cache;
 mod config;
 mod data;
-mod env_var;
+pub(crate) mod env_var;
 mod file_check;
 mod filter;
 mod flatten;

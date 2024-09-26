@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("unit_tests") {
   testonly = true
@@ -12,7 +13,7 @@ group("unit_tests") {
   ]
 }
 
-executable("codec_impl_unit_tests_bin") {
+cc_test_executable("codec_impl_unit_tests_bin") {
   testonly = true
   output_name = "codec_impl_unit_tests"
 
@@ -57,7 +58,7 @@ source_set("codec_impl_tests") {
   ]
 }
 
-executable("decryptor_adapter_tests_bin") {
+cc_test_executable("decryptor_adapter_tests_bin") {
   testonly = true
   output_name = "decryptor_adapter_tests"
 

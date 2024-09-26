@@ -24,7 +24,7 @@ use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use std::fmt::Debug;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// As per [RFC 4861] sections 4.1-4.5, NDP packets MUST have a hop limit of 255.
 ///
@@ -37,7 +37,7 @@ pub const MESSAGE_TTL: u8 = 255;
 /// options, the full NDP packet (including IPv6 and Ethernet headers) will be
 /// transmitted to the fake endpoint's network.
 pub async fn write_message<
-    B: ByteSlice + Debug,
+    B: SplitByteSlice + Debug,
     M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpUnusedCode> + Debug,
 >(
     src_mac: net_types::ethernet::Mac,

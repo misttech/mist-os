@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -116,7 +112,10 @@ impl SomeProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<SomeProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<SomeProtocolEvent, fidl::Error> {
         SomeProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }
@@ -316,12 +315,31 @@ impl fidl::endpoints::ControlHandle for SomeProtocolControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl SomeProtocolControlHandle {}
 
 mod internal {
     use super::*;
+
+    impl fidl::encoding::ResourceTypeMarker for Handles {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
     unsafe impl fidl::encoding::TypeMarker for Handles {
         type Owned = Self;
@@ -336,26 +354,23 @@ mod internal {
             136
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for Handles {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Handles> for &mut Handles {
+    unsafe impl fidl::encoding::Encode<Handles, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut Handles
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Handles>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Handles>::encode(
+            fidl::encoding::Encode::<Handles, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
                 (
                     <fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.plain_handle),
                     <fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.bti_handle),
@@ -403,6 +418,7 @@ mod internal {
                     { fidl::ObjectType::NONE.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T1: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -410,6 +426,7 @@ mod internal {
                     { fidl::ObjectType::BTI.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T2: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -417,6 +434,7 @@ mod internal {
                     { fidl::ObjectType::CHANNEL.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T3: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -424,6 +442,7 @@ mod internal {
                     { fidl::ObjectType::CLOCK.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T4: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -431,6 +450,7 @@ mod internal {
                     { fidl::ObjectType::DEBUGLOG.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T5: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -438,6 +458,7 @@ mod internal {
                     { fidl::ObjectType::EVENT.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T6: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -445,6 +466,7 @@ mod internal {
                     { fidl::ObjectType::EVENTPAIR.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T7: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -452,6 +474,7 @@ mod internal {
                     { fidl::ObjectType::EXCEPTION.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T8: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -459,6 +482,7 @@ mod internal {
                     { fidl::ObjectType::FIFO.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T9: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -466,6 +490,7 @@ mod internal {
                     { fidl::ObjectType::GUEST.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T10: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -473,6 +498,7 @@ mod internal {
                     { fidl::ObjectType::INTERRUPT.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T11: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -480,6 +506,7 @@ mod internal {
                     { fidl::ObjectType::IOMMU.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T12: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -487,6 +514,7 @@ mod internal {
                     { fidl::ObjectType::JOB.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T13: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -494,6 +522,7 @@ mod internal {
                     { fidl::ObjectType::MSI.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T14: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -501,6 +530,7 @@ mod internal {
                     { fidl::ObjectType::PAGER.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T15: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -508,6 +538,7 @@ mod internal {
                     { fidl::ObjectType::PMT.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T16: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -515,6 +546,7 @@ mod internal {
                     { fidl::ObjectType::PORT.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T17: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -522,6 +554,7 @@ mod internal {
                     { fidl::ObjectType::PROCESS.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T18: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -529,6 +562,7 @@ mod internal {
                     { fidl::ObjectType::PROFILE.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T19: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -536,6 +570,7 @@ mod internal {
                     { fidl::ObjectType::RESOURCE.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T20: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -543,6 +578,7 @@ mod internal {
                     { fidl::ObjectType::SOCKET.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T21: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -550,6 +586,7 @@ mod internal {
                     { fidl::ObjectType::STREAM.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T22: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -557,6 +594,7 @@ mod internal {
                     { fidl::ObjectType::SUSPEND_TOKEN.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T23: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -564,6 +602,7 @@ mod internal {
                     { fidl::ObjectType::THREAD.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T24: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -571,6 +610,7 @@ mod internal {
                     { fidl::ObjectType::TIMER.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T25: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -578,6 +618,7 @@ mod internal {
                     { fidl::ObjectType::VCPU.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T26: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -585,6 +626,7 @@ mod internal {
                     { fidl::ObjectType::VMAR.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T27: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -592,9 +634,11 @@ mod internal {
                     { fidl::ObjectType::VMO.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T28: fidl::encoding::Encode<
                 fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T29: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -602,6 +646,7 @@ mod internal {
                     { fidl::ObjectType::NONE.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T30: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -609,17 +654,21 @@ mod internal {
                     { fidl::ObjectType::VMO.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T31: fidl::encoding::Encode<
                 fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T32: fidl::encoding::Encode<
                 fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T33: fidl::encoding::Encode<
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-        > fidl::encoding::Encode<Handles>
+        > fidl::encoding::Encode<Handles, fidl::encoding::DefaultFuchsiaResourceDialect>
         for (
             T0,
             T1,
@@ -660,7 +709,10 @@ mod internal {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -706,47 +758,49 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Handles {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for Handles {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                plain_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
-                bti_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>),
-                channel_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>),
-                clock_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>),
-                debuglog_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>),
-                event_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>),
-                eventpair_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>),
-                exception_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>),
-                fifo_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>),
-                guest_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>),
-                interrupt_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>),
-                iommu_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>),
-                job_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>),
-                msi_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>),
-                pager_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>),
-                pmt_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>),
-                port_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>),
-                process_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>),
-                profile_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>),
-                resource_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>),
-                socket_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>),
-                stream_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>),
-                suspendtoken_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>),
-                thread_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>),
-                timer_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>),
-                vcpu_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>),
-                vmar_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>),
-                vmo_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
-                rights_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>),
-                aliased_plain_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
-                aliased_subtype_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
-                aliased_rights_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>),
+                plain_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                bti_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                channel_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                clock_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                debuglog_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                event_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                eventpair_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                exception_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                fifo_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                guest_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                interrupt_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                iommu_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                job_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                msi_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                pager_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                pmt_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                port_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                process_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                profile_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                resource_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                socket_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                stream_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                suspendtoken_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                thread_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                timer_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                vcpu_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                vmar_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                vmo_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                rights_handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                aliased_plain_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                aliased_subtype_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                aliased_rights_handle_field: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>, fidl::encoding::DefaultFuchsiaResourceDialect),
                 some_protocol: fidl::new_empty!(
-                    fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>
+                    fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 request_some_protocol: fidl::new_empty!(
-                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
             }
         }
@@ -754,46 +808,50 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.plain_handle, decoder, offset + 0, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>, &mut self.bti_handle, decoder, offset + 4, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.channel_handle, decoder, offset + 8, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>, &mut self.clock_handle, decoder, offset + 12, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>, &mut self.debuglog_handle, decoder, offset + 16, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>, &mut self.event_handle, decoder, offset + 20, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>, &mut self.eventpair_handle, decoder, offset + 24, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>, &mut self.exception_handle, decoder, offset + 28, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>, &mut self.fifo_handle, decoder, offset + 32, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>, &mut self.guest_handle, decoder, offset + 36, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>, &mut self.interrupt_handle, decoder, offset + 40, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>, &mut self.iommu_handle, decoder, offset + 44, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>, &mut self.job_handle, decoder, offset + 48, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>, &mut self.msi_handle, decoder, offset + 52, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>, &mut self.pager_handle, decoder, offset + 56, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>, &mut self.pmt_handle, decoder, offset + 60, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>, &mut self.port_handle, decoder, offset + 64, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>, &mut self.process_handle, decoder, offset + 68, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>, &mut self.profile_handle, decoder, offset + 72, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>, &mut self.resource_handle, decoder, offset + 76, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>, &mut self.socket_handle, decoder, offset + 80, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>, &mut self.stream_handle, decoder, offset + 84, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>, &mut self.suspendtoken_handle, decoder, offset + 88, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>, &mut self.thread_handle, decoder, offset + 92, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>, &mut self.timer_handle, decoder, offset + 96, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>, &mut self.vcpu_handle, decoder, offset + 100, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>, &mut self.vmar_handle, decoder, offset + 104, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, &mut self.vmo_handle, decoder, offset + 108, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>, &mut self.rights_handle, decoder, offset + 112, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.aliased_plain_handle_field, decoder, offset + 116, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, &mut self.aliased_subtype_handle_field, decoder, offset + 120, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>, &mut self.aliased_rights_handle_field, decoder, offset + 124, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.plain_handle, decoder, offset + 0, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Bti, { fidl::ObjectType::BTI.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.bti_handle, decoder, offset + 4, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.channel_handle, decoder, offset + 8, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Clock, { fidl::ObjectType::CLOCK.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.clock_handle, decoder, offset + 12, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::DebugLog, { fidl::ObjectType::DEBUGLOG.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.debuglog_handle, decoder, offset + 16, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Event, { fidl::ObjectType::EVENT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.event_handle, decoder, offset + 20, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::EventPair, { fidl::ObjectType::EVENTPAIR.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.eventpair_handle, decoder, offset + 24, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Exception, { fidl::ObjectType::EXCEPTION.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.exception_handle, decoder, offset + 28, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Fifo, { fidl::ObjectType::FIFO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.fifo_handle, decoder, offset + 32, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Guest, { fidl::ObjectType::GUEST.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.guest_handle, decoder, offset + 36, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Interrupt, { fidl::ObjectType::INTERRUPT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.interrupt_handle, decoder, offset + 40, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Iommu, { fidl::ObjectType::IOMMU.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.iommu_handle, decoder, offset + 44, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Job, { fidl::ObjectType::JOB.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.job_handle, decoder, offset + 48, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Msi, { fidl::ObjectType::MSI.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.msi_handle, decoder, offset + 52, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Pager, { fidl::ObjectType::PAGER.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.pager_handle, decoder, offset + 56, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Pmt, { fidl::ObjectType::PMT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.pmt_handle, decoder, offset + 60, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Port, { fidl::ObjectType::PORT.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.port_handle, decoder, offset + 64, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Process, { fidl::ObjectType::PROCESS.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.process_handle, decoder, offset + 68, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Profile, { fidl::ObjectType::PROFILE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.profile_handle, decoder, offset + 72, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Resource, { fidl::ObjectType::RESOURCE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.resource_handle, decoder, offset + 76, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.socket_handle, decoder, offset + 80, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Stream, { fidl::ObjectType::STREAM.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.stream_handle, decoder, offset + 84, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::SuspendToken, { fidl::ObjectType::SUSPEND_TOKEN.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.suspendtoken_handle, decoder, offset + 88, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Thread, { fidl::ObjectType::THREAD.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.thread_handle, decoder, offset + 92, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Timer, { fidl::ObjectType::TIMER.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.timer_handle, decoder, offset + 96, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vcpu, { fidl::ObjectType::VCPU.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.vcpu_handle, decoder, offset + 100, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmar, { fidl::ObjectType::VMAR.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.vmar_handle, decoder, offset + 104, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.vmo_handle, decoder, offset + 108, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 5>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.rights_handle, decoder, offset + 112, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.aliased_plain_handle_field, decoder, offset + 116, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.aliased_subtype_handle_field, decoder, offset + 120, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 1>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.aliased_rights_handle_field, decoder, offset + 124, _depth)?;
             fidl::decode!(
                 fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<SomeProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.some_protocol,
                 decoder,
                 offset + 128,
@@ -801,6 +859,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<SomeProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.request_some_protocol,
                 decoder,
                 offset + 132,

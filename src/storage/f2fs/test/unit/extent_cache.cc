@@ -83,8 +83,7 @@ TEST_F(ExtentCacheTest, UpdateExtentCache) {
   for (uint32_t i = 0; i < kNumPage; ++i) {
     FileTester::AppendToFile(file_.get(), buf, kPageSize);
   }
-  WritebackOperation op = {.bSync = true};
-  file_->Writeback(op);
+  file_->Writeback(true, true);
 
   auto extent_info = file_->GetExtentTree().LookupExtent(0);
   ASSERT_TRUE(extent_info.is_ok());
@@ -183,8 +182,7 @@ TEST_F(ExtentCacheTest, SplitAndMerge) TA_NO_THREAD_SAFETY_ANALYSIS {
   for (uint32_t i = 0; i < kNumPage; ++i) {
     FileTester::AppendToFile(file_.get(), buf, kPageSize);
   }
-  WritebackOperation op = {.bSync = true};
-  file_->Writeback(op);
+  file_->Writeback(true, true);
 
   block_t start_blkaddr;
   constexpr pgoff_t kHolePos = kMinExtentLen + 1;
@@ -243,8 +241,7 @@ TEST_F(ExtentCacheTest, GcConsistency) {
   for (uint32_t i = 0; i < kNumPage; ++i) {
     FileTester::AppendToFile(file_.get(), buf, kPageSize);
   }
-  WritebackOperation op = {.bSync = true};
-  file_->Writeback(op);
+  file_->Writeback(true, true);
 
   block_t blkaddr_before, blkaddr_after;
 
@@ -307,8 +304,7 @@ TEST_F(ExtentCacheTest, RecoveryConsistency) {
   for (uint32_t i = 0; i < kNumPage; ++i) {
     FileTester::AppendToFile(file_.get(), buf, kPageSize);
   }
-  WritebackOperation op = {.bSync = true};
-  file_->Writeback(op);
+  file_->Writeback(true, true);
 
   block_t blkaddr_before_modify, blkaddr_after_modify;
 

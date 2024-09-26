@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::ops::Range;
-use zerocopy::{AsBytes, Ref};
+use zerocopy::{IntoBytes, Ref};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_sme as fidl_sme,
@@ -1122,25 +1122,25 @@ mod tests {
         assert_eq!(bss.country(), Some(&[1, 2, 3][..]));
         assert_eq!(bss.rsne(), Some(&fake_wpa2_rsne()[..]));
         assert_variant!(bss.ht_cap(), Some(capability_info) => {
-            assert_eq!(capability_info.bytes(), &ht_cap[..]);
+            assert_eq!(Ref::bytes(&capability_info), &ht_cap[..]);
         });
         assert_eq!(
             bss.raw_ht_cap().map(|capability_info| capability_info.bytes.to_vec()),
             Some(ht_cap)
         );
         assert_variant!(bss.ht_op(), Some(op) => {
-            assert_eq!(op.bytes(), &ht_op[..]);
+            assert_eq!(Ref::bytes(&op), &ht_op[..]);
         });
         assert_eq!(bss.raw_ht_op().map(|op| op.bytes.to_vec()), Some(ht_op));
         assert_variant!(bss.vht_cap(), Some(capability_info) => {
-            assert_eq!(capability_info.bytes(), &vht_cap[..]);
+            assert_eq!(Ref::bytes(&capability_info), &vht_cap[..]);
         });
         assert_eq!(
             bss.raw_vht_cap().map(|capability_info| capability_info.bytes.to_vec()),
             Some(vht_cap)
         );
         assert_variant!(bss.vht_op(), Some(op) => {
-            assert_eq!(op.bytes(), &vht_op[..]);
+            assert_eq!(Ref::bytes(&op), &vht_op[..]);
         });
         assert_eq!(bss.raw_vht_op().map(|op| op.bytes.to_vec()), Some(vht_op));
     }

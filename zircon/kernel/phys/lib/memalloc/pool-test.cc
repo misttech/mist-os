@@ -1823,7 +1823,7 @@ TEST(MemallocPoolTests, Resizing) {
   }
 }
 
-TEST(MemallocPoolTests, TotalRamRestriction) {
+TEST(MemallocPoolTests, TotalRamTruncation) {
   PoolContext ctx;
   Range ranges[] = {
       // free RAM: [0, 2*kChunkSize)
@@ -1836,10 +1836,10 @@ TEST(MemallocPoolTests, TotalRamRestriction) {
   ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
 
   //
-  // Restriction to the current amount of RAM should be a no-op.
+  // Truncation to the current amount of RAM should be a no-op.
   //
 
-  ctx.pool.RestrictTotalRam(2 * kChunkSize);
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(2 * kChunkSize).is_ok());
 
   constexpr Range kUnrestricted[] = {
       // bookkeeping: [0, kChunkSize)
@@ -1858,13 +1858,13 @@ TEST(MemallocPoolTests, TotalRamRestriction) {
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kUnrestricted}));
 
   //
-  // Restriction by a half of a chunk should result in the second half of the
+  // Truncation by a half of a chunk should result in the second half of the
   // free RAM range being removed.
   //
 
-  ctx.pool.RestrictTotalRam(3 * kChunkSize / 2);
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(3 * kChunkSize / 2).is_ok());
 
-  constexpr Range kChunkPartlyShavedOff[] = {
+  constexpr Range kChunkPartlyTruncated[] = {
       // bookkeeping: [0, kChunkSize)
       {
           .addr = 0,
@@ -1877,57 +1877,78 @@ TEST(MemallocPoolTests, TotalRamRestriction) {
           .size = kChunkSize / 2,
           .type = Type::kFreeRam,
       },
+      // truncated RAM: [3*kChunkSize/2, 2*kChunkSize)
+      {
+          .addr = 3 * kChunkSize / 2,
+          .size = kChunkSize / 2,
+          .type = Type::kTruncatedRam,
+      },
   };
-  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kChunkPartlyShavedOff}));
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kChunkPartlyTruncated}));
 
   //
-  // Restriction by another half chunk should just remove the remaining RAM
+  // Truncation by another half chunk should just remove the remaining RAM
   // range, even if allocated.
   //
 
   ASSERT_NO_FATAL_FAILURE(
       TestPoolAllocation(ctx.pool, Type::kPoolTestPayload, kChunkSize / 2, kChunkSize / 2));
 
-  ctx.pool.RestrictTotalRam(kChunkSize);
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(kChunkSize).is_ok());
 
-  constexpr Range kChunkShavedOff[] = {
-      // bookkeeping: [0, kChunkSize)
-      {
-          .addr = 0,
-          .size = kChunkSize,
-          .type = Type::kPoolBookkeeping,
-      },
-  };
-  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kChunkShavedOff}));
+  constexpr Range kChunkTruncated[] = {// bookkeeping: [0, kChunkSize)
+                                       {
+                                           .addr = 0,
+                                           .size = kChunkSize,
+                                           .type = Type::kPoolBookkeeping,
+                                       },
+                                       // truncated RAM: [kChunkSize, 2*kChunkSize)
+                                       {
+                                           .addr = kChunkSize,
+                                           .size = kChunkSize,
+                                           .type = Type::kTruncatedRam,
+                                       }};
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kChunkTruncated}));
 
   //
   // Even parts of bookkeeping space may be removed.
   //
 
-  ctx.pool.RestrictTotalRam(kChunkSize / 2);
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(kChunkSize / 2).is_ok());
 
-  constexpr Range kBookkeepingPartlyShaved[] = {
-      // bookkeeping: [0, kChunkSize/2)
-      {
-          .addr = 0,
-          .size = kChunkSize / 2,
-          .type = Type::kPoolBookkeeping,
-      },
-  };
+  constexpr Range kBookkeepingPartlyShaved[] = {// bookkeeping: [0, kChunkSize/2)
+                                                {
+                                                    .addr = 0,
+                                                    .size = kChunkSize / 2,
+                                                    .type = Type::kPoolBookkeeping,
+                                                },
+                                                // truncated RAM: [kChunkSize/2, 2*kChunkSize)
+                                                {
+                                                    .addr = kChunkSize / 2,
+                                                    .size = 3 * kChunkSize / 2,
+                                                    .type = Type::kTruncatedRam,
+                                                }};
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kBookkeepingPartlyShaved}));
 
   //
   // Even all of bookkeeping space may be removed.
   //
 
-  ctx.pool.RestrictTotalRam(0);
-  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {}));
+  constexpr Range kAllTruncated[] = {// truncated RAM: [0, 2*kChunkSize)
+                                     {
+                                         .addr = 0,
+                                         .size = 2 * kChunkSize,
+                                         .type = Type::kTruncatedRam,
+                                     }};
+
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(0).is_ok());
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, kAllTruncated));
 
   ASSERT_NO_FATAL_FAILURE(TestPoolAllocation(ctx.pool, Type::kPhysScratch, kChunkSize, kChunkSize,
                                              {}, {}, /*alloc_error=*/true));
 }
 
-TEST(MemallocPoolTests, TotalRamRestrictionWithPeripheralRanges) {
+TEST(MemallocPoolTests, TotalRamTruncationWithPeripheralRanges) {
   PoolContext ctx;
   Range ranges[] = {
       // free RAM: [0, 2*kChunkSize)
@@ -1970,14 +1991,15 @@ TEST(MemallocPoolTests, TotalRamRestrictionWithPeripheralRanges) {
   ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
 
   //
-  // Restricting to 3 chunks should result in the following set of ranges,
-  // leaving the peripheral ranges in place and removing all RAM midway through
-  // the test payload.
+  // Truncating to 3 chunks should result in the following set of ranges,
+  // leaving the peripheral ranges in place and reallocating all RAM midway
+  // through the test payload.
   //
 
-  ctx.pool.RestrictTotalRam(3 * kChunkSize);
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(3 * kChunkSize).is_ok());
 
   constexpr Range kExpected[] = {
+      // pool bookkeeping: [0, kChunkSize)
       {
           .addr = 0,
           .size = kChunkSize,
@@ -2001,11 +2023,23 @@ TEST(MemallocPoolTests, TotalRamRestrictionWithPeripheralRanges) {
           .size = kChunkSize,
           .type = Type::kPoolTestPayload,
       },
+      // truncated RAM: [10*kChunkSize, 13*kChunkSize)
+      {
+          .addr = 11 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kTruncatedRam,
+      },
       // peripheral: [20*kChunkSize, 21*kChunkSize)
       {
           .addr = 20 * kChunkSize,
           .size = kChunkSize,
           .type = Type::kPeripheral,
+      },
+      // truncated RAM: [30*kChunkSize, 31*kChunkSize)
+      {
+          .addr = 30 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kTruncatedRam,
       },
   };
 
@@ -2014,21 +2048,38 @@ TEST(MemallocPoolTests, TotalRamRestrictionWithPeripheralRanges) {
   //
   // Even after removing all RAM, we should still track the peripheral ranges.
   //
-  ctx.pool.RestrictTotalRam(0);
+  ASSERT_TRUE(ctx.pool.TruncateTotalRam(0).is_ok());
 
   constexpr Range kJustPeripheral[] = {
-
+      // truncated RAM: [0, 2*kChunkSize)
+      {
+          .addr = 0,
+          .size = 2 * kChunkSize,
+          .type = Type::kTruncatedRam,
+      },
       // peripheral: [2*kChunkSize, 3*kChunkSize)
       {
           .addr = 2 * kChunkSize,
           .size = kChunkSize,
           .type = Type::kPeripheral,
       },
+      // truncated RAM: [10*kChunkSize, 13*kChunkSize)
+      {
+          .addr = 10 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kTruncatedRam,
+      },
       // peripheral: [20*kChunkSize, 21*kChunkSize)
       {
           .addr = 20 * kChunkSize,
           .size = kChunkSize,
           .type = Type::kPeripheral,
+      },
+      // truncated RAM: [30*kChunkSize, 31*kChunkSize)
+      {
+          .addr = 30 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kTruncatedRam,
       },
   };
 

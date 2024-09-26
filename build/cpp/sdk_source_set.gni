@@ -70,15 +70,44 @@ import("//build/sdk/sdk_atom.gni")
 #     See https://fxbug.dev/42068255 for more details about this field.
 #
 #   stable (optional)
-#     Whether this library is stabilized. If false, there will not be
-#     .api file generated, and the atom will be marked as unstable in the final
-#     IDK.
-#     Defaults to false.
+#     Whether this source library is stabilized.
+#     When true, an .api file is generated. When false, the atom is marked as
+#     unstable in the final IDK.
+#     Must be specified when `sdk_category` is defined and not "internal";
+#     otherwise, must not be specified.
 #
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
-  is_internal = invoker.category == "internal"
 
+  # Only categories that are included in an IDK makes sense.
+  valid_categories = [
+    # "excluded" is deprecated.
+    # "experimental" is deprecated.
+    "internal",  # TODO(https://fxbug.dev/333125197): Disable once @internal_sdk
+                 # is removed.
+
+    # "cts" is only for ABI compatibility and thus not applicable.
+    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    "partner",
+
+    # "public" is not yet implemented.
+  ]
+
+  # Remove categories that should not be used in new targets.
+  valid_categories_for_error_message = valid_categories - [ "internal" ]
+
+  # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
+  valid_categories += [ "experimental" ]
+
+  # TODO(https://fxbug.dev/331991540): Remove once Firmware SDK no longer uses.
+  valid_categories += [ "firmware_sdk" ]
+
+  assert(
+      valid_categories + [ invoker.category ] - [ invoker.category ] !=
+          valid_categories,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories_for_error_message}.")
+
+  is_internal = invoker.category == "internal"
   assert(is_internal || defined(invoker.sdk_name),
          "Non-internal sdk_source_set must define an SDK name")
 
@@ -100,10 +129,21 @@ template("sdk_source_set") {
 
   sdk_id = "sdk://${sdk_root_path}"
 
-  stable = defined(invoker.stable) && invoker.stable
+  is_exempt_from_unstable_allowlist = false
+  if (invoker.category == "internal" || invoker.category == "firmware_sdk" ||
+      # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
+      invoker.category == "experimental") {
+    assert(!defined(invoker.stable) || !invoker.stable)
+    is_stable = false
+    is_exempt_from_unstable_allowlist = true
+  } else {
+    assert(defined(invoker.stable), "Must specify stability.")
+    is_stable = invoker.stable
+  }
+  assert(!is_stable || invoker.category == "partner")
 
   # Only stable library has API validation
-  if (stable) {
+  if (is_stable) {
     api_reference = "${sdk_name}.api"
     if (defined(invoker.api)) {
       api_reference = invoker.api
@@ -158,12 +198,15 @@ template("sdk_source_set") {
     # Ensure that stable 'sdk_source_set()' targets are included in the SDK
     # source_sets allowlist. The allowlist target's `visibility`
     # list ensures that the target using this template is in the allowlist.
-    if (stable) {
+    if (is_stable) {
       deps += [ "//build/sdk:sdk_source_sets_allowlist" ]
+      not_needed([ "is_exempt_from_unstable_allowlist" ])
+    } else if (!is_exempt_from_unstable_allowlist) {
+      deps += [ "//build/sdk:sdk_unstable_source_sets_allowlist" ]
     }
 
-    # TODO(https://fxbug.dev/42079584): All SDK libraries should compile with `sdk_extra_warnings`.
-    if (invoker.category == "partner" || invoker.category == "public") {
+    # TODO(https://fxbug.dev/42079584): Fix failures and remove exception.
+    if (invoker.category != "internal") {
       configs += [ "//build/config:sdk_extra_warnings" ]
     }
 
@@ -304,11 +347,6 @@ template("sdk_source_set") {
   metadata_target_name = "${target_name}_sdk_metadata"
   metadata_file = "$target_gen_dir/$target_name.sdk_meta.json"
 
-  _stable = false
-  if (defined(invoker.stable)) {
-    _stable = invoker.stable
-  }
-
   action(metadata_target_name) {
     forward_variables_from(invoker, [ "testonly" ])
     script = "//build/cpp/gen_sdk_sources_meta_file.py"
@@ -332,7 +370,7 @@ template("sdk_source_set") {
     args += [ "--sources" ] + sdk_metadata_sources
     args += [ "--headers" ] + sdk_metadata_headers
 
-    if (_stable) {
+    if (is_stable) {
       args += [ "--stable" ]
     }
     deps = sdk_deps
@@ -343,9 +381,22 @@ template("sdk_source_set") {
                            [
                              "source_dir",
                              "testonly",
-                             "category",
                              "sdk_area",
                            ])
+
+    # Atoms for the Firmware SDK, which is not a real IDK, use this template,
+    # but none of the supported categories are appropriate. Specifically, this
+    # template contains special logic related to the Bazel SDK for "internal"
+    # category. Thus, allow "firmware_sdk" in this template then convert it
+    # to "internal" for the atom.
+    # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for
+    # building the firmware SDK.
+    category = invoker.category
+    if (category == "firmware_sdk" ||
+        # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
+        category == "experimental") {
+      category = "internal"
+    }
 
     id = sdk_id
 
@@ -359,7 +410,7 @@ template("sdk_source_set") {
       source = metadata_file
       dest = "$sdk_root_path/meta.json"
       schema = "cc_source_library"
-      stable = _stable
+      stable = is_stable
     }
 
     files = sdk_files

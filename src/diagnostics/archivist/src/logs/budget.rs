@@ -66,9 +66,8 @@ impl BudgetState {
 
         while self.current > self.capacity {
             // find the container with the oldest log message
-            self.containers.sort_unstable_by_key(|c| {
-                c.oldest_timestamp().unwrap_or(zx::MonotonicTime::from_nanos(i64::MAX))
-            });
+            self.containers
+                .sort_unstable_by_key(|c| c.oldest_timestamp().unwrap_or(zx::BootTime::INFINITE));
 
             let container_with_oldest = Arc::clone(
                 self.containers
@@ -177,18 +176,18 @@ mod tests {
         assert_eq!(manager.state.lock().containers.len(), 2);
 
         // Add a few test messages
-        container_b.ingest_message(fake_message_bytes(1));
-        container_a.ingest_message(fake_message_bytes(2));
+        container_b.ingest_message(fake_message_bytes(zx::BootTime::from_nanos(1)));
+        container_a.ingest_message(fake_message_bytes(zx::BootTime::from_nanos(2)));
 
         let mut cursor = CursorWrapper(
             container_b.cursor(StreamMode::SnapshotThenSubscribe, ftrace::Id::random()),
         );
-        assert_eq!(cursor.next().await, Some(Arc::new(fake_message(1))));
+        assert_eq!(cursor.next().await, Some(Arc::new(fake_message(zx::BootTime::from_nanos(1)))));
 
         container_b.mark_stopped();
 
         // This allocation exceeds capacity, so the B container is dropped and terminated.
-        container_a.ingest_message(fake_message_bytes(3));
+        container_a.ingest_message(fake_message_bytes(zx::BootTime::from_nanos(3)));
         assert_eq!(manager.state.lock().containers.len(), 1);
 
         // The container was terminated too.
@@ -198,9 +197,9 @@ mod tests {
         assert_eq!(cursor.next().await, None);
     }
 
-    fn fake_message_bytes(timestamp: i64) -> StoredMessage {
+    fn fake_message_bytes(timestamp: zx::BootTime) -> StoredMessage {
         let record = Record {
-            timestamp,
+            timestamp: timestamp.into_nanos(),
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(123) },
@@ -214,9 +213,9 @@ mod tests {
         StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 
-    fn fake_message(timestamp: i64) -> LogsData {
+    fn fake_message(timestamp: zx::BootTime) -> LogsData {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: timestamp.into(),
+            timestamp: timestamp.into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,

@@ -29,9 +29,9 @@ if (is_host && target_cpu == "x64") {
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-io",
       "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:gpt",
       "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:tempfile",
+      "//tools/make-fuchsia-vol:lib",
     ]
 
     non_rust_deps = [

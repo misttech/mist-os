@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum, HandleBased};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::prelude::*;
 use std::ffi::{CStr, CString};
 use std::{iter, mem};
@@ -838,12 +838,11 @@ pub async fn get_dynamic_linker<'a>(
 
     // Retrieve the dynamic linker as a VMO from fuchsia.ldsvc.Loader
     const LDSO_LOAD_TIMEOUT_SEC: i64 = 30;
-    let load_fut = ldsvc
-        .load_object(interp_str)
-        .map_err(ProcessBuilderError::LoadDynamicLinker)
-        .on_timeout(fasync::Time::after(LDSO_LOAD_TIMEOUT_SEC.seconds()), || {
-            Err(ProcessBuilderError::LoadDynamicLinkerTimeout())
-        });
+    let load_fut =
+        ldsvc.load_object(interp_str).map_err(ProcessBuilderError::LoadDynamicLinker).on_timeout(
+            fasync::Time::after(zx::Duration::from_seconds(LDSO_LOAD_TIMEOUT_SEC)),
+            || Err(ProcessBuilderError::LoadDynamicLinkerTimeout()),
+        );
     let (status, ld_vmo) = load_fut.await?;
     zx::Status::ok(status).map_err(|s| {
         ProcessBuilderError::GenericStatus(
@@ -1484,15 +1483,14 @@ mod tests {
     // contained in it.
     fn parse_handle_info_from_message(message: &zx::MessageBuf) -> Result<Vec<HandleInfo>, Error> {
         let bytes = message.bytes();
-        let header = Ref::<&[u8], process_args::MessageHeader>::new_from_prefix(bytes)
-            .ok_or(anyhow!("Failed to parse process_args header"))?
-            .0;
+        let (header, _) = Ref::<&[u8], process_args::MessageHeader>::from_prefix(bytes)
+            .map_err(|_| anyhow!("Failed to parse process_args header"))?;
 
         let offset = header.handle_info_off as usize;
         let len = mem::size_of::<u32>() * message.n_handles();
         let info_bytes = &bytes[offset..offset + len];
-        let raw_info = Ref::<&[u8], [u32]>::new_slice(info_bytes)
-            .ok_or(anyhow!("Failed to parse raw handle info"))?;
+        let raw_info = Ref::<&[u8], [u32]>::from_bytes(info_bytes)
+            .map_err(|_| anyhow!("Failed to parse raw handle info"))?;
 
         Ok(raw_info.iter().map(|raw| HandleInfo::try_from(*raw)).collect::<Result<_, _>>()?)
     }

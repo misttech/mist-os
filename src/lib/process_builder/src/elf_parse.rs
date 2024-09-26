@@ -10,7 +10,7 @@ use num_traits::cast::FromPrimitive;
 use static_assertions::assert_eq_size;
 use std::{fmt, mem};
 use thiserror::Error;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Possible errors that can occur during ELF parsing.
 #[derive(Error, Debug)]
@@ -47,7 +47,9 @@ trait Validate {
 }
 
 /// ELF identity header.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Debug, Eq, PartialEq, Default, Clone, Copy)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Debug, Eq, PartialEq, Default, Clone, Copy,
+)]
 #[repr(C)]
 pub struct ElfIdent {
     /// e_ident[EI_MAG0:EI_MAG3]
@@ -118,7 +120,9 @@ impl ElfIdent {
     }
 }
 
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Debug, Eq, PartialEq, Default, Clone, Copy)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Debug, Eq, PartialEq, Default, Clone, Copy,
+)]
 #[repr(C)]
 pub struct Elf64FileHeader {
     pub ident: ElfIdent,
@@ -229,7 +233,9 @@ impl Validate for Elf64FileHeader {
     }
 }
 
-#[derive(FromZeros, FromBytes, NoCell, AsBytes, Debug, Eq, PartialEq, Default, Clone, Copy)]
+#[derive(
+    KnownLayout, FromBytes, Immutable, IntoBytes, Debug, Eq, PartialEq, Default, Clone, Copy,
+)]
 #[repr(C)]
 pub struct Elf64ProgramHeader {
     pub segment_type: u32,
@@ -284,7 +290,9 @@ pub enum Elf64DynTag {
     Hiproc = 0x7fffffff,
 }
 
-#[derive(AsBytes, NoCell, Copy, Clone, FromBytes, FromZeros, Default, Debug, Eq, PartialEq)]
+#[derive(
+    IntoBytes, Immutable, Copy, Clone, KnownLayout, FromBytes, Default, Debug, Eq, PartialEq,
+)]
 #[repr(C)]
 pub struct Elf64Dyn {
     pub tag: u64,
@@ -303,7 +311,7 @@ pub type Elf64Word = u32;
 pub type Elf64Xword = u64;
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct elf64_sym {
     pub st_name: Elf64Word,
     pub st_info: u8,
@@ -429,7 +437,7 @@ impl Elf64Headers {
     pub fn from_vmo(vmo: &zx::Vmo) -> Result<Elf64Headers, ElfParseError> {
         // Read and parse the ELF file header from the VMO.
         let mut file_header = Box::<Elf64FileHeader>::default();
-        vmo.read(file_header.as_bytes_mut(), 0).map_err(|s| ElfParseError::ReadError(s))?;
+        vmo.read(file_header.as_mut_bytes(), 0).map_err(|s| ElfParseError::ReadError(s))?;
         file_header.validate()?;
 
         // Read and parse the ELF program headers from the VMO. Also support the degenerate case
@@ -438,7 +446,7 @@ impl Elf64Headers {
         let mut program_headers = None;
         if file_header.phnum > 0 {
             let mut phdrs = vec![Elf64ProgramHeader::default(); file_header.phnum as usize];
-            vmo.read(phdrs.as_bytes_mut(), file_header.phoff as u64)
+            vmo.read(phdrs.as_mut_bytes(), file_header.phoff as u64)
                 .map_err(|s| ElfParseError::ReadError(s))?;
             phdrs.validate()?;
             program_headers = Some(phdrs.into_boxed_slice());
@@ -506,7 +514,7 @@ impl Elf64DynSection {
         if let Some(dynamic_header) = headers.program_header_with_type(SegmentType::Dynamic)? {
             let dyn_entries_size = dynamic_header.filesz as usize / ENTRY_SIZE;
             let mut entries = vec![Elf64Dyn::default(); dyn_entries_size];
-            vmo.read(entries.as_bytes_mut(), dynamic_header.offset as u64)
+            vmo.read(entries.as_mut_bytes(), dynamic_header.offset as u64)
                 .map_err(|s| ElfParseError::ReadError(s))?;
             let dyn_entries = entries.into_boxed_slice();
             return Ok(Elf64DynSection { dyn_entries });

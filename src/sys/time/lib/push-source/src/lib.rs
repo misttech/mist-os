@@ -533,7 +533,7 @@ mod test {
         assert_eq!(proxy_3.watch_status().await.unwrap(), Status::Hardware);
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_property_updates_sent_to_update_algorithm() {
         let mut harness = TestHarness::new();
         let proxy = harness.new_proxy();
@@ -541,8 +541,10 @@ mod test {
 
         proxy.update_device_properties(&Properties::default()).unwrap();
         proxy_2.update_device_properties(&Properties::default()).unwrap();
-        // Sleep here to allow the executor to run the tasks servicing these requests.
-        fasync::Timer::new(fasync::Time::after(zx::Duration::from_nanos(1000))).await;
+
+        // Allow tasks to service the request before checking the properties.
+        let _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+
         harness.assert_device_properties(&vec![Properties::default(), Properties::default()]).await;
     }
 }

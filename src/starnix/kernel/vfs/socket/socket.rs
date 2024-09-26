@@ -46,8 +46,9 @@ use std::collections::VecDeque;
 use std::ffi::CStr;
 use std::mem::size_of;
 use std::net::IpAddr;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes as _};
+use zerocopy::{FromBytes as _, IntoBytes};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 
@@ -355,8 +356,14 @@ impl Socket {
             Anon,
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
-        node.set_socket(socket.clone());
         FileObject::new_anonymous(SocketFile::new(socket), node, open_flags)
+    }
+
+    /// Returns the Socket that this FileHandle refers to. If this file is not a socket file,
+    /// returns ENOTSOCK.
+    pub fn get_from_file(file: &FileHandle) -> Result<&SocketHandle, Errno> {
+        let socket_file = file.downcast_file::<SocketFile>().ok_or_else(|| errno!(ENOTSOCK))?;
+        Ok(&socket_file.socket)
     }
 
     pub fn downcast_socket<T>(&self) -> Option<&T>
@@ -502,13 +509,13 @@ impl Socket {
                     if let Some(errno) = maybe_errno {
                         return errno;
                     }
-                    sockaddr_in {
+                    let _ = sockaddr_in {
                         sin_family: AF_INET,
                         sin_port: 0,
                         sin_addr: in_addr { s_addr },
                         __pad: Default::default(),
                     }
-                    .write_to_prefix(addr.as_bytes_mut());
+                    .write_to_prefix(addr.as_mut_bytes());
                     addr
                 };
 
@@ -576,6 +583,7 @@ impl Socket {
                     unsafe { in_ifreq.ifr_ifru.ifru_addr }.as_bytes(),
                 )
                 .expect("sockaddr_in is smaller than sockaddr")
+                .0
                 .sin_addr
                 .s_addr;
                 if addr != 0 {
@@ -728,7 +736,11 @@ impl Socket {
         self.ops.connect(self, current_task, peer)
     }
 
-    pub fn listen(&self, backlog: i32, credentials: ucred) -> Result<(), Errno> {
+    pub fn listen(&self, current_task: &CurrentTask, backlog: i32) -> Result<(), Errno> {
+        let max_connections =
+            current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
+        let backlog = std::cmp::min(backlog, max_connections);
+        let credentials = current_task.as_ucred();
         self.ops.listen(self, backlog, credentials)
     }
 

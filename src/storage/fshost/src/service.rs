@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
-use crate::device::{constants, BlockDevice, Device};
-use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
-use crate::service::constants::{
-    DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
+use crate::device::constants::{
+    self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
+    UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
 };
+use crate::device::{BlockDevice, Device};
+use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
 use crate::{debug_log, fxblob, watcher};
 use anyhow::{anyhow, Context, Error};
 use device_watcher::recursive_wait_and_open;
@@ -195,7 +196,8 @@ async fn wipe_storage_fxblob(
     let mut serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
     let blob_volume = serving_fxfs
         .create_volume(
-            "blob",
+            BLOB_VOLUME_LABEL,
+            fidl_fuchsia_fs_startup::CreateOptions::default(),
             fidl_fuchsia_fs_startup::MountOptions { as_blob: Some(true), ..Default::default() },
         )
         .await
@@ -534,7 +536,7 @@ async fn shred_data_volume(
             ServeFilesystemStatus::FormatRequired => return Ok(()),
             ServeFilesystemStatus::Serving(fs) => fs,
         };
-        let unencrypted = filesystem.volume("unencrypted").ok_or_else(|| {
+        let unencrypted = filesystem.volume(UNENCRYPTED_VOLUME_LABEL).ok_or_else(|| {
             tracing::error!("Failed to find unencrypted volume");
             zx::Status::NOT_FOUND
         })?;

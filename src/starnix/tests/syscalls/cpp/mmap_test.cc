@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
@@ -16,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -304,6 +306,22 @@ TEST_F(MMapProcTest, AdjacentFileMappings) {
 
   close(fd);
   unlink(path.c_str());
+}
+
+TEST_F(MMapProcTest, OrderOfLayout) {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  static int anchor;
+  uintptr_t executable_addr = reinterpret_cast<uintptr_t>(&anchor);
+  uintptr_t program_break = reinterpret_cast<uintptr_t>(sbrk(0));
+  uintptr_t mmap_general_addr = reinterpret_cast<uintptr_t>(
+      mmap(nullptr, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  ASSERT_NE((void*)mmap_general_addr, MAP_FAILED);
+  uintptr_t stack_addr = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+
+  EXPECT_LT(executable_addr, program_break);
+  EXPECT_LT(program_break, mmap_general_addr);
+  EXPECT_LT(mmap_general_addr, stack_addr);
+  SAFE_SYSCALL(munmap((void*)mmap_general_addr, page_size));
 }
 
 class MMapProcStatmTest : public ProcTestBase, public testing::WithParamInterface<int> {
@@ -1081,6 +1099,36 @@ TEST(Mmap, ProtExecInChild) {
     ASSERT_NE(mapped, MAP_FAILED);
   });
   ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Mmap, ChoosesSameAddress) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* addr1 = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(addr1, MAP_FAILED);
+  ASSERT_EQ(munmap(addr1, page_size), 0);
+  void* addr2 = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_EQ(addr1, addr2);
+  ASSERT_EQ(munmap(addr2, page_size), 0);
+}
+
+TEST(Mmap, AddressesAreInDescendingOrder) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  std::vector<void*> addresses;
+  auto restorer = fit::defer([&]() {
+    for (auto addr : addresses) {
+      EXPECT_EQ(munmap(addr, page_size), 0);
+    }
+  });
+
+  for (size_t i = 0; i < 10; i++) {
+    void* addr = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(addr, MAP_FAILED);
+    addresses.push_back(addr);
+  }
+
+  for (size_t i = 1; i < addresses.size(); i++) {
+    EXPECT_LT(addresses[i], addresses[i - 1]);
+  }
 }
 
 }  // namespace

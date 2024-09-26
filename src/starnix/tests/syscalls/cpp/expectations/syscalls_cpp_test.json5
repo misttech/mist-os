@@ -31,6 +31,7 @@
                 "SysfsPowerTest.SuspendStateFileWriteFailsEpollDelete",
                 "SysfsPowerTest.SuspendStatsFilesUpdateAfterSuccessfulSuspend",
                 "SysfsPowerTest.SuspendStatsFilesUpdateAfterFailedSuspend",
+                "SysfsPowerTest.WakeLockBlocksSuspend",
             ],
         },
         {
@@ -67,6 +68,12 @@
                 "OverlayFs/FsMountTest.CantBypassDirectoryPermissions/0",
                 "OverlayFs/FsMountTest.ChmodWithDifferentModes/0",
                 "OverlayFs/FsMountTest.CreateWithDifferentModes/0",
+
+                // TODO(https://fxbug.dev/368658840)
+                "OverlayFs/FsMountTest.ChownMinusOneSucceeds/0",
+                "OverlayFs/FsMountTest.ChownMinusOneNoPathAccessFails/0",
+                "TmpFs/FsMountTest.ChownMinusOneSucceeds/0",
+                "TmpFs/FsMountTest.ChownMinusOneNoPathAccessFails/0",
 
                 // TODO(https://fxbug.dev/335701084)
                 "VmspliceTest.FileInPipe",

@@ -16,14 +16,14 @@ pub mod harness {
     use super::*;
     use itertools::{EitherOrBoth, Itertools};
     use std::fmt::Debug;
-    use zerocopy::ByteSlice;
+    use zerocopy::SplitByteSlice;
 
     pub fn assert_msdus_exactly_one_eq<M, E>(
         msdus: impl IntoIterator<Item = Msdu<M>>,
         expected: Msdu<E>,
     ) where
-        M: ByteSlice + Debug,
-        E: ByteSlice + Debug,
+        M: SplitByteSlice + Debug,
+        E: SplitByteSlice + Debug,
     {
         let mut msdus = msdus.into_iter().peekable();
         let Msdu { dst_addr, src_addr, llc_frame } =
@@ -44,8 +44,8 @@ pub mod harness {
         msdus: impl IntoIterator<Item = Msdu<M>>,
         expected: impl IntoIterator<Item = LlcFrame<E>>,
     ) where
-        M: ByteSlice + Debug,
-        E: ByteSlice + Debug,
+        M: SplitByteSlice + Debug,
+        E: SplitByteSlice + Debug,
     {
         let mut msdus = msdus.into_iter().zip_longest(expected).peekable();
         while let Some(EitherOrBoth::Both(Msdu { llc_frame, .. }, expected)) = msdus.peek() {

@@ -142,6 +142,8 @@ section.
    -  [Input report reader library][input-report-reader-library]
 -  SDMMC drivers
    -  [SDMMC drivers architecture][sdmmc-drivers-architecture]
+-  SPMI drivers
+   -  [SPMI overview][spmi-overview]
 
 ### Others
 
@@ -215,3 +217,4 @@ section.
 [driver-examples]: developer_guide/driver-examples.md
 [metadata-tutorial]: tutorials/metadata-tutorial.md
 [dfv2-overview]: dfv2-overview.md
+[spmi-overview]: driver_guides/spmi/overview.md

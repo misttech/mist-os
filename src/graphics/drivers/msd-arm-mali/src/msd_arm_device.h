@@ -140,6 +140,13 @@ class MsdArmDevice : public msd::Device,
 
   magma::Status QueryTimestamp(std::unique_ptr<magma::PlatformBuffer> buffer);
 
+  FuchsiaPowerManager::PowerGoals GetPowerGoals() {
+    if (fuchsia_power_manager_) {
+      return fuchsia_power_manager_->GetPowerGoals();
+    }
+    return {};
+  }
+
   // MsdArmConnection::Owner implementation.
   void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override;
   void CancelAtoms(std::shared_ptr<MsdArmConnection> connection) override;

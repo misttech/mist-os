@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/mipicsi/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/i2c-channel.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fpromise/result.h>
 
 #include <array>

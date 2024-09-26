@@ -8,6 +8,7 @@
 #include <lib/abr/abr.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
 #include <lib/zx/result.h>
@@ -32,6 +33,9 @@ struct ZbiContext {
 //
 // Returns memory map key on success, which will be used for ExitBootService.
 zx::result<size_t> AddMemoryItems(void *zbi, size_t capacity, const ZbiContext *context);
+// Collects ZBI_MEM_TYPE_PERIPHERAL type memory ranges into the given buffer `out`.
+zx::result<cpp20::span<zbi_mem_range_t>> CollectPeripheralMemoryItems(
+    const ZbiContext *context, cpp20::span<zbi_mem_range_t> &out);
 bool AddGigabootZbiItems(zbi_header_t *image, size_t capacity, const AbrSlotIndex *slot,
                          ZbiContext *context);
 zbi_result_t AddBootloaderFiles(const char *name, const void *data, size_t len);

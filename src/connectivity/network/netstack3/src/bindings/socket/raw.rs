@@ -5,7 +5,6 @@
 use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
-use fidl::encoding::Decode as _;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker, RequestStream};
 use futures::StreamExt as _;
 use log::error;
@@ -21,7 +20,7 @@ use netstack3_core::sync::Mutex;
 use netstack3_core::IpExt;
 use packet::Buf;
 use packet_formats::ip::IpPacket as _;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
@@ -51,7 +50,7 @@ impl RawIpSocketsBindingsTypes for BindingsCtx {
 }
 
 impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
-    fn receive_packet<B: ByteSlice>(
+    fn receive_packet<B: SplitByteSlice>(
         &self,
         socket: &RawIpSocketId<I>,
         packet: &I::Packet<B>,
@@ -73,7 +72,7 @@ impl<I: IpExt> SocketState<I> {
         SocketState { rx_queue: Mutex::new(MessageQueue::new(event)) }
     }
 
-    fn enqueue_rx_packet<B: ByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
+    fn enqueue_rx_packet<B: SplitByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
         // NB: Perform the expensive tasks before taking the message queue lock.
         let packet = ReceivedIpPacket::new::<B>(packet, device);
         self.rx_queue.lock().receive(packet);
@@ -96,7 +95,7 @@ struct ReceivedIpPacket<I: Ip> {
 }
 
 impl<I: IpExt> ReceivedIpPacket<I> {
-    fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
+    fn new<B: SplitByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
         // NB: Match Linux, and only provide the packet header for IPv4.
         let data = match I::VERSION {
             IpVersion::V4 => packet.to_vec(),
@@ -158,7 +157,7 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
 
     type Spawner = ();
 
-    fn handle_request(
+    async fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
@@ -370,12 +369,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                         .log_error("raw::GetIpMulticastTtl"),
                 )
                 .unwrap_or_log("failed to respond"),
-            fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => {
-                respond_not_supported!("raw::SetIpMulticastLoopback", responder)
-            }
-            fpraw::SocketRequest::GetIpMulticastLoopback { responder } => {
-                respond_not_supported!("raw::GetIpMulticastLoopback", responder)
-            }
+            fpraw::SocketRequest::SetIpMulticastLoopback { value, responder } => responder
+                .send(
+                    handle_set_multicast_loop(ctx, data, value, IpVersion::V4)
+                        .log_error("raw::SetIpMulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpMulticastLoopback { responder } => responder
+                .send(
+                    handle_get_multicast_loop(ctx, data, IpVersion::V4)
+                        .log_error("raw::GetIpMulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::AddIpMembership { membership: _, responder } => {
                 respond_not_supported!("raw::AddIpMembership", responder)
             }
@@ -437,12 +442,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                         .log_error("raw::GetIpv6MulticastHops"),
                 )
                 .unwrap_or_log("failed to respond"),
-            fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => {
-                respond_not_supported!("raw::SetIpv6MulticastLoopback", responder)
-            }
-            fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => {
-                respond_not_supported!("raw::GetIpv6MulticastLoopback", responder)
-            }
+            fpraw::SocketRequest::SetIpv6MulticastLoopback { value, responder } => responder
+                .send(
+                    handle_set_multicast_loop(ctx, data, value, IpVersion::V6)
+                        .log_error("raw::SetIpv6MulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => responder
+                .send(
+                    handle_get_multicast_loop(ctx, data, IpVersion::V6)
+                        .log_error("raw::GetIpv6MulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6Only { value: _, responder } => {
                 respond_not_supported!("raw::SetIpv6Only", responder)
             }
@@ -648,12 +659,7 @@ fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
         I::SocketAddress::new(src_addr, RAW_IP_PORT_NUM).into_sock_addr()
     });
 
-    Ok(RecvMsgResponse {
-        src_addr,
-        data,
-        control: fposix_socket::NetworkSocketRecvControlData::new_empty(),
-        truncated_bytes,
-    })
+    Ok(RecvMsgResponse { src_addr, data, control: Default::default(), truncated_bytes })
 }
 
 /// Handler for a [`fpraw::SocketRequest::SendMsg`] request.
@@ -764,6 +770,39 @@ fn handle_get_icmpv6_filter<I: IpExt>(
             Ok(filter) => Ok(filter.into_fidl()),
         },
     )
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::SetIpMulticastLoop`]
+///  - [`fpraw::SocketRequest::SetIpv6MulticastLoop`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_set_multicast_loop<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    value: bool,
+    ip_version: IpVersion,
+) -> Result<(), fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+    let _old_value: bool = ctx.api().raw_ip_socket().set_multicast_loop(&socket.id, value);
+    Ok(())
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::GetIpMulticastLoop`]
+///  - [`fpraw::SocketRequest::GetIpv6MulticastLoop`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_multicast_loop<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    ip_version: IpVersion,
+) -> Result<bool, fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+
+    Ok(ctx.api().raw_ip_socket().get_multicast_loop(&socket.id))
 }
 
 /// The type of hop limit to set/get.

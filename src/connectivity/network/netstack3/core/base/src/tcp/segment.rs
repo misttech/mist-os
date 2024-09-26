@@ -8,6 +8,7 @@ use crate::alloc::borrow::ToOwned;
 use core::borrow::Borrow;
 use core::convert::TryFrom as _;
 use core::fmt::Debug;
+use core::mem::MaybeUninit;
 use core::num::{NonZeroU16, TryFromIntError};
 use core::ops::Range;
 
@@ -385,6 +386,13 @@ pub trait Payload: PayloadLen + Sized {
     /// Panics if offset is too large or we couldn't fill the `dst` slice.
     fn partial_copy(&self, offset: usize, dst: &mut [u8]);
 
+    /// Copies part of the payload beginning at `offset` into `dst`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if offset is too large or we couldn't fill the `dst` slice.
+    fn partial_copy_uninit(&self, offset: usize, dst: &mut [MaybeUninit<u8>]);
+
     /// Creates a new empty payload.
     ///
     /// An empty payload must report 0 as its length.
@@ -416,6 +424,15 @@ impl Payload for &[u8] {
         dst.copy_from_slice(&self[offset..offset + dst.len()])
     }
 
+    fn partial_copy_uninit(&self, offset: usize, dst: &mut [MaybeUninit<u8>]) {
+        // TODO(https://github.com/rust-lang/rust/issues/79995): Replace unsafe
+        // with copy_from_slice when stabiliized.
+        let src = &self[offset..offset + dst.len()];
+        // SAFETY: &[T] and &[MaybeUninit<T>] have the same layout.
+        let uninit_src: &[MaybeUninit<u8>] = unsafe { core::mem::transmute(src) };
+        dst.copy_from_slice(&uninit_src);
+    }
+
     fn new_empty() -> Self {
         &[]
     }
@@ -439,6 +456,15 @@ impl Payload for () {
     }
 
     fn partial_copy(&self, offset: usize, dst: &mut [u8]) {
+        if dst.len() != 0 || offset != 0 {
+            panic!(
+                "source slice length (0) does not match destination slice length ({})",
+                dst.len()
+            );
+        }
+    }
+
+    fn partial_copy_uninit(&self, offset: usize, dst: &mut [MaybeUninit<u8>]) {
         if dst.len() != 0 || offset != 0 {
             panic!(
                 "source slice length (0) does not match destination slice length ({})",
@@ -640,6 +666,10 @@ mod test {
         }
 
         fn partial_copy(&self, _offset: usize, _dst: &mut [u8]) {
+            unimplemented!("TestPayload doesn't carry any data");
+        }
+
+        fn partial_copy_uninit(&self, _offset: usize, _dst: &mut [MaybeUninit<u8>]) {
             unimplemented!("TestPayload doesn't carry any data");
         }
 

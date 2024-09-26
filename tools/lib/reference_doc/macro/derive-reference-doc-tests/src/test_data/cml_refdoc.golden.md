@@ -463,6 +463,12 @@ This supports the following additional fields:
 
     For `resolver`, the target of the path MUST be a channel and MUST speak
     the protocol `fuchsia.component.resolution.Resolver`.
+
+    For `dictionary`, this is optional. If provided, it is a path to a
+    `fuchsia.component.sandbox/Router` served by the program which should return a
+    `fuchsia.component.sandbox/DictionaryRef`, by which the program may dynamically provide
+    a dictionary from itself. If this is set for `dictionary`, `offer` to this dictionary
+    is not allowed.
 - `rights`: (_optional `array of string`_) (`directory` only) The maximum [directory rights][doc-directory-rights] that may be set
     when using this directory.
 - `from`: (_optional `string`_) (`storage` only) The source component of an existing directory capability backing this
@@ -475,9 +481,6 @@ This supports the following additional fields:
     - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
     - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
     - `self/<relative_path>`: A path to a dictionary defined by this component.
-    - `program/<relative_path>`: A path to a dictionary served by this component's program.
-      <relative_path> is a path in the program's outgoing directory to a
-      fuchsia.component.sandbox/DictionaryGetter protocol.
     `<relative_path>` may be either a name, identifying a dictionary capability), or
     a path with multiple parts, identifying a nested dictionary.
 - `backing_dir`: (_optional `string`_) (`storage` only) The [name](#name) of the directory capability backing the storage. The

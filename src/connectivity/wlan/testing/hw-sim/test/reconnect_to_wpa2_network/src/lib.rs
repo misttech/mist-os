@@ -5,7 +5,6 @@
 use anyhow::format_err;
 use fidl_test_wlan_realm::WlanConfig;
 use fuchsia_async::Task;
-use fuchsia_zircon::prelude::*;
 use futures::channel::oneshot;
 use ieee80211::{Bssid, Ssid};
 use std::pin::pin;
@@ -18,7 +17,7 @@ use wlan_hw_sim::*;
 use wlan_rsn::rsna::UpdateSink;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap as fidl_tap,
+    fidl_fuchsia_wlan_tap as fidl_tap, fuchsia_zircon as zx,
 };
 
 async fn run_policy_and_assert_transparent_reconnect(
@@ -159,7 +158,7 @@ async fn reconnect_to_wpa2_network() {
     ));
     helper
         .run_until_complete_or_timeout(
-            30.seconds(),
+            zx::Duration::from_seconds(30),
             format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_reassociate(
                 &phy,

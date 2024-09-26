@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use super::{format_sources, get_policy, unseal_sources, KeyConsumer};
+use crate::device::constants::{DATA_VOLUME_LABEL, UNENCRYPTED_VOLUME_LABEL};
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
-use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume};
 use fuchsia_component::client::{
@@ -77,10 +78,12 @@ pub async fn unlock_data_volume<'a>(
 ) -> Result<Option<(CryptService, String, &'a mut ServingVolume)>, Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
     if config.check_filesystems {
-        fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
+        fs.check_volume(UNENCRYPTED_VOLUME_LABEL, None)
+            .await
+            .context("Failed to verify unencrypted")?;
     }
     let root_vol = fs
-        .open_volume("unencrypted", MountOptions::default())
+        .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
         .await
         .context("Failed to open unencrypted")?;
     let keybag_dir = fuchsia_fs::directory::open_directory_deprecated(
@@ -104,18 +107,18 @@ pub async fn unlock_data_volume<'a>(
             .await
             .context("init_crypt_service")?;
     if config.check_filesystems {
-        fs.check_volume("data", Some(crypt_service.connect()))
+        fs.check_volume(DATA_VOLUME_LABEL, Some(crypt_service.connect()))
             .await
             .context("Failed to verify data")?;
     }
     let crypt = Some(crypt_service.connect());
 
     let volume = fs
-        .open_volume("data", MountOptions { crypt, ..MountOptions::default() })
+        .open_volume(DATA_VOLUME_LABEL, MountOptions { crypt, ..MountOptions::default() })
         .await
         .context("Failed to open data")?;
 
-    Ok(Some((crypt_service, "data".to_string(), volume)))
+    Ok(Some((crypt_service, DATA_VOLUME_LABEL.to_string(), volume)))
 }
 
 /// Initializes the data volume in `fs`, which should be freshly reformatted.
@@ -126,7 +129,7 @@ pub async fn init_data_volume<'a>(
 ) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
     let root_vol = fs
-        .create_volume("unencrypted", MountOptions::default())
+        .create_volume(UNENCRYPTED_VOLUME_LABEL, CreateOptions::default(), MountOptions::default())
         .await
         .context("Failed to create unencrypted")?;
     let keybag_dir = fuchsia_fs::directory::create_directory_deprecated(
@@ -149,11 +152,15 @@ pub async fn init_data_volume<'a>(
     let crypt = Some(crypt_service.connect());
 
     let volume = fs
-        .create_volume("data", MountOptions { crypt, ..MountOptions::default() })
+        .create_volume(
+            DATA_VOLUME_LABEL,
+            CreateOptions::default(),
+            MountOptions { crypt, ..MountOptions::default() },
+        )
         .await
         .context("Failed to create data")?;
 
-    Ok((crypt_service, "data".to_string(), volume))
+    Ok((crypt_service, DATA_VOLUME_LABEL.to_string(), volume))
 }
 
 static FXFS_CRYPT_COLLECTION_NAME: &str = "fxfs-crypt";
@@ -242,4 +249,19 @@ impl Drop for CryptService {
             });
         }
     }
+}
+
+pub async fn shred_key_bag(unencrypted_volume: &ServingVolume) -> Result<(), Error> {
+    let dir = fuchsia_fs::directory::open_directory_deprecated(
+        unencrypted_volume.root(),
+        "keys",
+        fio::OpenFlags::RIGHT_WRITABLE,
+    )
+    .await
+    .context("Failed to open keys dir")?;
+    dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
+        .await?
+        .map_err(|e| anyhow!(zx::Status::from_raw(e)))
+        .context("Failed to remove keybag")?;
+    Ok(())
 }

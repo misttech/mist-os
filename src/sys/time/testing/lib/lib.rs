@@ -705,13 +705,13 @@ pub const STD_DEV: zx::Duration = zx::Duration::from_millis(50);
 
 /// Create a new clock with backstop time set to `BACKSTOP_TIME`.
 // TODO: b/306024715 - To be removed once all tests are migrated to TTRF.
-pub fn new_clock() -> Arc<zx::Clock> {
+pub fn new_clock() -> Arc<zx::SyntheticClock> {
     Arc::new(new_nonshareable_clock())
 }
 
 /// Create a new clock with backstop time set to `BACKSTOP_TIME`.
-pub fn new_nonshareable_clock() -> zx::Clock {
-    zx::Clock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME)).unwrap()
+pub fn new_nonshareable_clock() -> zx::SyntheticClock {
+    zx::SyntheticClock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME)).unwrap()
 }
 
 fn zx_time_to_rtc_time(zx_time: zx::SyntheticTime) -> fidl_fuchsia_hardware_rtc::Time {

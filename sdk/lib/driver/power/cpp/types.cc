@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/power/cpp/types.h"
-
+#include <lib/driver/power/cpp/types.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace fdf_power {
 
@@ -51,3 +52,5 @@ std::optional<std::string> ParentElement::GetInstanceName() const {
 bool ParentElement::operator==(const ParentElement& rhs) const { return value_ == rhs.value_; }
 
 }  // namespace fdf_power
+
+#endif

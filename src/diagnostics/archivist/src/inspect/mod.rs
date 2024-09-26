@@ -30,7 +30,7 @@ pub struct NodeHierarchyData {
     // Name of the file that created this snapshot.
     name: Option<InspectHandleName>,
     // Timestamp at which this snapshot resolved or failed.
-    timestamp: zx::MonotonicTime,
+    timestamp: zx::BootTime,
     // Errors encountered when processing this snapshot.
     errors: Vec<schema::InspectError>,
     // Optional DiagnosticsHierarchy of the inspect hierarchy, in case reading fails
@@ -313,7 +313,7 @@ impl ReaderServer {
         let mut builder = InspectDataBuilder::new(
             pumped_inspect_data.identity.moniker.clone(),
             identity.url.clone(),
-            hierarchy_data.timestamp.into_nanos(),
+            hierarchy_data.timestamp,
         );
         if let Some(hierarchy) = hierarchy_data.hierarchy {
             builder = builder.with_hierarchy(hierarchy);

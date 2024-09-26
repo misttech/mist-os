@@ -59,6 +59,7 @@ class ImageAssemblyConfig:
     devicetree: Optional[FilePath] = None
     netboot_mode: bool = False
     board_name: str = None
+    image_mode: str = None
 
     # TODO:  Flesh out the images_config with the actual types, if it's needed.
     images_config: Dict[str, List[str]] = field(default_factory=dict)

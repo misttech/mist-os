@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/power-support.h>
+#include <zircon/syscalls/object.h>
 
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 
-#include "lib/fidl/cpp/wire/channel.h"
-#include "sdk/lib/driver/power/cpp/element-description-builder.h"
-#include "sdk/lib/driver/power/cpp/power-support.h"
-#include "zircon/syscalls/object.h"
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace power_lib_test {
 class ElementBuilderTests : public gtest::TestLoopFixture {};
@@ -157,3 +157,5 @@ TEST_F(ElementBuilderTests, ElementBuilderMin) {
 }
 
 }  // namespace power_lib_test
+
+#endif

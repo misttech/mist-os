@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 metrics_registry("metrics_registry") {
@@ -70,7 +71,7 @@ fuchsia_package_with_single_component("cobalt_system_metrics") {
   deps = [ ":system-metrics" ]
 }
 
-executable("cobalt_system_metrics_unittests") {
+cc_test_executable("cobalt_system_metrics_unittests") {
   testonly = true
 
   sources = [ "system_metrics_daemon_test.cc" ]

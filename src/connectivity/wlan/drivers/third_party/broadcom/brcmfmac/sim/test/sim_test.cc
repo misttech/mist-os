@@ -118,9 +118,7 @@ zx_status_t SimInterface::Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFull
 
 void SimInterface::OnScanResult(OnScanResultRequestView request,
                                 OnScanResultCompleter::Sync& completer) {
-  auto& copy = request->result;
-
-  auto results = scan_results_.find(copy.txn_id);
+  auto results = scan_results_.find(request->txn_id());
 
   // Verify that we started a scan on this interface
   ZX_ASSERT(results != scan_results_.end());
@@ -128,10 +126,12 @@ void SimInterface::OnScanResult(OnScanResultRequestView request,
   // Verify that the scan hasn't sent a completion notice
   ZX_ASSERT(!results->second.result_code);
 
+  fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest copy = fidl::ToNatural(*request);
   // Copy the IES data over since the original location may change data by the time we verify.
-  std::vector<uint8_t> ies(copy.bss.ies.data(), copy.bss.ies.data() + copy.bss.ies.count());
+  std::vector<uint8_t> ies(copy.bss()->ies().data(),
+                           copy.bss()->ies().data() + copy.bss()->ies().size());
   scan_results_ies_.push_back(ies);
-  copy.bss.ies = fidl::VectorView<uint8_t>::FromExternal(*(scan_results_ies_.rbegin()));
+  copy.bss()->ies() = std::vector<uint8_t>(*scan_results_ies_.rbegin());
   results->second.result_list.push_back(copy);
   completer.Reply();
 }
@@ -445,8 +445,8 @@ std::optional<wlan_fullmac_wire::WlanScanResult> SimInterface::ScanResultCode(ui
   return results->second.result_code;
 }
 
-const std::list<wlan_fullmac_wire::WlanFullmacScanResult>* SimInterface::ScanResultList(
-    uint64_t txn_id) {
+const std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest>*
+SimInterface::ScanResultList(uint64_t txn_id) {
   auto results = scan_results_.find(txn_id);
 
   // Verify that we started a scan on this interface

@@ -83,7 +83,9 @@ TEST(Bti, NameSupport) {
   ASSERT_STREQ(empty_name, name_buffer);
 }
 
-void bti_pin_test_helper(bool contiguous_vmo) {
+enum class VmoType : bool { Contiguous, NonContiguous };
+
+void bti_pin_test_helper(VmoType vmo_type) {
   zx::iommu iommu;
   zx::bti bti;
   zx_iommu_desc_dummy_t desc;
@@ -101,7 +103,7 @@ void bti_pin_test_helper(bool contiguous_vmo) {
   static constexpr uint64_t kPageCount = 256;
   const uint64_t kVmoSize = zx_system_get_page_size() * kPageCount;
   zx::vmo vmo;
-  if (contiguous_vmo) {
+  if (vmo_type == VmoType::Contiguous) {
     ASSERT_EQ(zx::vmo::create_contiguous(bti, kVmoSize, 0, &vmo), ZX_OK);
   } else {
     ASSERT_EQ(zx::vmo::create(kVmoSize, 0, &vmo), ZX_OK);
@@ -113,16 +115,16 @@ void bti_pin_test_helper(bool contiguous_vmo) {
 
   ASSERT_EQ(pmt.unpin(), ZX_OK);
 
-  if (contiguous_vmo) {
+  if (vmo_type == VmoType::Contiguous) {
     for (unsigned i = 1; i < kPageCount; i++) {
       ASSERT_EQ(paddrs[i], paddrs[0] + i * zx_system_get_page_size());
     }
   }
 }
 
-TEST(Bti, Pin) { bti_pin_test_helper(false); }
+TEST(Bti, Pin) { bti_pin_test_helper(VmoType::NonContiguous); }
 
-TEST(Bti, PinContiguous) { bti_pin_test_helper(true); }
+TEST(Bti, PinContiguous) { bti_pin_test_helper(VmoType::Contiguous); }
 
 TEST(Bti, PinContigFlag) {
   zx::iommu iommu;

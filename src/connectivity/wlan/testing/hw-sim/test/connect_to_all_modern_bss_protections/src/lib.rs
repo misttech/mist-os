@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::prelude::*;
 use ieee80211::{Bssid, Ssid};
 use tracing::info;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
+use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
 
 /// Test connections against all modern bool (non-WEP/WPA1) BSS protection types.
 #[fuchsia::test]
@@ -63,7 +62,7 @@ async fn connect_to_modern_wpa_network() {
 
         let () = connect_or_timeout(
             &mut helper,
-            30.seconds(),
+            zx::Duration::from_seconds(30),
             &ssid,
             &bss,
             &bss_protection,

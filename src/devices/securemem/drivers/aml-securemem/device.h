@@ -32,7 +32,7 @@ class AmlogicSecureMemDevice;
 
 using AmlogicSecureMemDeviceBase =
     ddk::Device<AmlogicSecureMemDevice, ddk::Messageable<fuchsia_hardware_securemem::Device>::Mixin,
-                ddk::Suspendable>;
+                ddk::Suspendable, ddk::Unbindable>;
 
 class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
                                public ddk::EmptyProtocol<ZX_PROTOCOL_SECURE_MEM> {
@@ -42,6 +42,7 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   zx_status_t Bind();
 
   void DdkSuspend(ddk::SuspendTxn txn);
+  void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease() { delete this; }
 
   // LLCPP interface implementations
@@ -57,6 +58,8 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   zx_status_t CreateAndServeSysmemTee();
 
   void SysmemSecureMemServerOnUnbound(bool is_success);
+
+  void StartCleanServerClose(fit::closure on_unbind_callback);
 
   // The dispatcher that this |AmlogicSecureMemDevice| lives on.
   fdf_dispatcher_t* const fdf_dispatcher_;
@@ -81,8 +84,8 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   async_patterns::DispatcherBound<SysmemSecureMemServer> sysmem_secure_mem_server_{
       sysmem_secure_mem_server_loop_.dispatcher()};
 
-  bool is_suspend_mexec_ = false;
-  std::optional<ddk::SuspendTxn> suspend_txn_;
+  bool is_clean_server_close_started_ = false;
+  fit::closure on_unbind_callback_;
 
   // Used to receive messages from |SysmemSecureMemServer|, e.g. the server has stopped.
   async_patterns::Receiver<AmlogicSecureMemDevice> receiver_;

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::fmt::{Debug, Display, Error, Formatter};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
 /// Error type indicating that the given slice was not the expected size.
 #[derive(Debug, Eq, PartialEq, Hash, thiserror::Error)]
@@ -17,7 +17,7 @@ impl Display for WrongSize {
 
 /// Data type representing a EUI64 address.
 #[derive(
-    Debug, Eq, PartialEq, Hash, Copy, Clone, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+    Debug, Eq, PartialEq, Hash, Copy, Clone, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
 )]
 #[repr(C)]
 #[derive(Default)]
@@ -36,13 +36,16 @@ impl<'a> std::convert::TryInto<&'a EUI64> for &'a [u8] {
     type Error = WrongSize;
 
     fn try_into(self) -> Result<&'a EUI64, Self::Error> {
-        Ref::<_, EUI64>::new_unaligned(self).ok_or(WrongSize).map(Ref::into_ref)
+        Ref::<_, EUI64>::from_bytes(self)
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| WrongSize)
+            .map(Ref::into_ref)
     }
 }
 
 /// Data type representing a EUI48 address.
 #[derive(
-    Debug, Eq, PartialEq, Hash, Copy, Clone, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+    Debug, Eq, PartialEq, Hash, Copy, Clone, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
 )]
 #[repr(C)]
 #[derive(Default)]
@@ -61,6 +64,9 @@ impl<'a> std::convert::TryInto<&'a EUI48> for &'a [u8] {
     type Error = WrongSize;
 
     fn try_into(self) -> Result<&'a EUI48, Self::Error> {
-        Ref::<_, EUI48>::new_unaligned(self).ok_or(WrongSize).map(Ref::into_ref)
+        Ref::<_, EUI48>::from_bytes(self)
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| WrongSize)
+            .map(Ref::into_ref)
     }
 }

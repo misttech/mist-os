@@ -99,19 +99,13 @@ constexpr size_t stack_size = ZIRCON_DEFAULT_STACK_SIZE;
 
 #include "userboot-code.h"
 
-// This is defined in assembly via RODSO_IMAGE (see rodso-asm.h);
-// userboot-code.h gives details about the image's size and layout.
-extern "C" const char userboot_image[];
-
 KCOUNTER(timeline_userboot, "boot.timeline.userboot")
 KCOUNTER(init_time, "init.userboot.time.msec")
 
 class UserbootImage : private RoDso {
  public:
-  UserbootImage(const VDso* vdso, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle)
-      : RoDso("userboot", userboot_image, USERBOOT_CODE_END, USERBOOT_CODE_START,
-              vmo_kernel_handle),
-        vdso_(vdso) {}
+  UserbootImage(fbl::RefPtr<VmObject> vmo, const VDso* vdso)
+      : RoDso(ktl::move(vmo), USERBOOT_CODE_END, USERBOOT_CODE_START), vdso_(vdso) {}
 
   // The whole userboot image consists of the userboot rodso image
   // immediately followed by the vDSO image.  This returns the size
@@ -223,7 +217,7 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
   return ZX_OK;
 }
 
-void bootstrap_vmos(Handle** handles) {
+UserbootImage bootstrap_vmos(ktl::span<Handle*, userboot::kHandleCount> handles) {
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
   zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
@@ -231,10 +225,29 @@ void bootstrap_vmos(Handle** handles) {
 
   HandoffEnd end = EndHandoff();
 
-  ktl::copy(end.extra_phys_vmos.begin(), end.extra_phys_vmos.end(),
-            &handles[userboot::kFirstExtraPhysVmo]);
+  for (size_t i = 0; i < PhysVmo::kMaxExtraHandoffPhysVmos; ++i) {
+    handles[userboot::kFirstExtraPhysVmo + i] = end.extra_phys_vmos[i].release();
+  }
 
-  handles[userboot::kZbi] = end.zbi;
+  handles[userboot::kZbi] = end.zbi.release();
+
+  KernelHandle<VmObjectDispatcher> vdso_kernel_handles[userboot::kNumVdsoVariants];
+  KernelHandle<VmObjectDispatcher> time_values_handle;
+  const VDso* vdso =
+      VDso::Create(ktl::move(end.vdso), ktl::span{vdso_kernel_handles}, &time_values_handle);
+  handles[userboot::kTimeValues] =
+      Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
+          .release();
+  ASSERT(handles[userboot::kTimeValues]);
+  for (size_t i = 0; i < userboot::kNumVdsoVariants; ++i) {
+    handles[userboot::kFirstVdso + i] =
+        Handle::Make(ktl::move(vdso_kernel_handles[i]), vdso->vmo_rights()).release();
+    ASSERT(handles[userboot::kFirstVdso + i]);
+  }
+  DEBUG_ASSERT(handles[userboot::kFirstVdso + 1]->dispatcher() == vdso->dispatcher());
+  if (gBootOptions->always_use_next_vdso) {
+    ktl::swap(handles[userboot::kFirstVdso], handles[userboot::kFirstVdso + 1]);
+  }
 
   // Crashlog.
   fbl::RefPtr<VmObject> crashlog_vmo;
@@ -285,6 +298,8 @@ void bootstrap_vmos(Handle** handles) {
   status = get_vmo_handle(ktl::move(kcounters_vmo), true, CounterArena().VmoContentSize(), nullptr,
                           &handles[userboot::kCounters]);
   ASSERT(status == ZX_OK);
+
+  return {ktl::move(end.userboot), vdso};
 }
 
 }  // namespace
@@ -295,8 +310,9 @@ void userboot_init() {
   MessagePacketPtr msg;
   zx_status_t status = MessagePacket::Create(nullptr, 0, userboot::kHandleCount, &msg);
   ASSERT(status == ZX_OK);
-  Handle** const handles = msg->mutable_handles();
+
   DEBUG_ASSERT(msg->num_handles() == userboot::kHandleCount);
+  ktl::span<Handle*, userboot::kHandleCount> handles{msg->mutable_handles(), msg->num_handles()};
 
   // Create the process.
   KernelHandle<ProcessDispatcher> process_handle;
@@ -331,25 +347,7 @@ void userboot_init() {
   handles[userboot::kRootJob] = get_job_handle().release();
   ASSERT(handles[userboot::kRootJob]);
 
-  // It also gets many VMOs for VDSOs and other things.
-  constexpr int kVariants = static_cast<int>(userboot::VdsoVariant::COUNT);
-  KernelHandle<VmObjectDispatcher> vdso_kernel_handles[kVariants];
-  KernelHandle<VmObjectDispatcher> time_values_handle;
-  const VDso* vdso = VDso::Create(vdso_kernel_handles, &time_values_handle);
-  handles[userboot::kTimeValues] =
-      Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
-          .release();
-  ASSERT(handles[userboot::kTimeValues]);
-  for (int i = 0; i < kVariants; ++i) {
-    handles[userboot::kFirstVdso + i] =
-        Handle::Make(ktl::move(vdso_kernel_handles[i]), vdso->vmo_rights()).release();
-    ASSERT(handles[userboot::kFirstVdso + i]);
-  }
-  DEBUG_ASSERT(handles[userboot::kFirstVdso + 1]->dispatcher() == vdso->vmo());
-  if (gBootOptions->always_use_next_vdso) {
-    ktl::swap(handles[userboot::kFirstVdso], handles[userboot::kFirstVdso + 1]);
-  }
-  bootstrap_vmos(handles);
+  UserbootImage userboot = bootstrap_vmos(handles);
 
   // Make the channel that will hold the message.
   KernelHandle<ChannelDispatcher> user_handle, kernel_handle;
@@ -368,8 +366,6 @@ void userboot_init() {
   process->handle_table().AddHandle(ktl::move(user_handle_owner));
 
   // Map in the userboot image along with the vDSO.
-  KernelHandle<VmObjectDispatcher> userboot_vmo_kernel_handle;
-  UserbootImage userboot(vdso, &userboot_vmo_kernel_handle);
   uintptr_t vdso_base = 0;
   uintptr_t entry = 0;
   status = userboot.Map(vmar, &vdso_base, &entry);

@@ -23,10 +23,8 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use crate::logs::testing::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use diagnostics_data::{
-        LegacySeverity, DROPPED_LABEL, MESSAGE_LABEL, PID_LABEL, TAG_LABEL, TID_LABEL,
-    };
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use diagnostics_data::{DROPPED_LABEL, MESSAGE_LABEL, PID_LABEL, TAG_LABEL, TID_LABEL};
+    use diagnostics_log_encoding::{Argument, Record, Severity, Value};
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
     use fuchsia_zircon as zx;
     use moniker::ExtendedMoniker;
@@ -504,20 +502,16 @@ mod tests {
         let logs = vec![
             Record {
                 timestamp: 6,
-                severity: StreamSeverity::Info.into_primitive(),
+                severity: Severity::Info.into_primitive(),
                 arguments: vec![Argument {
                     name: MESSAGE_LABEL.into(),
                     value: Value::Text("hi".to_string()),
                 }],
             },
-            Record {
-                timestamp: 14,
-                severity: StreamSeverity::Error.into_primitive(),
-                arguments: vec![],
-            },
+            Record { timestamp: 14, severity: Severity::Error.into_primitive(), arguments: vec![] },
             Record {
                 timestamp: 19,
-                severity: StreamSeverity::Warn.into_primitive(),
+                severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: PID_LABEL.into(), value: Value::UnsignedInt(0x1d1) },
                     Argument { name: TID_LABEL.into(), value: Value::UnsignedInt(0x1d2) },
@@ -531,7 +525,7 @@ mod tests {
             },
             Record {
                 timestamp: 21,
-                severity: StreamSeverity::Warn.into_primitive(),
+                severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-1")) },
                     Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-2")) },
@@ -544,7 +538,7 @@ mod tests {
                 pid: zx::sys::ZX_KOID_INVALID,
                 tid: zx::sys::ZX_KOID_INVALID,
                 time: 6,
-                severity: LegacySeverity::Info.into(),
+                severity: LogLevelFilter::Info as i32,
                 dropped_logs: 0,
                 msg: String::from("hi"),
                 tags: vec!["UNKNOWN".to_owned()],
@@ -553,7 +547,7 @@ mod tests {
                 pid: zx::sys::ZX_KOID_INVALID,
                 tid: zx::sys::ZX_KOID_INVALID,
                 time: 14,
-                severity: LegacySeverity::Error.into(),
+                severity: LogLevelFilter::Error as i32,
                 dropped_logs: 0,
                 msg: String::from(""),
                 tags: vec!["UNKNOWN".to_owned()],
@@ -562,7 +556,7 @@ mod tests {
                 pid: 0x1d1,
                 tid: 0x1d2,
                 time: 19,
-                severity: LegacySeverity::Warn.into(),
+                severity: LogLevelFilter::Warn as i32,
                 dropped_logs: 23,
                 msg: String::from("message"),
                 tags: vec![String::from("tag")],
@@ -571,7 +565,7 @@ mod tests {
                 pid: zx::sys::ZX_KOID_INVALID,
                 tid: zx::sys::ZX_KOID_INVALID,
                 time: 21,
-                severity: LegacySeverity::Warn.into(),
+                severity: LogLevelFilter::Warn as i32,
                 dropped_logs: 0,
                 msg: String::from(""),
                 tags: vec![String::from("tag-1"), String::from("tag-2")],
@@ -604,7 +598,7 @@ mod tests {
                 tid: log1.record.tid.raw_koid(),
                 time: log1.record.timestamp.into_nanos(),
                 dropped_logs: 0,
-                severity: fidl_fuchsia_logger::LogLevelFilter::Info as i32,
+                severity: LogLevelFilter::Info as i32,
                 msg: String::from("log1"),
                 tags: vec![String::from("klog")],
             },
@@ -613,7 +607,7 @@ mod tests {
                 tid: log2.record.tid.raw_koid(),
                 time: log2.record.timestamp.into_nanos(),
                 dropped_logs: 0,
-                severity: fidl_fuchsia_logger::LogLevelFilter::Info as i32,
+                severity: LogLevelFilter::Info as i32,
                 msg: String::from("log2"),
                 tags: vec![String::from("klog")],
             },
@@ -622,7 +616,7 @@ mod tests {
                 tid: log3.record.tid.raw_koid(),
                 time: log3.record.timestamp.into_nanos(),
                 dropped_logs: 0,
-                severity: fidl_fuchsia_logger::LogLevelFilter::Info as i32,
+                severity: LogLevelFilter::Info as i32,
                 msg: String::from("log3"),
                 tags: vec![String::from("klog")],
             },

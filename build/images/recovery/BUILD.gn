@@ -48,11 +48,13 @@ if (is_fuchsia) {
         check_for_managed_mode = true
       }
 
-      # Use the same data filesystem format as the "main" product assembly.  The default is fxfs, so
-      # this only needs to be set if it's not that.
-      if (!fxfs_blob) {
-        storage = {
-          filesystems = {
+      storage = {
+        filesystems = {
+          image_mode = "ramdisk"
+
+          # Use the same data filesystem format as the "main" product assembly.
+          # The default is fxfs, so this only needs to be set if it's not that.
+          if (!fxfs_blob) {
             volume = {
               fvm = {
                 data = {

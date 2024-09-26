@@ -10,7 +10,7 @@ use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
-use ::routing::WeakInstanceTokenExt;
+use ::routing::{WeakInstanceTokenExt, WithDefault};
 use async_trait::async_trait;
 use cm_util::WeakTaskGroup;
 use fidl::endpoints::{ProtocolMarker, RequestStream};
@@ -108,12 +108,17 @@ impl LaunchTaskOnReceive {
         }
         #[async_trait]
         impl Routable for LaunchTaskRouter {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
+                let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
                 let WeakExtendedInstance::Component(target) = request.target.to_instance() else {
                     return Err(cm_unexpected());
                 };
                 let cap = self.inner.clone().into_sender(target).into();
-                if !request.debug {
+                if !debug {
                     Ok(cap)
                 } else {
                     Ok(self
@@ -219,18 +224,23 @@ impl<T: Routable + 'static> RoutableExt for T {
 
         #[async_trait]
         impl Routable for OnReadableRouter {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                if request.debug {
-                    return self.router.route(request).await;
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
+                if debug {
+                    return self.router.route(request, debug).await;
                 }
+                let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
 
                 let ExtendedInstance::Component(target) =
                     request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?
                 else {
                     return Err(cm_unexpected());
                 };
-                let entry = self.router.clone().into_directory_entry(
-                    request,
+                let subrouter = self.router.clone().with_default(request);
+                let entry = subrouter.into_directory_entry(
                     self.entry_type,
                     target.execution_scope.clone(),
                     move |err| {
@@ -403,11 +413,11 @@ pub mod tests {
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar/data").unwrap(),
-                Request {
+                Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
-                    debug: false,
                     metadata,
-                },
+                }),
+                false,
             )
             .await;
         assert_matches!(
@@ -428,11 +438,11 @@ pub mod tests {
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
-                Request {
+                Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
-                    debug: false,
                     metadata,
-                },
+                }),
+                false,
             )
             .await;
         assert_matches!(
@@ -454,11 +464,11 @@ pub mod tests {
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
-                Request {
+                Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
-                    debug: false,
                     metadata,
-                },
+                }),
+                false,
             )
             .await;
         assert_matches!(cap, Ok(None));
@@ -478,11 +488,11 @@ pub mod tests {
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo").unwrap(),
-                Request {
+                Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
-                    debug: false,
                     metadata,
-                },
+                }),
+                false,
             )
             .await;
         assert_matches!(cap, Ok(Some(Capability::Dictionary(_))));
@@ -493,11 +503,11 @@ pub mod tests {
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
-                Request {
+                Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
-                    debug: false,
                     metadata,
-                },
+                }),
+                false,
             )
             .await;
         assert_matches!(cap, Ok(None));
@@ -521,7 +531,7 @@ pub mod tests {
 
     #[async_trait]
     impl Routable for RouteCounter {
-        async fn route(&self, _: Request) -> Result<Capability, RouterError> {
+        async fn route(&self, _: Option<Request>, _: bool) -> Result<Capability, RouterError> {
             self.counter.inc();
             Ok(self.capability.try_clone().unwrap())
         }
@@ -550,7 +560,7 @@ pub mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let capability = router
-            .route(Request { target: component.as_weak().into(), debug: false, metadata })
+            .route(Some(Request { target: component.as_weak().into(), metadata }), false)
             .await
             .unwrap();
 
@@ -601,7 +611,7 @@ pub mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let capability = router
-            .route(Request { target: component.as_weak().into(), debug: false, metadata })
+            .route(Some(Request { target: component.as_weak().into(), metadata }), false)
             .await
             .unwrap();
 
@@ -639,10 +649,11 @@ pub mod tests {
         source.moniker = source_moniker;
         let source = WeakExtendedInstance::Component(source);
         let source2 = source.clone();
-        let debug_router = Router::new(move |router: Request| {
+        let debug_router = Router::new(move |request: Option<Request>, debug: bool| {
             let source2 = source2.clone();
             async move {
-                assert!(router.debug);
+                let _ = request.unwrap();
+                assert!(debug);
                 let res: Result<Capability, RouterError> =
                     Ok(Capability::Instance(WeakInstanceToken::from(source2.clone())));
                 res
@@ -662,7 +673,7 @@ pub mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let capability = router
-            .route(Request { target: target.as_weak().into(), debug: true, metadata })
+            .route(Some(Request { target: target.as_weak().into(), metadata }), true)
             .await
             .unwrap();
         assert_matches!(
@@ -686,11 +697,13 @@ pub mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Optional);
         let capability = downscoped_router
-            .route(Request {
-                target: test_invalid_instance_token::<ComponentInstance>(),
-                debug: false,
-                metadata,
-            })
+            .route(
+                Some(Request {
+                    target: test_invalid_instance_token::<ComponentInstance>(),
+                    metadata,
+                }),
+                false,
+            )
             .await
             .unwrap();
         let capability = match capability {
@@ -727,11 +740,13 @@ pub mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Optional);
         let capability = downscoped_router
-            .route(Request {
-                target: test_invalid_instance_token::<ComponentInstance>(),
-                debug: false,
-                metadata,
-            })
+            .route(
+                Some(Request {
+                    target: test_invalid_instance_token::<ComponentInstance>(),
+                    metadata,
+                }),
+                false,
+            )
             .await
             .unwrap();
         let capability = match capability {

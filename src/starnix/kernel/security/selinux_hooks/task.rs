@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_permission, check_self_permission, fs_node_effective_sid, FsNode, PermissionCheck,
-    ProcessPermission, TaskAttrs,
+    check_permission, check_self_permission, fs_node_effective_sid, fs_node_set_label_with_task,
+    FsNode, PermissionCheck, ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::todo_check_permission;
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::TempRef;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
 
@@ -58,7 +59,7 @@ pub fn check_exec_access(
         (state.current_sid, state.exec_sid)
     };
 
-    let executable_sid = fs_node_effective_sid(security_server, current_task, executable_node);
+    let executable_sid = fs_node_effective_sid(executable_node);
 
     let new_sid = if let Some(exec_sid) = exec_sid {
         // Use the proc exec SID if set.
@@ -327,6 +328,11 @@ pub fn set_procattr(
     };
 
     Ok(())
+}
+
+/// Sets the sid of `fs_node` to be that of `task`.
+pub fn fs_node_init_with_task(task: &TempRef<'_, Task>, fs_node: &FsNode) {
+    fs_node_set_label_with_task(fs_node, task.into());
 }
 
 #[cfg(test)]

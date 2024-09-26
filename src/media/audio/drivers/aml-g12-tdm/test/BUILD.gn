@@ -5,8 +5,9 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("aml-g12-tdm-test-bin") {
+cc_test_executable("aml-g12-tdm-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
   sources = [
@@ -56,7 +57,7 @@ executable("aml-g12-tdm-test-bin") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
-executable("aml-g12-tdm-dai-test-bin") {
+cc_test_executable("aml-g12-tdm-dai-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
   sources = [

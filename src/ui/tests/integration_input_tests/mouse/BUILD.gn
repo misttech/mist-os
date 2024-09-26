@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -21,7 +22,7 @@ group("tests") {
   ]
 }
 
-executable("mouse-input-test-bin") {
+cc_test_executable("mouse-input-test-bin") {
   testonly = true
   sources = [ "mouse-input-test.cc" ]
   output_name = "mouse-input-test"

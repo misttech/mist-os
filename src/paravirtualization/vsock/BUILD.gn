@@ -12,12 +12,22 @@ group("tests") {
   deps = [ ":vsock_service-tests" ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "vsock_service"
+  manifest = "meta/vsock_service.cml"
+}
+
+fuchsia_structured_config_rust_lib("vsock_service_config") {
+  cm_label = ":manifest"
+}
+
 rustc_binary("bin") {
   name = "vsock_service"
   edition = "2021"
 
   deps = [
     ":lib",
+    ":vsock_service_config",
     "//sdk/fidl/fuchsia.hardware.vsock:fuchsia.hardware.vsock_rust",
     "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
     "//sdk/lib/device-watcher/rust",
@@ -39,12 +49,11 @@ rustc_library("lib") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.vsock:fuchsia.hardware.vsock_rust",
     "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
+    "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:crossbeam",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
@@ -59,7 +68,7 @@ rustc_library("lib") {
 }
 
 fuchsia_package_with_single_component("vsock_service") {
-  manifest = "meta/vsock_service.cml"
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 

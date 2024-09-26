@@ -22,7 +22,7 @@ use wlan_common::buffer_writer::BufferWriter;
 use wlan_common::{frame_len, mac};
 use wlan_frame_writer::append_frame_to;
 use wlan_statemachine::*;
-use zerocopy::{ByteSlice, Ref};
+use zerocopy::{Ref, SplitByteSlice};
 use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
 
 pub const ADDBA_REQ_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaReqHdr);
@@ -187,7 +187,7 @@ impl BlockAckState {
     ///
     /// The `body` parameter must **not** include the management action byte. This value should be
     /// parsed beforehand and removed from the frame body.
-    pub fn on_block_ack_frame<B: ByteSlice>(
+    pub fn on_block_ack_frame<B: SplitByteSlice>(
         self,
         tx: &mut impl BlockAckTx,
         action: mac::BlockAckAction,
@@ -353,7 +353,7 @@ pub fn write_delba_body<B: Append>(
 /// # Errors
 ///
 /// Returns an error if the header cannot be parsed.
-fn read_addba_req_hdr<B: ByteSlice>(body: B) -> Result<Ref<B, mac::AddbaReqHdr>, Error> {
+fn read_addba_req_hdr<B: SplitByteSlice>(body: B) -> Result<Ref<B, mac::AddbaReqHdr>, Error> {
     let mut reader = BufferReader::new(body);
     reader.read::<mac::AddbaReqHdr>().ok_or_else(|| {
         Error::Status("error reading ADDBA request header".to_string(), zx::Status::IO)
@@ -369,7 +369,7 @@ fn read_addba_req_hdr<B: ByteSlice>(body: B) -> Result<Ref<B, mac::AddbaReqHdr>,
 ///
 /// Returns an error if the header cannot be parsed or if its dialog token is not the same as the
 /// given parameters.
-fn read_addba_resp_hdr<B: ByteSlice>(
+fn read_addba_resp_hdr<B: SplitByteSlice>(
     dialog_token: u8,
     body: B,
 ) -> Result<Ref<B, mac::AddbaRespHdr>, Error> {
@@ -399,7 +399,7 @@ fn read_addba_resp_hdr<B: ByteSlice>(
 /// # Errors
 ///
 /// Returns an error if the header cannot be parsed.
-fn read_delba_hdr<B: ByteSlice>(body: B) -> Result<Ref<B, mac::DelbaHdr>, Error> {
+fn read_delba_hdr<B: SplitByteSlice>(body: B) -> Result<Ref<B, mac::DelbaHdr>, Error> {
     let mut reader = BufferReader::new(body);
     reader
         .read::<mac::DelbaHdr>()
@@ -495,7 +495,7 @@ mod tests {
         // Create a buffer describing an ADDBA request body and read the management action byte.
         let (n, body) = addba_req_body(1);
         let body = &body[..n];
-        let (_, body) = Ref::<_, mac::ActionHdr>::new_unaligned_from_prefix(body).unwrap();
+        let (_, body) = Ref::<_, mac::ActionHdr>::from_prefix(body).unwrap();
 
         let mut station = Station::Up;
         let state = BlockAckState::from(State::new(Closed));
@@ -515,7 +515,7 @@ mod tests {
         // Create a buffer describing a DELBA body and read the management action byte.
         let (n, body) = delba_body(true, fidl_ieee80211::ReasonCode::UnspecifiedReason.into());
         let body = &body[..n];
-        let (_, body) = Ref::<_, mac::ActionHdr>::new_unaligned_from_prefix(body).unwrap();
+        let (_, body) = Ref::<_, mac::ActionHdr>::from_prefix(body).unwrap();
 
         let mut station = Station::Up;
         let state = BlockAckState::from(statemachine::testing::new_state(Established {

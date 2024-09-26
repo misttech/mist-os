@@ -9,7 +9,7 @@ use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
 use fuchsia_inspect_derive::{IValue, Inspect};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use futures::{select, StreamExt};
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -41,7 +41,10 @@ impl StreamConfigOrTask {
 
 /// Number of frames within the duration.  This includes frames that end at exactly the duration.
 pub(crate) fn frames_from_duration(frames_per_second: usize, duration: fasync::Duration) -> usize {
-    assert!(duration >= 0.nanos(), "frames_from_duration is not defined for negative durations");
+    assert!(
+        duration >= zx::Duration::from_nanos(0),
+        "frames_from_duration is not defined for negative durations"
+    );
     let mut frames = duration.into_seconds() * frames_per_second as i64;
     let frames_partial =
         ((duration.into_nanos() % 1_000_000_000) as f64 / 1e9) * frames_per_second as f64;
@@ -539,21 +542,21 @@ pub(crate) mod tests {
         const ONE_FRAME_NANOS: i64 = 20833 + 1;
         const THREE_FRAME_NANOS: i64 = 20833 * 3 + 1;
 
-        assert_eq!(0, frames_from_duration(FPS, 0.nanos()));
+        assert_eq!(0, frames_from_duration(FPS, zx::Duration::from_nanos(0)));
 
-        assert_eq!(0, frames_from_duration(FPS, (ONE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(1, frames_from_duration(FPS, ONE_FRAME_NANOS.nanos()));
+        assert_eq!(0, frames_from_duration(FPS, zx::Duration::from_nanos(ONE_FRAME_NANOS - 1)));
+        assert_eq!(1, frames_from_duration(FPS, zx::Duration::from_nanos(ONE_FRAME_NANOS)));
 
         // Three frames is an exact number of nanoseconds, we should be able to get an exact number
         // of frames from the duration.
-        assert_eq!(2, frames_from_duration(FPS, (THREE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(3, frames_from_duration(FPS, THREE_FRAME_NANOS.nanos()));
-        assert_eq!(3, frames_from_duration(FPS, (THREE_FRAME_NANOS + 1).nanos()));
+        assert_eq!(2, frames_from_duration(FPS, zx::Duration::from_nanos(THREE_FRAME_NANOS - 1)));
+        assert_eq!(3, frames_from_duration(FPS, zx::Duration::from_nanos(THREE_FRAME_NANOS)));
+        assert_eq!(3, frames_from_duration(FPS, zx::Duration::from_nanos(THREE_FRAME_NANOS + 1)));
 
-        assert_eq!(FPS, frames_from_duration(FPS, 1.second()));
-        assert_eq!(72000, frames_from_duration(FPS, 1500.millis()));
+        assert_eq!(FPS, frames_from_duration(FPS, zx::Duration::from_seconds(1)));
+        assert_eq!(72000, frames_from_duration(FPS, zx::Duration::from_millis(1500)));
 
-        assert_eq!(10660, frames_from_duration(FPS, 222084000.nanos()));
+        assert_eq!(10660, frames_from_duration(FPS, zx::Duration::from_nanos(222084000)));
     }
 
     #[fuchsia::test]
@@ -722,7 +725,7 @@ pub(crate) mod tests {
         // Should account for the external_delay here.
         match result {
             Poll::Ready(Ok(DelayInfo { internal_delay: Some(x), .. })) => {
-                assert_eq!(150.millis().into_nanos(), x)
+                assert_eq!(zx::Duration::from_millis(150).into_nanos(), x)
             }
             other => panic!("Expected the correct delay info, got {other:?}"),
         }

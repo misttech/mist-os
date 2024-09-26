@@ -29,9 +29,8 @@ void VnodeCache::Reset() {
   ForAllVnodes([this](fbl::RefPtr<VnodeF2fs>& vnode) { return Evict(vnode.get()); });
 }
 
-zx_status_t VnodeCache::ForAllVnodes(VnodeCallback callback) {
-  fbl::RefPtr<VnodeF2fs> prev_vnode;
-
+zx_status_t VnodeCache::ForAllVnodes(VnodeCallback callback, bool evict_inactive) {
+  ino_t key = 0;
   while (true) {
     fbl::RefPtr<VnodeF2fs> vnode;
     // Scope the lock to prevent letting fbl::RefPtr<VnodeF2fs> destructors from running while
@@ -41,42 +40,37 @@ zx_status_t VnodeCache::ForAllVnodes(VnodeCallback callback) {
       if (vnode_table_.is_empty()) {
         return ZX_OK;
       }
-
-      VnodeF2fs* raw_vnode = nullptr;
-      if (prev_vnode == nullptr) {
-        // Acquire the first node from the front of the cache...
-        raw_vnode = &vnode_table_.front();
-      } else {
-        // ... Acquire all subsequent nodes by iterating from the lower bound of the current node.
-        auto current = vnode_table_.lower_bound(prev_vnode->GetKey());
-        if (current == vnode_table_.end()) {
-          return ZX_OK;
-        } else if (current.CopyPointer() != prev_vnode.get()) {
-          raw_vnode = current.CopyPointer();
-        } else {
-          auto next = ++current;
-          if (next == vnode_table_.end()) {
-            return ZX_OK;
-          }
-          raw_vnode = next.CopyPointer();
-        }
+      // ... Acquire all subsequent nodes by iterating from the lower bound of the current node.
+      auto current = vnode_table_.lower_bound(key);
+      if (current == vnode_table_.end()) {
+        return ZX_OK;
       }
-
-      if (raw_vnode->IsActive()) {
-        vnode = fbl::MakeRefPtrUpgradeFromRaw(raw_vnode, table_lock_);
+      key = current->GetKey();
+      if (current->IsActive()) {
+        vnode = fbl::MakeRefPtrUpgradeFromRaw(current.CopyPointer(), table_lock_);
         if (vnode == nullptr) {
           // When it is being recycled, we should wait for deactivation or eviction.
-          raw_vnode->WaitForDeactive(table_lock_);
+          current->WaitForDeactive(table_lock_);
           continue;
         }
       } else {
-        // When it is inactive, it is safe to make Refptr.
-        vnode = fbl::ImportFromRawPtr(raw_vnode);
+        // Evict inactive vnodes if they have no pages.
+        if (evict_inactive && !current->GetPageCount()) {
+          EvictUnsafe(current.CopyPointer());
+        }
+        // It is safe to make Refptr of inactive vnodes.
+        vnode = fbl::ImportFromRawPtr(current.CopyPointer());
         vnode->Activate();
       }
+      // When |vnode| is evicted, we don't need to increase |key|.
+      if (vnode->fbl::WAVLTreeContainable<VnodeF2fs*>::InContainer()) {
+        ++key;
+      }
+    }
+    if (!callback) {
+      continue;
     }
     zx_status_t status = callback(vnode);
-    prev_vnode = std::move(vnode);
     if (status == ZX_ERR_STOP) {
       break;
     }
@@ -123,6 +117,7 @@ void VnodeCache::Downgrade(VnodeF2fs* raw_vnode) {
   // If it has been evicted already, it should be freed.
   if (!(*raw_vnode).fbl::WAVLTreeContainable<VnodeF2fs*>::InContainer()) {
     ZX_ASSERT(!(*raw_vnode).fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer());
+    vnode->ReleasePagedVmo();
     delete fbl::ExportToRawPtr(&vnode);
     return;
   }
@@ -223,14 +218,12 @@ zx_status_t VnodeCache::RemoveDirtyUnsafe(VnodeF2fs* vnode) {
   return ZX_OK;
 }
 
-void VnodeCache::EvictInactiveVnodes() {
-  ForAllVnodes([this](fbl::RefPtr<VnodeF2fs>& vnode) {
-    vnode->CleanupPages();
-    if (!vnode->IsActive()) {
-      return Evict(vnode.get());
-    }
+void VnodeCache::Shrink() {
+  ForAllVnodes([](fbl::RefPtr<VnodeF2fs>& vnode) {
+    vnode->CleanupCache();
     return ZX_OK;
   });
+  ForAllVnodes(nullptr, true);
 }
 
 }  // namespace f2fs

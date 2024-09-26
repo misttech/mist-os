@@ -66,6 +66,7 @@ source_set("zxio") {
     "remote.cc",
     "socket.cc",
     "socket_address.cc",
+    "transferable.cc",
     "transitional.cc",
     "vmo.cc",
     "zxio.cc",

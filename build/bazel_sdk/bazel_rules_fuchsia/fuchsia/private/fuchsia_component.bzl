@@ -23,7 +23,14 @@ def _manifest_target(name, manifest_in, tags, testonly):
     )
     return target_name
 
-def fuchsia_component(*, name, manifest, deps = [], tags = ["manual"], **kwargs):
+def fuchsia_component(
+        *,
+        name,
+        manifest,
+        moniker = "/core/ffx-laboratory:{COMPONENT_NAME}",
+        deps = [],
+        tags = ["manual"],
+        **kwargs):
     """Creates a Fuchsia component that can be added to a package.
 
     Args:
@@ -36,6 +43,8 @@ def fuchsia_component(*, name, manifest, deps = [], tags = ["manual"], **kwargs)
 
             If you need to have more control over the compilation of the .cm file
             we suggest you create a fuchsia_component_manifest target.
+        moniker: The moniker to run the component under.
+            Defaults to "/core/ffx-laboratory:{COMPONENT_NAME}".
         deps: A list of targets that this component depends on.
         tags: Typical meaning in Bazel. By default this target is manual.
         **kwargs: Extra attributes to forward to the build rule.
@@ -45,6 +54,7 @@ def fuchsia_component(*, name, manifest, deps = [], tags = ["manual"], **kwargs)
     _fuchsia_component(
         name = name,
         compiled_manifest = manifest_target,
+        moniker = moniker,
         deps = deps,
         tags = tags,
         is_driver = False,
@@ -105,7 +115,7 @@ def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = [
         **kwargs
     )
 
-def _make_fuchsia_component_providers(*, component_name, manifest, resources, is_driver, is_test, run_tag):
+def _make_fuchsia_component_providers(*, component_name, manifest, resources, is_driver, is_test, moniker, run_tag):
     return [
         FuchsiaComponentInfo(
             name = component_name,
@@ -113,6 +123,7 @@ def _make_fuchsia_component_providers(*, component_name, manifest, resources, is
             resources = resources,
             is_driver = is_driver,
             is_test = is_test,
+            moniker = moniker,
             run_tag = run_tag,
         ),
         FuchsiaPackageResourcesInfo(resources = [
@@ -144,6 +155,7 @@ def _fuchsia_component_impl(ctx):
         resources = resources,
         is_driver = ctx.attr.is_driver,
         is_test = ctx.attr._variant == "test",
+        moniker = ctx.attr.moniker.format(COMPONENT_NAME = component_name),
         run_tag = label_name(str(ctx.label)),
     ) + [
         collect_debug_symbols(ctx.attr.deps),
@@ -161,6 +173,9 @@ number of dependencies which will be included in the final package.
     attrs = {
         "deps": attr.label_list(
             doc = "A list of targets that this component depends on",
+        ),
+        "moniker": attr.string(
+            doc = "The moniker to run non-test, non-driver, and non-session components under.",
         ),
         "compiled_manifest": attr.label(
             doc = """The component manifest file

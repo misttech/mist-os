@@ -85,11 +85,11 @@ void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_resu
                                          wlan_fullmac_wire::WlanScanResult expect_code) {
   EXPECT_GE(client_ifc_.ScanResultList(scan_id)->size(), min_result_num);
 
-  wlan_fullmac_wire::WlanFullmacScanResult back_scan_result =
+  fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest back_scan_result =
       client_ifc_.ScanResultList(scan_id)->back();
-  auto ssid =
-      brcmf_find_ssid_in_ies(back_scan_result.bss.ies.data(), back_scan_result.bss.ies.count());
-  common::MacAddr bssid(back_scan_result.bss.bssid.data());
+  auto ssid = brcmf_find_ssid_in_ies(back_scan_result.bss()->ies().data(),
+                                     back_scan_result.bss()->ies().size());
+  common::MacAddr bssid(back_scan_result.bss()->bssid().data());
 
   EXPECT_EQ(bssid, kDefaultBssid);
   EXPECT_EQ(ssid.size(), kDefaultSsid.len);

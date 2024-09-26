@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Wrap configc's package validator and provide in-tree-specific suggestions on failure."
     )
@@ -57,3 +57,5 @@ disable this check.
 
     with open(args.stamp, "w") as f:
         f.write("")
+
+    return 0

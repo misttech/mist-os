@@ -85,7 +85,8 @@ void Dwc2::dump_regs() {
 void Dwc2::HandleReset() {
   auto* mmio = get_mmio();
 
-  zxlogf(SERIAL, "\nRESET");
+  // TODO(b/355271738): Downgrade back to SERIAL when done debugging b/355271738.
+  zxlogf(INFO, "\nRESET");
 
   ep0_state_ = Ep0State::DISCONNECTED;
   configured_ = false;
@@ -143,10 +144,16 @@ void Dwc2::HandleReset() {
 }
 
 // Handler for usbsuspend interrupt.
-void Dwc2::HandleSuspend() { SetConnected(false); }
+void Dwc2::HandleSuspend() {
+  // TODO(b/355271738): Logs added to debug b/355271738. Remove when fixed.
+  zxlogf(INFO, "%s", __func__);
+  SetConnected(false);
+}
 
 // Handler for enumdone interrupt.
 void Dwc2::HandleEnumDone() {
+  // TODO(b/355271738): Logs added to debug b/355271738. Remove when fixed.
+  zxlogf(INFO, "%s", __func__);
   SetConnected(true);
 
   auto* mmio = get_mmio();

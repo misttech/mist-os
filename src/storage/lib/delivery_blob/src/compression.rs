@@ -12,7 +12,7 @@ use rayon::prelude::*;
 use std::ops::Range;
 use thiserror::Error;
 use zerocopy::byteorder::{LE, U16, U32, U64};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
 #[derive(Debug, Error)]
 pub enum ChunkedArchiveError {
@@ -53,9 +53,9 @@ pub fn decode_archive(
     data: &[u8],
     archive_length: usize,
 ) -> Result<Option<(Vec<ChunkInfo>, /*archive_data*/ &[u8])>, ChunkedArchiveError> {
-    match Ref::<_, ChunkedArchiveHeader>::new_unaligned_from_prefix(data) {
-        Some((header, data)) => header.decode_seek_table(data, archive_length as u64),
-        None => Ok(None), // Not enough data.
+    match Ref::<_, ChunkedArchiveHeader>::from_prefix(data).map_err(Into::into) {
+        Ok((header, data)) => header.decode_seek_table(data, archive_length as u64),
+        Err(zerocopy::SizeError { .. }) => Ok(None), // Not enough data.
     }
 }
 
@@ -86,7 +86,7 @@ impl ChunkInfo {
 }
 
 /// Chunked archive header.
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct ChunkedArchiveHeader {
     magic: [u8; 8],
@@ -99,7 +99,7 @@ struct ChunkedArchiveHeader {
 }
 
 /// Chunked archive seek table entry.
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 struct SeekTableEntry {
     decompressed_offset: U64<LE>,
@@ -158,12 +158,12 @@ impl ChunkedArchiveHeader {
     ) -> Result<Option<(Vec<ChunkInfo>, /*chunk_data*/ &[u8])>, ChunkedArchiveError> {
         // Deserialize seek table.
         let num_entries = self.num_entries.get() as usize;
-        let Some((entries, chunk_data)) =
-            Ref::<_, [SeekTableEntry]>::new_slice_unaligned_from_prefix(data, num_entries)
+        let Ok((entries, chunk_data)) =
+            Ref::<_, [SeekTableEntry]>::from_prefix_with_elems(data, num_entries)
         else {
             return Ok(None);
         };
-        let entries: &[SeekTableEntry] = entries.into_slice();
+        let entries: &[SeekTableEntry] = Ref::into_ref(entries);
 
         // Validate archive header.
         if self.magic != Self::CHUNKED_ARCHIVE_MAGIC {

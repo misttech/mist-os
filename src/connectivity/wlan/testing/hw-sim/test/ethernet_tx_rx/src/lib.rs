@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum;
 use ieee80211::Bssid;
 use lazy_static::lazy_static;
 use std::pin::pin;
@@ -18,6 +16,7 @@ use wlan_hw_sim::{
     connect_or_timeout, default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper,
     rx_wlan_data_frame, test_utils, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
+use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
 
 lazy_static! {
     static ref BSS: Bssid = [0x65, 0x74, 0x68, 0x6e, 0x65, 0x74].into();
@@ -54,7 +53,7 @@ async fn verify_tx_and_rx(
         let mut sent_payload = Vec::new();
         let (header, received_payload) = helper
             .run_until_complete_or_timeout(
-                5.seconds(),
+                zx::Duration::from_seconds(5),
                 "verify ethernet_tx_rx",
                 event::on_transmit(event::extract(|frame: Buffered<DataFrame>| {
                     for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.get() {
@@ -99,7 +98,7 @@ async fn ethernet_tx_rx() {
 
     connect_or_timeout(
         &mut helper,
-        30.seconds(),
+        zx::Duration::from_seconds(30),
         &AP_SSID,
         &BSS,
         &Protection::Open,

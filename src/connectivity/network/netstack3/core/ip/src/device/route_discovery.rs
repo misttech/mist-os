@@ -12,8 +12,8 @@ use fakealloc::collections::HashSet;
 use net_types::ip::{Ipv6Addr, Subnet};
 use net_types::LinkLocalUnicastAddr;
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, ExistsError, HandleableTimer,
-    InstantBindingsTypes, LocalTimerHeap, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, InstantBindingsTypes,
+    LocalTimerHeap, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 
@@ -87,7 +87,7 @@ pub trait Ipv6DiscoveredRoutesContext<BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         route: Ipv6DiscoveredRoute,
-    ) -> Result<(), ExistsError>;
+    );
 
     /// Deletes a previously discovered (now invalidated) IPv6 route from the
     /// routing table.
@@ -167,16 +167,7 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6RouteDiscoveryContext<BC>>
                 Some(lifetime) => {
                     let newly_added = routes.insert(route.clone());
                     if newly_added {
-                        match core_ctx.add_discovered_ipv6_route(bindings_ctx, device_id, route) {
-                            Ok(()) => (),
-                            Err(ExistsError) => {
-                                // If we fail to add the route to the route table,
-                                // remove it from our table of discovered routes and
-                                // do nothing further.
-                                let _: bool = routes.remove(&route);
-                                return;
-                            }
-                        }
+                        core_ctx.add_discovered_ipv6_route(bindings_ctx, device_id, route);
                     }
 
                     let prev_timer_fires_at = match lifetime {
@@ -262,8 +253,6 @@ fn invalidate_route<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6DiscoveredRou
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
-
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeTimerCtxExt as _,
         FakeWeakDeviceId,
@@ -290,14 +279,9 @@ mod tests {
             _bindings_ctx: &mut C,
             FakeDeviceId: &Self::DeviceId,
             route: Ipv6DiscoveredRoute,
-        ) -> Result<(), ExistsError> {
+        ) {
             let Self { route_table } = self;
-            let newly_inserted = route_table.insert(route);
-            if newly_inserted {
-                Ok(())
-            } else {
-                Err(ExistsError)
-            }
+            let _newly_inserted = route_table.insert(route);
         }
 
         fn del_discovered_ipv6_route(
@@ -433,29 +417,6 @@ mod tests {
     ) {
         trigger_next_timer(core_ctx, bindings_ctx, route);
         assert_route_invalidated(core_ctx, bindings_ctx, route);
-    }
-
-    #[test]
-    fn new_route_already_exists() {
-        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
-
-        // Fake the route already being present in the routing table.
-        assert!(core_ctx.state.route_table.route_table.insert(ROUTE1));
-
-        // Clear events so we can assert on route-added events later.
-        let _: Vec<()> = bindings_ctx.take_events();
-
-        RouteDiscoveryHandler::update_route(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeDeviceId,
-            ROUTE1,
-            Some(NonZeroNdpLifetime::Finite(ONE_SECOND)),
-        );
-
-        // There should not be any add-route events dispatched.
-        assert_eq!(bindings_ctx.take_events(), []);
-        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[test]

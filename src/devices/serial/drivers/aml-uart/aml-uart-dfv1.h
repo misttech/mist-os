@@ -30,7 +30,7 @@ class AmlUartV1 : public DeviceType {
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
-  zx_status_t Init(ddk::PDevFidl pdev,
+  zx_status_t Init(fdf::PDev pdev,
                    const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
                    fdf::MmioBuffer mmio);
 

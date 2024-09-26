@@ -5,7 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.network.driver") {
-  sdk_category = "internal"
+  sdk_category = "partner"
+
+  # TODO(https://fxbug.dev/369404264): Stabilize this API.
+  stable = false
+  sdk_area = "Netstack"
   sources = [
     "network-device.fidl",
     "network-mac.fidl",

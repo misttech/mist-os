@@ -1111,11 +1111,11 @@ pub const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";
 // The following functions generate unique test package dummy content. Callers are recommended
 // to pass in the name of the test case.
 pub fn test_package_bin(s: &str) -> Vec<u8> {
-    return format!("!/boot/bin/sh\n{s}").as_bytes().to_owned();
+    format!("!/boot/bin/sh\n{s}").as_bytes().to_owned()
 }
 
 pub fn test_package_cml(s: &str) -> Vec<u8> {
-    return format!("{{program:{{runner:\"elf\",binary:\"bin/{s}\"}}}}").as_bytes().to_owned();
+    format!("{{program:{{runner:\"elf\",binary:\"bin/{s}\"}}}}").as_bytes().to_owned()
 }
 
 pub fn extra_blob_contents(s: &str, i: u32) -> Vec<u8> {

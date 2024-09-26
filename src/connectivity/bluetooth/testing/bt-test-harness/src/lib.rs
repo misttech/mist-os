@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{Duration, DurationNum};
+use fuchsia_zircon::Duration;
 
 pub mod access;
 pub mod bootstrap;
@@ -28,5 +28,5 @@ pub mod profile;
 const TIMEOUT_SECONDS: i64 = 4 * 60;
 
 pub fn timeout_duration() -> Duration {
-    TIMEOUT_SECONDS.seconds()
+    Duration::from_seconds(TIMEOUT_SECONDS)
 }

@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.serial") {
   sdk_category = "partner"
+  stable = false
   sources = [ "serial.fidl" ]
   sdk_area = "Drivers"
   public_deps = [ "//zircon/vdso/zx" ]

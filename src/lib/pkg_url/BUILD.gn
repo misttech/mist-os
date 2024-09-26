@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fuzz.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("pkg_url") {
   sources = [
@@ -17,7 +18,7 @@ source_set("pkg_url") {
   deps = [ "//third_party/re2" ]
 }
 
-executable("tests") {
+cc_test_executable("tests") {
   testonly = true
 
   output_name = "pkg_url_unittests"

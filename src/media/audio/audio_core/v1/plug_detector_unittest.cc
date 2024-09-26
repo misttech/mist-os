@@ -5,7 +5,6 @@
 #include "src/media/audio/audio_core/v1/plug_detector.h"
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
-#include <fuchsia/io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/namespace.h>
@@ -105,15 +104,16 @@ class PlugDetectorTest : public gtest::RealLoopFixture,
     zx::channel c1, c2;
 
     // Serve up the emulated audio-input directory
-    ASSERT_EQ(zx::channel::create(0, &c1, &c2), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(input_dir_, std::move(c1), fs::VnodeConnectionOptions::ReadOnly()), ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-input", c2.release()), ZX_OK);
+    auto [in_client, in_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(input_dir_, std::move(in_server)), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-input", in_client.TakeChannel().release()),
+              ZX_OK);
 
     // Serve up the emulated audio-output directory
-    ASSERT_EQ(zx::channel::create(0, &c1, &c2), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(output_dir_, std::move(c1), fs::VnodeConnectionOptions::ReadOnly()),
+    auto [out_client, out_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(output_dir_, std::move(out_server)), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-output", out_client.TakeChannel().release()),
               ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, "/dev/class/audio-output", c2.release()), ZX_OK);
   }
   void TearDown() override {
     ASSERT_TRUE(input_dir_->IsEmpty());

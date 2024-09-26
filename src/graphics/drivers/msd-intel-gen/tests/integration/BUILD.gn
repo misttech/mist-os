@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 declare_args() {
@@ -14,7 +15,7 @@ group("integration") {
   public_deps = [ ":msd_intel_gen_integration_tests" ]
 }
 
-executable("msd_intel_gen_integration_tests") {
+cc_test_executable("msd_intel_gen_integration_tests") {
   testonly = true
 
   defines =

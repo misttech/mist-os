@@ -30,20 +30,23 @@
         },
         {
             protocol: [
+                // Used for partial stack registry (codec)
+                "fuchsia.audio.device.Provider",
+
+                // For pausing A2DP when HFP is active
+                "fuchsia.bluetooth.internal.a2dp.Controller",
+
+                // Used for full-stack audio (audio_core) devices
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.mediacodec.CodecFactory",
+
+                // If available, report battery levels
+                "fuchsia.power.battery.BatteryManager",
+
+                // Used for audio encoding (only audio_core)
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
-            from: "parent",
-            availability: "optional",
-        },
-        {
-            protocol: [ "fuchsia.power.battery.BatteryManager" ],
-            availability: "optional",
-        },
-        {
-            protocol: [ "fuchsia.bluetooth.internal.a2dp.Controller" ],
             availability: "optional",
         },
     ],

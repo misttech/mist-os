@@ -17,8 +17,8 @@ use crate::object_store::object_record::{
 };
 use crate::object_store::store_object_handle::{MaybeChecksums, NeedsTrim};
 use crate::object_store::transaction::{
-    self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
-    Transaction,
+    self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Operation,
+    Options, Transaction,
 };
 use crate::object_store::{
     HandleOptions, HandleOwner, RootDigest, StoreObjectHandle, TrimMode, TrimResult,
@@ -40,6 +40,10 @@ use std::sync::atomic::{self, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
 
+mod allocated_ranges;
+pub use allocated_ranges::RangeType;
+use allocated_ranges::{AllocatedRanges, RangeOverlapIter};
+
 /// How much data each transaction will cover when writing an attribute across batches. Pulled from
 /// `FLUSH_BATCH_SIZE` in paged_object_handle.rs.
 pub const WRITE_ATTR_BATCH_SIZE: usize = 524_288;
@@ -56,6 +60,7 @@ pub struct DataObjectHandle<S: HandleOwner> {
     attribute_id: u64,
     content_size: AtomicU64,
     fsverity_state: Mutex<FsverityState>,
+    overwrite_ranges: AllocatedRanges,
 }
 
 #[derive(Debug)]
@@ -97,12 +102,14 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         fsverity_state: FsverityState,
         options: HandleOptions,
         trace: bool,
+        overwrite_ranges: Vec<Range<u64>>,
     ) -> Self {
         Self {
             handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
             attribute_id,
             content_size: AtomicU64::new(size),
             fsverity_state: Mutex::new(fsverity_state),
+            overwrite_ranges: AllocatedRanges::new(overwrite_ranges),
         }
     }
 
@@ -112,6 +119,16 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
     pub fn verified_file(&self) -> bool {
         matches!(*self.fsverity_state.lock().unwrap(), FsverityState::Some(_))
+    }
+
+    /// Find the overlapping overwrite ranges in the given range for this file, so writes can be
+    /// split between them appropriately. Ranges with RangeType::Overwrite should be written to
+    /// with multi_overwrite and RangeType::Cow should use multi_write.
+    ///
+    /// Note: The returned iterator holds a lock on the ranges until it's dropped, so use it
+    /// accordingly.
+    pub fn overwrite_ranges_overlap<'a>(&'a self, range: Range<u64>) -> RangeOverlapIter<'a> {
+        self.overwrite_ranges.overlap(range)
     }
 
     /// Sets `self.fsverity_state` to FsverityState::Started. Called at the top of `enable_verity`.
@@ -223,18 +240,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .allocator()
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
-        transaction.add_with_object(
-            self.store().store_object_id,
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    self.object_id(),
-                    self.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
-                ObjectValue::attribute(new_size),
-            ),
-            AssocObj::Borrowed(self),
-        );
+        self.txn_update_size(transaction, new_size).await?;
         transaction.add(
             self.store().store_object_id,
             Mutation::merge_object(
@@ -454,10 +460,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
     /// Pre-allocate disk space for the given logical file range. If any part of the allocation
     /// range is beyond the end of the file, the file size is updated.
-    /// NB: Do not hook this up yet! This is just for testing until all the fallocate features are
-    /// implemented.
-    #[cfg(test)]
-    async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
+    pub async fn allocate(&self, range: Range<u64>) -> Result<(), Error> {
         debug_assert!(range.start < range.end);
         debug_assert_eq!(range.start % self.block_size(), 0);
         debug_assert_eq!(range.end % self.block_size(), 0);
@@ -586,21 +589,28 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             to_allocate.push(new_range.clone());
         }
 
+        // We can update the size in the first transaction because even if subsequent transactions
+        // don't get replayed, the data between the current and new end of the file will be zero
+        // (either sparse zero or allocated zero). On the other hand, if we don't update the size
+        // in the first transaction, overwrite extents may be written past the end of the file
+        // which is an fsck error.
+        let new_size = std::cmp::max(new_range.end, self.get_size());
         // Make sure the mutation that flips the has_overwrite_extents advisory flag is in the
         // first transaction, in case we split transactions. This makes it okay to only replay the
         // first transaction if power loss occurs - the file will be in an unusual state, but not
         // an invalid one, if only part of the allocate goes through.
-        let mut mutation =
-            self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
-        if let ObjectValue::Object {
-            kind: ObjectKind::File { has_overwrite_extents, .. }, ..
-        } = &mut mutation.item.value
-        {
-            *has_overwrite_extents = true;
-        } else {
-            bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
-        }
-        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+        transaction.add_with_object(
+            self.store().store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    self.object_id(),
+                    self.attribute_id(),
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::Attribute { size: new_size, has_overwrite_extents: true },
+            ),
+            AssocObj::Borrowed(self),
+        );
 
         // The maximum number of mutations we are going to allow per transaction in allocate. This
         // is probably quite a bit lower than the actual limit, but it should be large enough to
@@ -624,9 +634,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let allocator = self.store().allocator();
         for mut allocate_range in to_allocate {
             while allocate_range.start < allocate_range.end {
-                // TODO(https://fxbug.dev/293943124): if any extents are beyond the end of the file
-                // and the transaction gets split, it will cause an fsck failure. We need to handle
-                // that case somehow (probably by adding a temporary TRIM record).
                 let device_range = allocator
                     .allocate(
                         &mut transaction,
@@ -657,28 +664,16 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 allocated += device_range_len;
 
                 if transaction.mutations().len() >= MAX_TRANSACTION_SIZE {
+                    self.update_allocated_size(&mut transaction, allocated, 0).await?;
                     transaction.commit_and_continue().await?;
+                    allocated = 0;
                 }
             }
         }
 
-        if new_range.end > self.txn_get_size(&transaction) {
-            transaction.add_with_object(
-                self.store().store_object_id(),
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id(),
-                        self.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(new_range.end),
-                ),
-                AssocObj::Borrowed(self),
-            );
-        }
         self.update_allocated_size(&mut transaction, allocated, 0).await?;
-
         transaction.commit().await?;
+
         Ok(())
     }
 
@@ -809,18 +804,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         )
         .await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
-            transaction.add_with_object(
-                self.store().store_object_id,
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id(),
-                        self.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(offset + buf.len() as u64),
-                ),
-                AssocObj::Borrowed(self),
-            );
+            self.txn_update_size(transaction, offset + buf.len() as u64).await?;
         }
         Ok(())
     }
@@ -1069,13 +1053,43 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 ),
             )
             .and_then(|m| {
-                if let ObjectItem { value: ObjectValue::Attribute { size }, .. } = m.item {
+                if let ObjectItem { value: ObjectValue::Attribute { size, .. }, .. } = m.item {
                     Some(size)
                 } else {
                     None
                 }
             })
             .unwrap_or_else(|| self.get_size())
+    }
+
+    pub async fn txn_update_size<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        new_size: u64,
+    ) -> Result<(), Error> {
+        let key =
+            ObjectKey::attribute(self.object_id(), self.attribute_id(), AttributeKey::Attribute);
+        let mut mutation = if let Some(mutation) =
+            transaction.get_object_mutation(self.store().store_object_id(), key.clone())
+        {
+            mutation.clone()
+        } else {
+            ObjectStoreMutation {
+                item: self.store().tree().find(&key).await?.ok_or(FxfsError::NotFound)?,
+                op: Operation::ReplaceOrInsert,
+            }
+        };
+        if let ObjectValue::Attribute { size, .. } = &mut mutation.item.value {
+            *size = new_size;
+        } else {
+            bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected object value"));
+        }
+        transaction.add_with_object(
+            self.store().store_object_id(),
+            Mutation::ObjectStore(mutation),
+            AssocObj::Borrowed(self),
+        );
+        Ok(())
     }
 
     async fn update_allocated_size(
@@ -1093,18 +1107,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         size: u64,
     ) -> Result<NeedsTrim, Error> {
         let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
-        transaction.add_with_object(
-            self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    self.object_id(),
-                    self.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
-                ObjectValue::attribute(size),
-            ),
-            AssocObj::Borrowed(self),
-        );
+        self.txn_update_size(transaction, size).await?;
         Ok(needs_trim)
     }
 
@@ -1183,18 +1186,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 }
             }
         }
-        transaction.add_with_object(
-            store.store_object_id,
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    self.object_id(),
-                    self.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
-                ObjectValue::attribute(size),
-            ),
-            AssocObj::Borrowed(self),
-        );
+        self.txn_update_size(transaction, size).await?;
         Ok(())
     }
 
@@ -1333,18 +1325,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         }
         // Update the file size if it changed.
         if file_range.start > round_up(self.txn_get_size(transaction), block_size).unwrap() {
-            transaction.add_with_object(
-                self.store().store_object_id,
-                Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id(),
-                        self.attribute_id(),
-                        AttributeKey::Attribute,
-                    ),
-                    ObjectValue::attribute(file_range.start),
-                ),
-                AssocObj::Borrowed(self),
-            );
+            self.txn_update_size(transaction, file_range.start).await?;
         }
         self.update_allocated_size(transaction, allocated, 0).await?;
         Ok(ranges)
@@ -1519,19 +1500,45 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.read(0u64, buf.as_mut()).await?;
         Ok(buf.as_slice().into())
     }
+
+    fn apply_overwrite_range(&self, range: Range<u64>) {
+        self.overwrite_ranges.apply_range(range);
+    }
 }
 
 impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
     fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
         match mutation {
             Mutation::ObjectStore(ObjectStoreMutation {
-                item: ObjectItem { value: ObjectValue::Attribute { size }, .. },
+                item: ObjectItem { value: ObjectValue::Attribute { size, .. }, .. },
                 ..
             }) => self.content_size.store(*size, atomic::Ordering::Relaxed),
             Mutation::ObjectStore(ObjectStoreMutation {
                 item: ObjectItem { value: ObjectValue::VerifiedAttribute { .. }, .. },
                 ..
             }) => self.finalize_fsverity_state(),
+            Mutation::ObjectStore(ObjectStoreMutation {
+                item:
+                    ObjectItem {
+                        key:
+                            ObjectKey {
+                                object_id,
+                                data:
+                                    ObjectKeyData::Attribute(
+                                        attr_id,
+                                        AttributeKey::Extent(ExtentKey { range }),
+                                    ),
+                            },
+                        value: ObjectValue::Extent(ExtentValue::Some { mode, .. }),
+                        ..
+                    },
+                ..
+            }) if self.object_id() == *object_id && self.attribute_id() == *attr_id => match mode {
+                ExtentMode::Overwrite | ExtentMode::OverwritePartial(_) => {
+                    self.apply_overwrite_range(range.clone())
+                }
+                ExtentMode::Raw | ExtentMode::Cow(_) => (),
+            },
             _ => {}
         }
     }
@@ -1698,7 +1705,11 @@ mod tests {
     use crate::filesystem::{
         FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
     };
-    use crate::fsck::{fsck, fsck_volume_with_options, fsck_with_options, FsckOptions};
+    use crate::fsck::{
+        fsck, fsck_volume, fsck_volume_with_options, fsck_with_options, FsckOptions,
+    };
+    use crate::lsm_tree::types::{ItemRef, LayerIterator};
+    use crate::lsm_tree::Query;
     use crate::object_handle::{
         ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
     };
@@ -1708,11 +1719,14 @@ mod tests {
     use crate::object_store::transaction::{lock_keys, Mutation, Options};
     use crate::object_store::volume::root_volume;
     use crate::object_store::{
-        DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes,
+        AttributeKey, DataObjectHandle, Directory, ExtentKey, ExtentMode, ExtentValue,
+        HandleOptions, LockKey, ObjectKeyData, ObjectStore, PosixAttributes,
         FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
     };
+    use crate::range::RangeExt;
     use crate::round::{round_down, round_up};
     use assert_matches::assert_matches;
+    use bit_vec::BitVec;
     use futures::channel::oneshot::channel;
     use futures::stream::{FuturesUnordered, StreamExt};
     use futures::FutureExt;
@@ -1762,15 +1776,10 @@ mod tests {
             .await
             .expect("new_transaction failed");
 
-        object = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            crypt,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        object =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), crypt)
+                .await
+                .expect("create_object failed");
 
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
@@ -1959,15 +1968,10 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let object2 = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        let object2 =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         let mut ef_buffer = object.allocate_buffer(block_size).await;
         ef_buffer.as_mut_slice().fill(0xef);
@@ -2474,15 +2478,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2522,7 +2520,6 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -2574,7 +2571,6 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -2662,15 +2658,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2706,15 +2696,10 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
-        handle = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        handle =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
 
         // As of writing, an empty filesystem has two 512kiB superblock extents and a little over
         // 256kiB of additional allocations (journal, etc) so we start use a 'magic' starting point
@@ -2807,7 +2792,11 @@ mod tests {
                 if let Err(e) =
                     ObjectStore::open_object(store, object_id, HandleOptions::default(), None).await
                 {
-                    assert!(FxfsError::NotFound.matches(&e));
+                    assert!(
+                        FxfsError::NotFound.matches(&e),
+                        "open_object didn't fail with NotFound: {:?}",
+                        e
+                    );
                     break;
                 }
                 // The graveyard should eventually tombstone the object.
@@ -2946,7 +2935,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object = root_directory
-            .create_child_file(&mut transaction, "foo", None)
+            .create_child_file(&mut transaction, "foo")
             .await
             .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
@@ -3171,15 +3160,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         for _ in 0..100 {
@@ -3450,15 +3433,10 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let object2 = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        let object2 =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
 
         object2
@@ -3660,5 +3638,313 @@ mod tests {
 
             fs.close().await.expect("close failed");
         }
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_multi_overwrite() {
+        struct Case {
+            pre_writes: Vec<Range<usize>>,
+            allocate_ranges: Vec<Range<u64>>,
+            overwrites: Vec<Vec<Range<u64>>>,
+        }
+        let cases = [
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![1..3],
+                overwrites: vec![vec![1..3]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..1, 1..2, 2..3, 3..4],
+                overwrites: vec![vec![0..4]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..4],
+                overwrites: vec![vec![0..1], vec![1..2], vec![3..4]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..4],
+                overwrites: vec![vec![3..4]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..4],
+                overwrites: vec![vec![3..4], vec![2..3], vec![1..2]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![1..2, 5..6, 7..8],
+                overwrites: vec![vec![5..6]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![1..3],
+                overwrites: vec![
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                ],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..5],
+                overwrites: vec![
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                    vec![1..3],
+                ],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..5],
+                overwrites: vec![vec![0..2, 2..4, 4..5]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..5, 5..10],
+                overwrites: vec![vec![1..2, 2..3, 4..7, 7..8]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..4, 6..10],
+                overwrites: vec![vec![2..3, 7..9]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..10],
+                overwrites: vec![vec![1..2, 5..10], vec![0..1, 5..10], vec![0..5, 5..10]],
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..10],
+                overwrites: vec![vec![0..2, 2..4, 4..6, 6..8, 8..10], vec![0..5, 5..10]],
+            },
+            Case {
+                pre_writes: vec![1..3],
+                allocate_ranges: vec![1..3],
+                overwrites: vec![vec![1..3]],
+            },
+            Case {
+                pre_writes: vec![1..3],
+                allocate_ranges: vec![4..6],
+                overwrites: vec![vec![5..6]],
+            },
+            Case {
+                pre_writes: vec![1..3],
+                allocate_ranges: vec![0..4],
+                overwrites: vec![vec![0..4]],
+            },
+            Case {
+                pre_writes: vec![1..3],
+                allocate_ranges: vec![2..4],
+                overwrites: vec![vec![2..4]],
+            },
+            Case {
+                pre_writes: vec![3..5],
+                allocate_ranges: vec![1..3, 6..7],
+                overwrites: vec![vec![1..3, 6..7]],
+            },
+            Case {
+                pre_writes: vec![1..3, 5..7, 8..9],
+                allocate_ranges: vec![0..5],
+                overwrites: vec![vec![0..2, 2..5], vec![0..5]],
+            },
+        ];
+
+        for (i, case) in cases.into_iter().enumerate() {
+            let (fs, object) = test_filesystem_and_empty_object().await;
+            let block_size = fs.block_size();
+            let file_size = block_size * 10;
+            object.truncate(file_size).await.unwrap();
+
+            for write in case.pre_writes {
+                let write_len = (write.end - write.start) * block_size as usize;
+                let mut write_buf = object.allocate_buffer(write_len).await;
+                write_buf.as_mut_slice().fill(0xff);
+                assert_eq!(
+                    object
+                        .write_or_append(Some(block_size * write.start as u64), write_buf.as_ref())
+                        .await
+                        .unwrap(),
+                    file_size
+                );
+            }
+
+            for allocate_range in case.allocate_ranges {
+                object
+                    .allocate(allocate_range.start * block_size..allocate_range.end * block_size)
+                    .await
+                    .unwrap();
+            }
+
+            for overwrite in case.overwrites {
+                let mut write_len = 0;
+                let overwrite = overwrite
+                    .into_iter()
+                    .map(|r| {
+                        write_len += (r.end - r.start) * block_size;
+                        r.start * block_size..r.end * block_size
+                    })
+                    .collect::<Vec<_>>();
+                let mut write_buf = object.allocate_buffer(write_len as usize).await;
+                let data = (0..20).cycle().take(write_len as usize).collect::<Vec<_>>();
+                write_buf.as_mut_slice().copy_from_slice(&data);
+
+                let mut expected_buf = object.allocate_buffer(file_size as usize).await;
+                assert_eq!(
+                    object.read(0, expected_buf.as_mut()).await.unwrap(),
+                    expected_buf.len()
+                );
+                let expected_buf_slice = expected_buf.as_mut_slice();
+                let mut data_slice = data.as_slice();
+                for r in &overwrite {
+                    let len = r.length().unwrap() as usize;
+                    let (copy_from, rest) = data_slice.split_at(len);
+                    expected_buf_slice[r.start as usize..r.end as usize]
+                        .copy_from_slice(&copy_from);
+                    data_slice = rest;
+                }
+
+                let mut transaction = object.new_transaction().await.unwrap();
+                object
+                    .multi_overwrite(&mut transaction, 0, &overwrite, write_buf.as_mut())
+                    .await
+                    .unwrap_or_else(|_| panic!("multi_overwrite error on case {}", i));
+                transaction.commit().await.unwrap();
+
+                let mut buf = object.allocate_buffer(file_size as usize).await;
+                assert_eq!(
+                    object.read(0, buf.as_mut()).await.unwrap(),
+                    buf.len(),
+                    "failed length check on case {}",
+                    i,
+                );
+                assert_eq!(buf.as_slice(), expected_buf.as_slice(), "failed on case {}", i);
+            }
+
+            fsck_volume(&fs, object.store().store_object_id(), None).await.expect("fsck failed");
+            fs.close().await.expect("close failed");
+        }
+    }
+
+    async fn get_mode(obj: &DataObjectHandle<ObjectStore>) -> ExtentMode {
+        let store = obj.store();
+        let block_size = store.block_size();
+        let tree = store.tree();
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let iter = merger
+            .query(Query::FullRange(&ObjectKey::attribute(
+                obj.object_id(),
+                0,
+                AttributeKey::Extent(ExtentKey::search_key_from_offset(0)),
+            )))
+            .await
+            .unwrap();
+        match iter.get() {
+            Some(ItemRef {
+                key:
+                    ObjectKey {
+                        object_id,
+                        data:
+                            ObjectKeyData::Attribute(
+                                attribute_id,
+                                AttributeKey::Extent(ExtentKey { range }),
+                            ),
+                    },
+                value: ObjectValue::Extent(ExtentValue::Some { mode, .. }),
+                ..
+            }) if *object_id == obj.object_id() && *attribute_id == 0 => {
+                assert_eq!(*range, 0..block_size * 10, "unexpected extent range");
+                mode.clone()
+            }
+            x => panic!("looking for extent record, found this {:?}", x),
+        }
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_multi_overwrite_mode_updates() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let block_size = fs.block_size();
+        let file_size = block_size * 10;
+        object.truncate(file_size).await.unwrap();
+
+        let mut expected_bitmap = BitVec::from_elem(10, false);
+
+        object.allocate(0..10 * block_size).await.unwrap();
+        assert_eq!(get_mode(&object).await, ExtentMode::OverwritePartial(expected_bitmap.clone()));
+
+        let mut write_buf = object.allocate_buffer(2 * block_size as usize).await;
+        let data = (0..20).cycle().take(write_buf.len()).collect::<Vec<_>>();
+        write_buf.as_mut_slice().copy_from_slice(&data);
+        let mut transaction = object.new_transaction().await.unwrap();
+        object
+            .multi_overwrite(
+                &mut transaction,
+                0,
+                &[2 * block_size..4 * block_size],
+                write_buf.as_mut(),
+            )
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+
+        expected_bitmap.set(2, true);
+        expected_bitmap.set(3, true);
+        assert_eq!(get_mode(&object).await, ExtentMode::OverwritePartial(expected_bitmap.clone()));
+
+        let mut write_buf = object.allocate_buffer(3 * block_size as usize).await;
+        let data = (0..20).cycle().take(write_buf.len()).collect::<Vec<_>>();
+        write_buf.as_mut_slice().copy_from_slice(&data);
+        let mut transaction = object.new_transaction().await.unwrap();
+        object
+            .multi_overwrite(
+                &mut transaction,
+                0,
+                &[3 * block_size..5 * block_size, 6 * block_size..7 * block_size],
+                write_buf.as_mut(),
+            )
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+
+        expected_bitmap.set(4, true);
+        expected_bitmap.set(6, true);
+        assert_eq!(get_mode(&object).await, ExtentMode::OverwritePartial(expected_bitmap.clone()));
+
+        let mut write_buf = object.allocate_buffer(6 * block_size as usize).await;
+        let data = (0..20).cycle().take(write_buf.len()).collect::<Vec<_>>();
+        write_buf.as_mut_slice().copy_from_slice(&data);
+        let mut transaction = object.new_transaction().await.unwrap();
+        object
+            .multi_overwrite(
+                &mut transaction,
+                0,
+                &[
+                    0..2 * block_size,
+                    5 * block_size..6 * block_size,
+                    7 * block_size..10 * block_size,
+                ],
+                write_buf.as_mut(),
+            )
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+
+        assert_eq!(get_mode(&object).await, ExtentMode::Overwrite);
+
+        fs.close().await.expect("close failed");
     }
 }

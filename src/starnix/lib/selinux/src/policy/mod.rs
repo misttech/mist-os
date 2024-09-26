@@ -29,7 +29,9 @@ use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::ops::Deref;
 use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
-use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
+use zerocopy::{
+    little_endian as le, FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned,
+};
 
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
@@ -487,7 +489,7 @@ impl Validate for [u8] {
     }
 }
 
-impl<B: ByteSlice, T: Validate + FromBytes + NoCell> Validate for Ref<B, T> {
+impl<B: SplitByteSlice, T: Validate + FromBytes + KnownLayout + Immutable> Validate for Ref<B, T> {
     type Error = <T as Validate>::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -495,7 +497,7 @@ impl<B: ByteSlice, T: Validate + FromBytes + NoCell> Validate for Ref<B, T> {
     }
 }
 
-impl<B: ByteSlice, T: Counted + FromBytes + NoCell> Counted for Ref<B, T> {
+impl<B: SplitByteSlice, T: Counted + FromBytes + KnownLayout + Immutable> Counted for Ref<B, T> {
     fn count(&self) -> u32 {
         self.deref().count()
     }
@@ -531,7 +533,7 @@ impl<PS: ParseStrategy, M: Counted + Parse<PS>, D: ParseSlice<PS>> Parse<PS> for
 }
 
 impl<
-        T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
+        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
         PS: ParseStrategy<Output<T> = T>,
     > Parse<PS> for T
 {
@@ -680,8 +682,8 @@ macro_rules! array_type_validate_deref_none_data_vec {
 pub(super) use array_type_validate_deref_none_data_vec;
 
 impl<
-        B: Debug + ByteSlice + PartialEq,
-        T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
+        B: Debug + SplitByteSlice + PartialEq,
+        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
     > Parse<ByRef<B>> for Ref<B, T>
 {
     type Error = anyhow::Error;
@@ -699,8 +701,8 @@ impl<
 }
 
 impl<
-        B: Debug + ByteSlice + PartialEq,
-        T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
+        B: Debug + SplitByteSlice + PartialEq,
+        T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned,
     > ParseSlice<ByRef<B>> for Ref<B, [T]>
 {
     /// [`Ref`] may return a [`ParseError`] internally, or `<T as Parse>::Error`. Unify error return

@@ -10,7 +10,7 @@ use super::{
 };
 
 use std::fmt::Debug;
-use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
+use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
 pub(super) const SELINUX_MAGIC: u32 = 0xf97cff8c;
 
@@ -26,7 +26,7 @@ pub(super) const CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG: u32 = 1 << 2;
 pub(super) const CONFIG_HANDLE_UNKNOWN_MASK: u32 =
     CONFIG_HANDLE_UNKNOWN_REJECT_FLAG | CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG;
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct Magic(le::U32);
 
@@ -62,7 +62,7 @@ impl<PS: ParseStrategy> ValidateArray<SignatureMetadata, u8> for Signature<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct SignatureMetadata(le::U32);
 
@@ -86,7 +86,7 @@ impl Counted for SignatureMetadata {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct PolicyVersion(le::U32);
 
@@ -174,7 +174,7 @@ fn try_handle_unknown_fom_config(config: u32) -> Result<HandleUnknown, ParseErro
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct Counts {
     symbols_count: le::U32,

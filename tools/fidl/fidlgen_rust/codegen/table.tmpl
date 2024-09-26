@@ -36,6 +36,26 @@ impl {{ .Name }} {
     }
 }
 
+{{ $resourceDialectName := "D" }}
+{{ $resourceDialectGeneric := "<D: fidl::encoding::ResourceDialect>" }}
+{{- if .IsResourceType }}
+{{ $resourceDialectName = ResourceDialect }}
+{{ $resourceDialectGeneric = "" }}
+impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a mut Self;
+    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+        value
+    }
+}
+{{- else }}
+impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
+    type Borrowed<'a> = &'a Self;
+    fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        value
+    }
+}
+{{- end }}
+
 unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     type Owned = Self;
 
@@ -50,24 +70,8 @@ unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     }
 }
 
-{{- if .IsResourceType }}
-impl fidl::encoding::ResourceTypeMarker for {{ .Name }} {
-    type Borrowed<'a> = &'a mut Self;
-    fn take_or_borrow<'a>(value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-        value
-    }
-}
-{{- else }}
-impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
-    type Borrowed<'a> = &'a Self;
-    fn borrow<'a>(value: &'a <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
-        value
-    }
-}
-{{- end }}
-
-unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
-    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
+unsafe impl{{ $resourceDialectGeneric }} fidl::encoding::Encode<{{ .Name }}, {{ $resourceDialectName }}> for &{{ if .IsResourceType }}mut {{ end }}{{ .Name }} {
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_, {{ $resourceDialectName }}>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
         encoder.debug_check_bounds::<{{ .Name }}>(offset);
         // Vector header
         let max_ordinal: u64 = self.max_ordinal_present();
@@ -100,11 +104,11 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
         // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
         // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
         //   envelope_size bytes, there is always sufficient room.
-        fidl::encoding::encode_in_envelope_optional::<{{ .Type.Fidl }}>(
+        fidl::encoding::encode_in_envelope_optional::<{{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}>(
             {{- if .Type.IsResourceType }}
-            self.{{ .Name }}.as_mut().map(<{{ .Type.Fidl }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow),
+            self.{{ .Name }}.as_mut().map(<{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::ResourceTypeMarker>::take_or_borrow),
             {{- else }}
-            self.{{ .Name }}.as_ref().map(<{{ .Type.Fidl }} as fidl::encoding::ValueTypeMarker>::borrow),
+            self.{{ .Name }}.as_ref().map(<{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::ValueTypeMarker>::borrow),
             {{- end }}
             encoder, offset + cur_offset, depth
         )?;
@@ -116,13 +120,13 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
     }
 }
 
-impl fidl::encoding::Decode<Self> for {{ .Name }} {
+impl{{ $resourceDialectGeneric }} fidl::encoding::Decode<Self, {{ $resourceDialectName }}> for {{ .Name }} {
     #[inline(always)]
     fn new_empty() -> Self {
         Self::default()
     }
 
-    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_, {{ $resourceDialectName }}>, offset: usize, mut depth: fidl::encoding::Depth) -> fidl::Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
         let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
             None => return Err(fidl::Error::NotNullable),
@@ -159,7 +163,7 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
         if let Some((inlined, num_bytes, num_handles)) =
             fidl::encoding::decode_envelope_header(decoder, next_offset)?
         {
-            let member_inline_size = <{{ .Type.Fidl }} as fidl::encoding::TypeMarker>::inline_size(decoder.context);
+            let member_inline_size = <{{ .Type.Fidl $resourceDialectName }} as fidl::encoding::TypeMarker>::inline_size(decoder.context);
             if inlined != (member_inline_size <= 4) {
                 return Err(fidl::Error::InvalidInlineBitInEnvelope);
             }
@@ -173,8 +177,8 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
                 inner_depth.increment()?;
             }
             let val_ref =
-                self.{{ .Name }}.get_or_insert_with(|| fidl::new_empty!({{ .Type.Fidl }}));
-            fidl::decode!({{ .Type.Fidl }}, val_ref, decoder, inner_offset, inner_depth)?;
+                self.{{ .Name }}.get_or_insert_with(|| fidl::new_empty!({{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}));
+            fidl::decode!({{ .Type.Fidl $resourceDialectName }}, {{ $resourceDialectName }}, val_ref, decoder, inner_offset, inner_depth)?;
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
                 return Err(fidl::Error::InvalidNumBytesInEnvelope);
             }

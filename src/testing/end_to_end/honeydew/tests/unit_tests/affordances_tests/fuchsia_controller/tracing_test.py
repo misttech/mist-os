@@ -74,7 +74,7 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     def test_initialize(
@@ -100,7 +100,7 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_initialize.assert_called()
 
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     def test_initialize_error(
@@ -141,11 +141,11 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -174,11 +174,11 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_start.assert_called()
 
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -222,16 +222,16 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -260,16 +260,16 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_stop.assert_called()
 
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -305,18 +305,12 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
-    )
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "terminate_tracing",
-        new_callable=mock.AsyncMock,
     )
     def test_terminate(
         self,
         parameterized_dict: dict[str, Any],
-        mock_tracingcontroller_terminate: mock.Mock,
         *unused_args: Any,
     ) -> None:
         """Test for Tracing.terminate() method."""
@@ -326,58 +320,10 @@ class TracingFCTests(unittest.TestCase):
 
         # Check whether an `errors.FuchsiaStateError` exception is raised when
         # state is not valid.
-        if not parameterized_dict.get("session_initialized"):
-            with self.assertRaises(errors.FuchsiaStateError):
-                self.tracing_obj.terminate()
-        else:
-            self.tracing_obj.terminate()
-            mock_tracingcontroller_terminate.assert_called()
-            # Check that no warning logs got printed.
-            self.assertNoLogs()
-
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "when_session_is_not_initialized",
-                    "session_initialized": False,
-                },
-            ),
-            (
-                {
-                    "label": "with_no_download",
-                    "session_initialized": True,
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "initialize_tracing",
-    )
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "terminate_tracing",
-        new_callable=mock.AsyncMock,
-    )
-    def test_terminate_session_init(
-        self,
-        parameterized_dict: dict[str, Any],
-        *unused_args: Any,
-    ) -> None:
-        """Test for Tracing.terminate() method with session initialization."""
-        # Perform setup based on parameters.
-        if parameterized_dict.get("session_initialized"):
-            self.tracing_obj.initialize()
-
-        # Check whether an `errors.FuchsiaStateError` exception is raised when
-        # state is not valid.
-        if not parameterized_dict.get("session_initialized"):
-            with self.assertRaises(errors.FuchsiaStateError):
-                self.tracing_obj.terminate()
-        else:
-            self.tracing_obj.terminate()
+        self.tracing_obj.terminate()
+        self.assertFalse(self.tracing_obj.is_active())
+        # Check that no warning logs got printed.
+        self.assertNoLogs()
 
     @parameterized.expand(
         [
@@ -399,25 +345,30 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "terminate_tracing",
+        f_tracingcontroller.Session.Client,
+        "start_tracing",
         new_callable=mock.AsyncMock,
     )
-    def test_terminate_with_warning(
+    @mock.patch.object(
+        f_tracingcontroller.Session.Client,
+        "stop_tracing",
+        new_callable=mock.AsyncMock,
+    )
+    def test_stop_with_warning(
         self,
         parameterized_dict: dict[str, Any],
-        mock_tracingcontroller_terminate: mock.Mock,
+        mock_tracingcontroller_stop: mock.Mock,
         *unused_args: Any,
     ) -> None:
-        """Test for Tracing.terminate() method with Warning."""
+        """Test for Tracing.stop() method with Warning."""
         # Perform setup based on parameters.
         records_dropped = parameterized_dict.get("dropped")
-        mock_tracingcontroller_terminate.return_value = mock.Mock(
-            response=f_tracingcontroller.ControllerTerminateTracingResponse(
+        mock_tracingcontroller_stop.return_value = mock.Mock(
+            response=f_tracingcontroller.SessionStopTracingResponse(
                 result=f_tracingcontroller.TerminateResult(
                     provider_stats=[
                         f_tracingcontroller.ProviderStats(
@@ -435,59 +386,30 @@ class TracingFCTests(unittest.TestCase):
         )
 
         self.tracing_obj.initialize()
+        self.tracing_obj.start()
         if parameterized_dict.get("assert_warning"):
             with self.assertLogs(level="WARNING") as lc:
-                self.tracing_obj.terminate()
-                mock_tracingcontroller_terminate.assert_called()
+                self.tracing_obj.stop()
+                mock_tracingcontroller_stop.assert_called()
                 self.assertIn(
                     f"{records_dropped} records were dropped for virtual-console.cm!",
                     lc.output[0],
                 )
         else:
             with self.assertNoLogs(level="WARNING") as lc:
-                self.tracing_obj.terminate()
-
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "initialize_tracing",
-    )
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "terminate_tracing",
-        new_callable=mock.AsyncMock,
-    )
-    def test_terminate_error(
-        self, mock_tracingcontroller_terminate: mock.Mock, *unused_args: Any
-    ) -> None:
-        """Test for Tracing.terminate() when the FIDL call raises an error.
-        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        self.tracing_obj.initialize()
-
-        mock_tracingcontroller_terminate.side_effect = fc.ZxStatus(
-            fc.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
-        with self.assertRaises(errors.FuchsiaControllerError):
-            self.tracing_obj.terminate()
+                self.tracing_obj.stop()
 
     @parameterized.expand(
         [
             (
                 {
-                    "label": "when_session_is_not_initialized",
-                    "session_initialized": False,
-                },
-            ),
-            (
-                {
                     "label": "with_tracing_download_default_file_name",
-                    "session_initialized": True,
                     "return_value": "samp_trace_data",
                 },
             ),
             (
                 {
                     "label": "with_tracing_download_given_file_name",
-                    "session_initialized": True,
                     "trace_file": "trace.fxt",
                     "return_value": "samp_trace_data",
                 },
@@ -496,20 +418,16 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "terminate_tracing",
-        new_callable=mock.AsyncMock,
-    )
+    @mock.patch.object(fc, "Channel")
     @mock.patch.object(fc, "Socket")
     def test_terminate_and_download(
         self,
         parameterized_dict: dict[str, Any],
         mock_fc_socket: mock.Mock,
-        mock_tracingcontroller_terminate: mock.Mock,
+        mock_fc_channel: mock.Mock,
         *unused_args: Any,
     ) -> None:
         """Test for Tracing.terminate_and_download() method."""
@@ -523,6 +441,11 @@ class TracingFCTests(unittest.TestCase):
         mock_fc_socket.create.return_value = (
             mock.MagicMock(),
             mock_client_socket,
+        )
+
+        mock_fc_channel.create.return_value = (
+            mock.MagicMock(),
+            mock.MagicMock(),
         )
 
         # Perform setup based on parameters.
@@ -539,7 +462,7 @@ class TracingFCTests(unittest.TestCase):
             trace_path: str = self.tracing_obj.terminate_and_download(
                 directory=tmpdir, trace_file=trace_file
             )
-            mock_tracingcontroller_terminate.assert_called()
+            self.assertFalse(self.tracing_obj.is_active())
 
             # Check the return value of the terminate method.
             if trace_file:
@@ -578,30 +501,26 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Provisioner.Client,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
+        f_tracingcontroller.Session.Client,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
-    @mock.patch.object(
-        f_tracingcontroller.Controller.Client,
-        "terminate_tracing",
-        new_callable=mock.AsyncMock,
-    )
+    @mock.patch.object(fc, "Channel")
     @mock.patch.object(fc, "Socket")
     def test_trace_session(
         self,
         parameterized_dict: dict[str, Any],
         mock_fc_socket: mock.MagicMock,
-        mock_tracingcontroller_terminate: mock.MagicMock,
+        mock_fc_channel: mock.MagicMock,
         *unused_args: Any,
     ) -> None:
         """Test for Tracing.trace_session() method."""
@@ -617,6 +536,11 @@ class TracingFCTests(unittest.TestCase):
             mock_client_socket,
         )
 
+        mock_fc_channel.create.return_value = (
+            mock.MagicMock(),
+            mock.MagicMock(),
+        )
+
         with tempfile.TemporaryDirectory() as tmpdir:
             trace_file: str = parameterized_dict.get("trace_file", "")
             download_trace: bool = parameterized_dict.get(
@@ -628,8 +552,8 @@ class TracingFCTests(unittest.TestCase):
             with self.tracing_obj.trace_session(
                 download=download_trace, directory=tmpdir, trace_file=trace_file
             ):
-                mock_tracingcontroller_terminate.assert_not_called()
-            mock_tracingcontroller_terminate.assert_called()
+                self.assertTrue(self.tracing_obj.is_active())
+            self.assertFalse(self.tracing_obj.is_active())
 
             if download_trace:
                 trace_path: str = os.path.join(tmpdir, trace_file)

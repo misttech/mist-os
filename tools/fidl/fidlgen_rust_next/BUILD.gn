@@ -1,0 +1,115 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/host.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/testing/golden_files.gni")
+import("//tools/fidl/fidlc/testdata/info.gni")
+
+if (is_host) {
+  rustc_binary("fidlgen_rust_next") {
+    edition = "2021"
+    sources = [
+      "src/compiler/mod.rs",
+      "src/compiler/natural/enum.rs",
+      "src/compiler/natural/mod.rs",
+      "src/compiler/natural/struct.rs",
+      "src/compiler/natural/table.rs",
+      "src/compiler/natural/union.rs",
+      "src/compiler/query.rs",
+      "src/compiler/util.rs",
+      "src/compiler/wire/enum.rs",
+      "src/compiler/wire/mod.rs",
+      "src/compiler/wire/struct.rs",
+      "src/compiler/wire/table.rs",
+      "src/compiler/wire/union.rs",
+      "src/de.rs",
+      "src/ir/attribute.rs",
+      "src/ir/comp_ident.rs",
+      "src/ir/constant.rs",
+      "src/ir/decl_type.rs",
+      "src/ir/enum.rs",
+      "src/ir/handle.rs",
+      "src/ir/library.rs",
+      "src/ir/literal.rs",
+      "src/ir/mod.rs",
+      "src/ir/object.rs",
+      "src/ir/primitive.rs",
+      "src/ir/struct.rs",
+      "src/ir/table.rs",
+      "src/ir/type.rs",
+      "src/ir/union.rs",
+      "src/main.rs",
+    ]
+    deps = [
+      "//third_party/rust_crates:argh",
+      "//third_party/rust_crates:bitflags",
+      "//third_party/rust_crates:serde",
+      "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:serde_repr",
+    ]
+    with_unit_tests = true
+  }
+
+  golden_files("fidlgen_rust_next_golden_tests") {
+    testonly = true
+
+    formatter = {
+      script = "$rustc_prefix/bin/rustfmt"
+      inputs = [ "//rustfmt.toml" ]
+      args = [
+        "--config-path",
+        rebase_path(inputs[0], root_build_dir),
+      ]
+    }
+
+    deps = []
+    comparisons = []
+    foreach(info, fidl_testdata_info) {
+      if (info.denylist + [ "fidlgen_rust_next" ] - [ "fidlgen_rust_next" ] ==
+          info.denylist) {
+        deps += [ "${info.target}_rust_next_generate($fidl_toolchain)" ]
+        _library_underscore = string_replace(info.library, ".", "_")
+        comparisons += [
+          {
+            golden = "goldens/${info.name}.rs.golden"
+            candidate = "${info.fidl_gen_dir}/${info.target_name}/rust_next/fidl_${_library_underscore}.rs"
+          },
+        ]
+      }
+    }
+  }
+}
+
+install_host_tools("host") {
+  deps = [ ":fidlgen_rust_next" ]
+  outputs = [ "fidlgen_rust_next" ]
+}
+
+group("goldens") {
+  testonly = true
+
+  denylist_key = "device_build_denylist"
+  if (is_host) {
+    denylist_key = "host_build_denylist"
+  }
+
+  deps = []
+  foreach(info, fidl_testdata_info) {
+    if (info[denylist_key] + [ "fidlgen_rust_next" ] -
+        [ "fidlgen_rust_next" ] == info[denylist_key]) {
+      deps += [ "${info.target}_rust_next" ]
+    }
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":fidlgen_rust_next_golden_tests($host_toolchain)",
+    ":fidlgen_rust_next_test($host_toolchain)",
+    ":goldens",
+    ":goldens($host_toolchain)",
+  ]
+}

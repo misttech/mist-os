@@ -331,7 +331,7 @@ mod test {
     use assert_matches::assert_matches;
     use fuchsia_async::{self as fasync};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
     use std::collections::HashMap;
     use std::fmt::Debug;
     use std::io::{Error, ErrorKind};
@@ -460,16 +460,17 @@ mod test {
         F: Future + Unpin,
         <F as Future>::Output: Debug,
     {
-        if duration == 0.millis() {
+        if duration == zx::Duration::from_millis(0) {
             assert!(!executor.wake_expired_timers());
         } else {
             // Advance time right before the timer is supposed to fire, and make sure it does not.
-            let () = executor.set_fake_time(executor.now() + duration - 1.millis());
+            let () =
+                executor.set_fake_time(executor.now() + duration - zx::Duration::from_millis(1));
             assert!(!executor.wake_expired_timers());
             assert_matches!(executor.run_until_stalled(fut), Poll::Pending);
 
             // Advance time to when the timer should fire and make sure it does.
-            let () = executor.set_fake_time(executor.now() + 1.millis());
+            let () = executor.set_fake_time(executor.now() + zx::Duration::from_millis(1));
             assert!(executor.wake_expired_timers());
         }
 
@@ -535,7 +536,8 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.enumerate().map(|(i, addr)| {
-            let delay = if i == 0 { 0.millis() } else { RECOMMENDED_MIN_CONN_ATT_DELAY };
+            let delay =
+                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_MIN_CONN_ATT_DELAY };
             (
                 delay,
                 Event::Connecting {
@@ -601,7 +603,8 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay = if i == 0 { 0.millis() } else { RECOMMENDED_CONN_ATT_DELAY };
+            let delay =
+                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_CONN_ATT_DELAY };
             (
                 delay,
                 Event::Connecting {
@@ -772,7 +775,7 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay = if i == 0 { 0.millis() } else { delay };
+            let delay = if i == 0 { zx::Duration::from_millis(0) } else { delay };
             (
                 delay,
                 Event::Connecting {
@@ -842,7 +845,8 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay = if i == 0 { 0.millis() } else { RECOMMENDED_CONN_ATT_DELAY };
+            let delay =
+                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_CONN_ATT_DELAY };
             (
                 delay,
                 Event::Connecting {
@@ -903,7 +907,7 @@ mod test {
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
-                0.millis(),
+                zx::Duration::from_millis(0),
                 Event::Connecting {
                     addr: nl_v4,
                     class: Class::NotListening,
@@ -975,7 +979,7 @@ mod test {
             conn_addrs = vec![nl_v4, bh_v4, bh_v6, nl_v6];
             expected_events = vec![
                 (
-                    0.millis(),
+                    zx::Duration::from_millis(0),
                     Event::Connecting {
                         addr: nl_v4,
                         class: Class::NotListening,
@@ -1011,7 +1015,7 @@ mod test {
             conn_addrs = vec![nl_v6, bh_v6, bh_v4, nl_v4];
             expected_events = vec![
                 (
-                    0.millis(),
+                    zx::Duration::from_millis(0),
                     Event::Connecting {
                         addr: nl_v6,
                         class: Class::NotListening,
@@ -1095,7 +1099,7 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         let () = executor.set_fake_time(Time::from_nanos(0));
 
-        let delay = RECOMMENDED_CONN_ATT_DELAY + 5.millis();
+        let delay = RECOMMENDED_CONN_ATT_DELAY + zx::Duration::from_millis(5);
 
         let mut connector = TestEnvConnector::new(Some(server_addr))
             .add_classified_addrs(Class::DelayedConnectable { delay }, vec![server_addr])
@@ -1112,7 +1116,7 @@ mod test {
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
-                0.millis(),
+                zx::Duration::from_millis(0),
                 Event::Connecting {
                     addr: server_addr,
                     class: Class::DelayedConnectable { delay },
@@ -1137,7 +1141,7 @@ mod test {
 
         // Sleep to when the server should eventually respond.
         assert_matches::assert_matches!(
-            next_event(&mut executor, &mut fut, 5.millis()),
+            next_event(&mut executor, &mut fut, zx::Duration::from_millis(5)),
             Poll::Ready(Ok(a)) if a == server_addr
         );
         assert_eq!(connector.take_events(), vec![Event::DelayFinished { addr: server_addr }]);
@@ -1179,7 +1183,7 @@ mod test {
         // Walk through all the events that should occur in this setup.
         for (abstime, woke, done, optional_event) in vec![
             (
-                0.millis(),
+                zx::Duration::from_millis(0),
                 false,
                 false,
                 Some(Event::Connecting {
@@ -1189,7 +1193,7 @@ mod test {
                 }),
             ),
             (
-                10.millis(),
+                zx::Duration::from_millis(10),
                 true,
                 false,
                 Some(Event::Connecting {
@@ -1198,11 +1202,11 @@ mod test {
                     bind_device: Some("timer_behavior".into()),
                 }),
             ),
-            (250.millis(), false, false, None),
+            (zx::Duration::from_millis(250), false, false, None),
             (
                 // N.B. 2010ms is the absolute time for the successful connection because it was
                 // scheduled 2s out from the 10ms clamp where the blackholed connection was queued.
-                2010.millis(),
+                zx::Duration::from_millis(2010),
                 true,
                 true,
                 Some(Event::Connecting {

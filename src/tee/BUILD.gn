@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components/fuchsia_component.gni")
+import("//build/components/fuchsia_package.gni")
+
 group("tests") {
   testonly = true
   deps = [
@@ -13,4 +16,13 @@ group("tests") {
     "testing:tests",
     "tests",
   ]
+}
+
+fuchsia_component("tee-component") {
+  manifest = "meta/tee.cml"
+  component_name = "tee"
+}
+
+fuchsia_package("tee") {
+  deps = [ ":tee-component" ]
 }

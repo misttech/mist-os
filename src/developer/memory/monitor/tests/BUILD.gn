@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -13,7 +14,7 @@ group("tests") {
   ]
 }
 
-executable("memory_monitor_unittests") {
+cc_test_executable("memory_monitor_unittests") {
   testonly = true
   output_name = "memory_monitor_unittests"
 
@@ -59,7 +60,7 @@ executable("bin-monitor") {
   ]
 }
 
-executable("test-inspect") {
+cc_test_executable("test-inspect") {
   testonly = true
   output_name = "memory_monitor_inspect_integration_tests"
 

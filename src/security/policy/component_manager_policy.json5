@@ -19,6 +19,7 @@
                 "/core/testing/starnix-tests:**",
                 "/core/testing/system-tests:**",
                 "/core/testing/starnix_test_runners/starnix_unit_test_runner",
+                "/core/test_manager/fuzz_starnix_test_runner",
             ],
         },
         capability_policy: [
@@ -255,6 +256,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/memory_monitor",
+                    "/core/memory_monitor2",
                 ],
             },
             {

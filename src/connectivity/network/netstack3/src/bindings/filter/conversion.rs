@@ -292,7 +292,14 @@ where
                     netstack3_core::filter::Action::TransparentProxy(proxy)
                 }
                 fnet_filter_ext::Action::Redirect { dst_port } => {
-                    netstack3_core::filter::Action::Redirect { dst_port }
+                    netstack3_core::filter::Action::Redirect {
+                        dst_port: dst_port.map(|fnet_filter_ext::PortRange(range)| range),
+                    }
+                }
+                fnet_filter_ext::Action::Masquerade { src_port } => {
+                    netstack3_core::filter::Action::Masquerade {
+                        src_port: src_port.map(|fnet_filter_ext::PortRange(range)| range),
+                    }
                 }
             };
 

@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -971,7 +967,10 @@ impl TestProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<TestProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<TestProtocolEvent, fidl::Error> {
         TestProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -1220,13 +1219,11 @@ impl futures::Stream for TestProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x5bfca9479251b9c3 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = TestProtocolControlHandle { inner: this.inner.clone() };
                     Ok(TestProtocolRequest::StrictUnionHenceResponseMayBeStackAllocated {
                         responder:
@@ -1238,13 +1235,11 @@ impl futures::Stream for TestProtocolRequestStream {
                 }
                 0x694fede3b8829ce2 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = TestProtocolControlHandle { inner: this.inner.clone() };
                     Ok(TestProtocolRequest::FlexibleUnionHenceResponseMustBeHeapAllocated {
                         responder:
@@ -1333,6 +1328,16 @@ impl fidl::endpoints::ControlHandle for TestProtocolControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -1475,6 +1480,13 @@ impl TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponder {
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for Empty {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Empty {
         type Owned = Self;
 
@@ -1488,20 +1500,12 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Empty {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Empty> for &Empty {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Empty, D> for &Empty {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1511,7 +1515,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Empty {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Empty {
         #[inline(always)]
         fn new_empty() -> Self {
             Self
@@ -1520,7 +1524,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1529,6 +1533,13 @@ mod internal {
                 0 => Ok(()),
                 _ => Err(fidl::Error::Invalid),
             }
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for NullableUnionStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1545,26 +1556,20 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for NullableUnionStruct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<NullableUnionStruct> for &NullableUnionStruct {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<NullableUnionStruct, D>
+        for &NullableUnionStruct
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<NullableUnionStruct>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<NullableUnionStruct>::encode(
+            fidl::encoding::Encode::<NullableUnionStruct, D>::encode(
                 (
                     <fidl::encoding::OptionalUnion<Union> as fidl::encoding::ValueTypeMarker>::borrow(&self.the_union),
                 ),
@@ -1572,13 +1577,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::OptionalUnion<Union>>>
-        fidl::encoding::Encode<NullableUnionStruct> for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::OptionalUnion<Union>, D>,
+        > fidl::encoding::Encode<NullableUnionStruct, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1591,16 +1598,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for NullableUnionStruct {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for NullableUnionStruct {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { the_union: fidl::new_empty!(fidl::encoding::OptionalUnion<Union>) }
+            Self { the_union: fidl::new_empty!(fidl::encoding::OptionalUnion<Union>, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1608,12 +1615,20 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::OptionalUnion<Union>,
+                D,
                 &mut self.the_union,
                 decoder,
                 offset + 0,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for Pasta {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1630,26 +1645,18 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Pasta {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Pasta> for &Pasta {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Pasta, D> for &Pasta {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Pasta>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Pasta>::encode(
+            fidl::encoding::Encode::<Pasta, D>::encode(
                 (<fidl::encoding::BoundedString<16> as fidl::encoding::ValueTypeMarker>::borrow(
                     &self.sauce,
                 ),),
@@ -1659,13 +1666,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::BoundedString<16>>>
-        fidl::encoding::Encode<Pasta> for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::BoundedString<16>, D>,
+        > fidl::encoding::Encode<Pasta, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1678,16 +1687,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Pasta {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Pasta {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { sauce: fidl::new_empty!(fidl::encoding::BoundedString<16>) }
+            Self { sauce: fidl::new_empty!(fidl::encoding::BoundedString<16>, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1695,12 +1704,20 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::BoundedString<16>,
+                D,
                 &mut self.sauce,
                 decoder,
                 offset + 0,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for Pizza {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1717,26 +1734,18 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Pizza {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Pizza> for &Pizza {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Pizza, D> for &Pizza {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Pizza>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Pizza>::encode(
+            fidl::encoding::Encode::<Pizza, D>::encode(
                 (
                     <fidl::encoding::UnboundedVector<fidl::encoding::BoundedString<16>> as fidl::encoding::ValueTypeMarker>::borrow(&self.toppings),
                 ),
@@ -1745,15 +1754,17 @@ mod internal {
         }
     }
     unsafe impl<
+            D: fidl::encoding::ResourceDialect,
             T0: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::BoundedString<16>>,
+                D,
             >,
-        > fidl::encoding::Encode<Pizza> for (T0,)
+        > fidl::encoding::Encode<Pizza, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1766,12 +1777,13 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Pizza {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Pizza {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
                 toppings: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::BoundedString<16>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::BoundedString<16>>,
+                    D
                 ),
             }
         }
@@ -1779,7 +1791,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1787,12 +1799,20 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::BoundedString<16>>,
+                D,
                 &mut self.toppings,
                 decoder,
                 offset + 0,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for StructWithNullableUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1809,26 +1829,20 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for StructWithNullableUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<StructWithNullableUnion> for &StructWithNullableUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<StructWithNullableUnion, D> for &StructWithNullableUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<StructWithNullableUnion>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<StructWithNullableUnion>::encode(
+            fidl::encoding::Encode::<StructWithNullableUnion, D>::encode(
                 (
                     <fidl::encoding::OptionalUnion<OlderSimpleUnion> as fidl::encoding::ValueTypeMarker>::borrow(&self.x1),
                 ),
@@ -1836,13 +1850,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::OptionalUnion<OlderSimpleUnion>>>
-        fidl::encoding::Encode<StructWithNullableUnion> for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::OptionalUnion<OlderSimpleUnion>, D>,
+        > fidl::encoding::Encode<StructWithNullableUnion, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1855,16 +1871,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for StructWithNullableUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for StructWithNullableUnion
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { x1: fidl::new_empty!(fidl::encoding::OptionalUnion<OlderSimpleUnion>) }
+            Self { x1: fidl::new_empty!(fidl::encoding::OptionalUnion<OlderSimpleUnion>, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1872,6 +1890,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::OptionalUnion<OlderSimpleUnion>,
+                D,
                 &mut self.x1,
                 decoder,
                 offset + 0,
@@ -1881,6 +1900,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
     {
@@ -1896,25 +1924,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl
-        fidl::encoding::Encode<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, D>
         for &TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1922,6 +1940,7 @@ mod internal {
             // Delegate to tuple encoding.
             fidl::encoding::Encode::<
                 TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+                D,
             >::encode(
                 (<OlderSimpleUnion as fidl::encoding::ValueTypeMarker>::borrow(&self.xu),),
                 encoder,
@@ -1930,14 +1949,14 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<OlderSimpleUnion>>
-        fidl::encoding::Encode<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<OlderSimpleUnion, D>>
+        fidl::encoding::Encode<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, D>
         for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1950,25 +1969,34 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self>
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
     {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { xu: fidl::new_empty!(OlderSimpleUnion) }
+            Self { xu: fidl::new_empty!(OlderSimpleUnion, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(OlderSimpleUnion, &mut self.xu, decoder, offset + 0, _depth)?;
+            fidl::decode!(OlderSimpleUnion, D, &mut self.xu, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker
+        for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1987,46 +2015,39 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl
-        fidl::encoding::Encode<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, D>
         for &TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::encode(
-                (
-                    <StrictBoundedUnion as fidl::encoding::ValueTypeMarker>::borrow(&self.xu),
-                ),
-                encoder, offset, _depth
+            fidl::encoding::Encode::<
+                TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+                D,
+            >::encode(
+                (<StrictBoundedUnion as fidl::encoding::ValueTypeMarker>::borrow(&self.xu),),
+                encoder,
+                offset,
+                _depth,
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<StrictBoundedUnion>>
-        fidl::encoding::Encode<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<StrictBoundedUnion, D>>
+        fidl::encoding::Encode<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, D>
         for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2039,25 +2060,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self>
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
     {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { xu: fidl::new_empty!(StrictBoundedUnion) }
+            Self { xu: fidl::new_empty!(StrictBoundedUnion, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(StrictBoundedUnion, &mut self.xu, decoder, offset + 0, _depth)?;
+            fidl::decode!(StrictBoundedUnion, D, &mut self.xu, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnionSandwich {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2074,26 +2102,20 @@ mod internal {
             32
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnionSandwich {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnionSandwich> for &UnionSandwich {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionSandwich, D>
+        for &UnionSandwich
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<UnionSandwich>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<UnionSandwich>::encode(
+            fidl::encoding::Encode::<UnionSandwich, D>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.a),
                     <ExplicitFlexibleUnion as fidl::encoding::ValueTypeMarker>::borrow(&self.u),
@@ -2106,15 +2128,16 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u32>,
-            T1: fidl::encoding::Encode<ExplicitFlexibleUnion>,
-            T2: fidl::encoding::Encode<u32>,
-        > fidl::encoding::Encode<UnionSandwich> for (T0, T1, T2)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u32, D>,
+            T1: fidl::encoding::Encode<ExplicitFlexibleUnion, D>,
+            T2: fidl::encoding::Encode<u32, D>,
+        > fidl::encoding::Encode<UnionSandwich, D> for (T0, T1, T2)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2137,20 +2160,20 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnionSandwich {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionSandwich {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                a: fidl::new_empty!(u32),
-                u: fidl::new_empty!(ExplicitFlexibleUnion),
-                b: fidl::new_empty!(u32),
+                a: fidl::new_empty!(u32, D),
+                u: fidl::new_empty!(ExplicitFlexibleUnion, D),
+                b: fidl::new_empty!(u32, D),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2174,10 +2197,17 @@ mod internal {
                     padding_start: offset + 24 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u32, &mut self.a, decoder, offset + 0, _depth)?;
-            fidl::decode!(ExplicitFlexibleUnion, &mut self.u, decoder, offset + 8, _depth)?;
-            fidl::decode!(u32, &mut self.b, decoder, offset + 24, _depth)?;
+            fidl::decode!(u32, D, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(ExplicitFlexibleUnion, D, &mut self.u, decoder, offset + 8, _depth)?;
+            fidl::decode!(u32, D, &mut self.b, decoder, offset + 24, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EmptyFlexibleUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2194,20 +2224,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for EmptyFlexibleUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<EmptyFlexibleUnion> for &EmptyFlexibleUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<EmptyFlexibleUnion, D>
+        for &EmptyFlexibleUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2219,7 +2243,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for EmptyFlexibleUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for EmptyFlexibleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -2228,7 +2252,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2274,6 +2298,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ExplicitFlexibleUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExplicitFlexibleUnion {
         type Owned = Self;
 
@@ -2287,33 +2318,27 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExplicitFlexibleUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExplicitFlexibleUnion> for &ExplicitFlexibleUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ExplicitFlexibleUnion, D>
+        for &ExplicitFlexibleUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ExplicitFlexibleUnion>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                ExplicitFlexibleUnion::I(ref val) => fidl::encoding::encode_in_envelope::<i64>(
+                ExplicitFlexibleUnion::I(ref val) => fidl::encoding::encode_in_envelope::<i64, D>(
                     <i64 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
                     _depth,
                 ),
-                ExplicitFlexibleUnion::F(ref val) => fidl::encoding::encode_in_envelope::<f32>(
+                ExplicitFlexibleUnion::F(ref val) => fidl::encoding::encode_in_envelope::<f32, D>(
                     <f32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -2324,7 +2349,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExplicitFlexibleUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ExplicitFlexibleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -2333,7 +2358,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2369,11 +2394,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitFlexibleUnion::I(fidl::new_empty!(i64));
+                        *self = ExplicitFlexibleUnion::I(fidl::new_empty!(i64, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitFlexibleUnion::I(ref mut val) = self {
-                        fidl::decode!(i64, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i64, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2384,11 +2409,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitFlexibleUnion::F(fidl::new_empty!(f32));
+                        *self = ExplicitFlexibleUnion::F(fidl::new_empty!(f32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitFlexibleUnion::F(ref mut val) = self {
-                        fidl::decode!(f32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(f32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2411,6 +2436,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ExplicitFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExplicitFoo {
         type Owned = Self;
 
@@ -2424,27 +2456,21 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExplicitFoo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExplicitFoo> for &ExplicitFoo {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ExplicitFoo, D>
+        for &ExplicitFoo
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ExplicitFoo>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                ExplicitFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                ExplicitFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -2452,6 +2478,7 @@ mod internal {
                 ),
                 ExplicitFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
+                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -2465,7 +2492,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExplicitFoo {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ExplicitFoo {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -2474,7 +2501,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2512,11 +2539,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitFoo::I(fidl::new_empty!(i32));
+                        *self = ExplicitFoo::I(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitFoo::I(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2527,12 +2554,14 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                        *self =
+                            ExplicitFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitFoo::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -2560,6 +2589,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ExplicitPizzaOrPasta {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExplicitPizzaOrPasta {
         type Owned = Self;
 
@@ -2573,20 +2609,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExplicitPizzaOrPasta {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExplicitPizzaOrPasta> for &ExplicitPizzaOrPasta {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ExplicitPizzaOrPasta, D>
+        for &ExplicitPizzaOrPasta
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2594,7 +2624,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 ExplicitPizzaOrPasta::Pizza(ref val) => {
-                    fidl::encoding::encode_in_envelope::<Pizza>(
+                    fidl::encoding::encode_in_envelope::<Pizza, D>(
                         <Pizza as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -2602,7 +2632,7 @@ mod internal {
                     )
                 }
                 ExplicitPizzaOrPasta::Pasta(ref val) => {
-                    fidl::encoding::encode_in_envelope::<Pasta>(
+                    fidl::encoding::encode_in_envelope::<Pasta, D>(
                         <Pasta as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -2613,16 +2643,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExplicitPizzaOrPasta {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ExplicitPizzaOrPasta {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Pizza(fidl::new_empty!(Pizza))
+            Self::Pizza(fidl::new_empty!(Pizza, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2657,11 +2687,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitPizzaOrPasta::Pizza(fidl::new_empty!(Pizza));
+                        *self = ExplicitPizzaOrPasta::Pizza(fidl::new_empty!(Pizza, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitPizzaOrPasta::Pizza(ref mut val) = self {
-                        fidl::decode!(Pizza, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pizza, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2672,11 +2702,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitPizzaOrPasta::Pasta(fidl::new_empty!(Pasta));
+                        *self = ExplicitPizzaOrPasta::Pasta(fidl::new_empty!(Pasta, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitPizzaOrPasta::Pasta(ref mut val) = self {
-                        fidl::decode!(Pasta, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pasta, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2693,6 +2723,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ExplicitStrictFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExplicitStrictFoo {
         type Owned = Self;
 
@@ -2706,27 +2743,21 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExplicitStrictFoo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExplicitStrictFoo> for &ExplicitStrictFoo {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ExplicitStrictFoo, D>
+        for &ExplicitStrictFoo
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ExplicitStrictFoo>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                ExplicitStrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                ExplicitStrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -2734,6 +2765,7 @@ mod internal {
                 ),
                 ExplicitStrictFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
+                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -2746,16 +2778,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExplicitStrictFoo {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ExplicitStrictFoo {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::I(fidl::new_empty!(i32))
+            Self::I(fidl::new_empty!(i32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2792,11 +2824,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitStrictFoo::I(fidl::new_empty!(i32));
+                        *self = ExplicitStrictFoo::I(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitStrictFoo::I(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2807,13 +2839,16 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            ExplicitStrictFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                        *self = ExplicitStrictFoo::S(fidl::new_empty!(
+                            fidl::encoding::UnboundedString,
+                            D
+                        ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitStrictFoo::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -2835,6 +2870,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ExplicitUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExplicitUnion {
         type Owned = Self;
 
@@ -2848,20 +2890,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExplicitUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExplicitUnion> for &ExplicitUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ExplicitUnion, D>
+        for &ExplicitUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2869,13 +2905,13 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
             ExplicitUnion::Primitive(ref val) => {
-                fidl::encoding::encode_in_envelope::<i32>(
+                fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             ExplicitUnion::StringNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString, D>(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
@@ -2884,16 +2920,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExplicitUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ExplicitUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Primitive(fidl::new_empty!(i32))
+            Self::Primitive(fidl::new_empty!(i32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2930,11 +2966,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ExplicitUnion::Primitive(fidl::new_empty!(i32));
+                        *self = ExplicitUnion::Primitive(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitUnion::Primitive(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -2946,13 +2982,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = ExplicitUnion::StringNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedString
+                            fidl::encoding::UnboundedString,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ExplicitUnion::StringNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -2974,6 +3012,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for FieldCollision {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for FieldCollision {
         type Owned = Self;
 
@@ -2987,20 +3032,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for FieldCollision {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<FieldCollision> for &FieldCollision {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<FieldCollision, D>
+        for &FieldCollision
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3008,7 +3047,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 FieldCollision::FieldCollisionTag(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -3019,16 +3058,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for FieldCollision {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for FieldCollision {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::FieldCollisionTag(fidl::new_empty!(i32))
+            Self::FieldCollisionTag(fidl::new_empty!(i32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3062,11 +3101,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FieldCollision::FieldCollisionTag(fidl::new_empty!(i32));
+                        *self = FieldCollision::FieldCollisionTag(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FieldCollision::FieldCollisionTag(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3083,6 +3122,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for FlexibleFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for FlexibleFoo {
         type Owned = Self;
 
@@ -3096,20 +3142,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for FlexibleFoo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<FlexibleFoo> for &FlexibleFoo {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<FlexibleFoo, D>
+        for &FlexibleFoo
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3118,6 +3158,7 @@ mod internal {
             match self {
                 FlexibleFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
+                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -3126,7 +3167,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                FlexibleFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                FlexibleFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -3137,7 +3178,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for FlexibleFoo {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for FlexibleFoo {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -3146,7 +3187,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3184,12 +3225,14 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FlexibleFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                        *self =
+                            FlexibleFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleFoo::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -3205,11 +3248,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FlexibleFoo::I(fidl::new_empty!(i32));
+                        *self = FlexibleFoo::I(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleFoo::I(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3232,6 +3275,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for FlexiblePizzaOrPasta {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for FlexiblePizzaOrPasta {
         type Owned = Self;
 
@@ -3245,20 +3295,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for FlexiblePizzaOrPasta {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<FlexiblePizzaOrPasta> for &FlexiblePizzaOrPasta {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<FlexiblePizzaOrPasta, D>
+        for &FlexiblePizzaOrPasta
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3266,7 +3310,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 FlexiblePizzaOrPasta::Pizza(ref val) => {
-                    fidl::encoding::encode_in_envelope::<Pizza>(
+                    fidl::encoding::encode_in_envelope::<Pizza, D>(
                         <Pizza as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -3274,7 +3318,7 @@ mod internal {
                     )
                 }
                 FlexiblePizzaOrPasta::Pasta(ref val) => {
-                    fidl::encoding::encode_in_envelope::<Pasta>(
+                    fidl::encoding::encode_in_envelope::<Pasta, D>(
                         <Pasta as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -3286,7 +3330,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for FlexiblePizzaOrPasta {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for FlexiblePizzaOrPasta {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -3295,7 +3339,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3331,11 +3375,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FlexiblePizzaOrPasta::Pizza(fidl::new_empty!(Pizza));
+                        *self = FlexiblePizzaOrPasta::Pizza(fidl::new_empty!(Pizza, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexiblePizzaOrPasta::Pizza(ref mut val) = self {
-                        fidl::decode!(Pizza, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pizza, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3346,11 +3390,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FlexiblePizzaOrPasta::Pasta(fidl::new_empty!(Pasta));
+                        *self = FlexiblePizzaOrPasta::Pasta(fidl::new_empty!(Pasta, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexiblePizzaOrPasta::Pasta(ref mut val) = self {
-                        fidl::decode!(Pasta, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pasta, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3373,6 +3417,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for FlexibleUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for FlexibleUnion {
         type Owned = Self;
 
@@ -3386,20 +3437,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for FlexibleUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<FlexibleUnion> for &FlexibleUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<FlexibleUnion, D>
+        for &FlexibleUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3407,19 +3452,19 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
             FlexibleUnion::Primitive(ref val) => {
-                fidl::encoding::encode_in_envelope::<i32>(
+                fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             FlexibleUnion::StringNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString, D>(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             FlexibleUnion::VectorStringAlsoNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>, D>(
                     <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
@@ -3429,7 +3474,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for FlexibleUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for FlexibleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -3438,7 +3483,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3475,11 +3520,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = FlexibleUnion::Primitive(fidl::new_empty!(i32));
+                        *self = FlexibleUnion::Primitive(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleUnion::Primitive(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3491,13 +3536,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = FlexibleUnion::StringNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedString
+                            fidl::encoding::UnboundedString,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleUnion::StringNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -3514,13 +3561,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = FlexibleUnion::VectorStringAlsoNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let FlexibleUnion::VectorStringAlsoNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -3548,6 +3597,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for NewerSimpleUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for NewerSimpleUnion {
         type Owned = Self;
 
@@ -3561,20 +3617,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for NewerSimpleUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<NewerSimpleUnion> for &NewerSimpleUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<NewerSimpleUnion, D>
+        for &NewerSimpleUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3582,19 +3632,19 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
             NewerSimpleUnion::I(ref val) => {
-                fidl::encoding::encode_in_envelope::<i64>(
+                fidl::encoding::encode_in_envelope::<i64, D>(
                     <i64 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             NewerSimpleUnion::S(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString, D>(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             NewerSimpleUnion::V(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>, D>(
                     <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
@@ -3604,7 +3654,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for NewerSimpleUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for NewerSimpleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -3613,7 +3663,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3650,11 +3700,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = NewerSimpleUnion::I(fidl::new_empty!(i64));
+                        *self = NewerSimpleUnion::I(fidl::new_empty!(i64, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let NewerSimpleUnion::I(ref mut val) = self {
-                        fidl::decode!(i64, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i64, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3665,13 +3715,16 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            NewerSimpleUnion::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                        *self = NewerSimpleUnion::S(fidl::new_empty!(
+                            fidl::encoding::UnboundedString,
+                            D
+                        ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let NewerSimpleUnion::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -3688,13 +3741,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = NewerSimpleUnion::V(fidl::new_empty!(
-                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let NewerSimpleUnion::V(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -3722,6 +3777,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for OlderSimpleUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for OlderSimpleUnion {
         type Owned = Self;
 
@@ -3735,33 +3797,27 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for OlderSimpleUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<OlderSimpleUnion> for &OlderSimpleUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<OlderSimpleUnion, D>
+        for &OlderSimpleUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<OlderSimpleUnion>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                OlderSimpleUnion::I(ref val) => fidl::encoding::encode_in_envelope::<i64>(
+                OlderSimpleUnion::I(ref val) => fidl::encoding::encode_in_envelope::<i64, D>(
                     <i64 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
                     _depth,
                 ),
-                OlderSimpleUnion::F(ref val) => fidl::encoding::encode_in_envelope::<f32>(
+                OlderSimpleUnion::F(ref val) => fidl::encoding::encode_in_envelope::<f32, D>(
                     <f32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -3772,7 +3828,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for OlderSimpleUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for OlderSimpleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -3781,7 +3837,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3817,11 +3873,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = OlderSimpleUnion::I(fidl::new_empty!(i64));
+                        *self = OlderSimpleUnion::I(fidl::new_empty!(i64, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let OlderSimpleUnion::I(ref mut val) = self {
-                        fidl::decode!(i64, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i64, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3832,11 +3888,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = OlderSimpleUnion::F(fidl::new_empty!(f32));
+                        *self = OlderSimpleUnion::F(fidl::new_empty!(f32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let OlderSimpleUnion::F(ref mut val) = self {
-                        fidl::decode!(f32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(f32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3859,6 +3915,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for PizzaOrPasta {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for PizzaOrPasta {
         type Owned = Self;
 
@@ -3872,33 +3935,27 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for PizzaOrPasta {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<PizzaOrPasta> for &PizzaOrPasta {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<PizzaOrPasta, D>
+        for &PizzaOrPasta
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<PizzaOrPasta>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                PizzaOrPasta::Pizza(ref val) => fidl::encoding::encode_in_envelope::<Pizza>(
+                PizzaOrPasta::Pizza(ref val) => fidl::encoding::encode_in_envelope::<Pizza, D>(
                     <Pizza as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
                     _depth,
                 ),
-                PizzaOrPasta::Pasta(ref val) => fidl::encoding::encode_in_envelope::<Pasta>(
+                PizzaOrPasta::Pasta(ref val) => fidl::encoding::encode_in_envelope::<Pasta, D>(
                     <Pasta as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -3908,16 +3965,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for PizzaOrPasta {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for PizzaOrPasta {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Pizza(fidl::new_empty!(Pizza))
+            Self::Pizza(fidl::new_empty!(Pizza, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3952,11 +4009,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = PizzaOrPasta::Pizza(fidl::new_empty!(Pizza));
+                        *self = PizzaOrPasta::Pizza(fidl::new_empty!(Pizza, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let PizzaOrPasta::Pizza(ref mut val) = self {
-                        fidl::decode!(Pizza, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pizza, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3967,11 +4024,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = PizzaOrPasta::Pasta(fidl::new_empty!(Pasta));
+                        *self = PizzaOrPasta::Pasta(fidl::new_empty!(Pasta, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let PizzaOrPasta::Pasta(ref mut val) = self {
-                        fidl::decode!(Pasta, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pasta, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -3988,6 +4045,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ReverseOrdinalUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ReverseOrdinalUnion {
         type Owned = Self;
 
@@ -4001,52 +4065,50 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ReverseOrdinalUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ReverseOrdinalUnion> for &ReverseOrdinalUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ReverseOrdinalUnion, D>
+        for &ReverseOrdinalUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ReverseOrdinalUnion>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                ReverseOrdinalUnion::First(ref val) => fidl::encoding::encode_in_envelope::<u32>(
-                    <u32 as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
-                ReverseOrdinalUnion::Second(ref val) => fidl::encoding::encode_in_envelope::<u32>(
-                    <u32 as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
+                ReverseOrdinalUnion::First(ref val) => {
+                    fidl::encoding::encode_in_envelope::<u32, D>(
+                        <u32 as fidl::encoding::ValueTypeMarker>::borrow(val),
+                        encoder,
+                        offset + 8,
+                        _depth,
+                    )
+                }
+                ReverseOrdinalUnion::Second(ref val) => {
+                    fidl::encoding::encode_in_envelope::<u32, D>(
+                        <u32 as fidl::encoding::ValueTypeMarker>::borrow(val),
+                        encoder,
+                        offset + 8,
+                        _depth,
+                    )
+                }
             }
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ReverseOrdinalUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ReverseOrdinalUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::First(fidl::new_empty!(u32))
+            Self::First(fidl::new_empty!(u32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4081,11 +4143,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ReverseOrdinalUnion::First(fidl::new_empty!(u32));
+                        *self = ReverseOrdinalUnion::First(fidl::new_empty!(u32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ReverseOrdinalUnion::First(ref mut val) = self {
-                        fidl::decode!(u32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(u32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4096,11 +4158,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ReverseOrdinalUnion::Second(fidl::new_empty!(u32));
+                        *self = ReverseOrdinalUnion::Second(fidl::new_empty!(u32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ReverseOrdinalUnion::Second(ref mut val) = self {
-                        fidl::decode!(u32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(u32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4117,6 +4179,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for StrictBoundedUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for StrictBoundedUnion {
         type Owned = Self;
 
@@ -4130,20 +4199,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for StrictBoundedUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<StrictBoundedUnion> for &StrictBoundedUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StrictBoundedUnion, D>
+        for &StrictBoundedUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4151,7 +4214,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 StrictBoundedUnion::V(ref val) => {
-                    fidl::encoding::encode_in_envelope::<fidl::encoding::Vector<u8, 10>>(
+                    fidl::encoding::encode_in_envelope::<fidl::encoding::Vector<u8, 10>, D>(
                         <fidl::encoding::Vector<u8, 10> as fidl::encoding::ValueTypeMarker>::borrow(
                             val,
                         ),
@@ -4164,16 +4227,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for StrictBoundedUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StrictBoundedUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::V(fidl::new_empty!(fidl::encoding::Vector<u8, 10>))
+            Self::V(fidl::new_empty!(fidl::encoding::Vector<u8, 10>, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4209,12 +4272,13 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            StrictBoundedUnion::V(fidl::new_empty!(fidl::encoding::Vector<u8, 10>));
+                        *self = StrictBoundedUnion::V(
+                            fidl::new_empty!(fidl::encoding::Vector<u8, 10>, D),
+                        );
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictBoundedUnion::V(ref mut val) = self {
-                        fidl::decode!(fidl::encoding::Vector<u8, 10>, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(fidl::encoding::Vector<u8, 10>, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4231,6 +4295,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for StrictFoo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for StrictFoo {
         type Owned = Self;
 
@@ -4244,20 +4315,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for StrictFoo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<StrictFoo> for &StrictFoo {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StrictFoo, D>
+        for &StrictFoo
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4266,6 +4331,7 @@ mod internal {
             match self {
                 StrictFoo::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
+                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -4274,7 +4340,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                StrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                StrictFoo::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -4284,16 +4350,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for StrictFoo {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StrictFoo {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::S(fidl::new_empty!(fidl::encoding::UnboundedString))
+            Self::S(fidl::new_empty!(fidl::encoding::UnboundedString, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4330,12 +4396,13 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                        *self = StrictFoo::S(fidl::new_empty!(fidl::encoding::UnboundedString, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictFoo::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -4351,11 +4418,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictFoo::I(fidl::new_empty!(i32));
+                        *self = StrictFoo::I(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictFoo::I(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4372,6 +4439,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for StrictPizzaOrPasta {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for StrictPizzaOrPasta {
         type Owned = Self;
 
@@ -4385,52 +4459,50 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for StrictPizzaOrPasta {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<StrictPizzaOrPasta> for &StrictPizzaOrPasta {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StrictPizzaOrPasta, D>
+        for &StrictPizzaOrPasta
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<StrictPizzaOrPasta>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                StrictPizzaOrPasta::Pizza(ref val) => fidl::encoding::encode_in_envelope::<Pizza>(
-                    <Pizza as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
-                StrictPizzaOrPasta::Pasta(ref val) => fidl::encoding::encode_in_envelope::<Pasta>(
-                    <Pasta as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
+                StrictPizzaOrPasta::Pizza(ref val) => {
+                    fidl::encoding::encode_in_envelope::<Pizza, D>(
+                        <Pizza as fidl::encoding::ValueTypeMarker>::borrow(val),
+                        encoder,
+                        offset + 8,
+                        _depth,
+                    )
+                }
+                StrictPizzaOrPasta::Pasta(ref val) => {
+                    fidl::encoding::encode_in_envelope::<Pasta, D>(
+                        <Pasta as fidl::encoding::ValueTypeMarker>::borrow(val),
+                        encoder,
+                        offset + 8,
+                        _depth,
+                    )
+                }
             }
         }
     }
 
-    impl fidl::encoding::Decode<Self> for StrictPizzaOrPasta {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StrictPizzaOrPasta {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Pizza(fidl::new_empty!(Pizza))
+            Self::Pizza(fidl::new_empty!(Pizza, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4465,11 +4537,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictPizzaOrPasta::Pizza(fidl::new_empty!(Pizza));
+                        *self = StrictPizzaOrPasta::Pizza(fidl::new_empty!(Pizza, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictPizzaOrPasta::Pizza(ref mut val) = self {
-                        fidl::decode!(Pizza, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pizza, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4480,11 +4552,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictPizzaOrPasta::Pasta(fidl::new_empty!(Pasta));
+                        *self = StrictPizzaOrPasta::Pasta(fidl::new_empty!(Pasta, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictPizzaOrPasta::Pasta(ref mut val) = self {
-                        fidl::decode!(Pasta, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Pasta, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4501,6 +4573,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for StrictSimpleUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for StrictSimpleUnion {
         type Owned = Self;
 
@@ -4514,33 +4593,27 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for StrictSimpleUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<StrictSimpleUnion> for &StrictSimpleUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StrictSimpleUnion, D>
+        for &StrictSimpleUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<StrictSimpleUnion>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                StrictSimpleUnion::I(ref val) => fidl::encoding::encode_in_envelope::<i32>(
+                StrictSimpleUnion::I(ref val) => fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
                     _depth,
                 ),
-                StrictSimpleUnion::F(ref val) => fidl::encoding::encode_in_envelope::<f32>(
+                StrictSimpleUnion::F(ref val) => fidl::encoding::encode_in_envelope::<f32, D>(
                     <f32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -4548,6 +4621,7 @@ mod internal {
                 ),
                 StrictSimpleUnion::S(ref val) => fidl::encoding::encode_in_envelope::<
                     fidl::encoding::UnboundedString,
+                    D,
                 >(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                         val,
@@ -4560,16 +4634,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for StrictSimpleUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StrictSimpleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::I(fidl::new_empty!(i32))
+            Self::I(fidl::new_empty!(i32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4607,11 +4681,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictSimpleUnion::I(fidl::new_empty!(i32));
+                        *self = StrictSimpleUnion::I(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictSimpleUnion::I(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4622,11 +4696,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictSimpleUnion::F(fidl::new_empty!(f32));
+                        *self = StrictSimpleUnion::F(fidl::new_empty!(f32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictSimpleUnion::F(ref mut val) = self {
-                        fidl::decode!(f32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(f32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4637,13 +4711,16 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self =
-                            StrictSimpleUnion::S(fidl::new_empty!(fidl::encoding::UnboundedString));
+                        *self = StrictSimpleUnion::S(fidl::new_empty!(
+                            fidl::encoding::UnboundedString,
+                            D
+                        ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictSimpleUnion::S(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -4665,6 +4742,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for StrictUnion {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for StrictUnion {
         type Owned = Self;
 
@@ -4678,20 +4762,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for StrictUnion {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<StrictUnion> for &StrictUnion {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<StrictUnion, D>
+        for &StrictUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4699,19 +4777,19 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
             StrictUnion::Primitive(ref val) => {
-                fidl::encoding::encode_in_envelope::<i32>(
+                fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             StrictUnion::StringNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString, D>(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             StrictUnion::VectorStringAlsoNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>, D>(
                     <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
@@ -4720,16 +4798,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for StrictUnion {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for StrictUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Primitive(fidl::new_empty!(i32))
+            Self::Primitive(fidl::new_empty!(i32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4765,11 +4843,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = StrictUnion::Primitive(fidl::new_empty!(i32));
+                        *self = StrictUnion::Primitive(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictUnion::Primitive(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4781,13 +4859,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = StrictUnion::StringNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedString
+                            fidl::encoding::UnboundedString,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictUnion::StringNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -4804,13 +4884,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = StrictUnion::VectorStringAlsoNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let StrictUnion::VectorStringAlsoNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -4832,6 +4914,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Union {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Union {
         type Owned = Self;
 
@@ -4845,20 +4934,12 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Union {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Union> for &Union {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Union, D> for &Union {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4866,19 +4947,19 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
             Union::Primitive(ref val) => {
-                fidl::encoding::encode_in_envelope::<i32>(
+                fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             Union::StringNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedString, D>(
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
             }
             Union::VectorStringAlsoNeedsConstructor(ref val) => {
-                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>>(
+                fidl::encoding::encode_in_envelope::<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>, D>(
                     <fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString> as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
@@ -4887,16 +4968,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Union {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Union {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::Primitive(fidl::new_empty!(i32))
+            Self::Primitive(fidl::new_empty!(i32, D))
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -4932,11 +5013,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = Union::Primitive(fidl::new_empty!(i32));
+                        *self = Union::Primitive(fidl::new_empty!(i32, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let Union::Primitive(ref mut val) = self {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -4948,13 +5029,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = Union::StringNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedString
+                            fidl::encoding::UnboundedString,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let Union::StringNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedString,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -4971,13 +5054,15 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = Union::VectorStringAlsoNeedsConstructor(fidl::new_empty!(
-                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                            fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D
                         ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let Union::VectorStringAlsoNeedsConstructor(ref mut val) = self {
                         fidl::decode!(
                             fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                            D,
                             val,
                             decoder,
                             _inner_offset,
@@ -4999,6 +5084,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnionContainingEmptyStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnionContainingEmptyStruct {
         type Owned = Self;
 
@@ -5012,20 +5104,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnionContainingEmptyStruct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnionContainingEmptyStruct> for &UnionContainingEmptyStruct {
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnionContainingEmptyStruct, D> for &UnionContainingEmptyStruct
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -5033,7 +5119,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnionContainingEmptyStruct::Empty(ref val) => {
-                    fidl::encoding::encode_in_envelope::<Empty>(
+                    fidl::encoding::encode_in_envelope::<Empty, D>(
                         <Empty as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -5047,7 +5133,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnionContainingEmptyStruct {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnionContainingEmptyStruct
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -5056,7 +5144,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -5091,11 +5179,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = UnionContainingEmptyStruct::Empty(fidl::new_empty!(Empty));
+                        *self = UnionContainingEmptyStruct::Empty(fidl::new_empty!(Empty, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionContainingEmptyStruct::Empty(ref mut val) = self {
-                        fidl::decode!(Empty, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(Empty, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -5119,6 +5207,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnionWithAttributes {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnionWithAttributes {
         type Owned = Self;
 
@@ -5132,27 +5227,21 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnionWithAttributes {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnionWithAttributes> for &UnionWithAttributes {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<UnionWithAttributes, D>
+        for &UnionWithAttributes
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<UnionWithAttributes>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                UnionWithAttributes::X(ref val) => fidl::encoding::encode_in_envelope::<i64>(
+                UnionWithAttributes::X(ref val) => fidl::encoding::encode_in_envelope::<i64, D>(
                     <i64 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -5163,7 +5252,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnionWithAttributes {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for UnionWithAttributes {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -5172,7 +5261,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -5207,11 +5296,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = UnionWithAttributes::X(fidl::new_empty!(i64));
+                        *self = UnionWithAttributes::X(fidl::new_empty!(i64, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let UnionWithAttributes::X(ref mut val) = self {
-                        fidl::decode!(i64, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i64, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

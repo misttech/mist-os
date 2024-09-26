@@ -394,9 +394,8 @@ impl FxFilesystemBuilder {
                     transaction::Options::default(),
                 )
                 .await?;
-            let volume_directory = root_directory
-                .create_child_dir(&mut transaction, VOLUMES_DIRECTORY, Default::default())
-                .await?;
+            let volume_directory =
+                root_directory.create_child_dir(&mut transaction, VOLUMES_DIRECTORY).await?;
             transaction.commit().await?;
             objects.set_volume_directory(volume_directory);
         } else {
@@ -925,7 +924,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, &format!("{}", i), None)
+                .create_child_file(&mut transaction, &format!("{}", i))
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -1015,7 +1014,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "test", None)
+            .create_child_file(&mut transaction, "test")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -1156,7 +1155,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let object = root_directory
-                .create_child_file(&mut transaction, "test", None)
+                .create_child_file(&mut transaction, "test")
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -1221,7 +1220,7 @@ mod tests {
                             .await
                             .expect("new_transaction failed");
                         root_directory
-                            .create_child_file(&mut transaction, &format!("{prefix} {i}"), None)
+                            .create_child_file(&mut transaction, &format!("{prefix} {i}"))
                             .await
                             .expect("create_child_file failed");
                         transaction.commit().await.expect("commit failed");
@@ -1245,7 +1244,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 let object = root_directory
-                    .create_child_file(&mut transaction, "test", None)
+                    .create_child_file(&mut transaction, "test")
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
@@ -1325,7 +1324,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 let object = root_directory
-                    .create_child_file(&mut transaction, &format!("C"), None)
+                    .create_child_file(&mut transaction, &format!("C"))
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");

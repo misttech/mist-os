@@ -119,7 +119,7 @@ impl DurationExt for zx::Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
 
     fn time_operations_param(zxt1: zx::MonotonicTime, zxt2: zx::MonotonicTime, d: zx::Duration) {
         let t1 = Time::from_zx(zxt1);
@@ -148,12 +148,12 @@ mod tests {
         time_operations_param(
             zx::MonotonicTime::from_nanos(0),
             zx::MonotonicTime::from_nanos(1000),
-            12.seconds(),
+            zx::Duration::from_seconds(12),
         );
         time_operations_param(
             zx::MonotonicTime::from_nanos(-100000),
             zx::MonotonicTime::from_nanos(65324),
-            (-785).hours(),
+            zx::Duration::from_hours(-785),
         );
     }
 

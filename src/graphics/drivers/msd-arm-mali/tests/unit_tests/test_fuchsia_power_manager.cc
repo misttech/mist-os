@@ -210,8 +210,10 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     auto lessor_impl = std::make_unique<FakeLessor>();
     if (req.element_name() == FuchsiaPowerManager::kHardwarePowerElementName) {
       hardware_power_lessor_ = lessor_impl.get();
+    } else if (req.element_name() == FuchsiaPowerManager::kOnReadyForWorkPowerElementName) {
+      // Ignore.
     } else {
-      ZX_ASSERT_MSG(0, "Unexpected power element.");
+      ADD_FAILURE() << "Unexpected power element " << req.element_name().value_or("{none}");
     }
     fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
         fidl::BindServer<fuchsia_power_broker::Lessor>(
@@ -226,8 +228,10 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     if (req.element_name() == FuchsiaPowerManager::kHardwarePowerElementName) {
       hardware_power_current_level_ = current_level_impl.get();
       hardware_power_required_level_ = required_level_impl.get();
+    } else if (req.element_name() == FuchsiaPowerManager::kOnReadyForWorkPowerElementName) {
+      // Ignore.
     } else {
-      ZX_ASSERT_MSG(0, "Unexpected power element.");
+      ADD_FAILURE() << "Unexpected power element " << req.element_name().value_or("{none}");
     }
     fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
         fidl::BindServer<fuchsia_power_broker::CurrentLevel>(

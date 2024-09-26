@@ -6,7 +6,7 @@
 
 use core::fmt::{self, Debug, Display, Formatter};
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 use crate::ip::{AddrSubnet, IpAddr, IpAddress, Ipv6, Ipv6Addr};
 use crate::{
@@ -39,7 +39,9 @@ use crate::{
 ///     ethertype: [u8; 2],
 /// }
 /// ```
-#[derive(Copy, Clone, Eq, PartialEq, Hash, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Hash, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
+)]
 #[repr(transparent)]
 pub struct Mac([u8; Mac::BYTES]);
 

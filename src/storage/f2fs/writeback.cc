@@ -139,7 +139,7 @@ fpromise::promise<> Writer::GetTaskForWriteIO(PageList to_submit, sync_completio
 }
 
 void Writer::ScheduleWriteback(fpromise::promise<> task) {
-  writeback_executor_.schedule_task(std::move(task));
+  writeback_executor_.schedule_task(writeback_sequencer_.wrap(std::move(task)));
 }
 
 void Writer::ScheduleWriteBlocks(sync_completion_t *completion, PageList pages, bool flush) {

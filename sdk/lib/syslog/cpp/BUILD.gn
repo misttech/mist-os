@@ -167,10 +167,36 @@ fuchsia_unittest_component("logging-cpp-unittests-structured") {
   deps = [ ":logging_cpp_unittests_structured" ]
 }
 
+test("logging-cpp-from-void") {
+  sources = [ "log_from_void.cc" ]
+
+  deps = [
+    ":cpp",
+    "//src/lib/files",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+fuchsia_component("from_void_test_root") {
+  testonly = true
+  deps = [ ":logging-cpp-from-void" ]
+  manifest = "meta/from_void_test_root.cml"
+}
+
+fuchsia_unittest_component("logging-cpp-from-void-test") {
+  manifest = "meta/logging_cpp_from_void_test.cml"
+  deps = [
+    ":from_void_test_root",
+    ":logging-cpp-from-void",
+  ]
+}
+
 fuchsia_test_package("logging-cpp-tests") {
   test_components = [
     ":logging-cpp-unittests",
     ":logging-cpp-unittests-structured",
+    ":logging-cpp-from-void-test",
   ]
   test_specs = {
     log_settings = {

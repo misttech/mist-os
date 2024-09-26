@@ -56,7 +56,10 @@ fn param_type(parameter: &ftee::Parameter) -> u32 {
 }
 
 fn empty_tee_param() -> TEE_Param {
-    TEE_Param { value: TEE_Param__bindgen_ty_2 { a: 0, b: 0 } }
+    // Unsafe block necessary to unmarshal from zeroed bytes. Ideally we'd use
+    // zerocopy::FromZeros, but the derivation of that stumbles on the
+    // `*mut ::std::os::raw::c_void` field in `TEE_Param__bindgen_ty_1`.
+    unsafe { std::mem::zeroed() }
 }
 
 fn import_value_from_fidl(value: Value) -> Result<(TEE_Param, ParamInfo), Error> {
@@ -264,6 +267,18 @@ impl ParamAdapter {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[fuchsia::test]
+    fn empty_param_is_zeroed() -> Result<(), Error> {
+        let empty = empty_tee_param();
+        // Accessing the fields of the parameter's union is unsafe as it is a
+        // repr(C) union and carries no type information.
+        let memref = unsafe { empty.memref };
+        assert_eq!(memref, TEE_Param__bindgen_ty_1 { buffer: std::ptr::null_mut(), size: 0 });
+        let value = unsafe { empty.value };
+        assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 0, b: 0 });
+        Ok(())
+    }
 
     #[fuchsia::test]
     fn empty_fidl_parameters_to_tee_params() -> Result<(), Error> {

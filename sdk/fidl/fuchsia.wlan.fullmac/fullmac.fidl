@@ -65,14 +65,6 @@ type WlanFullmacSaeFrame = struct {
     sae_fields vector<uint8>:MAX;
 };
 
-type WlanFullmacScanResult = struct {
-    txn_id uint64;
-    // Time of the scan result relative to when the system was powered on.
-    // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
-    timestamp_nanos zx.Time;
-    bss fuchsia.wlan.common.BssDescription;
-};
-
 type WlanScanResult = flexible enum : uint8 {
     SUCCESS = 0;
     NOT_SUPPORTED = 1;
@@ -407,8 +399,12 @@ type WlanFullmacPmkInfo = struct {
 @discoverable
 closed protocol WlanFullmacImplIfc {
     // MLME operations
-    strict OnScanResult(struct {
-        result WlanFullmacScanResult;
+    strict OnScanResult(table {
+        1: txn_id uint64;
+        // Time of the scan result relative to when the system was powered on.
+        // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
+        2: timestamp_nanos zx.Time;
+        3: bss fuchsia.wlan.common.BssDescription;
     }) -> ();
     strict OnScanEnd(struct {
         end WlanFullmacScanEnd;

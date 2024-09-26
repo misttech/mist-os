@@ -474,9 +474,13 @@ assembly_input_bundle("fake_battery_driver") {
   ]
 }
 
-# TA Manager is capable of running Trusted Apps (TAs) on fuchsia.
-assembly_input_bundle("ta_manager") {
-  bootfs_packages = [ "//src/tee/manager:ta-manager" ]
+# Trusted execution environment.
+assembly_input_bundle("trusted_execution_environment") {
+  bootfs_packages = [
+    "//src/tee/manager:ta-manager",
+    "//src/tee/binder-proxy",
+    "//src/tee",
+  ]
   compiled_packages = [
     {
       bootfs_package = true
@@ -484,7 +488,7 @@ assembly_input_bundle("ta_manager") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/tee/manager/meta/ta-manager.bootstrap_shard.cml" ]
+          shards = [ "//src/tee/meta/tee.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -513,6 +517,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/registers/bin/register-util:bootfs",
     "//src/devices/spi/bin/spiutil:bootfs",
     "//src/devices/spmi/bin/spmi-ctl:bootfs",
+    "//src/devices/suspend/bin/suspendctl:bootfs",
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",

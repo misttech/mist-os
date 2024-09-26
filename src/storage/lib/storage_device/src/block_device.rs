@@ -107,7 +107,7 @@ impl Device for BlockDevice {
 
     async fn close(&self) -> Result<(), Error> {
         // We can leak the VMO id because we are closing the device.
-        self.vmoid.take().into_id();
+        let _ = self.vmoid.take().into_id();
         Ok(self.remote.close().await?)
     }
 
@@ -128,7 +128,7 @@ impl Drop for BlockDevice {
     fn drop(&mut self) {
         // We can't detach the VmoId because we're not async here, but we are tearing down the
         // connection to the block device so we don't really need to.
-        self.vmoid.take().into_id();
+        let _ = self.vmoid.take().into_id();
     }
 }
 

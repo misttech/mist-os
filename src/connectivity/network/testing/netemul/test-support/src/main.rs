@@ -85,11 +85,27 @@ struct Args {
     /// the value at which to start the counter.
     #[argh(option, default = "0")]
     starting_value: u32,
+    /// read the starting value from structured config.
+    ///
+    /// starting_value is ignored if provided.
+    #[argh(switch)]
+    starting_value_from_config: bool,
 }
 
 #[fuchsia::main()]
 async fn main() -> Result<(), Error> {
-    let Args { starting_value } = argh::from_env();
+    let Args { starting_value, starting_value_from_config } = argh::from_env();
+    let starting_value = if starting_value_from_config {
+        // We only try to read this if the program arg is passed because it
+        // makes it easier to handle different CMLs for the same binary, some of
+        // which may not contain configs.
+        let counter_config::Config { routed_config: _, starting_value } =
+            counter_config::Config::take_from_startup_handle();
+        starting_value
+    } else {
+        starting_value
+    };
+
     let mut fs = ServiceFs::new();
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server_task =

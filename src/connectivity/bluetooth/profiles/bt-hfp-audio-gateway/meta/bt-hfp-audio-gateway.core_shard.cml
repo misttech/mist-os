@@ -14,19 +14,25 @@
         {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
-            to: [ "#bt-hfp-audio-gateway" ],
+            to: "#bt-hfp-audio-gateway",
         },
         {
             directory: "dev-class",
             from: "parent",
             as: "dev-dai",
-            to: [ "#bt-hfp-audio-gateway" ],
+            to: "#bt-hfp-audio-gateway",
             subdir: "dai",
         },
         {
             protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],
             from: "#audio_core",
-            to: [ "#bt-hfp-audio-gateway" ],
+            to: "#bt-hfp-audio-gateway",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.audio.device.Provider" ],
+            from: "#audio_device_registry",
+            to: "#bt-hfp-audio-gateway",
             source_availability: "unknown",
         },
         {

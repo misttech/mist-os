@@ -595,6 +595,7 @@ impl ServingMultiVolumeFilesystem {
     pub async fn create_volume(
         &mut self,
         volume: &str,
+        create_options: CreateOptions,
         options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
@@ -602,7 +603,7 @@ impl ServingMultiVolumeFilesystem {
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
         )?
-        .create(volume, server, CreateOptions::default(), options)
+        .create(volume, server, create_options, options)
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
         self.insert_volume(volume.to_string(), exposed_dir).await
@@ -1221,8 +1222,10 @@ mod tests {
             "Opening nonexistent volume should fail"
         );
 
-        let vol =
-            fs.create_volume("foo", MountOptions::default()).await.expect("Create volume failed");
+        let vol = fs
+            .create_volume("foo", CreateOptions::default(), MountOptions::default())
+            .await
+            .expect("Create volume failed");
         vol.query().await.expect("Query volume failed");
         fs.close_volume("foo");
         // TODO(https://fxbug.dev/42057878) Closing the volume is not synchronous. Immediately reopening the
@@ -1246,7 +1249,7 @@ mod tests {
         let mut fs = fxfs.serve_multi_volume().await.expect("failed to serve fxfs");
         let file = {
             let vol = fs
-                .create_volume("foo", MountOptions::default())
+                .create_volume("foo", CreateOptions::default(), MountOptions::default())
                 .await
                 .expect("Create volume failed");
             let file = fuchsia_fs::directory::open_file_deprecated(

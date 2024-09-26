@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
   public_deps = [ ":injector-tests" ]
 }
 
-executable("injector_tests") {
+cc_test_executable("injector_tests") {
   testonly = true
   sources = [
     "injector_config_setup_unittest.cc",

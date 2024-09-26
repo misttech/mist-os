@@ -67,11 +67,8 @@
                 "AllUDPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUDPSockets/UDPSocketPairTest.GetSocketAcceptConn/*",
                 "AllUDPSockets/UDPSocketPairTest.IPPKTINFODefault/*",
-                "AllUDPSockets/UDPSocketPairTest.RecvTosDefault/*",
                 "AllInetTests/UdpSocketControlMessagesTest.SendAndReceiveTTLOrHopLimit/*",
-                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceiveTOSOrTClass/*",
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceiveTTLOrHopLimit/*",
-                "AllUDPSockets/UDPSocketPairTest.TOSRecvMismatch/*",
 
                 // TODO(https://fxbug.dev/326281908): Support IP_PKTINFO.
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/0",
@@ -89,7 +86,6 @@
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetIPPKTINFO/*",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/[0235]",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetSocketLinger/*",
-                "AllUDPSockets/UDPSocketPairTest.SetRecvTos/*",
 
                 // https://fxbug.dev/42154343
                 "AllUDPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",

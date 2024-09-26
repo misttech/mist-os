@@ -21,10 +21,11 @@ use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::{FutureExt, StreamExt};
 use router_error::RouterError;
+use routing::bedrock::sandbox_construction::ProgramInput;
 use sandbox::{Capability, Dict, DirEntry};
 use serve_processargs::NamespaceBuilder;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 
@@ -88,12 +89,21 @@ fn add_pkg_directory(
 }
 
 /// Adds namespace entries for a component's use declarations.
+/// `program_input_namespace_dict` should be the `component`'s `sandbox.program_input.namespace`.
 async fn add_use_decls(
     namespace: &mut NamespaceBuilder,
     component: &Arc<ComponentInstance>,
     uses: impl Iterator<Item = &UseDecl>,
-    program_input_dict: &Dict,
+    program_input_namespace_dict: &Dict,
 ) -> Result<(), CreateNamespaceError> {
+    // Only `program_input.namespace` (`program_input_namespace_dict`) is provided to this
+    // function. However, `into_router` expects the full [ProgramInput], so synthesize our own
+    // ProgramInput with the other fields empty.
+    let program_input = ProgramInput {
+        namespace: program_input_namespace_dict.clone(),
+        runner: Arc::new(Mutex::new(None)),
+        config: Dict::new(),
+    };
     for use_ in uses {
         if let cm_rust::UseDecl::Runner(_) = use_ {
             // The runner is not available in the namespace.
@@ -128,7 +138,7 @@ async fn add_use_decls(
         let capability: Capability = match use_ {
             // Bedrock
             cm_rust::UseDecl::Protocol(s) => {
-                protocol_use(s.clone(), component, program_input_dict).into()
+                protocol_use(s.clone(), component, &program_input).into()
             }
 
             // Legacy
@@ -164,20 +174,16 @@ async fn add_use_decls(
 fn protocol_use(
     decl: UseProtocolDecl,
     component: &Arc<ComponentInstance>,
-    program_input_dict: &Dict,
+    program_input: &ProgramInput,
 ) -> DirEntry {
-    let (router, request) = BedrockUseRouteRequest::UseProtocol(decl.clone()).into_router(
-        component.as_weak(),
-        program_input_dict,
-        false,
-    );
+    let router = BedrockUseRouteRequest::UseProtocol(decl.clone())
+        .into_router(component.as_weak(), program_input);
 
     // When there are router errors, they are sent to the error handler, which reports
     // errors.
     let weak_target = component.as_weak();
     let legacy_request = LegacyRouteRequest::UseProtocol(decl);
     DirEntry::new(router.into_directory_entry(
-        request,
         fio::DirentType::Service,
         component.execution_scope.clone(),
         move |error: &RouterError| {

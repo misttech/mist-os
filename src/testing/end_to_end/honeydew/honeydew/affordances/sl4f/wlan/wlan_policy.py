@@ -183,11 +183,14 @@ class WlanPolicy(wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            TimeoutError: Reached timeout without any updates.
             TypeError: Return values not correct types.
         """
         try:
             resp: dict[str, object] = self._sl4f.run(
-                method=_Sl4fMethods.GET_UPDATE, timeout=timeout
+                method=_Sl4fMethods.GET_UPDATE,
+                attempts=1,
+                timeout=timeout,
             )
         except errors.Sl4fError as e:
             raise errors.HoneydewWlanError("Failed to get_update") from e
@@ -351,6 +354,9 @@ class WlanPolicy(wlan_policy.WlanPolicy):
     def start_client_connections(self) -> None:
         """Enables device to initiate connections to networks.
 
+        Either by auto-connecting to saved networks or acting on incoming calls
+        triggering connections.
+
         Raises:
             HoneydewWlanError: Error from WLAN stack.
             RuntimeError: A client controller has not been created yet
@@ -364,6 +370,9 @@ class WlanPolicy(wlan_policy.WlanPolicy):
 
     def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.
+
+        Tears down any existing connections to WLAN networks and disables
+        initiation of new connections.
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.

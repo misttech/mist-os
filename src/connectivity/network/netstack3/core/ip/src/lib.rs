@@ -221,19 +221,21 @@ pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,
     BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
-    IpDeviceContext, IpDeviceMtuContext, IpDeviceStateContext, IpLayerBindingsContext,
-    IpLayerContext, IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId,
-    IpPacketDestination, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
-    IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
-    Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
-    Ipv6StateBuilder, MulticastMembershipHandler, ReceiveIpPacketMeta, ReceivePacketAction,
-    ResolveRouteError, RoutingTableId, SendIpPacketMeta, TransparentLocalDelivery,
-    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
-    IPV6_DEFAULT_SUBNET,
+    IpDeviceConfirmReachableContext, IpDeviceContext, IpDeviceMtuContext, IpDeviceStateContext,
+    IpLayerBindingsContext, IpLayerContext, IpLayerEvent, IpLayerHandler, IpLayerIpExt,
+    IpLayerTimerId, IpPacketDestination, IpRouteTablesContext, IpSendFrameError,
+    IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
+    IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder,
+    Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder, MulticastMembershipHandler,
+    ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, RoutingTableId, SendIpPacketMeta,
+    TransparentLocalDelivery, TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS,
+    DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
-pub use internal::routing::rules::{Rule, RuleAction, RuleMatcher, RulesTable};
+pub use internal::routing::rules::{
+    Mark, MarkDomain, MarkMatcher, MarkMatchers, Marks, Rule, RuleAction, RuleMatcher, RulesTable,
+};
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
     NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,

@@ -61,20 +61,20 @@ pub struct Options<'a> {
     /// "#meta/{component-name}.cm".  The library will attempt to connect to a static child first,
     /// and if that fails, it will launch the filesystem within a collection. It will try to
     /// create a child component via the absolute URL and then fallback to the relative URL.
-    component_name: &'a str,
+    pub component_name: &'a str,
 
     /// It should be possible to reuse components after serving them, but it's not universally
     /// supported.
-    reuse_component_after_serving: bool,
+    pub reuse_component_after_serving: bool,
 
     /// Format options as defined by the startup protocol
-    format_options: FormatOptions,
+    pub format_options: FormatOptions,
 
     /// Start options as defined by the startup protocol
-    start_options: StartOptions,
+    pub start_options: StartOptions,
 
     /// Whether to launch this filesystem as a dynamic or static child.
-    component_type: ComponentType,
+    pub component_type: ComponentType,
 }
 
 /// Describes the configuration for a particular filesystem.
@@ -412,5 +412,62 @@ impl FSConfig for F2fs {
 
     fn disk_format(&self) -> format::DiskFormat {
         format::DiskFormat::F2fs
+    }
+}
+
+/// FvmFilesystem Configuration
+#[derive(Clone)]
+pub struct Fvm {
+    pub component_type: ComponentType,
+}
+
+impl Default for Fvm {
+    fn default() -> Self {
+        Self { component_type: Default::default() }
+    }
+}
+
+impl Fvm {
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
+    }
+
+    /// Launch Fvm, with the default configuration, as a dynamic child in the fs-collection.
+    pub fn dynamic_child() -> Self {
+        Self {
+            component_type: ComponentType::DynamicChild {
+                collection_name: FS_COLLECTION_NAME.to_string(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+impl FSConfig for Fvm {
+    fn options(&self) -> Options<'_> {
+        Options {
+            component_name: "fvm",
+            reuse_component_after_serving: true,
+            format_options: FormatOptions::default(),
+            start_options: StartOptions {
+                read_only: false,
+                verbose: false,
+                fsck_after_every_transaction: false,
+                write_compression_level: -1,
+                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                cache_eviction_policy_override: EvictionPolicyOverride::None,
+                startup_profiling_seconds: 0,
+            },
+            component_type: self.component_type.clone(),
+        }
+    }
+
+    fn is_multi_volume(&self) -> bool {
+        true
+    }
+
+    fn disk_format(&self) -> format::DiskFormat {
+        format::DiskFormat::Fvm
     }
 }

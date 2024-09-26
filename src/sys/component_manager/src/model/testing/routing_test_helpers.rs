@@ -256,7 +256,7 @@ impl RoutingTest {
             .expect("could not create test file");
 
         // Create and populate an outgoing directory for each component.
-        let mut mock_resolver = MockResolver::new();
+        let mock_resolver = MockResolver::new();
         for (name, decl) in &builder.components {
             let host_fn = match builder.custom_outgoing_host_fns.remove(*name) {
                 // If a custom outgoing HostFn was provided, use that.
@@ -305,7 +305,7 @@ impl RoutingTest {
         let mut env_builder = BuiltinEnvironmentBuilder::new()
             .set_inspector(inspector)
             .set_runtime_config(config)
-            .add_resolver("test".to_string(), Box::new(mock_resolver))
+            .add_resolver("test".to_string(), Arc::new(mock_resolver))
             .add_runner(TEST_RUNNER_NAME.parse().unwrap(), mock_runner.clone());
         for name in builder.mock_builtin_runners.clone() {
             env_builder = env_builder.add_runner(name, mock_runner.clone())

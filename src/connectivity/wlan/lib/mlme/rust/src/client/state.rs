@@ -27,7 +27,7 @@ use wlan_common::stats::SignalStrengthAverage;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{ie, tim};
 use wlan_statemachine::*;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
@@ -169,7 +169,7 @@ impl Authenticating {
     //  association has started.
     /// Returns AuthProgress::InProgress if authentication is still ongoing.
     /// Returns AuthProgress::Failed if failed to authenticate or start association request.
-    async fn on_auth_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_auth_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         auth_frame: mac::AuthFrame<B>,
@@ -285,7 +285,7 @@ impl Associating {
     /// with the BSS was successful.
     /// Returns Ok(()) if the association was successful, otherwise Err(()).
     /// Note: The pending authentication timeout will be canceled in any case.
-    async fn on_assoc_resp_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_assoc_resp_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         assoc_resp_frame: mac::AssocRespFrame<B>,
@@ -451,7 +451,7 @@ impl Associating {
 
 /// Extract HT Operation and VHT Operation IEs from the association response frame.
 /// If either IE is of an incorrect length, it will be ignored.
-fn extract_ht_vht_op<B: ByteSlice>(
+fn extract_ht_vht_op<B: SplitByteSlice>(
     assoc_resp_frame: &mac::AssocRespFrame<B>,
 ) -> (Option<ie::HtOperation>, Option<ie::VhtOperation>) {
     let mut ht_op = None;
@@ -459,14 +459,14 @@ fn extract_ht_vht_op<B: ByteSlice>(
     for (id, body) in assoc_resp_frame.ies() {
         match id {
             ie::Id::HT_OPERATION => match ie::parse_ht_operation(body) {
-                Ok(parsed_ht_op) => ht_op = Some(parsed_ht_op.read()),
+                Ok(parsed_ht_op) => ht_op = Some(zerocopy::Ref::read(&parsed_ht_op)),
                 Err(e) => {
                     error!("Invalid HT Operation: {}", e);
                     continue;
                 }
             },
             ie::Id::VHT_OPERATION => match ie::parse_vht_operation(body) {
-                Ok(parsed_vht_op) => vht_op = Some(parsed_vht_op.read()),
+                Ok(parsed_vht_op) => vht_op = Some(zerocopy::Ref::read(&parsed_vht_op)),
                 Err(e) => {
                     error!("Invalid VHT Operation: {}", e);
                     continue;
@@ -622,7 +622,7 @@ impl Associated {
 
     /// Process and inbound beacon frame.
     /// Resets LostBssCounter, check buffered frame if available.
-    async fn on_beacon_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_beacon_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         header: &BeaconHdr,
@@ -660,7 +660,7 @@ impl Associated {
     /// Fuchsia's Netstack if the STA's controlled port is open.
     /// NULL-Data frames are interpreted as "Keep Alive" requests and responded with NULL data
     /// frames if the STA's controlled port is open.
-    fn on_data_frame<B: ByteSlice, D: DeviceOps>(
+    fn on_data_frame<B: SplitByteSlice, D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
         data_frame: mac::DataFrame<B>,
@@ -733,7 +733,7 @@ impl Associated {
         wtrace::async_end_wlansoftmac_rx(async_id, "completed data frame processing");
     }
 
-    fn on_eth_frame<B: ByteSlice, D: DeviceOps>(
+    fn on_eth_frame<B: SplitByteSlice, D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
         frame: B,
@@ -768,7 +768,7 @@ impl Associated {
         )
     }
 
-    fn on_block_ack_frame<B: ByteSlice, D>(
+    fn on_block_ack_frame<B: SplitByteSlice, D>(
         &mut self,
         _sta: &mut BoundClient<'_, D>,
         _action: mac::BlockAckAction,
@@ -781,7 +781,7 @@ impl Associated {
         //self.0.block_ack_state.replace_state(|state| state.on_block_ack_frame(sta, action, body));
     }
 
-    async fn on_spectrum_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_spectrum_mgmt_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
         action: mac::SpectrumMgmtAction,
@@ -1027,7 +1027,7 @@ impl States {
     /// - frames are from a foreign BSS
     /// - frames are unicast but destined for a MAC address that is different from this STA.
     // TODO(https://fxbug.dev/42119762): Implement a packet counter and add tests to verify frames are dropped correctly.
-    pub async fn on_mac_frame<B: ByteSlice, D: DeviceOps>(
+    pub async fn on_mac_frame<B: SplitByteSlice, D: DeviceOps>(
         mut self,
         sta: &mut BoundClient<'_, D>,
         bytes: B,
@@ -1095,7 +1095,7 @@ impl States {
 
     /// Processes inbound management frames.
     /// Only frames from the joined BSS are processed. Frames from other STAs are dropped.
-    async fn on_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    async fn on_mgmt_frame<B: SplitByteSlice, D: DeviceOps>(
         self,
         sta: &mut BoundClient<'_, D>,
         mgmt_frame: mac::MgmtFrame<B>,
@@ -1200,7 +1200,7 @@ impl States {
         }
     }
 
-    pub fn on_eth_frame<B: ByteSlice, D: DeviceOps>(
+    pub fn on_eth_frame<B: SplitByteSlice, D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
         frame: B,
@@ -1416,7 +1416,7 @@ impl States {
 #[cfg(test)]
 mod free_function_tests {
     use super::*;
-    use wlan_common::mac::AsBytesExt as _;
+    use wlan_common::mac::IntoBytesExt as _;
 
     fn assoc_resp_frame_from_ies(elements: &[u8]) -> mac::AssocRespFrame<&[u8]> {
         mac::AssocRespFrame {
@@ -1486,7 +1486,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::buffer_writer::BufferWriter;
     use wlan_common::ie::IeType;
-    use wlan_common::mac::AsBytesExt as _;
+    use wlan_common::mac::IntoBytesExt as _;
     use wlan_common::sequence::SequenceManager;
     use wlan_common::test_utils::fake_capabilities::fake_client_capabilities;
     use wlan_common::test_utils::fake_frames::*;

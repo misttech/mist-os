@@ -34,7 +34,6 @@
 #include <dev/interrupt.h>
 #include <dev/power.h>
 #include <dev/psci.h>
-#include <dev/uart.h>
 #include <explicit-memory/bytes.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/cpu.h>
@@ -75,8 +74,6 @@
 
 // Defined in start.S.
 extern paddr_t kernel_entry_paddr;
-
-static bool uart_disabled = false;
 
 static ktl::atomic<int> panic_started;
 static ktl::atomic<int> halted;
@@ -335,9 +332,6 @@ void platform_early_init(void) {
   dlog_bypass_init();
 
   // Serial port should be active now
-
-  // Check if serial should be enabled (i.e., not using the null driver).
-  ktl::visit([](const auto& uart) { uart_disabled = uart.extra() == 0; }, gBootOptions->serial);
 
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();

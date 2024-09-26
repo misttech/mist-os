@@ -46,7 +46,15 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
         opts::Commands::Merge { files, output, fromfile, depfile } => {
             merge::merge(files, output, fromfile, depfile)?
         }
-        opts::Commands::Include { file, output, depfile, includepath, includeroot, validate } => {
+        opts::Commands::Include {
+            file,
+            output,
+            depfile,
+            includepath,
+            includeroot,
+            validate,
+            features,
+        } => {
             path_exists(&file)?;
             include::merge_includes(
                 &file,
@@ -55,6 +63,7 @@ pub fn run_cmc(opt: opts::Opt) -> Result<(), Error> {
                 &includepath,
                 &includeroot,
                 validate,
+                &features.into(),
             )?
         }
         opts::Commands::CheckIncludes {

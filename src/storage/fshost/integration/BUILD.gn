@@ -52,6 +52,7 @@ rustc_library("fshost_test_fixture") {
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:gpt",
     "//third_party/rust_crates:tracing",
@@ -215,6 +216,7 @@ template("fshost_integration_test_package") {
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:regex",
       "//third_party/rust_crates:tracing",
     ]
     if (defined(invoker.extra_deps)) {
@@ -280,12 +282,19 @@ template("fshost_integration_test_package") {
     test_components = [
       ":$_integration_component_target",
       ":$_migration_component_target",
+      ":$_wipe_storage_component_target",
       ":$_write_data_file_component_target",
     ]
 
-    # TODO(https://fxbug.dev/339491886): Support wipe_storage in storage-host builds
-    if (!(defined(fshost_options.storage_host) && fshost_options.storage_host)) {
-      test_components += [ ":$_wipe_storage_component_target" ]
+    # TODO(https://fxbug.dev/339491886): Support these components in storage-host
+    if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
+      test_components -= [ ":$_wipe_storage_component_target" ]
+      if (defined(fshost_options.fxfs_blob) && !fshost_options.fxfs_blob) {
+        test_components -= [
+          ":$_migration_component_target",
+          ":$_write_data_file_component_target",
+        ]
+      }
     }
     deps = [
       ":$_fshost_target",
@@ -314,7 +323,7 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
   ]
 }
 
-fshost_integration_test_package("fshost_integration_tests_fxfs_gpt") {
+fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
   data_filesystem_variant = "fxblob"
   options = {
     data_filesystem_format = "fxfs"
@@ -325,6 +334,35 @@ fshost_integration_test_package("fshost_integration_tests_fxfs_gpt") {
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/storage-host",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
+  ]
+}
+
+fshost_integration_test_package("fshost_integration_tests_storage_host_minfs") {
+  options = {
+    data_filesystem_format = "minfs"
+    use_disk_migration = false
+    storage_host = true
+    fxfs_blob = false
+  }
+  extra_deps = [
+    "//src/storage/fvm:fvm-component",
+    "//src/storage/storage-host",
+  ]
+}
+
+fshost_integration_test_package(
+    "fshost_integration_tests_storage_host_minfs_no_zxcrypt") {
+  data_filesystem_variant = "minfs-no-zxcrypt"
+  options = {
+    data_filesystem_format = "minfs"
+    use_disk_migration = false
+    storage_host = true
+    fxfs_blob = false
+    no_zxcrypt = true
+  }
+  extra_deps = [
+    "//src/storage/fvm:fvm-component",
+    "//src/storage/storage-host",
   ]
 }
 
@@ -373,9 +411,11 @@ group("tests") {
     ":fshost_integration_tests_f2fs",
     ":fshost_integration_tests_f2fs_no_zxcrypt",
     ":fshost_integration_tests_fxfs",
-    ":fshost_integration_tests_fxfs_gpt",
     ":fshost_integration_tests_fxfs_no_fxblob",
     ":fshost_integration_tests_minfs",
     ":fshost_integration_tests_minfs_no_zxcrypt",
+    ":fshost_integration_tests_storage_host_fxfs",
+    ":fshost_integration_tests_storage_host_minfs",
+    ":fshost_integration_tests_storage_host_minfs_no_zxcrypt",
   ]
 }

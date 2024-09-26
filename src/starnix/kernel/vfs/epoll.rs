@@ -7,10 +7,9 @@ use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
     WaitQueue, Waiter,
 };
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
-    WeakFileHandle,
+    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
+    FileObject, FileOps, WeakFileHandle,
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
@@ -519,30 +518,7 @@ impl EpollFileObject {
 impl FileOps for EpollFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
-
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        error!(EINVAL)
-    }
-
-    fn read(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        _data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        error!(EINVAL)
-    }
+    fileops_impl_dataless!();
 
     fn wait_async(
         &self,

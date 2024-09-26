@@ -148,24 +148,22 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
 def get_action_graph_from_labels(
     bazel_exe: str, compilation_mode, labels: Sequence[str]
 ) -> Sequence[Dict]:
-    all_actions = []
-    for label in labels:
-        info("Getting action graph for {}".format(label))
-        action_graph = json.loads(
-            run(
-                bazel_exe,
-                "aquery",
-                "mnemonic('CppCompile',deps({label}))".format(label=label),
-                compilation_mode,
-                "--output=jsonproto",
-                "--ui_event_filters=-info,-warning",
-                "--noshow_loading_progress",
-                "--noshow_progress",
-                "--show_result=0",
-            )
+    labels_set = "set({})".format(" ".join(labels))
+    info("Getting action graph for {}".format(labels_set))
+    action_graph = json.loads(
+        run(
+            bazel_exe,
+            "aquery",
+            "mnemonic('CppCompile',deps({}))".format(labels_set),
+            compilation_mode,
+            "--output=jsonproto",
+            "--ui_event_filters=-info,-warning",
+            "--noshow_loading_progress",
+            "--noshow_progress",
+            "--show_result=0",
         )
-        all_actions.extend(collect_actions(action_graph))
-    return all_actions
+    )
+    return collect_actions(action_graph)
 
 
 def compilation_mode(args: Sequence[str]) -> str:
@@ -301,8 +299,14 @@ def main(argv: Sequence[str]):
         labels,
     )
 
-    output_base = run(args.bazel, "info", "output_base")
-    output_path = run(args.bazel, "info", "output_path")
+    # Output from the following bazel info command follows this format:
+    #
+    #   output_base: /path/to/output/base
+    #   output_path: /path/to/output/path
+    #
+    bazel_info = run(args.bazel, "info", "output_base", "output_path").split()
+    output_base = bazel_info[1]
+    output_path = bazel_info[3]
 
     formatter = CompDBFormatter(
         args.build_dir,

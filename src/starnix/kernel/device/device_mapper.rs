@@ -68,7 +68,12 @@ pub fn device_mapper_init(current_task: &CurrentTask) {
 
     kernel
         .device_registry
-        .register_major(DEVICE_MAPPER_MAJOR, get_or_create_dm_device, DeviceMode::Block)
+        .register_major(
+            "device-mapper".into(),
+            DeviceMode::Block,
+            DEVICE_MAPPER_MAJOR,
+            get_or_create_dm_device,
+        )
         .expect("dm device register failed.");
 }
 
@@ -215,8 +220,7 @@ impl DmDevice {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let dm_device_name = FsString::from(format!("dm-{minor}"));
-        let virtual_block_class =
-            registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
+        let virtual_block_class = registry.objects.virtual_block_class();
         let device = Arc::new(Self {
             number: DeviceType::new(DEVICE_MAPPER_MAJOR, minor),
             ..Default::default()

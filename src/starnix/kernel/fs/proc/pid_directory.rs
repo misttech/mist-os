@@ -168,7 +168,9 @@ pub fn pid_directory(
         TaskListDirectory { thread_group: OwnedRef::downgrade(&task.thread_group) },
         mode!(IFDIR, 0o777),
     );
-    TaskDirectory::new(current_task, fs, task, dir)
+    let fs_node = TaskDirectory::new(current_task, fs, task, dir);
+    security::task_to_fs_node(current_task, task, &fs_node);
+    fs_node
 }
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/task/<tid>` directory for `task`.

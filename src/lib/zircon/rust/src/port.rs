@@ -436,9 +436,8 @@ impl Port {
     /// [zx_port_queue](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_queue.md)
     /// syscall.
     pub fn queue(&self, packet: &Packet) -> Result<(), Status> {
-        let status = unsafe {
-            sys::zx_port_queue(self.raw_handle(), &packet.0 as *const sys::zx_port_packet_t)
-        };
+        let status =
+            unsafe { sys::zx_port_queue(self.raw_handle(), std::ptr::from_ref(&packet.0)) };
         ok(status)
     }
 
@@ -483,12 +482,12 @@ bitflags! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, Event};
+    use crate::{Duration, Event};
     use assert_matches::assert_matches;
 
     #[test]
     fn port_basic() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         let port = Port::create();
 
@@ -506,7 +505,7 @@ mod tests {
 
     #[test]
     fn wait_async_once() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
         let key = 42;
 
         let port = Port::create();

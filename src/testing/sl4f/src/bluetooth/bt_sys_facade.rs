@@ -16,7 +16,7 @@ use fidl_fuchsia_bluetooth_sys::{
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_bluetooth::types::Address;
 use fuchsia_component as component;
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use tracing::{error, info};
 
 use fuchsia_sync::RwLock;
@@ -227,7 +227,7 @@ impl BluetoothSysFacade {
                                 (true, None)
                             }
                             PairingMethod::PasskeyEntry => {
-                                let timeout = 30.seconds(); // Spec defined timeout
+                                let timeout = zx::Duration::from_seconds(30); // Spec defined timeout
                                 let pin = match pin_receiver
                                     .next()
                                     .on_timeout(timeout.after_now(), || None)
@@ -468,7 +468,11 @@ impl BluetoothSysFacade {
                 .peer_watcher_stream
             {
                 Some(stream) => {
-                    match stream.next().on_timeout(100.millis().after_now(), || None).await {
+                    match stream
+                        .next()
+                        .on_timeout(zx::Duration::from_millis(100).after_now(), || None)
+                        .await
+                    {
                         Some(Ok(d)) => d,
                         Some(Err(e)) => fx_err_and_bail!(
                             &with_line!(tag),
@@ -672,7 +676,11 @@ impl BluetoothSysFacade {
 
         let host_info_list = match &mut self.inner.write().host_watcher_stream {
             Some(stream) => {
-                match stream.next().on_timeout(1.seconds().after_now(), || None).await {
+                match stream
+                    .next()
+                    .on_timeout(zx::Duration::from_seconds(1).after_now(), || None)
+                    .await
+                {
                     Some(r) => match r {
                         Ok(d) => d,
                         Err(e) => fx_err_and_bail!(

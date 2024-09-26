@@ -13,7 +13,8 @@ class SpmiCtl {
   int Execute(int argc, char** argv);
 
  private:
-  fidl::SyncClient<fuchsia_hardware_spmi::Device> GetSpmiClient(std::string device);
+  fidl::SyncClient<fuchsia_hardware_spmi::Device> GetSpmiClient(std::string target,
+                                                                std::string sub_target);
   void ListDevices();
 
   std::optional<fidl::SyncClient<fuchsia_hardware_spmi::Device>> test_client_;

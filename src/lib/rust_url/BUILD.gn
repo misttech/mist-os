@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/rust/rustc_staticlib.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("rust_url") {
   sources = [
@@ -23,7 +24,7 @@ rustc_staticlib("rust_url_c_api") {
   ]
 }
 
-executable("rust_url_unittests_bin") {
+cc_test_executable("rust_url_unittests_bin") {
   testonly = true
   sources = [ "rust_url_unittests.cc" ]
   deps = [

@@ -4,7 +4,7 @@
 
 use num_derive::{FromPrimitive, ToPrimitive};
 use zerocopy::byteorder::little_endian::U32;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 const ZBI_MAX_SMT: usize = 4;
 
@@ -81,7 +81,7 @@ impl ZbiType {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 pub struct zbi_header_t {
     pub zbi_type: U32,
     pub length: U32,
@@ -108,7 +108,7 @@ pub fn zbi_container_header(length: u32) -> zbi_header_t {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 /// Defines the Rust version of `zbi_topology_node_v2_t` in
 /// sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 pub struct ZbiTopologyNode {
@@ -140,7 +140,7 @@ pub enum ZbiTopologyArchitecture {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub union Entity {
     pub processor: ZbiTopologyProcessor,
     pub cluster: ZbiTopologyCluster,
@@ -149,7 +149,7 @@ pub union Entity {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct ZbiTopologyProcessor {
     pub logical_ids: [u16; ZBI_MAX_SMT],
     pub logical_id_count: u8,
@@ -162,14 +162,14 @@ pub struct ZbiTopologyProcessor {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub union ArchitectureInfo {
     pub arm64: ZbiTopologyArm64Info,
     pub x64: ZbiTopologyX64Info,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct ZbiTopologyCluster {
     // Relative performance level of this processor in the system.
     // Refer to sdk/lib/zbi-format/include/lib/zbi-format/zbi.h for more details.
@@ -177,7 +177,7 @@ pub struct ZbiTopologyCluster {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct ZbiTopologyNumaRegion {
     // Starting and ending memory addresses of this numa region.
     pub start_address: u64,
@@ -185,14 +185,14 @@ pub struct ZbiTopologyNumaRegion {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct ZbiTopologyCache {
     // Unique id of this cache node. No other semantics are assumed.
     pub cache_id: u32,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct ZbiTopologyArm64Info {
     // Cluster ids for each level, one being closest to the cpu.
     // These map to aff1, aff2, and aff3 values in the ARM registers.
@@ -210,7 +210,7 @@ pub struct ZbiTopologyArm64Info {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromZeros, FromBytes, NoCell)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct ZbiTopologyX64Info {
     // Indexes here correspond to the logical_ids index for the thread.
     pub apic_ids: [u32; ZBI_MAX_SMT],

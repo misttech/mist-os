@@ -548,6 +548,22 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   static void UnlockPiChainCommon(StartNodeType& start, const void* stop_point = nullptr)
       TA_REQ(chainlock_transaction_token) TA_REL(start);
 
+  void SetOwner(Thread& owner) TA_REQ(get_lock(), owner.get_lock()) {
+    // If we are adding an owner to this OWQ, we should be able to assert that
+    // it does not currently have one.
+    DEBUG_ASSERT(owner_ == nullptr);
+    owner.owned_wait_queues_.push_back(this);
+    owner_ = &owner;
+  }
+
+  // Reset the owner of this queue from |owner| to nullptr.  We need to be
+  // holding both the queue's lock and the owner's lock to do this.
+  void ResetOwner(Thread& owner) TA_REQ(get_lock(), owner.get_lock()) {
+    DEBUG_ASSERT(owner_ == &owner);
+    owner.owned_wait_queues_.erase(*this);
+    owner_ = nullptr;
+  }
+
   TA_GUARDED(get_lock()) Thread* owner_ = nullptr;
 
   // A pointer to a thread (which _must_ be a current member of this owned wait queue's)

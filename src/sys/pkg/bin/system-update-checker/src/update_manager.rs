@@ -678,7 +678,7 @@ pub(crate) mod tests {
     use fidl_fuchsia_update_ext::AttemptOptions;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::prelude::*;
+    use fuchsia_zircon as zx;
     use futures::channel::mpsc::{channel, Receiver, Sender};
     use futures::lock::Mutex as AsyncMutex;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1244,7 +1244,11 @@ pub(crate) mod tests {
 
         // The update attempt will never leave the WaitingForReboot state.
         assert_eq!(
-            receiver.next().map(Some).on_timeout(100.millis().after_now(), || None).await,
+            receiver
+                .next()
+                .map(Some)
+                .on_timeout(zx::Duration::from_millis(100).after_now(), || None)
+                .await,
             None
         );
     }

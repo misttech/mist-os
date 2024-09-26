@@ -2003,6 +2003,7 @@ pub fn translate_capabilities(
                     name: Some(n.clone().into()),
                     source,
                     source_dictionary,
+                    source_path: capability.path.clone().map(Into::into),
                     ..Default::default()
                 }));
             }
@@ -2096,8 +2097,6 @@ pub fn any_ref_to_decl(
         AnyRef::Debug => fdecl::Ref::Debug(fdecl::DebugRef {}),
         AnyRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         AnyRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
-        #[cfg(fuchsia_api_level_at_least = "HEAD")]
-        AnyRef::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         AnyRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
         AnyRef::Dictionary(d) => {
             if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
@@ -2120,8 +2119,6 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
         }
         RootDictionaryRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         RootDictionaryRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
-        #[cfg(fuchsia_api_level_at_least = "HEAD")]
-        RootDictionaryRef::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
     };
     (root, Some(d.path.to_string()))
 }
@@ -4985,7 +4982,7 @@ mod tests {
                     },
                     {
                         "dictionary": "dict2",
-                        "extends": "program/in/a",
+                        "path": "/in/a",
                     },
                     {
                         "dictionary": "dict3",
@@ -5086,8 +5083,9 @@ mod tests {
                     fdecl::Capability::Dictionary (
                         fdecl::Dictionary {
                             name: Some("dict2".into()),
-                            source: Some(fdecl::Ref::Program(fdecl::ProgramRef {})),
-                            source_dictionary: Some("in/a".into()),
+                            source: None,
+                            source_dictionary: None,
+                            source_path: Some("/in/a".into()),
                             ..Default::default()
                         }
                     ),

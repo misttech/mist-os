@@ -41,7 +41,7 @@ use std::collections::{HashMap, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
-use zerocopy::{AsBytes, FromBytes, FromZeroes, IntoBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
 const CONFIGURATION_AVAILABLE_EVENT: u64 = std::u64::MAX;
@@ -2063,10 +2063,10 @@ impl RunningOperationKind {
         }
     }
 
-    fn to_response<T: FromBytes + AsBytes + NoCell>(buffer: &[u8]) -> T {
+    fn to_response<T: FromBytes + IntoBytes + Immutable>(buffer: &[u8]) -> T {
         let mut result = T::new_zeroed();
         let length_to_copy = std::cmp::min(buffer.len(), std::mem::size_of::<T>());
-        result.as_bytes_mut()[..length_to_copy].copy_from_slice(&buffer[..length_to_copy]);
+        result.as_mut_bytes()[..length_to_copy].copy_from_slice(&buffer[..length_to_copy]);
         result
     }
 
@@ -2333,7 +2333,7 @@ impl FuseResponse {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable)]
 pub struct CreateResponse {
     entry: uapi::fuse_entry_out,
     open: uapi::fuse_open_out,

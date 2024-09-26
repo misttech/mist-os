@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -249,18 +245,18 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for MyEmptyFlexibleEnum {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for MyEmptyFlexibleEnum {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D>
+        for MyEmptyFlexibleEnum
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -270,7 +266,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for MyEmptyFlexibleEnum {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for MyEmptyFlexibleEnum {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::unknown()
@@ -279,7 +275,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -317,18 +313,16 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for MyFlexibleEnum {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for MyFlexibleEnum {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for MyFlexibleEnum {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -338,7 +332,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for MyFlexibleEnum {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for MyFlexibleEnum {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::unknown()
@@ -347,7 +341,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -385,18 +379,18 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for MyFlexibleEnumWithCustomUnknown {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for MyFlexibleEnumWithCustomUnknown {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D>
+        for MyFlexibleEnumWithCustomUnknown
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -406,7 +400,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for MyFlexibleEnumWithCustomUnknown {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for MyFlexibleEnumWithCustomUnknown
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::unknown()
@@ -415,7 +411,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -453,18 +449,16 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for MyStrictEnum {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for MyStrictEnum {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for MyStrictEnum {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -474,7 +468,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for MyStrictEnum {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for MyStrictEnum {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::Foo
@@ -483,7 +477,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

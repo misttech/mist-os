@@ -60,10 +60,16 @@ class SingleFileTest : public F2fsFakeDevTestFixture {
     F2fsFakeDevTestFixture::TearDown();
   }
 
-  LockedPage GetPage(pgoff_t index) {
+  LockedPage GetLockedPage(pgoff_t index) {
     LockedPage page;
-    ZX_ASSERT(vnode().GrabCachePage(index, &page) == ZX_OK);
+    ZX_ASSERT(vnode().GrabLockedPage(index, &page) == ZX_OK);
     return page;
+  }
+
+  fbl::RefPtr<Page> GetPage(pgoff_t index) {
+    zx::result pages_or = vnode().GrabPages(index, index + 1);
+    ZX_ASSERT(pages_or.is_ok());
+    return pages_or->front();
   }
 
   void CloseVnode() {

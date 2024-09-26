@@ -400,6 +400,20 @@ static zx_status_t apic_timer_set_divide_value(uint8_t v) {
 
 static void apic_timer_init(void) {
   lapic_reg_write(LAPIC_REG_LVT_TIMER, LVT_VECTOR(X86_INT_APIC_TIMER) | LVT_MASKED);
+  if (x86_feature_test(X86_FEATURE_TSC_DEADLINE)) {
+    apic_timer_tsc_deadline_init();
+  }
+}
+
+// Invoked on each CPU to enable the TSC Deadline timer.
+void apic_timer_tsc_deadline_init() {
+  DEBUG_ASSERT(x86_feature_test(X86_FEATURE_TSC_DEADLINE));
+  lapic_reg_write(LAPIC_REG_LVT_TIMER,
+    LVT_VECTOR(X86_INT_APIC_TIMER) | LVT_TIMER_MODE_TSC_DEADLINE);
+  // Intel recommends using an MFENCE to ensure the LVT_TIMER_ADDR write
+  // takes before the write_msr(), since writes to this MSR are ignored if the
+  // time mode is not DEADLINE.
+  arch::DeviceMemoryBarrier();
 }
 
 // Racy; primarily useful for calibrating the timer.
@@ -444,24 +458,10 @@ zx_status_t apic_timer_set_oneshot(uint32_t count, uint8_t divisor, bool masked)
   return ZX_OK;
 }
 
-void apic_timer_set_tsc_deadline(uint64_t deadline, bool masked) {
+void apic_timer_set_tsc_deadline(uint64_t deadline) {
   DEBUG_ASSERT(x86_feature_test(X86_FEATURE_TSC_DEADLINE));
-
-  uint32_t timer_config = LVT_VECTOR(X86_INT_APIC_TIMER) | LVT_TIMER_MODE_TSC_DEADLINE;
-  if (masked) {
-    timer_config |= LVT_MASKED;
-  }
-
-  {
-    InterruptDisableGuard irqd;
-
-    lapic_reg_write(LAPIC_REG_LVT_TIMER, timer_config);
-    // Intel recommends using an MFENCE to ensure the LVT_TIMER_ADDR write
-    // takes before the write_msr(), since writes to this MSR are ignored if the
-    // time mode is not DEADLINE.
-    arch::DeviceMemoryBarrier();
-    write_msr(X86_MSR_IA32_TSC_DEADLINE, deadline);
-  }
+  DEBUG_ASSERT(arch_ints_disabled());
+  write_msr(X86_MSR_IA32_TSC_DEADLINE, deadline);
 }
 
 void apic_timer_interrupt_handler(void) { platform_handle_apic_timer_tick(); }

@@ -169,6 +169,7 @@ typedef struct zxio_datagram_prelude_size {
 #define ZXIO_OBJECT_TYPE_PACKET_SOCKET                ((zxio_object_type_t)12)
 #define ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET              ((zxio_object_type_t)13)
 #define ZXIO_OBJECT_TYPE_SYMLINK                      ((zxio_object_type_t)14)
+#define ZXIO_OBJECT_TYPE_TRANSFERABLE                 ((zxio_object_type_t)15)
 // clang-format on
 
 // File and directory access ---------------------------------------------------

@@ -52,6 +52,7 @@ _all_modes_defaults = {
   # cxx defaults
   cxx_exec_strategy = "remote_local_fallback"
   cxx_download_objects = true
+  cxx_minimalist_wrapper = true
 
   # link defaults
   link_exec_strategy = "remote_local_fallback"
@@ -129,8 +130,6 @@ _default_rbe_settings = {
     bazel_exec_strategy = "remote"
   }
 
-  # This mode itself is experimental.
-  #
   # Enable remote execution only as a cache, but on cache-misses,
   # execute build actions locally, thereby consuming no remote execution
   # worker slots.
@@ -164,6 +163,7 @@ _default_rbe_settings = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     cxx_download_objects = false
+    cxx_minimalist_wrapper = false
 
     link_enable = true
 
@@ -185,17 +185,14 @@ _default_rbe_settings = {
 # Validate that the chosen RBE mode is one of the valid modes
 assert(
     defined(_default_rbe_settings[rbe_mode]),
-    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only' (*), and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
+    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only', and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
 
 # Set the RBE settings to use based on the chosen RBE mode
 _settings_defaults = _default_rbe_settings[rbe_mode]
 
 if (_print_warnings) {
   # Warn about using experimental modes.
-  _experimental_rbe_modes = [
-    "low_bandwidth_remote",
-    "remote_cache_only",
-  ]
+  _experimental_rbe_modes = [ "low_bandwidth_remote" ]
   if (_experimental_rbe_modes + [ rbe_mode ] - [ rbe_mode ] !=
       _experimental_rbe_modes) {
     print("WARNING: You're using an experimental 'rbe_mode':  \"${rbe_mode}\"")
@@ -250,6 +247,9 @@ rbe_settings = {
   }
   if (defined(rbe_settings_overrides["cxx_download_objects"])) {
     cxx_download_objects = rbe_settings_overrides["cxx_download_objects"]
+  }
+  if (defined(rbe_settings_overrides["cxx_minimalist_wrapper"])) {
+    cxx_minimalist_wrapper = rbe_settings_overrides["cxx_minimalist_wrapper"]
   }
 
   # link overrides

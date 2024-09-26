@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/testing/cc_test_executable.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 
@@ -13,12 +14,12 @@ group("tests") {
   deps = [ ":enumeration-integration-test" ]
 }
 
-executable("example_test") {
+cc_test_executable("example_test") {
   testonly = true
   sources = [ "example_test_main.cc" ]
 }
 
-executable("check_path_test") {
+cc_test_executable("check_path_test") {
   testonly = true
   sources = [ "check_path_test_main.cc" ]
 }

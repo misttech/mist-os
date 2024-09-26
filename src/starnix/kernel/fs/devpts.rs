@@ -107,19 +107,7 @@ fn init_devpts(
     kernel: &Arc<Kernel>,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let state = Arc::new(TTYState::new());
-    let device = DevPtsDevice::new(state.clone());
-
-    // Register /dev/pts/X device type.
-    for n in 0..DEVPTS_MAJOR_COUNT {
-        kernel.device_registry.register_major(
-            DEVPTS_FIRST_MAJOR + n,
-            device.clone(),
-            DeviceMode::Char,
-        )?;
-    }
-    // Register tty and ptmx device types.
-    kernel.device_registry.register_major(TTY_ALT_MAJOR, device, DeviceMode::Char)?;
+    let state = kernel.expando.get::<TTYState>();
 
     let uid =
         options.params.get(b"uid").map(|uid| fs_args::parse::<uid_t>(uid.as_ref())).transpose()?;
@@ -141,9 +129,25 @@ where
     L: LockBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
+    let state = kernel.expando.get::<TTYState>();
+    let device = DevPtsDevice::new(state.clone());
+
     let registry = &kernel.device_registry;
-    let tty_class =
-        registry.objects.get_or_create_class("tty".into(), registry.objects.virtual_bus());
+
+    // Register /dev/pts/X device type.
+    for n in 0..DEVPTS_MAJOR_COUNT {
+        registry
+            .register_major("pts".into(), DeviceMode::Char, DEVPTS_FIRST_MAJOR + n, device.clone())
+            .expect("can register pts{n} device");
+    }
+
+    // Register tty and ptmx device types.
+    kernel
+        .device_registry
+        .register_major("/dev/tty".into(), DeviceMode::Char, TTY_ALT_MAJOR, device)
+        .expect("can register tty device");
+
+    let tty_class = registry.objects.tty_class();
     registry.add_device(
         locked,
         current_task,
@@ -939,7 +943,7 @@ mod tests {
     use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::signals::{SIGCHLD, SIGTTOU};
 
-    fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
+    fn ioctl<T: zerocopy::IntoBytes + zerocopy::FromBytes + zerocopy::Immutable + Copy>(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
@@ -1021,6 +1025,7 @@ mod tests {
     #[::fuchsia::test]
     async fn opening_ptmx_creates_pts() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         lookup_node(&task, &fs, "0".into()).unwrap_err();
         let _ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
@@ -1030,6 +1035,7 @@ mod tests {
     #[::fuchsia::test]
     async fn closing_ptmx_closes_pts() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         lookup_node(&task, &fs, "0".into()).unwrap_err();
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
@@ -1042,6 +1048,7 @@ mod tests {
     #[::fuchsia::test]
     async fn pts_are_reused() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
 
         let _ptmx0 = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
@@ -1064,6 +1071,7 @@ mod tests {
     #[::fuchsia::test]
     async fn opening_inexistant_replica_fails() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         // Initialize pts devices
         ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let fs = TmpFs::new_fs(&kernel);
@@ -1119,6 +1127,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unknown_ioctl() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
 
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
@@ -1131,6 +1140,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_tiocgptn_ioctl() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx0 = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let ptmx1 = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
@@ -1145,6 +1155,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_new_terminal_is_locked() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let _ptmx_file = open_file(&mut locked, &task, &fs, "ptmx".into()).expect("open file");
 
@@ -1158,6 +1169,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_lock_ioctls() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let pts = lookup_node(&task, &fs, "0".into()).expect("component_lookup");
@@ -1181,6 +1193,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_ptmx_stats() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         task.set_creds(Credentials::with_ids(22, 22));
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
@@ -1196,6 +1209,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_attach_terminal_when_open() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let _opened_main = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         // Opening the main terminal should not set the terminal of the session.
@@ -1242,6 +1256,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_attach_terminal() {
         let (kernel, task1, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task1);
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         task2.thread_group.setsid(&mut locked).expect("setsid");
 
@@ -1279,6 +1294,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_steal_terminal() {
         let (kernel, task1, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task1);
         task1.set_creds(Credentials::with_ids(1, 1));
 
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
@@ -1355,6 +1371,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_foreground_process() {
         let (kernel, init, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &init);
         let task1 = init.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         task1.thread_group.setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
@@ -1442,6 +1459,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_detach_session() {
         let (kernel, task1, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task1);
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         task2.thread_group.setsid(&mut locked).expect("setsid");
 
@@ -1479,6 +1497,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_send_data_back_and_forth() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");

@@ -1157,10 +1157,11 @@ mod handle_driver_event_tests {
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let bss = create_bss_descriptions();
-        let scan_result = fidl_fullmac::WlanFullmacScanResult {
-            txn_id: 42u64,
-            timestamp_nanos: 1337i64,
-            bss: bss.clone(),
+        let scan_result = fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest {
+            txn_id: Some(42u64),
+            timestamp_nanos: Some(1337i64),
+            bss: Some(bss.clone()),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_scan_result(&scan_result)),

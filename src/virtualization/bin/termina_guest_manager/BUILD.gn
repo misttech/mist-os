@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/sys/core/build/core_shard.gni")
 import("//src/virtualization/buildtools/linux_paths.gni")
 import("//src/virtualization/buildtools/romfs_image.gni")
@@ -176,7 +177,7 @@ fuchsia_package("termina_guest_manager") {
   subpackages = [ "//src/virtualization/packages/termina_guest" ]
 }
 
-executable("termina_guest_manager_unittests") {
+cc_test_executable("termina_guest_manager_unittests") {
   visibility = [ ":*" ]
   testonly = true
 

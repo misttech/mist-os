@@ -17,7 +17,7 @@ use tracing::error;
 use wlan_common::mac::{self, CapabilityInfo, EthernetIIHdr};
 use wlan_common::timer::EventId;
 use wlan_common::{ie, tim, TimeUnit};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
@@ -330,7 +330,7 @@ impl InfraBss {
         )
     }
 
-    pub async fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    pub async fn handle_mgmt_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         mgmt_frame: mac::MgmtFrame<B>,
@@ -435,7 +435,7 @@ impl InfraBss {
     /// Handles an incoming data frame.
     ///
     ///
-    pub fn handle_data_frame<B: ByteSlice, D: DeviceOps>(
+    pub fn handle_data_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         data_frame: mac::DataFrame<B>,
@@ -481,7 +481,7 @@ impl InfraBss {
         Ok(())
     }
 
-    pub fn handle_ctrl_frame<B: ByteSlice, D: DeviceOps>(
+    pub fn handle_ctrl_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         ctrl_frame: mac::CtrlFrame<B>,
@@ -629,7 +629,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::big_endian::BigEndianU16;
-    use wlan_common::mac::AsBytesExt as _;
+    use wlan_common::mac::IntoBytesExt as _;
     use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
     use wlan_common::timer::{self, create_timer};
 

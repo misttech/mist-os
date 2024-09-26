@@ -154,6 +154,10 @@ struct InvpcidDescriptor {
   uint64_t address{};
 };
 
+static void invpcid(InvpcidDescriptor desc, uint64_t mode) {
+  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+}
+
 static void invpcid_va_pcid(vaddr_t addr, uint16_t pcid) {
   // Mode 0 of INVPCID takes both the virtual address + pcid and locally shoots
   // down non global pages with it on the current cpu.
@@ -163,7 +167,7 @@ static void invpcid_va_pcid(vaddr_t addr, uint16_t pcid) {
       .address = addr,
   };
 
-  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+  invpcid(desc, mode);
 }
 
 static void invpcid_pcid_all(uint16_t pcid) {
@@ -175,7 +179,7 @@ static void invpcid_pcid_all(uint16_t pcid) {
       .address = 0,
   };
 
-  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+  invpcid(desc, mode);
 }
 
 static void invpcid_all_including_global() {
@@ -187,7 +191,7 @@ static void invpcid_all_including_global() {
       .address = 0,
   };
 
-  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+  invpcid(desc, mode);
 }
 
 static void invpcid_all_excluding_global() {
@@ -199,7 +203,7 @@ static void invpcid_all_excluding_global() {
       .address = 0,
   };
 
-  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+  invpcid(desc, mode);
 }
 
 /**

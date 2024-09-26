@@ -293,8 +293,9 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
         if l.starts_with("Authenticated to ") {
             continue;
         }
-        // Additional debugging messages will begin with "debug1".
-        if l.starts_with("debug1:") {
+        // Additional debugging messages will begin with "debug{1,2,3}" based on the various
+        // verbosity settings.
+        if l.starts_with("debug1:") || l.starts_with("debug2:") || l.starts_with("debug3:") {
             continue;
         }
         // At this point, we just want to look at one line to see if it is the compatibility
@@ -356,6 +357,15 @@ pub async fn write_ssh_log(prefix: &str, line: &String, ctx: &EnvironmentContext
 mod test {
     use super::*;
     use assert_matches::assert_matches;
+
+    #[fuchsia::test]
+    async fn test_parse_ssh_output_doesnt_fail_with_debug2() {
+        let env = ffx_config::test_init().await.expect("test env init");
+        let line = "debug1: we are debugging\ndebug2: more debugging\ndebug1: debug one again\ndebug3: man this sure is verbose";
+        let err = parse_ssh_error(&mut line.as_bytes(), true, &env.context).await;
+        // Can't assert_eq because IoError doesn't impl PartialEq.
+        assert!(matches!(err, PipeError::NoCompatibilityCheck));
+    }
 
     #[fuchsia::test]
     async fn test_parse_ssh_connection_works() {

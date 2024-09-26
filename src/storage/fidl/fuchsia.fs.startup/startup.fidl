@@ -111,6 +111,12 @@ type MountOptions = resource table {
 
     /// If true, mount as a blob filesystem.
     2: as_blob bool;
+
+    /// URI containing implementation specific options.  For example, for FVM backed volumes, if
+    /// specified, this indicates the component URL for the filesystem should be mounted.  If
+    /// unspecified, FVM backed volumes will expose the volume as a block device.  At time of
+    /// writing, this is ignored by Fxfs.
+    3: uri string:1024;
 };
 
 closed protocol Volume {

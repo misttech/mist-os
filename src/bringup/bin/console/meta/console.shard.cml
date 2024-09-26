@@ -20,9 +20,9 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.virtcon.Disable" ],
             from: "parent",
             to: "#console-launcher",
-            config: [ "fuchsia.virtcon.Disable" ],
             availability: "optional",
         },
 
@@ -70,7 +70,7 @@
         {
             protocol: [
                 "fuchsia.dash.Launcher",
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
             ],
             from: "parent",
             to: [ "#console-launcher" ],
@@ -240,7 +240,15 @@
             to: "#console-launcher",
         },
         {
-            service: "fuchsia.hardware.spmi.Service",
+            service: [
+                "fuchsia.hardware.spmi.SubTargetService",
+                "fuchsia.hardware.spmi.TargetService",
+            ],
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
+            service: "fuchsia.gpu.magma.Service",
             from: "#boot-drivers",
             to: "#console-launcher",
         },
@@ -283,6 +291,11 @@
             ],
         },
         {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             protocol: [ "fuchsia.tpm.cr50.Cr50" ],
             from: "#cr50_agent",
             to: "#console-launcher",
@@ -302,6 +315,12 @@
             from: "#system-activity-governor",
             to: "#console-launcher",
             availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "#power-broker",
+            to: "#console-launcher",
             source_availability: "unknown",
         },
     ],

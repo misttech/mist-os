@@ -8,7 +8,7 @@ use crate::error::{FrameParseError, FrameParseResult};
 use crate::organization::Oui;
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use paste::paste;
-use zerocopy::{ByteSlice, Ref};
+use zerocopy::{Ref, SplitByteSlice};
 
 macro_rules! validate {
     ( $condition:expr, $message:expr ) => {
@@ -21,11 +21,11 @@ macro_rules! validate {
 macro_rules! simple_parse_func {
     ( $ie_snake_case:ident ) => {
         paste! {
-            pub fn [<parse_ $ie_snake_case>]<B: ByteSlice>(
+            pub fn [<parse_ $ie_snake_case>]<B: SplitByteSlice>(
                 raw_body: B,
             ) -> FrameParseResult<Ref<B, [<$ie_snake_case:camel>]>> {
-                Ref::new(raw_body)
-                    .ok_or(FrameParseError(
+                Ref::from_bytes(raw_body)
+                    .map_err(|_| FrameParseError(
                         format!(concat!(
                             "Invalid length or alignment for ",
                             stringify!([<$ie_snake_case:camel>])))))
@@ -48,12 +48,12 @@ simple_parse_func!(extended_channel_switch_announcement);
 simple_parse_func!(sec_chan_offset);
 simple_parse_func!(wide_bandwidth_channel_switch);
 
-pub fn parse_ssid<B: ByteSlice>(raw_body: B) -> FrameParseResult<B> {
+pub fn parse_ssid<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<B> {
     validate!(raw_body.len() <= (fidl_ieee80211::MAX_SSID_BYTE_LEN as usize), "SSID is too long");
     Ok(raw_body)
 }
 
-pub fn parse_supported_rates<B: ByteSlice>(
+pub fn parse_supported_rates<B: SplitByteSlice>(
     raw_body: B,
 ) -> FrameParseResult<Ref<B, [SupportedRate]>> {
     // IEEE Std 802.11-2016, 9.2.4.3 specifies that the Supported Rates IE may contain at most
@@ -62,10 +62,10 @@ pub fn parse_supported_rates<B: ByteSlice>(
     // the number of rates to improve interoperability.
     validate!(!raw_body.is_empty(), "Empty Supported Rates IE");
     // unwrap() is OK because sizeof(SupportedRate) is 1, and any slice length is a multiple of 1
-    Ok(Ref::new_slice_unaligned(raw_body).unwrap())
+    Ok(Ref::from_bytes(raw_body).unwrap())
 }
 
-pub fn parse_extended_supported_rates<B: ByteSlice>(
+pub fn parse_extended_supported_rates<B: SplitByteSlice>(
     raw_body: B,
 ) -> FrameParseResult<Ref<B, [SupportedRate]>> {
     validate!(!raw_body.is_empty(), "Empty Extended Supported Rates IE");
@@ -73,18 +73,21 @@ pub fn parse_extended_supported_rates<B: ByteSlice>(
     // maximum number of bytes in an IE. Therefore, there is no need to check the max length
     // of the extended supported rates IE body.
     // unwrap() is OK because sizeof(SupportedRate) is 1, and any slice length is a multiple of 1
-    Ok(Ref::new_slice_unaligned(raw_body).unwrap())
+    Ok(Ref::from_bytes(raw_body).unwrap())
 }
 
-pub fn parse_tim<B: ByteSlice>(raw_body: B) -> FrameParseResult<TimView<B>> {
-    let (header, bitmap) = Ref::<B, TimHeader>::new_unaligned_from_prefix(raw_body)
-        .ok_or(FrameParseError(format!("Element body is too short to include a TIM header")))?;
+pub fn parse_tim<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<TimView<B>> {
+    let (header, bitmap) = Ref::<B, TimHeader>::from_prefix(raw_body).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| {
+            FrameParseError(format!("Element body is too short to include a TIM header"))
+        },
+    )?;
     validate!(!bitmap.is_empty(), "Bitmap in TIM is empty");
     validate!(bitmap.len() <= TIM_MAX_BITMAP_LEN, "Bitmap in TIM is too long");
     Ok(TimView { header: *header, bitmap })
 }
 
-pub fn parse_country<B: ByteSlice>(raw_body: B) -> FrameParseResult<CountryView<B>> {
+pub fn parse_country<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<CountryView<B>> {
     let mut reader = BufferReader::new(raw_body);
     let country_code = reader
         .read::<[u8; 2]>()
@@ -99,7 +102,7 @@ pub fn parse_country<B: ByteSlice>(raw_body: B) -> FrameParseResult<CountryView<
     })
 }
 
-pub fn parse_ext_capabilities<B: ByteSlice>(raw_body: B) -> ExtCapabilitiesView<B> {
+pub fn parse_ext_capabilities<B: SplitByteSlice>(raw_body: B) -> ExtCapabilitiesView<B> {
     let mut reader = BufferReader::new(raw_body);
     let ext_caps_octet_1 = reader.read();
     let ext_caps_octet_2 = reader.read();
@@ -112,13 +115,13 @@ pub fn parse_ext_capabilities<B: ByteSlice>(raw_body: B) -> ExtCapabilitiesView<
     }
 }
 
-pub fn parse_wpa_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<wpa::WpaIe> {
+pub fn parse_wpa_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<wpa::WpaIe> {
     wpa::from_bytes(&raw_body[..])
         .map(|(_, r)| r)
         .map_err(|_| FrameParseError(format!("Failed to parse WPA IE")))
 }
 
-pub fn parse_transmit_power_envelope<B: ByteSlice>(
+pub fn parse_transmit_power_envelope<B: SplitByteSlice>(
     raw_body: B,
 ) -> FrameParseResult<TransmitPowerEnvelopeView<B>> {
     let mut reader = BufferReader::new(raw_body);
@@ -154,7 +157,7 @@ pub fn parse_transmit_power_envelope<B: ByteSlice>(
     })
 }
 
-pub fn parse_channel_switch_wrapper<B: ByteSlice>(
+pub fn parse_channel_switch_wrapper<B: SplitByteSlice>(
     raw_body: B,
 ) -> FrameParseResult<ChannelSwitchWrapperView<B>> {
     let mut result = ChannelSwitchWrapperView {
@@ -186,7 +189,7 @@ pub fn parse_channel_switch_wrapper<B: ByteSlice>(
     FrameParseResult::Ok(result)
 }
 
-pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B>> {
+pub fn parse_vendor_ie<B: SplitByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B>> {
     let mut reader = BufferReader::new(raw_body);
     let oui = *reader.read::<Oui>().ok_or(FrameParseError(format!("Failed to read vendor OUI")))?;
     let vendor_ie = match oui {
@@ -196,11 +199,11 @@ pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B
                 Some(wpa::VENDOR_SPECIFIC_TYPE) => {
                     // We already know from our peek_byte that at least one byte remains, so this
                     // split will not panic.
-                    let (_type, body) = reader.into_remaining().split_at(1);
+                    let (_type, body) = reader.into_remaining().split_at(1).ok().unwrap();
                     VendorIe::MsftLegacyWpa(body)
                 }
                 Some(wsc::VENDOR_SPECIFIC_TYPE) => {
-                    let (_type, body) = reader.into_remaining().split_at(1);
+                    let (_type, body) = reader.into_remaining().split_at(1).ok().unwrap();
                     VendorIe::Wsc(body)
                 }
                 // The first three bytes after OUI are OUI type, OUI subtype, and version.
@@ -215,8 +218,10 @@ pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B
                     match subtype {
                         // Safe to split because we already checked that there are at least 3
                         // bytes remaining.
-                        WMM_INFO_OUI_SUBTYPE => VendorIe::WmmInfo(body.split_at(3).1),
-                        WMM_PARAM_OUI_SUBTYPE => VendorIe::WmmParam(body.split_at(3).1),
+                        WMM_INFO_OUI_SUBTYPE => VendorIe::WmmInfo(body.split_at(3).ok().unwrap().1),
+                        WMM_PARAM_OUI_SUBTYPE => {
+                            VendorIe::WmmParam(body.split_at(3).ok().unwrap().1)
+                        }
                         _ => VendorIe::Unknown { oui, body },
                     }
                 }
@@ -232,10 +237,10 @@ pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B
 mod tests {
     use super::*;
     use crate::assert_variant;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     #[repr(C)]
-    #[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+    #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
     pub struct SomeIe {
         some_field: u16,
     }

@@ -60,8 +60,8 @@ ${FASTBOOT} reboot
 # Wait until device has completed bootup.
 sleep 60
 
-# Install user's public SSH key.
+# Install user's public SSH key (the first one in $AUTHKEYS_PATH).
 AUTHKEYS_PATH="$(get-ssh-authkeys)"
 readonly AUTHKEYS_PATH
-echo "echo \"$(cat "${AUTHKEYS_PATH}")\" > /data/ssh/authorized_keys" > "${SERIAL_PATH}"
+echo "echo \"$(head -n 1 "${AUTHKEYS_PATH}")\" > /data/ssh/authorized_keys" > "${SERIAL_PATH}"
 echo "Done flashing Kola device."

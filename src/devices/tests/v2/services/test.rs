@@ -7,8 +7,7 @@ use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::client;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use fuchsia_zircon::DurationNum;
-use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft};
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft, fuchsia_zircon as zx};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_services() -> Result<()> {
@@ -45,7 +44,7 @@ async fn test_services() -> Result<()> {
             instance = entry.name.clone();
             break;
         }
-        Timer::new(100.millis().after_now()).await;
+        Timer::new(zx::Duration::from_millis(100).after_now()).await;
     }
 
     // Connect to the `Device` service.

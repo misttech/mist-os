@@ -189,6 +189,14 @@ type Dictionary = table {
     ///
     /// This must be set iff `source` is set.
     3: source_dictionary dictionary_path;
+
+    /// (Optional) Path in the component's outgoing directory to a
+    /// [fuchsia.component.sandbox/Router] that returns a [fuchsia.component.sandbox/DirectoryRef]
+    /// for this dictionary.
+    ///
+    /// If this is set, it means the dictionary is provided by the program directly, not component
+    /// manager. `source` and `source_dictionary` must be `null` if this is set.
+    4: source_path string:MAX_PATH_LENGTH;
 };
 
 /// Declares a configuration capability.

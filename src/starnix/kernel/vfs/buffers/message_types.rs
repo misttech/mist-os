@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::mm::VmsplicePayload;
 use crate::task::CurrentTask;
@@ -107,7 +107,7 @@ pub enum AncillaryData {
 
 // Reads int `cmsg` value and tries to convert it to u8.
 fn read_u8_value_from_int_cmsg(data: &[u8]) -> Option<u8> {
-    u8::try_from(c_int::read_from_prefix(data)?).ok()
+    u8::try_from(c_int::read_from_prefix(data).ok()?.0).ok()
 }
 
 impl AncillaryData {
@@ -122,7 +122,7 @@ impl AncillaryData {
                 Ok(AncillaryData::Unix(UnixControlData::new(current_task, message)?))
             }
             (SOL_IP, IP_TOS) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTos(
-                u8::read_from_prefix(&message.data[..]).ok_or_else(|| errno!(EINVAL))?,
+                u8::read_from_prefix(&message.data[..]).map_err(|_| errno!(EINVAL))?.0,
             ))),
             (SOL_IP, IP_TTL) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTtl(
                 read_u8_value_from_int_cmsg(&message.data).ok_or_else(|| errno!(EINVAL))?,
@@ -130,7 +130,8 @@ impl AncillaryData {
             (SOL_IP, IP_RECVORIGDSTADDR) => {
                 Ok(AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(
                     <[u8; size_of::<sockaddr_in>()]>::read_from_prefix(&message.data[..])
-                        .ok_or_else(|| errno!(EINVAL))?,
+                        .map_err(|_| errno!(EINVAL))?
+                        .0,
                 )))
             }
             (SOL_IPV6, IPV6_TCLASS) => Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(
@@ -142,8 +143,8 @@ impl AncillaryData {
                 )))
             }
             (SOL_IPV6, IPV6_PKTINFO) => {
-                let pktinfo = in6_pktinfo::read_from_prefix(&message.data[..])
-                    .ok_or_else(|| errno!(EINVAL))?;
+                let (pktinfo, _) =
+                    in6_pktinfo::read_from_prefix(&message.data[..]).map_err(|_| errno!(EINVAL))?;
                 Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo {
                     local_addr: pktinfo
                         .ipi6_addr
@@ -321,8 +322,9 @@ impl UnixControlData {
                     return error!(EINVAL);
                 }
 
-                let credentials = ucred::read_from(&message.data[..std::mem::size_of::<ucred>()])
-                    .ok_or_else(|| errno!(EINVAL))?;
+                let credentials =
+                    ucred::read_from_bytes(&message.data[..std::mem::size_of::<ucred>()])
+                        .map_err(|_| errno!(EINVAL))?;
                 Ok(UnixControlData::Credentials(credentials))
             }
             SCM_SECURITY => Ok(UnixControlData::Security(message.data.into())),

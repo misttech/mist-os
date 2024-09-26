@@ -16,7 +16,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 /// A trait to receive the log from the verifier.
 pub trait VerifierLogger {
@@ -922,7 +922,7 @@ impl Stack {
 
     fn insert_sub_value(mut original: u64, value: u64, width: DataWidth, offset: usize) -> u64 {
         let byte_count = width.bytes();
-        let original_buf = original.as_bytes_mut();
+        let original_buf = original.as_mut_bytes();
         let value_buf = value.as_bytes();
         for i in 0..byte_count {
             original_buf[i + offset] = value_buf[i];

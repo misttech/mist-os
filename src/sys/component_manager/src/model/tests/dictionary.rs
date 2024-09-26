@@ -1380,19 +1380,15 @@ async fn extend_from_child() {
 }
 
 #[fuchsia::test]
-async fn extend_from_program() {
-    // Tests extending a dictionary, when the source dictionary is provided by the program.
+async fn dictionary_from_program() {
+    // Tests a dictionary that is backed by the program.
 
-    const ROUTER_PATH: &str = "svc/fuchsia.component.sandbox.Router";
+    const ROUTER_PATH: &str = "/svc/fuchsia.component.sandbox.Router";
     let components = vec![
         (
             "root",
             ComponentDeclBuilder::new()
-                .capability(
-                    CapabilityBuilder::dictionary()
-                        .name("dict")
-                        .source_dictionary(DictionarySource::Program, ROUTER_PATH),
-                )
+                .capability(CapabilityBuilder::dictionary().name("dict").path(ROUTER_PATH))
                 .offer(
                     OfferBuilder::dictionary()
                         .name("dict")
@@ -1452,7 +1448,7 @@ async fn extend_from_program() {
     let mut root_out_dir = OutDir::new();
     let dict_store2 = store.clone();
     root_out_dir.add_entry(
-        format!("/{ROUTER_PATH}").parse().unwrap(),
+        ROUTER_PATH.parse().unwrap(),
         vfs::service::endpoint(move |scope, channel| {
             let server_end: ServerEnd<fsandbox::RouterMarker> = channel.into_zx_channel().into();
             let mut stream = server_end.into_stream().unwrap();
@@ -1601,7 +1597,7 @@ async fn use_from_dictionary_availability_invalid() {
                         .name("foo")
                         .target_name("A")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .target(OfferTarget::Capability("required_dict".parse().unwrap()))
                         .availability(Availability::Optional),
                 )
                 .offer(
@@ -1784,7 +1780,7 @@ async fn offer_from_dictionary_availability_invalid() {
                         .name("foo")
                         .target_name("A")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .target(OfferTarget::Capability("required_dict".parse().unwrap()))
                         .availability(Availability::Optional),
                 )
                 .offer(

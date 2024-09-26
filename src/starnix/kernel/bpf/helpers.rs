@@ -30,7 +30,7 @@ use starnix_logging::track_stub;
 use starnix_sync::{BpfHelperOps, Locked};
 use std::collections::HashSet;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 fn read_skbuf_data(
     _context: &mut HelperFunctionContext<'_>,
@@ -843,7 +843,7 @@ impl ArgBuilder {
     fn add_mapping(&mut self, mapping: FieldMapping) {
         self.mappings.push(mapping);
     }
-    fn build<T: AsBytes>(self) -> Vec<Type> {
+    fn build<T: IntoBytes>(self) -> Vec<Type> {
         let buffer_size = std::mem::size_of::<T>() as u64;
         vec![
             Type::PtrToMemory {
@@ -858,18 +858,18 @@ impl ArgBuilder {
     }
 }
 
-fn build_bpf_args<T: AsBytes>() -> Vec<Type> {
+fn build_bpf_args<T: IntoBytes>() -> Vec<Type> {
     ArgBuilder::default().build::<T>()
 }
 
-fn build_bpf_args_with_id<T: AsBytes>(id: MemoryId) -> Vec<Type> {
+fn build_bpf_args_with_id<T: IntoBytes>(id: MemoryId) -> Vec<Type> {
     let mut builder = ArgBuilder::default();
     builder.set_id(id);
     builder.build::<T>()
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct SkBuf {
     pub len: u32,
     pub pkt_type: u32,
@@ -941,7 +941,7 @@ static SK_BUF_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
 });
 
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct XdpMd {
     pub data: uref<u8>,
     pub data_meta: u32,
@@ -987,7 +987,7 @@ static BPF_SOCKOPT_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_soc
 static BPF_SOCK_ADDR_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock_addr>());
 
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct TraceEntry {
     r#type: u16,
     flags: u8,
@@ -996,7 +996,7 @@ struct TraceEntry {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct TraceEvent {
     trace_entry: TraceEntry,
     id: u64,

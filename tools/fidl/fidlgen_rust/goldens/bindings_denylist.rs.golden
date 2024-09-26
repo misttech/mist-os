@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -368,6 +364,16 @@ impl fidl::endpoints::ControlHandle for AllowedControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl AllowedControlHandle {}
@@ -445,7 +451,10 @@ impl DenyEachBindingSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<DenyEachBindingEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<DenyEachBindingEvent, fidl::Error> {
         DenyEachBindingEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -840,13 +849,11 @@ impl futures::Stream for DenyEachBindingRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x290bad96051b1b92 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyCppRequest);
-                    fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyCppRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        DenyEachBindingOnlyDenyCppRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyCppRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
                     Ok(DenyEachBindingRequest::OnlyDenyCpp {
                         a: req.a,
@@ -859,13 +866,11 @@ impl futures::Stream for DenyEachBindingRequestStream {
                 }
                 0x75384066a26d87d7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyDartRequest);
-                    fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyDartRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        DenyEachBindingOnlyDenyDartRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyDartRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
                     Ok(DenyEachBindingRequest::OnlyDenyDart {
                         a: req.a,
@@ -878,13 +883,11 @@ impl futures::Stream for DenyEachBindingRequestStream {
                 }
                 0x657655b981478d99 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyGoRequest);
-                    fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyGoRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        DenyEachBindingOnlyDenyGoRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyGoRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
                     Ok(DenyEachBindingRequest::OnlyDenyGo {
                         a: req.a,
@@ -897,13 +900,11 @@ impl futures::Stream for DenyEachBindingRequestStream {
                 }
                 0x1e4f89c329617b1e => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(DenyEachBindingOnlyDenyLibfuzzerRequest);
-                    fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenyLibfuzzerRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        DenyEachBindingOnlyDenyLibfuzzerRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyLibfuzzerRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
                     Ok(DenyEachBindingRequest::OnlyDenyLibfuzzer {
                         a: req.a,
@@ -916,13 +917,11 @@ impl futures::Stream for DenyEachBindingRequestStream {
                 }
                 0x202ee614a749e98a => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(DenyEachBindingOnlyDenySyzkallerRequest);
-                    fidl::encoding::Decoder::decode_into::<DenyEachBindingOnlyDenySyzkallerRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        DenyEachBindingOnlyDenySyzkallerRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenySyzkallerRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
                     Ok(DenyEachBindingRequest::OnlyDenySyzkaller {
                         a: req.a,
@@ -1034,6 +1033,16 @@ impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -1629,8 +1638,8 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x698380acfd29e8f => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ImportsSameNameContextControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1640,8 +1649,8 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                 }
                 0x2874096c521236f8 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ImportsSameNameContextControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1719,12 +1728,29 @@ impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl ImportsSameNameContextControlHandle {}
 
 mod internal {
     use super::*;
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyCppRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
 
     unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyCppRequest {
         type Owned = Self;
@@ -1739,28 +1765,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyCppRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyCppRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppRequest, D>
         for &DenyEachBindingOnlyDenyCppRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<DenyEachBindingOnlyDenyCppRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<DenyEachBindingOnlyDenyCppRequest>::encode(
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyCppRequest, D>::encode(
                 (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
                 encoder,
                 offset,
@@ -1768,13 +1787,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1787,23 +1806,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyCppRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyCppRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool) }
+            Self { a: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(bool, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyDartRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1820,28 +1848,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyDartRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyDartRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartRequest, D>
         for &DenyEachBindingOnlyDenyDartRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<DenyEachBindingOnlyDenyDartRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<DenyEachBindingOnlyDenyDartRequest>::encode(
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyDartRequest, D>::encode(
                 (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
                 encoder,
                 offset,
@@ -1849,13 +1870,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1868,23 +1889,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyDartRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyDartRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool) }
+            Self { a: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(bool, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyGoRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1901,28 +1931,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyGoRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyGoRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoRequest, D>
         for &DenyEachBindingOnlyDenyGoRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<DenyEachBindingOnlyDenyGoRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<DenyEachBindingOnlyDenyGoRequest>::encode(
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyGoRequest, D>::encode(
                 (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
                 encoder,
                 offset,
@@ -1930,13 +1953,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1949,23 +1972,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyGoRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyGoRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool) }
+            Self { a: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(bool, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyLibfuzzerRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -1982,28 +2014,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyLibfuzzerRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerRequest, D>
         for &DenyEachBindingOnlyDenyLibfuzzerRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<DenyEachBindingOnlyDenyLibfuzzerRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<DenyEachBindingOnlyDenyLibfuzzerRequest>::encode(
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenyLibfuzzerRequest, D>::encode(
                 (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
                 encoder,
                 offset,
@@ -2011,13 +2036,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2030,23 +2055,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyLibfuzzerRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyLibfuzzerRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool) }
+            Self { a: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(bool, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenySyzkallerRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2063,28 +2097,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenySyzkallerRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerRequest, D>
         for &DenyEachBindingOnlyDenySyzkallerRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<DenyEachBindingOnlyDenySyzkallerRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<DenyEachBindingOnlyDenySyzkallerRequest>::encode(
+            fidl::encoding::Encode::<DenyEachBindingOnlyDenySyzkallerRequest, D>::encode(
                 (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
                 encoder,
                 offset,
@@ -2092,13 +2119,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2111,23 +2138,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenySyzkallerRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenySyzkallerRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool) }
+            Self { a: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(bool, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyCppResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2153,22 +2189,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyCppResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyCppResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppResponse, D>
         for &DenyEachBindingOnlyDenyCppResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2184,13 +2213,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyCppResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2203,16 +2232,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyCppResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyCppResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { b: fidl::new_empty!(i32) }
+            Self { b: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2224,6 +2255,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyDartResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2249,22 +2287,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyDartResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyDartResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartResponse, D>
         for &DenyEachBindingOnlyDenyDartResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2280,13 +2311,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyDartResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2299,16 +2330,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyDartResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyDartResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { b: fidl::new_empty!(i32) }
+            Self { b: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2320,6 +2353,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyGoResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2345,22 +2385,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyGoResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyGoResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoResponse, D>
         for &DenyEachBindingOnlyDenyGoResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2376,13 +2409,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyGoResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2395,16 +2428,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyGoResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyGoResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { b: fidl::new_empty!(i32) }
+            Self { b: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2416,6 +2451,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyLibfuzzerResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2441,22 +2483,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyLibfuzzerResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerResponse, D>
         for &DenyEachBindingOnlyDenyLibfuzzerResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2473,13 +2508,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenyLibfuzzerResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2492,16 +2527,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenyLibfuzzerResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenyLibfuzzerResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { b: fidl::new_empty!(i32) }
+            Self { b: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2513,6 +2550,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenySyzkallerResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2538,22 +2582,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenySyzkallerResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerResponse, D>
         for &DenyEachBindingOnlyDenySyzkallerResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2570,13 +2607,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<DenyEachBindingOnlyDenySyzkallerResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2589,16 +2626,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for DenyEachBindingOnlyDenySyzkallerResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for DenyEachBindingOnlyDenySyzkallerResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { b: fidl::new_empty!(i32) }
+            Self { b: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2610,6 +2649,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for MemberOnlyAppearsInImportingLibrary {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2626,28 +2672,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for MemberOnlyAppearsInImportingLibrary {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary, D>
         for &MemberOnlyAppearsInImportingLibrary
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<MemberOnlyAppearsInImportingLibrary>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<MemberOnlyAppearsInImportingLibrary>::encode(
+            fidl::encoding::Encode::<MemberOnlyAppearsInImportingLibrary, D>::encode(
                 (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
                 encoder,
                 offset,
@@ -2655,13 +2694,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
+        fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2674,23 +2713,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for MemberOnlyAppearsInImportingLibrary {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for MemberOnlyAppearsInImportingLibrary
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool) }
+            Self { a: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(bool, &mut self.a, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for OnlyAppearsInImportingLibrary {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -2707,28 +2755,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for OnlyAppearsInImportingLibrary {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<OnlyAppearsInImportingLibrary>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<OnlyAppearsInImportingLibrary, D>
         for &OnlyAppearsInImportingLibrary
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<OnlyAppearsInImportingLibrary>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<OnlyAppearsInImportingLibrary>::encode(
+            fidl::encoding::Encode::<OnlyAppearsInImportingLibrary, D>::encode(
                 (<MemberOnlyAppearsInImportingLibrary as fidl::encoding::ValueTypeMarker>::borrow(
                     &self.member_only_appears_in_importing_library,
                 ),),
@@ -2738,13 +2779,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary>>
-        fidl::encoding::Encode<OnlyAppearsInImportingLibrary> for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<MemberOnlyAppearsInImportingLibrary, D>,
+        > fidl::encoding::Encode<OnlyAppearsInImportingLibrary, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2757,12 +2800,15 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for OnlyAppearsInImportingLibrary {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for OnlyAppearsInImportingLibrary
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
                 member_only_appears_in_importing_library: fidl::new_empty!(
-                    MemberOnlyAppearsInImportingLibrary
+                    MemberOnlyAppearsInImportingLibrary,
+                    D
                 ),
             }
         }
@@ -2770,7 +2816,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2778,6 +2824,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 MemberOnlyAppearsInImportingLibrary,
+                D,
                 &mut self.member_only_appears_in_importing_library,
                 decoder,
                 offset + 0,
@@ -2794,6 +2841,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for OnlyRust {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for OnlyRust {
         type Owned = Self;
 
@@ -2807,19 +2861,11 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for OnlyRust {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<OnlyRust> for &OnlyRust {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<OnlyRust, D> for &OnlyRust {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -2843,7 +2889,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for OnlyRust {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for OnlyRust {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -2851,7 +2897,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

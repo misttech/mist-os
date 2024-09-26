@@ -391,7 +391,7 @@ mod tests {
     use diagnostics_assertions::{
         assert_data_tree, AnyBoolProperty, AnyBytesProperty, AnyNumericProperty, AnyStringProperty,
     };
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::task::Poll;
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
@@ -550,7 +550,7 @@ mod tests {
         let bss_description = fake_bss_description!(Open);
         let channel = bss_description.channel;
         let disconnect_info = DisconnectInfo {
-            connected_duration: 30.seconds(),
+            connected_duration: zx::Duration::from_seconds(30),
             is_sme_reconnecting: false,
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -605,7 +605,7 @@ mod tests {
                 disconnect_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        connected_duration: 30.seconds().into_nanos(),
+                        connected_duration: zx::Duration::from_seconds(30).into_nanos(),
                         disconnect_source_id: 0u64,
                         network_id: 0u64,
                         rssi_dbm: -30i64,

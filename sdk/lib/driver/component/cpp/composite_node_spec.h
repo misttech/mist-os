@@ -11,45 +11,6 @@
 
 namespace fdf {
 
-// Deprecated int keys with int values
-inline fuchsia_driver_framework::BindRule MakeBindRule(
-    const uint32_t key, const fuchsia_driver_framework::Condition condition,
-    cpp20::span<const uint32_t> values) {
-  std::vector<fuchsia_driver_framework::NodePropertyValue> values_vec;
-  values_vec.reserve(values.size());
-  for (auto val : values) {
-    values_vec.push_back(fuchsia_driver_framework::NodePropertyValue::WithIntValue(val));
-  }
-
-  return fuchsia_driver_framework::BindRule(
-      fuchsia_driver_framework::NodePropertyKey::WithIntValue(key), condition, values_vec);
-}
-
-inline fuchsia_driver_framework::BindRule MakeBindRule(
-    const uint32_t key, const fuchsia_driver_framework::Condition condition, const uint32_t value) {
-  return MakeBindRule(key, condition, {{value}});
-}
-
-inline fuchsia_driver_framework::BindRule MakeAcceptBindRule(const uint32_t key,
-                                                             const uint32_t value) {
-  return MakeBindRule(key, fuchsia_driver_framework::Condition::kAccept, value);
-}
-
-inline fuchsia_driver_framework::BindRule MakeAcceptBindRule(const uint32_t key,
-                                                             cpp20::span<const uint32_t> values) {
-  return MakeBindRule(key, fuchsia_driver_framework::Condition::kAccept, values);
-}
-
-inline fuchsia_driver_framework::BindRule MakeRejectBindRule(const uint32_t key,
-                                                             const uint32_t value) {
-  return MakeBindRule(key, fuchsia_driver_framework::Condition::kReject, value);
-}
-
-inline fuchsia_driver_framework::BindRule MakeRejectBindRule(const uint32_t key,
-                                                             cpp20::span<const uint32_t> values) {
-  return MakeBindRule(key, fuchsia_driver_framework::Condition::kReject, values);
-}
-
 // String keys with string values
 inline fuchsia_driver_framework::BindRule MakeBindRule(
     const std::string_view key, const fuchsia_driver_framework::Condition condition,

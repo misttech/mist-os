@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/test.gni")
 
 driver_bind_rules("coordinator_bind") {
   rules = "meta/coordinator.bind"
@@ -38,7 +40,7 @@ fuchsia_driver_package("package") {
   driver_components = [ ":coordinator" ]
 }
 
-# Also used by test/.
+# Also used by testing/.
 source_set("shared") {
   visibility = [
     "../fake:fake-display-stack",
@@ -68,7 +70,7 @@ source_set("shared") {
     "layer.h",
     "migration-util.cc",
     "migration-util.h",
-    "post-task.h",
+    "util/post-task.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
   ]
@@ -113,10 +115,85 @@ source_set("preferred-scanout-image-type") {
   sources = [ "preferred-scanout-image-type.h" ]
 }
 
+test("display-coordinator-unittests") {
+  configs += [ "//build/config:all_source" ]
+  sources = [
+    "display-info-test.cc",
+    "display-test.cc",
+    "fence-test.cc",
+    "image-test.cc",
+    "inspect-test.cc",
+    "integration-test.cc",
+    "layer-test.cc",
+    "util/post-task-test.cc",
+  ]
+  deps = [
+    ":testing",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_testing",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp_testing",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/async-testing",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
+    "//src/graphics/display/lib/edid-values",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+static_library("testing") {
+  configs += [ "//build/config:all_source" ]
+  testonly = true
+  sources = [
+    "testing/base.cc",
+    "testing/base.h",
+    "testing/fidl_client.cc",
+    "testing/fidl_client.h",
+    "testing/mock-coordinator-listener.cc",
+    "testing/mock-coordinator-listener.h",
+  ]
+  deps = [
+    "//src/devices/testing/mock-ddk",
+    "//src/lib/fsl",
+  ]
+  public_deps = [
+    ":shared",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/async-testing",
+    "//src/graphics/display/drivers/fake:fake-display-stack",
+    "//src/graphics/display/drivers/fake:fake-sysmem-device-hierarchy",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//src/sysmem/server:sysmem_common_srcs",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+fuchsia_unittest_package("display-coordinator-unittests-package") {
+  package_name = "display-coordinator-unittests"
+  deps = [ ":display-coordinator-unittests" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
 group("tests") {
   testonly = true
   deps = [
     ":coordinator_bind_test",
-    "tests",
+    ":display-coordinator-unittests-package",
   ]
 }

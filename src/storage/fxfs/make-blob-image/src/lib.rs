@@ -262,7 +262,6 @@ async fn install_blob(
         .create_child_file_with_options(
             &mut transaction,
             merkle.as_str(),
-            None,
             // Checksums are redundant for blobs, which are already content-verified.
             HandleOptions { skip_checksums: true, ..Default::default() },
         )

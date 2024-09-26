@@ -46,7 +46,7 @@ use std::mem::{size_of, size_of_val};
 use std::path::{Component, Path};
 use std::str;
 use zerocopy::byteorder::little_endian::U32 as LEU32;
-use zerocopy::{AsBytes, ByteSlice};
+use zerocopy::{IntoBytes, SplitByteSlice};
 
 // Assuming/ensuring that we are on a 64bit system where u64 == usize.
 assert_eq_size!(u64, usize);
@@ -277,7 +277,7 @@ impl Parser {
     }
 
     /// Handles an extent tree leaf node by invoking `extent_handler` for each contained extent.
-    fn iterate_extents_in_leaf<B: ByteSlice, F: FnMut(&Extent) -> Result<(), ParsingError>>(
+    fn iterate_extents_in_leaf<B: SplitByteSlice, F: FnMut(&Extent) -> Result<(), ParsingError>>(
         &self,
         extent_tree_node: &ExtentTreeNode<B>,
         extent_handler: &mut F,
@@ -297,7 +297,7 @@ impl Parser {
     }
 
     /// Handles traversal down an extent tree.
-    fn iterate_extents_in_tree<B: ByteSlice, F: FnMut(&Extent) -> Result<(), ParsingError>>(
+    fn iterate_extents_in_tree<B: SplitByteSlice, F: FnMut(&Extent) -> Result<(), ParsingError>>(
         &self,
         extent_tree_node: &ExtentTreeNode<B>,
         extent_handler: &mut F,
@@ -516,7 +516,7 @@ impl Parser {
             + u64::from(inode.e4di_extra_isize(sb).unwrap_or_default());
 
         let mut magic = LEU32::ZERO;
-        self.reader.read(xattr_magic_addr, magic.as_bytes_mut()).expect("Failed to read xattr");
+        self.reader.read(xattr_magic_addr, magic.as_mut_bytes()).expect("Failed to read xattr");
         if magic.get() == Self::XATTR_MAGIC {
             let first_entry = xattr_magic_addr + size_of_val(&magic) as u64;
             self.read_xattr_entries_from_inode(

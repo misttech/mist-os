@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::device::kobject::DeviceMetadata;
-use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::device::DeviceOps;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode,
 };
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
-use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
+use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -21,12 +20,10 @@ use std::sync::Arc;
 use zerocopy::IntoBytes;
 
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct TouchPowerPolicyDevice {
     touch_power_file: Arc<TouchPowerPolicyFile>,
 }
 
-#[allow(dead_code)]
 impl TouchPowerPolicyDevice {
     pub fn new(touch_standby_sender: Sender<bool>) -> Arc<Self> {
         Arc::new(TouchPowerPolicyDevice {
@@ -40,21 +37,16 @@ impl TouchPowerPolicyDevice {
     {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
-        let misc_class =
-            registry.objects.get_or_create_class("misc".into(), registry.objects.virtual_bus());
-        registry.add_and_register_device(
-            locked,
-            system_task,
-            FsString::from("touch_standby").as_ref(),
-            DeviceMetadata::new(
-                FsString::from("touch_standby"),
-                DeviceType::new(MISC_MAJOR, 0),
-                DeviceMode::Char,
-            ),
-            misc_class,
-            DeviceDirectory::new,
-            self,
-        );
+        registry
+            .register_dyn_device(
+                locked,
+                system_task,
+                "touch_standby".into(),
+                registry.objects.starnix_class(),
+                DeviceDirectory::new,
+                self,
+            )
+            .expect("can register touch_standby device");
     }
 
     pub fn start_relay(self: &Arc<Self>, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
@@ -82,7 +74,7 @@ impl DeviceOps for TouchPowerPolicyDevice {
         &self,
         _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
-        _id: DeviceType,
+        _device_type: DeviceType,
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
@@ -91,7 +83,6 @@ impl DeviceOps for TouchPowerPolicyDevice {
     }
 }
 
-#[allow(dead_code)]
 pub struct TouchPowerPolicyFile {
     // When false, Input Pipeline suspends processing of all touch events.
     touch_enabled: Mutex<bool>,
@@ -99,7 +90,6 @@ pub struct TouchPowerPolicyFile {
     touch_standby_sender: Sender<bool>,
 }
 
-#[allow(dead_code)]
 impl TouchPowerPolicyFile {
     pub fn new(touch_standby_sender: Sender<bool>) -> Arc<Self> {
         Arc::new(TouchPowerPolicyFile { touch_enabled: Mutex::new(true), touch_standby_sender })

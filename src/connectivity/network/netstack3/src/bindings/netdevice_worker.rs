@@ -729,6 +729,11 @@ impl PortHandler {
         let Self { port_id, inner: Inner { device, .. }, .. } = self;
         device.connect_port_server_end(*port_id, port)
     }
+
+    pub(crate) async fn wait_tx_done(&self) {
+        let Self { inner: Inner { session, .. }, .. } = self;
+        session.wait_tx_idle().await;
+    }
 }
 
 impl std::fmt::Debug for PortHandler {

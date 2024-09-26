@@ -301,10 +301,13 @@ pub(crate) enum OrderedLocality {
 pub(crate) struct OrderedEntry<'a, A: IpAddress, D> {
     // Order longer prefixes before shorter prefixes.
     prefix_len: core::cmp::Reverse<u8>,
+    // Order `OnLink` routes before `OffLink` routes.
+    //
+    // Adhere to industry norms by considering the route locality before the
+    // route metric.
+    locality: OrderedLocality,
     // Order lower metrics before larger metrics.
     metric: u32,
-    // Order `OnLink` routes before `OffLink` routes.
-    locality: OrderedLocality,
     // Earlier-added routes should come before later ones.
     generation: Generation,
     // To provide a consistent ordering, tiebreak using the remaining fields

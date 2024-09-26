@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum;
+use fuchsia_zircon as zx;
 use ieee80211::MacAddrBytes;
 use wlan_hw_sim::{
     default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper, test_utils,
@@ -33,7 +33,8 @@ async fn verify_ethernet() {
         test_utils::TestHelper::begin_test_with_context(ctx, default_wlantap_config_client()).await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    let mut retry = test_utils::RetryWithBackoff::infinite_with_max_interval(5.seconds());
+    let mut retry =
+        test_utils::RetryWithBackoff::infinite_with_max_interval(zx::Duration::from_seconds(5));
     loop {
         let client = netdevice_helper::create_client(
             helper.devfs(),

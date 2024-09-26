@@ -48,7 +48,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth::DeviceClass;
     use fidl_fuchsia_bluetooth_sys::{AccessMarker, AccessRequest, AccessRequestStream};
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
 
     // This is a mock handler that does the following for the purposes of the unit tests below:
     // - Return success if Access.SetLocalName is called with the given `expected_name`;
@@ -59,7 +59,7 @@ mod tests {
         mut stream: AccessRequestStream,
         expected_name: String,
     ) -> Result<(), Error> {
-        expect_call(&mut stream, 500.millis(), move |req| match req {
+        expect_call(&mut stream, zx::Duration::from_millis(500), move |req| match req {
             AccessRequest::SetLocalName { name, control_handle: _ } => {
                 if name == expected_name {
                     Ok(Status::Satisfied(()))

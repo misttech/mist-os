@@ -47,6 +47,7 @@ enum CommitError {
     RuleWithInvalidAction(fnet_filter_ext::RuleId),
     TransparentProxyWithInvalidMatcher(fnet_filter_ext::RuleId),
     RedirectWithInvalidMatcher(fnet_filter_ext::RuleId),
+    MasqueradeWithInvalidMatcher(fnet_filter_ext::RuleId),
     CyclicalRoutineGraph(fnet_filter_ext::RoutineId),
     ErrorOnChange { index: usize, error: fnet_filter::CommitError },
 }
@@ -149,6 +150,9 @@ impl UpdateDispatcherInner {
             netstack3_core::filter::ValidationError::RedirectWithInvalidMatcher(rule_id) => {
                 CommitError::RedirectWithInvalidMatcher(rule_id)
             }
+            netstack3_core::filter::ValidationError::MasqueradeWithInvalidMatcher(rule_id) => {
+                CommitError::MasqueradeWithInvalidMatcher(rule_id)
+            }
         })?;
 
         if !events.is_empty() {
@@ -163,6 +167,7 @@ impl UpdateDispatcherInner {
                 drop_actions: usize,
                 tproxy_actions: usize,
                 redirect_actions: usize,
+                masquerade_actions: usize,
             }
 
             let mut counts = Counts { namespaces: new_state.len(), ..Default::default() };
@@ -178,6 +183,9 @@ impl UpdateDispatcherInner {
                             }
                             fnet_filter_ext::Action::Redirect { .. } => {
                                 counts.redirect_actions += 1
+                            }
+                            fnet_filter_ext::Action::Masquerade { .. } => {
+                                counts.masquerade_actions += 1
                             }
                             fnet_filter_ext::Action::Accept | fnet_filter_ext::Action::Return => {}
                         }
@@ -524,11 +532,11 @@ async fn serve_controller(
                                         ChangeValidationError::InvalidTransparentProxyAction,
                                     )
                                 }
-                                FidlConversionError::UnspecifiedRedirectPort
-                                | FidlConversionError::InvalidRedirectPortRange => {
-                                    Error::ReturnToClient(
-                                        ChangeValidationError::InvalidRedirectAction,
-                                    )
+                                FidlConversionError::UnspecifiedNatPort => {
+                                    Error::ReturnToClient(ChangeValidationError::InvalidNatAction)
+                                }
+                                FidlConversionError::InvalidPortRange => {
+                                    Error::ReturnToClient(ChangeValidationError::InvalidPortRange)
                                 }
                                 FidlConversionError::NotAnError => unreachable!(
                                     "should not get this error when converting a `Change`"
@@ -591,6 +599,9 @@ async fn serve_controller(
                         }
                         CommitError::RedirectWithInvalidMatcher(rule) => {
                             fnet_filter::CommitResult::RedirectWithInvalidMatcher(rule.into())
+                        }
+                        CommitError::MasqueradeWithInvalidMatcher(rule) => {
+                            fnet_filter::CommitResult::MasqueradeWithInvalidMatcher(rule.into())
                         }
                         CommitError::CyclicalRoutineGraph(routine) => {
                             fnet_filter::CommitResult::CyclicalRoutineGraph(routine.into())

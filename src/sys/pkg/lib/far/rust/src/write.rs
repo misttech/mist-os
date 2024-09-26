@@ -10,7 +10,7 @@ use crate::{
 use std::collections::BTreeMap;
 use std::convert::TryInto as _;
 use std::io::{copy, Read, Write};
-use zerocopy::AsBytes as _;
+use zerocopy::IntoBytes as _;
 
 fn write_zeros(mut target: impl Write, count: usize) -> Result<(), Error> {
     let b = vec![0u8; count];

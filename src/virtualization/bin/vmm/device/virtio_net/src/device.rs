@@ -18,7 +18,7 @@ use std::pin::Pin;
 use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
 use virtio_device::mem::{DeviceRange, DriverMem};
 use virtio_device::queue::DriverNotify;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 pub struct NetDevice<T: GuestEthernetInterface> {
     // Safe wrapper around the C++ FFI for interacting with the netstack.
@@ -734,7 +734,7 @@ mod tests {
         assert_eq!(len as usize, data_length + header_length);
 
         let slice = unsafe { std::slice::from_raw_parts(data_ptr as *const u8, len as usize) };
-        let header = wire::VirtioNetHeader::read_from(&slice[..header_length]).unwrap();
+        let header = wire::VirtioNetHeader::read_from_bytes(&slice[..header_length]).unwrap();
         assert_eq!(header.num_buffers.get(), 1);
         assert_eq!(&slice[header_length..], &packet_data);
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use zerocopy::byteorder::network_endian::{U32, U64};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 // Supported minimum platform AVB version.
 const MIN_AVB_VERSION_MAJOR: u32 = 1;
@@ -20,7 +20,7 @@ fn get_release_string() -> String {
     format!("avbtool {}.{}.{}", AVB_VERSION_MAJOR, AVB_VERSION_MINOR, AVB_VERSION_SUB)
 }
 
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Debug, PartialEq)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Debug, PartialEq)]
 #[repr(C, packed)]
 #[allow(missing_docs)]
 pub struct Header {

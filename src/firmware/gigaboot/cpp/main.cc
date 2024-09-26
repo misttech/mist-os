@@ -14,6 +14,7 @@
 
 #include "backends.h"
 #include "fastboot_tcp.h"
+#include "gbl_loader.h"
 #include "gigaboot/src/netifc.h"
 #include "input.h"
 #include "lib/zircon_boot/zircon_boot.h"
@@ -67,8 +68,8 @@ void SetSerial() {
   // Temporarily set `gEfiSystemTable->ConOut` to NULL to force serial console setup.
   // This won't affect the graphic set up done earlier.
   //
-  // This function can be removed once SetEfiStdout() can correctly set up both graphics and serial
-  // output.
+  // This function can be removed once SetEfiStdout() can correctly set up both graphics and
+  // serial output.
 
   auto conn_out = gEfiSystemTable->ConOut;
   gEfiSystemTable->ConOut = nullptr;
@@ -127,10 +128,18 @@ gigaboot::RebootMode LoadRebootMode() {
   return reboot_mode;
 }
 
+bool CheckFastbootKey() {
+  constexpr zx::duration timeout = zx::sec(2);
+  gigaboot::InputReceiver receiver(gEfiSystemTable);
+  printf("Press f to enter fastboot.\n");
+  std::optional<char> key = receiver.GetKeyPrompt("f", timeout, "Auto boot in");
+  return key == 'f';
+}
+
 }  // namespace
 
-int main(int argc, char** argv) {
-  SetSerial();
+// Main routine for gigaboot.
+int gigaboot_main(int argc, char** argv) {
   printf("Gigaboot main\n");
 
   auto is_secureboot_on = gigaboot::IsSecureBootOn();
@@ -158,11 +167,7 @@ int main(int argc, char** argv) {
     printf(
         "Your BIOS or ABR instructed Gigaboot to enter fastboot directly and skip normal boot.\n");
   } else {
-    constexpr zx::duration timeout = zx::sec(2);
-    gigaboot::InputReceiver receiver(gEfiSystemTable);
-    printf("Press f to enter fastboot.\n");
-    std::optional<char> key = receiver.GetKeyPrompt("f", timeout, "Auto boot in");
-    enter_fastboot = key == 'f';
+    enter_fastboot = CheckFastbootKey();
   }
 
   if (enter_fastboot) {
@@ -187,4 +192,24 @@ int main(int argc, char** argv) {
   }
 
   return 0;
+}
+
+// Main routine for booting embedded GBL.
+int gbl_main(int argc, char** argv) {
+  printf("Preparing to boot Generic Bootloader(GBL)...\n");
+  auto mode = gigaboot::GetCommandlineRebootMode(IsQemu()).value_or(gigaboot::RebootMode::kNormal);
+  if (gigaboot::LaunchGbl(mode == gigaboot::RebootMode::kBootloader || CheckFastbootKey())
+          .is_error()) {
+    printf("Failed to boot GBL\n");
+  }
+  return 1;
+}
+
+int main(int argc, char** argv) {
+  SetSerial();
+#ifdef GIGABOOT_BOOT_GBL
+  return gbl_main(argc, argv);
+#else
+  return gigaboot_main(argc, argv);
+#endif
 }

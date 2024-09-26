@@ -37,6 +37,7 @@ use starnix_uapi::auth::{Credentials, UserAndOrGroupId, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
+use starnix_uapi::futex_address::FutexAddress;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
     release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
@@ -1154,8 +1155,12 @@ impl CurrentTask {
                 return;
             }
 
-            let futex_addr = UserAddress::from(futex_base);
-            // TODO - What if this isn't 4 byte aligned?
+            let futex_addr = match FutexAddress::try_from(futex_base as usize) {
+                Ok(addr) => addr,
+                Err(_) => {
+                    return;
+                }
+            };
 
             let futex = if let Ok(futex) = self.mm().atomic_load_u32_relaxed(futex_addr) {
                 futex

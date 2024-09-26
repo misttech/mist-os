@@ -73,32 +73,10 @@ async fn open_childs_service_directory<C: ComponentClientAdapter>(
     }
 }
 
-/// Sanitize |filename| so first character is either ASCII or '_' character
-/// and ensure |filename| only contains ASCII, '_', '-', or '.' characters
-fn sanitize_filename(filename: String) -> String {
-    let mut res: String = String::new();
-    let mut first_char = true;
-
-    for char in filename.chars() {
-        if first_char {
-            if char.is_ascii_alphanumeric() || char == '_' {
-                first_char = false;
-                res.push(char);
-            }
-        } else {
-            if char.is_ascii_alphanumeric() || char == '_' || char == '-' || char == '.' {
-                res.push(char);
-            }
-        }
-    }
-    res
-}
-
 // Use the fuchsia.component.Realm protocol to create a dynamic child instance in the collection.
 async fn create_bt_host(realm: &RealmProxy, filename: String) -> Result<(), Error> {
-    let sanitized_filename = sanitize_filename(filename);
-    let component_name = format!("{BT_HOST}_{sanitized_filename}");
-    let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/{sanitized_filename}");
+    let component_name = format!("{BT_HOST}_{filename}");
+    let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/{filename}");
     let collection_ref = CollectionRef { name: BT_HOST_COLLECTION.to_owned() };
 
     info!("Creating component with device_path: {:?}", device_path,);
@@ -127,43 +105,19 @@ async fn run_device_watcher() -> Result<(), Error> {
     let dir = format!("{}/{}", DEV_DIR, HCI_DEVICE_DIR);
     let directory =
         fuchsia_fs::directory::open_in_namespace_deprecated(&dir, fuchsia_fs::OpenFlags::empty())?;
-    let watcher = fuchsia_fs::directory::Watcher::new(&directory).await?;
+    let mut stream = device_watcher::watch_for_files(&directory).await?;
 
     let realm = client::connect_to_protocol::<RealmMarker>()
         .expect("failed to connect to fuchsia.component.Realm");
-    let realm_ref = &realm;
 
-    watcher
-        .map(|result| result.context("failed to watch vendor device drivers"))
-        .try_for_each(|fuchsia_fs::directory::WatchMessage { event, filename }| async move {
-            info!(
-                "Watching {DEV_DIR}/{HCI_DEVICE_DIR}. Event: {:?}; Filename: {:?}",
-                event,
-                filename.to_str().unwrap()
-            );
-            use fuchsia_fs::directory::WatchEvent;
-            match event {
-                WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
-                    if filename != std::path::Path::new(".") && filename != std::path::Path::new("")
-                    {
-                        let path = filename.to_str().expect("utf-8 path");
-                        create_bt_host(realm_ref, path.to_owned()).await?;
-                    }
-                }
-                WatchEvent::REMOVE_FILE => {
-                    info!(
-                        "Removed vendor device driver with filename: {:?}",
-                        filename.to_str().unwrap()
-                    );
-                }
-                WatchEvent::IDLE => {}
-                e => {
-                    warn!("Unrecognized vendor device driver watch event: {e:?}");
-                }
-            }
-            Ok(())
-        })
-        .await
+    while let Some(filename) =
+        stream.try_next().await.context("failed to watch vendor device drivers")?
+    {
+        let path = filename.to_str().expect("utf-8 path");
+        info!("Watching {DEV_DIR}/{HCI_DEVICE_DIR}. Filename: {path}");
+        create_bt_host(&realm, path.to_owned()).await?;
+    }
+    Ok(())
 }
 
 #[fuchsia::main(logging_tags = ["bt-init"])]

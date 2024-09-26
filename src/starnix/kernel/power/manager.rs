@@ -20,9 +20,9 @@ use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use {
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_session_power as fpower, fidl_fuchsia_starnix_runner as frunner,
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
+    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
 
 cfg_if::cfg_if! {
@@ -41,13 +41,6 @@ struct PowerElement {
     lessor_proxy: fbroker::LessorSynchronousProxy,
     level_proxy: Option<fbroker::CurrentLevelSynchronousProxy>,
 }
-
-// String keys used for various suspend events.  We should try to keep these
-// keys in sync across binaries.
-const SUSPEND_FAILED_AT: &str = "failed_at_ns";
-const SUSPEND_ATTEMPTED_AT: &str = "attempted_at_ns";
-const SUSPEND_RESUMED_AT: &str = "resumed_at_ns";
-const SUSPEND_REQUESTED_STATE: &str = "requested_power_state";
 
 /// Manager for suspend and resume.
 #[derive(Default)]
@@ -127,6 +120,7 @@ pub struct SuspendResumeManagerInner {
     /// The currently active wake locks in the system. If non-empty, this prevents
     /// the container from suspending.
     active_locks: HashSet<String>,
+    inactive_locks: HashSet<String>,
 
     /// The currently active EPOLLWAKEUPs in the system. If non-empty, this prevents
     /// the container from suspending.
@@ -158,6 +152,7 @@ impl Default for SuspendResumeManagerInner {
             lease_control_channel: Default::default(),
             suspend_waiter: Default::default(),
             active_locks: Default::default(),
+            inactive_locks: Default::default(),
             active_epolls: Default::default(),
             active_lock_reader,
             active_lock_writer,
@@ -309,17 +304,24 @@ impl SuspendResumeManager {
     }
 
     /// Adds a wake lock `name` to the active wake locks.
-    pub fn add_lock(&self, name: String) {
+    pub fn add_lock(&self, name: &str) -> bool {
         let mut state = self.lock();
-        state.active_locks.insert(name);
+        let res = state.active_locks.insert(String::from(name));
         state.signal_wake_events();
+        res
     }
 
     /// Removes a wake lock `name` from the active wake locks.
-    pub fn remove_lock(&self, name: &str) {
+    pub fn remove_lock(&self, name: &str) -> bool {
         let mut state = self.lock();
-        state.active_locks.remove(name);
+        let res = state.active_locks.remove(name);
+        if !res {
+            return false;
+        }
+
+        state.inactive_locks.insert(String::from(name));
         state.signal_wake_events();
+        res
     }
 
     /// Adds a wake lock `key` to the active epoll wake locks.
@@ -334,6 +336,14 @@ impl SuspendResumeManager {
         let mut state = self.lock();
         state.active_epolls.remove(&key);
         state.signal_wake_events();
+    }
+
+    pub fn active_wake_locks(&self) -> Vec<String> {
+        Vec::from_iter(self.lock().active_locks.clone())
+    }
+
+    pub fn inactive_wake_locks(&self) -> Vec<String> {
+        Vec::from_iter(self.lock().inactive_locks.clone())
     }
 
     /// Returns a duplicate handle to the `EventPair` that is signaled when wake
@@ -424,7 +434,7 @@ impl SuspendResumeManager {
     /// Returns the supported suspend states.
     pub fn suspend_states(&self) -> HashSet<SuspendState> {
         // TODO(b/326470421): Remove the hardcoded supported state.
-        HashSet::from([SuspendState::Ram, SuspendState::Idle])
+        HashSet::from([SuspendState::Idle])
     }
 
     /// Sets the power level to `level`.
@@ -499,8 +509,8 @@ impl SuspendResumeManager {
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
-            node.record_string(SUSPEND_REQUESTED_STATE, state.to_str());
+            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
+            node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
         });
 
         let waiter = SuspendWaiter::new();
@@ -535,14 +545,14 @@ impl SuspendResumeManager {
             SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?,
             SuspendResult::Failure => {
                 self.lock().inspect_node.add_entry(|node| {
-                    node.record_int(SUSPEND_FAILED_AT, now.into_nanos());
+                    node.record_int(fobs::SUSPEND_FAILED_AT, now.into_nanos());
                 });
                 return error!(EINVAL, format!("failed to suspend at ns: {}", &now.into_nanos()));
             }
         }
 
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(SUSPEND_RESUMED_AT, now.into_nanos());
+            node.record_int(fobs::SUSPEND_RESUMED_AT, now.into_nanos());
         });
         log_info!(state=?state, "Resumed from suspend");
 
@@ -607,6 +617,12 @@ pub trait WakeLeaseInterlockOps {
 pub trait OnWakeOps: Send + Sync {
     fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel);
 }
+
+/// The signal that the runner raises when handing over an event to the kernel.
+pub const RUNNER_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_0;
+
+/// The signal that the kernel raises to indicate that a message has been handled.
+pub const KERNEL_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
 ///

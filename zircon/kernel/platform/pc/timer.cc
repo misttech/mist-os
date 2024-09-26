@@ -607,7 +607,9 @@ static void pc_init_timer(uint level) {
       invariant_tsc && (!force_wallclock || gBootOptions->x86_wallclock == WallclockType::kTsc);
 
   use_tsc_deadline = use_invariant_tsc && x86_feature_test(X86_FEATURE_TSC_DEADLINE);
-  if (!use_tsc_deadline) {
+  if (use_tsc_deadline) {
+    apic_timer_tsc_deadline_init();
+  } else {
     calibrate_apic_timer();
   }
 
@@ -776,7 +778,7 @@ zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline) {
 
   if (use_tsc_deadline) {
     LTRACEF("Scheduling oneshot timer: %" PRIi64 " deadline\n", deadline);
-    apic_timer_set_tsc_deadline(deadline, false /* unmasked */);
+    apic_timer_set_tsc_deadline(deadline);
     kcounter_add(platform_timer_set_counter, 1);
     return ZX_OK;
   }
@@ -831,7 +833,12 @@ zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline) {
 void platform_stop_timer(void) {
   /* Enable interrupt mode that will stop the decreasing counter of the PIT */
   // outp(I8253_CONTROL_REG, 0x30);
-  apic_timer_stop();
+  if (use_tsc_deadline) {
+    // In TSC deadline mode, a deadline of 0 disarms the LAPIC timer
+    apic_timer_set_tsc_deadline(0);
+  } else {
+    apic_timer_stop();
+  }
   kcounter_add(platform_timer_cancel_counter, 1);
 }
 

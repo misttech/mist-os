@@ -12,7 +12,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
-use fuchsia_zircon::{self as zx, Duration, DurationNum};
+use fuchsia_zircon::{self as zx, Duration};
 use futures::stream::StreamExt;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::info;
@@ -31,7 +31,7 @@ use {
 const TIMEOUT_SECONDS: i64 = 2 * 60;
 
 pub fn peer_observer_timeout() -> Duration {
-    TIMEOUT_SECONDS.seconds()
+    Duration::from_seconds(TIMEOUT_SECONDS)
 }
 
 static MOCK_PICONET_SERVER_URL: &str = "#meta/mock-piconet-server.cm";

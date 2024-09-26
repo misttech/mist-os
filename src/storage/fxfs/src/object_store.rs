@@ -21,7 +21,9 @@ mod tree;
 mod tree_cache;
 pub mod volume;
 
-pub use data_object_handle::{DataObjectHandle, DirectWriter, FsverityState, FsverityStateInner};
+pub use data_object_handle::{
+    DataObjectHandle, DirectWriter, FsverityState, FsverityStateInner, RangeType,
+};
 pub use directory::Directory;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{
@@ -66,7 +68,7 @@ use storage_device::Device;
 use uuid::Uuid;
 
 pub use extent_record::{
-    ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
+    ExtentKey, ExtentMode, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
     FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
 pub use object_record::{
@@ -555,12 +557,10 @@ impl ObjectStore {
                 options.object_id,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await?
         } else {
-            ObjectStore::create_object(self, transaction, HandleOptions::default(), None, None)
-                .await?
+            ObjectStore::create_object(self, transaction, HandleOptions::default(), None).await?
         };
         let filesystem = self.filesystem();
         let store = if let Some(crypt) = options.crypt {
@@ -612,7 +612,7 @@ impl ObjectStore {
         let buf = {
             // Create a root directory and graveyard directory.
             let graveyard_directory_object_id = Graveyard::create(transaction, &self);
-            let root_directory = Directory::create(transaction, &self, Default::default()).await?;
+            let root_directory = Directory::create(transaction, &self).await?;
 
             let serialized_info = {
                 let mut store_info = self.store_info.lock().unwrap();
@@ -781,7 +781,7 @@ impl ObjectStore {
         }
 
         // Need to create an internal directory.
-        let directory = Directory::create(&mut transaction, self, Default::default()).await?;
+        let directory = Directory::create(&mut transaction, self).await?;
 
         transaction.add(self.store_object_id, Mutation::CreateInternalDir(directory.object_id()));
         transaction.commit().await?;
@@ -799,7 +799,7 @@ impl ObjectStore {
             ))
             .await?
             .ok_or(FxfsError::NotFound)?;
-        if let ObjectValue::Attribute { size } = item.value {
+        if let ObjectValue::Attribute { size, .. } = item.value {
             Ok(size)
         } else {
             bail!(FxfsError::NotFile);
@@ -814,44 +814,92 @@ impl ObjectStore {
     /// dropped when a handle is dropped, which will impact any other handles for the same object.
     pub async fn open_object<S: HandleOwner>(
         owner: &Arc<S>,
-        object_id: u64,
+        obj_id: u64,
         options: HandleOptions,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         let mut fsverity_descriptor = None;
+        let mut overwrite_ranges = Vec::new();
         let item = store
             .tree
-            .find(&ObjectKey::attribute(
-                object_id,
-                DEFAULT_DATA_ATTRIBUTE_ID,
-                AttributeKey::Attribute,
-            ))
+            .find(&ObjectKey::attribute(obj_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute))
             .await?
             .ok_or(FxfsError::NotFound)?;
 
-        let size = match item.value {
-            ObjectValue::Attribute { size } => size,
+        let (size, track_overwrite_extents) = match item.value {
+            ObjectValue::Attribute { size, has_overwrite_extents } => (size, has_overwrite_extents),
             ObjectValue::VerifiedAttribute { size, fsverity_metadata } => {
                 fsverity_descriptor = Some(fsverity_metadata);
-                size
+                // We only track the overwrite extents in memory for writes, reads handle them
+                // implicitly, which means verified files (where the data won't change anymore)
+                // don't need to track them.
+                (size, false)
             }
-            _ => bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attribute")),
+            _ => bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attibute")),
         };
 
         ensure!(size <= MAX_FILE_SIZE, FxfsError::Inconsistent);
+
+        if track_overwrite_extents {
+            let layer_set = store.tree.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = merger
+                .query(Query::FullRange(&ObjectKey::attribute(
+                    obj_id,
+                    DEFAULT_DATA_ATTRIBUTE_ID,
+                    AttributeKey::Extent(ExtentKey::search_key_from_offset(0)),
+                )))
+                .await?;
+            loop {
+                match iter.get() {
+                    Some(ItemRef {
+                        key:
+                            ObjectKey {
+                                object_id,
+                                data:
+                                    ObjectKeyData::Attribute(
+                                        attribute_id,
+                                        AttributeKey::Extent(ExtentKey { range }),
+                                    ),
+                            },
+                        value,
+                        ..
+                    }) if *object_id == obj_id && *attribute_id == DEFAULT_DATA_ATTRIBUTE_ID => {
+                        match value {
+                            ObjectValue::Extent(ExtentValue::None)
+                            | ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::Raw,
+                                ..
+                            })
+                            | ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::Cow(_),
+                                ..
+                            }) => (),
+                            ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::OverwritePartial(_),
+                                ..
+                            })
+                            | ObjectValue::Extent(ExtentValue::Some {
+                                mode: ExtentMode::Overwrite,
+                                ..
+                            }) => overwrite_ranges.push(range.clone()),
+                            _ => bail!(anyhow!(FxfsError::Inconsistent)
+                                .context("open_object: Expected extent")),
+                        }
+                        iter.advance().await?;
+                    }
+                    _ => break,
+                }
+            }
+        }
 
         // If a crypt service has been specified, it needs to be a permanent key because cached
         // keys can only use the store's crypt service.
         let permanent = if let Some(crypt) = crypt {
             store
                 .key_manager
-                .get_or_insert(
-                    object_id,
-                    crypt,
-                    store.get_keys(object_id),
-                    /* permanent: */ true,
-                )
+                .get_or_insert(obj_id, crypt, store.get_keys(obj_id), /* permanent: */ true)
                 .await?;
             true
         } else {
@@ -859,13 +907,14 @@ impl ObjectStore {
         };
         let data_object_handle = DataObjectHandle::new(
             owner.clone(),
-            object_id,
+            obj_id,
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             size,
             FsverityState::None,
             options,
             false,
+            overwrite_ranges,
         );
         if let Some(descriptor) = fsverity_descriptor {
             match data_object_handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await? {
@@ -888,7 +937,6 @@ impl ObjectStore {
         mut object_id: u64,
         options: HandleOptions,
         mut crypt: Option<&dyn Crypt>,
-        create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         if object_id == INVALID_OBJECT_ID {
@@ -904,43 +952,11 @@ impl ObjectStore {
             crypt = store_crypt.as_deref();
         }
         let now = Timestamp::now();
-        let creation_time = create_attributes
-            .and_then(|a| a.creation_time)
-            .map(Timestamp::from_nanos)
-            .unwrap_or_else(|| now.clone());
-        let modification_time = create_attributes
-            .and_then(|a| a.modification_time)
-            .map(Timestamp::from_nanos)
-            .unwrap_or_else(|| now.clone());
-        let access_time = create_attributes
-            .and_then(|a| a.access_time)
-            .map(Timestamp::from_nanos)
-            .unwrap_or_else(|| now.clone());
-        let change_time = now;
-        let posix_attributes = create_attributes.and_then(|a| {
-            (a.mode.is_some() || a.uid.is_some() || a.gid.is_some() || a.rdev.is_some()).then_some(
-                PosixAttributes {
-                    mode: a.mode.unwrap_or_default(),
-                    uid: a.uid.unwrap_or_default(),
-                    gid: a.gid.unwrap_or_default(),
-                    rdev: a.rdev.unwrap_or_default(),
-                },
-            )
-        });
         transaction.add(
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::object(object_id),
-                ObjectValue::file(
-                    1,
-                    0,
-                    creation_time,
-                    modification_time,
-                    access_time,
-                    change_time,
-                    0,
-                    posix_attributes,
-                ),
+                ObjectValue::file(1, 0, now.clone(), now.clone(), now.clone(), now, 0, None),
             ),
         );
         if let Some(crypt) = crypt {
@@ -958,7 +974,8 @@ impl ObjectStore {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::attribute(object_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
-                ObjectValue::attribute(0),
+                // This is a new object so nothing has pre-allocated overwrite extents yet.
+                ObjectValue::attribute(0, false),
             ),
         );
         Ok(DataObjectHandle::new(
@@ -970,6 +987,7 @@ impl ObjectStore {
             FsverityState::None,
             options,
             false,
+            Vec::new(),
         ))
     }
 
@@ -984,7 +1002,6 @@ impl ObjectStore {
         mut transaction: &mut Transaction<'_>,
         options: HandleOptions,
         crypt: Option<&dyn Crypt>,
-        create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<DataObjectHandle<S>, Error> {
         ObjectStore::create_object_with_id(
             owner,
@@ -992,7 +1009,6 @@ impl ObjectStore {
             INVALID_OBJECT_ID,
             options,
             crypt,
-            create_attributes,
         )
         .await
     }
@@ -1192,7 +1208,7 @@ impl ObjectStore {
                                     ObjectKeyData::Attribute(size_attribute_id, AttributeKey::Attribute),
                                 ..
                             },
-                        value: ObjectValue::Attribute { size },
+                        value: ObjectValue::Attribute { size, .. },
                         ..
                     } = item_ref
                     {
@@ -2294,15 +2310,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object1 = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         let mut transaction = fs
@@ -2311,15 +2321,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object2 = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2331,15 +2335,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object3 = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2374,15 +2372,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
 
         transaction.add(
@@ -2408,7 +2400,7 @@ mod tests {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(0),
+                ObjectValue::attribute(0, false),
             ),
         );
 
@@ -2434,15 +2426,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2572,15 +2558,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2639,7 +2619,6 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await
             .expect("create_object failed");
@@ -2672,15 +2651,10 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let child = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        let child =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         assert!(store.key_manager.get(child.object_id()).await.unwrap().is_some());
         store
@@ -2705,7 +2679,6 @@ mod tests {
                 &root_store,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await
@@ -2771,7 +2744,7 @@ mod tests {
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "test", None)
+            .create_child_file(&mut transaction, "test")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -2827,7 +2800,7 @@ mod tests {
                     .await
                     .expect("open failed");
                 let object = root_directory
-                    .create_child_file(&mut transaction, &format!("test {}", iteration), None)
+                    .create_child_file(&mut transaction, &format!("test {}", iteration))
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
@@ -2964,7 +2937,7 @@ mod tests {
                 .await
                 .expect("open failed");
             let object = root_directory
-                .create_child_file(&mut transaction, "test", None)
+                .create_child_file(&mut transaction, "test")
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -3009,7 +2982,7 @@ mod tests {
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         root_directory
-            .create_child_file(&mut transaction, "test", None)
+            .create_child_file(&mut transaction, "test")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -3041,7 +3014,7 @@ mod tests {
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
         root_directory
-            .create_child_file(&mut transaction, "test", None)
+            .create_child_file(&mut transaction, "test")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -3081,7 +3054,7 @@ mod tests {
                 .await
                 .expect("open failed");
             object_id = root_directory
-                .create_child_file(&mut transaction, "test", None)
+                .create_child_file(&mut transaction, "test")
                 .await
                 .expect("create_child_file failed")
                 .object_id();
@@ -3181,7 +3154,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             root_directory
-                .create_child_file(&mut transaction, "test", None)
+                .create_child_file(&mut transaction, "test")
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -3199,7 +3172,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             root_directory
-                .create_child_file(&mut transaction, "test2", None)
+                .create_child_file(&mut transaction, "test2")
                 .await
                 .map(|_| ())
                 .expect_err("create_child_file should fail");

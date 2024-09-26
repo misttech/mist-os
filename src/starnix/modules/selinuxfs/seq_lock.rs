@@ -7,20 +7,20 @@ use std::marker::PhantomData;
 use std::mem::{align_of, size_of};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 
 /// Declare an instance of [`SeqLock`] by supplying header([`H`]) and value([`T`]) types,
 /// which should be configured with C-style layout & alignment.
 /// [`SeqLock`] will place a 32-bit atomic sequence number in-between the
 /// header and value, in a VMO.
-pub struct SeqLock<H: AsBytes + NoCell, T: AsBytes + NoCell> {
+pub struct SeqLock<H: IntoBytes + Immutable, T: IntoBytes + Immutable> {
     map_addr: usize,
     readonly_vmo: Arc<zx::Vmo>,
     writable_vmo: zx::Vmo,
     _phantom_data: PhantomData<(H, T)>,
 }
 
-impl<H: AsBytes + Default + NoCell, T: AsBytes + Default + NoCell> SeqLock<H, T> {
+impl<H: IntoBytes + Default + Immutable, T: IntoBytes + Default + Immutable> SeqLock<H, T> {
     pub fn new_default() -> Result<Self, zx::Status> {
         Self::new(H::default(), T::default())
     }
@@ -42,7 +42,7 @@ const fn vmo_size<H, T>() -> usize {
     value_offset::<H, T>() + size_of::<T>()
 }
 
-impl<H: AsBytes + NoCell, T: AsBytes + NoCell> SeqLock<H, T> {
+impl<H: IntoBytes + Immutable, T: IntoBytes + Immutable> SeqLock<H, T> {
     /// Returns an instance with initial values and a read-only VMO handle.
     /// May fail if the VMO backing the structure cannot be created, duplicated
     /// read-only, or mapped.
@@ -105,7 +105,7 @@ impl<H: AsBytes + NoCell, T: AsBytes + NoCell> SeqLock<H, T> {
     }
 }
 
-impl<H: AsBytes + NoCell, T: AsBytes + NoCell> Drop for SeqLock<H, T> {
+impl<H: IntoBytes + Immutable, T: IntoBytes + Immutable> Drop for SeqLock<H, T> {
     fn drop(&mut self) {
         // SAFETY: `self` owns the mapping, and does not dispense any references
         // to it.

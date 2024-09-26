@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use super::errors::{error, Errno};
+use super::futex_address::FutexAddress;
 use super::math::round_up_to_increment;
 use super::uapi;
 use super::user_buffer::UserBuffer;
 use fuchsia_zircon::sys::zx_vaddr_t;
 use std::marker::PhantomData;
 use std::{fmt, mem, ops};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[derive(
-    Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeros, FromBytes, NoCell,
+    Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, KnownLayout, FromBytes, Immutable,
 )]
 #[repr(transparent)]
 pub struct UserAddress(u64);
@@ -52,6 +53,10 @@ impl UserAddress {
         self.0.checked_add(rhs as u64).map(UserAddress)
     }
 
+    pub fn checked_sub(&self, rhs: usize) -> Option<UserAddress> {
+        self.0.checked_sub(rhs as u64).map(UserAddress)
+    }
+
     pub fn saturating_add(&self, rhs: usize) -> Self {
         UserAddress(self.0.saturating_add(rhs as u64))
     }
@@ -84,6 +89,12 @@ impl From<uapi::uaddr> for UserAddress {
 impl From<UserAddress> for uapi::uaddr {
     fn from(value: UserAddress) -> Self {
         Self { addr: value.0 }
+    }
+}
+
+impl From<FutexAddress> for UserAddress {
+    fn from(value: FutexAddress) -> Self {
+        Self(value.ptr() as u64)
     }
 }
 
@@ -256,10 +267,10 @@ impl<T> fmt::Display for UserRef<T> {
     Hash,
     Ord,
     PartialOrd,
-    AsBytes,
-    FromZeros,
+    IntoBytes,
+    KnownLayout,
     FromBytes,
-    NoCell,
+    Immutable,
 )]
 #[repr(transparent)]
 pub struct UserCString(UserAddress);

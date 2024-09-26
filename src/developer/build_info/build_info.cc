@@ -19,6 +19,8 @@ namespace {
 const char kProductFilePath[] = "/config/build-info/product";
 const char kBoardFilePath[] = "/config/build-info/board";
 const char kVersionFilePath[] = "/config/build-info/version";
+const char kPlatformVersionFilePath[] = "/config/build-info/platform_version";
+const char kProductVersionFilePath[] = "/config/build-info/product_version";
 const char kLatestCommitDateFilePath[] = "/config/build-info/latest-commit-date";
 
 // Returns the contents of |file_path| with any trailing whitespace removed.
@@ -62,6 +64,23 @@ void ProviderImpl::GetBuildInfo(GetBuildInfoCallback callback) {
 
   if (!version_->empty()) {
     build_info.set_version(*version_);
+  }
+
+  if (!platform_version_) {
+    platform_version_ =
+        std::make_unique<std::string>(ContentsOfFileAtPath(kPlatformVersionFilePath));
+  }
+
+  if (!platform_version_->empty()) {
+    build_info.set_platform_version(*platform_version_);
+  }
+
+  if (!product_version_) {
+    product_version_ = std::make_unique<std::string>(ContentsOfFileAtPath(kProductVersionFilePath));
+  }
+
+  if (!product_version_->empty()) {
+    build_info.set_product_version(*product_version_);
   }
 
   if (!latest_commit_date_) {

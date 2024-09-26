@@ -4,14 +4,10 @@
 """Honeydew python module."""
 
 import logging
+from typing import Any
 
 from honeydew import errors
-from honeydew.fuchsia_device.fuchsia_controller import (
-    fuchsia_device as fc_fuchsia_device,
-)
-from honeydew.fuchsia_device.fuchsia_controller_preferred import (
-    fuchsia_device as fc_preferred_fuchsia_device,
-)
+from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
@@ -25,6 +21,8 @@ def create_device(
     device_info: custom_types.DeviceInfo,
     transport: custom_types.TRANSPORT,
     ffx_config: custom_types.FFXConfig,
+    # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
+    config: dict[str, Any] | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -36,13 +34,49 @@ def create_device(
         ffx_config: Ffx configuration that need to be used while running ffx
             commands.
 
+        config: Honeydew device configuration, if any.
+            Format:
+                {
+                    "transports": {
+                        <transport_name>: {
+                            <key>: <value>,
+                            ...
+                        },
+                        ...
+                    },
+                    "affordances": {
+                        <affordance_name>: {
+                            <key>: <value>,
+                            ...
+                        },
+                        ...
+                    },
+                }
+            Example:
+                {
+                    "transports": {
+                        "fuchsia_controller": {
+                            "timeout": 30,
+                        }
+                    },
+                    "affordances": {
+                        "bluetooth": {
+                            "implementation": "fuchsia-controller",
+                        },
+                        "wlan": {
+                            "implementation": "sl4f",
+                        }
+                    },
+                }
+
     Returns:
         Fuchsia device object
 
     Raises:
         errors.FuchsiaDeviceError: Failed to create Fuchsia device object.
-        errors.FfxCommandError: Failure in running an FFX Command.
     """
+    _LOGGER.debug("create_device has been called with: %s", locals())
+
     try:
         if device_info.ip_port:
             _LOGGER.info(
@@ -53,16 +87,12 @@ def create_device(
                 device_info.ip_port,
             )
 
-        if transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER:
-            return fc_fuchsia_device.FuchsiaDevice(
-                device_info,
-                ffx_config,
-            )
-        else:  # transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED:
-            return fc_preferred_fuchsia_device.FuchsiaDevice(
-                device_info,
-                ffx_config,
-            )
+        return fuchsia_device.FuchsiaDevice(
+            device_info,
+            ffx_config,
+            transport,
+            config,
+        )
     except errors.HoneydewError as err:
         raise errors.FuchsiaDeviceError(
             f"Failed to create device for '{device_info.name}': {err}"

@@ -8,7 +8,7 @@ use crate::{ok, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
-use zerocopy::{FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable};
 
 // Tuning constants for get_info_vec(). pub(crate) to support unit tests.
 pub(crate) const INFO_VEC_SIZE_INITIAL: usize = 16;
@@ -35,7 +35,7 @@ pub(crate) unsafe trait ObjectQuery {
     /// A `Topic` identifying this query.
     const TOPIC: Topic;
     /// The datatype returned by querying for Self::TOPIC.
-    type InfoTy: FromBytes + FromZeros + NoCell;
+    type InfoTy: FromBytes + Immutable;
 }
 
 assoc_values!(Topic, [
@@ -77,7 +77,7 @@ fn object_get_info<'a, Q: ObjectQuery>(
     out: &'a mut [MaybeUninit<Q::InfoTy>],
 ) -> Result<(&'a mut [Q::InfoTy], &'a mut [MaybeUninit<Q::InfoTy>], usize), Status>
 where
-    Q::InfoTy: FromBytes + FromZeros + NoCell,
+    Q::InfoTy: FromBytes + Immutable,
 {
     let mut actual = 0;
     let mut avail = 0;
@@ -88,7 +88,7 @@ where
         sys::zx_object_get_info(
             handle.raw_handle(),
             *Q::TOPIC,
-            out.as_mut_ptr() as *mut u8,
+            out.as_mut_ptr().cast::<u8>(),
             std::mem::size_of_val(out),
             &mut actual,
             &mut avail,
@@ -103,7 +103,7 @@ where
     // traits to be instantiated from arbitrary bytes.
     let initialized: &mut [Q::InfoTy] = unsafe {
         std::slice::from_raw_parts_mut(
-            initialized.as_mut_ptr() as *mut Q::InfoTy,
+            initialized.as_mut_ptr().cast::<Q::InfoTy>(),
             initialized.len(),
         )
     };
@@ -116,7 +116,7 @@ pub(crate) fn object_get_info_single<Q: ObjectQuery>(
     handle: HandleRef<'_>,
 ) -> Result<Q::InfoTy, Status>
 where
-    Q::InfoTy: Copy + FromBytes + FromZeros + NoCell,
+    Q::InfoTy: Copy + FromBytes + Immutable,
 {
     let mut info = MaybeUninit::<Q::InfoTy>::uninit();
     let (info, _, _) = object_get_info::<Q>(handle, std::slice::from_mut(&mut info))?;

@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fuzz.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("vmm") {
   deps = [ ":vmm_package" ]
@@ -208,7 +209,7 @@ fuchsia_package("vmm_package") {
   deps = [ ":vmm_component" ]
 }
 
-executable("vmm_unittests") {
+cc_test_executable("vmm_unittests") {
   visibility = [ ":*" ]
   testonly = true
 

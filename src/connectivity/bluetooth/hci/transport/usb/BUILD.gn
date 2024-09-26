@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("bt_transport_usb_bind") {
   rules = "meta/bt_transport_usb.bind"
@@ -67,7 +68,7 @@ source_set("common") {
   ]
 }
 
-executable("tests_executable") {
+cc_test_executable("tests_executable") {
   testonly = true
 
   output_name = "bt-transport-usb-tests"

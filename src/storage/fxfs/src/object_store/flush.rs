@@ -196,7 +196,6 @@ impl ObjectStore {
             &mut transaction,
             HandleOptions { skip_journal_checks: true, ..Default::default() },
             self.crypt().as_deref(),
-            None,
         )
         .await?;
         let writer = DirectWriter::new(&new_object_tree_layer, txn_options).await;
@@ -323,7 +322,6 @@ impl ObjectStore {
                 parent_store,
                 &mut transaction,
                 HandleOptions { skip_journal_checks: true, ..Default::default() },
-                None,
                 None,
             )
             .await?;
@@ -482,7 +480,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 root_dir
-                    .create_child_file(&mut transaction, &format!("{:<200}", i), None)
+                    .create_child_file(&mut transaction, &format!("{:<200}", i))
                     .await
                     .expect("create_child_file failed");
                 i += 1;
@@ -510,7 +508,7 @@ mod tests {
                 .expect("new_transaction failed");
             let last_filename = format!("{:<200}", i);
             root_dir
-                .create_child_file(&mut transaction, &last_filename, None)
+                .create_child_file(&mut transaction, &last_filename)
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -586,7 +584,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let foo = root_dir
-            .create_child_file(&mut transaction, "foo", None)
+            .create_child_file(&mut transaction, "foo")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -605,7 +603,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let bar = root_dir
-            .create_child_file(&mut transaction, "bar", None)
+            .create_child_file(&mut transaction, "bar")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");

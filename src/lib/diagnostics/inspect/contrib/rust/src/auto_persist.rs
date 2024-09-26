@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics_persist::PersistResult;
-use fuchsia_zircon::prelude::*;
 use fuchsia_zircon::{self as zx};
 use futures::channel::mpsc;
 use futures::{Future, StreamExt};
@@ -106,7 +105,7 @@ fn log_at_most_once_per_min_factory(
     move |message| {
         let now = zx::MonotonicTime::from_nanos(time_source.now());
         let should_log = match last_logged {
-            Some(last_logged) => (now - last_logged) >= 1.minutes(),
+            Some(last_logged) => (now - last_logged) >= zx::Duration::from_minutes(1),
             None => true,
         };
         if should_log {
@@ -245,7 +244,7 @@ mod tests {
         assert_eq!(*log_count.borrow(), 1);
 
         {
-            *now.borrow_mut() += 30.seconds();
+            *now.borrow_mut() += zx::Duration::from_seconds(30);
         }
 
         // Not enough time has passed, so log_count shouldn't increase
@@ -253,7 +252,7 @@ mod tests {
         assert_eq!(*log_count.borrow(), 1);
 
         {
-            *now.borrow_mut() += 30.seconds();
+            *now.borrow_mut() += zx::Duration::from_seconds(30);
         }
 
         // Enough time has passed, so log_count should increase

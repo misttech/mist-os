@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // IEEE Std 802.11-2016, 9.4.1.32
 // 24-bit organization unique identifier
@@ -11,10 +11,10 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
     Eq,
     PartialEq,
     Hash,
-    AsBytes,
-    FromZeros,
+    IntoBytes,
+    KnownLayout,
     FromBytes,
-    NoCell,
+    Immutable,
     Unaligned,
     Copy,
     Clone,

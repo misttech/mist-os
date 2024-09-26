@@ -23,7 +23,11 @@ class RebootCapableDevice(abc.ABC):
 
     @abc.abstractmethod
     def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
-        """Register a function that will be called in on_device_boot."""
+        """Register a function that will be called in `on_device_boot()`.
+
+        Args:
+            fn: Function that need to be called after FuchsiaDevice boot up.
+        """
 
     @abc.abstractmethod
     def wait_for_offline(self) -> None:
@@ -47,4 +51,17 @@ class FuchsiaDeviceLogger(abc.ABC):
         Args:
             message: Message that need to logged.
             level: Log message level.
+        """
+
+
+class FuchsiaDeviceClose(abc.ABC):
+    """Abstract base class which contains methods that let you register to run any custom logic
+    during device cleanup."""
+
+    @abc.abstractmethod
+    def register_for_on_device_close(self, fn: Callable[[], None]) -> None:
+        """Register a function that will be called during device clean up in `close()`.
+
+        Args:
+            fn: Function that need to be called during FuchsiaDevice cleanup.
         """

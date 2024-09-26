@@ -6,19 +6,19 @@ use super::{Header, Id, IeType};
 use crate::buffer_reader::BufferReader;
 use std::mem::size_of;
 use std::ops::Range;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 // TODO(https://fxbug.dev/42164332): Should probably remove Reader in favor of
 // IeSummaryIter everywhere.
 pub struct Reader<B>(BufferReader<B>);
 
-impl<B: ByteSlice> Reader<B> {
+impl<B: SplitByteSlice> Reader<B> {
     pub fn new(bytes: B) -> Self {
         Reader(BufferReader::new(bytes))
     }
 }
 
-impl<B: ByteSlice> Iterator for Reader<B> {
+impl<B: SplitByteSlice> Iterator for Reader<B> {
     type Item = (Id, B);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -46,13 +46,13 @@ impl<B: ByteSlice> Iterator for Reader<B> {
 ///     the extension ID
 pub struct IeSummaryIter<B>(BufferReader<B>);
 
-impl<B: ByteSlice> IeSummaryIter<B> {
+impl<B: SplitByteSlice> IeSummaryIter<B> {
     pub fn new(bytes: B) -> Self {
         Self(BufferReader::new(bytes))
     }
 }
 
-impl<B: ByteSlice> Iterator for IeSummaryIter<B> {
+impl<B: SplitByteSlice> Iterator for IeSummaryIter<B> {
     type Item = (IeType, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {

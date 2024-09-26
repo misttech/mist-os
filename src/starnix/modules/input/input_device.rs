@@ -2,34 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    parse_fidl_keyboard_event_to_linux_input_event, FuchsiaTouchEventToLinuxTouchEventConverter,
-    InputFile,
-};
-use fidl::endpoints::{ClientEnd, RequestStream};
+use crate::input_event_relay::{DeviceId, EventProxyMode, OpenedFiles};
+use crate::{parse_fidl_keyboard_event_to_linux_input_event, InputFile};
+use fidl::endpoints::RequestStream;
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use fidl_fuchsia_ui_pointer::{
-    TouchEvent as FidlTouchEvent, TouchResponse as FidlTouchResponse, TouchResponseType,
-    {self as fuipointer},
-};
 use fuchsia_zircon::Peered;
 use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::power::create_proxy_for_wake_events;
+use starnix_core::power::{
+    create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
+};
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::{DeviceType, INPUT_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::timeval_from_time;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{input_id, BUS_VIRTUAL};
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use {
     fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
     fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -96,19 +91,9 @@ enum InputDeviceType {
 pub struct InputDevice {
     device_type: InputDeviceType,
 
-    open_files: Arc<Mutex<Vec<Weak<InputFile>>>>,
+    pub open_files: OpenedFiles,
 
     input_files_node: Arc<fuchsia_inspect::Node>,
-}
-
-pub enum EventProxyMode {
-    /// Don't proxy input events at all.
-    None,
-
-    /// Have the Starnix runner proxy events such that the container
-    /// will wake up if events are received while the container is
-    /// suspended.
-    WakeContainer,
 }
 
 impl InputDevice {
@@ -134,17 +119,19 @@ impl InputDevice {
         })
     }
 
-    pub fn register<L>(self: Arc<Self>, locked: &mut Locked<'_, L>, system_task: &CurrentTask)
-    where
+    pub fn register<L>(
+        self: Arc<Self>,
+        locked: &mut Locked<'_, L>,
+        system_task: &CurrentTask,
+        device_id: DeviceId,
+    ) where
         L: LockBefore<FileOpsCore>,
     {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
 
-        let input_class =
-            registry.objects.get_or_create_class("input".into(), registry.objects.virtual_bus());
-        let device_id = get_next_device_id();
-        registry.add_and_register_device(
+        let input_class = registry.objects.input_class();
+        registry.register_device(
             locked,
             system_task,
             FsString::from(format!("event{}", device_id)).as_ref(),
@@ -157,116 +144,6 @@ impl InputDevice {
             DeviceDirectory::new,
             self,
         );
-    }
-
-    /// Starts reading events from the Fuchsia input system, and making those events available
-    /// to the guest system.
-    ///
-    /// This method *should* be called as soon as possible after the `TouchSourceProxy` has been
-    /// registered with the `TouchSource` server, as the server expects `TouchSource` clients to
-    /// consume events in a timely manner.
-    ///
-    /// # Parameters
-    /// * `touch_source_proxy`: a connection to the Fuchsia input system, which will provide
-    ///   touch events associated with the Fuchsia `View` created by Starnix.
-    pub fn start_touch_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        touch_source_client_end: ClientEnd<fuipointer::TouchSourceMarker>,
-        event_proxy_mode: EventProxyMode,
-    ) {
-        let slf = self.clone();
-        let mut fidl_to_linux_converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (touch_source_proxy, resume_event) = match event_proxy_mode {
-                    EventProxyMode::WakeContainer => {
-                        // Proxy the touch events through the Starnix runner. This allows touch events to
-                        // wake the container when it is suspended.
-                        let (touch_source_channel, resume_event) =
-                            create_proxy_for_wake_events(touch_source_client_end.into_channel());
-                        (
-                            fuipointer::TouchSourceProxy::new(fidl::AsyncChannel::from_channel(
-                                touch_source_channel,
-                            )),
-                            Some(resume_event),
-                        )
-                    }
-                    EventProxyMode::None => (
-                        touch_source_client_end.into_proxy().expect("Failed to create proxy"),
-                        None,
-                    ),
-                };
-
-                let mut previous_event_disposition = vec![];
-                loop {
-                    // Create the future to watch for the the next input events, but don't execute
-                    // it...
-                    let watch_future = touch_source_proxy.watch(&previous_event_disposition);
-
-                    // .. until the event that we passed to the runner has been cleared. This prevents
-                    // the container from suspending between calls to `watch`.
-                    let (clear_mask, set_mask) =
-                        (zx::Signals::EVENT_SIGNALED, zx::Signals::empty());
-                    resume_event.as_ref().map(|e| {
-                        // The proxy may have dropped the signal peer by now, so disregard errors.
-                        // In the future we may need a better way to check that this is expected.
-                        let _ = e.signal_peer(clear_mask, set_mask);
-                    });
-
-                    match watch_future.await {
-                        Ok(touch_events) => {
-                            let num_received_events: u64 = touch_events.len().try_into().unwrap();
-                            previous_event_disposition =
-                                touch_events.iter().map(make_response_for_fidl_event).collect();
-                            let (
-                                mut new_events,
-                                num_converted_events,
-                                num_ignored_events,
-                                num_unexpected_events,
-                            ) = fidl_to_linux_converter.handle(touch_events);
-
-                            let mut files = slf.open_files.lock();
-                            let filtered_files: Vec<Arc<InputFile>> =
-                                files.drain(..).flat_map(|f| f.upgrade()).collect();
-                            for file in filtered_files {
-                                let mut inner = file.inner.lock();
-                                match &inner.inspect_status {
-                                    Some(inspect_status) => {
-                                        inspect_status.count_received_events(num_received_events);
-                                        inspect_status.count_ignored_events(num_ignored_events);
-                                        inspect_status
-                                            .count_unexpected_events(num_unexpected_events);
-                                        inspect_status.count_converted_events(num_converted_events);
-                                        inspect_status.count_generated_events(
-                                            new_events.len().try_into().unwrap(),
-                                        );
-                                    }
-                                    None => (),
-                                }
-
-                                if !new_events.is_empty() {
-                                    // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
-                                    // not provide access to events that occurred before the file was
-                                    // opened.
-                                    inner.events.append(&mut new_events);
-                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                                }
-
-                                files.push(Arc::downgrade(&file));
-                            }
-                        }
-                        Err(e) => {
-                            log_warn!(
-                                "error {:?} reading from TouchSourceProxy; input is stopped",
-                                e
-                            );
-                            break;
-                        }
-                    };
-                }
-            })
-        });
     }
 
     pub fn start_keyboard_relay(
@@ -362,7 +239,7 @@ impl InputDevice {
         loop {
             let next_event_future = local_listener_stream.next();
 
-            let (clear_mask, set_mask) = (zx::Signals::EVENT_SIGNALED, zx::Signals::empty());
+            let (clear_mask, set_mask) = (RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL);
             local_resume_event.as_ref().map(|e| {
                 let _ = e.signal_peer(clear_mask, set_mask);
             });
@@ -426,7 +303,7 @@ impl InputDevice {
     }
 
     #[cfg(test)]
-    fn open_test(
+    pub fn open_test(
         &self,
         current_task: &CurrentTask,
     ) -> Result<starnix_core::vfs::FileHandle, Errno> {
@@ -487,16 +364,6 @@ impl DeviceOps for InputDevice {
     }
 }
 
-/// get_next_device_id() returns the current value of NEXT_DEVICE_ID for next
-/// available device id, and increase the NEXT_DEVICE_ID for next call.
-pub fn get_next_device_id() -> u32 {
-    // Maintain an atomic increment number as device_id, used as X in
-    // /dev/input/eventX.
-    static NEXT_DEVICE_ID: AtomicU32 = AtomicU32::new(0);
-
-    NEXT_DEVICE_ID.fetch_add(1, Ordering::SeqCst)
-}
-
 fn parse_fidl_button_event(
     fidl_event: &MediaButtonsEvent,
     power_was_pressed: bool,
@@ -533,23 +400,12 @@ fn parse_fidl_button_event(
     (events, power_is_pressed, function_is_pressed)
 }
 
-/// Returns a FIDL response for `fidl_event`.
-fn make_response_for_fidl_event(fidl_event: &FidlTouchEvent) -> FidlTouchResponse {
-    match fidl_event {
-        FidlTouchEvent { pointer_sample: Some(_), .. } => FidlTouchResponse {
-            response_type: Some(TouchResponseType::Yes), // Event consumed by Starnix.
-            trace_flow_id: fidl_event.trace_flow_id,
-            ..Default::default()
-        },
-        _ => FidlTouchResponse::default(),
-    }
-}
-
 #[cfg(test)]
 mod test {
     #![allow(clippy::unused_unit)] // for compatibility with `test_case`
 
     use super::*;
+    use crate::input_event_relay;
     use anyhow::anyhow;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
@@ -600,10 +456,12 @@ mod test {
             fidl::endpoints::create_request_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
 
-        input_device.start_touch_relay(
-            current_task.kernel(),
-            touch_source_client_end,
+        let relay = input_event_relay::InputEventsRelay::new();
+        relay.start_relays(
+            &current_task.kernel(),
             EventProxyMode::None,
+            touch_source_client_end,
+            input_device.open_files.clone(),
         );
 
         (input_device, input_file, touch_source_stream)
@@ -683,17 +541,40 @@ mod test {
         pointer_id: u32,
         time_nanos: i64,
     ) -> fuipointer::TouchEvent {
+        make_touch_event_with_coords_phase_timestamp_device_id(
+            x, y, phase, pointer_id, time_nanos, 0,
+        )
+    }
+
+    fn make_empty_touch_event() -> fuipointer::TouchEvent {
+        TouchEvent {
+            pointer_sample: Some(TouchPointerSample {
+                interaction: Some(TouchInteractionId {
+                    pointer_id: 0,
+                    device_id: 0,
+                    interaction_id: 0,
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn make_touch_event_with_coords_phase_timestamp_device_id(
+        x: f32,
+        y: f32,
+        phase: EventPhase,
+        pointer_id: u32,
+        time_nanos: i64,
+        device_id: u32,
+    ) -> fuipointer::TouchEvent {
         TouchEvent {
             timestamp: Some(time_nanos),
             pointer_sample: Some(TouchPointerSample {
                 position_in_viewport: Some([x, y]),
                 // Default to `Change`, because that has the fewest side effects.
                 phase: Some(phase),
-                interaction: Some(TouchInteractionId {
-                    pointer_id,
-                    device_id: 0,
-                    interaction_id: 0,
-                }),
+                interaction: Some(TouchInteractionId { pointer_id, device_id, interaction_id: 0 }),
                 ..Default::default()
             }),
             ..Default::default()
@@ -713,8 +594,8 @@ mod test {
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
             match file.read(&mut locked, current_task, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(
-                    uapi::input_event::read_from(Vec::from(event_bytes).as_slice())
-                        .ok_or(anyhow!("failed to read input_event from buffer")),
+                    uapi::input_event::read_from_bytes(Vec::from(event_bytes).as_slice())
+                        .map_err(|_| anyhow!("failed to read input_event from buffer")),
                 ),
                 Ok(other_size) => {
                     Some(Err(anyhow!("got {} bytes (expected {})", other_size, INPUT_EVENT_SIZE)))
@@ -1022,7 +903,7 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
         // `uapi::input_event`s. This should be counted as a received event and an ignored event.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -1031,7 +912,7 @@ mod test {
 
         // Reply to `Watch` request of empty event. This should be counted as a received event and
         // an ignored event.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
 
         // Wait for another `Watch`.
         match touch_source_stream.next().await {
@@ -1080,7 +961,7 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
         // `uapi::input_event`s. This should be counted as a received event and an ignored event.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -1131,7 +1012,7 @@ mod test {
         // Wait for another `Watch` to ensure input_file done processing the first reply.
         // Use an empty `TouchEvent`, to minimize the chance that this event
         // creates unexpected `uapi::input_event`s.
-        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_empty_touch_event()]).await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
@@ -1788,7 +1669,7 @@ mod test {
         // A TouchEvent::default() has no pointer sample so these events should be discarded.
         match touch_source_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responder, .. })) => responder
-                .send(&vec![TouchEvent::default(); 2])
+                .send(&vec![make_empty_touch_event(); 2])
                 .expect("failure sending Watch reply"),
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }

@@ -104,8 +104,18 @@ macro_rules! tree_assertion {
     }};
 
     // Key identifier format
+    // Unquoted, e.g.: `foo: ... `
     (@build $tree_assertion:expr, $key:ident: $($rest:tt)+) => {{
         let key = stringify!($key);
+        $crate::tree_assertion!(@build $tree_assertion, var key: $($rest)+);
+    }};
+    // Key identifier as a constant.
+    // e.g.: `ref some::crate::CONSTANT: ...`
+    //
+    // Note, this works ONLY if it's a full path. For unquoted literals,
+    // such as `foo`, see the production above.
+    (@build $tree_assertion:expr, ref $key:path: $($rest:tt)+) => {{
+        let key: &str = $key.as_ref(); // Accept only AsRef<str>
         $crate::tree_assertion!(@build $tree_assertion, var key: $($rest)+);
     }};
     // Allows string literal for key
@@ -1026,6 +1036,22 @@ mod tests {
         let time_key = "@time";
         assert_data_tree!(diagnostics_hierarchy, key: {
             var time_key: "1.000"
+        });
+    }
+
+    const KEY_AS_STR: &str = "@time";
+
+    // Similar to above, except the key is stored in a constant.
+    #[fuchsia::test]
+    fn test_path_key_syntax() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::String("@time".to_string(), "1.000".to_string())],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            // This is a fully qualified path on purpose.
+            ref crate::tests::KEY_AS_STR: "1.000"
         });
     }
 

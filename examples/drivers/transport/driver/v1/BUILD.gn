@@ -4,6 +4,13 @@
 
 import("//build/drivers.gni")
 
+group("drivers") {
+  deps = [
+    ":child_component",
+    ":parent_component",
+  ]
+}
+
 driver_bind_rules("parent_bind") {
   rules = "meta/parent-driver.bind"
   bind_output = "parent-driver.bindbc"

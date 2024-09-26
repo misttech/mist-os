@@ -52,6 +52,7 @@ def send_http_request(
 
     Raises:
         errors.HttpRequestError: In case of failures.
+        errors.HttpTimeoutError: Requests timed out.
     """
     if exceptions_to_skip is None:
         exceptions_to_skip = []
@@ -102,6 +103,14 @@ def send_http_request(
                     "%s on iteration %s/%s", err_msg, attempt, attempts
                 )
                 continue
+
+            if isinstance(err, urllib.error.URLError) and isinstance(
+                err.reason, TimeoutError
+            ):
+                raise errors.HttpTimeoutError(
+                    f"{err_msg} after {timeout}s"
+                ) from err
+
             raise errors.HttpRequestError(err_msg) from err
     raise errors.HttpRequestError(
         f"Failed to send the HTTP request to url={url} with data={data} and "

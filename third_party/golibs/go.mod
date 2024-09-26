@@ -1,6 +1,6 @@
 module go.fuchsia.dev/fuchsia
 
-go 1.20
+go 1.21.1
 
 require (
 	cloud.google.com/go/storage v1.27.0
@@ -29,7 +29,6 @@ require (
 	golang.org/x/sys v0.17.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/api v0.103.0
-	google.golang.org/grpc v1.53.0-dev.0.20230123225046-4075ef07c5d5
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.3.0
 	google.golang.org/protobuf v1.32.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -62,4 +61,5 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/grpc v1.53.0-dev.0.20230123225046-4075ef07c5d5 // indirect
 )

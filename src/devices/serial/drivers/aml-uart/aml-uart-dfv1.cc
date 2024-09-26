@@ -17,11 +17,16 @@
 namespace serial {
 
 zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
-  zx_status_t status;
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "AmlUart::Create: Could not get pdev");
-    return ZX_ERR_NO_RESOURCES;
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                          "pdev");
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to connect to pdev: %s", result.status_string());
+      return result.status_value();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
   zx::result info = ddk::GetEncodedMetadata<fuchsia_hardware_serial::wire::SerialPortInfo>(
@@ -31,11 +36,10 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
     return info.error_value();
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_map_&mmio__buffer failed %d", __func__, status);
-    return status;
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
 
   fbl::AllocChecker ac;
@@ -44,7 +48,7 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  return uart->Init(std::move(pdev), **info, *std::move(mmio));
+  return uart->Init(std::move(pdev), **info, std::move(mmio.value()));
 }
 
 void AmlUartV1::DdkUnbind(ddk::UnbindTxn txn) {
@@ -67,7 +71,7 @@ void AmlUartV1::DdkRelease() {
   delete this;
 }
 
-zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev,
+zx_status_t AmlUartV1::Init(fdf::PDev pdev,
                             const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
                             fdf::MmioBuffer mmio) {
   zx::result irq_dispatcher_result =

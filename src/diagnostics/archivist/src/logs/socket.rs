@@ -130,7 +130,7 @@ mod tests {
         let mut ls = LogMessageSocket::new(socket, Default::default());
         sin.write(packet.as_bytes()).unwrap();
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(packet.metadata.time).into(),
+            timestamp: zx::BootTime::from_nanos(packet.metadata.time).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Info,
@@ -170,7 +170,7 @@ mod tests {
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
 
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: timestamp.into(),
+            timestamp: zx::BootTime::from_nanos(timestamp).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Fatal,

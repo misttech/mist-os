@@ -81,8 +81,6 @@ pub fn watch_phy_devices<'a>(
 mod tests {
     use super::*;
     use fidl_fuchsia_wlan_device::{ConnectorRequest, ConnectorRequestStream};
-    use fuchsia_async as fasync;
-    use fuchsia_zircon::DurationNum as _;
     use futures::poll;
     use futures::stream::StreamExt as _;
     use futures::task::Poll;
@@ -94,6 +92,7 @@ mod tests {
     use vfs::path::Path;
     use vfs::pseudo_directory;
     use wlan_common::test_utils::ExpectWithin;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fasync::run_singlethreaded(test)]
     async fn watch_single_phy() {
@@ -108,7 +107,7 @@ mod tests {
 
         phy_watcher
             .next()
-            .expect_within(60.seconds(), "phy_watcher did not respond")
+            .expect_within(zx::Duration::from_seconds(60), "phy_watcher did not respond")
             .await
             .expect("phy_watcher ended without yielding a phy")
             .expect("phy_watcher returned an error");
@@ -133,7 +132,7 @@ mod tests {
         for _ in 0..2 {
             phy_watcher
                 .next()
-                .expect_within(60.seconds(), "phy_watcher did not respond")
+                .expect_within(zx::Duration::from_seconds(60), "phy_watcher did not respond")
                 .await
                 .expect("phy_watcher ended without yielding a phy")
                 .expect("phy_watcher returned an error");

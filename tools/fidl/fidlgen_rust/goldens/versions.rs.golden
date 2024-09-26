@@ -223,7 +223,10 @@ impl OtherProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<OtherProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<OtherProtocolEvent, fidl::Error> {
         OtherProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }
@@ -423,6 +426,16 @@ impl fidl::endpoints::ControlHandle for OtherProtocolControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl OtherProtocolControlHandle {}
@@ -481,7 +494,10 @@ impl ProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -671,13 +687,11 @@ impl futures::Stream for ProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x567a8096af6e6139 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::Foo { control_handle })
                 }
@@ -773,6 +787,16 @@ impl fidl::endpoints::ControlHandle for ProtocolControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl ProtocolControlHandle {}
@@ -859,18 +883,16 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for Bits {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for Bits {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for Bits {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -880,7 +902,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Bits {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Bits {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::empty()
@@ -889,7 +911,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -926,18 +948,16 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for Enum {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for Enum {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for Enum {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -947,7 +967,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Enum {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Enum {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::unknown()
@@ -956,7 +976,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -965,6 +985,15 @@ mod internal {
 
             *self = Self::from_primitive_allow_unknown(prim);
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ResourceTypeMarker for Struct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
         }
     }
 
@@ -990,20 +1019,17 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for Struct {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Struct> for &mut Struct {
+    unsafe impl fidl::encoding::Encode<Struct, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut Struct
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1018,11 +1044,16 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u32>> fidl::encoding::Encode<Struct> for (T0,) {
+    unsafe impl<T0: fidl::encoding::Encode<u32, fidl::encoding::DefaultFuchsiaResourceDialect>>
+        fidl::encoding::Encode<Struct, fidl::encoding::DefaultFuchsiaResourceDialect> for (T0,)
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1035,16 +1066,19 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Struct {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for Struct {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { x: fidl::new_empty!(u32) }
+            Self { x: fidl::new_empty!(u32, fidl::encoding::DefaultFuchsiaResourceDialect) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1069,6 +1103,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ResourceTypeMarker for Table {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Table {
         type Owned = Self;
 
@@ -1082,19 +1125,16 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for Table {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Table> for &mut Table {
+    unsafe impl fidl::encoding::Encode<Table, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut Table
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1128,7 +1168,10 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<u32>(
+            fidl::encoding::encode_in_envelope_optional::<
+                u32,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >(
                 self.x.as_ref().map(<u32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1141,7 +1184,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Table {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for Table {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -1149,7 +1192,10 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1201,8 +1247,17 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(u32));
-                fidl::decode!(u32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.x.get_or_insert_with(|| {
+                    fidl::new_empty!(u32, fidl::encoding::DefaultFuchsiaResourceDialect)
+                });
+                fidl::decode!(
+                    u32,
+                    fidl::encoding::DefaultFuchsiaResourceDialect,
+                    val_ref,
+                    decoder,
+                    inner_offset,
+                    inner_depth
+                )?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -1225,6 +1280,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ResourceTypeMarker for Union {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Union {
         type Owned = Self;
 
@@ -1238,27 +1302,27 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for Union {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Union> for &mut Union {
+    unsafe impl fidl::encoding::Encode<Union, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut Union
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Union>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                Union::X(ref val) => fidl::encoding::encode_in_envelope::<u32>(
+                Union::X(ref val) => fidl::encoding::encode_in_envelope::<
+                    u32,
+                    fidl::encoding::DefaultFuchsiaResourceDialect,
+                >(
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -1269,7 +1333,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Union {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for Union {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -1278,7 +1342,10 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1313,11 +1380,21 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = Union::X(fidl::new_empty!(u32));
+                        *self = Union::X(fidl::new_empty!(
+                            u32,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let Union::X(ref mut val) = self {
-                        fidl::decode!(u32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(
+                            u32,
+                            fidl::encoding::DefaultFuchsiaResourceDialect,
+                            val,
+                            decoder,
+                            _inner_offset,
+                            depth
+                        )?;
                     } else {
                         unreachable!()
                     }

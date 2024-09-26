@@ -30,45 +30,45 @@ use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketRaw};
 use packet_formats::tcp::options::TcpOption;
 use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions, TcpSegmentRaw};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
-use zerocopy::{ByteSlice, ByteSliceMut};
+use zerocopy::{SplitByteSlice, SplitByteSliceMut};
 
 /// An IP extension trait for the filtering crate.
 pub trait FilterIpExt: IpExt {
     /// A marker type to add an [`IpPacket`] bound to [`Self::Packet`].
-    type FilterIpPacket<B: ByteSliceMut>: IpPacket<Self>;
+    type FilterIpPacket<B: SplitByteSliceMut>: IpPacket<Self>;
 
     /// A no-op conversion to help the compiler identify that [`Self::Packet`]
     /// actually implements [`IpPacket`].
-    fn as_filter_packet<B: ByteSliceMut>(packet: Self::Packet<B>) -> Self::FilterIpPacket<B>;
+    fn as_filter_packet<B: SplitByteSliceMut>(packet: Self::Packet<B>) -> Self::FilterIpPacket<B>;
 
     /// The reciprocal of [`Self::as_filter_ip_packet`].
-    fn as_ip_packet<B: ByteSliceMut>(packet: Self::FilterIpPacket<B>) -> Self::Packet<B>;
+    fn as_ip_packet<B: SplitByteSliceMut>(packet: Self::FilterIpPacket<B>) -> Self::Packet<B>;
 }
 
 impl FilterIpExt for Ipv4 {
-    type FilterIpPacket<B: ByteSliceMut> = Ipv4Packet<B>;
+    type FilterIpPacket<B: SplitByteSliceMut> = Ipv4Packet<B>;
 
     #[inline]
-    fn as_filter_packet<B: ByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
+    fn as_filter_packet<B: SplitByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
         packet
     }
 
     #[inline]
-    fn as_ip_packet<B: ByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
+    fn as_ip_packet<B: SplitByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
         packet
     }
 }
 
 impl FilterIpExt for Ipv6 {
-    type FilterIpPacket<B: ByteSliceMut> = Ipv6Packet<B>;
+    type FilterIpPacket<B: SplitByteSliceMut> = Ipv6Packet<B>;
 
     #[inline]
-    fn as_filter_packet<B: ByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
+    fn as_filter_packet<B: SplitByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
         packet
     }
 
     #[inline]
-    fn as_ip_packet<B: ByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
+    fn as_ip_packet<B: SplitByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
         packet
     }
 }
@@ -275,7 +275,7 @@ pub trait TransportPacketMut<I: IpExt> {
     fn update_pseudo_header_dst_addr(&mut self, old: I::Addr, new: I::Addr);
 }
 
-impl<B: ByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
+impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
     type TransportPacket<'a> = &'a Self where Self: 'a;
     type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, Ipv4>> where B: 'a;
 
@@ -338,7 +338,7 @@ impl<B: ByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
     }
 }
 
-impl<B: ByteSlice> MaybeTransportPacket for Ipv4Packet<B> {
+impl<B: SplitByteSlice> MaybeTransportPacket for Ipv4Packet<B> {
     fn transport_packet_data(&self) -> Option<TransportPacketData> {
         parse_transport_header_in_ipv4_packet(
             self.src_ip(),
@@ -349,7 +349,7 @@ impl<B: ByteSlice> MaybeTransportPacket for Ipv4Packet<B> {
     }
 }
 
-impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
+impl<B: SplitByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
     type TransportPacket<'a> = &'a Self where Self: 'a;
     type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, Ipv6>> where B: 'a;
 
@@ -412,7 +412,7 @@ impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
     }
 }
 
-impl<B: ByteSlice> MaybeTransportPacket for Ipv6Packet<B> {
+impl<B: SplitByteSlice> MaybeTransportPacket for Ipv6Packet<B> {
     fn transport_packet_data(&self) -> Option<TransportPacketData> {
         parse_transport_header_in_ipv6_packet(
             self.src_ip(),

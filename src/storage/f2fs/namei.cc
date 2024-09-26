@@ -32,7 +32,6 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
 }
 
 zx::result<> Dir::RecoverLink(VnodeF2fs &vnode) {
-  fs::SharedLock lock(f2fs::GetGlobalLock());
   std::lock_guard dir_lock(mutex_);
   fbl::RefPtr<Page> page;
   auto dir_entry = FindEntry(vnode.GetNameView(), &page);
@@ -445,27 +444,22 @@ zx_status_t Dir::Unlink(std::string_view name, bool must_be_dir) {
     return ZX_ERR_BAD_STATE;
   }
   fbl::RefPtr<fs::Vnode> vnode;
-  if (zx_status_t status = Lookup(name, &vnode); status != ZX_OK) {
+  fs::SharedLock lock(f2fs::GetGlobalLock());
+  std::lock_guard dir_lock(mutex_);
+  if (zx_status_t status = DoLookup(name, &vnode); status != ZX_OK) {
     return status;
   }
-  {
-    fs::SharedLock lock(f2fs::GetGlobalLock());
-    std::lock_guard dir_lock(mutex_);
-    fbl::RefPtr<VnodeF2fs> removed = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(vnode));
-    zx_status_t ret;
-    if (removed->IsDir()) {
-      fbl::RefPtr<Dir> dir = fbl::RefPtr<Dir>::Downcast(std::move(removed));
-      ret = Rmdir(dir.get(), name);
-    } else if (must_be_dir) {
-      return ZX_ERR_NOT_DIR;
-    } else {
-      ret = DoUnlink(removed.get(), name);
-    }
-    if (ret != ZX_OK) {
-      return ret;
-    }
+  fbl::RefPtr<VnodeF2fs> removed = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(vnode));
+  zx_status_t ret;
+  if (removed->IsDir()) {
+    fbl::RefPtr<Dir> dir = fbl::RefPtr<Dir>::Downcast(std::move(removed));
+    ret = Rmdir(dir.get(), name);
+  } else if (must_be_dir) {
+    return ZX_ERR_NOT_DIR;
+  } else {
+    ret = DoUnlink(removed.get(), name);
   }
-  return ZX_OK;
+  return ret;
 }
 
 }  // namespace f2fs

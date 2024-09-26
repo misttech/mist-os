@@ -128,7 +128,7 @@
         },
         {
             protocol: [
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.provider.Registry",
             ],
 
@@ -166,7 +166,14 @@
             availability: "optional",
         },
         {
-            service: "fuchsia.hardware.spmi.Service",
+            service: [
+                "fuchsia.hardware.spmi.SubTargetService",
+                "fuchsia.hardware.spmi.TargetService",
+            ],
+            availability: "optional",
+        },
+        {
+            service: "fuchsia.gpu.magma.Service",
             availability: "optional",
         },
         {
@@ -184,6 +191,7 @@
             // Used by power integration tests running against the testing variant of the
             // system-activity-governor.
             protocol: [
+                "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
                 "test.sagcontrol.State",

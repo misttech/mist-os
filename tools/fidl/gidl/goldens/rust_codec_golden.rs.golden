@@ -14,7 +14,7 @@ use {
     gidl_util::{
         HandleDef, HandleSubtype, copy_handle, create_handles, decode_value,
         get_handle_koid, get_info_handle_valid, repeat, select_handle_infos,
-        select_raw_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t,
+        select_raw_handle_infos, to_zx_handle_disposition_t,
     },
 };
 
@@ -260,7 +260,7 @@ HandleDef{
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ]);
     assert_eq!(
-        handle_dispositions.iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
+        handle_dispositions.into_iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
         &[
 zx_types::zx_handle_disposition_t {
    operation: zx_types::ZX_HANDLE_OP_MOVE,
@@ -286,7 +286,7 @@ HandleDef{
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 ]);
     assert_eq!(
-        handle_dispositions.iter().map(to_zx_handle_t).collect::<Vec<_>>(),
+        handle_dispositions.iter().map(|h| h.raw_handle()).collect::<Vec<_>>(),
         &[handle_defs[0].handle,
 ]
     );

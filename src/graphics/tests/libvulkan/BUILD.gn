@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/resource.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("src") {
   testonly = true
@@ -21,7 +22,7 @@ source_set("src") {
   public_deps += [ "//src/lib/vulkan" ]
 }
 
-executable("libvulkan_test_bin") {
+cc_test_executable("libvulkan_test_bin") {
   testonly = true
   output_name = "libvulkan_test"
 

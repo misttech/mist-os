@@ -4,11 +4,12 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("log_message_store_unittest_exe") {
+cc_test_executable("log_message_store_unittest_exe") {
   testonly = true
 
   sources = [ "log_message_store_unittest.cc" ]
@@ -26,7 +27,7 @@ executable("log_message_store_unittest_exe") {
   ]
 }
 
-executable("lz4_encoding_unittest_exe") {
+cc_test_executable("lz4_encoding_unittest_exe") {
   testonly = true
 
   sources = [ "lz4_encoding_unittest.cc" ]
@@ -46,7 +47,7 @@ executable("lz4_encoding_unittest_exe") {
   ]
 }
 
-executable("reader_unittest_exe") {
+cc_test_executable("reader_unittest_exe") {
   testonly = true
 
   sources = [ "reader_unittest.cc" ]
@@ -66,7 +67,7 @@ executable("reader_unittest_exe") {
   ]
 }
 
-executable("system_log_recorder_unittest_exe") {
+cc_test_executable("system_log_recorder_unittest_exe") {
   testonly = true
 
   sources = [ "system_log_recorder_unittest.cc" ]
@@ -88,7 +89,7 @@ executable("system_log_recorder_unittest_exe") {
   ]
 }
 
-executable("writer_unittest_exe") {
+cc_test_executable("writer_unittest_exe") {
   testonly = true
 
   sources = [ "writer_unittest.cc" ]

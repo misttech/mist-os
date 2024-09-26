@@ -137,8 +137,9 @@ impl ZbiParser {
         &self,
         bytes: &'a [u8],
     ) -> Result<(ZbiType, Ref<&'a [u8], zbi_header_t>), ZbiParserError> {
-        let header = Ref::<&[u8], zbi_header_t>::new_unaligned(&bytes[..])
-            .ok_or(ZbiParserError::FailedToParseHeader)?;
+        let header = Ref::<&[u8], zbi_header_t>::from_bytes(&bytes[..])
+            .map_err(Into::into)
+            .map_err(|_: zerocopy::SizeError<_, _>| ZbiParserError::FailedToParseHeader)?;
 
         if header.magic.get() != ZBI_ITEM_MAGIC {
             return Err(ZbiParserError::InvalidHeaderMagic { actual: header.magic.get() });
@@ -476,7 +477,7 @@ mod tests {
     use super::*;
     use anyhow::Error;
     use zerocopy::byteorder::little_endian::U32;
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     fn check_item_bytes(builder: &ZbiBuilder, parser: &ZbiParser) {
         for (zbi_type, items) in &parser.items {

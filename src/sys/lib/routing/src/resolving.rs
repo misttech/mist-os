@@ -16,6 +16,9 @@ use {
     fuchsia_zircon_status as zx,
 };
 
+#[cfg(target_os = "fuchsia")]
+use cm_rust::{FidlIntoNative, NativeIntoFidl};
+
 /// The prefix for relative URLs internally represented as url::Url.
 const RELATIVE_URL_PREFIX: &str = "relative:///";
 lazy_static! {
@@ -38,6 +41,115 @@ pub struct ResolvedComponent {
     pub package: Option<ResolvedPackage>,
     pub config_values: Option<cm_rust::ConfigValuesData>,
     pub abi_revision: Option<AbiRevision>,
+}
+
+// This block and others in this file only build on target, because these functions rely on
+// mem_util which has a test dependency on `vfs`, which isn't typically allowed to be built on
+// host.
+#[cfg(target_os = "fuchsia")]
+impl TryFrom<fresolution::Component> for ResolvedComponent {
+    type Error = ResolverError;
+
+    fn try_from(component: fresolution::Component) -> Result<Self, Self::Error> {
+        let decl_buffer: fidl_fuchsia_mem::Data =
+            component.decl.ok_or(ResolverError::RemoteInvalidData)?;
+        let decl = read_and_validate_manifest(&decl_buffer)?;
+        let config_values = match &decl.config {
+            Some(config) => match config.value_source {
+                cm_rust::ConfigValueSource::PackagePath(_) => {
+                    Some(read_and_validate_config_values(
+                        &component.config_values.ok_or(ResolverError::RemoteInvalidData)?,
+                    )?)
+                }
+                cm_rust::ConfigValueSource::Capabilities(_) => None,
+            },
+            None => None,
+        };
+        let resolved_url = component.url.ok_or(ResolverError::RemoteInvalidData)?;
+        let context_to_resolve_children = component.resolution_context.map(Into::into);
+        let abi_revision = component.abi_revision.map(Into::into);
+        Ok(ResolvedComponent {
+            resolved_url,
+            context_to_resolve_children,
+            decl,
+            package: component.package.map(TryInto::try_into).transpose()?,
+            config_values,
+            abi_revision,
+        })
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<ResolvedComponent> for fresolution::Component {
+    fn from(component: ResolvedComponent) -> Self {
+        let ResolvedComponent {
+            resolved_url,
+            context_to_resolve_children,
+            decl,
+            package,
+            config_values,
+            abi_revision,
+        } = component;
+        let decl_bytes = fidl::persist(&decl.native_into_fidl())
+            .expect("failed to serialize validated manifest");
+        let decl_vmo = fidl::Vmo::create(decl_bytes.len() as u64).expect("failed to create VMO");
+        decl_vmo.write(&decl_bytes, 0).expect("failed to write to VMO");
+        fresolution::Component {
+            url: Some(resolved_url.to_string()),
+            decl: Some(fidl_fuchsia_mem::Data::Buffer(fidl_fuchsia_mem::Buffer {
+                vmo: decl_vmo,
+                size: decl_bytes.len() as u64,
+            })),
+            package: package.map(|p| fresolution::Package {
+                url: Some(p.url),
+                directory: Some(p.directory),
+                ..Default::default()
+            }),
+            config_values: config_values.map(|config_values| {
+                let config_values_bytes = fidl::persist(&config_values.native_into_fidl())
+                    .expect("failed to serialize config values");
+                let config_values_vmo = fidl::Vmo::create(config_values_bytes.len() as u64)
+                    .expect("failed to create VMO");
+                config_values_vmo.write(&config_values_bytes, 0).expect("failed to write to VMO");
+                fidl_fuchsia_mem::Data::Buffer(fidl_fuchsia_mem::Buffer {
+                    vmo: config_values_vmo,
+                    size: config_values_bytes.len() as u64,
+                })
+            }),
+            resolution_context: context_to_resolve_children.map(Into::into),
+            abi_revision: abi_revision.map(Into::into),
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+pub fn read_and_validate_manifest(
+    data: &fidl_fuchsia_mem::Data,
+) -> Result<cm_rust::ComponentDecl, ResolverError> {
+    let bytes = mem_util::bytes_from_data(data).map_err(ResolverError::manifest_invalid)?;
+    read_and_validate_manifest_bytes(&bytes)
+}
+
+#[cfg(target_os = "fuchsia")]
+pub fn read_and_validate_manifest_bytes(
+    bytes: &[u8],
+) -> Result<cm_rust::ComponentDecl, ResolverError> {
+    let component_decl: fidl_fuchsia_component_decl::Component =
+        fidl::unpersist(bytes).map_err(ResolverError::manifest_invalid)?;
+    cm_fidl_validator::validate(&component_decl).map_err(ResolverError::manifest_invalid)?;
+    Ok(component_decl.fidl_into_native())
+}
+
+#[cfg(target_os = "fuchsia")]
+pub fn read_and_validate_config_values(
+    data: &fidl_fuchsia_mem::Data,
+) -> Result<cm_rust::ConfigValuesData, ResolverError> {
+    let bytes = mem_util::bytes_from_data(&data).map_err(ResolverError::config_values_invalid)?;
+    let values = fidl::unpersist(&bytes).map_err(ResolverError::fidl_error)?;
+    cm_fidl_validator::validate_values_data(&values)
+        .map_err(|e| ResolverError::config_values_invalid(e))?;
+    Ok(values.fidl_into_native())
 }
 
 /// The response returned from a Resolver. This struct is derived from the FIDL
@@ -205,12 +317,11 @@ async fn get_parent<C: ComponentInstanceInterface>(
     }
 }
 
-/// Indicates the kind of `ComponentAddress`, and holds `ComponentAddress`
-/// properties specific to its kind. Note that there is no kind for a relative
-/// resource component URL (a URL that only contains a resource fragment, such
-/// as `#meta/comp.cm`) because `ComponentAddress::from()` will translate a
-/// resource fragment component URL into one of the fully-resolvable
-/// `ComponentAddress`s.
+/// Indicates the kind of `ComponentAddress`, and holds `ComponentAddress` properties specific to
+/// its kind. Note that there is no kind for a relative resource component URL (a URL that only
+/// contains a resource fragment, such as `#meta/comp.cm`) because `ComponentAddress::from_url()`
+/// and `ComponentAddress::from_url_and_context()` will translate a resource fragment component URL
+/// into one of the fully-resolvable `ComponentAddress`s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComponentAddress {
     /// A fully-qualified component URL.
@@ -326,13 +437,35 @@ impl ComponentAddress {
         path.strip_prefix('/').unwrap_or(path)
     }
 
-    /// Parse the given `component_url` to determine if it is an absolute URL,
-    /// a relative subpackage URL, or a relative resource URL, and return the
-    /// corresponding `ComponentAddress` enum variant and value. If the URL is
-    /// relative, use the component instance to get the required resolution
-    /// context from the component's parent.
-    pub async fn from<C: ComponentInstanceInterface>(
+    /// Parse the given `component_url` to determine if it is an absolute URL, a relative
+    /// subpackage URL, or a relative resource URL, and return the corresponding `ComponentAddress`
+    /// enum variant and value. If the URL is relative, use the component instance to get the
+    /// required resolution context from the component's parent.
+    pub async fn from_url<C: ComponentInstanceInterface>(
         component_url: &cm_types::Url,
+        component: &Arc<C>,
+    ) -> Result<Self, ResolverError> {
+        Self::from(component_url, None, component).await
+    }
+
+    /// Parse the given `component_url` to determine if it is an absolute URL, a relative
+    /// subpackage URL, or a relative resource URL, and return the corresponding `ComponentAddress`
+    /// enum variant and value. If the URL is relative, the provided context is used.
+    pub async fn from_url_and_context<C: ComponentInstanceInterface>(
+        component_url: &cm_types::Url,
+        context: ComponentResolutionContext,
+        component: &Arc<C>,
+    ) -> Result<Self, ResolverError> {
+        Self::from(component_url, Some(context), component).await
+    }
+
+    /// This function is the helper for `from_url` and `from_url_and_context`. It assembles a new
+    /// `ComponentAddress`, using the provided resolution context. If a resolution context is not
+    /// provided, and the URL is a relative URL, the component's parent will be used to create a
+    /// context.
+    async fn from<C: ComponentInstanceInterface>(
+        component_url: &cm_types::Url,
+        context: Option<ComponentResolutionContext>,
         component: &Arc<C>,
     ) -> Result<Self, ResolverError> {
         let result = Self::from_absolute_url(component_url);
@@ -351,32 +484,33 @@ impl ComponentAddress {
             )));
         }
         if relative_path.is_empty() {
-            // The `component_url` had only a fragment, so the new address will
-            // be the same as its parent (for example, the same package), except
-            // for its resource.
+            // The `component_url` had only a fragment, so the new address will be the same as its
+            // parent (for example, the same package), except for its resource.
             let resolved_parent = ResolvedAncestorComponent::direct_parent_of(component).await?;
             resolved_parent.address.clone_with_new_resource(relative_url.fragment())
         } else {
-            // The `component_url` starts with a relative path (for example, a
-            // subpackage name). Create a `RelativePath` address, and resolve it
-            // using the `context_to_resolve_children`, from this component's
-            // parent, or the first ancestor that is from a "package". (Note
-            // that Realm Builder realms are synthesized, and not from a
-            // package. A test component using Realm Builder will build a realm
-            // and may add child components using subpackage references. Those
-            // child components should get resolved using the context of the
-            // test package, not the intermediate realm created via
-            // RealmBuilder.)
+            // The `component_url` starts with a relative path (for example, a subpackage name).
+            // Create a `RelativePath` address, and resolve it using the
+            // `context_to_resolve_children`, from this component's parent, or the first ancestor
+            // that is from a "package". (Note that Realm Builder realms are synthesized, and not
+            // from a package. A test component using Realm Builder will build a realm and may add
+            // child components using subpackage references. Those child components should get
+            // resolved using the context of the test package, not the intermediate realm created
+            // via RealmBuilder.)
             let resolved_ancestor =
                 ResolvedAncestorComponent::first_packaged_ancestor_of(component).await?;
             let scheme = resolved_ancestor.address.scheme();
-            let context = resolved_ancestor.context_to_resolve_children.clone().ok_or_else(|| {
-                    ResolverError::RelativeUrlMissingContext(format!(
-                        "Relative path component URL '{}' cannot be resolved because its ancestor did not provide a resolution context. The ancestor's component address is {:?}.",
-                         component_url, resolved_ancestor.address
-                    ))
-                })?;
-            Self::new_relative_path(relative_path, relative_url.fragment(), scheme, context)
+            if let Some(context) = context {
+                Self::new_relative_path(relative_path, relative_url.fragment(), scheme, context)
+            } else {
+                let context = resolved_ancestor.context_to_resolve_children.clone().ok_or_else(|| {
+                        ResolverError::RelativeUrlMissingContext(format!(
+                            "Relative path component URL '{}' cannot be resolved because its ancestor did not provide a resolution context. The ancestor's component address is {:?}.",
+                             component_url, resolved_ancestor.address
+                        ))
+                    })?;
+                Self::new_relative_path(relative_path, relative_url.fragment(), scheme, context)
+            }
         }
     }
 
@@ -620,6 +754,33 @@ impl From<fresolution::ResolverError> for ResolverError {
             fresolution::ResolverError::InvalidAbiRevision => {
                 ResolverError::abi_revision_invalid(RemoteError(err))
             }
+        }
+    }
+}
+
+impl From<ResolverError> for fresolution::ResolverError {
+    fn from(err: ResolverError) -> fresolution::ResolverError {
+        match err {
+            ResolverError::Internal(_) => fresolution::ResolverError::Internal,
+            ResolverError::Io(_) => fresolution::ResolverError::Io,
+            ResolverError::ManifestNotFound(_) => fresolution::ResolverError::ManifestNotFound,
+            ResolverError::PackageNotFound(_) => fresolution::ResolverError::PackageNotFound,
+            ResolverError::ManifestInvalid(_) => fresolution::ResolverError::InvalidManifest,
+            ResolverError::ConfigValuesInvalid(_) => fresolution::ResolverError::InvalidManifest,
+            ResolverError::AbiRevisionNotFound => fresolution::ResolverError::AbiRevisionNotFound,
+            ResolverError::AbiRevisionInvalid(_) => fresolution::ResolverError::InvalidAbiRevision,
+            ResolverError::ConfigValuesIo(_) => fresolution::ResolverError::Io,
+            ResolverError::SchemeNotRegistered => fresolution::ResolverError::NotSupported,
+            ResolverError::MalformedUrl(_) => fresolution::ResolverError::InvalidArgs,
+            ResolverError::NoParentContext(_) => fresolution::ResolverError::Internal,
+            ResolverError::PackageUrlMissing => fresolution::ResolverError::PackageNotFound,
+            ResolverError::PackageDirectoryMissing => fresolution::ResolverError::PackageNotFound,
+            ResolverError::RelativeUrlNotExpected(_) => fresolution::ResolverError::InvalidArgs,
+            ResolverError::RoutingError(_) => fresolution::ResolverError::Internal,
+            ResolverError::RelativeUrlMissingContext(_) => fresolution::ResolverError::InvalidArgs,
+            ResolverError::UnexpectedRelativePath(_) => fresolution::ResolverError::InvalidArgs,
+            ResolverError::RemoteInvalidData => fresolution::ResolverError::InvalidManifest,
+            ResolverError::FidlError(_) => fresolution::ResolverError::Internal,
         }
     }
 }

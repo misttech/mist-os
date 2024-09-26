@@ -46,7 +46,7 @@ impl Iommu {
     // [`zx_iommu_create`](https://fuchsia.dev/fuchsia-src/reference/syscalls/iommu_create) system call to create an iommu with type `ZX_IOMMU_TYPE_DUMMY`
     pub fn create_dummy(resource: &Resource, desc: IommuDescDummy) -> Result<Iommu, Status> {
         let mut iommu_handle = sys::zx_handle_t::default();
-        let mut desc_dummy = sys::zx_iommu_desc_dummy_t::from(desc);
+        let desc_dummy = sys::zx_iommu_desc_dummy_t::from(desc);
         let status = unsafe {
             // SAFETY:
             //  * desc parameter is a valid pointer (desc_dummy).
@@ -54,7 +54,7 @@ impl Iommu {
             sys::zx_iommu_create(
                 resource.raw_handle(),
                 sys::ZX_IOMMU_TYPE_DUMMY,
-                &mut desc_dummy as *mut sys::zx_iommu_desc_dummy_t as *const u8,
+                std::ptr::from_ref(&desc_dummy).cast::<u8>(),
                 std::mem::size_of_val(&desc_dummy),
                 &mut iommu_handle,
             )

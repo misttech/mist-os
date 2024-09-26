@@ -11,7 +11,7 @@ use crate::fuchsia::volume::FxVolume;
 use anyhow::{anyhow, Error};
 use arrayref::{array_refs, mut_array_refs};
 use async_trait::async_trait;
-use event_listener::EventListener;
+use event_listener::{EventListener, Listener as _};
 use fuchsia_hash::Hash;
 use fxfs::drop_event::DropEvent;
 use fxfs::errors::FxfsError;
@@ -727,7 +727,7 @@ mod tests {
             .expect("Creating transaction for new file");
         let id = root_dir
             .directory()
-            .create_child_file(&mut transaction, name, None)
+            .create_child_file(&mut transaction, name)
             .await
             .expect("Creating new_file")
             .object_id();

@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use thiserror::Error;
 use zerocopy::byteorder::big_endian::{U32 as BigEndianU32, U64 as BigEndianU64};
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 
 pub mod builder;
 
@@ -110,7 +110,7 @@ impl HashDescriptor {
     }
 }
 
-#[derive(AsBytes, NoCell, Debug, PartialEq)]
+#[derive(IntoBytes, Immutable, Debug, PartialEq)]
 #[repr(C, packed)]
 struct HashDescriptorHeader {
     tag: BigEndianU64,

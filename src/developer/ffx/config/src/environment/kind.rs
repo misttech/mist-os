@@ -17,6 +17,11 @@ pub enum EnvironmentKind {
     InTree { tree_root: PathBuf, build_dir: Option<PathBuf> },
     /// Isolated within a particular directory for testing or consistency purposes
     Isolated { isolate_root: PathBuf },
+    /// An environment context in which the config should:
+    /// a.) Be readonly.
+    /// b.) Return an error if any config values are not able to be found.
+    /// c.) No shell env substitution occurs (things like $FUCHSIA_DIR are not allowed).
+    CoreContext,
     /// Any other context with no specific information, using the user directory for
     /// all (non-global/default) configuration.
     NoContext,
@@ -71,6 +76,7 @@ impl std::fmt::Display for EnvironmentKind {
                 "Isolated environment with an isolated root of {root}",
                 root = isolate_root.display()
             ),
+            CoreContext => write!(f, "ffx-core Env Context"),
             NoContext => write!(f, "Global user context"),
         }
     }

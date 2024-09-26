@@ -35,7 +35,7 @@ pub use config_macros::FfxConfigBacked;
 
 pub use environment::{test_init, test_init_in_tree, Environment, EnvironmentContext, TestEnv};
 pub use sdk::{self, Sdk, SdkRoot};
-pub use storage::ConfigMap;
+pub use storage::{AssertNoEnv, AssertNoEnvError, ConfigMap};
 
 lazy_static::lazy_static! {
     static ref ENV: Mutex<Option<EnvironmentContext>> = Mutex::default();

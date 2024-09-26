@@ -12,7 +12,9 @@ use std::net::IpAddr;
 
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::byteorder::network_endian::{U16, U32};
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 const IPV4_SIZE: usize = 4;
 const IPV6_SIZE: usize = 16;
@@ -37,7 +39,7 @@ fn unwrap_domain_pointer(i: u16) -> u16 {
 pub trait EmbeddedPacketBuilder {
     fn bytes_len(&self) -> usize;
 
-    fn serialize<B: ByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV);
+    fn serialize<B: SplitByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV);
 
     /// Return the output of packet building as a Vec<u8>, useful for tests that don't care about
     /// zerocopy resource constraints.
@@ -51,14 +53,14 @@ pub trait EmbeddedPacketBuilder {
 
 struct BufferViewWrapper<B>(B);
 
-impl<B: ByteSlice + Clone> BufferView<B> for BufferViewWrapper<B> {
+impl<B: SplitByteSlice + Clone> BufferView<B> for BufferViewWrapper<B> {
     fn into_rest(self) -> B {
         self.0
     }
 
     fn take_front(&mut self, n: usize) -> Option<B> {
         if self.len() >= n {
-            let (ret, next) = self.0.clone().split_at(n);
+            let (ret, next) = self.0.clone().split_at(n).ok().unwrap();
             self.0 = next;
             Some(ret)
         } else {
@@ -73,7 +75,7 @@ impl<B: ByteSlice + Clone> BufferView<B> for BufferViewWrapper<B> {
     }
 }
 
-impl<B: ByteSlice> AsRef<[u8]> for BufferViewWrapper<B> {
+impl<B: SplitByteSlice> AsRef<[u8]> for BufferViewWrapper<B> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -186,7 +188,7 @@ impl TryFrom<u16> for Class {
 
 /// Represents an mDNS packet header.
 #[repr(C)]
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 pub struct Header {
     id: U16,
     flags: U16,
@@ -229,14 +231,14 @@ impl Header {
 }
 
 /// Represents a parsed mDNS question.
-pub struct Question<B: ByteSlice> {
+pub struct Question<B: SplitByteSlice> {
     pub domain: Domain<B>,
     pub qtype: Type,
     pub class: Class,
     pub unicast: bool,
 }
 
-impl<B: ByteSlice + Copy> Question<B> {
+impl<B: SplitByteSlice + Copy> Question<B> {
     fn parse<BV: BufferView<B>>(buffer: &mut BV, parent: Option<B>) -> Result<Self, ParseError> {
         let domain = Domain::parse(buffer, parent)?;
         let qtype = buffer.take_obj_front::<U16>().ok_or(ParseError::Malformed)?;
@@ -247,13 +249,13 @@ impl<B: ByteSlice + Copy> Question<B> {
     }
 }
 
-impl<B: ByteSlice + Copy> Display for Question<B> {
+impl<B: SplitByteSlice + Copy> Display for Question<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl<B: ByteSlice + Copy> Debug for Question<B> {
+impl<B: SplitByteSlice + Copy> Debug for Question<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -285,7 +287,7 @@ impl EmbeddedPacketBuilder for QuestionBuilder {
             + mem::size_of::<U16>() // class + unicast
     }
 
-    fn serialize<B: ByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
+    fn serialize<B: SplitByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
         self.domain.serialize(bv);
         bv.take_obj_front::<U16>().unwrap().set(self.qtype.into());
         bv.take_obj_front::<U16>().unwrap().set(self.class.into_u16_with_bool(self.unicast));
@@ -293,22 +295,22 @@ impl EmbeddedPacketBuilder for QuestionBuilder {
 }
 
 /// A parsed AAAA type record.
-#[derive(FromZeros, FromBytes, NoCell)]
+#[derive(KnownLayout, FromBytes, Immutable)]
 pub struct Aaaa([u8; IPV6_SIZE]);
 
 /// A parsed A type record.
-#[derive(FromZeros, FromBytes, NoCell)]
+#[derive(KnownLayout, FromBytes, Immutable)]
 pub struct A([u8; IPV4_SIZE]);
 
 /// A parsed SRV type record.
-pub struct SrvRecord<B: ByteSlice> {
+pub struct SrvRecord<B: SplitByteSlice> {
     priority: u16,
     weight: u16,
     port: u16,
     domain: Domain<B>,
 }
 
-impl<B: ByteSlice + Copy> SrvRecord<B> {
+impl<B: SplitByteSlice + Copy> SrvRecord<B> {
     fn parse<BV: BufferView<B>>(
         buffer: &mut BV,
         parent: Option<B>,
@@ -333,7 +335,7 @@ impl<B: ByteSlice + Copy> SrvRecord<B> {
 /// PTR type, this will always be a `RData::Domain`. In a SRV type packet, this
 /// will always be a `RData::Srv`, anything else, currently, will be converted
 /// into `RData::Bytes`.
-pub enum RData<B: ByteSlice> {
+pub enum RData<B: SplitByteSlice> {
     A(A),
     Aaaa(Aaaa),
     Bytes(B),
@@ -341,7 +343,7 @@ pub enum RData<B: ByteSlice> {
     Srv(SrvRecord<B>),
 }
 
-impl<B: ByteSlice> RData<B> {
+impl<B: SplitByteSlice> RData<B> {
     /// Returns a reference to a `SrvRecord` if possible `None` otherwise.
     fn srv(&self) -> Option<&SrvRecord<B>> {
         match self {
@@ -384,7 +386,7 @@ impl<B: ByteSlice> RData<B> {
 /// Record is the catch-all container for Answer, Authority, and Additional
 /// Records sections of an MDNS packet. This is the parsed version that is
 /// created when parsing a packet.
-pub struct Record<B: ByteSlice> {
+pub struct Record<B: SplitByteSlice> {
     pub domain: Domain<B>,
     pub rtype: Type,
     pub class: Class,
@@ -393,13 +395,13 @@ pub struct Record<B: ByteSlice> {
     pub rdata: RData<B>,
 }
 
-impl<B: ByteSlice + Copy> Display for Record<B> {
+impl<B: SplitByteSlice + Copy> Display for Record<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl<B: ByteSlice + Copy> Debug for Record<B> {
+impl<B: SplitByteSlice + Copy> Debug for Record<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: type {:?}, class {:?}", self.domain, self.rtype, self.class)?;
         match self.rtype {
@@ -445,7 +447,7 @@ fn valid_rdata_len(r: Type, len: u16) -> Result<u16, ParseError> {
     Ok(len)
 }
 
-impl<B: ByteSlice + Copy> Record<B> {
+impl<B: SplitByteSlice + Copy> Record<B> {
     fn parse<BV: BufferView<B>>(buffer: &mut BV, parent: Option<B>) -> Result<Self, ParseError> {
         let domain = Domain::parse(buffer, parent)?;
         let rtype: Type =
@@ -475,11 +477,11 @@ impl<B: ByteSlice + Copy> Record<B> {
             }
             Type::A => {
                 let buf = buffer.take_front(IPV4_SIZE).ok_or(ParseError::Malformed)?;
-                RData::A(A::read_from(&buf).ok_or(ParseError::Malformed)?)
+                RData::A(A::read_from_bytes(&buf).map_err(|_| ParseError::Malformed)?)
             }
             Type::Aaaa => {
                 let buf = buffer.take_front(IPV6_SIZE).ok_or(ParseError::Malformed)?;
-                RData::Aaaa(Aaaa::read_from(&buf).ok_or(ParseError::Malformed)?)
+                RData::Aaaa(Aaaa::read_from_bytes(&buf).map_err(|_| ParseError::Malformed)?)
             }
             _ => RData::Bytes(buffer.take_front(rdata_len.into()).ok_or(ParseError::Malformed)?),
         };
@@ -537,7 +539,7 @@ impl EmbeddedPacketBuilder for RecordBuilder<'_> {
             + self.rdata.len()
     }
 
-    fn serialize<B: ByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
+    fn serialize<B: SplitByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
         self.domain.serialize(bv);
         bv.take_obj_front::<U16>().unwrap().set(self.rtype.into());
         bv.take_obj_front::<U16>().unwrap().set(self.class.into_u16_with_bool(self.flush));
@@ -548,7 +550,7 @@ impl EmbeddedPacketBuilder for RecordBuilder<'_> {
 }
 
 /// A parsed mDNS message in its entirety.
-pub struct Message<B: ByteSlice> {
+pub struct Message<B: SplitByteSlice> {
     pub header: Ref<B, Header>,
     pub questions: Vec<Question<B>>,
     pub answers: Vec<Record<B>>,
@@ -556,7 +558,7 @@ pub struct Message<B: ByteSlice> {
     pub additional: Vec<Record<B>>,
 }
 
-impl<B: ByteSlice + Copy> Message<B> {
+impl<B: SplitByteSlice + Copy> Message<B> {
     #[inline]
     fn parse_records<BV: BufferView<B>>(
         buffer: &mut BV,
@@ -571,7 +573,7 @@ impl<B: ByteSlice + Copy> Message<B> {
     }
 }
 
-impl<B: ByteSlice + Copy> ParsablePacket<B, ()> for Message<B> {
+impl<B: SplitByteSlice + Copy> ParsablePacket<B, ()> for Message<B> {
     type Error = ParseError;
 
     fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> Result<Self, Self::Error> {
@@ -669,16 +671,16 @@ impl InnerPacketBuilder for MessageBuilder<'_> {
 /// A parsed mDNS domain. There is no need to worry about message compression
 /// when comparing against a string, and can be treated as a contiguous domain.
 #[derive(PartialEq, Eq)]
-pub struct Domain<B: ByteSlice> {
+pub struct Domain<B: SplitByteSlice> {
     fragments: Vec<B>,
 }
 
-enum DomainData<B: ByteSlice> {
+enum DomainData<B: SplitByteSlice> {
     Domain(B),
     Pointer(Option<B>, u16),
 }
 
-impl<B: ByteSlice + Copy> Domain<B> {
+impl<B: SplitByteSlice + Copy> Domain<B> {
     fn fmt_byte_slice(f: &mut Formatter<'_>, b: &B) -> std::fmt::Result {
         let mut iter = b.as_ref().iter();
         let mut idx = 0;
@@ -851,19 +853,19 @@ impl<B: ByteSlice + Copy> Domain<B> {
 
 /// Implementation of PartialEq to make it possible to compare a parsed domain
 /// with the initial string that was used to construct it.
-impl<B: ByteSlice + Copy> PartialEq<&str> for Domain<B> {
+impl<B: SplitByteSlice + Copy> PartialEq<&str> for Domain<B> {
     fn eq(&self, other: &&str) -> bool {
         self.partial_eq_helper_str(other).or_else::<bool, _>(|_| Ok(false)).unwrap()
     }
 }
 
-impl<B: ByteSlice + Copy> Display for Domain<B> {
+impl<B: SplitByteSlice + Copy> Display for Domain<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl<B: ByteSlice + Copy> Debug for Domain<B> {
+impl<B: SplitByteSlice + Copy> Debug for Domain<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut iter = self.fragments.iter();
         let data = iter.next().unwrap();
@@ -945,7 +947,7 @@ impl EmbeddedPacketBuilder for DomainBuilder {
         self.data.len()
     }
 
-    fn serialize<B: ByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
+    fn serialize<B: SplitByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
         bv.take_front(self.data.len()).unwrap().copy_from_slice(self.data.as_slice());
     }
 }
@@ -1040,14 +1042,14 @@ mod tests {
     #[test]
     fn test_ipv4_parse() {
         const ADDR: [u8; IPV4_SIZE] = [192, 168, 0, 2];
-        let a = RData::<&[u8]>::A(A::read_from(&ADDR[..]).unwrap());
+        let a = RData::<&[u8]>::A(A::read_from_bytes(&ADDR[..]).unwrap());
         assert_eq!(a.ip_addr(), Some(IpAddr::from(ADDR)));
     }
 
     #[test]
     fn test_ipv6_parse() {
         const ADDR: [u8; IPV6_SIZE] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-        let aaaa = RData::<&[u8]>::Aaaa(Aaaa::read_from(&ADDR[..]).unwrap());
+        let aaaa = RData::<&[u8]>::Aaaa(Aaaa::read_from_bytes(&ADDR[..]).unwrap());
         assert_eq!(aaaa.ip_addr(), Some(IpAddr::from(ADDR)));
     }
 

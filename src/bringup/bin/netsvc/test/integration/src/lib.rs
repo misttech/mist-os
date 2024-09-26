@@ -23,7 +23,7 @@ use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU16;
 use test_case::test_case;
 use zerocopy::byteorder::native_endian::U32;
-use zerocopy::{FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, Unaligned};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_tun as fnet_tun,
     fidl_fuchsia_netemul_network as fnetemul_network,
@@ -818,7 +818,7 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
     const TIMEOUT_OPTION_SECS: u8 = std::u8::MAX;
 
     #[repr(C)]
-    #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+    #[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
     // Defined in zircon/system/public/zircon/boot/netboot.h.
     struct BoardInfo {
         board_name: [u8; 32],
@@ -884,8 +884,8 @@ async fn get_board_info_inner(sock: fuchsia_async::net::UdpSocket, scope_id: u32
             .expect("unexpected message");
         assert_eq!(data.block(), 1);
         assert_eq!(data.payload().len(), std::mem::size_of::<BoardInfo>());
-        let board_info =
-            Ref::<_, BoardInfo>::new(data.payload().as_ref()).expect("failed to get board info");
+        let board_info = Ref::<_, BoardInfo>::from_bytes(data.payload().as_ref())
+            .expect("failed to get board info");
         let BoardInfo { board_name, board_revision, mac_address, _padding } = &*board_info;
         // mac_address is not filled by netsvc.
         assert_eq!(mac_address, [0u8; 6].as_ref());

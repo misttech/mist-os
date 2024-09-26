@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/board.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("pixeltests") {
   testonly = true
@@ -26,7 +27,7 @@ config("engine_pixeltest_config") {
   }
 }
 
-executable("pixeltests_with_real_display") {
+cc_test_executable("pixeltests_with_real_display") {
   output_name = "flatland_display_compositor_pixeltests"
   testonly = true
   deps = [ ":pixeltest_lib" ]
@@ -38,7 +39,7 @@ config("engine_pixeltest_with_fake_display_config") {
   defines = [ "FAKE_DISPLAY" ]
 }
 
-executable("pixeltests_with_fake_display") {
+cc_test_executable("pixeltests_with_fake_display") {
   output_name = "flatland_display_compositor_pixeltests_with_fake_display"
   testonly = true
   deps = [ ":pixeltest_lib" ]

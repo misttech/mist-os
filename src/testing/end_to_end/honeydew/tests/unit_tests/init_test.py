@@ -11,9 +11,7 @@ import fuchsia_controller_py as fuchsia_controller
 
 import honeydew
 from honeydew import errors
-from honeydew.fuchsia_device.fuchsia_controller import (
-    fuchsia_device as fc_fuchsia_device,
-)
+from honeydew.fuchsia_device import fuchsia_device
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
@@ -37,6 +35,7 @@ _INPUT_ARGS: dict[str, Any] = {
         mdns_enabled=False,
         subtools_search_path=None,
         proxy_timeout_secs=None,
+        ssh_keepalive_timeout=None,
     ),
     "target_name": _TARGET_NAME,
     "target_ip_port": _REMOTE_TARGET_IP_PORT_OBJ,
@@ -60,15 +59,14 @@ class InitTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
-    def test_create_device_return_fc_device(
+    def test_create_device_return(
         self,
         mock_fc_context: mock.Mock,
         mock_ffx_check_connection: mock.Mock,
         mock_fc_check_connection: mock.Mock,
         mock_sl4f_check_connection: mock.Mock,
     ) -> None:
-        """Test case for honeydew.create_device() where it returns
-        Fuchsia-Controller based fuchsia device object."""
+        """Test case for honeydew.create_device()."""
         self.assertIsInstance(
             honeydew.create_device(
                 device_info=custom_types.DeviceInfo(
@@ -79,7 +77,7 @@ class InitTests(unittest.TestCase):
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
-            fc_fuchsia_device.FuchsiaDevice,
+            fuchsia_device.FuchsiaDevice,
         )
 
         mock_fc_context.assert_called_once_with(
@@ -132,7 +130,7 @@ class InitTests(unittest.TestCase):
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
-            fc_fuchsia_device.FuchsiaDevice,
+            fuchsia_device.FuchsiaDevice,
         )
 
         mock_fc_context.assert_called_once_with(
@@ -149,7 +147,7 @@ class InitTests(unittest.TestCase):
         mock_ffx_check_connection.assert_called()
 
     @mock.patch.object(
-        fc_fuchsia_device.FuchsiaDevice,
+        fuchsia_device.FuchsiaDevice,
         "__init__",
         side_effect=errors.FuchsiaControllerConnectionError("Error"),
         autospec=True,

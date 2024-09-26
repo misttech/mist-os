@@ -436,17 +436,14 @@ impl From<Timestamp> for std::time::Duration {
     }
 }
 
-pub type ObjectKind = ObjectKindV40;
+pub type ObjectKind = ObjectKindV41;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKindV40 {
+pub enum ObjectKindV41 {
     File {
         /// The number of references to this file.
         refs: u64,
-        /// Whether this file has any overwrite-mode extents in it. This lets files which don't
-        /// have any skip looking for them during open and write.
-        has_overwrite_extents: bool,
     },
     Directory {
         /// The number of sub-directories in this directory.
@@ -467,6 +464,29 @@ pub enum ObjectKindV40 {
         link: Vec<u8>,
     },
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+pub enum ObjectKindV40 {
+    File { refs: u64, has_overwrite_extents: bool },
+    Directory { sub_dirs: u64, wrapping_key_id: Option<u128>, casefold: bool },
+    Graveyard,
+    Symlink { refs: u64, link: Vec<u8> },
+}
+
+impl From<ObjectKindV40> for ObjectKindV41 {
+    fn from(value: ObjectKindV40) -> Self {
+        match value {
+            // Ignore has_overwrite_extents - it wasn't used here and we are moving it.
+            ObjectKindV40::File { refs, .. } => ObjectKindV41::File { refs },
+            ObjectKindV40::Directory { sub_dirs, wrapping_key_id, casefold } => {
+                ObjectKindV41::Directory { sub_dirs, wrapping_key_id, casefold }
+            }
+            ObjectKindV40::Graveyard => ObjectKindV41::Graveyard,
+            ObjectKindV40::Symlink { refs, link } => ObjectKindV41::Symlink { refs, link },
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 pub enum ObjectKindV38 {
     File { refs: u64, has_overwrite_extents: bool },
@@ -635,14 +655,14 @@ pub struct FsverityMetadataV33 {
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
-pub type ObjectValue = ObjectValueV40;
+pub type ObjectValue = ObjectValueV41;
 impl Value for ObjectValue {
     const DELETED_MARKER: Self = Self::None;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectValueV40 {
+pub enum ObjectValueV41 {
     /// Some keys have no value (this often indicates a tombstone of some sort).  Records with this
     /// value are always filtered when a major compaction is performed, so the meaning must be the
     /// same as if the item was not present.
@@ -651,11 +671,11 @@ pub enum ObjectValueV40 {
     /// (None) i.e. their value is really a boolean: None => false, Some => true.
     Some,
     /// The value for an ObjectKey::Object record.
-    Object { kind: ObjectKindV40, attributes: ObjectAttributesV32 },
+    Object { kind: ObjectKindV41, attributes: ObjectAttributesV32 },
     /// Encryption keys for an object.
     Keys(EncryptionKeysV40),
     /// An attribute associated with a file object. |size| is the size of the attribute in bytes.
-    Attribute { size: u64 },
+    Attribute { size: u64, has_overwrite_extents: bool },
     /// An extent associated with an object.
     Extent(ExtentValueV38),
     /// A child of an object.
@@ -671,6 +691,47 @@ pub enum ObjectValueV40 {
     ExtendedAttribute(ExtendedAttributeValueV32),
     /// An attribute associated with a verified file object. |size| is the size of the attribute
     /// in bytes. |fsverity_metadata| holds the descriptor for the fsverity-enabled file.
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
+}
+
+impl From<ObjectValueV40> for ObjectValueV41 {
+    fn from(value: ObjectValueV40) -> Self {
+        match value {
+            ObjectValueV40::None => ObjectValueV41::None,
+            ObjectValueV40::Some => ObjectValueV41::Some,
+            ObjectValueV40::Object { kind, attributes } => {
+                ObjectValueV41::Object { kind: kind.into(), attributes }
+            }
+            ObjectValueV40::Keys(keys) => ObjectValueV41::Keys(keys),
+            ObjectValueV40::Attribute { size } => {
+                ObjectValueV41::Attribute { size, has_overwrite_extents: false }
+            }
+            ObjectValueV40::Extent(extent_value) => ObjectValueV41::Extent(extent_value),
+            ObjectValueV40::Child(child) => ObjectValueV41::Child(child),
+            ObjectValueV40::Trim => ObjectValueV41::Trim,
+            ObjectValueV40::BytesAndNodes { bytes, nodes } => {
+                ObjectValueV41::BytesAndNodes { bytes, nodes }
+            }
+            ObjectValueV40::ExtendedAttribute(xattr) => ObjectValueV41::ExtendedAttribute(xattr),
+            ObjectValueV40::VerifiedAttribute { size, fsverity_metadata } => {
+                ObjectValueV41::VerifiedAttribute { size, fsverity_metadata }
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, TypeFingerprint, Versioned)]
+pub enum ObjectValueV40 {
+    None,
+    Some,
+    Object { kind: ObjectKindV40, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV40),
+    Attribute { size: u64 },
+    Extent(ExtentValueV38),
+    Child(ChildValueV32),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValueV32),
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
@@ -750,7 +811,7 @@ impl ObjectValue {
         posix_attributes: Option<PosixAttributes>,
     ) -> ObjectValue {
         ObjectValue::Object {
-            kind: ObjectKind::File { refs, has_overwrite_extents: false },
+            kind: ObjectKind::File { refs },
             attributes: ObjectAttributes {
                 creation_time,
                 modification_time,
@@ -766,8 +827,8 @@ impl ObjectValue {
         ObjectValue::Keys(keys)
     }
     /// Creates an ObjectValue for an object attribute.
-    pub fn attribute(size: u64) -> ObjectValue {
-        ObjectValue::Attribute { size }
+    pub fn attribute(size: u64, has_overwrite_extents: bool) -> ObjectValue {
+        ObjectValue::Attribute { size, has_overwrite_extents }
     }
     /// Creates an ObjectValue for an object attribute of a verified file.
     pub fn verified_attribute(size: u64, fsverity_metadata: FsverityMetadata) -> ObjectValue {
@@ -814,18 +875,26 @@ impl ObjectValue {
     }
 }
 
-pub type ObjectItem = ObjectItemV40;
+pub type ObjectItem = ObjectItemV41;
+pub type ObjectItemV41 = Item<ObjectKeyV40, ObjectValueV41>;
 pub type ObjectItemV40 = Item<ObjectKeyV40, ObjectValueV40>;
 pub type ObjectItemV38 = Item<ObjectKeyV32, ObjectValueV38>;
 pub type ObjectItemV37 = Item<ObjectKeyV32, ObjectValueV37>;
 pub type ObjectItemV33 = Item<ObjectKeyV32, ObjectValueV33>;
 pub type ObjectItemV32 = Item<ObjectKeyV32, ObjectValueV32>;
 
+impl From<ObjectItemV40> for ObjectItemV41 {
+    fn from(item: ObjectItemV40) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
+
 impl From<ObjectItemV38> for ObjectItemV40 {
     fn from(item: ObjectItemV38) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
     }
 }
+
 impl From<ObjectItemV37> for ObjectItemV38 {
     fn from(item: ObjectItemV37) -> Self {
         Self { key: item.key, value: item.value.into(), sequence: item.sequence }

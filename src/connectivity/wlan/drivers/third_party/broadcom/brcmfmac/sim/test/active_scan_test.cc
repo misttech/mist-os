@@ -40,7 +40,7 @@ struct ClientIfc : public SimInterface {
  public:
   void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override {
-    on_scan_result_(&request->result);
+    on_scan_result_(request);
     completer.Reply();
   }
   void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override {
@@ -48,7 +48,8 @@ struct ClientIfc : public SimInterface {
     completer.Reply();
   }
 
-  std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult*)> on_scan_result_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)>
+      on_scan_result_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacScanEnd*)> on_scan_end_;
 };
 
@@ -82,7 +83,7 @@ class ActiveScanTest : public SimTest {
 
   uint32_t GetNumProbeReqsSeen() { return num_probe_reqs_seen; }
 
-  void OnScanResult(const wlan_fullmac_wire::WlanFullmacScanResult* result);
+  void OnScanResult(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result);
   void OnScanEnd(const wlan_fullmac_wire::WlanFullmacScanEnd* end);
 
  protected:
@@ -98,7 +99,7 @@ class ActiveScanTest : public SimTest {
   // Result of the previous scan
   wlan_fullmac_wire::WlanScanResult scan_result_code_ = wlan_fullmac_wire::WlanScanResult::kSuccess;
 
-  std::list<wlan_fullmac_wire::WlanFullmacScanResult> scan_results_;
+  std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest> scan_results_;
   // BSS's IEs are raw pointers. Store the IEs here so we don't have dangling pointers
   std::vector<std::vector<uint8_t>> seen_ies_;
 
@@ -117,15 +118,17 @@ class ActiveScanTest : public SimTest {
   uint32_t num_probe_reqs_seen = 0;
 };
 
-void ActiveScanTest::OnScanResult(const wlan_fullmac_wire::WlanFullmacScanResult* result) {
+void ActiveScanTest::OnScanResult(
+    const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result) {
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(scan_txn_id_, result->txn_id);
+  EXPECT_EQ(scan_txn_id_, result->txn_id());
 
-  wlan_fullmac_wire::WlanFullmacScanResult copy = *result;
+  fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest copy = fidl::ToNatural(*result);
   // Copy the IES data over since the original location may change data by the time we verify.
-  std::vector<uint8_t> ies(copy.bss.ies.data(), copy.bss.ies.data() + copy.bss.ies.count());
+  std::vector<uint8_t> ies(copy.bss()->ies().data(),
+                           copy.bss()->ies().data() + copy.bss()->ies().size());
   seen_ies_.push_back(ies);
-  copy.bss.ies = fidl::VectorView<uint8_t>::FromExternal(*seen_ies_.rbegin());
+  copy.bss()->ies() = std::vector<uint8_t>(*seen_ies_.rbegin());
   scan_results_.emplace_back(copy);
 }
 
@@ -181,28 +184,28 @@ void ActiveScanTest::VerifyScanResults() {
 
     for (auto& ap_info : aps_) {
       common::MacAddr mac_addr = ap_info->ap_.GetBssid();
-      ASSERT_EQ(result.bss.bssid.size(), sizeof(mac_addr.byte));
-      if (!std::memcmp(result.bss.bssid.data(), mac_addr.byte, sizeof(mac_addr.byte))) {
+      ASSERT_EQ(result.bss()->bssid().size(), sizeof(mac_addr.byte));
+      if (!std::memcmp(result.bss()->bssid().data(), mac_addr.byte, sizeof(mac_addr.byte))) {
         ap_info->probe_resp_seen_ = true;
         matches_seen++;
 
         // Verify SSID
         wlan_ieee80211::CSsid ssid_info = ap_info->ap_.GetSsid();
-        auto ssid = brcmf_find_ssid_in_ies(result.bss.ies.data(), result.bss.ies.count());
+        auto ssid = brcmf_find_ssid_in_ies(result.bss()->ies().data(), result.bss()->ies().size());
         EXPECT_EQ(ssid.size(), ssid_info.len);
         ASSERT_LE(ssid_info.len, ssid_info.data.size());
         EXPECT_EQ(memcmp(ssid.data(), ssid_info.data.data(), ssid_info.len), 0);
 
         // Verify channel
         wlan_common::WlanChannel channel = ap_info->ap_.GetChannel();
-        EXPECT_EQ(result.bss.channel.primary, channel.primary);
-        EXPECT_EQ(result.bss.channel.cbw, channel.cbw);
-        EXPECT_EQ(result.bss.channel.secondary80, channel.secondary80);
+        EXPECT_EQ(result.bss()->channel().primary(), channel.primary);
+        EXPECT_EQ(result.bss()->channel().cbw(), channel.cbw);
+        EXPECT_EQ(result.bss()->channel().secondary80(), channel.secondary80);
 
         // Verify has RSSI value
-        ASSERT_LT(result.bss.rssi_dbm, 0);
-        ASSERT_EQ(result.bss.snr_db,
-                  sim_utils::SnrDbFromSignalStrength(result.bss.rssi_dbm, simulation::kNoiseLevel));
+        ASSERT_LT(result.bss()->rssi_dbm(), 0);
+        ASSERT_EQ(result.bss()->snr_db(), sim_utils::SnrDbFromSignalStrength(
+                                              result.bss()->rssi_dbm(), simulation::kNoiseLevel));
       }
     }
 

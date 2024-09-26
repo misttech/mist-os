@@ -60,11 +60,11 @@ type traits struct {
 	// Whether std::cmp::Eq and std::cmp::PartialEq are supported.
 	eq bool
 
-	// Whether zerocopy::AsBytes is supported (effectively whether instances
+	// Whether zerocopy::IntoBytes is supported (effectively whether instances
 	// are convertible to byte slices).
 	//
-	// https://docs.rs/zerocopy/latest/zerocopy/trait.AsBytes.html
-	asBytes bool
+	// https://docs.rs/zerocopy/latest/zerocopy/trait.IntoBytes.html
+	intoBytes bool
 
 	// Whether zerocopy::FromBytes is supported (effectively whether each
 	// byte slice (of the same size and alignment) is uniquely converible to an
@@ -82,11 +82,11 @@ func (t traits) supported() []string {
 	if t.eq {
 		supported = append(supported, "Eq", "PartialEq")
 	}
-	if t.asBytes {
-		supported = append(supported, "AsBytes")
+	if t.intoBytes {
+		supported = append(supported, "IntoBytes")
 	}
 	if t.fromBytes {
-		supported = append(supported, "FromZeroes", "FromBytes")
+		supported = append(supported, "FromBytes")
 	}
 	return supported
 }
@@ -105,33 +105,33 @@ func (gen Generator) DeclCallback(decl zither.Decl) {
 	case *zither.Enum:
 		t.debug = true
 		t.eq = true
-		t.asBytes = true
+		t.intoBytes = true
 	case *zither.Bits, *zither.Handle:
 		t.debug = true
 		t.eq = true
-		t.asBytes = true
+		t.intoBytes = true
 		t.fromBytes = true
 	case *zither.Struct:
 		t.debug = true
 		t.eq = true
 		s := decl.(*zither.Struct)
-		t.asBytes = !s.HasPadding
+		t.intoBytes = !s.HasPadding
 		t.fromBytes = !s.HasPadding
 		for _, m := range s.Members {
 			mt := getExtraTraitsOfDependency(m.Type, name)
 			t.debug = t.debug && mt.debug
 			t.eq = t.eq && mt.eq
-			t.asBytes = t.asBytes && mt.asBytes
+			t.intoBytes = t.intoBytes && mt.intoBytes
 			t.fromBytes = t.fromBytes && mt.fromBytes
 		}
 	case *zither.Overlay:
 		o := decl.(*zither.Overlay)
-		t.asBytes = true
+		t.intoBytes = true
 		for _, m := range o.Variants {
-			// AsBytes can only be derived if no variant has padding.
-			t.asBytes = t.asBytes && //
+			// IntoBytes can only be derived if no variant has padding.
+			t.intoBytes = t.intoBytes && //
 				m.Type.Size == o.MaxVariantSize && //
-				getExtraTraitsOfDependency(m.Type, name).asBytes
+				getExtraTraitsOfDependency(m.Type, name).intoBytes
 		}
 	case *zither.Alias:
 		a := decl.(*zither.Alias)
@@ -146,7 +146,7 @@ func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *tr
 	case zither.TypeKindBool:
 		t.debug = true
 		t.eq = true
-		t.asBytes = true
+		t.intoBytes = true
 	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct,
 		zither.TypeKindOverlay, zither.TypeKindAlias:
 		var ok bool
@@ -160,7 +160,7 @@ func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *tr
 		t.debug = true
 		t.eq = true
 		if !dep.Kind.IsPointerLike() {
-			t.asBytes = true
+			t.intoBytes = true
 			t.fromBytes = true
 		}
 	}
@@ -252,23 +252,23 @@ func Imports(summary zither.FileSummary) []string {
 		}
 	}
 
-	asBytes := false
+	intoBytes := false
 	fromBytes := false
 	for _, decl := range summary.Decls {
 		t := extraTraits[decl.Name().String()]
-		asBytes = asBytes || t.asBytes
+		intoBytes = intoBytes || t.intoBytes
 		fromBytes = fromBytes || t.fromBytes
-		if asBytes && fromBytes {
+		if intoBytes && fromBytes {
 			break
 		}
 	}
-	if asBytes || fromBytes {
+	if intoBytes || fromBytes {
 		var zerocopyImports []string
-		if asBytes {
-			zerocopyImports = append(zerocopyImports, "AsBytes")
+		if intoBytes {
+			zerocopyImports = append(zerocopyImports, "IntoBytes")
 		}
 		if fromBytes {
-			zerocopyImports = append(zerocopyImports, "FromZeroes", "FromBytes")
+			zerocopyImports = append(zerocopyImports, "FromBytes")
 		}
 		imports = append(imports, fmt.Sprintf("zerocopy::{%s}", strings.Join(zerocopyImports, ", ")))
 	}
@@ -339,7 +339,7 @@ func layoutAttributes(decl zither.Decl) []string {
 func EnumAttributes(e zither.Enum) []string { return layoutAttributes(&e) }
 
 func U64EnumAttributes() []string {
-	supported := append(defaultTraits, "AsBytes", "Debug", "Eq", "PartialEq")
+	supported := append(defaultTraits, "IntoBytes", "Debug", "Eq", "PartialEq")
 	sort.Strings(supported)
 	return []string{
 		"#[repr(u64)]",
@@ -352,7 +352,7 @@ func BitsAttributes() []string {
 	// macro.
 	return []string{
 		"#[repr(C)]",
-		"#[derive(AsBytes, FromZeroes, FromBytes)]",
+		"#[derive(IntoBytes, FromBytes)]",
 	}
 }
 

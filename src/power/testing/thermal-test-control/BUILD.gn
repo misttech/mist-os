@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 fuchsia_component("thermal-test-control-v2") {
   testonly = true
@@ -11,7 +12,7 @@ fuchsia_component("thermal-test-control-v2") {
   deps = [ ":thermal_test_control_bin" ]
 }
 
-executable("thermal_test_control_bin") {
+cc_test_executable("thermal_test_control_bin") {
   output_name = "thermal_test_control"
   sources = [
     "main.cc",
@@ -28,7 +29,7 @@ executable("thermal_test_control_bin") {
   ]
 }
 
-executable("thermal-test-control-test-bin") {
+cc_test_executable("thermal-test-control-test-bin") {
   testonly = true
   output_name = "thermal_test_control_test_bin"
   sources = [

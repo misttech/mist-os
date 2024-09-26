@@ -22,6 +22,8 @@
 #include <gtest/gtest.h>
 #include <linux/capability.h>
 
+#include "src/lib/files/file.h"
+#include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
@@ -591,6 +593,144 @@ TEST_P(FsMountTest, ChmodWithDifferentModes) {
       EXPECT_EQ(file_stat.st_mode & kModeMask, mode) << "wrong permissions";
     }
   });
+}
+
+TEST_P(FsMountTest, ChownMinusOneSucceeds) {
+  // Executing chown(file, -1, -1) should almost always work.
+  std::string user1_file = files::JoinPath(mount_path_, "user1_file");
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), S_IRWXU)));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+
+  // Running as the same user.
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_file.c_str(), -1, -1), SyscallSucceeds());
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Running as a different user.
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_file.c_str(), -1, -1), SyscallSucceeds());
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  SAFE_SYSCALL(unlink(user1_file.c_str()));
+}
+
+TEST_P(FsMountTest, ChownMinusOneNoPathAccessFails) {
+  // Executing chown(file, -1, -1) fails if we can't resolve the path.
+  std::string user1_folder = files::JoinPath(mount_path_, "user1_folder");
+  std::string user1_file = files::JoinPath(user1_folder, "user1_file");
+  SAFE_SYSCALL(mkdir(user1_folder.c_str(), S_IRWXU));  // user2 can't access.
+
+  SAFE_SYSCALL(chown(user1_folder.c_str(), kUser1Uid, kUser1Gid));
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), S_IRWXU)));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([user1_folder, user1_file] {
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_folder.c_str(), -1, -1), SyscallSucceeds());
+    EXPECT_THAT(chown(user1_file.c_str(), -1, -1), SyscallFailsWithErrno(EACCES));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  SAFE_SYSCALL(unlink(user1_file.c_str()));
+}
+
+TEST_P(FsMountTest, ChownMinusOneOnSUIDFileFails) {
+  // Executing chown(file, -1, -1) fails if the file is set-user-ID.
+  std::string user1_file = files::JoinPath(mount_path_, "user1_file");
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), 0)));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+  SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISUID));
+
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_file.c_str(), -1, -1), SyscallFailsWithErrno(EPERM));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // The file should still be set-user-ID even after failure.
+  struct stat file_stat{};
+  SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
+  EXPECT_NE(file_stat.st_mode & S_ISUID, 0U);
+
+  // But not if we are the owners.
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_file.c_str(), -1, -1), SyscallSucceeds());
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // Doing a successful chown should have dropped the set-user-ID bit of the file.
+  SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
+  EXPECT_EQ(file_stat.st_mode & S_ISUID, 0U);
+
+  SAFE_SYSCALL(unlink(user1_file.c_str()));
+}
+
+TEST_P(FsMountTest, ChownSameOwnerAndGroupFails) {
+  // Executing chown explicitly specifying owner and gid (instead of -1), fails
+  // if we are not owners.
+  std::string user1_file = files::JoinPath(mount_path_, "user1_file");
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), S_IRWXU)));
+  SAFE_SYSCALL(chmod(user1_file.c_str(), S_IRWXU));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_file.c_str(), kUser1Uid, kUser1Gid), SyscallFailsWithErrno(EPERM));
+    EXPECT_THAT(chown(user1_file.c_str(), -1, kUser1Gid), SyscallFailsWithErrno(EPERM));
+    EXPECT_THAT(chown(user1_file.c_str(), kUser1Uid, -1), SyscallFailsWithErrno(EPERM));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  SAFE_SYSCALL(unlink(user1_file.c_str()));
+}
+
+TEST_P(FsMountTest, ChownOnSUIDFileDropsSUIDBit) {
+  std::string user1_file = files::JoinPath(mount_path_, "user1_file");
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), 0)));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    test_helper::DropAllCapabilities();
+
+    for (mode_t mode = 0000; mode <= 0777; mode++) {
+      SCOPED_TRACE(fxl::StringPrintf("Mode: %o", mode));
+      SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISUID | mode));
+      SAFE_SYSCALL(chown(user1_file.c_str(), -1, -1));
+
+      struct stat file_stat{};
+      SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
+      EXPECT_EQ(file_stat.st_mode & S_ISUID, 0U);
+    }
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 TEST_P(FsMountTest, OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS) {

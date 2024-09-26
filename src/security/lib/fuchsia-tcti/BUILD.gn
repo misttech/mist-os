@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 # TCG TSS 2.0 Fuchsia TCTI Bridge for fuchsia.tpm.Command. This is the default
 # library that should be used by most applications.
@@ -39,7 +40,7 @@ static_library("device") {
   ]
 }
 
-executable("fuchsia-tcti-tests-agent-bin") {
+cc_test_executable("fuchsia-tcti-tests-agent-bin") {
   sources = [ "src/fuchsia-tcti-unittests.cc" ]
   deps = [
     ":agent",
@@ -50,7 +51,7 @@ executable("fuchsia-tcti-tests-agent-bin") {
   testonly = true
 }
 
-executable("fuchsia-tcti-tests-device-bin") {
+cc_test_executable("fuchsia-tcti-tests-device-bin") {
   sources = [ "src/fuchsia-tcti-unittests.cc" ]
   deps = [
     ":device",

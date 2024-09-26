@@ -178,7 +178,7 @@ def fuchsia_wrap_cc_binary(
         exact_cc_binary_deps = None,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
-        package_clang_dist_files = True,
+        features = [],
         **kwargs):
     """Wrap a native cc_binary.
 
@@ -194,7 +194,7 @@ def fuchsia_wrap_cc_binary(
             them in cc_binary as well as fuchsia_wrap_cc_binary.
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
-        package_clang_dist_files: If True, the @fuchsia_clang//:dist files will be packaged.
+        features: The usual bazel meaning.
         **kwargs: Arguments to forward to the fuchsia cc_binary wrapper.
     """
     if exact_cc_binary_deps == None:
@@ -205,7 +205,21 @@ def fuchsia_wrap_cc_binary(
         "%s//:runtime" % clang_root_label,
     ]
 
-    if package_clang_dist_files:
+    # Check to see if the user is requesting a static cpp compilation via our
+    # provided feature. If they do not make this request we need to add the
+    # dist target to include the libcxx package resources.
+    # It would be tempting to use a feature_flag and add this as a select but
+    # this does not work because the feature_flag will only check if the feature
+    # is enabled in the context of the action which is not set yet.
+    #
+    # Additionally, this mechanism only works if a user specifies this feature
+    # on the target they are compiling and not at a higher level since features
+    # will not be known if they are set on the command line. This is not a
+    # problem because we are not globally controlling this feature. If we want
+    # to add that support in the future we can.
+    #
+    # A future optimization would be to move the select into the dist target itself.
+    if "static_cpp_standard_library" not in features:
         data.append("%s//:dist" % clang_root_label)
 
     _fuchsia_cc_binary(
@@ -216,6 +230,7 @@ def fuchsia_wrap_cc_binary(
         deps = exact_cc_binary_deps,
         implicit_deps = ["%s//pkg/fdio" % sdk_root_label],
         data = data,
+        features = features,
         **kwargs
     )
 
@@ -227,6 +242,7 @@ def fuchsia_cc_binary(
         clang_root_label = "@fuchsia_clang",
         tags = ["manual"],
         visibility = None,
+        features = [],
         **cc_binary_kwargs):
     """A fuchsia-specific cc_binary drop-in replacement.
 
@@ -239,6 +255,7 @@ def fuchsia_cc_binary(
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
         tags: Tags to set for all generated targets. This type of target is marked "manual" by default.
         visibility: The visibility of all generated targets.
+        features: The normal bazel meaning.
         **cc_binary_kwargs: Arguments to forward to `cc_binary`.
     """
 
@@ -246,6 +263,7 @@ def fuchsia_cc_binary(
         name = "_%s_native" % name,
         tags = tags + ["manual"],
         visibility = visibility,
+        features = features,
         **cc_binary_kwargs
     )
     native.alias(
@@ -253,6 +271,7 @@ def fuchsia_cc_binary(
         actual = "_%s_native" % name,
         tags = tags + ["manual"],
         visibility = visibility,
+        features = features,
         deprecation = "fuchsia_cc_binary supports direct execution now. Please use `:%s` instead." % name,
     )
     fuchsia_wrap_cc_binary(
@@ -263,6 +282,7 @@ def fuchsia_cc_binary(
         sdk_root_label = sdk_root_label,
         clang_root_label = clang_root_label,
         tags = tags,
+        features = features,
         visibility = visibility,
     )
 

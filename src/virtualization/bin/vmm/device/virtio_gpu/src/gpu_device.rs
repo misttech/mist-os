@@ -18,7 +18,7 @@ use std::io::{Read, Write};
 use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
 use virtio_device::mem::{DriverMem, DriverRange};
 use virtio_device::queue::DriverNotify;
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// This is a (somewhat arbitrary) upper bound to the number of entries in a
 /// VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING command.
@@ -28,7 +28,7 @@ const ATTACH_BACKING_MAX_ENTRIES: u32 = 1024;
 ///
 /// Will fail if there is an error walking the chain, or if there is insufficient space left in
 /// `chain`.
-fn write_to_chain<'a, 'b, N: DriverNotify, M: DriverMem, T: AsBytes + NoCell>(
+fn write_to_chain<'a, 'b, N: DriverNotify, M: DriverMem, T: IntoBytes + Immutable>(
     mut chain: WritableChain<'a, 'b, N, M>,
     message: T,
 ) -> Result<(), Error> {
@@ -67,9 +67,9 @@ fn read_from_chain<'a, 'b, N: DriverNotify, M: DriverMem, T: FromBytes>(
     // compiler will accept an array here we can remove this allocation.
     let mut buffer = vec![0u8; std::mem::size_of::<T>()];
     chain.read_exact(&mut buffer)?;
-    // read_from should not fail since we've sized the buffer appropriately. Any failures here are
-    // unexpected.
-    Ok(T::read_from(buffer.as_slice()).unwrap())
+    // read_from_bytes should not fail since we've sized the buffer
+    // appropriately. Any failures here are unexpected.
+    Ok(T::read_from_bytes(buffer.as_slice()).unwrap())
 }
 
 #[derive(Debug, PartialEq)]
@@ -726,7 +726,7 @@ mod tests {
         let (data, len) = range;
         let slice =
             unsafe { std::slice::from_raw_parts::<u8>(data as usize as *const u8, len as usize) };
-        T::read_from(slice).expect("Failed to read result from returned chain")
+        T::read_from_bytes(slice).expect("Failed to read result from returned chain")
     }
 
     #[fuchsia::test]

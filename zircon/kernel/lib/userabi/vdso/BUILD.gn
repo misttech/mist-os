@@ -81,6 +81,8 @@ if (toolchain_environment == "user.basic") {
       "//zircon/vdso:private",
     ]
 
+    outputs = [ "$root_out_dir/libzircon.so" ]
+
     # Instruct the linker to preserve the hidden alternate entry points.
     # Note, "./" makes GN realize this is a file rather than a -l switch.
     libs = [ "./alternates.ld" ]
@@ -88,11 +90,17 @@ if (toolchain_environment == "user.basic") {
     # Set e_entry so _zx_process_exit is easy to find without reading .dynsym.
     ldflags += [ "-Wl,-e,_zx_process_exit" ]
 
-    # This ensures that the vDSO is never installed into filesystem images
-    # since it's materialized at runtime by the kernel.
+    # This target goes into a kernel package that expects the "vdso" filename,
+    # and never goes into userland Fuchsia packages.
     metadata = {
       distribution_entries_barrier = []
-      distribution_entries = []
+      distribution_entries = [
+        {
+          source = rebase_path(outputs[0], root_build_dir)
+          destination = "vdso"
+          label = get_label_info(":$target_name", "label_with_toolchain")
+        },
+      ]
     }
 
     # workaround for b/349448459 to remote-link successfully

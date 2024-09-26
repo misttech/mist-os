@@ -12,8 +12,6 @@
     ],
     offer: [
         {
-            from: "#config",
-            to: "#core",
             config: [
                 "fuchsia.bluetooth.LegacyPairing",
                 "fuchsia.fonts.FontManifest",
@@ -51,6 +49,8 @@
                 "fuchsia.wlan.RecoveryProfile",
                 "fuchsia.wlan.RoamingPolicy",
             ],
+            from: "#config",
+            to: "#core",
             availability: "same_as_target",
         },
         {
@@ -228,10 +228,13 @@
         },
         {
             service: [
+                "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
-                "fuchsia.hardware.spmi.Service",
+                "fuchsia.hardware.spmi.SubTargetService",
+                "fuchsia.hardware.spmi.TargetService",
+                "fuchsia.hardware.suspend.SuspendService",
                 "fuchsia.power.broker.ElementInfoProviderService",
             ],
             from: "#bootstrap",

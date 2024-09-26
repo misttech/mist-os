@@ -61,18 +61,22 @@ impl Matchers {
                 }
             } else {
                 let ramdisk_required = if config.ramdisk_image { ramdisk_path } else { None };
-                let fvm_matcher = Box::new(FvmMatcher::new(
-                    ramdisk_required,
-                    config.netboot,
-                    config.blobfs,
-                    config.data,
-                ));
+                let fvm_matcher = if config.storage_host {
+                    Box::new(FvmComponentMatcher::new(ramdisk_required)) as Box<dyn Matcher>
+                } else {
+                    Box::new(FvmMatcher::new(
+                        ramdisk_required,
+                        config.netboot,
+                        config.blobfs,
+                        config.data,
+                    )) as Box<dyn Matcher>
+                };
                 if config.fvm || (!config.netboot && (config.blobfs || config.data)) {
                     matchers.push(fvm_matcher);
                 }
             }
         }
-        if config.fvm && config.ramdisk_image {
+        if config.fvm && config.ramdisk_image && !config.storage_host {
             // Add another matcher for the non-ramdisk version of fvm.
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Fvm,
@@ -192,8 +196,8 @@ struct FxblobMatcher {
     // have.
     ramdisk_required: Option<String>,
     // Because this matcher binds to the system Fxfs component, we can only match on it once.
-    // TODO(https://fxbug.dev/42079130): Can we be more precise here, e.g. give the matcher an expected device
-    // path based on system configuration?
+    // TODO(https://fxbug.dev/42079130): Can we be more precise here, e.g. give the matcher an
+    // expected device path based on system configuration?
     already_matched: AtomicBool,
 }
 
@@ -243,6 +247,70 @@ impl Matcher for FxblobMatcher {
     ) -> Result<(), Error> {
         self.already_matched.store(true, Ordering::Relaxed);
         env.mount_fxblob(device).await?;
+        env.mount_blob_volume().await?;
+        env.mount_data_volume().await?;
+        Ok(())
+    }
+}
+
+// Matches against FVM partitions, binding them to the new FVM component driver.
+struct FvmComponentMatcher {
+    // If this partition is required to exist on a ramdisk, then this contains the prefix it should
+    // have.
+    ramdisk_required: Option<String>,
+    // Because this matcher binds to the system Fvm component, we can only match on it once.
+    // TODO(https://fxbug.dev/42079130): Can we be more precise here, e.g. give the matcher an
+    // expected device path based on system configuration?
+    already_matched: AtomicBool,
+}
+
+impl FvmComponentMatcher {
+    fn new(ramdisk_required: Option<String>) -> Self {
+        Self { ramdisk_required, already_matched: AtomicBool::new(false) }
+    }
+}
+
+#[async_trait]
+impl Matcher for FvmComponentMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if self.already_matched.load(Ordering::Relaxed) {
+            return false;
+        }
+        if let Some(ramdisk_prefix) = &self.ramdisk_required {
+            if !device.topological_path().starts_with(ramdisk_prefix) {
+                return false;
+            }
+        }
+        match device.partition_label().await {
+            Ok(label) => {
+                // There are a few different labels used depending on the device. If we don't see
+                // any of them, this isn't the right partition.
+                // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
+                // track of partition labels.
+                if !(label == FVM_PARTITION_LABEL
+                    || label == FUCHSIA_FVM_PARTITION_LABEL
+                    || label == FTL_PARTITION_LABEL
+                    || label == SUPER_PARTITION_LABEL)
+                {
+                    tracing::info!("Label {label} doesn't match");
+                    return false;
+                }
+            }
+            // If there is an error getting the partition label, it might be because this device
+            // doesn't support labels (like if it's directly on a raw disk in an emulator).
+            // Continue with content sniffing.
+            Err(_) => (),
+        }
+        device.content_format().await.ok() == Some(DiskFormat::Fvm)
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<(), Error> {
+        self.already_matched.store(true, Ordering::Relaxed);
+        env.mount_fvm(device).await?;
         env.mount_blob_volume().await?;
         env.mount_data_volume().await?;
         Ok(())
@@ -420,9 +488,9 @@ mod tests {
     use super::{Device, DiskFormat, Environment, Matchers};
     use crate::config::default_config;
     use crate::device::constants::{
-        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
+        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FTL_PARTITION_LABEL,
         FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
-        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
+        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
     };
     use crate::environment::{Filesystem, FilesystemQueue};
     use anyhow::{anyhow, Error};
@@ -529,11 +597,13 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
     struct MockEnv {
         expected_driver_path: Mutex<Option<String>>,
         expect_bind_and_enumerate_fvm: Mutex<bool>,
         expect_mount_blobfs_on: Mutex<bool>,
         expect_mount_fxblob: Mutex<bool>,
+        expect_mount_fvm: Mutex<bool>,
         expect_mount_blob_volume: Mutex<bool>,
         expect_mount_data_volume: Mutex<bool>,
         expect_mount_data_on: Mutex<bool>,
@@ -546,20 +616,9 @@ mod tests {
 
     impl MockEnv {
         fn new() -> Self {
-            MockEnv {
-                expected_driver_path: Mutex::new(None),
-                expect_bind_and_enumerate_fvm: Mutex::new(false),
-                expect_mount_blobfs_on: Mutex::new(false),
-                expect_mount_fxblob: Mutex::new(false),
-                expect_mount_blob_volume: Mutex::new(false),
-                expect_mount_data_volume: Mutex::new(false),
-                expect_mount_data_on: Mutex::new(false),
-                expect_format_data: Mutex::new(false),
-                expect_bind_data: Mutex::new(false),
-                expect_launch_storage_host: Mutex::new(false),
-                legacy_data_format: false,
-                create_data_partition: true,
-            }
+            let mut env = MockEnv::default();
+            env.create_data_partition = true;
+            env
         }
         fn expect_attach_driver(mut self, path: impl ToString) -> Self {
             *self.expected_driver_path.get_mut().unwrap() = Some(path.to_string());
@@ -583,6 +642,10 @@ mod tests {
         }
         fn expect_mount_fxblob(mut self) -> Self {
             *self.expect_mount_fxblob.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_mount_fvm(mut self) -> Self {
+            *self.expect_mount_fvm.get_mut().unwrap() = true;
             self
         }
         fn expect_mount_blob_volume(mut self) -> Self {
@@ -703,6 +766,15 @@ mod tests {
             Ok(())
         }
 
+        async fn mount_fvm(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_mount_fvm.lock().unwrap()),
+                true,
+                "Unexpected call to mount_fxblob"
+            );
+            Ok(())
+        }
+
         async fn mount_blob_volume(&mut self) -> Result<(), Error> {
             assert_eq!(
                 std::mem::take(&mut *self.expect_mount_blob_volume.lock().unwrap()),
@@ -738,6 +810,7 @@ mod tests {
             assert!(!*self.expect_bind_and_enumerate_fvm.lock().unwrap());
             assert!(!*self.expect_bind_data.lock().unwrap());
             assert!(!*self.expect_mount_fxblob.lock().unwrap());
+            assert!(!*self.expect_mount_fvm.lock().unwrap());
             assert!(!*self.expect_mount_blob_volume.lock().unwrap());
             assert!(!*self.expect_mount_data_volume.lock().unwrap());
             assert!(!*self.expect_format_data.lock().unwrap());
@@ -1081,6 +1154,67 @@ mod tests {
             .match_device(
                 &mut MockDevice::new()
                     .set_content_format(DiskFormat::Fxfs)
+                    .set_partition_label(FVM_PARTITION_LABEL),
+                &mut MockEnv::new(),
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_fvm_component_matcher() {
+        let new_matchers = || {
+            Matchers::new(
+                &fshost_config::Config {
+                    storage_host: true,
+                    fvm: true,
+                    data_filesystem_format: "minfs".to_string(),
+                    ..default_config()
+                },
+                None,
+            )
+        };
+
+        let mut matchers = new_matchers();
+
+        // A device with the wrong label should fail.
+        assert!(!matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_content_format(DiskFormat::Fvm)
+                    .set_partition_label("wrong_label"),
+                &mut MockEnv::new()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // A device with the right label should succeed.
+        for label in [
+            FVM_PARTITION_LABEL,
+            FUCHSIA_FVM_PARTITION_LABEL,
+            FTL_PARTITION_LABEL,
+            SUPER_PARTITION_LABEL,
+        ] {
+            matchers = new_matchers();
+            assert!(matchers
+                .match_device(
+                    &mut MockDevice::new()
+                        .set_content_format(DiskFormat::Fvm)
+                        .set_partition_label(label),
+                    &mut MockEnv::new()
+                        .expect_mount_fvm()
+                        .expect_mount_blob_volume()
+                        .expect_mount_data_volume()
+                )
+                .await
+                .expect("match_device failed"));
+        }
+
+        // We should only be able to match Fvm once.
+        assert!(!matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_content_format(DiskFormat::Fvm)
                     .set_partition_label(FVM_PARTITION_LABEL),
                 &mut MockEnv::new(),
             )

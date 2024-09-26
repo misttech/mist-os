@@ -196,10 +196,24 @@
             to: [ "#http-client" ],
         },
         {
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             from: "parent",
             to: "#http-client",
-            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             availability: "same_as_target",
+        },
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            to: "#netstack",
+            availability: "same_as_target",
+        },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "parent",
+            to: "#netstack",
         },
         {
             storage: "cache",

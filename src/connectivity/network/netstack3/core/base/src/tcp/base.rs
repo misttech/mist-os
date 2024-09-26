@@ -10,6 +10,7 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 use const_unwrap::const_unwrap_option;
+use core::mem::MaybeUninit;
 use net_types::ip::{Ip, IpVersion};
 use packet::InnerPacketBuilder;
 use packet_formats::ip::IpExt;
@@ -131,6 +132,37 @@ impl<'a, const N: usize> FragmentedPayload<'a, N> {
         let Self { storage, start, end } = self;
         &storage[*start..*end]
     }
+
+    /// Extracted function to implement [`Payload::partial_copy`] and
+    /// [`Payload::partial_copy_uninit`].
+    fn apply_copy<T, F: Fn(&[u8], &mut [T])>(
+        &self,
+        mut offset: usize,
+        mut dst: &mut [T],
+        apply: F,
+    ) {
+        let mut slices = self.slices().into_iter();
+        while let Some(sl) = slices.next() {
+            let l = sl.len();
+            if offset >= l {
+                offset -= l;
+                continue;
+            }
+            let sl = &sl[offset..];
+            let cp = sl.len().min(dst.len());
+            let (target, new_dst) = dst.split_at_mut(cp);
+            apply(&sl[..cp], target);
+
+            // We're done.
+            if new_dst.len() == 0 {
+                return;
+            }
+
+            dst = new_dst;
+            offset = 0;
+        }
+        assert_eq!(dst.len(), 0, "failed to fill dst");
+    }
 }
 
 impl<'a, const N: usize> PayloadLen for FragmentedPayload<'a, N> {
@@ -212,32 +244,24 @@ impl<'a, const N: usize> Payload for FragmentedPayload<'a, N> {
         Self { storage, start: self_start, end: self_end }
     }
 
-    fn partial_copy(&self, mut offset: usize, mut dst: &mut [u8]) {
-        let mut slices = self.slices().into_iter();
-        while let Some(sl) = slices.next() {
-            let l = sl.len();
-            if offset >= l {
-                offset -= l;
-                continue;
-            }
-            let sl = &sl[offset..];
-            let cp = sl.len().min(dst.len());
-            let (target, new_dst) = dst.split_at_mut(cp);
-            target.copy_from_slice(&sl[..cp]);
-
-            // We're done.
-            if new_dst.len() == 0 {
-                return;
-            }
-
-            dst = new_dst;
-            offset = 0;
-        }
-        assert_eq!(dst.len(), 0, "failed to fill dst");
-    }
-
     fn new_empty() -> Self {
         Self { storage: [&[]; N], start: 0, end: 0 }
+    }
+
+    fn partial_copy(&self, offset: usize, dst: &mut [u8]) {
+        self.apply_copy(offset, dst, |src, dst| {
+            dst.copy_from_slice(src);
+        });
+    }
+
+    fn partial_copy_uninit(&self, offset: usize, dst: &mut [MaybeUninit<u8>]) {
+        self.apply_copy(offset, dst, |src, dst| {
+            // TODO(https://github.com/rust-lang/rust/issues/79995): Replace unsafe
+            // with copy_from_slice when stabiliized.
+            // SAFETY: &[T] and &[MaybeUninit<T>] have the same layout.
+            let uninit_src: &[MaybeUninit<u8>] = unsafe { core::mem::transmute(src) };
+            dst.copy_from_slice(&uninit_src);
+        });
     }
 }
 

@@ -337,7 +337,7 @@ if (current_toolchain == dart_toolchain) {
     # SDK support
     #
 
-    if (defined(invoker.sdk_category) && invoker.sdk_category != "excluded") {
+    if (defined(invoker.sdk_category)) {
       assert(
           defined(invoker.package_name),
           "Dart libraries published in SDKs must have an explicit package name")

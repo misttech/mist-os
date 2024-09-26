@@ -66,11 +66,17 @@ if (is_linux || is_mac) {
 # This group is included as part of CQ
 group("tests") {
   testonly = true
-  public_deps = [ "bash_tests:tests" ]
+
+  # We don't run any tests in CQ because the GN SDK is being deprecated, and no
+  # one is actually manitaining these tests.
+  public_deps = []
 }
 
 # This group is tests that can be run locally by a developer
 group("local_tests") {
   testonly = true
-  public_deps = [ ":host_gn_sdk_test($host_toolchain)" ]
+  public_deps = [
+    ":host_gn_sdk_test($host_toolchain)",
+    "bash_tests:tests",
+  ]
 }

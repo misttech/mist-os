@@ -167,7 +167,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     .package(package)
                     .component(component)?
                     .field("num_threads", connectivity_config.network.netstack_thread_count.get())?
-                    .field("debug_logs", false)?;
+                    .field("debug_logs", false)?
+                    // Routed from fuchsia.power.SuspendEnabled capability.
+                    //
+                    // TODO(https://fxbug.dev/368386068): This should not be
+                    // necessary once we teach structured config and routed
+                    // capabilities to coexist peacefully.
+                    .field("suspend_enabled", false)?;
             }
 
             // Add the networking test collection on all eng builds. The test

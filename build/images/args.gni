@@ -19,10 +19,6 @@ declare_args() {
   # assembly work until that's been addressed.
   recovery_only = false
 
-  # List of arguments to add to /boot/config/additional_boot_args.
-  # These come after synthesized arguments to configure blobfs and pkgfs.
-  additional_boot_args = []
-
   # Build the gigaboot bootloader.
   use_gigaboot = false
 
@@ -37,12 +33,6 @@ declare_args() {
   # Will be located at obj/build/images/installer relative to the build directory.
   # See https://fuchsia.dev/fuchsia-src/development/hardware/installer
   build_usb_installer = false
-
-  # (deprecated) List of kernel images to include in the update (OTA) package.
-  # If no list is provided, all built kernels are included. The names in the
-  # list are strings that must match the filename to be included in the update
-  # package.
-  update_kernels = []
 
   # The epoch to use in the update (OTA) package.
   # Before applying an update, Fuchsia confirms that the epoch in the update

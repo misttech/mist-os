@@ -42,10 +42,10 @@ use crate::model::events::serve::serve_event_stream;
 use crate::model::events::source_factory::{EventSourceFactory, EventSourceFactoryCapability};
 use crate::model::events::stream_provider::EventStreamProvider;
 use crate::model::model::{Model, ModelParams};
-use crate::model::resolver::ResolverRegistry;
+use crate::model::resolver::{Resolver, ResolverRegistry};
 use crate::model::token::InstanceRegistry;
 use crate::root_stop_notifier::RootStopNotifier;
-use crate::sandbox_util::LaunchTaskOnReceive;
+use crate::sandbox_util::{take_handle_as_stream, LaunchTaskOnReceive};
 use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::routing::bedrock::dict_ext::DictExt;
@@ -82,7 +82,8 @@ use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
 use cm_rust::{
     Availability, CapabilityTypeName, RunnerRegistration, UseEventStreamDecl, UseSource,
 };
-use cm_types::Name;
+use cm_types::{Name, Url};
+use cm_util::WeakTaskGroup;
 use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::ProcessLauncher;
 use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo};
@@ -100,6 +101,7 @@ use futures::future::{self, BoxFuture};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
 use moniker::ExtendedMoniker;
+use routing::resolving::ComponentAddress;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
@@ -114,9 +116,6 @@ use {
 };
 
 use fidl_fuchsia_boot as fuchsia_boot;
-
-#[cfg(test)]
-use crate::model::resolver::Resolver;
 
 // Allow shutdown to take up to an hour.
 pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
@@ -233,7 +232,7 @@ impl BuiltinEnvironmentBuilder {
     pub fn add_resolver(
         mut self,
         scheme: String,
-        resolver: Box<dyn Resolver + Send + Sync + 'static>,
+        resolver: Arc<dyn Resolver + Send + Sync + 'static>,
     ) -> Self {
         self.resolvers.register(scheme, resolver);
         self
@@ -375,22 +374,19 @@ impl BuiltinEnvironmentBuilder {
 }
 
 /// Constructs a [ComponentInput] that contains built-in capabilities.
-struct RootComponentInputBuilder {
+pub struct RootComponentInputBuilder {
     input: ComponentInput,
-    top_instance: Arc<ComponentManagerInstance>,
+    task_group: WeakTaskGroup,
     security_policy: Arc<SecurityPolicy>,
     policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
 }
 
 impl RootComponentInputBuilder {
-    fn new(
-        top_instance: Arc<ComponentManagerInstance>,
-        runtime_config: &Arc<RuntimeConfig>,
-    ) -> Self {
+    pub fn new(task_group: WeakTaskGroup, runtime_config: &Arc<RuntimeConfig>) -> Self {
         Self {
             input: ComponentInput::default(),
-            top_instance,
+            task_group,
             security_policy: runtime_config.security_policy.clone(),
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             builtin_capabilities: runtime_config.builtin_capabilities.clone(),
@@ -426,7 +422,7 @@ impl RootComponentInputBuilder {
 
         let launch = LaunchTaskOnReceive::new(
             capability_source,
-            self.top_instance.task_group().as_weak(),
+            self.task_group.clone(),
             name.clone(),
             Some(self.policy_checker.clone()),
             Arc::new(move |server_end, _| {
@@ -456,7 +452,7 @@ impl RootComponentInputBuilder {
         });
         let launch = LaunchTaskOnReceive::new(
             capability_source,
-            self.top_instance.task_group().as_weak(),
+            self.task_group.clone(),
             "namespace capability dispatcher",
             Some(self.policy_checker.clone()),
             Arc::new(move |server_end, _| {
@@ -493,12 +489,120 @@ impl RootComponentInputBuilder {
         }
     }
 
+    pub fn add_resolver(
+        &mut self,
+        resolver_schema: String,
+        resolver: Arc<dyn Resolver + Send + Sync + 'static>,
+    ) {
+        let resolver_schema = Name::new(resolver_schema)
+            .expect("invalid resolver schema, this should be prevented by manifest_validation");
+        let capability_source = CapabilitySource::Builtin(BuiltinSource {
+            capability: InternalCapability::Resolver(resolver_schema.clone()),
+        });
+        let resolver = Arc::new(resolver);
+        async fn do_resolve(
+            weak_target: &WeakComponentInstance,
+            resolver: &Arc<dyn Resolver + Send + Sync>,
+            url: String,
+            context: Option<fresolution::Context>,
+        ) -> Result<fresolution::Component, fresolution::ResolverError> {
+            let target = weak_target.upgrade().map_err(|_| fresolution::ResolverError::Internal)?;
+            let url = Url::new(url).map_err(|_| fresolution::ResolverError::InvalidArgs)?;
+            let component_address = match context {
+                Some(context) => {
+                    ComponentAddress::from_url_and_context(&url, context.into(), &target).await
+                }
+                None => ComponentAddress::from_url(&url, &target).await,
+            }
+            .map_err(|_| fresolution::ResolverError::InvalidArgs)?;
+            let component = resolver.resolve(&component_address).await?;
+            Ok(component.into())
+        }
+        let name_for_warn = resolver_schema.clone();
+        let launch = LaunchTaskOnReceive::new(
+            capability_source,
+            self.task_group.clone(),
+            resolver_schema.clone(),
+            Some(self.policy_checker.clone()),
+            Arc::new(move |server_end, weak_target| {
+                let resolver = resolver.clone();
+                let name_for_warn = name_for_warn.clone();
+                async move {
+                    let mut stream =
+                        take_handle_as_stream::<fresolution::ResolverMarker>(server_end);
+                    while let Some(request) = stream.try_next().await? {
+                        match request {
+                            fresolution::ResolverRequest::Resolve { component_url, responder } => {
+                                responder.send(
+                                    do_resolve(&weak_target, &resolver, component_url, None).await,
+                                )?;
+                            }
+                            fresolution::ResolverRequest::ResolveWithContext {
+                                component_url,
+                                context,
+                                responder,
+                            } => {
+                                responder.send(
+                                    do_resolve(
+                                        &weak_target,
+                                        &resolver,
+                                        component_url,
+                                        Some(context),
+                                    )
+                                    .await,
+                                )?;
+                            }
+                            other_request => warn!(
+                                "unexpected resolver request received for resolver {}: {:?}",
+                                name_for_warn, other_request
+                            ),
+                        };
+                    }
+                    Ok(())
+                }
+                .boxed()
+            }),
+        );
+        // TODO(https://fxbug.dev/369573212): Historically the fuchsia-boot resolver has been
+        // placed in the root component's environment as `fuchsia-boot` and offered to the root
+        // component as `boot_resolver`. This discrepancy must be handled here, as existing tests
+        // and production manifests expect this
+        // behavior.
+        let resolver_name_str = match resolver_schema.as_str() {
+            "fuchsia-boot" => "boot_resolver".to_string(),
+            resolver_name => resolver_name.to_string(),
+        };
+        let resolver_name = Name::new(resolver_name_str)
+            .expect("invalid resolver name, this should be prevented by manifest_validation");
+
+        let r = launch
+            .into_router()
+            .with_porcelain_type(CapabilityTypeName::Resolver, ExtendedMoniker::ComponentManager);
+        if let Err(e) =
+            self.input.capabilities().insert_capability(&resolver_name, r.clone().into())
+        {
+            warn!(
+                "failed to add resolver {} to root component offered capabilities: {e:?}",
+                resolver_name
+            );
+        }
+        if let Err(e) =
+            self.input.environment().resolvers().insert_capability(&resolver_schema, r.into())
+        {
+            warn!("failed to add resolver {} to root component environment: {e:?}", resolver_schema)
+        }
+    }
+
     fn add_runner_if_enabled(&mut self, runner: BuiltinRunner) {
         if self.builtin_capabilities.iter().find(|decl| decl.name() == runner.name()).is_none() {
             // This builtin protocol is not enabled based on the runtime config, so don't add the
             // capability to the input.
             return;
         }
+        self.add_runner(runner);
+    }
+
+    pub fn add_runner(&mut self, runner: BuiltinRunner) {
         let name = runner.name().clone();
         let capability_source = CapabilitySource::Builtin(BuiltinSource {
             capability: InternalCapability::Runner(name.clone()),
@@ -507,7 +611,7 @@ impl RootComponentInputBuilder {
         let execution_scope = ExecutionScope::new();
         let launch = LaunchTaskOnReceive::new(
             capability_source,
-            self.top_instance.task_group().as_weak(),
+            self.task_group.clone(),
             runner.name().clone(),
             Some(self.policy_checker.clone()),
             Arc::new(move |server_end, weak_component| {
@@ -550,7 +654,7 @@ impl RootComponentInputBuilder {
         }
     }
 
-    fn build(self) -> ComponentInput {
+    pub fn build(self) -> ComponentInput {
         self.input
     }
 }
@@ -603,7 +707,7 @@ pub struct BuiltinEnvironment {
 
 impl BuiltinEnvironment {
     async fn new(
-        params: ModelParams,
+        mut params: ModelParams,
         runtime_config: Arc<RuntimeConfig>,
         system_resource_handle: Option<Resource>,
         builtin_runners: Vec<BuiltinRunner>,
@@ -620,7 +724,11 @@ impl BuiltinEnvironment {
         let top_instance = params.top_instance.clone();
 
         let mut root_input_builder =
-            RootComponentInputBuilder::new(top_instance.clone(), &runtime_config);
+            RootComponentInputBuilder::new(top_instance.task_group().as_weak(), &runtime_config);
+
+        for (resolver_schema, resolver) in params.root_environment.drain_resolvers() {
+            root_input_builder.add_resolver(resolver_schema, resolver);
+        }
 
         // If capability passthrough is enabled, add capabilities offered from
         // the parent to the input dictionary of the root component.
@@ -1552,7 +1660,7 @@ impl BuiltinEnvironment {
 }
 
 fn register_builtin_resolver(resolvers: &mut ResolverRegistry) {
-    resolvers.register(BUILTIN_SCHEME.to_string(), Box::new(BuiltinResolver {}));
+    resolvers.register(BUILTIN_SCHEME.to_string(), Arc::new(BuiltinResolver {}));
 }
 
 // Creates a FuchsiaBootResolver if the /boot directory is installed in component_manager's
@@ -1574,7 +1682,7 @@ async fn register_boot_resolver(
             Ok(None)
         }
         Some(resolver) => {
-            resolvers.register(BOOT_SCHEME.to_string(), Box::new(resolver.clone()));
+            resolvers.register(BOOT_SCHEME.to_string(), Arc::new(resolver.clone()));
             Ok(Some(resolver))
         }
     }
@@ -1585,6 +1693,6 @@ fn register_realm_builder_resolver(
 ) -> Result<RealmBuilderResolver, Error> {
     let resolver =
         RealmBuilderResolver::new().context("Failed to create realm builder resolver")?;
-    resolvers.register(REALM_BUILDER_SCHEME.to_string(), Box::new(resolver.clone()));
+    resolvers.register(REALM_BUILDER_SCHEME.to_string(), Arc::new(resolver.clone()));
     Ok(resolver)
 }

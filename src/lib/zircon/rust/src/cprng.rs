@@ -29,7 +29,7 @@ pub use sys::zx_cprng_draw as cprng_draw_raw;
 pub fn cprng_draw(buffer: &mut [u8]) {
     // SAFETY: &[u8] and &[MaybeUninit<u8>] have the same layout.
     let buffer = unsafe {
-        std::slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut MaybeUninit<u8>, buffer.len())
+        std::slice::from_raw_parts_mut(buffer.as_mut_ptr().cast::<MaybeUninit<u8>>(), buffer.len())
     };
 
     cprng_draw_uninit(buffer);
@@ -46,7 +46,7 @@ pub fn cprng_draw(buffer: &mut [u8]) {
 pub fn cprng_draw_uninit(buffer: &mut [MaybeUninit<u8>]) -> &mut [u8] {
     // SAFETY: `buffer` is a well formed slice of (maybe) uninitialized `u8`s.
     // `MaybeUninit<T>` and `T` have the same layout.
-    unsafe { cprng_draw_raw(buffer.as_mut_ptr() as *mut u8, buffer.len()) };
+    unsafe { cprng_draw_raw(buffer.as_mut_ptr().cast::<u8>(), buffer.len()) };
 
     // SAFETY: We're converting &mut [MaybeUninit<u8>] back to &mut [u8], which is only
     // valid to do if all elements of `buffer` have actually been initialized. Here we
@@ -55,7 +55,7 @@ pub fn cprng_draw_uninit(buffer: &mut [MaybeUninit<u8>]) -> &mut [u8] {
     // slice is init.
     //
     // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable
-    unsafe { std::slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut u8, buffer.len()) }
+    unsafe { std::slice::from_raw_parts_mut(buffer.as_mut_ptr().cast::<u8>(), buffer.len()) }
 }
 
 /// Mix the given entropy into the kernel CPRNG.

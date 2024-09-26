@@ -11,7 +11,7 @@ use crate::key::igtk::Igtk;
 use crate::key::ptk::Ptk;
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, UpdateSink};
 use crate::Error;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Key {
@@ -48,7 +48,7 @@ pub enum Method {
 }
 
 impl Method {
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: Dot11VerifiedKeyFrame<B>,
@@ -99,7 +99,7 @@ pub fn compute_mic_from_buf(
 /// Fails if the AKM has no associated integrity algorithm or MIC size, the given Key Frame's MIC
 /// has a different size than the MIC length derived from the AKM or the Key Frame doesn't have its
 /// MIC bit set.
-pub fn compute_mic<B: ByteSlice>(
+pub fn compute_mic<B: SplitByteSlice>(
     kck: &[u8],
     protection: &NegotiatedProtection,
     frame: &eapol::KeyFrameRx<B>,

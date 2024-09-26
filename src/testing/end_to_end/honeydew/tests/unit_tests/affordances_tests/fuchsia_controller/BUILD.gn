@@ -60,6 +60,14 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
+  python_host_test("netstack_fc_test") {
+    enable_mypy = true
+    main_source = "netstack_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("wlan_fc_test") {
     enable_mypy = true
     main_source = "wlan_test.py"
@@ -83,6 +91,7 @@ group("tests") {
     ":bluetooth_fidl_servers_fc_test($host_toolchain)",
     ":bluetooth_gap_fc_test($host_toolchain)",
     ":bluetooth_le_fc_test($host_toolchain)",
+    ":netstack_fc_test($host_toolchain)",
     ":rtc_fc_test($host_toolchain)",
     ":tracing_fc_test($host_toolchain)",
     ":user_input_fc_test($host_toolchain)",

@@ -27,6 +27,7 @@ bind_library://bind/fuchsia.register
 bind_library://bind/fuchsia.regulator
 bind_library://bind/fuchsia.sdio
 bind_library://bind/fuchsia.serial
+bind_library://bind/fuchsia.spmi
 bind_library://bind/fuchsia.sysmem
 bind_library://bind/fuchsia.test
 bind_library://bind/fuchsia.test.platform
@@ -65,6 +66,7 @@ cc_source_library://pkg/driver_logging_cpp
 cc_source_library://pkg/driver_metadata_cpp (unstable)
 cc_source_library://pkg/driver_node_cpp
 cc_source_library://pkg/driver_outgoing_cpp
+cc_source_library://pkg/driver_power_cpp (unstable)
 cc_source_library://pkg/driver_runtime
 cc_source_library://pkg/driver_runtime_cpp
 cc_source_library://pkg/driver_runtime_env
@@ -128,7 +130,7 @@ data://pkg/heapdump_instrumentation/heapdump_instrumentation_shard.json
 data://pkg/inspect/inspect.json
 data://pkg/sys/component/realm_builder_shard_sdk.json
 data://pkg/sys/testing/testing_sdk.json
-data://pkg/syslog/syslog.json
+data://pkg/syslog/syslog_sdk.json
 data://pkg/trace/trace.json
 data://pkg/vulkan/vulkan.json
 documentation://docs/low_level.json
@@ -255,6 +257,7 @@ fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.network
+fidl_library://fidl/fuchsia.hardware.network.driver (unstable)
 fidl_library://fidl/fuchsia.hardware.pci
 fidl_library://fidl/fuchsia.hardware.pin (unstable)
 fidl_library://fidl/fuchsia.hardware.pinimpl (unstable)
@@ -320,8 +323,10 @@ fidl_library://fidl/fuchsia.net.mdns
 fidl_library://fidl/fuchsia.net.reachability
 fidl_library://fidl/fuchsia.net.routes
 fidl_library://fidl/fuchsia.net.stackmigrationdeprecated
+fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel
 fidl_library://fidl/fuchsia.power.profile
+fidl_library://fidl/fuchsia.power.system (unstable)
 fidl_library://fidl/fuchsia.power.systemmode
 fidl_library://fidl/fuchsia.process
 fidl_library://fidl/fuchsia.process.lifecycle
@@ -369,6 +374,7 @@ fidl_library://fidl/fuchsia.version
 fidl_library://fidl/fuchsia.weave
 fidl_library://fidl/fuchsia.web
 fidl_library://fidl/fuchsia.wlan.common
+fidl_library://fidl/fuchsia.wlan.fullmac (unstable)
 fidl_library://fidl/fuchsia.wlan.ieee80211
 fidl_library://fidl/fuchsia.wlan.phyimpl
 fidl_library://fidl/fuchsia.wlan.policy

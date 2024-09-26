@@ -8,15 +8,16 @@ use assembly_config_schema::assembly_config::{
     AssemblyConfigWrapperForOverrides, CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
+use assembly_config_schema::platform_config::PlatformConfig;
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
 use assembly_file_relative_path::SupportsFileRelativePaths;
-use assembly_images_config::ImagesConfig;
+use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_tool::SdkToolProvider;
 use assembly_util::{read_config, BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
-use ffx_assembly_args::{PackageMode, PackageValidationHandling, ProductArgs};
+use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use tracing::info;
 
 mod assembly_builder;
@@ -29,9 +30,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         gendir: _,
         input_bundles_dir,
         legacy_bundle,
-        additional_packages_path,
         package_validation,
-        mode,
         custom_kernel_aib,
         developer_overrides,
     } = args;
@@ -80,7 +79,7 @@ Resulting product is not supported and may misbehave!
 
         let config_path = if file_relative_paths { Some(&product_path) } else { None };
 
-        let platform = merge_override_values_with_resolved_paths(
+        let mut platform: PlatformConfig = merge_override_values_with_resolved_paths(
             platform,
             config_path,
             platform_config_overrides,
@@ -100,6 +99,13 @@ Resulting product is not supported and may misbehave!
             product: serde_json::Value::Null,
             ..developer_overrides
         };
+
+        // If the developer overrides specifies `netboot_mode`, then we override
+        // the image mode to 'ramdisk'.
+        if developer_overrides.developer_only_options.netboot_mode {
+            platform.storage.filesystems.image_mode = FilesystemImageMode::Ramdisk;
+        }
+        let platform = platform;
 
         (platform, product, Some(developer_overrides))
     } else {
@@ -161,20 +167,20 @@ Resulting product is not supported and may misbehave!
     let board_info = BoardInformation { configuration: board_provided_config, ..board_info };
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
-    let ramdisk_image = mode == PackageMode::DiskImageInZbi;
     let resource_dir = input_bundles_dir.join("resources");
     let configuration = assembly_platform_configuration::define_configuration(
         &platform,
         &product,
         &board_info,
-        ramdisk_image,
         &outdir,
         &resource_dir,
     )?;
 
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
-    let mut builder = ImageAssemblyConfigBuilder::new(platform.build_type, board_info.name.clone());
+    let image_mode = platform.storage.filesystems.image_mode;
+    let mut builder =
+        ImageAssemblyConfigBuilder::new(platform.build_type, board_info.name.clone(), image_mode);
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {
@@ -275,12 +281,6 @@ Resulting product is not supported and may misbehave!
         .add_product_base_drivers(product.base_drivers)
         .context("Adding product-provided base-drivers")?;
 
-    if let Some(package_config_path) = additional_packages_path {
-        let additional_packages =
-            read_config(package_config_path).context("Reading additional package config")?;
-        builder.add_product_packages(additional_packages).context("Adding additional packages")?;
-    }
-
     // Add devicetree binary
     if let Some(devicetree_path) = &board_info.devicetree {
         builder
@@ -289,13 +289,11 @@ Resulting product is not supported and may misbehave!
     }
 
     // Construct and set the images config
-    let zbi_only = mode != PackageMode::DiskImage;
     builder
         .set_images_config(
             ImagesConfig::from_product_and_board(
                 &platform.storage.filesystems,
                 &board_info.filesystems,
-                zbi_only,
             )
             .context("Constructing images config")?,
         )

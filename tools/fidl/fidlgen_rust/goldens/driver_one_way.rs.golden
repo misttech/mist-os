@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -28,6 +24,13 @@ impl fidl::Persistable for Payload {}
 
 mod internal {
     use super::*;
+
+    impl fidl::encoding::ValueTypeMarker for Payload {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
 
     unsafe impl fidl::encoding::TypeMarker for Payload {
         type Owned = Self;
@@ -51,20 +54,12 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Payload {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Payload> for &Payload {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Payload, D> for &Payload {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -79,11 +74,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u32>> fidl::encoding::Encode<Payload> for (T0,) {
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<u32, D>>
+        fidl::encoding::Encode<Payload, D> for (T0,)
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -96,16 +93,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Payload {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Payload {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { value: fidl::new_empty!(u32) }
+            Self { value: fidl::new_empty!(u32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

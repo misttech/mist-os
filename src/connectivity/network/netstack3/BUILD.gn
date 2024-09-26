@@ -33,6 +33,8 @@ common_deps = [
   "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
   "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
   "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
+  "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+  "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
   "//src/connectivity/lib/fidl_fuchsia_net_neighbor_ext",
   "//src/connectivity/lib/net-declare",
   "//src/connectivity/lib/net-types",
@@ -54,11 +56,13 @@ common_deps = [
   "//src/lib/network/fidl_fuchsia_net_multicast_ext",
   "//src/lib/network/fidl_fuchsia_net_routes_ext",
   "//src/lib/network/packet",
+  "//src/lib/replace-with",
   "//src/lib/trace/rust:trace",
   "//src/lib/trace/rust:trace-provider",
   "//src/lib/zircon/rust:fuchsia-zircon",
   "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
   "//third_party/rust_crates:assert_matches",
+  "//third_party/rust_crates:async-ringbuf",
   "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:either",
   "//third_party/rust_crates:futures",
@@ -84,10 +88,12 @@ common_test_deps = [
   "//src/lib/diagnostics/hierarchy/rust",
   "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
   "//src/lib/network/fidl_fuchsia_net_ext",
+  "//src/lib/proptest-support",
   "//src/lib/testing/fixture",
   "//third_party/rust_crates:futures-lite",
   "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:log",
+  "//third_party/rust_crates:proptest",
   "//third_party/rust_crates:test-case",
 ]
 
@@ -108,6 +114,7 @@ common_sources = [
   "src/bindings/name_worker.rs",
   "src/bindings/neighbor_worker.rs",
   "src/bindings/netdevice_worker.rs",
+  "src/bindings/power.rs",
   "src/bindings/resource_removal.rs",
   "src/bindings/root_fidl_worker.rs",
   "src/bindings/routes.rs",
@@ -123,6 +130,7 @@ common_sources = [
   "src/bindings/socket/queue.rs",
   "src/bindings/socket/raw.rs",
   "src/bindings/socket/stream.rs",
+  "src/bindings/socket/stream/buffer.rs",
   "src/bindings/socket/worker.rs",
   "src/bindings/stack_fidl_worker.rs",
   "src/bindings/timers.rs",
@@ -204,23 +212,23 @@ rustc_binary("bin-instrumented") {
 
 fuchsia_component_manifest("component_manifest") {
   component_name = "netstack3"
-  manifest = "meta/netstack3.cml"
+  manifest = "meta/netstack3_prod.cml"
 }
 
 network_unified_binary_regular_and_gub_components("component") {
   cm_label = ":component_manifest"
   component_name = "netstack3"
   gub_deps = [ ":bin" ]
+  visibility = [
+    # Only available to top level network for bubbling up into assembly. Use the
+    # test components everywhere else.
+    "//src/connectivity/network:*",
+  ]
 }
 
 fuchsia_structured_config_rust_lib("config_lib") {
   name = "ns3_config"
   cm_label = ":component_manifest"
-}
-
-fuchsia_structured_config_values("config_for_tests") {
-  cm_label = ":component_manifest"
-  values_source = "config/test.json5"
 }
 
 template("ns3_test_component") {
@@ -254,6 +262,14 @@ template("ns3_test_component") {
   }
 }
 
+# A stand-in for :component to use for tests.
+ns3_test_component("component-for-tests") {
+  component_name = "netstack3"
+  manifest = "meta/netstack3_test.cml"
+  config_values_source = "config/test.json5"
+  deps = [ ":bin" ]
+}
+
 # Component with debugging instrumentation enabled. This should be used for
 # tests but not benchmarks.
 ns3_test_component("component-debug") {
@@ -266,7 +282,7 @@ ns3_test_component("component-debug") {
 # Drop-in component with the name "netstack" rather than "netstack3."
 ns3_test_component("component-dropin") {
   component_name = "netstack"
-  manifest = "meta/netstack3.cml"
+  manifest = "meta/netstack3_test.cml"
   config_values_source = "config/test.json5"
   deps = [ ":bin" ]
 }

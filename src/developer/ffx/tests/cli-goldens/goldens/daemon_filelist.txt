@@ -1,5 +1,6 @@
 ffx/daemon.golden
 ffx/daemon/crash.golden
+ffx/daemon/disconnect.golden
 ffx/daemon/echo.golden
 ffx/daemon/hang.golden
 ffx/daemon/log.golden

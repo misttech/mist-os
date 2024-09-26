@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -51,14 +52,14 @@ source_set("driver_runner_test_fixture") {
   ]
 }
 
-executable("driver_runner_test") {
+cc_test_executable("driver_runner_test") {
   testonly = true
   sources = [ "driver_runner_test.cc" ]
 
   deps = [ ":driver_runner_test_fixture" ]
 }
 
-executable("driver_runner_death_test") {
+cc_test_executable("driver_runner_death_test") {
   testonly = true
   sources = [ "driver_runner_death_test.cc" ]
 
@@ -91,7 +92,7 @@ fuchsia_unittest_component("driver-runner-test") {
   deps = [ ":driver_runner_test" ]
 }
 
-executable("bind_manager_test") {
+cc_test_executable("bind_manager_test") {
   testonly = true
   sources = [
     "bind_manager_test.cc",
@@ -114,7 +115,7 @@ fuchsia_unittest_component("bind-manager-test") {
   deps = [ ":bind_manager_test" ]
 }
 
-executable("composite_node_spec_impl_test") {
+cc_test_executable("composite_node_spec_impl_test") {
   testonly = true
   sources = [ "composite_node_spec_impl_test.cc" ]
 
@@ -125,7 +126,7 @@ fuchsia_unittest_component("node-test") {
   deps = [ ":node_test" ]
 }
 
-executable("node_test") {
+cc_test_executable("node_test") {
   testonly = true
   sources = [ "node_test.cc" ]
 
@@ -141,7 +142,7 @@ fuchsia_unittest_component("composite-node-spec-v2-test") {
   deps = [ ":composite_node_spec_impl_test" ]
 }
 
-executable("node_removal_tracker_test") {
+cc_test_executable("node_removal_tracker_test") {
   testonly = true
   sources = [ "node_removal_tracker_test.cc" ]
 
@@ -161,7 +162,7 @@ fuchsia_unittest_component("node-shutdown-test") {
   deps = [ ":node_shutdown_test" ]
 }
 
-executable("node_shutdown_test") {
+cc_test_executable("node_shutdown_test") {
   testonly = true
   sources = [ "node_shutdown_test.cc" ]
 

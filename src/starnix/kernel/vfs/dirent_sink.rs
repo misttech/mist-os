@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::mem;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::mm::MemoryAccessor;
 use crate::task::CurrentTask;
@@ -53,7 +53,7 @@ impl DirectoryEntryType {
 const DIRENT64_PADDING_SIZE: usize = 5;
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 struct DirentHeader64 {
     d_ino: u64,
     d_off: i64,
@@ -201,13 +201,13 @@ mod x86_64 {
     use starnix_uapi::user_address::UserAddress;
     use starnix_uapi::{ino_t, off_t};
     use std::mem;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     const DIRENT32_PADDING_SIZE: usize = 6;
     const DIRENT32_HEADER_SIZE: usize = mem::size_of::<DirentHeader32>() - DIRENT32_PADDING_SIZE;
 
     #[repr(C)]
-    #[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+    #[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
     struct DirentHeader32 {
         d_ino: u64,
         d_off: i64,

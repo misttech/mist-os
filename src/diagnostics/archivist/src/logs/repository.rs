@@ -479,6 +479,7 @@ mod tests {
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fidl_fuchsia_logger::LogSinkMarker;
+    use fuchsia_zircon as zx;
     use moniker::ExtendedMoniker;
     use selectors::FastError;
     use std::io::Cursor;
@@ -496,9 +497,9 @@ mod tests {
             "fuchsia-pkg://bar",
         )));
 
-        foo_container.ingest_message(make_message("a", 1));
-        bar_container.ingest_message(make_message("b", 2));
-        foo_container.ingest_message(make_message("c", 3));
+        foo_container.ingest_message(make_message("a", zx::BootTime::from_nanos(1)));
+        bar_container.ingest_message(make_message("b", zx::BootTime::from_nanos(2)));
+        foo_container.ingest_message(make_message("c", zx::BootTime::from_nanos(3)));
 
         let stream = repo.logs_cursor(StreamMode::Snapshot, None, ftrace::Id::random());
 
@@ -604,9 +605,9 @@ mod tests {
         assert_eq!(initial_interest.min_severity, expected_severity);
     }
 
-    fn make_message(msg: &str, timestamp: i64) -> StoredMessage {
+    fn make_message(msg: &str, timestamp: zx::BootTime) -> StoredMessage {
         let record = Record {
-            timestamp,
+            timestamp: timestamp.into_nanos(),
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },

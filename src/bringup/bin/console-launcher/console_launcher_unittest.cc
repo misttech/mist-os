@@ -14,7 +14,6 @@ namespace {
 
 TEST(SystemInstanceTest, CheckBootArgParsing) {
   std::map<std::string, std::string> arguments;
-  arguments["kernel.shell"] = "false";
   arguments["console.shell"] = "true";
   arguments["console.device_topological_suffix"] = "/test/path";
   arguments["TERM"] = "FAKE_TERM";
@@ -43,8 +42,6 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
 
 TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
   std::map<std::string, std::string> arguments;
-  arguments["kernel.shell"] = "true";
-  arguments["console.shell"] = "true";
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   mock_boot_arguments::Server boot_server(std::move(arguments));

@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_package.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -118,7 +119,7 @@ source_set("qcow_test_data") {
   sources = [ "qcow_test_data.h" ]
 }
 
-executable("device_unittests") {
+cc_test_executable("device_unittests") {
   visibility = [ ":*" ]
   testonly = true
 

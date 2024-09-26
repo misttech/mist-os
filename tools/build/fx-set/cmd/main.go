@@ -184,6 +184,8 @@ type setArgs struct {
 	enableCxxRbe  bool
 	disableCxxRbe bool
 
+	buildEventService string
+
 	includeClippy bool
 
 	isRelease        bool
@@ -241,6 +243,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.BoolVar(&cmd.disableCxxRbe, "no-cxx-rbe", false, "")
 	flagSet.BoolVar(&cmd.enableLinkRbe, "link-rbe", false, "")
 	flagSet.BoolVar(&cmd.enableBazelRbe, "bazel-rbe", false, "")
+
+	flagSet.StringVar(&cmd.buildEventService, "bes", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
 	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
@@ -421,6 +425,10 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 
 	// fint already translates the *_rbe_enable variables into GN args.
 
+	if args.buildEventService != "" {
+		gnArgs = append(gnArgs, fmt.Sprintf("bazel_upload_build_events = \"%s\"", args.buildEventService))
+	}
+
 	if args.netboot {
 		gnArgs = append(gnArgs, "enable_netboot=true")
 	}
@@ -449,6 +457,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		CxxRbeEnable:        useCxxRbeFinal,
 		LinkRbeEnable:       args.enableLinkRbe,
 		BazelRbeEnable:      args.enableBazelRbe,
+		BuildEventService:   args.buildEventService,
 		IdeFiles:            args.ideFiles,
 		JsonIdeScripts:      args.jsonIDEScripts,
 		ExportRustProject:   true,

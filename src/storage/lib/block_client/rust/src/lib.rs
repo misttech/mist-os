@@ -201,6 +201,7 @@ impl Drop for ResponseFuture {
 
 /// Wraps a vmo-id. Will panic if you forget to detach.
 #[derive(Debug)]
+#[must_use]
 pub struct VmoId(AtomicU16);
 
 impl VmoId {
@@ -219,6 +220,7 @@ impl VmoId {
     }
 
     /// Takes the ID.  The caller assumes responsibility for detaching.
+    #[must_use]
     pub fn into_id(self) -> u16 {
         self.0.swap(block_driver::BLOCK_VMOID_INVALID, Ordering::Relaxed)
     }
@@ -564,7 +566,7 @@ impl Drop for Common {
     fn drop(&mut self) {
         // It's OK to leak the VMO id because the server will dump all VMOs when the fifo is torn
         // down.
-        self.temp_vmo_id.take().into_id();
+        let _ = self.temp_vmo_id.take().into_id();
         self.fifo_state.lock().unwrap().terminate();
     }
 }
@@ -1149,7 +1151,7 @@ mod tests {
 
             // Set up a mock server.
             let (server_fifo, client_fifo) =
-                zx::Fifo::create(16, std::mem::size_of::<BlockFifoRequest>())
+                zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16)
                     .expect("Fifo::create failed");
             let maybe_server_fifo = std::sync::Mutex::new(Some(client_fifo));
 
@@ -1204,7 +1206,9 @@ mod tests {
                                         match request {
                                             block::SessionRequest::GetFifo { responder } => {
                                                 match maybe_server_fifo.lock().unwrap().take() {
-                                                    Some(fifo) => responder.send(Ok(fifo)),
+                                                    Some(fifo) => {
+                                                        responder.send(Ok(fifo.downcast()))
+                                                    }
                                                     None => responder.send(Err(
                                                         zx::Status::NO_RESOURCES.into_raw(),
                                                     )),

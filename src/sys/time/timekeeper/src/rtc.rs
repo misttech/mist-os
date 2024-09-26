@@ -11,7 +11,7 @@ use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
 use fuchsia_runtime::UtcTime;
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use futures::{select, FutureExt, StreamExt, TryFutureExt};
 use std::path::PathBuf;
 use thiserror::Error;
@@ -225,8 +225,11 @@ impl Rtc for RtcImpl {
         } else {
             // ...otherwise, wait until the top of the current second than set the RTC using the
             // following second.
-            fasync::Timer::new(fasync::Time::after(1.second() - fractional_second)).await;
-            zx_time_to_fidl_time(value + 1.second())
+            fasync::Timer::new(fasync::Time::after(
+                zx::Duration::from_seconds(1) - fractional_second,
+            ))
+            .await;
+            zx_time_to_fidl_time(value + zx::Duration::from_seconds(1))
         };
         let status = self
             .proxy
@@ -311,7 +314,7 @@ mod test {
         let to_fidl = zx_time_to_fidl_time(TEST_ZX_TIME);
         assert_eq!(to_fidl, TEST_FIDL_TIME);
         // Times should be truncated to the previous second
-        let to_fidl_2 = zx_time_to_fidl_time(TEST_ZX_TIME + 999.millis());
+        let to_fidl_2 = zx_time_to_fidl_time(TEST_ZX_TIME + zx::Duration::from_millis(999));
         assert_eq!(to_fidl_2, TEST_FIDL_TIME);
 
         let to_zx = fidl_time_to_zx_time(TEST_FIDL_TIME).unwrap();

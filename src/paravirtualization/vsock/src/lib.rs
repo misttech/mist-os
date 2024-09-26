@@ -15,11 +15,12 @@ mod tests {
     use super::*;
     use fidl::endpoints::{self, Proxy};
     use fidl_fuchsia_hardware_vsock::{
-        CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream,
+        CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream, VMADDR_CID_HOST,
+        VMADDR_CID_LOCAL,
     };
     use fidl_fuchsia_vsock::{
         AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
-        ConnectorMarker, ConnectorProxy,
+        ConnectorMarker, ConnectorProxy, ListenerMarker,
     };
     use futures::{channel, future, FutureExt, StreamExt, TryFutureExt};
     use {fuchsia_async as fasync, fuchsia_zircon as zx};
@@ -58,13 +59,13 @@ mod tests {
             let (cb, responder) =
                 unwrap_msg!(DeviceRequest::Start{cb, responder} from driver_server);
             let driver_callbacks = cb.into_proxy().unwrap();
-            responder.send(zx::Status::OK.into_raw()).unwrap();
+            responder.send(Ok(())).unwrap();
             let _ = tx.send((driver_server, driver_callbacks));
         })
         .detach();
 
-        let (service, event_loop) = Vsock::new(driver_client.into_proxy()?).await?;
-        fasync::Task::spawn(event_loop.map_err(|x| panic!("Event loop stopped {}", x)).map(|_| ()))
+        let (service, event_loop) = Vsock::new(None, Some(driver_client.into_proxy()?)).await?;
+        fasync::Task::local(event_loop.map_err(|x| panic!("Event loop stopped {}", x)).map(|_| ()))
             .detach();
         let (driver_server, driver_callbacks) = rx.await?;
         let driver = MockDriver::new(driver_server, driver_callbacks);
@@ -83,7 +84,7 @@ mod tests {
         let (app_client, app_remote) = endpoints::create_endpoints::<ConnectorMarker>();
         let app_client = app_client.into_proxy()?;
         // Run the client
-        fasync::Task::spawn(
+        fasync::Task::local(
             Vsock::run_client_connection(service.clone(), app_remote.into_stream()?)
                 .then(|_| future::ready(())),
         )
@@ -123,7 +124,7 @@ mod tests {
         }
 
         // Create a connection from the driver
-        driver.callbacks.request(&*addr::Vsock::new(8000, 80, 4))?;
+        driver.callbacks.request(&*addr::Vsock::new(8000, 80, VMADDR_CID_HOST))?;
         let (_data_socket, _client_end, con) = make_con()?;
 
         let (_, responder) =
@@ -133,7 +134,49 @@ mod tests {
         // expect a response
         let (_, _server_data_socket, responder) =
             unwrap_msg!(DeviceRequest::SendResponse{addr, data, responder} from driver.client);
-        responder.send(zx::Status::OK.into_raw())?;
+        responder.send(Ok(()))?;
+
+        Ok(())
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn basic_bind_and_listen() -> Result<(), anyhow::Error> {
+        let (mut driver, service) = common_setup().await?;
+        let app_client = make_client(&service)?;
+        let (_, listener_remote) = endpoints::create_endpoints::<ListenerMarker>();
+
+        // Should reject listening at the ephemeral port ranges.
+        assert_eq!(
+            app_client.bind(VMADDR_CID_LOCAL, 49152, listener_remote).await?,
+            Err(zx::sys::ZX_ERR_UNAVAILABLE)
+        );
+
+        let (listener_client, listener_remote) = endpoints::create_endpoints::<ListenerMarker>();
+        // Listen on a reasonable value.
+        assert_eq!(app_client.bind(VMADDR_CID_LOCAL, 8000, listener_remote).await?, Ok(()));
+
+        // Validate that we cannot listen twice
+        let (_, listener_remote2) = endpoints::create_endpoints::<ListenerMarker>();
+        assert_eq!(
+            app_client.bind(VMADDR_CID_LOCAL, 8000, listener_remote2).await?,
+            Err(zx::sys::ZX_ERR_ALREADY_BOUND)
+        );
+
+        let listener_client = listener_client.into_proxy().unwrap();
+        assert_eq!(listener_client.listen(1).await?, Ok(()));
+
+        // Create a connection from the driver
+        driver.callbacks.request(&*addr::Vsock::new(8000, 80, VMADDR_CID_LOCAL))?;
+        let (_data_socket, _client_end, con) = make_con()?;
+
+        let accept_fut = listener_client.accept(con);
+
+        // expect a response
+        let (_, _server_data_socket, responder) =
+            unwrap_msg!(DeviceRequest::SendResponse{addr, data, responder} from driver.client);
+        responder.send(Ok(()))?;
+
+        assert_eq!(accept_fut.await?, Ok(*addr::Vsock::new(8000, 80, VMADDR_CID_LOCAL)));
 
         Ok(())
     }
@@ -146,13 +189,13 @@ mod tests {
 
         // Send a connection request
         let (_data_socket, _client_end, con) = make_con()?;
-        let request = app_client.connect(4, 8000, con);
+        let request = app_client.connect(VMADDR_CID_HOST, 8000, con);
 
         // Expect a driver message
         {
             let (addr, _server_data_socket, responder) =
                 unwrap_msg!(DeviceRequest::SendRequest{addr, data, responder} from driver.client);
-            responder.send(zx::Status::OK.into_raw())?;
+            responder.send(Ok(()))?;
             // Now simulate an incoming RST for a rejected connection
             driver.callbacks.rst(&addr)?;
             // Leave this scope to drop the server_data_socket
@@ -170,10 +213,10 @@ mod tests {
 
         // Create a connection.
         let (_data_socket_request, client_end_request, con) = make_con()?;
-        let request = app_client.connect(4, 8000, con);
+        let request = app_client.connect(VMADDR_CID_HOST, 8000, con);
         let (addr, server_data_socket_request, responder) =
             unwrap_msg!(DeviceRequest::SendRequest{addr, data, responder} from driver.client);
-        responder.send(zx::Status::OK.into_raw())?;
+        responder.send(Ok(()))?;
         driver.callbacks.response(&addr)?;
         let _ = request.await?.map_err(zx::Status::from_raw)?;
 
@@ -190,7 +233,7 @@ mod tests {
         client_end_request.on_closed().await?;
 
         // Listener should still be active and receive a connection
-        driver.callbacks.request(&*addr::Vsock::new(9000, 80, 4))?;
+        driver.callbacks.request(&*addr::Vsock::new(9000, 80, VMADDR_CID_HOST))?;
         let (_data_socket, _client_end, _con) = make_con()?;
 
         let (_addr, responder) =

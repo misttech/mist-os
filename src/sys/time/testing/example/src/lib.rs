@@ -47,7 +47,7 @@ async fn test_example() {
     // We give it an arbitrary backstop time. On real systems the backstop
     // time is generated based on the timestamp of the last change that
     // made it into the release.
-    let utc_clock = zx::Clock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME))
+    let utc_clock = zx::SyntheticClock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME))
         .expect("zx calls should not fail");
 
     // RealmProxy endpoint is useful for connecting to any protocols in the test realm, by name.

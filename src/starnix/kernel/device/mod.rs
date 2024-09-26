@@ -18,6 +18,7 @@ pub mod device_mapper;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod framebuffer;
 pub mod kobject;
+pub mod kobject_store;
 pub mod mem;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod perfetto_consumer;

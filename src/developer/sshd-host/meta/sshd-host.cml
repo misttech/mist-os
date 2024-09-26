@@ -317,12 +317,18 @@
 
         // Services available in the shell
         {
-            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+            service: [
+                "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.suspend.SuspendService",
+            ],
             from: "parent",
             to: "#shell",
         },
         {
-            service: [ "fuchsia.hardware.spmi.Service" ],
+            service: [
+                "fuchsia.hardware.spmi.SubTargetService",
+                "fuchsia.hardware.spmi.TargetService",
+            ],
             from: "parent",
             to: "#shell",
         },

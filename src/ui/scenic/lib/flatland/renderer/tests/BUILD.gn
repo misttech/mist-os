@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/board.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -25,7 +26,7 @@ source_set("testing_deps") {
   ]
 }
 
-executable("unittests") {
+cc_test_executable("unittests") {
   output_name = "flatland_renderer_unittests"
   testonly = true
   sources = [

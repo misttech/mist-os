@@ -29,7 +29,7 @@ use starnix_uapi::{
 use std::collections::HashMap;
 use std::mem::size_of;
 use thiserror::Error;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
 
 const NAMESPACE_ID_PREFIX: &str = "starnix";
@@ -487,8 +487,8 @@ impl IpTables {
             // Returns information about the table specified by `optval`.
             IPT_SO_GET_INFO => {
                 if socket.domain == SocketDomain::Inet {
-                    let mut info =
-                        ipt_getinfo::read_from_prefix(&*optval).ok_or_else(|| errno!(EINVAL))?;
+                    let (mut info, _) =
+                        ipt_getinfo::read_from_prefix(&*optval).map_err(|_| errno!(EINVAL))?;
                     let table = self.ipv4.get(&info.name);
                     match table {
                         Some(iptable) => {
@@ -502,8 +502,8 @@ impl IpTables {
                         None => Ok(optval),
                     }
                 } else {
-                    let mut info =
-                        ip6t_getinfo::read_from_prefix(&*optval).ok_or_else(|| errno!(EINVAL))?;
+                    let (mut info, _) =
+                        ip6t_getinfo::read_from_prefix(&*optval).map_err(|_| errno!(EINVAL))?;
                     let table = self.ipv6.get(&info.name);
                     match table {
                         Some(iptable) => {
@@ -522,8 +522,8 @@ impl IpTables {
             // Returns the entries of the table specified by `optval`.
             IPT_SO_GET_ENTRIES => {
                 if socket.domain == SocketDomain::Inet {
-                    let get_entries = ipt_get_entries::read_from_prefix(&*optval)
-                        .ok_or_else(|| errno!(EINVAL))?;
+                    let (get_entries, _) =
+                        ipt_get_entries::read_from_prefix(&*optval).map_err(|_| errno!(EINVAL))?;
                     let mut entry_bytes = match self.ipv4.get(&get_entries.name) {
                         Some(iptable) => iptable.entries.clone(),
                         None => vec![],
@@ -537,8 +537,8 @@ impl IpTables {
                     optval.truncate(std::mem::size_of::<ipt_get_entries>());
                     optval.append(&mut entry_bytes);
                 } else {
-                    let get_entries = ip6t_get_entries::read_from_prefix(&*optval)
-                        .ok_or_else(|| errno!(EINVAL))?;
+                    let (get_entries, _) =
+                        ip6t_get_entries::read_from_prefix(&*optval).map_err(|_| errno!(EINVAL))?;
                     let mut entry_bytes = match self.ipv6.get(&get_entries.name) {
                         Some(iptable) => iptable.entries.clone(),
                         None => vec![],
@@ -557,16 +557,16 @@ impl IpTables {
 
             // Returns the revision match. Currently stubbed to return a max version number.
             IPT_SO_GET_REVISION_MATCH | IP6T_SO_GET_REVISION_MATCH => {
-                let mut revision =
-                    xt_get_revision::read_from_prefix(&*optval).ok_or_else(|| errno!(EINVAL))?;
+                let (mut revision, _) =
+                    xt_get_revision::read_from_prefix(&*optval).map_err(|_| errno!(EINVAL))?;
                 revision.revision = u8::MAX;
                 Ok(revision.as_bytes().to_vec())
             }
 
             // Returns the revision target. Currently stubbed to return a max version number.
             IPT_SO_GET_REVISION_TARGET | IP6T_SO_GET_REVISION_TARGET => {
-                let mut revision =
-                    xt_get_revision::read_from_prefix(&*optval).ok_or_else(|| errno!(EINVAL))?;
+                let (mut revision, _) =
+                    xt_get_revision::read_from_prefix(&*optval).map_err(|_| errno!(EINVAL))?;
                 revision.revision = u8::MAX;
                 Ok(revision.as_bytes().to_vec())
             }
@@ -598,8 +598,8 @@ impl IpTables {
 
             // Sets the counters of the [`IpTable`] specified by `user_opt`.
             IPT_SO_SET_ADD_COUNTERS => {
-                let counters_info =
-                    xt_counters_info::read_from_prefix(&*bytes).ok_or_else(|| errno!(EINVAL))?;
+                let (counters_info, _) =
+                    xt_counters_info::read_from_prefix(&*bytes).map_err(|_| errno!(EINVAL))?;
 
                 if let Some(entry) = match socket.domain {
                     SocketDomain::Inet => self.ipv4.get_mut(&counters_info.name),
@@ -610,7 +610,7 @@ impl IpTables {
                     bytes = bytes.split_off(std::mem::size_of::<xt_counters_info>());
                     for chunk in bytes.chunks(std::mem::size_of::<xt_counters>()) {
                         counters.push(
-                            xt_counters::read_from_prefix(chunk).ok_or_else(|| errno!(EINVAL))?,
+                            xt_counters::read_from_prefix(chunk).map_err(|_| errno!(EINVAL))?.0,
                         );
                     }
                     entry.counters = counters;
@@ -725,6 +725,7 @@ impl IpTables {
                         | CommitError::TransparentProxyWithInvalidMatcher(_)
                         | CommitError::CyclicalRoutineGraph(_)
                         | CommitError::RedirectWithInvalidMatcher(_)
+                        | CommitError::MasqueradeWithInvalidMatcher(_)
                         | CommitError::ErrorOnChange(_)),
                     ) => {
                         log_warn!(

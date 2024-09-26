@@ -11,6 +11,11 @@ pub const FUCHSIA_FVM_PARTITION_LABEL: &str = "fuchsia-fvm";
 pub const FTL_PARTITION_LABEL: &str = "ftl";
 pub const SUPER_PARTITION_LABEL: &str = "super";
 
+// -- Fxfs volume labels --
+pub const BLOB_VOLUME_LABEL: &str = "blob";
+pub const DATA_VOLUME_LABEL: &str = "data";
+pub const UNENCRYPTED_VOLUME_LABEL: &str = "unencrypted";
+
 // -- Partition type GUIDs --
 pub const BLOBFS_TYPE_GUID: [u8; 16] = [
     0x0e, 0x38, 0x67, 0x29, 0x4c, 0x13, 0xbb, 0x4c, 0xb6, 0xda, 0x17, 0xe7, 0xce, 0x1c, 0xa4, 0x5d,

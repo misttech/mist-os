@@ -608,7 +608,7 @@ mod tests {
         let (data, len) = range;
         let slice =
             unsafe { std::slice::from_raw_parts::<u8>(data as usize as *const u8, len as usize) };
-        T::read_from(slice).expect("Failed to read result from returned chain")
+        T::read_from_bytes(slice).expect("Failed to read result from returned chain")
     }
 
     #[fuchsia::test]

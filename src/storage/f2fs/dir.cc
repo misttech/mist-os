@@ -610,8 +610,7 @@ zx_status_t Dir::Readdir(fs::VdirCookie *cookie, void *dirents, size_t len, size
   return ret;
 }
 
-void Dir::VmoRead(uint64_t offset, uint64_t length) {
-  fs::SharedLock lock(mutex_);
+void Dir::VmoRead(uint64_t offset, uint64_t length) TA_NO_THREAD_SAFETY_ANALYSIS {
   ZX_ASSERT_MSG(0,
                 "Unexpected ZX_PAGER_VMO_READ request to dir node[%s:%u]. offset: %lu, size: %lu",
                 name_.data(), GetKey(), offset, length);
@@ -655,7 +654,7 @@ zx::result<LockedPage> Dir::FindDataPage(pgoff_t index, bool do_read) {
   }
 
   LockedPage locked_page;
-  if (zx_status_t err = GrabCachePage(index, &locked_page); err != ZX_OK) {
+  if (zx_status_t err = GrabLockedPage(index, &locked_page); err != ZX_OK) {
     return zx::error(err);
   }
 

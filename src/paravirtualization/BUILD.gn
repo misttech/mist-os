@@ -5,5 +5,9 @@
 group("tests") {
   testonly = true
 
-  deps = [ "vsock:tests" ]
+  deps = [
+    "lib:tests",
+    "vsock:tests",
+    "vsock-loopback:tests",
+  ]
 }

@@ -85,10 +85,10 @@ pub const DIR_NAMES_CHUNK_TYPE: ChunkType = *b"DIRNAMES";
     Clone,
     Copy,
     Default,
-    zerocopy::AsBytes,
-    zerocopy::FromZeros,
+    zerocopy::IntoBytes,
     zerocopy::FromBytes,
-    zerocopy::NoCell,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 #[repr(C)]
 struct Index {
@@ -105,10 +105,10 @@ const INDEX_LEN: u64 = std::mem::size_of::<Index>() as u64;
     Clone,
     Copy,
     Default,
-    zerocopy::AsBytes,
-    zerocopy::FromZeros,
+    zerocopy::IntoBytes,
     zerocopy::FromBytes,
-    zerocopy::NoCell,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 #[repr(C)]
 struct IndexEntry {
@@ -126,10 +126,10 @@ const INDEX_ENTRY_LEN: u64 = std::mem::size_of::<IndexEntry>() as u64;
     Clone,
     Copy,
     Default,
-    zerocopy::AsBytes,
-    zerocopy::FromZeros,
+    zerocopy::IntoBytes,
     zerocopy::FromBytes,
-    zerocopy::NoCell,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 #[repr(C)]
 struct DirectoryEntry {
@@ -352,7 +352,7 @@ impl SafeIntegerConversion for u32 {
 pub(crate) mod tests {
     use super::*;
     use std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _};
-    use zerocopy::AsBytes as _;
+    use zerocopy::IntoBytes as _;
 
     pub(crate) fn example_archive() -> Vec<u8> {
         let mut b: Vec<u8> = vec![0; 16384];
@@ -417,7 +417,7 @@ pub(crate) mod tests {
         assert_eq!(target.seek(SeekFrom::Start(0)).unwrap(), 0);
 
         let mut decoded_index = Index::default();
-        let () = target.get_ref().as_slice().read_exact(decoded_index.as_bytes_mut()).unwrap();
+        let () = target.get_ref().as_slice().read_exact(decoded_index.as_mut_bytes()).unwrap();
         assert_eq!(index, decoded_index);
     }
 
@@ -432,7 +432,7 @@ pub(crate) mod tests {
 
         let mut decoded_index_entry = IndexEntry::default();
         let () =
-            target.get_ref().as_slice().read_exact(decoded_index_entry.as_bytes_mut()).unwrap();
+            target.get_ref().as_slice().read_exact(decoded_index_entry.as_mut_bytes()).unwrap();
         assert_eq!(index_entry, decoded_index_entry);
     }
 
@@ -453,7 +453,7 @@ pub(crate) mod tests {
 
         let mut decoded_directory_entry = DirectoryEntry::default();
         let () =
-            target.get_ref().as_slice().read_exact(decoded_directory_entry.as_bytes_mut()).unwrap();
+            target.get_ref().as_slice().read_exact(decoded_directory_entry.as_mut_bytes()).unwrap();
         assert_eq!(directory_entry, decoded_directory_entry);
     }
 

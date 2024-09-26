@@ -246,14 +246,23 @@ impl FxDirectory {
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<Arc<dyn FxNode>, Error> {
         if create_dir {
-            Ok(Arc::new(FxDirectory::new(
+            let dir = Arc::new(FxDirectory::new(
                 Some(self.clone()),
-                self.directory.create_child_dir(transaction, name, create_attributes).await?,
-            )) as Arc<dyn FxNode>)
+                self.directory.create_child_dir(transaction, name).await?,
+            ));
+            if let Some(attrs) = create_attributes {
+                dir.directory().update_attributes(transaction, Some(&attrs), 0, None).await?;
+            }
+            Ok(dir as Arc<dyn FxNode>)
         } else {
-            Ok(FxFile::new(
-                self.directory.create_child_file(transaction, name, create_attributes).await?,
-            ) as Arc<dyn FxNode>)
+            let file = FxFile::new(self.directory.create_child_file(transaction, name).await?);
+            if let Some(attrs) = create_attributes {
+                file.handle()
+                    .uncached_handle()
+                    .update_attributes(transaction, Some(&attrs), None)
+                    .await?;
+            }
+            Ok(file as Arc<dyn FxNode>)
         }
     }
 
@@ -2003,6 +2012,38 @@ mod tests {
         .expect("Failed to set xattr with create");
 
         close_dir_checked(dir).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_large_xattr() {
+        let fixture = TestFixture::new().await;
+        {
+            let root = fixture.root();
+            let dir = open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+            .await;
+
+            dir.set_extended_attribute(
+                "name".as_bytes(),
+                fio::ExtendedAttributeValue::Bytes(vec![17u8; 300]),
+                fio::SetExtendedAttributeMode::Create,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("Set xattr failed");
+
+            dir.remove_extended_attribute("name".as_bytes())
+                .await
+                .expect("FIDL call failed")
+                .expect("Set xattr failed");
+        }
         fixture.close().await;
     }
 

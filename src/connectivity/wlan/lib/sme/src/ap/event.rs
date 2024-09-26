@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::prelude::DurationNum;
 use fuchsia_zircon::{self as zx};
 use ieee80211::MacAddr;
 use wlan_common::timer::TimeoutDuration;
@@ -37,8 +36,8 @@ pub enum SmeEvent {
 impl SmeEvent {
     pub fn timeout_duration(&self) -> zx::Duration {
         match self {
-            SmeEvent::StartTimeout => START_TIMEOUT_SECONDS.seconds(),
-            SmeEvent::StopTimeout => STOP_TIMEOUT_SECONDS.seconds(),
+            SmeEvent::StartTimeout => zx::Duration::from_seconds(START_TIMEOUT_SECONDS),
+            SmeEvent::StopTimeout => zx::Duration::from_seconds(STOP_TIMEOUT_SECONDS),
         }
     }
 }
@@ -60,8 +59,8 @@ impl ClientEvent {
         match self {
             // We only use schedule_at, so we ignore these timeout durations here.
             // TODO(tonyy): Switch everything to use schedule_at, maybe?
-            ClientEvent::AssociationTimeout => 0.seconds(),
-            ClientEvent::RsnaTimeout { .. } => 0.seconds(),
+            ClientEvent::AssociationTimeout => zx::Duration::from_seconds(0),
+            ClientEvent::RsnaTimeout { .. } => zx::Duration::from_seconds(0),
         }
     }
 }

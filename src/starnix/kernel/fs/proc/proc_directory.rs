@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::device::DeviceMode;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
@@ -13,10 +14,10 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_noop_sync, fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink,
-    unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile,
-    SymlinkTarget,
+    unbounded_seek, BytesFile, BytesFileOps, DirectoryEntryType, DirentSink, DynamicFile,
+    DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
+    StubEmptyFile, SymlinkTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
@@ -25,6 +26,7 @@ use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -32,6 +34,7 @@ use starnix_uapi::time::duration_to_scheduler_clock;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, off_t, pid_t};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 use std::time::SystemTime;
@@ -67,6 +70,11 @@ impl ProcDirectory {
                     FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
                 )
             },
+            "devices".into() => fs.create_node(
+                current_task,
+                DevicesFile::new_node(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
             "self".into() => SelfSymlink::new_node(current_task, fs),
             "thread-self".into() => ThreadSelfSymlink::new_node(current_task, fs),
             "meminfo".into() => fs.create_node(
@@ -144,7 +152,7 @@ impl ProcDirectory {
             ),
             "misc".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/misc", bug_ref!("https://fxbug.dev/322893943")),
+                MiscFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "modules".into() => fs.create_node(
@@ -412,6 +420,31 @@ impl FileOps for ProcKmsgFile {
     }
 }
 
+struct DevicesFile;
+impl DevicesFile {
+    pub fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self)
+    }
+}
+impl BytesFileOps for DevicesFile {
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let registery = &current_task.kernel().device_registry;
+        let char_devices = registery.list_major_devices(DeviceMode::Char);
+        let block_devices = registery.list_major_devices(DeviceMode::Block);
+        let mut contents = String::new();
+        contents.push_str("Character devices:\n");
+        for (major, name) in char_devices {
+            contents.push_str(&format!("{:3} {}\n", major, name));
+        }
+        contents.push_str("\n");
+        contents.push_str("Block devices:\n");
+        for (major, name) in block_devices {
+            contents.push_str(&format!("{:3} {}\n", major, name));
+        }
+        Ok(contents.into_bytes().into())
+    }
+}
+
 /// A node that represents a symlink to `proc/<pid>` where <pid> is the pid of the task that
 /// reads the `proc/self` symlink.
 struct SelfSymlink;
@@ -654,6 +687,28 @@ impl DynamicFileSource for ConfigFile {
         })?;
         sink.write(&contents);
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MiscFile;
+impl MiscFile {
+    pub fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self)
+    }
+}
+impl BytesFileOps for MiscFile {
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let registery = &current_task.kernel().device_registry;
+        let devices = registery.list_minor_devices(
+            DeviceMode::Char,
+            DeviceType::new_range(MISC_MAJOR, DeviceMode::Char.minor_range()),
+        );
+        let mut contents = String::new();
+        for (device_type, name) in devices {
+            contents.push_str(&format!("{:3} {}\n", device_type.minor(), name));
+        }
+        Ok(contents.into_bytes().into())
     }
 }
 

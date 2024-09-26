@@ -3,10 +3,11 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/virtualization/buildtools/linux_paths.gni")
 import("//src/virtualization/buildtools/romfs_image.gni")
 
-executable("hypervisor_integration_tests") {
+cc_test_executable("hypervisor_integration_tests") {
   testonly = true
   sources = [
     # Common code.

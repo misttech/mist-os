@@ -19,7 +19,7 @@
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder};
 use std::marker::PhantomData;
 use std::ops::Deref;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// A parsed set of arbitrary sequential records.
 ///
@@ -310,7 +310,7 @@ where
 
 impl<B, R> Records<B, R>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     R: for<'a> RecordsImpl<'a>,
 {
     /// Parse a set of records with a context.
@@ -395,7 +395,7 @@ where
 
 impl<B, R> Records<B, R>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     R: for<'a> RecordsImpl<'a, Context = ()>,
 {
     /// Parses a set of records.
@@ -420,7 +420,7 @@ where
 
 impl<'a, B, R> Records<B, R>
 where
-    B: 'a + ByteSlice,
+    B: 'a + SplitByteSlice,
     R: RecordsImpl<'a>,
 {
     /// Create an iterator over options.
@@ -539,14 +539,14 @@ impl<'a> packet::BufferView<&'a [u8]> for LongLivedBuff<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
     const DUMMY_BYTES: [u8; 16] = [
         0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03,
         0x04,
     ];
 
-    #[derive(Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+    #[derive(Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
     #[repr(C)]
     struct DummyRecord {
         a: [u8; 2],
@@ -772,7 +772,7 @@ mod test {
         assert_eq!(rec.b, 0x03);
     }
 
-    fn validate_parsed_stateful_context_records<B: ByteSlice>(
+    fn validate_parsed_stateful_context_records<B: SplitByteSlice>(
         records: Records<B, StatefulContextRecordImpl>,
         context: StatefulContext,
     ) {

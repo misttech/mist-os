@@ -250,7 +250,7 @@ pub struct SnapshotData {
     /// Optional name of the file or InspectSink proxy that created this snapshot.
     pub name: Option<InspectHandleName>,
     /// Timestamp at which this snapshot resolved or failed.
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::BootTime,
     /// Errors encountered when processing this snapshot.
     pub errors: Vec<schema::InspectError>,
     /// Optional snapshot of the inspect hierarchy, in case reading fails
@@ -345,7 +345,7 @@ impl SnapshotData {
     ) -> SnapshotData {
         SnapshotData {
             name,
-            timestamp: fasync::Time::now().into_zx(),
+            timestamp: zx::BootTime::get(),
             errors: Vec::new(),
             snapshot: Some(snapshot),
             escrowed,
@@ -360,7 +360,7 @@ impl SnapshotData {
     ) -> SnapshotData {
         SnapshotData {
             name,
-            timestamp: fasync::Time::now().into_zx(),
+            timestamp: zx::BootTime::get(),
             errors: vec![error],
             snapshot: None,
             escrowed,
@@ -500,7 +500,7 @@ impl UnpopulatedInspectDataContainer {
             unpopulated: this,
             batch_timeout: zx::Duration::from_seconds(timeout),
             global_stats,
-            elapsed_time: zx::Duration::from_nanos(0),
+            elapsed_time: zx::Duration::ZERO,
             trace_guard: Arc::new(trace_guard),
             trace_id,
         };
@@ -550,7 +550,7 @@ impl UnpopulatedInspectDataContainer {
 mod test {
     use super::*;
     use fuchsia_inspect::Node;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::StreamExt;
     use std::sync::LazyLock;
 
@@ -568,7 +568,7 @@ mod test {
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         fasync::Task::spawn(async move {
             while stream.next().await.is_some() {
-                fasync::Timer::new(fasync::Time::after(100000.second())).await;
+                fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(100000))).await;
             }
         })
         .detach();

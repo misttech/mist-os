@@ -58,7 +58,7 @@ import("//build/group_with_inputs.gni")
 #   enable_mypy (optional)
 #     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
-#     Default: False
+#     Default: true
 #
 #   assert_no_deps (optional)
 #     GN usual
@@ -114,7 +114,11 @@ template("python_library") {
     _full_data_source_paths += [ rebase_path(data_source, root_build_dir) ]
   }
 
-  _enable_mypy = defined(invoker.enable_mypy) && invoker.enable_mypy
+  _enable_mypy = true
+  if (defined(invoker.enable_mypy)) {
+    _enable_mypy = invoker.enable_mypy
+  }
+
   _library_name = target_name
   if (defined(invoker.library_name)) {
     _library_name = invoker.library_name

@@ -7,6 +7,7 @@ load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "ARCH",
     "BUILD_TYPES",
+    "PACKAGE_MODE",
     "fuchsia_product",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
@@ -77,6 +78,7 @@ fuchsia_product(
     name = "microfuchsia_eng.x64",
     board_config = "//boards:x64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    package_mode = PACKAGE_MODE.BOOTFS,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )
@@ -84,6 +86,7 @@ fuchsia_product(
 fuchsia_product(
     name = "microfuchsia_eng.pkvm-x64",
     board_config = "//boards:pkvm-x64",
+    package_mode = PACKAGE_MODE.BOOTFS,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )
@@ -92,6 +95,7 @@ fuchsia_product(
     name = "microfuchsia_eng.arm64",
     board_config = "//boards:arm64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    package_mode = PACKAGE_MODE.BOOTFS,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )
@@ -99,6 +103,7 @@ fuchsia_product(
 fuchsia_product(
     name = "microfuchsia_eng.pkvm-arm64",
     board_config = "//boards:pkvm-arm64",
+    package_mode = PACKAGE_MODE.BOOTFS,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )

@@ -578,15 +578,6 @@ def Main(args):
         # Just copy the existing image file.
         output.CopyImage(args.from_image)
     else:
-        # Set up the ChromeOS reserved partition.
-        reserved_part = Partition(
-            None,
-            "reserved",
-            "reserved",
-            Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE,
-        )
-        output.AddPartition(reserved_part)
-
         build_dir = args.build_dir
         if build_dir == "":
             build_dir = paths.FUCHSIA_BUILD_DIR
@@ -599,9 +590,23 @@ def Main(args):
         if not parts:
             return 1
 
-        # Add a abr metadata partition
         with tempfile.TemporaryDirectory() as temp_dir:
-            # A pre-generated abr metadata that can only boots zircon-r
+            # Set up the ChromeOS reserved partition.
+            reserved_zeroes = os.path.join(temp_dir, "reserved")
+            with open(reserved_zeroes, "wb") as f:
+                sz = Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE
+                f.write(b"\x00" * sz)
+
+            reserved_part = Partition(
+                reserved_zeroes,
+                "reserved",
+                "reserved",
+                Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE,
+            )
+            output.AddPartition(reserved_part)
+
+            # Add an abr metadata partition.
+            # A pre-generated abr metadata that can only boots zircon-r.
             abr_data_file = os.path.join(temp_dir, "abr_data")
             with open(abr_data_file, "wb") as abr_data:
                 abr_data.write(

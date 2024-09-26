@@ -7,7 +7,7 @@
 
 #![allow(unused_imports)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub type BoolAlias = bool;
 
@@ -32,7 +32,7 @@ pub type Uint64Alias = u64;
 pub const CONST_FROM_ALIAS: u8 = 0xff;
 
 #[repr(i16)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, IntoBytes, PartialEq)]
 pub enum Enum {
     Member = 0,
 }
@@ -40,7 +40,7 @@ pub enum Enum {
 pub type EnumAlias = Enum;
 
 #[repr(u16)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, IntoBytes, PartialEq)]
 pub enum Bits {
     One = 1,
 }

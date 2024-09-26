@@ -5,8 +5,10 @@
 """Entry point of Mobly Driver which conducts Mobly test execution."""
 
 import argparse
+import json
 import os
 import sys
+from typing import Any
 
 import mobly_driver
 from mobly_driver import driver_factory
@@ -25,6 +27,11 @@ parser.add_argument(
     "--params-yaml-path",
     default=None,
     help="path to the Mobly test params YAML file.",
+)
+parser.add_argument(
+    "--honeydew-config-json-path",
+    default=None,
+    help="path to the Honeydew config json file.",
 )
 parser.add_argument(
     "--test-timeout-sec",
@@ -79,16 +86,11 @@ def main() -> None:
     underlying Mobly test.
     """
     factory = driver_factory.DriverFactory(
-        ffx_path=os.path.abspath(args.ffx_path),
+        honeydew_config=generate_honeydew_config(),
         transport=args.transport,
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
-        ffx_subtools_search_path=(
-            os.path.abspath(args.ffx_subtools_path)
-            if args.ffx_subtools_path
-            else None
-        ),
         ssh_path=os.path.abspath(args.ssh_path) if args.ssh_path else None,
     )
     driver = factory.get_driver()
@@ -103,3 +105,63 @@ def main() -> None:
         verbose=args.v,
         hermetic=args.hermetic,
     )
+
+
+def generate_honeydew_config() -> dict[str, Any]:
+    """Generates and returns the Honeydew config.
+
+    Generated Honeydew config will be in the following format:
+    {
+        "transports": {
+            <transport_name>: {
+                <key>: <value>,
+                ...
+            }
+            ...
+        }
+        "affordances": {
+            <affordance_name>: {
+                <key>: <value>,
+                ...
+            }
+            ...
+        }
+    }
+
+    Example:
+    {
+        "transports": {
+            "ffx": {
+                "path": "/ffx/path",
+                "subtools_search_path": "/subtools/path",
+            }
+        }
+        "affordances": {
+            "bluetooth": {
+                "implementation": "fuchsia-controller"
+            }
+            "wlan": {
+                "implementation": "sl4f"
+            }
+        }
+    }
+    """
+    ffx_config: dict[str, Any] = {}
+    ffx_config["path"] = os.path.abspath(args.ffx_path)
+    if args.ffx_subtools_path:
+        ffx_config["subtools_search_path"] = os.path.abspath(
+            args.ffx_subtools_path
+        )
+
+    honeydew_config: dict[str, Any] = {}
+    if args.honeydew_config_json_path:
+        with open(args.honeydew_config_json_path, "r") as honeydew_config_file:
+            config = json.load(honeydew_config_file)
+        honeydew_config.update(config)
+    if "transports" not in honeydew_config:
+        honeydew_config["transports"] = {}
+    if "ffx" not in honeydew_config["transports"]:
+        honeydew_config["transports"]["ffx"] = {}
+    honeydew_config["transports"]["ffx"].update(ffx_config)
+
+    return honeydew_config

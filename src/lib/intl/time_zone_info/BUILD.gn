@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/icu/icu_executable.gni")
 import("//build/icu/icu_source_set.gni")
 import("//build/icu/third_party_icu_headers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("time_zone_info") {
   testonly = true
@@ -52,7 +53,7 @@ icu_source_set("time-zone-info-service-lib") {
   public_deps = [ "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp" ]
 }
 
-executable("time-zone-info-service-lib-test-bin") {
+cc_test_executable("time-zone-info-service-lib-test-bin") {
   testonly = true
   output_name = "time-zone-info-service-lib-test"
   sources = [ "time_zone_info_service_test.cc" ]

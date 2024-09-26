@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
   deps = [ ":opencl_loader_tests" ]
 }
 
-executable("test_bin") {
+cc_test_executable("test_bin") {
   testonly = true
   output_name = "opencl_loader_test"
   sources = [ "test.cc" ]
@@ -26,7 +27,7 @@ executable("test_bin") {
   ]
 }
 
-executable("unittest_bin") {
+cc_test_executable("unittest_bin") {
   testonly = true
   output_name = "opencl_loader_unittest"
   sources = [ "unittest.cc" ]

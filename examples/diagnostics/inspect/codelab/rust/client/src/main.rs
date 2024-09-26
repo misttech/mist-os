@@ -6,7 +6,7 @@ use anyhow::Error;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_examples_inspect::ReverserMarker;
 use fuchsia_component::client;
-use fuchsia_zircon::DurationNum;
+use fuchsia_zircon as zx;
 use tracing::{error, info};
 
 struct Args {
@@ -60,6 +60,6 @@ async fn main() -> Result<(), Error> {
     info!("Done reversing! Please use `ffx component stop`");
 
     loop {
-        1.seconds().sleep();
+        zx::Duration::from_seconds(1).sleep();
     }
 }

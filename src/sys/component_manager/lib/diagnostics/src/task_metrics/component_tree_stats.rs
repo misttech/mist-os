@@ -542,7 +542,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use diagnostics_hierarchy::DiagnosticsHierarchy;
     use fuchsia_inspect::DiagnosticsHierarchyGetter;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use injectable_time::{FakeTime, IncrementingFakeTime};
 
     #[fuchsia::test]
@@ -574,7 +574,7 @@ mod tests {
                     previous_task_count = current;
                     break;
                 }
-                fasync::Timer::new(fasync::Time::after(100i64.millis())).await;
+                fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100i64))).await;
             }
         }
 
@@ -816,7 +816,7 @@ mod tests {
                     previous_task_count = current;
                     break;
                 }
-                fasync::Timer::new(fasync::Time::after(100i64.millis())).await;
+                fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100i64))).await;
             }
 
             for task in stats
@@ -1224,7 +1224,7 @@ mod tests {
             if stats.tree.lock().await.len() == 2 {
                 break;
             }
-            fasync::Timer::new(fasync::Time::after(100i64.millis())).await;
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100i64))).await;
         }
 
         assert_data_tree!(inspector, root: {
@@ -1302,7 +1302,7 @@ mod tests {
             if stats.tree.lock().await.len() == 2 {
                 break;
             }
-            fasync::Timer::new(fasync::Time::after(100i64.millis())).await;
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100i64))).await;
         }
 
         assert_eq!(stats.tree.lock().await.len(), 2);

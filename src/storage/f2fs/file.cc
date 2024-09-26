@@ -355,6 +355,11 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   if (unlikely(offset + length > MaxFileSize())) {
     return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, ZX_ERR_BAD_STATE);
   }
+
+  uint32_t num_blocks =
+      CheckedDivRoundUp<uint32_t>(safemath::checked_cast<uint32_t>(length), kBlockSize);
+  fs()->BalanceFs(num_blocks);
+  fs::SharedLock lock(f2fs::GetGlobalLock());
   // There's no need to touch anything when it is being purged, migrating inline data, or an
   // orphan.
   if (unlikely(TestFlag(InodeInfoFlag::kNoAlloc) || TestFlag(InodeInfoFlag::kInlineData) ||
@@ -362,10 +367,6 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
     return VnodeF2fs::VmoDirty(offset, length);
   }
 
-  uint32_t num_blocks =
-      CheckedDivRoundUp<uint32_t>(safemath::checked_cast<uint32_t>(length), kBlockSize);
-  fs()->BalanceFs(num_blocks);
-  fs::SharedLock lock(f2fs::GetGlobalLock());
   auto pages_or = WriteBegin(offset, length);
   if (unlikely(pages_or.is_error())) {
     return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, pages_or.error_value());

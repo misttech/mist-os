@@ -44,7 +44,7 @@ impl Vcpu {
             sys::zx_vcpu_read_state(
                 self.raw_handle(),
                 sys::ZX_VCPU_STATE,
-                &mut state as *mut _ as *mut u8,
+                std::ptr::from_mut(&mut state).cast::<u8>(),
                 std::mem::size_of_val(&state),
             )
         };
@@ -57,7 +57,7 @@ impl Vcpu {
             sys::zx_vcpu_write_state(
                 self.raw_handle(),
                 sys::ZX_VCPU_STATE,
-                state as *const _ as *const u8,
+                std::ptr::from_ref(state).cast::<u8>(),
                 std::mem::size_of_val(state),
             )
         };
@@ -70,7 +70,7 @@ impl Vcpu {
             sys::zx_vcpu_write_state(
                 self.raw_handle(),
                 sys::ZX_VCPU_IO,
-                state as *const _ as *const u8,
+                std::ptr::from_ref(state).cast::<u8>(),
                 std::mem::size_of_val(state),
             )
         };

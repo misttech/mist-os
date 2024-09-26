@@ -323,10 +323,16 @@
 
         // Services
         {
-            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+            service: [
+                "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.suspend.SuspendService",
+            ],
         },
         {
-            service: [ "fuchsia.hardware.spmi.Service" ],
+            service: [
+                "fuchsia.hardware.spmi.SubTargetService",
+                "fuchsia.hardware.spmi.TargetService",
+            ],
         },
     ],
 }

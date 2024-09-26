@@ -40,26 +40,28 @@ impl Router {
             router: &Router,
             payload: fsandbox::RouteRequest,
         ) -> Result<fsandbox::Capability, fsandbox::RouterError> {
-            let Some(token) = payload.requesting else {
-                return Err(fsandbox::RouterError::InvalidArgs);
+            let cap = match (payload.requesting, payload.metadata) {
+                (Some(token), Some(metadata)) => {
+                    let capability =
+                        crate::fidl::registry::get(token.token.as_handle_ref().get_koid().unwrap());
+                    let component = match capability {
+                        Some(crate::Capability::Instance(c)) => c,
+                        Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
+                        None => return Err(fsandbox::RouterError::InvalidArgs),
+                    };
+                    let Capability::Dictionary(metadata) =
+                        Capability::try_from(fsandbox::Capability::Dictionary(metadata)).unwrap()
+                    else {
+                        return Err(fsandbox::RouterError::InvalidArgs);
+                    };
+                    let request = Request { target: component, metadata };
+                    router.route(Some(request), false).await?
+                }
+                (None, None) => router.route(None, false).await?,
+                _ => {
+                    return Err(fsandbox::RouterError::InvalidArgs);
+                }
             };
-            let Some(metadata) = payload.metadata else {
-                return Err(fsandbox::RouterError::InvalidArgs);
-            };
-            let capability =
-                crate::fidl::registry::get(token.token.as_handle_ref().get_koid().unwrap());
-            let component = match capability {
-                Some(crate::Capability::Instance(c)) => c,
-                Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
-                None => return Err(fsandbox::RouterError::InvalidArgs),
-            };
-            let Capability::Dictionary(metadata) =
-                Capability::try_from(fsandbox::Capability::Dictionary(metadata)).unwrap()
-            else {
-                return Err(fsandbox::RouterError::InvalidArgs);
-            };
-            let request = Request { target: component, debug: false, metadata };
-            let cap = router.route(request).await?;
             Ok(cap.into())
         }
 

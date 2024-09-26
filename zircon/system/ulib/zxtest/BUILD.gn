@@ -36,15 +36,6 @@ zxtest_headers = [
   "include/zxtest/zxtest.h",
 ]
 
-sdk_headers_for_internal_use = [
-  # These headers are not intended to be included directly into user code.
-  "include/zxtest/c/zxtest.h",
-  "include/zxtest/cpp/assert.h",
-  "include/zxtest/cpp/assert_streams.h",
-  "include/zxtest/cpp/scoped_trace.h",
-  "include/zxtest/cpp/zxtest.h",
-]
-
 zxtest_sources = [
   "assertion.cc",
   "c-wrappers.cc",
@@ -89,11 +80,7 @@ if (is_fuchsia || is_mistos) {
   }
 }
 
-sdk_source_set("zxtest") {
-  sdk_name = "zxtest"
-  category = "cts"
-  build_as_static = true
-
+static_library("zxtest") {
   public = zxtest_headers
   sources = zxtest_sources
   public_deps = zxtest_public_deps
@@ -120,11 +107,7 @@ sdk_source_set("zxtest") {
   }
 }
 
-sdk_source_set("zxtest-streams") {
-  sdk_name = "zxtest"
-  category = "cts"
-  build_as_static = true
-
+static_library("zxtest-streams") {
   public = zxtest_headers
   sources = zxtest_sources
   public_deps = zxtest_public_deps

@@ -87,7 +87,7 @@ async fn run_puppet(mut requests: LogSinkPuppetRequestStream) {
                 tracing::dispatcher::get_default(|dispatcher| {
                     let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
                     if record.timestamp == 0 {
-                        record.timestamp = zx::MonotonicTime::get().into_nanos();
+                        record.timestamp = zx::BootTime::get().into_nanos();
                     }
                     let test_record = TestRecord::from(&file, line, &record);
                     publisher.event_for_testing(test_record);

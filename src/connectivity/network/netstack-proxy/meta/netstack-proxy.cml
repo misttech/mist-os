@@ -7,6 +7,7 @@
         "//src/connectivity/network/netstack/meta/netstack2-common.shard.cml",
         "//src/connectivity/network/netstack/meta/netstack2-prod.shard.cml",
         "//src/connectivity/network/netstack3/meta/netstack3.shard.cml",
+        "//src/connectivity/network/netstack3/meta/routed_configs.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {

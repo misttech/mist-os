@@ -9,6 +9,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
+#include <lib/fit/thread_safety.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -19,13 +20,36 @@
 #include <zircon/syscalls.h>
 
 #include <cstring>
-#include <optional>
+#include <mutex>
 #include <string_view>
+#include <tuple>
+#include <unordered_map>
 #include <utility>
-#include <variant>
-#include <vector>
 
 #include "src/lib/fxl/strings/string_printf.h"
+
+// Explicit instantiation to enable std associative containers with a Uuid key
+// type.
+template <>
+struct std::hash<fuchsia_tee::wire::Uuid> {
+  size_t operator()(const fuchsia_tee::wire::Uuid& uuid) const {
+    size_t hash = 0;
+    HashAndCombine(hash, uuid.time_low);
+    HashAndCombine(hash, uuid.time_mid);
+    HashAndCombine(hash, uuid.time_hi_and_version);
+    for (size_t i = 0; i < 8; ++i) {
+      HashAndCombine(hash, uuid.clock_seq_and_node[i]);
+    }
+    return hash;
+  }
+
+  // Adapted from: https://www.boost.org/doc/libs/1_64_0/boost/functional/hash/hash.hpp.
+  template <class T>
+  static void HashAndCombine(size_t& seed, const T& v) {
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  }
+};
 
 namespace {
 
@@ -50,19 +74,59 @@ struct UuidEqualityComparator {
   }
 };
 
-using UuidToAppContainer =
-    std::vector<std::pair<fuchsia_tee::wire::Uuid, fidl::ClientEnd<fuchsia_tee::Application>>>;
+// A basic thread-safe, UUID-associative container for application endpoints
+// that backs the context implementation.
+class AppContainer {
+ public:
+  using Uuid = fuchsia_tee::wire::Uuid;
 
-std::string GetApplicationDirectoryPath(const fuchsia_tee::wire::Uuid& app_uuid) {
-  constexpr const char* kPathFormat = "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x";
+  static void InitInContext(TEEC_Context& context) {
+    context.imp.uuid_to_channel = new AppContainer();
+  }
 
-  return fxl::StringPrintf(kPathFormat, app_uuid.time_low, app_uuid.time_mid,
-                           app_uuid.time_hi_and_version, app_uuid.clock_seq_and_node[0],
-                           app_uuid.clock_seq_and_node[1], app_uuid.clock_seq_and_node[2],
-                           app_uuid.clock_seq_and_node[3], app_uuid.clock_seq_and_node[4],
-                           app_uuid.clock_seq_and_node[5], app_uuid.clock_seq_and_node[6],
-                           app_uuid.clock_seq_and_node[7]);
-}
+  static AppContainer* FromContext(TEEC_Context& context) {
+    return reinterpret_cast<AppContainer*>(context.imp.uuid_to_channel);
+  }
+
+  [[nodiscard]] std::lock_guard<std::mutex> lock() FIT_ACQUIRE(m_) { return std::lock_guard{m_}; }
+
+  // Attempts to connect to the associated app.
+  zx::result<fidl::UnownedClientEnd<fuchsia_tee::Application>> Connect(const Uuid& uuid)
+      FIT_REQUIRES(m_) {
+    auto it = apps_.find(uuid);
+    if (it == apps_.end()) {
+      auto result = component::Connect<fuchsia_tee::Application>(AppConnectionPath(uuid));
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      std::tie(it, std::ignore) = apps_.emplace(uuid, std::move(result).value());
+    }
+    return zx::ok(it->second.borrow());
+  }
+
+  void Delete(const Uuid& uuid) {
+    std::lock_guard lock(m_);
+    auto it = apps_.find(uuid);
+    ZX_ASSERT(it != apps_.end());
+    apps_.erase(it);
+  }
+
+ private:
+  static std::string AppConnectionPath(const Uuid& uuid) {
+    constexpr const char* kPathFormat = "/ta/%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x/%s";
+
+    return fxl::StringPrintf(kPathFormat, uuid.time_low, uuid.time_mid, uuid.time_hi_and_version,
+                             uuid.clock_seq_and_node[0], uuid.clock_seq_and_node[1],
+                             uuid.clock_seq_and_node[2], uuid.clock_seq_and_node[3],
+                             uuid.clock_seq_and_node[4], uuid.clock_seq_and_node[5],
+                             uuid.clock_seq_and_node[6], uuid.clock_seq_and_node[7],
+                             fidl::DiscoverableProtocolName<fuchsia_tee::Application>);
+  }
+  std::mutex m_;
+  std::unordered_map<Uuid, fidl::ClientEnd<fuchsia_tee::Application>, std::hash<Uuid>,
+                     UuidEqualityComparator>
+      apps_ FIT_GUARDED(m_);
+};
 
 constexpr uint32_t GetParamTypeForIndex(uint32_t param_types, size_t index) {
   constexpr uint32_t kBitsPerParamType = 4;
@@ -608,69 +672,22 @@ fidl::UnownedClientEnd<fuchsia_tee::Application> GetApplicationFromSession(TEEC_
   return fidl::UnownedClientEnd<fuchsia_tee::Application>(session->imp.application_channel);
 }
 
-UuidToAppContainer* GetUuidToAppContainerFromContext(TEEC_Context* context) {
-  ZX_DEBUG_ASSERT(context);
-  return reinterpret_cast<UuidToAppContainer*>(context->imp.uuid_to_channel);
-}
-
-UuidToAppContainer::iterator FindInUuidToAppContainer(UuidToAppContainer* container,
-                                                      const fuchsia_tee::wire::Uuid& uuid) {
-  ZX_DEBUG_ASSERT(container);
-
-  return std::find_if(container->begin(), container->end(), [&](const auto& uuid_app_pair) {
-    return UuidEqualityComparator{}(uuid_app_pair.first, uuid);
-  });
-}
-
-// Opens a connection to a `fuchsia.tee.Application` via the directory.
-TEEC_Result ConnectApplicationViaDirectory(const fuchsia_tee::wire::Uuid& app_uuid,
-                                           fidl::ClientEnd<fuchsia_tee::Application>* out_app) {
-  ZX_DEBUG_ASSERT(out_app);
-
-  std::string connection_path_base = "/ta/" + GetApplicationDirectoryPath(app_uuid);
-
-  std::string connection_path =
-      connection_path_base + "/" + fidl::DiscoverableProtocolName<fuchsia_tee::Application>;
-
-  auto application = component::Connect<fuchsia_tee::Application>(connection_path);
-  if (!application.is_ok()) {
-    return TEEC_ERROR_COMMUNICATION;
-  }
-
-  *out_app = std::move(application.value());
-  return TEEC_SUCCESS;
-}
-
-TEEC_Result ConnectApplication(const fuchsia_tee::wire::Uuid& app_uuid, TEEC_Context* context,
+TEEC_Result ConnectApplication(const fuchsia_tee::wire::Uuid& uuid, TEEC_Context* context,
                                fidl::UnownedClientEnd<fuchsia_tee::Application>* out_app) {
   ZX_DEBUG_ASSERT(context);
   ZX_DEBUG_ASSERT(out_app);
 
-  UuidToAppContainer* uuid_to_app = GetUuidToAppContainerFromContext(context);
-  if (uuid_to_app == nullptr) {
+  AppContainer* apps = AppContainer::FromContext(*context);
+  if (apps == nullptr) {
     return TEEC_ERROR_BAD_PARAMETERS;
   }
 
-  if (auto iter = FindInUuidToAppContainer(uuid_to_app, app_uuid); iter != uuid_to_app->end()) {
-    // A connection to this application already exists, so just reuse the channel.
-    *out_app = iter->second.borrow();
-    return TEEC_SUCCESS;
+  std::lock_guard lock = apps->lock();
+  zx::result result = apps->Connect(uuid);
+  if (result.is_error()) {
+    return TEEC_ERROR_COMMUNICATION;
   }
-
-  // This is a new connection to this application, so a new connection must be made.
-  fidl::ClientEnd<fuchsia_tee::Application> app_owned;
-
-  TEEC_Result result = ConnectApplicationViaDirectory(app_uuid, &app_owned);
-
-  if (result != TEEC_SUCCESS) {
-    return result;
-  }
-
-  *out_app = app_owned.borrow();
-
-  // Stash the client end into the `uuid_to_app` for ownership and future use.
-  uuid_to_app->emplace_back(app_uuid, std::move(app_owned));
-
+  *out_app = result.value();
   return TEEC_SUCCESS;
 }
 
@@ -681,12 +698,9 @@ TEEC_Result TEEC_InitializeContext(const char* name, TEEC_Context* context) {
   if (!context) {
     return TEEC_ERROR_BAD_PARAMETERS;
   }
-
   fidl::ClientEnd<fuchsia_hardware_tee::DeviceConnector> device_connector;
-
   context->imp.device_connector_channel = device_connector.TakeChannel().release();
-  context->imp.uuid_to_channel = new UuidToAppContainer();
-
+  AppContainer::InitInContext(*context);
   return TEEC_SUCCESS;
 }
 
@@ -696,7 +710,7 @@ void TEEC_FinalizeContext(TEEC_Context* context) {
     zx_handle_close(context->imp.device_connector_channel);
     context->imp.device_connector_channel = ZX_HANDLE_INVALID;
 
-    delete GetUuidToAppContainerFromContext(context);
+    delete AppContainer::FromContext(*context);
     context->imp.uuid_to_channel = nullptr;
   }
 }
@@ -805,11 +819,7 @@ TEEC_Result TEEC_OpenSession(TEEC_Context* context, TEEC_Session* session,
 
     if (status == ZX_ERR_PEER_CLOSED) {
       // If the channel has closed, drop the entry from the map, closing the client end.
-      UuidToAppContainer* uuid_to_app = GetUuidToAppContainerFromContext(context);
-      if (auto iter = FindInUuidToAppContainer(uuid_to_app, app_uuid_fidl);
-          iter != uuid_to_app->end()) {
-        uuid_to_app->erase(iter);
-      }
+      AppContainer::FromContext(*context)->Delete(app_uuid_fidl);
     }
 
     return ConvertStatusToResult(status);

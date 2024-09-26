@@ -63,6 +63,8 @@ if (is_host) {
   }
 
   python_library("test_case_revive") {
+    # TODO(b/366268742): Enable MyPy type checking
+    enable_mypy = false
     testonly = true
     source_root = "test_case_revive"
     sources = [

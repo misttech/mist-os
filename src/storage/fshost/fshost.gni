@@ -39,11 +39,15 @@ template("fshost_cml") {
           "//src/storage/fshost/meta/minfs_fshost_test.cml",
         ]
       } else if (options.data_filesystem_format == "minfs") {
-        sources += [
-          "//src/storage/fshost/meta/blobfs_fshost_test.cml",
-          "//src/storage/fshost/meta/minfs_fshost_test.cml",
-          "//src/storage/fshost/meta/non_fxfs_fshost.cml",
-        ]
+        if (defined(options.storage_host) && options.storage_host) {
+          sources += [ "//src/storage/fshost/meta/storage_host_minfs.cml" ]
+        } else {
+          sources += [
+            "//src/storage/fshost/meta/blobfs_fshost_test.cml",
+            "//src/storage/fshost/meta/minfs_fshost_test.cml",
+            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+          ]
+        }
       } else if (options.data_filesystem_format == "fxfs") {
         if (defined(options.fxfs_blob) && !options.fxfs_blob) {
           sources += [

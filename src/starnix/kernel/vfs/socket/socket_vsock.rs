@@ -333,7 +333,7 @@ mod tests {
             .abstract_vsock_namespace
             .bind(&current_task, VSOCK_PORT, &listen_socket)
             .expect("Failed to bind socket.");
-        listen_socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
+        listen_socket.listen(&current_task, 10).expect("Failed to listen.");
 
         let listen_socket = current_task
             .abstract_vsock_namespace

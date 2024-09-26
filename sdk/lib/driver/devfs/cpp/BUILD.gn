@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -22,7 +23,7 @@ sdk_source_set("cpp") {
   public_deps = [ "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp" ]
 }
 
-executable("cpp_test") {
+cc_test_executable("cpp_test") {
   testonly = true
   output_name = "devfs-exporter-cpp-test"
   sources = [ "devfs_exporter_test.cc" ]

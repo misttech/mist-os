@@ -219,6 +219,9 @@ void StackOwnedLoanedPagesInterval::WakeWaitersAndClearOwner(Thread* current_thr
     return owned_wait_queue_->WakeThreads(ktl::numeric_limits<uint32_t>::max());
   }();
 
-  // We should be able to assert that we woke at least one thread.
-  DEBUG_ASSERT(result.woken > 0);
+  // In the common case we will have woken a thread, however due to aspects of the chain-lock
+  // transaction the thread attempting to block may have needed to backoff and therefore not have
+  // actually blocked in the wait queue. Although we will not wake such a thread, it will have
+  // already noticed that the page is no longer loaned and that the ownership interval has been
+  // cancelled.
 }

@@ -137,7 +137,6 @@ async fn install_items_in_store<K: Key, V: Value>(
         &mut transaction,
         HandleOptions::default(),
         store.crypt().as_deref(),
-        None,
     )
     .await
     .expect("create_object failed");
@@ -243,7 +242,7 @@ async fn test_bad_graveyard_value() {
             root_store.store_object_id(),
             Mutation::replace_or_insert_object(
                 ObjectKey::graveyard_entry(graveyard_id, 1000),
-                ObjectValue::Attribute { size: 500 },
+                ObjectValue::Attribute { size: 500, has_overwrite_extents: false },
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -335,7 +334,6 @@ async fn test_malformed_allocation() {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -526,7 +524,7 @@ async fn test_volume_allocation_mismatch() {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "child_file", None)
+                .create_child_file(&mut transaction, "child_file")
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -658,11 +656,11 @@ async fn test_too_many_object_refs() {
             .await
             .expect("new_transaction failed");
         let child_file = root_directory
-            .create_child_file(&mut transaction, "child_file", None)
+            .create_child_file(&mut transaction, "child_file")
             .await
             .expect("create_child_file failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, "child_dir", None)
+            .create_child_dir(&mut transaction, "child_dir")
             .await
             .expect("create_child_directory failed");
 
@@ -694,15 +692,9 @@ async fn test_too_few_object_refs() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        ObjectStore::create_object(
-            &root_store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        ObjectStore::create_object(&root_store, &mut transaction, HandleOptions::default(), None)
+            .await
+            .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
     }
 
@@ -724,7 +716,7 @@ async fn test_missing_object_tree_layer_file() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None, None)
+        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None)
             .await
             .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
@@ -861,7 +853,10 @@ async fn test_mismatched_key_and_value() {
         install_items_in_store(
             &fs,
             store.as_ref(),
-            vec![Item::new(ObjectKey::object(10), ObjectValue::Attribute { size: 100 })],
+            vec![Item::new(
+                ObjectKey::object(10),
+                ObjectValue::Attribute { size: 100, has_overwrite_extents: false },
+            )],
         )
         .await;
         store.store_object_id()
@@ -932,7 +927,7 @@ async fn test_multiple_links_to_directory() {
             .await
             .expect("new_transaction failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, "a", None)
+            .create_child_dir(&mut transaction, "a")
             .await
             .expect("create_child_dir failed");
         root_directory
@@ -972,7 +967,7 @@ async fn test_conflicting_link_types() {
             .await
             .expect("new_transaction failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, "a", None)
+            .create_child_dir(&mut transaction, "a")
             .await
             .expect("create_child_dir failed");
         root_directory
@@ -1044,7 +1039,7 @@ async fn test_children_on_file() {
             .await
             .expect("new_transaction failed");
         let object_id = root_directory
-            .create_child_file(&mut transaction, "a'", None)
+            .create_child_file(&mut transaction, "a'")
             .await
             .expect("Create child failed")
             .object_id();
@@ -1135,7 +1130,7 @@ async fn test_verified_file_merkle_attribute_missing() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
+                        kind: ObjectKind::File { refs: 1 },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -1269,7 +1264,7 @@ async fn test_orphaned_extended_attribute() {
             store.as_ref(),
             vec![Item::new(
                 ObjectKey::attribute(store.root_directory_object_id(), 64, AttributeKey::Attribute),
-                ObjectValue::attribute(100),
+                ObjectValue::attribute(100, false),
             )],
         )
         .await;
@@ -1300,7 +1295,7 @@ async fn test_orphaned_attribute() {
             store.as_ref(),
             vec![Item::new(
                 ObjectKey::attribute(10, 1, AttributeKey::Attribute),
-                ObjectValue::attribute(100),
+                ObjectValue::attribute(100, false),
             )],
         )
         .await;
@@ -1333,7 +1328,7 @@ async fn test_records_for_tombstoned_object() {
                 Item::new(ObjectKey::object(10), ObjectValue::None),
                 Item::new(
                     ObjectKey::attribute(10, 1, AttributeKey::Attribute),
-                    ObjectValue::attribute(100),
+                    ObjectValue::attribute(100, false),
                 ),
             ],
         )
@@ -1367,13 +1362,13 @@ async fn test_invalid_value_graveyard_attribute_entry() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
+                        kind: ObjectKind::File { refs: 1 },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
                 Item::new(
                     ObjectKey::attribute(10, 1, AttributeKey::Attribute),
-                    ObjectValue::attribute(100),
+                    ObjectValue::attribute(100, false),
                 ),
                 Item::new(
                     ObjectKey::graveyard_attribute_entry(
@@ -1531,13 +1526,11 @@ async fn test_link_cycle() {
             .await
             .expect("new_transaction failed");
         let parent = root_directory
-            .create_child_dir(&mut transaction, "a", None)
+            .create_child_dir(&mut transaction, "a")
             .await
             .expect("Create child failed");
-        let child = parent
-            .create_child_dir(&mut transaction, "b", None)
-            .await
-            .expect("Create child failed");
+        let child =
+            parent.create_child_dir(&mut transaction, "b").await.expect("Create child failed");
         child
             .insert_child(&mut transaction, "c", parent.object_id(), ObjectDescriptor::Directory)
             .await
@@ -1577,8 +1570,8 @@ async fn test_orphaned_link_cycle() {
             .await
             .expect("new_transaction failed");
 
-        let dir1 = Directory::create(&mut transaction, &store, None).await.expect("create failed");
-        let dir2 = Directory::create(&mut transaction, &store, None).await.expect("create failed");
+        let dir1 = Directory::create(&mut transaction, &store).await.expect("create failed");
+        let dir2 = Directory::create(&mut transaction, &store).await.expect("create failed");
 
         dir1.insert_child(&mut transaction, "dir2", dir2.object_id(), ObjectDescriptor::Directory)
             .await
@@ -1614,7 +1607,7 @@ async fn test_incorrect_merkle_tree_size_empty_file() {
             .await
             .expect("new_transaction failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "verified file", None)
+            .create_child_file(&mut transaction, "verified file")
             .await
             .expect("Create child failed");
         transaction.commit_and_continue().await.expect("commit_and_continue transaction failed");
@@ -1635,7 +1628,7 @@ async fn test_incorrect_merkle_tree_size_empty_file() {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(0),
+                ObjectValue::attribute(0, false),
             ),
         );
         transaction.commit().await.expect("commit transaction failed");
@@ -1671,7 +1664,7 @@ async fn test_incorrect_merkle_tree_size_one_data_block() {
             .await
             .expect("new_transaction failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "verified file", None)
+            .create_child_file(&mut transaction, "verified file")
             .await
             .expect("Create child failed");
         transaction.commit_and_continue().await.expect("commit_and_continue transaction failed");
@@ -1695,7 +1688,7 @@ async fn test_incorrect_merkle_tree_size_one_data_block() {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(2 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64),
+                ObjectValue::attribute(2 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64, false),
             ),
         );
         transaction.commit().await.expect("commit transaction failed");
@@ -1732,7 +1725,7 @@ async fn test_incorrect_merkle_tree_size_data_unaligned() {
             .await
             .expect("new_transaction failed");
         let object = root_directory
-            .create_child_file(&mut transaction, "verified file", None)
+            .create_child_file(&mut transaction, "verified file")
             .await
             .expect("Create child failed");
         transaction.commit_and_continue().await.expect("commit_and_continue transaction failed");
@@ -1756,7 +1749,7 @@ async fn test_incorrect_merkle_tree_size_data_unaligned() {
                     FSVERITY_MERKLE_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(10 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64),
+                ObjectValue::attribute(10 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64, false),
             ),
         );
         transaction.commit().await.expect("commit transaction failed");
@@ -1794,15 +1787,10 @@ async fn test_file_length_mismatch() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let handle = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create object failed");
+        let handle =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create object failed");
         transaction.commit().await.expect("commit transaction failed");
 
         let mut transaction = fs
@@ -1833,7 +1821,7 @@ async fn test_file_length_mismatch() {
                     handle.attribute_id(),
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::attribute(123),
+                ObjectValue::attribute(123, false),
             ),
         );
         transaction.add(
@@ -1841,7 +1829,7 @@ async fn test_file_length_mismatch() {
             Mutation::replace_or_insert_object(
                 ObjectKey::object(handle.object_id()),
                 ObjectValue::Object {
-                    kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
+                    kind: ObjectKind::File { refs: 1 },
                     attributes: ObjectAttributes {
                         creation_time: Timestamp::now(),
                         modification_time: Timestamp::now(),
@@ -1936,7 +1924,7 @@ async fn test_missing_encryption_key() {
             .await
             .expect("new_transaction failed");
         handle = root_directory
-            .create_child_file(&mut transaction, "child_file", None)
+            .create_child_file(&mut transaction, "child_file")
             .await
             .expect("create_child_file failed");
         let buf = handle.allocate_buffer(1).await;
@@ -2046,7 +2034,7 @@ async fn test_missing_encryption_keys() {
             .await
             .expect("new_transaction failed");
         handle = root_directory
-            .create_child_file(&mut transaction, "child_file", None)
+            .create_child_file(&mut transaction, "child_file")
             .await
             .expect("create_child_file failed");
 
@@ -2102,7 +2090,7 @@ async fn test_duplicate_key() {
             .await
             .expect("new_transaction failed");
         handle = root_directory
-            .create_child_file(&mut transaction, "child_file", None)
+            .create_child_file(&mut transaction, "child_file")
             .await
             .expect("create_child_file failed");
 
@@ -2177,7 +2165,7 @@ async fn test_project_accounting() {
             .await
             .expect("new_transaction failed");
         let object_id = root_directory
-            .create_child_file(&mut transaction, "a", None)
+            .create_child_file(&mut transaction, "a")
             .await
             .expect("Create child failed")
             .object_id();
@@ -2223,7 +2211,7 @@ async fn test_project_accounting() {
             ),
         );
         let object_id = root_directory
-            .create_child_file(&mut transaction, "b", None)
+            .create_child_file(&mut transaction, "b")
             .await
             .expect("Create child failed")
             .object_id();
@@ -2268,7 +2256,7 @@ async fn test_project_accounting() {
             ),
         );
         let object_id = root_directory
-            .create_child_file(&mut transaction, "c", None)
+            .create_child_file(&mut transaction, "c")
             .await
             .expect("Create child failed")
             .object_id();
@@ -2326,7 +2314,7 @@ async fn test_zombie_file() {
             .await
             .expect("new_transaction failed");
         handle = root_directory
-            .create_child_file(&mut transaction, "child_file", None)
+            .create_child_file(&mut transaction, "child_file")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -2374,7 +2362,7 @@ async fn test_zombie_dir() {
             .await
             .expect("new_transaction failed");
         handle = root_directory
-            .create_child_dir(&mut transaction, "child_dir", None)
+            .create_child_dir(&mut transaction, "child_dir")
             .await
             .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
@@ -2470,7 +2458,7 @@ async fn test_empty_volume() {
                 .await
                 .expect("new_transaction failed");
             file = root_directory
-                .create_child_file(&mut transaction, "child_file", None)
+                .create_child_file(&mut transaction, "child_file")
                 .await
                 .expect("create_child_file failed");
             let buffer = file.allocate_buffer(1).await;
@@ -2521,7 +2509,6 @@ async fn test_full_disk() {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -2615,7 +2602,7 @@ async fn test_delete_volume() {
             .await
             .expect("new_transaction failed");
         root_directory
-            .create_child_file(&mut transaction, "child_file", None)
+            .create_child_file(&mut transaction, "child_file")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
@@ -2641,7 +2628,7 @@ async fn test_delete_volume() {
                         .await
                         .expect("new_transaction failed");
                     root_directory
-                        .create_child_file(&mut transaction, &format!("child_file_{i}"), None)
+                        .create_child_file(&mut transaction, &format!("child_file_{i}"))
                         .await
                         .expect("create_child_file failed");
                     transaction.commit().await.expect("commit failed");
@@ -2689,7 +2676,7 @@ async fn test_casefold() {
             .await
             .expect("new_transaction failed");
         let child_dir = root_directory
-            .create_child_dir(&mut transaction, dirname, None)
+            .create_child_dir(&mut transaction, dirname)
             .await
             .expect("create_child_dir failed");
         transaction.commit().await.expect("commit transaction failed");
@@ -2705,7 +2692,7 @@ async fn test_casefold() {
             .expect("new_transaction failed");
 
         // Manually add a child entry so we can add the wrong ObjectKeyData child type.
-        let handle = Directory::create_with_options(&mut transaction, &store, None, true)
+        let handle = Directory::create_with_options(&mut transaction, &store, true)
             .await
             .expect("create_directory");
         transaction.add(

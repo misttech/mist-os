@@ -163,6 +163,7 @@ struct LoadedElf {
     headers: elf_parse::Elf64Headers,
     file_base: usize,
     vaddr_bias: usize,
+    length: usize,
 }
 
 // TODO: Improve the error reporting produced by this function by mapping ElfParseError to Errno more precisely.
@@ -221,18 +222,32 @@ impl elf_load::Mapper for Mapper<'_> {
     }
 }
 
+enum LoadElfUsage {
+    MainElf,
+    Interpreter,
+}
+
 fn load_elf(
     elf: FileHandle,
     elf_memory: Arc<MemoryObject>,
     mm: &Arc<MemoryManager>,
     file_write_guard: FileWriteGuardRef,
+    usage: LoadElfUsage,
 ) -> Result<LoadedElf, Errno> {
     let vmo = elf_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
     let elf_info = elf_load::loaded_elf_info(&headers);
+    let length = elf_info.high - elf_info.low;
     let file_base = match headers.file_header().elf_type() {
         Ok(elf_parse::ElfType::SharedObject) => {
-            mm.get_random_base(elf_info.high - elf_info.low).ptr()
+            match usage {
+                // Location of main position-independent executable is subject to ASLR
+                LoadElfUsage::MainElf => mm.get_random_base_for_executable(length)?.ptr(),
+                // Interpreter is mapped in the same range as regular `mmap` allocations.
+                LoadElfUsage::Interpreter => {
+                    mm.state.read().find_next_unused_range(length).ok_or(errno!(EINVAL))?.ptr()
+                }
+            }
         }
         Ok(elf_parse::ElfType::Executable) => elf_info.low,
         _ => return error!(EINVAL),
@@ -241,7 +256,7 @@ fn load_elf(
     let mapper = Mapper { file: &elf, mm, file_write_guard };
     elf_load::map_elf_segments(vmo, &headers, &mapper, mm.base_addr.ptr(), vaddr_bias)
         .map_err(elf_load_error_to_errno)?;
-    Ok(LoadedElf { headers, file_base, vaddr_bias })
+    Ok(LoadedElf { headers, file_base, vaddr_bias, length })
 }
 
 pub struct ThreadStartInfo {
@@ -502,11 +517,23 @@ pub fn load_executable(
         resolved_elf.memory,
         current_task.mm(),
         resolved_elf.file_write_guard,
+        LoadElfUsage::MainElf,
+    )?;
+    current_task.mm().initialize_brk_origin(
+        UserAddress::from_ptr(main_elf.file_base)
+            .checked_add(main_elf.length)
+            .ok_or_else(|| errno!(EINVAL))?,
     )?;
     let interp_elf = resolved_elf
         .interp
         .map(|interp| {
-            load_elf(interp.file, interp.memory, current_task.mm(), interp.file_write_guard)
+            load_elf(
+                interp.file,
+                interp.memory,
+                current_task.mm(),
+                interp.file_write_guard,
+                LoadElfUsage::Interpreter,
+            )
         })
         .transpose()?;
 
@@ -610,13 +637,7 @@ pub fn load_executable(
 
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
 
-    let stack_base = current_task.mm().map_anonymous(
-        DesiredAddress::Any,
-        stack_size,
-        prot_flags,
-        MappingOptions::ANONYMOUS,
-        MappingName::Stack,
-    )?;
+    let stack_base = current_task.mm().map_stack(stack_size, prot_flags)?;
 
     let stack = stack_base + (stack_size - 8);
 
@@ -630,7 +651,6 @@ pub fn load_executable(
     )?;
 
     let mut mm_state = current_task.mm().state.write();
-    mm_state.stack_base = stack_base;
     mm_state.stack_size = stack_size;
     mm_state.stack_start = stack.stack_pointer;
     mm_state.auxv_start = stack.auxv_start;

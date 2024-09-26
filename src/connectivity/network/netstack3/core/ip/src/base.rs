@@ -48,7 +48,7 @@ use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
 use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
@@ -79,7 +79,7 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
+use crate::internal::routing::rules::{Marks, Rule, RuleAction, RuleInput, RulesTable};
 use crate::internal::routing::{
     IpRoutingDeviceContext, NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };
@@ -393,6 +393,7 @@ pub trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     fn select_device_for_multicast_group(
         &mut self,
         addr: MulticastAddr<I::Addr>,
+        marks: &Marks,
     ) -> Result<Self::DeviceId, ResolveRouteError>;
 }
 
@@ -428,7 +429,7 @@ where
 impl<
         I: IpLayerIpExt,
         BC: FilterBindingsContext,
-        CC: IpDeviceContext<I, BC>
+        CC: IpDeviceContext<I>
             + IpSocketHandler<I, BC>
             + IpStateContext<I>
             + FilterIpContext<I, BC>
@@ -783,7 +784,7 @@ pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
 }
 
 /// The IP device context provided to the IP layer.
-pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
+pub trait IpDeviceContext<I: IpLayerIpExt>: IpDeviceStateContext<I> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -803,7 +804,10 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
 
     /// Returns true iff the device has unicast forwarding enabled.
     fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
+}
 
+/// Provides the ability to check neighbor reachability via a specific device.
+pub trait IpDeviceConfirmReachableContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Confirm transport-layer forward reachability to the specified neighbor
     /// through the specified device.
     fn confirm_reachable(
@@ -882,7 +886,7 @@ pub trait IpLayerContext<
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >:
     IpStateContext<I>
-    + IpDeviceContext<I, BC>
+    + IpDeviceContext<I>
     + IpDeviceMtuContext<I>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
@@ -895,7 +899,7 @@ impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
         CC: IpStateContext<I>
-            + IpDeviceContext<I, BC>
+            + IpDeviceContext<I>
             + IpDeviceMtuContext<I>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
@@ -938,15 +942,14 @@ fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     }
 }
 
-fn get_device_with_assigned_address<A, BC, CC>(
+fn get_device_with_assigned_address<A, CC>(
     core_ctx: &mut CC,
     addr: IpDeviceAddr<A>,
 ) -> Option<CC::DeviceId>
 where
     A: IpAddress,
     A::Version: IpLayerIpExt,
-    BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
-    CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version, BC>,
+    CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version>,
 {
     core_ctx.with_address_statuses(addr.into(), |mut it| {
         it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
@@ -1076,7 +1079,7 @@ pub fn resolve_output_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpStateContext<I>
-        + IpDeviceContext<I, BC>
+        + IpDeviceContext<I>
         + IpDeviceStateContext<I>
         + device::IpDeviceConfigurationContext<I, BC>,
 >(
@@ -1084,6 +1087,7 @@ pub fn resolve_output_route_to_destination<
     device: Option<&CC::DeviceId>,
     src_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     dst_ip: Option<RoutableIpAddr<I::Addr>>,
+    marks: &Marks,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
         WeakLoopback { dst_ip: A, device: D },
@@ -1159,8 +1163,10 @@ pub fn resolve_output_route_to_destination<
         });
     }
     let bound_address = src_ip_and_policy.map(|(sock_addr, _policy)| sock_addr.into_inner().get());
-    let rule_input =
-        RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device: device } };
+    let rule_input = RuleInput {
+        packet_origin: PacketOrigin::Local { bound_address, bound_device: device },
+        marks,
+    };
     core_ctx.with_rules_table(|core_ctx, rules| {
         let mut walk_rules = |rule_input, src_ip_and_policy| {
             walk_rules(
@@ -1228,6 +1234,7 @@ pub fn resolve_output_route_to_destination<
                         bound_address: Some(selected_src_addr.into()),
                         bound_device: device,
                     },
+                    marks,
                 },
                 Some((selected_src_addr, NonLocalSrcAddrPolicy::Deny)),
             ),
@@ -1266,7 +1273,8 @@ impl<
             + IpSocketBindingsContext,
         CC: IpLayerEgressContext<I, BC>
             + IpStateContext<I>
-            + IpDeviceContext<I, BC>
+            + IpDeviceContext<I>
+            + IpDeviceConfirmReachableContext<I, BC>
             + IpDeviceStateContext<I>
             + device::IpDeviceConfigurationContext<I, BC>
             + UseIpSocketContextBlanket,
@@ -1279,6 +1287,7 @@ impl<
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         addr: RoutableIpAddr<I::Addr>,
         transparent: bool,
+        marks: &Marks,
     ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
         let src_ip_and_policy = local_ip.map(|local_ip| {
             (
@@ -1290,7 +1299,7 @@ impl<
                 },
             )
         });
-        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr))
+        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr), marks)
     }
 
     fn send_ip_packet<S>(
@@ -1340,7 +1349,12 @@ impl<
                         return;
                     }
                 };
-                IpDeviceContext::confirm_reachable(self, bindings_ctx, &device, neighbor);
+                IpDeviceConfirmReachableContext::confirm_reachable(
+                    self,
+                    bindings_ctx,
+                    &device,
+                    neighbor,
+                );
             }
             None => {
                 debug!("can't confirm {dst:?} as reachable: no route");
@@ -3298,6 +3312,12 @@ pub fn receive_ipv6_packet<
                         "receive_ipv6_packet: handled IPv6 extension headers: dispatching packet"
                     );
 
+                    let meta = ReceiveIpPacketMeta {
+                        broadcast: None,
+                        transparent_override: None,
+                        dscp_and_ecn: packet.dscp_and_ecn(),
+                    };
+
                     // TODO(joshlf):
                     // - Do something with ICMP if we don't have a handler for
                     //   that protocol?
@@ -3309,7 +3329,7 @@ pub fn receive_ipv6_packet<
                         frame_dst,
                         packet,
                         packet_metadata,
-                        ReceiveIpPacketMeta::default(),
+                        meta,
                     )
                     .unwrap_or_else(|err| {
                         err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer)
@@ -3447,7 +3467,7 @@ pub enum DropReason {
 pub fn receive_ipv4_packet_action<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -3521,7 +3541,7 @@ pub fn receive_ipv4_packet_action<
 pub fn receive_ipv6_packet_action<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -3645,7 +3665,7 @@ pub fn receive_ipv6_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_multicast_packet_action<
     I: IpLayerIpExt,
-    B: ByteSlice,
+    B: SplitByteSlice,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
@@ -3697,7 +3717,7 @@ fn receive_ip_multicast_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
-    B: ByteSlice,
+    B: SplitByteSlice,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
@@ -3751,6 +3771,9 @@ fn receive_ip_packet_action_common<
         *dst_ip,
         RuleInput {
             packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+            // TODO(https://fxbug.dev/337134565): packets can have marks as a result of a filtering
+            // target like `MARK`.
+            marks: &Default::default(),
         },
     ) {
         Some(dst) => {

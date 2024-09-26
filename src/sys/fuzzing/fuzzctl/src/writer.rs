@@ -157,13 +157,13 @@ impl<O: OutputSink> Writer<O> {
         };
         let severity = &format!("{}", logs_data.metadata.severity)[..1];
         let location = match (&logs_data.metadata.file, &logs_data.metadata.line) {
-            (Some(filename), Some(line)) => format!(": [{}:{}]", filename, line),
-            (Some(filename), None) => format!(": [{}]", filename),
+            (Some(filename), Some(line)) => format!(": [{filename}:{line}]"),
+            (Some(filename), None) => format!(": [{filename}]"),
             _ => String::default(),
         };
         let formatted = format!(
             "[{ts:05.3}][{moniker}][{tags}][{textfmt}{sev}{reset}]{loc} {textfmt}{msg}{reset}\n",
-            ts = logs_data.metadata.timestamp as f64 / 1_000_000_000 as f64,
+            ts = logs_data.metadata.timestamp.into_nanos() as f64 / 1_000_000_000 as f64,
             moniker = logs_data.moniker,
             tags = logs_data.tags().map(|t| t.join(",")).unwrap_or(String::default()),
             textfmt = color_and_style,

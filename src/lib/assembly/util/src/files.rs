@@ -159,6 +159,8 @@ pub enum BootfsPackageDestination {
     ForTest,
     /// Any package that came from an AIB.
     FromAIB(String),
+    /// Any package that came from the product.
+    FromProduct(String),
     /// Any package that came from a board
     FromBoard(String),
     /// Any package that came from the developer.
@@ -171,8 +173,10 @@ impl std::fmt::Display for BootfsPackageDestination {
             f,
             "{}",
             match self {
-                Self::FromAIB(s) | Self::FromBoard(s) | Self::FromDeveloper(s) =>
-                    return write!(f, "{}", s),
+                Self::FromAIB(s)
+                | Self::FromProduct(s)
+                | Self::FromBoard(s)
+                | Self::FromDeveloper(s) => return write!(f, "{}", s),
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
                 Self::SysmemConfig => "sysmem-config",

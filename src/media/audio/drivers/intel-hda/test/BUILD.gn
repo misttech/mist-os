@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("test_libs") {
   visibility = [ ":*" ]
@@ -31,13 +32,13 @@ source_set("test_libs") {
   ]
 }
 
-executable("intel-hda-test-bin") {
+cc_test_executable("intel-hda-test-bin") {
   testonly = true
   sources = [ "intel_hda_test.cc" ]
   deps = [ ":test_libs" ]
 }
 
-executable("pixelbook-eve-test-bin") {
+cc_test_executable("pixelbook-eve-test-bin") {
   testonly = true
   sources = [ "pixelbook_eve_test.cc" ]
   deps = [ ":test_libs" ]

@@ -6,7 +6,7 @@ use crate::big_endian::BigEndianU16;
 use crate::buffer_reader::BufferReader;
 use crate::mac::data::*;
 use crate::mac::{DataFrame, MacAddr};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 // RFC 1042
 pub const LLC_SNAP_EXTENSION: u8 = 0xAA;
@@ -15,7 +15,7 @@ pub const LLC_SNAP_OUI: [u8; 3] = [0, 0, 0];
 
 // IEEE Std 802.2-1998, 3.2
 // IETF RFC 1042
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C, packed)]
 pub struct LlcHdr {
     pub dsap: u8,
@@ -33,11 +33,11 @@ pub struct LlcFrame<B> {
 impl<B> LlcFrame<B> {
     pub fn parse(bytes: B) -> Option<Self>
     where
-        B: ByteSlice,
+        B: SplitByteSlice,
     {
         // An LLC frame is only valid if it contains enough bytes for the header and one or more
         // bytes for the body.
-        let (hdr, body) = Ref::new_unaligned_from_prefix(bytes)?;
+        let (hdr, body) = Ref::from_prefix(bytes).ok()?;
         if body.is_empty() {
             None
         } else {
@@ -73,7 +73,7 @@ pub struct IntoMsduIter<B> {
 
 impl<B> From<DataFrame<B>> for IntoMsduIter<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: DataFrame<B>) -> Self {
         IntoMsduIter { subtype: frame.into() }
@@ -82,7 +82,7 @@ where
 
 impl<B> Iterator for IntoMsduIter<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     // TODO(https://fxbug.dev/330761628): The item should probably be `Result<Msdu<B>, _>` so that
     //                                    client code can distinguish between exhausting the
@@ -117,7 +117,7 @@ enum MsduIterSubtype<B> {
 
 impl<B> From<DataFrame<B>> for MsduIterSubtype<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: DataFrame<B>) -> Self {
         let fc = frame.fixed_fields.frame_ctrl;
@@ -153,7 +153,7 @@ mod tests {
                 dst_addr: mac::MacAddr::from([3; 6]),
                 src_addr: mac::MacAddr::from([4; 6]),
                 llc_frame: mac::LlcFrame {
-                    hdr: Ref::new(&[7, 7, 7, 8, 8, 8, 9, 10][..]).unwrap(),
+                    hdr: Ref::from_bytes(&[7, 7, 7, 8, 8, 8, 9, 10][..]).unwrap(),
                     body: &[11; 3][..],
                 },
             },
@@ -170,7 +170,7 @@ mod tests {
                 dst_addr: mac::MacAddr::from([3; 6]),
                 src_addr: mac::MacAddr::from([4; 6]),
                 llc_frame: mac::LlcFrame {
-                    hdr: Ref::new(&[7, 7, 7, 8, 8, 8, 9, 10][..]).unwrap(),
+                    hdr: Ref::from_bytes(&[7, 7, 7, 8, 8, 8, 9, 10][..]).unwrap(),
                     body: &[11; 5][..],
                 },
             },

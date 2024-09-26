@@ -170,6 +170,16 @@ fuchsia_component("test_manager_cmp") {
   visibility = [ ":*" ]
 }
 
+fuchsia_component("test_manager_for_bootstrap_cmp") {
+  testonly = true
+  component_name = "test_manager_for_bootstrap"
+  deps = [ ":bin" ]
+  manifest = "meta/test_manager_for_bootstrap.cml"
+
+  # Don't package this component in other packages.
+  visibility = [ ":*" ]
+}
+
 fuchsia_component("fxfs_backed_data_for_tests_cmp") {
   testonly = true
   component_name = "fxfs_backed_data_for_tests"
@@ -216,6 +226,18 @@ fuchsia_package("pkg") {
     "//src/sys/test_runners/rust:rust-test-runner",
     "//src/sys/test_runners/starnix:starnix-test-runners",
     "//src/sys/test_runners/stress_test:stress-test-runner",
+  ]
+}
+
+fuchsia_package("pkg_for_bootstrap") {
+  testonly = true
+  package_name = "test_manager"
+  visibility = [ ":*" ]
+  deps = [
+    ":test_manager_for_bootstrap_cmp",
+    "debug_data_processor",
+    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
+    "//src/storage/memfs:memfs_component",
   ]
 }
 

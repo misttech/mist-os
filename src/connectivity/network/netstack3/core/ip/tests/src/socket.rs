@@ -31,7 +31,7 @@ use netstack3_ip::socket::{
     IpSockSendError, IpSocketHandler, MmsError, SendOptions,
 };
 use netstack3_ip::{
-    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, RawMetric,
+    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, Marks, RawMetric,
     ResolveRouteError,
 };
 
@@ -97,6 +97,10 @@ impl<I: IpExt> SendOptions<I> for WithHopLimit {
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
+    }
+
+    fn marks(&self) -> &Marks {
+        &Marks::UNMARKED
     }
 }
 
@@ -300,6 +304,7 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
         SocketIpAddr::try_from(to_ip).unwrap(),
         proto,
         transparent,
+        &Marks::default(),
     );
     assert_eq!(res.map(|s| s.definition().clone()), get_expected_result(template));
 }
@@ -369,6 +374,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         SocketIpAddr::try_from(to_ip).unwrap(),
         I::ICMP_IP_PROTO,
         false, /* transparent */
+        &Marks::default(),
     )
     .unwrap();
 
@@ -426,6 +432,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         SocketIpAddr::try_from(remote_ip).unwrap(),
         proto,
         false, /* transparent */
+        &Marks::default(),
     )
     .unwrap();
 
@@ -564,6 +571,10 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
         fn dscp_and_ecn(&self) -> DscpAndEcn {
             DscpAndEcn::default()
         }
+
+        fn marks(&self) -> &Marks {
+            &Marks::UNMARKED
+        }
     }
 
     let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
@@ -602,6 +613,7 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
             destination_ip,
             I::ICMP_IP_PROTO,
             false, /* transparent */
+            &Marks::default(),
         )
         .unwrap();
 
@@ -683,6 +695,7 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
         SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
         I::ICMP_IP_PROTO,
         false, /* transparent */
+        &Marks::default(),
     )
     .unwrap();
 

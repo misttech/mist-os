@@ -14,7 +14,7 @@ use starnix_uapi::{
     errno, error, fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg,
     FS_VERITY_HASH_ALG_SHA256, FS_VERITY_HASH_ALG_SHA512,
 };
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 #[derive(Copy, Clone, Debug, Eq, FromPrimitive, PartialEq)]
 enum HashAlgorithm {
@@ -143,7 +143,7 @@ pub mod ioctl {
     use starnix_uapi::errors::Errno;
     use starnix_uapi::user_address::{UserAddress, UserRef};
     use starnix_uapi::{errno, error, uapi};
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.
     pub fn enable(

@@ -16,17 +16,20 @@ RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   return nullptr;
 }
 
-fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(RuntimeModule* module,
+fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule& root,
                                                              const char* ref) {
   Diagnostics diag;
   elfldltl::SymbolName name{ref};
-  if (const auto* sym = name.Lookup(module->symbol_info())) {
-    if (sym->type() == elfldltl::ElfSymType::kTls) {
-      diag.SystemError(
-          "TODO(https://fxbug.dev/331421403): TLS semantics for dlsym() are not supported yet.");
-      return diag.take_error();
+  // TODO(https://fxbug.dev/338229633): use elfldltl::MakeSymbolResolver.
+  for (const RuntimeModule* module : root.module_tree()) {
+    if (const auto* sym = name.Lookup(module->symbol_info())) {
+      if (sym->type() == elfldltl::ElfSymType::kTls) {
+        diag.SystemError(
+            "TODO(https://fxbug.dev/331421403): TLS semantics for dlsym() are not supported yet.");
+        return diag.take_error();
+      }
+      return diag.ok(reinterpret_cast<void*>(sym->value + module->load_bias()));
     }
-    return diag.ok(reinterpret_cast<void*>(sym->value + module->load_bias()));
   }
   diag.UndefinedSymbol(ref);
   return diag.take_error();

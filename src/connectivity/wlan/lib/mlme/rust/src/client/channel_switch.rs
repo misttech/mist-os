@@ -11,7 +11,7 @@ use tracing::error;
 use wlan_common::mac::BeaconHdr;
 use wlan_common::timer::EventId;
 use wlan_common::{ie, TimeUnit};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub trait ChannelActions {
@@ -294,7 +294,7 @@ pub enum ChannelSwitchError {
     InvalidChannelSwitchMode(u8),
 }
 
-impl<B: ByteSlice> ChannelSwitchBuilder<B> {
+impl<B: SplitByteSlice> ChannelSwitchBuilder<B> {
     // Convert a set of received channel-switch-related IEs into the parameters
     // for a channel switch. Returns an error if the IEs received do not describe
     // a deterministic, valid channel switch.
@@ -393,7 +393,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::mac::CapabilityInfo;
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     const NEW_CHANNEL: u8 = 10;
     const NEW_OPERATING_CLASS: u8 = 20;

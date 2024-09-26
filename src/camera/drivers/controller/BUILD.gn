@@ -79,7 +79,6 @@ source_set("source") {
     "//sdk/lib/fit-promise",
     "//src/camera/drivers/controller/configs",
     "//src/camera/lib/format_conversion",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/sysmem",
     "//src/lib/ddk",

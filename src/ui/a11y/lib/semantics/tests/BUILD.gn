@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 import("//src/fonts/build/fonts.gni")
 
@@ -24,7 +25,7 @@ group("integration") {
   ]
 }
 
-executable("semantics_tests") {
+cc_test_executable("semantics_tests") {
   output_name = "semantics_tests"
   testonly = true
   sources = [
@@ -113,7 +114,7 @@ source_set("semantics_integration_test_fixture") {
   ]
 }
 
-executable("web-semantics-test-bin") {
+cc_test_executable("web-semantics-test-bin") {
   testonly = true
   sources = [ "web_semantics_tests.cc" ]
   output_name = "web-semantics-test"

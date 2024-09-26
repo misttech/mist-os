@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -71,7 +72,7 @@ source_set("test_base") {
   ]
 }
 
-executable("cpp_test") {
+cc_test_executable("cpp_test") {
   testonly = true
   sources = [
     "tests/driver_base_test.cc",

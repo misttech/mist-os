@@ -44,7 +44,7 @@ class AmlUartHarness : public zxtest::Test {
 
     auto uart = std::make_unique<serial::AmlUartV1>(fake_parent_.get());
     zx_status_t status =
-        uart->Init(ddk::PDevFidl(std::move(pdev.client)), kSerialInfo, state_.GetMmio());
+        uart->Init(fdf::PDev(std::move(pdev.client)), kSerialInfo, state_.GetMmio());
     ASSERT_OK(status);
     device_ = uart.get();
     // The AmlUart* is now owned by the fake_ddk.

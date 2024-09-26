@@ -32,7 +32,7 @@ use starnix_uapi::{
     SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK, SO_PASSCRED,
     SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use std::sync::Arc;
@@ -416,7 +416,7 @@ impl UnixSocket {
         let unix_socket = downcast_socket_to_unix(socket);
         let mut inner = unix_socket.lock();
         inner.bind(address)?;
-        node.set_socket(socket.clone());
+        node.set_bound_socket(socket.clone());
         Ok(())
     }
 }
@@ -976,7 +976,7 @@ pub fn resolve_unix_socket_address(
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
-        name.entry.node.socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
+        name.entry.node.bound_socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
     }
 }
 
@@ -999,7 +999,7 @@ mod tests {
         socket
             .bind(&current_task, SocketAddress::Unix(b"\0".into()))
             .expect("Failed to bind socket.");
-        socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
+        socket.listen(&current_task, 10).expect("Failed to listen.");
         let connecting_socket = Socket::new(
             &current_task,
             SocketDomain::Unix,

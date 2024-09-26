@@ -204,7 +204,7 @@ void Dwc3::ReleaseResources() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.lock);
+    fbl::AutoLock lock(&uep.ep.lock);
     uep.fifo.Release();
     uep.ep.enabled = false;
   }
@@ -327,7 +327,7 @@ void Dwc3::ResetConfiguration() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.lock);
+    fbl::AutoLock lock(&uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
@@ -339,7 +339,7 @@ void Dwc3::HandleResetEvent() {
   Ep0Reset();
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.lock);
+    fbl::AutoLock lock(&uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
@@ -429,7 +429,7 @@ void Dwc3::HandleDisconnectedEvent() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.lock);
+    fbl::AutoLock lock(&uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
@@ -478,7 +478,7 @@ void Dwc3::UsbDciRequestQueue(usb_request_t* usb_req, const usb_request_complete
     zxlogf(SERIAL, "UsbDciRequestQueue ep %u length %zu", ep_num, length);
 
     {
-      fbl::AutoLock lock(&uep->lock);
+      fbl::AutoLock lock(&uep->ep.lock);
 
       if (!uep->ep.enabled) {
         zxlogf(ERROR, "Dwc3: ep(%u) not enabled!", ep_num);
@@ -584,7 +584,7 @@ zx_status_t Dwc3::CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_de
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fbl::AutoLock lock(&uep->lock);
+  fbl::AutoLock lock(&uep->ep.lock);
 
   if (zx_status_t status = uep->fifo.Init(bti_); status != ZX_OK) {
     zxlogf(ERROR, "fifo init failed %s", zx_status_get_string(status));
@@ -646,7 +646,7 @@ zx_status_t Dwc3::CommonDisableEndpoint(uint8_t ep_addr) {
 
   RequestQueue to_complete;
   {
-    fbl::AutoLock lock(&uep->lock);
+    fbl::AutoLock lock(&uep->ep.lock);
     to_complete = UserEpCancelAllLocked(*uep);
     uep->fifo.Release();
     uep->ep.enabled = false;
@@ -675,7 +675,7 @@ zx_status_t Dwc3::CommonEndpointSetStall(uint8_t ep_addr) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&uep->lock);
+  fbl::AutoLock lock(&uep->ep.lock);
   return EpSetStall(uep->ep, true);
 }
 
@@ -700,7 +700,7 @@ zx_status_t Dwc3::CommonEndpointClearStall(uint8_t ep_addr) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&uep->lock);
+  fbl::AutoLock lock(&uep->ep.lock);
   return EpSetStall(uep->ep, false);
 }
 

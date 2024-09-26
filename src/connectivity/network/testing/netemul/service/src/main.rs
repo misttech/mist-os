@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _};
+use cm_rust::FidlIntoNative as _;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_netemul::{
     self as fnetemul, ChildDef, ChildUses, ManagedRealmMarker, ManagedRealmRequest, RealmOptions,
@@ -197,8 +198,16 @@ async fn create_realm_instance(
             ChildOptions::new(),
         )
         .await?;
-    for ChildDef { source, name, exposes, uses, program_args, eager, .. } in
-        children.unwrap_or_default()
+    for ChildDef {
+        source,
+        name,
+        exposes,
+        uses,
+        program_args,
+        eager,
+        config_values,
+        __source_breaking: fidl::marker::SourceBreaking,
+    } in children.unwrap_or_default()
     {
         let source = source.ok_or(CreateRealmError::SourceNotProvided)?;
         let name = name.ok_or(CreateRealmError::NameNotProvided)?;
@@ -208,7 +217,12 @@ async fn create_realm_instance(
             child = child.eager();
         }
         let child_ref = match source {
-            fnetemul::ChildSource::Component(url) => builder.add_child(&name, &url, child).await?,
+            fnetemul::ChildSource::Component(url) => {
+                builder.add_child(&name, &url, child).await.map_err(|e| {
+                    error!("error adding child {name} with URL: {url}: {e:?}");
+                    e
+                })?
+            }
             fnetemul::ChildSource::Mock(dir) => {
                 let dir = dir.into_proxy().expect("failed to create proxy from channel");
                 builder
@@ -460,6 +474,13 @@ async fn create_realm_instance(
                 }
             }
         }
+        let config_values = config_values.unwrap_or_default();
+        if !config_values.is_empty() {
+            builder.init_mutable_config_from_package(&child_ref).await?;
+            for fnetemul::ChildConfigValue { key, value } in config_values {
+                builder.set_config_value(&child_ref, &key, value.fidl_into_native()).await?;
+            }
+        }
     }
     for route in child_dep_routes {
         let () = builder.add_route(route).await?;
@@ -499,6 +520,7 @@ async fn create_realm_instance(
         };
         let () = builder.replace_component_decl(component.as_str(), decl).await?;
     }
+
     let () = builder
         .add_route(
             Route::new()
@@ -959,6 +981,7 @@ async fn main() -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cm_rust::NativeIntoFidl as _;
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_netemul_test::{self as fnetemul_test, CounterMarker};
@@ -2489,6 +2512,31 @@ mod tests {
                 name: ".".to_string(),
                 kind: fuchsia_fs::directory::DirentKind::Directory
             }],
+        );
+    }
+
+    #[fixture(with_sandbox)]
+    #[fuchsia::test]
+    async fn override_config_values(sandbox: fnetemul::SandboxProxy) {
+        const STARTING_VALUE: u32 = 9000;
+        let realm = TestRealm::new(
+            &sandbox,
+            fnetemul::RealmOptions {
+                children: Some(vec![fnetemul::ChildDef {
+                    program_args: Some(vec!["--starting-value-from-config".to_string()]),
+                    config_values: Some(vec![fnetemul::ChildConfigValue {
+                        key: "starting_value".to_string(),
+                        value: cm_rust::ConfigValue::from(STARTING_VALUE).native_into_fidl(),
+                    }]),
+                    ..counter_component()
+                }]),
+                ..Default::default()
+            },
+        );
+        let counter = realm.connect_to_protocol::<CounterMarker>();
+        assert_eq!(
+            counter.increment().await.expect("failed to increment counter"),
+            STARTING_VALUE + 1,
         );
     }
 

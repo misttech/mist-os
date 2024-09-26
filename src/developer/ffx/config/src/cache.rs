@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::storage::{AssertNoEnv, AssertNoEnvError};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -29,6 +30,35 @@ pub(crate) struct Cache<T>(RwLock<HashMap<Option<PathBuf>, CacheItem<T>>>);
 impl<T> Default for Cache<T> {
     fn default() -> Self {
         Cache(RwLock::default())
+    }
+}
+
+impl<T: AssertNoEnv + Default> AssertNoEnv for Cache<T> {
+    fn assert_no_env(
+        &self,
+        preamble: Option<String>,
+        ctx: &crate::EnvironmentContext,
+    ) -> Result<(), AssertNoEnvError> {
+        load_config(self, None, || Ok(T::default()))
+            .map_err(|e| AssertNoEnvError::Unexpected(e.into()))?;
+        let config = self.0.read().expect("cache read mutex poisoned");
+        let defaults = config.get(&None).expect("config did not load");
+        let default_config = defaults.config.read().expect("config read mutex poisoned");
+        default_config.assert_no_env(preamble, ctx)
+    }
+}
+
+impl Cache<crate::storage::Config> {
+    /// Overwrites the default config with a specific `ConfigMap`. This is intended for use-cases
+    /// in which the config needs flattening.
+    pub(crate) fn overwrite_default(&self, overwrite: &crate::storage::ConfigMap) -> Result<()> {
+        load_config(self, None, || Ok(crate::storage::Config::default()))?;
+        let config = self.0.read().expect("cache read mutex poisoned");
+        let defaults = config.get(&None).expect("config did not load");
+        let mut defaults_config = defaults.config.write().expect("config write mutex poisoned");
+        crate::api::value::merge_map(&mut defaults_config.default, overwrite);
+
+        Ok(())
     }
 }
 

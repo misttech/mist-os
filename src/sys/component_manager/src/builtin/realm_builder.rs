@@ -8,9 +8,9 @@
 //! component manager behavior.
 
 use crate::builtin::runner::BuiltinRunnerFactory;
-use crate::model::resolver::{self, Resolver};
+use crate::model::resolver::Resolver;
 use ::routing::policy::ScopedPolicyChecker;
-use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use ::routing::resolving::{self, ComponentAddress, ResolvedComponent, ResolverError};
 use anyhow::Error;
 use async_trait::async_trait;
 use fuchsia_component::client as fclient;
@@ -88,9 +88,9 @@ impl Resolver for RealmBuilderResolver {
             .await?;
         let resolved_url = url.unwrap();
         let context_to_resolve_children = resolution_context.map(Into::into);
-        let decl = resolver::read_and_validate_manifest(&decl.unwrap())?;
+        let decl = resolving::read_and_validate_manifest(&decl.unwrap())?;
         let config_values = if let Some(data) = config_values {
-            Some(resolver::read_and_validate_config_values(&data)?)
+            Some(resolving::read_and_validate_config_values(&data)?)
         } else {
             None
         };

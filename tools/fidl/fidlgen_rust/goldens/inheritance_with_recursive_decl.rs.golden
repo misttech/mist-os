@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -310,25 +306,21 @@ impl futures::Stream for ChildRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x3723835775b3455b => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(ParentFirstRequest);
-                    fidl::encoding::Decoder::decode_into::<ParentFirstRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ParentFirstRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ParentFirstRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ChildControlHandle { inner: this.inner.clone() };
                     Ok(ChildRequest::First { request: req.request, control_handle })
                 }
                 0x23521821ca109865 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(ChildSecondRequest);
-                    fidl::encoding::Decoder::decode_into::<ChildSecondRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ChildSecondRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ChildSecondRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ChildControlHandle { inner: this.inner.clone() };
                     Ok(ChildRequest::Second { request: req.request, control_handle })
                 }
@@ -399,6 +391,16 @@ impl fidl::endpoints::ControlHandle for ChildControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -649,13 +651,11 @@ impl futures::Stream for ParentRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x3723835775b3455b => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(ParentFirstRequest);
-                    fidl::encoding::Decoder::decode_into::<ParentFirstRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ParentFirstRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ParentFirstRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ParentControlHandle { inner: this.inner.clone() };
                     Ok(ParentRequest::First { request: req.request, control_handle })
                 }
@@ -714,12 +714,31 @@ impl fidl::endpoints::ControlHandle for ParentControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl ParentControlHandle {}
 
 mod internal {
     use super::*;
+
+    impl fidl::encoding::ResourceTypeMarker for ChildSecondRequest {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
 
     unsafe impl fidl::encoding::TypeMarker for ChildSecondRequest {
         type Owned = Self;
@@ -734,26 +753,24 @@ mod internal {
             4
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for ChildSecondRequest {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ChildSecondRequest> for &mut ChildSecondRequest {
+    unsafe impl
+        fidl::encoding::Encode<ChildSecondRequest, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut ChildSecondRequest
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ChildSecondRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ChildSecondRequest>::encode(
+            fidl::encoding::Encode::<ChildSecondRequest, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
                 (
                     <fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.request),
                 ),
@@ -764,13 +781,19 @@ mod internal {
     unsafe impl<
             T0: fidl::encoding::Encode<
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-        > fidl::encoding::Encode<ChildSecondRequest> for (T0,)
+        >
+        fidl::encoding::Encode<ChildSecondRequest, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -783,12 +806,15 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ChildSecondRequest {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for ChildSecondRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
                 request: fidl::new_empty!(
-                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
             }
         }
@@ -796,7 +822,10 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -804,12 +833,22 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.request,
                 decoder,
                 offset + 0,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ResourceTypeMarker for ParentFirstRequest {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
         }
     }
 
@@ -826,26 +865,24 @@ mod internal {
             4
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for ParentFirstRequest {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ParentFirstRequest> for &mut ParentFirstRequest {
+    unsafe impl
+        fidl::encoding::Encode<ParentFirstRequest, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut ParentFirstRequest
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ParentFirstRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ParentFirstRequest>::encode(
+            fidl::encoding::Encode::<ParentFirstRequest, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
                 (
                     <fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.request),
                 ),
@@ -856,13 +893,19 @@ mod internal {
     unsafe impl<
             T0: fidl::encoding::Encode<
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-        > fidl::encoding::Encode<ParentFirstRequest> for (T0,)
+        >
+        fidl::encoding::Encode<ParentFirstRequest, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -875,12 +918,15 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ParentFirstRequest {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for ParentFirstRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
                 request: fidl::new_empty!(
-                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
             }
         }
@@ -888,7 +934,10 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -896,6 +945,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ParentMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.request,
                 decoder,
                 offset + 0,

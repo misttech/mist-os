@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::resolver;
+use ::routing::resolving;
 use async_trait::async_trait;
 use fuchsia_url::builtin_url::BuiltinUrl;
 use include_bytes_from_working_dir::include_bytes_from_working_dir_env;
@@ -42,7 +42,7 @@ impl Resolver for BuiltinResolver {
             "elf_runner.cm" => Ok(ELF_RUNNER_CM),
             _ => Err(ResolverError::manifest_not_found(ManifestNotFoundError(url.clone()))),
         }?;
-        let decl = resolver::read_and_validate_manifest_bytes(cm)?;
+        let decl = resolving::read_and_validate_manifest_bytes(cm)?;
 
         // Unpackaged components built into component_manager are assigned the
         // platform abi revision.
@@ -74,7 +74,7 @@ mod tests {
 
     #[fuchsia::test]
     fn elf_runner_cm_smoke_test() {
-        let decl = resolver::read_and_validate_manifest_bytes(ELF_RUNNER_CM).unwrap();
+        let decl = resolving::read_and_validate_manifest_bytes(ELF_RUNNER_CM).unwrap();
         let program = decl.program.unwrap();
         assert_eq!(program.runner.unwrap().as_str(), "builtin");
         let entries = program.info.entries.unwrap();

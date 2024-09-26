@@ -8,7 +8,7 @@ use linux_uapi as uapi;
 use static_assertions::assert_eq_size;
 use std::fmt;
 use std::ops::{BitAnd, BitOr, Not};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub const UNBLOCKABLE_SIGNALS: SigSet = SigSet(SIGKILL.mask() | SIGSTOP.mask());
 
@@ -180,7 +180,9 @@ impl fmt::Display for Signal {
 /// The layout of this object is designed to be identical to the layout of the current
 /// architecture's sigset_t type so UserRef<SigSet> can be used for system calls.
 #[repr(transparent)]
-#[derive(Debug, Copy, Clone, Default, AsBytes, Eq, FromZeros, FromBytes, NoCell, PartialEq)]
+#[derive(
+    Debug, Copy, Clone, Default, IntoBytes, Eq, KnownLayout, FromBytes, Immutable, PartialEq,
+)]
 pub struct SigSet(pub std::os::raw::c_ulong);
 assert_eq_size!(SigSet, sigset_t);
 

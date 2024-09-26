@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum;
 use futures::channel::oneshot;
 use futures::{future, join, FutureExt, StreamExt, TryFutureExt};
 use ieee80211::MacAddr;
@@ -17,7 +16,7 @@ use wlan_hw_sim::event::{action, branch, Handler};
 use wlan_hw_sim::*;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 lazy_static! {
@@ -140,7 +139,7 @@ async fn multiple_clients_ap() {
     let (finish_sender, finish_receiver) = oneshot::channel();
     let ap_fut = ap_helper
         .run_until_complete_or_timeout(
-            i64::MAX.nanos(),
+            zx::Duration::INFINITE,
             "serving as an AP",
             transmit_to_clients([&client1_proxy, &client2_proxy]),
             future::join(client1_confirm_receiver, client2_confirm_receiver).then(|_| {
@@ -165,7 +164,7 @@ async fn multiple_clients_ap() {
 
     let client1_connect_fut = pin!(client1_connect_fut);
     let client1_fut = client1_helper.run_until_complete_or_timeout(
-        i64::MAX.nanos(),
+        zx::Duration::INFINITE,
         "connecting to AP",
         scan_and_transmit_to_ap(&ap_proxy, &client1_proxy),
         client1_connect_fut,
@@ -186,7 +185,7 @@ async fn multiple_clients_ap() {
 
     let client2_connect_fut = pin!(client2_connect_fut);
     let client2_fut = client2_helper.run_until_complete_or_timeout(
-        i64::MAX.nanos(),
+        zx::Duration::INFINITE,
         "connecting to AP",
         scan_and_transmit_to_ap(&ap_proxy, &client2_proxy),
         client2_connect_fut,

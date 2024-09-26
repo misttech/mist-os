@@ -5,8 +5,9 @@
 //! An implementation of a client for a fidl interface.
 
 use crate::encoding::{
-    decode_transaction_header, Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody,
-    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
+    decode_transaction_header, Decode, Decoder, DefaultFuchsiaResourceDialect, DynamicFlags,
+    Encode, Encoder, EpitaphBody, TransactionHeader, TransactionMessage, TransactionMessageType,
+    TypeMarker,
 };
 use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
 use crate::Error;
@@ -28,14 +29,22 @@ use std::task::{RawWaker, RawWakerVTable};
 #[doc(hidden)] // only exported for use in macros or generated code
 pub fn decode_transaction_body<T: TypeMarker, const EXPECTED_ORDINAL: u64>(
     mut buf: MessageBufEtc,
-) -> Result<T::Owned, Error> {
+) -> Result<T::Owned, Error>
+where
+    T::Owned: Decode<T, DefaultFuchsiaResourceDialect>,
+{
     let (bytes, handles) = buf.split_mut();
     let (header, body_bytes) = decode_transaction_header(bytes)?;
     if header.ordinal != EXPECTED_ORDINAL {
         return Err(Error::InvalidResponseOrdinal);
     }
-    let mut output = Decode::<T>::new_empty();
-    Decoder::decode_into::<T>(&header, body_bytes, handles, &mut output)?;
+    let mut output = Decode::<T, DefaultFuchsiaResourceDialect>::new_empty();
+    Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<T>(
+        &header,
+        body_bytes,
+        handles,
+        &mut output,
+    )?;
     Ok(output)
 }
 
@@ -188,23 +197,27 @@ impl Client {
     /// Encodes and sends a request without expecting a response.
     pub fn send<T: TypeMarker>(
         &self,
-        body: impl Encode<T>,
+        body: impl Encode<T, DefaultFuchsiaResourceDialect>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
     ) -> Result<(), Error> {
         let msg =
             TransactionMessage { header: TransactionHeader::new(0, ordinal, dynamic_flags), body };
-        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, ()>(msg, |bytes, handles| {
-            self.send_raw(bytes, handles)
-        })
+        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, _, ()>(
+            msg,
+            |bytes, handles| self.send_raw(bytes, handles),
+        )
     }
 
     /// Encodes and sends a request. Returns a future that decodes the response.
     pub fn send_query<Request: TypeMarker, Response: TypeMarker, const ORDINAL: u64>(
         &self,
-        body: impl Encode<Request>,
+        body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
         dynamic_flags: DynamicFlags,
-    ) -> QueryResponseFut<Response::Owned> {
+    ) -> QueryResponseFut<Response::Owned>
+    where
+        Response::Owned: Decode<Response, DefaultFuchsiaResourceDialect>,
+    {
         self.send_query_and_decode::<Request, Response::Owned>(
             body,
             ORDINAL,
@@ -217,7 +230,7 @@ impl Client {
     /// using the given `decode` function.
     pub fn send_query_and_decode<Request: TypeMarker, Output>(
         &self,
-        body: impl Encode<Request>,
+        body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
         decode: fn(Result<MessageBufEtc, Error>) -> Result<Output, Error>,
@@ -638,6 +651,8 @@ impl ClientInner {
             let cx = &mut Context::from_waker(&waker);
 
             let mut buf = MessageBufEtc::new();
+            buf.ensure_capacity_bytes(crate::encoding::MIN_BUF_BYTES_SIZE);
+
             let result = self.channel.recv_etc_from(cx, &mut buf);
             match result {
                 Poll::Ready(Ok(())) => {}
@@ -659,8 +674,9 @@ impl ClientInner {
             if header.is_epitaph() {
                 // Received an epitaph. Record this so that everyone receives the same epitaph.
                 let handles = &mut [];
-                let mut epitaph_body = Decode::<EpitaphBody>::new_empty();
-                Decoder::decode_into::<EpitaphBody>(
+                let mut epitaph_body =
+                    Decode::<EpitaphBody, DefaultFuchsiaResourceDialect>::new_empty();
+                Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<EpitaphBody>(
                     &header,
                     body_bytes,
                     handles,
@@ -677,6 +693,7 @@ impl ClientInner {
             let txid = Txid(header.tx_id);
 
             let waker = {
+                buf.shrink_bytes_to_fit();
                 let mut interests = self.interests.lock();
                 if txid == Txid(0) {
                     interests.push_event(buf)
@@ -806,6 +823,7 @@ pub mod sync {
 
     use super::*;
     use fuchsia_zircon::{self as zx, AsHandleRef};
+    use std::mem::MaybeUninit;
 
     /// A synchronous client for making FIDL calls.
     #[derive(Debug)]
@@ -836,7 +854,7 @@ pub mod sync {
         /// Send a new message.
         pub fn send<T: TypeMarker>(
             &self,
-            body: impl Encode<T>,
+            body: impl Encode<T, DefaultFuchsiaResourceDialect>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
         ) -> Result<(), Error> {
@@ -860,11 +878,14 @@ pub mod sync {
         /// Send a new message expecting a response.
         pub fn send_query<Request: TypeMarker, Response: TypeMarker>(
             &self,
-            body: impl Encode<Request>,
+            body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
             deadline: zx::MonotonicTime,
-        ) -> Result<Response::Owned, Error> {
+        ) -> Result<Response::Owned, Error>
+        where
+            Response::Owned: Decode<Response, DefaultFuchsiaResourceDialect>,
+        {
             let mut write_bytes = Vec::new();
             let mut write_handles = Vec::new();
 
@@ -878,23 +899,32 @@ pub mod sync {
                 msg,
             )?;
 
-            let mut buf = zx::MessageBufEtc::new();
-            buf.ensure_capacity_bytes(zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
-            buf.ensure_capacity_handle_infos(zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
+            // Stack-allocate these buffers to avoid the heap and reuse any populated pages from
+            // previous function calls. Use uninitialized memory so that the only writes to this
+            // array will be by the kernel for whatever's actually used for the reply.
+            let bytes_out =
+                &mut [MaybeUninit::<u8>::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
+            let handles_out = &mut [const { MaybeUninit::<zx::HandleInfo>::uninit() };
+                zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
 
             // TODO: We should be able to use the same memory to back the bytes we use for writing
             // and reading.
-            self.channel
-                .call_etc(deadline, &write_bytes, &mut write_handles, &mut buf)
+            let (bytes_out, handles_out) = self
+                .channel
+                .call_etc_uninit(deadline, &write_bytes, &mut write_handles, bytes_out, handles_out)
                 .map_err(|e| self.wrap_error(Error::ClientCall, e))?;
 
-            let (bytes, mut handle_infos) = buf.split();
-            let (header, body_bytes) = decode_transaction_header(&bytes)?;
+            let (header, body_bytes) = decode_transaction_header(bytes_out)?;
             if header.ordinal != ordinal {
                 return Err(Error::InvalidResponseOrdinal);
             }
-            let mut output = Decode::<Response>::new_empty();
-            Decoder::decode_into::<Response>(&header, body_bytes, &mut handle_infos, &mut output)?;
+            let mut output = Decode::<Response, DefaultFuchsiaResourceDialect>::new_empty();
+            Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<Response>(
+                &header,
+                body_bytes,
+                handles_out,
+                &mut output,
+            )?;
             Ok(output)
         }
 
@@ -961,7 +991,7 @@ mod tests {
     use anyhow::{Context as _, Error};
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_zircon::{AsHandleRef, DurationNum};
+    use fuchsia_zircon::AsHandleRef;
     use futures::channel::oneshot;
     use futures::stream::FuturesUnordered;
     use futures::task::{noop_waker, waker, ArcWake};
@@ -1002,8 +1032,10 @@ mod tests {
         handles: &mut Vec<zx::HandleDisposition<'static>>,
     ) {
         let event = TransactionMessage { header, body: SEND_DATA };
-        Encoder::encode::<TransactionMessageType<u8>>(bytes, handles, event)
-            .expect("Encoding failure");
+        Encoder::<DefaultFuchsiaResourceDialect>::encode::<TransactionMessageType<u8>>(
+            bytes, handles, event,
+        )
+        .expect("Encoding failure");
     }
 
     #[test]
@@ -1026,7 +1058,10 @@ mod tests {
             // Server
             let mut received = MessageBufEtc::new();
             server_end
-                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::MonotonicTime::after(5.seconds()))
+                .wait_handle(
+                    zx::Signals::CHANNEL_READABLE,
+                    zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                )
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
@@ -1042,7 +1077,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds()),
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
@@ -1057,7 +1092,10 @@ mod tests {
             // Server
             let mut received = MessageBufEtc::new();
             server_end
-                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::MonotonicTime::after(5.seconds()))
+                .wait_handle(
+                    zx::Signals::CHANNEL_READABLE,
+                    zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                )
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
@@ -1081,13 +1119,13 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds()),
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
 
         let event_buf = client
-            .wait_for_event(zx::MonotonicTime::after(5.seconds()))
+            .wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)))
             .context("waiting for event")?;
         let (bytes, _handles) = event_buf.split();
         let (header, _body) = decode_transaction_header(&bytes).expect("event decode");
@@ -1103,12 +1141,14 @@ mod tests {
         let client2 = client1.clone();
 
         let thread1 = thread::spawn(move || {
-            let result = client1.wait_for_event(zx::MonotonicTime::after(5.seconds()));
+            let result =
+                client1.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)));
             assert!(result.is_ok());
         });
 
         let thread2 = thread::spawn(move || {
-            let result = client2.wait_for_event(zx::MonotonicTime::after(5.seconds()));
+            let result =
+                client2.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)));
             assert!(result.is_ok());
         });
 
@@ -1136,7 +1176,7 @@ mod tests {
             &server_end,
         );
         assert_matches!(
-            client.wait_for_event(zx::MonotonicTime::after(5.seconds())),
+            client.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5))),
             Err(crate::Error::UnexpectedSyncResponse)
         );
         Ok(())
@@ -1161,7 +1201,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds())
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5))
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
@@ -1186,7 +1226,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds())
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5))
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
@@ -1220,8 +1260,9 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receive message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive message in time!")
+        });
 
         client
             .send::<u8>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
@@ -1251,8 +1292,9 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receiver message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receiver message in time!")
+        });
 
         let sender = client
             .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
@@ -1260,8 +1302,9 @@ mod tests {
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let sender = sender
-            .on_timeout(300.millis().after_now(), || panic!("did not receive response in time!"));
+        let sender = sender.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive response in time!")
+        });
 
         let ((), ()) = join!(receiver, sender);
     }
@@ -1281,8 +1324,9 @@ mod tests {
                 .expect("failed to write epitaph");
         };
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receive message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive message in time!")
+        });
 
         let sender = async move {
             const ORDINAL: u64 = 42 << 32;
@@ -1296,8 +1340,9 @@ mod tests {
             );
         };
         // add a timeout to sender so if test is broken it doesn't take forever
-        let sender = sender
-            .on_timeout(300.millis().after_now(), || panic!("did not receive response in time!"));
+        let sender = sender.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive response in time!")
+        });
 
         let ((), ()) = join!(receiver, sender);
     }
@@ -1411,8 +1456,9 @@ mod tests {
             .map(|(x, _stream)| assert!(x.is_none(), "should have emptied"));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let recv =
-            recv.on_timeout(300.millis().after_now(), || panic!("did not receive event in time!"));
+        let recv = recv.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive event in time!")
+        });
 
         recv.await;
     }
@@ -1453,8 +1499,9 @@ mod tests {
                 .map(|(x, _stream)| assert!(x.is_none(), "should have emptied"));
 
             // add a timeout to receiver so if test is broken it doesn't take forever
-            let recv = recv
-                .on_timeout(300.millis().after_now(), || panic!("did not receive event in time!"));
+            let recv = recv.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+                panic!("did not receive event in time!")
+            });
 
             recv.await;
         }
@@ -1496,8 +1543,9 @@ mod tests {
         });
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let recv =
-            recv.on_timeout(300.millis().after_now(), || panic!("did not receive event in time!"));
+        let recv = recv.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive event in time!")
+        });
 
         recv.await;
     }
@@ -1875,8 +1923,9 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receiver message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receiver message in time!")
+        });
 
         let sender = client
             .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
@@ -1884,8 +1933,9 @@ mod tests {
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let sender = sender
-            .on_timeout(300.millis().after_now(), || panic!("did not receive response in time!"));
+        let sender = sender.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive response in time!")
+        });
 
         let ((), ()) = join!(receiver, sender);
 
@@ -1934,7 +1984,7 @@ mod tests {
 
         futures
             .collect::<Vec<_>>()
-            .on_timeout(1.seconds().after_now(), || panic!("timed out!"))
+            .on_timeout(zx::Duration::from_seconds(1).after_now(), || panic!("timed out!"))
             .await;
     }
 

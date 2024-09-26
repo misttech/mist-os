@@ -19,7 +19,7 @@ use starnix_sync::{FileOpsCore, Locked, Mutex};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::device::kobject::{Device, KObjectBased, UEventAction, UEventContext};
 use crate::device::{DeviceListener, DeviceListenerKey};
@@ -430,8 +430,8 @@ impl SocketOps for BaseNetlinkSocket {
         match msg {
             Some(message) => {
                 // Mark the message as complete and return it.
-                let mut nl_msg =
-                    nlmsghdr::read_from_prefix(&message.data).ok_or_else(|| errno!(EINVAL))?;
+                let (mut nl_msg, _) =
+                    nlmsghdr::read_from_prefix(&message.data).map_err(|_| errno!(EINVAL))?;
                 nl_msg.nlmsg_type = NLMSG_DONE as u16;
                 nl_msg.nlmsg_flags &= NLM_F_MULTI as u16;
                 let msg_bytes = nl_msg.as_bytes();

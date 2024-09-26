@@ -86,18 +86,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "additional-packages-path"
-        }
-      },
-      "optionality": "optional",
-      "long": "--additional-packages-path",
-      "short": null,
-      "description": "a file containing a ProductPackageConfig with additional packages to include which are not in the assembly input bundle",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "package-validation"
         }
       },
@@ -105,18 +93,6 @@
       "long": "--package-validation",
       "short": null,
       "description": "disable validation of the assembly's packages",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "mode"
-        }
-      },
-      "optionality": "optional",
-      "long": "--mode",
-      "short": null,
-      "description": "mode indicating where to place packages.",
       "hidden": false
     },
     {

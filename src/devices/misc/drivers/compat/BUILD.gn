@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("compat") {
   deps = [
@@ -163,7 +164,7 @@ resource("test-firmware-file") {
   outputs = [ "lib/firmware/test" ]
 }
 
-executable("unittests") {
+cc_test_executable("unittests") {
   testonly = true
   output_name = "compat_test"
   sources = [

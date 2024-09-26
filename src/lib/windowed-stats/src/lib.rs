@@ -8,7 +8,7 @@ pub mod experimental;
 use crate::aggregations::SumAndCount;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{ArrayProperty, Node as InspectNode};
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use std::collections::VecDeque;
 use std::fmt::{self, Debug};
 
@@ -174,13 +174,15 @@ impl<T: Default> TimeSeries<T> {
     /// then slide windows as many times as required until the window encompasses the current time.
     pub fn update_windows(&mut self) {
         let now = fasync::Time::now();
-        for _i in 0..get_num_slides_needed(self.last_timestamp, now, 1.minute()) {
+        for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_minutes(1))
+        {
             self.minutely.slide_window();
         }
-        for _i in 0..get_num_slides_needed(self.last_timestamp, now, 15.minutes()) {
+        for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_minutes(15))
+        {
             self.fifteen_minutely.slide_window();
         }
-        for _i in 0..get_num_slides_needed(self.last_timestamp, now, 1.hour()) {
+        for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_hours(1)) {
             self.hourly.slide_window();
         }
         self.last_timestamp = now;

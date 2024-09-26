@@ -24,7 +24,7 @@ use std::os::unix::prelude::AsRawFd;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 use timeout::timeout;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// Default mDNS port
 pub const MDNS_PORT: u16 = 5353;
@@ -545,7 +545,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
     }
 }
 
-fn make_target<B: ByteSlice + Copy>(
+fn make_target<B: SplitByteSlice + Copy>(
     src: SocketAddr,
     msg: dns::Message<B>,
 ) -> Option<(ffx::TargetInfo, u32)> {
@@ -827,7 +827,7 @@ async fn query_recv_loop(
 // the return path is likely not viable. In particular this filters out multicast that QEMU SLIRP
 // has invalidly pumped onto the network that would cause us to attempt to connect to the host
 // machine as if it was a Fuchsia target.
-fn contains_source_address<B: zerocopy::ByteSlice + Copy>(
+fn contains_source_address<B: zerocopy::SplitByteSlice + Copy>(
     addr: &SocketAddr,
     msg: &dns::Message<B>,
 ) -> bool {
@@ -852,14 +852,14 @@ fn contains_source_address<B: zerocopy::ByteSlice + Copy>(
     false
 }
 
-fn contains_txt_response<B: zerocopy::ByteSlice + Copy>(m: &dns::Message<B>) -> bool {
+fn contains_txt_response<B: zerocopy::SplitByteSlice + Copy>(m: &dns::Message<B>) -> bool {
     m.answers.iter().any(|a| a.rtype == dns::Type::Txt)
 }
-fn is_fuchsia_response<B: zerocopy::ByteSlice + Copy>(m: &dns::Message<B>) -> bool {
+fn is_fuchsia_response<B: zerocopy::SplitByteSlice + Copy>(m: &dns::Message<B>) -> bool {
     m.answers.iter().any(|a| a.domain == "_fuchsia._udp.local")
 }
 
-fn is_fastboot_response<B: zerocopy::ByteSlice + Copy>(
+fn is_fastboot_response<B: zerocopy::SplitByteSlice + Copy>(
     m: &dns::Message<B>,
 ) -> Option<ffx::FastbootInterface> {
     if m.answers.is_empty() {

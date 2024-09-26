@@ -259,6 +259,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//examples/drivers/simple/dfv2:*",
     "//examples/drivers/template:*",
+    "//examples/drivers/transport/driver/v2:*",
   ]
 }
 

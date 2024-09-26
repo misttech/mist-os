@@ -321,7 +321,7 @@ mod test {
         WriteRtcOutcome,
     };
     use fidl_fuchsia_metrics::MetricEventPayload;
-    use fuchsia_runtime::{UtcTime, UtcTimeline};
+    use fuchsia_runtime::{UtcClockUpdate, UtcTime};
     use futures::channel::mpsc;
     use futures::{FutureExt, StreamExt};
     use test_util::{assert_geq, assert_leq};
@@ -336,7 +336,7 @@ mod test {
 
     fn create_clock(time: UtcTime) -> Arc<UtcClock> {
         let clk = UtcClock::create(zx::ClockOpts::empty(), None).unwrap();
-        clk.update(zx::ClockUpdate::<UtcTimeline>::builder().approximate_value(time)).unwrap();
+        clk.update(UtcClockUpdate::builder().approximate_value(time)).unwrap();
         Arc::new(clk)
     }
 

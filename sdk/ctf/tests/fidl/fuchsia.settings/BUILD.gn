@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
 import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
@@ -17,7 +18,7 @@ group("ctf-tests") {
   deps = [ ":fuchsia-settings-tests_archive" ]
 }
 
-executable("settings_test_bin") {
+cc_test_executable("settings_test_bin") {
   testonly = true
 
   sources = [ "privacy_test.cc" ]

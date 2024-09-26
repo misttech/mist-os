@@ -204,7 +204,7 @@ impl Drop for Cache {
         if let Err(e) = self.flush() {
             error!("Flush failed: {}", e);
         }
-        self.vmo_id.take().into_id(); // Ok to leak because fifo will be closed.
+        let _ = self.vmo_id.take().into_id(); // Ok to leak because fifo will be closed.
     }
 }
 

@@ -234,6 +234,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
                 (),
                 &RuleInput {
                     packet_origin: PacketOrigin::Local { bound_address: None, bound_device: None },
+                    marks: &Default::default(),
                 },
                 |(), _core_ctx, _table| panic!("should not be able to look up tables")
             ),
@@ -252,6 +253,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
         matcher: RuleMatcher {
             source_address_matcher: Some(SubnetMatcher(I::TEST_ADDRS.subnet)),
             traffic_origin_matcher: None,
+            mark_matchers: Default::default(),
         },
         action: RuleAction::Lookup(table_id.clone()),
     };
@@ -291,6 +293,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
                         bound_address: Some(I::TEST_ADDRS.local_ip),
                         bound_device: None
                     },
+                    marks: &Default::default(),
                 },
                 |(), core_ctx, table| {
                     match table.lookup(core_ctx, None, I::TEST_ADDRS.remote_ip.get()) {
@@ -322,6 +325,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
                         bound_address: Some(I::LOOPBACK_ADDRESS),
                         bound_device: None
                     },
+                    marks: &Default::default(),
                 },
                 |(), core_ctx, table| {
                     match table.lookup(core_ctx, None, *I::LOOPBACK_ADDRESS) {

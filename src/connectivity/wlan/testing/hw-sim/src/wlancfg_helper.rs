@@ -6,11 +6,13 @@ use crate::test_utils::RetryWithBackoff;
 use fidl::endpoints::{create_endpoints, create_proxy};
 use fidl_fuchsia_wlan_policy::{Credential, NetworkConfig, NetworkIdentifier, SecurityType};
 use fuchsia_component::client::connect_to_protocol_at;
-use fuchsia_zircon::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 use ieee80211::Ssid;
 use tracing::info;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
+    fuchsia_zircon as zx,
+};
 
 fn create_network_config(
     ssid: &Ssid,
@@ -121,7 +123,7 @@ pub async fn start_ap_and_wait_for_confirmation(
     let () = responder.send().expect("failed to send update response");
 
     // Start the AP
-    let mut retry = RetryWithBackoff::new(120.seconds());
+    let mut retry = RetryWithBackoff::new(zx::Duration::from_seconds(120));
     loop {
         let controller = ap_controller.clone();
 

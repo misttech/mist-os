@@ -837,7 +837,6 @@ impl Allocator {
             self.object_id(),
             HandleOptions::default(),
             None,
-            None,
         )
         .await?;
         Ok(())
@@ -2003,7 +2002,6 @@ impl<'a> Flusher<'a> {
             &mut transaction,
             HandleOptions { skip_journal_checks: true, ..Default::default() },
             None,
-            None,
         )
         .await?;
         root_store.add_to_graveyard(&mut transaction, layer_object_handle.object_id());
@@ -2570,7 +2568,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let file = root_directory
-            .create_child_file(&mut transaction, &format!("foo {}", size), None)
+            .create_child_file(&mut transaction, &format!("foo {}", size))
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");

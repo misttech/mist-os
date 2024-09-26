@@ -13,6 +13,8 @@ struct fake_info {
   std::string product_config_;
   std::string board_config_;
   std::string version_;
+  std::string platform_version_;
+  std::string product_version_;
   std::string latest_commit_date_;
 };
 
@@ -33,10 +35,12 @@ class BuildInfoTestControllerImpl : public fuchsia::buildinfo::test::BuildInfoTe
 // Returns fake system build information. Used for testing.
 class FakeProviderImpl : public fuchsia::buildinfo::Provider {
  public:
-  static constexpr auto kProductFileNameDefault = "core";
-  static constexpr auto kBoardFileNameDefault = "chromebook-x64";
-  static constexpr auto kVersionFileNameDefault = "2019-03-28T09:00:20+00:00";
-  static constexpr auto kLastCommitDateFileNameDefault = "2019-03-28T09:00:20+00:00";
+  static constexpr auto kProductNameDefault = "core";
+  static constexpr auto kBoardNameDefault = "chromebook-x64";
+  static constexpr auto kVersionDefault = "2019-03-28T09:00:20+00:00";
+  static constexpr auto kPlatformVersionDefault = "2024-03-28T09:00:20+00:00";
+  static constexpr auto kProductVersionDefault = "2024-04-28T09:00:20+00:00";
+  static constexpr auto kLastCommitDateDefault = "2019-03-28T09:00:20+00:00";
 
   explicit FakeProviderImpl(std::shared_ptr<struct fake_info> info_ref)
       : info_ref_(std::move(info_ref)) {}

@@ -138,7 +138,6 @@ mod test {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
-            ramdisk_image: false,
             gendir: Default::default(),
             resource_dir: Default::default(),
         };
@@ -156,7 +155,6 @@ mod test {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
-            ramdisk_image: false,
             gendir: Default::default(),
             resource_dir: Default::default(),
         };
@@ -175,7 +173,6 @@ mod test {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
-            ramdisk_image: false,
             gendir: Default::default(),
             resource_dir: Default::default(),
         };

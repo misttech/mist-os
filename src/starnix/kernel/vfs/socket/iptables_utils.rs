@@ -31,7 +31,7 @@ use std::num::NonZeroU16;
 use std::ops::RangeInclusive;
 use std::str::Utf8Error;
 use thiserror::Error;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
 
 const TABLE_FILTER: &str = "filter";
@@ -479,7 +479,7 @@ pub struct TproxyInfo {
 //
 // `target` of type `xt_entry_target` is parsed first to determine the target's variant.
 #[repr(C)]
-#[derive(AsBytes, Debug, Default, FromBytes, FromZeros, NoCell)]
+#[derive(IntoBytes, Debug, Default, KnownLayout, FromBytes, Immutable)]
 pub struct VerdictWithPadding {
     pub verdict: c_int,
     pub _padding: [u8; 4usize],
@@ -489,7 +489,7 @@ pub struct VerdictWithPadding {
 //
 // `target` of type `xt_entry_target` is parsed first to determine the target's variant.
 #[repr(C)]
-#[derive(AsBytes, Debug, Default, FromBytes, FromZeros, NoCell)]
+#[derive(IntoBytes, Debug, Default, KnownLayout, FromBytes, Immutable)]
 pub struct ErrorNameWithPadding {
     pub errorname: [c_char; 30usize],
     pub _padding: [u8; 2usize],
@@ -539,8 +539,8 @@ impl IptReplaceParser {
     /// Initialize a new parser and tries to parse an `ipt_replace` struct from the buffer.
     /// The rest of the buffer is left unparsed.
     fn new_ipv4(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
-        let ipt_replace = ipt_replace::read_from_prefix(&bytes)
-            .ok_or_else(|| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
+        let (ipt_replace, _) = ipt_replace::read_from_prefix(&bytes)
+            .map_err(|_| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
         let replace_info = ReplaceInfo::try_from(ipt_replace)?;
 
         if replace_info.size != bytes.len() - IPT_REPLACE_SIZE {
@@ -562,8 +562,8 @@ impl IptReplaceParser {
     /// Initialize a new parser and tries to parse an `ip6t_replace` struct from the buffer.
     /// The rest of the buffer is left unparsed.
     fn new_ipv6(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
-        let ip6t_replace = ip6t_replace::read_from_prefix(&bytes)
-            .ok_or_else(|| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
+        let (ip6t_replace, _) = ip6t_replace::read_from_prefix(&bytes)
+            .map_err(|_| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
         let replace_info = ReplaceInfo::try_from(ip6t_replace)?;
 
         if replace_info.size != bytes.len() - IP6T_REPLACE_SIZE {
@@ -661,7 +661,7 @@ impl IptReplaceParser {
                 position: self.parse_pos,
             }
         })?;
-        let obj = T::read_from(bytes).expect("read_from slice of exact size is successful");
+        let obj = T::read_from_bytes(bytes).expect("read_from slice of exact size is successful");
         Ok(obj)
     }
 
@@ -1437,7 +1437,9 @@ impl Entry {
                     }
                     let start = NonZeroU16::new(range.start).ok_or_else(invalid_range_fn)?;
                     let end = NonZeroU16::new(range.end).ok_or_else(invalid_range_fn)?;
-                    Ok(Some(fnet_filter_ext::Action::Redirect { dst_port: Some(start..=end) }))
+                    Ok(Some(fnet_filter_ext::Action::Redirect {
+                        dst_port: Some(fnet_filter_ext::PortRange(start..=end)),
+                    }))
                 }
             }
 
@@ -2960,7 +2962,7 @@ mod tests {
 
     // Same layout as `nf_nat_ipv4_multi_range_compat`.
     #[repr(C)]
-    #[derive(AsBytes, Debug, Default, FromBytes, FromZeros, NoCell)]
+    #[derive(IntoBytes, Debug, Default, KnownLayout, FromBytes, Immutable)]
     struct RedirectTargetV4 {
         pub rangesize: u32,
         pub flags: u32,
@@ -2972,7 +2974,7 @@ mod tests {
 
     // Same layout as `xt_tproxy_target_info_v1` with an IPv4 address.
     #[repr(C)]
-    #[derive(AsBytes, Default, FromBytes, FromZeros, NoCell)]
+    #[derive(IntoBytes, Default, KnownLayout, FromBytes, Immutable)]
     struct TproxyTargetV4 {
         pub _mark_mask: u32,
         pub _mark_value: u32,
@@ -3195,7 +3197,7 @@ mod tests {
 
     // Same layout as `nf_nat_range`.
     #[repr(C)]
-    #[derive(AsBytes, Default, FromBytes, FromZeros, NoCell)]
+    #[derive(IntoBytes, Default, KnownLayout, FromBytes, Immutable)]
     struct RedirectTargetV6 {
         pub flags: u32,
         pub _min_addr: [u32; 4],
@@ -3206,7 +3208,7 @@ mod tests {
 
     // Same layout as `xt_tproxy_target_info_v1` with an IPv6 address.
     #[repr(C)]
-    #[derive(AsBytes, Default, FromBytes, FromZeros, NoCell)]
+    #[derive(IntoBytes, Default, KnownLayout, FromBytes, Immutable)]
     struct TproxyTargetV6 {
         pub _mark_mask: u32,
         pub _mark_value: u32,
@@ -3570,7 +3572,7 @@ mod tests {
                     ..Default::default()
                 },
                 action: fnet_filter_ext::Action::Redirect {
-                    dst_port: Some(NONZERO_PORT..=NONZERO_PORT),
+                    dst_port: Some(fnet_filter_ext::PortRange(NONZERO_PORT..=NONZERO_PORT)),
                 },
             },
             fnet_filter_ext::Rule {
@@ -3585,7 +3587,9 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-                action: fnet_filter_ext::Action::Redirect { dst_port: Some(NONZERO_PORT_RANGE) },
+                action: fnet_filter_ext::Action::Redirect {
+                    dst_port: Some(fnet_filter_ext::PortRange(NONZERO_PORT_RANGE)),
+                },
             },
             fnet_filter_ext::Rule {
                 id: fnet_filter_ext::RuleId {

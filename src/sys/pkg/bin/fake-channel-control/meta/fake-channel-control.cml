@@ -9,12 +9,18 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.update.channelcontrol.ChannelControl" ],
+            protocol: [
+                "fuchsia.update.channel.Provider",
+                "fuchsia.update.channelcontrol.ChannelControl",
+            ],
         },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.update.channelcontrol.ChannelControl" ],
+            protocol: [
+                "fuchsia.update.channel.Provider",
+                "fuchsia.update.channelcontrol.ChannelControl",
+            ],
             from: "self",
         },
     ],

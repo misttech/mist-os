@@ -290,9 +290,9 @@ pub struct SamplerConfigBuilder {
     fire_dir: Option<PathBuf>,
 }
 
-impl SamplerConfigBuilder {
+impl Default for SamplerConfigBuilder {
     /// Call default() to start the builder.
-    pub fn default() -> Self {
+    fn default() -> Self {
         SamplerConfigBuilder {
             minimum_sample_rate_sec: DEFAULT_MIN_SAMPLE_RATE_SEC,
             configure_reader_for_tests: false,
@@ -300,7 +300,9 @@ impl SamplerConfigBuilder {
             fire_dir: None,
         }
     }
+}
 
+impl SamplerConfigBuilder {
     /// Optional. If not called, a default value will be used.
     pub fn minimum_sample_rate_sec(mut self, minimum_sample_rate_sec: i64) -> Self {
         self.minimum_sample_rate_sec = minimum_sample_rate_sec;

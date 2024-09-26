@@ -938,7 +938,7 @@ pub(crate) mod tests {
     };
     use fuchsia_async::{self as fasync, DurationExt};
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
 
     fn setup_remote_peer(
         id: PeerId,
@@ -1181,7 +1181,7 @@ pub(crate) mod tests {
         expect_channel_writable(&remote);
 
         // Advance time by some arbitrary amount before peer decides to reconnect.
-        exec.set_fake_time(5.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
         let _ = exec.wake_expired_timers();
 
         // Peer reconnects with a new l2cap connection. Keep the old one alive to validate that it's
@@ -1244,7 +1244,7 @@ pub(crate) mod tests {
 
         // Advance time by LESS than the CONNECTION_THRESHOLD amount.
         let advance_time = CONNECTION_THRESHOLD.into_nanos() - 100;
-        exec.set_fake_time(advance_time.nanos().after_now());
+        exec.set_fake_time(zx::Duration::from_nanos(advance_time).after_now());
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound connection.
@@ -1455,7 +1455,7 @@ pub(crate) mod tests {
 
         // Advance time by LESS than the CONNECTION_THRESHOLD amount.
         let advance_time = CONNECTION_THRESHOLD.into_nanos() - 200;
-        exec.set_fake_time(advance_time.nanos().after_now());
+        exec.set_fake_time(zx::Duration::from_nanos(advance_time).after_now());
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound browse connection.
@@ -1563,7 +1563,7 @@ pub(crate) mod tests {
         expect_channel_writable(&remote2);
 
         // Advance time by some arbitrary amount before peer decides to reconnect.
-        exec.set_fake_time(5.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
         let _ = exec.wake_expired_timers();
 
         // After some time, remote peer sends incoming a new l2cap connection

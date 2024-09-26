@@ -52,17 +52,41 @@ impl<S: Subscriber> Layer<S> for KernelLogger {
         if *level <= Level::INFO {
             let mut visitor = StringVisitor("".to_string());
             event.record(&mut visitor);
-            let mut msg = visitor.0;
+            let mut msg_buffer = visitor.0;
 
             // msg always has a leading space
-            msg = msg.trim_start().to_string();
+            msg_buffer = msg_buffer.trim_start().to_string();
             let msg_prefix = format!("[component_manager] {}: ", level);
 
+            // &str pointing to the remains of the message.
+            let mut msg = msg_buffer.as_str();
             while msg.len() > 0 {
+                // Split the message if it contains a newline or is too long for
+                // the debug log.
+                let mut split_point = if let Some(newline_pos) = msg.find('\n') {
+                    newline_pos + 1
+                } else {
+                    msg.len()
+                };
+                split_point =
+                    std::cmp::min(split_point, zx::sys::ZX_LOG_RECORD_DATA_MAX - msg_prefix.len());
+
+                // Ensure the split point is at a character boundary - splitting
+                // in the middle of a unicode character causes a panic.
+                while !msg.is_char_boundary(split_point) {
+                    split_point -= 1;
+                }
+
                 // TODO(https://fxbug.dev/42108144): zx_debuglog_write also accepts options and the possible options include
                 // log levels, but they seem to be mostly unused and not displayed today, so we don't pass
                 // along log level yet.
-                let msg_to_write = format!("{}{}", msg_prefix, msg);
+                let mut msg_to_write = format!("{}{}", msg_prefix, &msg[..split_point]);
+
+                // If we split at a newline, strip it out.
+                if msg_to_write.chars().last() == Some('\n') {
+                    msg_to_write.truncate(msg_to_write.len() - 1);
+                }
+
                 if let Err(_) = self.debuglog.write(msg_to_write.as_bytes()) {
                     // If we do in fact fail to write to debuglog, then component_manager
                     // has no sink to write messages to. However, it's extremely
@@ -70,9 +94,7 @@ impl<S: Subscriber> Layer<S> for KernelLogger {
                     // component_manager receives a valid handle from userboot.
                     // Perhaps panicking would be better here?
                 }
-                let num_to_drain =
-                    std::cmp::min(msg.len(), zx::sys::ZX_LOG_RECORD_DATA_MAX - msg_prefix.len());
-                msg.drain(..num_to_drain);
+                msg = &msg[split_point..];
             }
         }
     }
@@ -129,6 +151,9 @@ mod tests {
     use std::panic;
     use tracing::{error, info, warn};
 
+    const MAX_INFO_LINE_LEN: usize =
+        zx::sys::ZX_LOG_RECORD_DATA_MAX - "[component_manager] INFO: ".len();
+
     fn get_readonlylog() -> zx::DebugLog {
         let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol::<fboot::ReadOnlyLogMarker>(server_end).unwrap();
@@ -180,6 +205,13 @@ mod tests {
         KernelLogger::init();
     }
 
+    fn make_str_with_len(prefix: &str, len: usize) -> String {
+        let mut rng = rand::thread_rng();
+        let mut res = format!("{}{}{}", prefix, rng.gen::<u64>().to_string(), "a".repeat(len));
+        res.truncate(len);
+        res
+    }
+
     #[test]
     fn log_info_test() {
         let mut rng = rand::thread_rng();
@@ -189,6 +221,97 @@ mod tests {
         info!("log_test {}", logged_value);
 
         expect_message_in_debuglog(format!("[component_manager] INFO: log_test {}", logged_value));
+    }
+
+    #[test]
+    fn log_info_newline_test() {
+        let mut rng = rand::thread_rng();
+        let logged_value1: u64 = rng.gen();
+        let logged_value2: u64 = rng.gen();
+
+        init();
+        info!("log_test1 {}\nlog_test2 {}", logged_value1, logged_value2);
+
+        expect_message_in_debuglog(format!(
+            "[component_manager] INFO: log_test1 {}",
+            logged_value1
+        ));
+        expect_message_in_debuglog(format!(
+            "[component_manager] INFO: log_test2 {}",
+            logged_value2
+        ));
+    }
+
+    #[test]
+    fn log_many_newlines_test() {
+        let mut rng = rand::thread_rng();
+        let logged_value1: u64 = rng.gen();
+        let logged_value2: u64 = rng.gen();
+
+        init();
+        info!("\n\nmnl_log_test1 {}\n\nmnl_log_test2 {}\n\n", logged_value1, logged_value2);
+
+        expect_message_in_debuglog(format!(
+            "[component_manager] INFO: mnl_log_test1 {}",
+            logged_value1
+        ));
+        expect_message_in_debuglog(format!(
+            "[component_manager] INFO: mnl_log_test2 {}",
+            logged_value2
+        ));
+    }
+
+    #[test]
+    fn log_one_very_long_line_test() {
+        let line1: String = make_str_with_len("line1:", MAX_INFO_LINE_LEN);
+        let line2: String = make_str_with_len("line2:", MAX_INFO_LINE_LEN);
+        let line3: String = make_str_with_len("line3:", MAX_INFO_LINE_LEN);
+
+        init();
+        info!("{}{}{}", line1, line2, line3);
+
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line1));
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line2));
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line3));
+    }
+
+    #[test]
+    fn log_line_that_would_be_split_without_newline_test() {
+        let line1: String = make_str_with_len("line1:", 128);
+        let line2: String = make_str_with_len("line2:", 128);
+
+        init();
+        info!("{}\n{}", line1, line2);
+
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line1));
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line2));
+    }
+
+    #[test]
+    fn log_overly_long_line_with_newline_test() {
+        let line1: String = make_str_with_len("line1:", MAX_INFO_LINE_LEN);
+        let line1part2: String = make_str_with_len("line1part2:", 80);
+        let line2: String = make_str_with_len("line2:", 80);
+
+        init();
+        info!("{}{}\n{}", line1, line1part2, line2);
+
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line1));
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line1part2));
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line2));
+    }
+
+    #[test]
+    fn log_pathological_utf8_data() {
+        // Naively, this would split the emoji half-way through, which would
+        // cause a panic.
+        let line1: String = make_str_with_len("emojiline1:", MAX_INFO_LINE_LEN - 1);
+
+        init();
+        info!("{}😈", line1);
+
+        expect_message_in_debuglog(format!("[component_manager] INFO: {}", line1));
+        expect_message_in_debuglog(format!("[component_manager] INFO: 😈"));
     }
 
     #[test]

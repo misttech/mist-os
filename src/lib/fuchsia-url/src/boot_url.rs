@@ -4,7 +4,7 @@
 
 pub use crate::errors::ParseError;
 pub use crate::parse::{validate_package_path_segment, validate_resource_path};
-use crate::{validate_path, Scheme, UrlParts};
+use crate::{validate_path, AbsoluteComponentUrl, Scheme, UrlParts};
 
 pub const SCHEME: &str = "fuchsia-boot";
 
@@ -75,12 +75,12 @@ impl BootUrl {
     }
 }
 
-#[cfg(mistos)]
-impl std::str::FromStr for BootUrl {
-    type Err = ParseError;
-
-    fn from_str(url: &str) -> Result<Self, Self::Err> {
-        Self::parse(url)
+impl TryFrom<&AbsoluteComponentUrl> for BootUrl {
+    type Error = ParseError;
+    fn try_from(component_url: &AbsoluteComponentUrl) -> Result<Self, ParseError> {
+        let path = format!("/{}", component_url.package_url().name());
+        let resource = component_url.resource().to_string();
+        Self::new_resource(path, resource)
     }
 }
 
@@ -99,6 +99,7 @@ impl std::fmt::Display for BootUrl {
 mod tests {
     use super::*;
     use crate::errors::{PackagePathSegmentError, ResourcePathError};
+    use crate::AbsoluteComponentUrl;
 
     macro_rules! test_parse_ok {
         (
@@ -394,5 +395,22 @@ mod tests {
             .unwrap();
         assert_eq!("/name", url.path());
         assert_eq!(Some("foo/bar"), url.resource());
+    }
+
+    #[test]
+    fn test_from_component_url() {
+        let component_url = AbsoluteComponentUrl::new(
+            "fuchsia-pkg://fuchsia.com".parse().unwrap(),
+            "package_name".parse().unwrap(),
+            None,
+            None,
+            "path/to/resource.txt".into(),
+        )
+        .unwrap();
+        let boot_url = BootUrl::try_from(&component_url).unwrap();
+        assert_eq!(
+            boot_url,
+            BootUrl { path: "/package_name".into(), resource: Some("path/to/resource.txt".into()) }
+        );
     }
 }

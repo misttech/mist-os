@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("test") {
+cc_test_executable("test") {
   testonly = true
   output_name = "clocktree_test"
 

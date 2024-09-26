@@ -26,6 +26,7 @@ namespace msd {
 template <typename FidlDeviceType>
 class MagmaDriverBase : public fdf::DriverBase,
                         public fidl::WireServer<FidlDeviceType>,
+                        public fidl::WireServer<fuchsia_gpu_magma::PowerElementProvider>,
                         internal::DependencyInjectionServer::Owner {
  public:
   using fws = fidl::WireServer<FidlDeviceType>;
@@ -87,6 +88,22 @@ class MagmaDriverBase : public fdf::DriverBase,
   virtual zx::result<> MagmaStart() = 0;
   // Called after MagmaStart to initialize devfs nodes.
   virtual zx::result<> CreateAdditionalDevNodes() { return zx::ok(); }
+
+  void GetPowerGoals(GetPowerGoalsCompleter::Sync& completer) override { completer.Reply({}); }
+
+  void GetClockSpeedLevel(
+      ::fuchsia_gpu_magma::wire::PowerElementProviderGetClockSpeedLevelRequest* request,
+      GetClockSpeedLevelCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetClockLimit(::fuchsia_gpu_magma::wire::PowerElementProviderSetClockLimitRequest* request,
+                     SetClockLimitCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_gpu_magma::PowerElementProvider> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   zx::result<zx::resource> GetInfoResource() {
     auto info_resource = incoming()->template Connect<fuchsia_kernel::InfoResource>();
@@ -253,6 +270,26 @@ class MagmaDriverBase : public fdf::DriverBase,
                                                      std::move(node_endpoints->server));
     gpu_node_controller_.Bind(std::move(controller_endpoints.client));
     gpu_node_.Bind(std::move(node_endpoints->client));
+    auto power_protocol =
+        [this](fidl::ServerEnd<fuchsia_gpu_magma::PowerElementProvider> server_end) mutable {
+          fidl::BindServer(dispatcher(), std::move(server_end), this);
+        };
+    auto device_protocol = [this](fidl::ServerEnd<fuchsia_gpu_magma::Device> server_end) mutable {
+      fidl::BindServer(dispatcher(), fidl::ServerEnd<FidlDeviceType>(server_end.TakeChannel()),
+                       this);
+    };
+
+    fuchsia_gpu_magma::Service::InstanceHandler handler(
+        {.device = std::move(device_protocol),
+         .power_element_provider = std::move(power_protocol)});
+    {
+      auto status = outgoing()->template AddService<fuchsia_gpu_magma::Service>(std::move(handler));
+      if (status.is_error()) {
+        FDF_LOG(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+                status.status_string());
+        return status.take_error();
+      }
+    }
     return zx::ok();
   }
 

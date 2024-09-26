@@ -7,7 +7,7 @@ use crate::ap::event::*;
 use crate::ap::remote_client::RemoteClient;
 use crate::ap::{aid, Context, RsnCfg};
 use anyhow::{ensure, format_err};
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use ieee80211::MacAddr;
 use std::sync::{Arc, Mutex};
 use tracing::error;
@@ -59,7 +59,7 @@ impl Authenticating {
         let event = ClientEvent::AssociationTimeout;
         let timeout_event_id = r_sta.schedule_at(
             ctx,
-            zx::MonotonicTime::after(ASSOCIATION_TIMEOUT_SECONDS.seconds()),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(ASSOCIATION_TIMEOUT_SECONDS)),
             event,
         );
 
@@ -520,7 +520,7 @@ impl Associated {
         let event = ClientEvent::AssociationTimeout;
         r_sta.schedule_at(
             ctx,
-            zx::MonotonicTime::after(ASSOCIATION_TIMEOUT_SECONDS.seconds()),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(ASSOCIATION_TIMEOUT_SECONDS)),
             event,
         )
     }

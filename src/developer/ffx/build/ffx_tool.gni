@@ -125,6 +125,10 @@ template("ffx_tool") {
     ]
   }
 
+  # internal target to create metadata about this tool for use by
+  # ffx when running hermetically.
+  tool_list_metadata_target = "${output_name}-ffx-tool-metadata"
+
   # Create the metadata file for in-tree discovery
   ffx_action(target_metadata) {
     # Use the unversion-stamped binary to generate the metadata file.  The
@@ -152,6 +156,7 @@ template("ffx_tool") {
       ":$target_metadata",
       ":$target_versioned_bin",
     ]
+    deps = [ ":${tool_list_metadata_target}" ]
   }
 
   # Install host tool
@@ -161,6 +166,34 @@ template("ffx_tool") {
       output_name,
       output_metadata,
     ]
+  }
+
+  group(tool_list_metadata_target) {
+    metadata = {
+      # LINT.IfChange(clidoc_subtool_manifest)
+
+      # this is a comment to remember to change clidoc.
+      # nested IfThisThenThat are not allowed.
+      # nor multiple files in the then clause.
+
+      # LINT.ThenChange(//tools/clidoc/src/ffx_doc.rs:clidoc_subtool_manifest)
+
+      # LINT.IfChange(subtool_manifest)
+      ffx_tool = [
+        {
+          name = output_name
+          category = "internal"
+          if (defined(invoker.sdk_category)) {
+            category = invoker.sdk_category
+          }
+          executable = rebase_path("$root_out_dir/$output_name", root_build_dir)
+          executable_metadata =
+              rebase_path("$root_out_dir/$output_metadata", root_build_dir)
+        },
+      ]
+
+      # LINT.ThenChange(//src/developer/ffx/lib/fho/search/src/lib.rs:subtool_manifest)
+    }
   }
 
   # Install host tool and metadata as test data
@@ -205,7 +238,7 @@ template("ffx_tool") {
       meta = {
         dest = "$file_base-meta.json"
         schema = "ffx_tool"
-        sources = [ "//build/sdk/meta/host_tool.json" ]
+        additional_schema_files = [ "//build/sdk/meta/host_tool.json" ]
         value = {
           type = "ffx_tool"
           name = output_name

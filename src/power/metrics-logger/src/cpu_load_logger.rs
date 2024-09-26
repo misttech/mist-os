@@ -68,10 +68,12 @@ fn vmo_to_topology(vmo: zx::Vmo, length: u32) -> Result<Vec<Cluster>> {
                 e
             )
         })?;
-        let node = ZbiTopologyNode::read_from(&buffer as &[u8]).ok_or(format_err!(
-            "Reads a copy of ZbiTopologyNode (index {:?}) from VMO bytes failed.",
-            index
-        ))?;
+        let node = ZbiTopologyNode::read_from_bytes(&buffer as &[u8]).map_err(|_| {
+            format_err!(
+                "Reads a copy of ZbiTopologyNode (index {:?}) from VMO bytes failed.",
+                index
+            )
+        })?;
         match ZbiTopologyEntityType::from_u8(node.entity_type) {
             Some(ZbiTopologyEntityType::ZbiTopologyEntityCluster) => {
                 let performance_class: u8 = unsafe { node.entity.cluster.performance_class };

@@ -41,11 +41,6 @@
             to: [ "#scene-provider" ],
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#input-helper" ],
-        },
-        {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "#fake_cobalt",
             to: [ "#scene_manager" ],

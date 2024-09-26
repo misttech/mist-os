@@ -103,7 +103,7 @@ impl DurationExt for Duration {
 pub struct Tick {
     start: Timestamp,
     end: Timestamp,
-    last_sample_timestamp: Timestamp,
+    last_sample_timestamp: Option<Timestamp>,
 }
 
 impl Tick {
@@ -118,8 +118,13 @@ impl Tick {
     /// Otherwise, return false.
     pub fn start_has_sample(self, max_sampling_period: Quanta) -> bool {
         let start = self.start.quantize();
-        let sample_time = self.last_sample_timestamp.quantize();
-        (start / max_sampling_period) == (sample_time / max_sampling_period)
+        match self.last_sample_timestamp {
+            Some(last_sample_timestamp) => {
+                let sample_time = last_sample_timestamp.quantize();
+                (start / max_sampling_period) == (sample_time / max_sampling_period)
+            }
+            None => false,
+        }
     }
 }
 
@@ -128,7 +133,7 @@ impl Tick {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationTime {
     pub(crate) last_update_timestamp: Timestamp,
-    pub(crate) last_sample_timestamp: Timestamp,
+    pub(crate) last_sample_timestamp: Option<Timestamp>,
 }
 
 impl ObservationTime {
@@ -153,7 +158,7 @@ impl ObservationTime {
             let new_observation_time = ObservationTime {
                 last_update_timestamp: timestamp,
                 last_sample_timestamp: if is_sample {
-                    timestamp
+                    Some(timestamp)
                 } else {
                     self.last_sample_timestamp
                 },
@@ -170,10 +175,7 @@ impl ObservationTime {
 
 impl Default for ObservationTime {
     fn default() -> Self {
-        ObservationTime {
-            last_update_timestamp: Timestamp::now(),
-            last_sample_timestamp: Timestamp::from_nanos(-1),
-        }
+        ObservationTime { last_update_timestamp: Timestamp::now(), last_sample_timestamp: None }
     }
 }
 
@@ -223,7 +225,7 @@ mod tests {
         let tick = Tick {
             start: timestamp,
             end: timestamp + Duration::from_quanta(3),
-            last_sample_timestamp: Timestamp::from_nanos(-999),
+            last_sample_timestamp: Some(Timestamp::from_nanos(-999)),
         };
         assert_eq!(tick.quantize(), (1, 4));
     }
@@ -233,41 +235,40 @@ mod tests {
         let tick = Tick {
             start: Timestamp::from_nanos(9_000_000_000),
             end: Timestamp::from_nanos(12_000_000_000),
-            last_sample_timestamp: Timestamp::from_nanos(8_000_000_000),
+            last_sample_timestamp: Some(Timestamp::from_nanos(8_000_000_000)),
         };
         assert!(tick.start_has_sample(10));
 
         let tick = Tick {
             start: Timestamp::from_nanos(10_000_000_000),
             end: Timestamp::from_nanos(13_000_000_000),
-            last_sample_timestamp: Timestamp::from_nanos(8_000_000_000),
+            last_sample_timestamp: Some(Timestamp::from_nanos(8_000_000_000)),
         };
         assert!(!tick.start_has_sample(10));
     }
 
     #[test]
     fn tick() {
-        const NEG: Timestamp = Timestamp::from_nanos(-999);
         const ZERO: Timestamp = Timestamp::from_nanos(0);
         const MINUTE_ONE: Timestamp = Timestamp::from_nanos(60_000_000_000);
         const MINUTE_THREE: Timestamp = Timestamp::from_nanos(180_000_000_000);
-        let mut last = ObservationTime { last_update_timestamp: ZERO, last_sample_timestamp: NEG };
+        let mut last = ObservationTime { last_update_timestamp: ZERO, last_sample_timestamp: None };
 
         let tick = last.tick(MINUTE_ONE, true).unwrap();
-        let expected_tick = Tick { start: ZERO, end: MINUTE_ONE, last_sample_timestamp: NEG };
+        let expected_tick = Tick { start: ZERO, end: MINUTE_ONE, last_sample_timestamp: None };
         let expected_last = ObservationTime {
             last_update_timestamp: MINUTE_ONE,
-            last_sample_timestamp: MINUTE_ONE,
+            last_sample_timestamp: Some(MINUTE_ONE),
         };
         assert_eq!(tick, expected_tick);
         assert_eq!(last, expected_last);
 
         let tick = last.tick(MINUTE_THREE, false).unwrap();
         let expected_tick =
-            Tick { start: MINUTE_ONE, end: MINUTE_THREE, last_sample_timestamp: MINUTE_ONE };
+            Tick { start: MINUTE_ONE, end: MINUTE_THREE, last_sample_timestamp: Some(MINUTE_ONE) };
         let expected_last = ObservationTime {
             last_update_timestamp: MINUTE_THREE,
-            last_sample_timestamp: MINUTE_ONE,
+            last_sample_timestamp: Some(MINUTE_ONE),
         };
         assert_eq!(tick, expected_tick);
         assert_eq!(last, expected_last);

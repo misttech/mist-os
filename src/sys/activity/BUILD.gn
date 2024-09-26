@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 
 source_set("lib") {
@@ -59,7 +60,7 @@ fuchsia_package("activity") {
   deps = [ ":activity-component" ]
 }
 
-executable("activity_test_bin") {
+cc_test_executable("activity_test_bin") {
   testonly = true
   output_name = "activity_test"
 

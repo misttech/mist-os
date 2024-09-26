@@ -28,7 +28,6 @@ from honeydew.typing.wlan import (
 
 # List of required FIDLs for the WLAN Fuchsia Controller affordance.
 _REQUIRED_CAPABILITIES = [
-    "fuchsia.location.namedplace",
     "fuchsia.wlan.device.service",
     "fuchsia.wlan.phyimpl",
 ]
@@ -101,13 +100,6 @@ class Wlan(wlan.Wlan):
         """Re-initializes connection to the WLAN stack."""
         self._device_monitor_proxy = f_wlan_device_service.DeviceMonitor.Client(
             self._fc_transport.connect_device_proxy(_DEVICE_MONITOR_PROXY)
-        )
-        self._regulatory_region_configurator = (
-            f_location_namedplace.RegulatoryRegionConfigurator.Client(
-                self._fc_transport.connect_device_proxy(
-                    _REGULATORY_REGION_CONFIGURATOR_PROXY
-                )
-            )
         )
 
     def connect(
@@ -430,8 +422,17 @@ class Wlan(wlan.Wlan):
                 f'Expected region_code to be length 2, got "{region_code}"'
             )
 
+        # TODO(http://b/323967235): Move this to its own affordance
+        regulatory_region_configurator = (
+            f_location_namedplace.RegulatoryRegionConfigurator.Client(
+                self._fc_transport.connect_device_proxy(
+                    _REGULATORY_REGION_CONFIGURATOR_PROXY
+                )
+            )
+        )
+
         try:
-            self._regulatory_region_configurator.set_region(region=region_code)
+            regulatory_region_configurator.set_region(region=region_code)
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
                 f"RegulatoryRegionConfigurator.SetRegion() error {status}"

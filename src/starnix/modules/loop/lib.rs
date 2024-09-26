@@ -139,8 +139,7 @@ impl LoopDevice {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let loop_device_name = FsString::from(format!("loop{minor}"));
-        let virtual_block_class =
-            registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
+        let virtual_block_class = registry.objects.virtual_block_class();
         let device = Arc::new(Self { number: minor, state: Default::default() });
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
         let k_device = registry.add_device(
@@ -573,7 +572,7 @@ pub fn loop_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &Curren
     // Device registry.
     kernel
         .device_registry
-        .register_major(LOOP_MAJOR, get_or_create_loop_device, DeviceMode::Block)
+        .register_major("loop".into(), DeviceMode::Block, LOOP_MAJOR, get_or_create_loop_device)
         .expect("loop device register failed.");
 
     // Ensure initial loop devices.

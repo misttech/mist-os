@@ -91,7 +91,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         // We may have truncated the address range (per kernel.memory-limit-mb),
         // so be sure to truncate the NVRAM range accordingly.
         auto back = ktl::prev(Allocation::GetPool().end());
-        while (!memalloc::IsRamType(back->type)) {
+        while (!memalloc::IsRamType(back->type) || back->type == memalloc::Type::kTruncatedRam) {
           --back;
         }
         uint64_t addr_cutoff = back->end();

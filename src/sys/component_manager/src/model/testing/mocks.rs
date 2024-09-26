@@ -33,73 +33,78 @@ use vfs::pseudo_directory;
 use vfs::service::endpoint;
 use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MockResolver {
+    inner: SyncMutex<MockResolverInner>,
+}
+
+#[derive(Debug, Default)]
+struct MockResolverInner {
     components: HashMap<String, ComponentDecl>,
     configs: HashMap<String, ConfigValuesData>,
-    blockers: Arc<
-        Mutex<HashMap<String, Arc<Mutex<Option<(oneshot::Sender<()>, oneshot::Receiver<()>)>>>>>,
-    >,
+    blockers: HashMap<String, Option<(oneshot::Sender<()>, oneshot::Receiver<()>)>>,
 }
 
 impl MockResolver {
     pub fn new() -> Self {
-        MockResolver {
-            components: HashMap::new(),
-            configs: HashMap::new(),
-            blockers: Arc::new(Mutex::new(HashMap::new())),
-        }
+        MockResolver { inner: SyncMutex::new(Default::default()) }
     }
 
     async fn resolve_async(
         &self,
         component_url: String,
     ) -> Result<ResolvedComponent, ResolverError> {
-        const NAME_PREFIX: &str = "test:///";
-        debug_assert!(component_url.starts_with(NAME_PREFIX), "invalid component url");
-        let (_, name) = component_url.split_at(NAME_PREFIX.len());
-        let decl = self
-            .components
-            .get(name)
-            .ok_or(ResolverError::manifest_not_found(format_err!("not in the hashmap")))?;
-        let config_values = match &decl.config {
-            None => None,
-            Some(config_decl) => match &config_decl.value_source {
-                cm_rust::ConfigValueSource::Capabilities(_) => None,
-                cm_rust::ConfigValueSource::PackagePath(path) => Some(
-                    self.configs
-                        .get(path)
-                        .ok_or_else(|| {
-                            ResolverError::manifest_invalid(format_err!(
-                                "config values not provided"
-                            ))
-                        })?
-                        .clone(),
-                ),
-            },
+        let (name, decl, config_values, maybe_blocker, client) = {
+            const NAME_PREFIX: &str = "test:///";
+            debug_assert!(component_url.starts_with(NAME_PREFIX), "invalid component url");
+            let (_, name) = component_url.split_at(NAME_PREFIX.len());
+            let mut guard = self.inner.lock().unwrap();
+            let decl = guard
+                .components
+                .get(name)
+                .cloned()
+                .ok_or(ResolverError::manifest_not_found(format_err!("not in the hashmap")))?;
+            let config_values = match &decl.config {
+                None => None,
+                Some(config_decl) => match &config_decl.value_source {
+                    cm_rust::ConfigValueSource::Capabilities(_) => None,
+                    cm_rust::ConfigValueSource::PackagePath(path) => Some(
+                        guard
+                            .configs
+                            .get(path)
+                            .ok_or_else(|| {
+                                ResolverError::manifest_invalid(format_err!(
+                                    "config values not provided"
+                                ))
+                            })?
+                            .clone(),
+                    ),
+                },
+            };
+            let (client, server): (
+                ClientEnd<fio::DirectoryMarker>,
+                ServerEnd<fio::DirectoryMarker>,
+            ) = create_endpoints();
+
+            let sub_dir = pseudo_directory!(
+                "fake_file" => read_only(b"content"),
+            );
+            sub_dir.open(
+                ExecutionScope::new(),
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                vfs::path::Path::dot(),
+                ServerEnd::new(server.into_channel()),
+            );
+
+            let maybe_blocker = { guard.blockers.get_mut(name).and_then(|b| b.take()) };
+            (name, decl, config_values, maybe_blocker, client)
         };
-        let (client, server): (ClientEnd<fio::DirectoryMarker>, ServerEnd<fio::DirectoryMarker>) =
-            create_endpoints();
-
-        let sub_dir = pseudo_directory!(
-            "fake_file" => read_only(b"content"),
-        );
-        sub_dir.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-
-        if let Some(blocker) = self.blockers.lock().await.get(name).cloned() {
-            let mut blocker = blocker.lock().await;
-            if let Some(blocker) = blocker.take() {
-                let (send, recv) = blocker;
-                send.send(()).unwrap();
-                let _ = recv.await.unwrap();
-            }
+        if let Some(blocker) = maybe_blocker {
+            let (send, recv) = blocker;
+            send.send(()).unwrap();
+            let _ = recv.await.unwrap();
         }
 
         Ok(ResolvedComponent {
@@ -116,12 +121,12 @@ impl MockResolver {
         })
     }
 
-    pub fn add_component(&mut self, name: &str, component: ComponentDecl) {
-        self.components.insert(name.to_string(), component);
+    pub fn add_component(&self, name: &str, component: ComponentDecl) {
+        self.inner.lock().unwrap().components.insert(name.to_string(), component);
     }
 
-    pub fn add_config_values(&mut self, path: &str, values: ConfigValuesData) {
-        self.configs.insert(path.to_string(), values);
+    pub fn add_config_values(&self, path: &str, values: ConfigValuesData) {
+        self.inner.lock().unwrap().configs.insert(path.to_string(), values);
     }
 
     pub async fn add_blocker(
@@ -130,14 +135,11 @@ impl MockResolver {
         send: oneshot::Sender<()>,
         recv: oneshot::Receiver<()>,
     ) {
-        self.blockers
-            .lock()
-            .await
-            .insert(path.to_string(), Arc::new(Mutex::new(Some((send, recv)))));
+        self.inner.lock().unwrap().blockers.insert(path.to_string(), Some((send, recv)));
     }
 
     pub fn get_component_decl(&self, name: &str) -> Option<ComponentDecl> {
-        self.components.get(name).map(Clone::clone)
+        self.inner.lock().unwrap().components.get(name).map(Clone::clone)
     }
 }
 

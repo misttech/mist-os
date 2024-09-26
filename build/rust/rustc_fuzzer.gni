@@ -123,6 +123,18 @@ template("rustc_fuzzer") {
   not_needed(invoker, ignored_parameters)
 }
 
+template("rustc_starnix_fuzzer") {
+  rustc_fuzzer(target_name) {
+    forward_variables_from(invoker, "*", [ "expect_includes_deps" ])
+    expect_includes_deps =
+        [ "//src/sys/fuzzing/libfuzzer:libfuzzer_starnix_includes" ]
+  }
+}
+
 set_defaults("rustc_fuzzer") {
+  configs = default_common_binary_configs + default_rust_configs
+}
+
+set_defaults("rustc_starnix_fuzzer") {
   configs = default_common_binary_configs + default_rust_configs
 }

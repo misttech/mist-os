@@ -13,6 +13,7 @@
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/status.h>
+#include <zircon/syscalls.h>
 
 #include <algorithm>
 
@@ -238,6 +239,23 @@ zx_status_t ChildProcess::AddChannel(uint32_t id, zx::channel channel) {
                              .h = {
                                  .id = PA_HND(PA_USER0, id),
                                  .handle = channel.release(),
+                             }};
+  actions_.emplace_back(std::move(action));
+  return ZX_OK;
+}
+
+zx_status_t ChildProcess::AddVmoVdso() {
+  static const zx_handle_t vdso = zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0));
+  zx_handle_t vdso_copy;
+  zx_status_t status = zx_handle_duplicate(vdso, ZX_RIGHT_SAME_RIGHTS, &vdso_copy);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  fdio_spawn_action_t action{.action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+                             .h = {
+                                 .id = PA_HND(PA_VMO_VDSO, 0),
+                                 .handle = vdso_copy,
                              }};
   actions_.emplace_back(std::move(action));
   return ZX_OK;

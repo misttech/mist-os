@@ -321,11 +321,13 @@ zx::result<Superblock> LoadSuperblockWithRepair(Bcache* bc, bool repair) {
     FX_LOGS(WARNING) << "Attempting to repair superblock";
 
 #ifdef __Fuchsia__
-    info_or = RepairSuperblock(bc, bc->device(), bc->Maxblk());
-    if (info_or.is_error()) {
-      FX_LOGS(ERROR) << "Unable to repair corrupt filesystem.";
+    auto repair_result = RepairSuperblock(bc, bc->device(), bc->Maxblk());
+    if (repair_result.is_error()) {
+      FX_LOGS(ERROR) << "Unable to repair corrupt filesystem: " << repair_result.status_string();
+      // Use the original error.
       return info_or.take_error();
     }
+    return repair_result;
 #else
     return zx::error(ZX_ERR_NOT_SUPPORTED);
 #endif
@@ -606,7 +608,7 @@ void Minfs::EnqueueCallback(SyncCallback callback) {
   if (callback) {
     journal_->schedule_task(journal_->Sync().then(
         [closure = std::move(callback)](fpromise::result<void, zx_status_t>& result) mutable
-        -> fpromise::result<void, zx_status_t> {
+            -> fpromise::result<void, zx_status_t> {
           if (result.is_ok()) {
             closure(ZX_OK);
           } else {

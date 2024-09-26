@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/compiled_action.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("virtmagma_vulkan_unit_tests") {
+cc_test_executable("virtmagma_vulkan_unit_tests") {
   testonly = true
 
   deps = [
@@ -33,7 +34,7 @@ compiled_action("basic_compute") {
   ]
 }
 
-executable("virtmagma_image_tests") {
+cc_test_executable("virtmagma_image_tests") {
   testonly = true
 
   sources = [ "virtmagma_image_tests.cc" ]
@@ -45,7 +46,7 @@ executable("virtmagma_image_tests") {
   ]
 }
 
-executable("virtmagma_unit_tests") {
+cc_test_executable("virtmagma_unit_tests") {
   testonly = true
 
   sources = [ "virtmagma_unit_tests.cc" ]

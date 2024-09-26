@@ -10,9 +10,7 @@ use linux_uapi::{
 };
 use once_cell::sync::OnceCell;
 use range_map::RangeMap;
-use starnix_core::device::kobject::DeviceMetadata;
-use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::device::DeviceOps;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
@@ -40,19 +38,9 @@ pub fn ashmem_device_init(locked: &mut Locked<'_, Unlocked>, system_task: &Curre
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let misc_class =
-        registry.objects.get_or_create_class("misc".into(), registry.objects.virtual_bus());
-    let ashmem_device =
-        registry.register_dyn_chrdev(AshmemDevice::new()).expect("ashmem device register failed.");
-
-    registry.add_device(
-        locked,
-        system_task,
-        "ashmem".into(),
-        DeviceMetadata::new("ashmem".into(), ashmem_device, DeviceMode::Char),
-        misc_class,
-        DeviceDirectory::new,
-    );
+    registry
+        .register_misc_device(locked, system_task, "ashmem".into(), AshmemDevice::new())
+        .expect("can register ashmem");
 }
 
 #[derive(Clone)]

@@ -13,7 +13,7 @@ use futures::stream::{self, BoxStream, StreamExt};
 use std::collections::VecDeque;
 use std::str::Utf8Error;
 use thiserror::Error;
-use zerocopy::{FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, Unaligned};
 use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 mod watcher;
@@ -939,7 +939,7 @@ pub async fn dir_contains_with_timeout(
 /// Returns either an error or a parsed entry for each entry in the supplied buffer (see
 /// read_dirents for the format of this buffer).
 pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentError>> {
-    #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+    #[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
     #[repr(C, packed)]
     struct Dirent {
         /// The inode number of the entry.
@@ -955,7 +955,7 @@ pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentErr
     let mut entries = vec![];
 
     while !buf.is_empty() {
-        let Some((dirent, rest)) = Ref::<_, Dirent>::new_unaligned_from_prefix(buf) else {
+        let Ok((dirent, rest)) = Ref::<_, Dirent>::from_prefix(buf) else {
             entries.push(Err(DecodeDirentError::BufferOverrun));
             return entries;
         };
@@ -1076,7 +1076,7 @@ mod tests {
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
     #[cfg(target_os = "fuchsia")]
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
 
     #[cfg(target_os = "fuchsia")]
     const LONG_DURATION: Duration = Duration::from_seconds(30);
@@ -1778,7 +1778,7 @@ mod tests {
         // in the past.
         let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("could not create proxy");
-        let result = readdir_recursive(&dir, Some(0.nanos()))
+        let result = readdir_recursive(&dir, Some(zx::Duration::from_nanos(0)))
             .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await
             .into_iter()

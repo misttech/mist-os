@@ -17,7 +17,7 @@ use super::{
 use anyhow::Context as _;
 use std::fmt::Debug;
 use std::num::NonZeroU32;
-use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
+use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
 pub(super) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
 pub(super) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
@@ -117,7 +117,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ConditionalNodeMetadata {
     state: le::U32,
@@ -139,7 +139,7 @@ impl Validate for ConditionalNodeMetadata {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ConditionalNodeDatum {
     node_type: le::U32,
@@ -286,7 +286,7 @@ impl<PS: ParseStrategy> Validate for AccessVector<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct AccessVectorMetadata {
     source_type: le::U16,
@@ -322,7 +322,7 @@ pub(super) enum ExtendedPermissions<PS: ParseStrategy> {
     NewType(PS::Output<le::U32>),
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct SpecifiedDriverPermissions {
     specified: u8,
@@ -346,7 +346,7 @@ impl<PS: ParseStrategy> ValidateArray<le::U32, RoleTransition> for RoleTransitio
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct RoleTransition {
     role: le::U32,
@@ -402,7 +402,7 @@ impl<PS: ParseStrategy> ValidateArray<le::U32, RoleAllow> for RoleAllows<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct RoleAllow {
     role: le::U32,
@@ -583,7 +583,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct DeprecatedFilenameTransitionMetadata {
     bit: le::U32,
@@ -692,7 +692,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ContextMetadata {
     user: le::U32,
@@ -784,7 +784,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct PortMetadata {
     protocol: le::U32,
@@ -916,7 +916,7 @@ impl<PS: ParseStrategy> Validate for FsUse<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct FsUseMetadata {
     /// The type of `fs_use` statement.
@@ -1100,7 +1100,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct InfinitiBandEndPortMetadata {
     length: le::U32,
@@ -1260,7 +1260,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct RangeTransitionMetadata {
     source_type: le::U32,

@@ -381,8 +381,9 @@ impl DeviceOps for Device {
         // Unwrap is safe because FrameControl is the correct size.
         const _: () =
             assert!(mem::size_of::<FrameControl>() == 2, "Size of FrameControl is not 2 bytes");
-        let frame_control =
-            zerocopy::Ref::<&[u8], FrameControl>::new(&buffer[0..=1]).unwrap().into_ref();
+        let frame_control = zerocopy::Ref::into_ref(
+            zerocopy::Ref::<&[u8], FrameControl>::from_bytes(&buffer[0..=1]).unwrap(),
+        );
         if frame_control.protected() {
             tx_flags |= fidl_softmac::WlanTxInfoFlags::PROTECTED;
         }

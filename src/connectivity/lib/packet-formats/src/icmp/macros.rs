@@ -22,7 +22,7 @@ macro_rules! impl_icmp_message {
 
             type Code = $code;
 
-            type Body<B: ByteSlice> = $body_type;
+            type Body<B: SplitByteSlice> = $body_type;
 
             const TYPE: <$ip as IcmpIpExt>::IcmpMessageType =
                 impl_icmp_message_inner_message_type!($ip, $msg_variant);
@@ -49,7 +49,7 @@ macro_rules! impl_common_icmp_message {
 
             type Code = $code;
 
-            type Body<B: zerocopy::ByteSlice> = $body_type;
+            type Body<B: zerocopy::SplitByteSlice> = $body_type;
 
             const TYPE: I::IcmpMessageType = I::$icmp_type;
 

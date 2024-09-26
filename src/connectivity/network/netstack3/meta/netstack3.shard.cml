@@ -25,6 +25,15 @@
             ],
         },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            availability: "optional",
+        },
+    ],
     expose: [
         {
             protocol: [

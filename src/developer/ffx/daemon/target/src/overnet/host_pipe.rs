@@ -10,10 +10,11 @@ use compat_info::CompatibilityInfo;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events;
 use ffx_daemon_events::TargetEvent;
+use ffx_ssh::config::SshConfig;
 use ffx_ssh::parse::{
     parse_ssh_output, read_ssh_line, write_ssh_log, HostAddr, ParseSshConnectionError, PipeError,
 };
-use ffx_ssh::ssh::{build_ssh_command_with_ssh_path, SshError};
+use ffx_ssh::ssh::{build_ssh_command_with_ssh_config, SshError};
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use nix::errno::Errno;
 use nix::sys::signal::kill;
@@ -32,6 +33,7 @@ use tokio::io::{copy_buf, BufReader};
 use tokio::process::Child;
 
 const BUFFER_SIZE: usize = 65536;
+const KEEPALIVE_TIMEOUT_CONFIG: &str = "daemon.ssh_keepalive_timeout";
 
 #[derive(Debug)]
 pub struct LogBuffer {
@@ -272,11 +274,7 @@ impl HostPipeChild {
             args.insert(0, "-vv");
         }
 
-        let mut ssh = tokio::process::Command::from(
-            build_ssh_command_with_ssh_path(ssh_path, addr, args)
-                .await
-                .map_err(|e| PipeError::Error(e.to_string()))?,
-        );
+        let mut ssh = get_ssh_command(&ctx, ssh_path, addr, args).await?;
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
 
@@ -417,6 +415,31 @@ impl HostPipeChild {
             },
         ))
     }
+}
+
+async fn get_ssh_command(
+    ctx: &EnvironmentContext,
+    ssh_path: &str,
+    addr: SocketAddr,
+    args: Vec<&str>,
+) -> Result<tokio::process::Command, PipeError> {
+    let mut ssh_config = SshConfig::new()
+        .map_err(|e| PipeError::Error(format!("Could not get default SshConfig: {e}")))?;
+    if let Some(keepalive_timeout) =
+        ctx.query(KEEPALIVE_TIMEOUT_CONFIG).get::<Option<u64>>().map_err(|e| {
+            PipeError::Error(format!("Could not get query {}: {e}", KEEPALIVE_TIMEOUT_CONFIG))
+        })?
+    {
+        ssh_config
+            .set_server_alive_count_max(keepalive_timeout as u16)
+            .map_err(|e| PipeError::Error(format!("Could not set ssh keepalive timeout: {e}")))?;
+    }
+    let ssh = tokio::process::Command::from(
+        build_ssh_command_with_ssh_config(ssh_path, addr, &ssh_config, args)
+            .await
+            .map_err(|e| PipeError::Error(e.to_string()))?,
+    );
+    Ok(ssh)
 }
 
 impl Drop for HostPipeChild {
@@ -869,10 +892,7 @@ mod test {
         assert!(buf.lines().is_empty());
     }
 
-    #[fuchsia::test]
-    async fn test_start_with_failure() {
-        let env = ffx_config::test_init().await.unwrap();
-
+    async fn write_test_ssh_keys(env: &ffx_config::TestEnv) {
         // Set the ssh key paths to something, the contents do no matter for this test.
         env.context
             .query("ssh.pub")
@@ -889,6 +909,12 @@ mod test {
             .set(json!([ssh_priv.to_string_lossy()]))
             .await
             .expect("setting ssh priv key");
+    }
+
+    #[fuchsia::test]
+    async fn test_start_with_failure() {
+        let env = ffx_config::test_init().await.unwrap();
+        write_test_ssh_keys(&env).await;
 
         let target = crate::target::Target::new_with_addrs(
             Some("test_target"),
@@ -919,22 +945,7 @@ mod test {
         fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
             .expect("setting permissions");
 
-        // Set the ssh key paths to something, the contents do no matter for this test.
-        env.context
-            .query("ssh.pub")
-            .level(Some(ConfigLevel::User))
-            .set(json!([env.isolate_root.path().join("test_authorized_keys")]))
-            .await
-            .expect("setting ssh pub key");
-
-        let ssh_priv = env.isolate_root.path().join("test_ed25519_key");
-        fs::write(&ssh_priv, "test-key").expect("writing test key");
-        env.context
-            .query("ssh.priv")
-            .level(Some(ConfigLevel::User))
-            .set(json!([ssh_priv.to_string_lossy()]))
-            .await
-            .expect("setting ssh priv key");
+        write_test_ssh_keys(&env).await;
 
         let target = crate::target::Target::new_with_addrs(
             Some("test_target"),
@@ -966,22 +977,7 @@ mod test {
         fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
             .expect("setting permissions");
 
-        // Set the ssh key paths to something, the contents do no matter for this test.
-        env.context
-            .query("ssh.pub")
-            .level(Some(ConfigLevel::User))
-            .set(json!([env.isolate_root.path().join("test_authorized_keys")]))
-            .await
-            .expect("setting ssh pub key");
-
-        let ssh_priv = env.isolate_root.path().join("test_ed25519_key");
-        fs::write(&ssh_priv, "test-key").expect("writing test key");
-        env.context
-            .query("ssh.priv")
-            .level(Some(ConfigLevel::User))
-            .set(json!([ssh_priv.to_string_lossy()]))
-            .await
-            .expect("setting ssh priv key");
+        write_test_ssh_keys(&env).await;
 
         let target = crate::target::Target::new_with_addrs(
             Some("test_target"),
@@ -1001,5 +997,23 @@ mod test {
         )
         .await
         .expect("host connection");
+    }
+
+    #[fuchsia::test]
+    async fn test_ssh_command_includes_keepalive_timeout() {
+        let env = ffx_config::test_init().await.unwrap();
+        write_test_ssh_keys(&env).await;
+
+        env.context
+            .query(KEEPALIVE_TIMEOUT_CONFIG)
+            .level(Some(ConfigLevel::User))
+            .set(json!(30))
+            .await
+            .expect("setting keepalive timeout key");
+
+        let addr = SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345);
+        let cmd = get_ssh_command(&env.context, "path-to-ssh", addr, vec![]).await.unwrap();
+        // Kind of a hack, but there's no non-debug method that returns a string corresponding to the command.
+        assert!(format!("{cmd:?}").contains("ServerAliveCountMax=30"));
     }
 }

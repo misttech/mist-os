@@ -18,6 +18,7 @@ ffx_plugin("ffx_repository_server_list") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",

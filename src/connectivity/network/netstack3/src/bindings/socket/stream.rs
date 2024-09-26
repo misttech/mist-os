@@ -4,6 +4,7 @@
 
 //! Stream sockets, primarily TCP sockets.
 
+use std::fmt::Debug;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError};
 use std::ops::ControlFlow;
 use std::pin::pin;
@@ -15,26 +16,25 @@ use explicit::ResultExt as _;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, RequestStream as _};
 use fidl::{AsHandleRef as _, HandleBased as _};
 use fuchsia_zircon::{self as zx, Peered as _};
-use futures::future::FusedFuture as _;
-use futures::{FutureExt as _, StreamExt as _};
+use futures::channel::{mpsc, oneshot};
+use futures::FutureExt as _;
 use log::{debug, error};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use net_types::{NonMappedAddr, SpecifiedAddr, ZonedAddr};
 use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::socket::ShutdownType;
 use netstack3_core::tcp::{
-    self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
-    ConnectionError, ConnectionInfo, FragmentedPayload, IntoBuffers, ListenError, ListenerNotifier,
-    NoConnection, OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer,
-    SendBuffer, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes,
-    UnboundInfo,
+    self, AcceptError, BindError, BoundInfo, BufferSizes, ConnectError, ConnectionError,
+    ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
+    OriginalDestinationError, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions,
+    TcpBindingsTypes, UnboundInfo,
 };
 use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_async as fasync,
+    fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
@@ -44,10 +44,14 @@ use crate::bindings::socket::{
 };
 use crate::bindings::util::{
     AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, IntoFidlWithContext as _,
-    NeedsDataNotifier, NeedsDataWatcher, ResultExt as _, TryIntoCoreWithContext,
-    TryIntoFidlWithContext,
+    ResultExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
 };
-use crate::bindings::{trace_duration, BindingsCtx, Ctx};
+use crate::bindings::{BindingsCtx, Ctx};
+
+mod buffer;
+use buffer::{
+    CoreReceiveBuffer, CoreSendBuffer, ReceiveBufferReader, SendBufferWriter, TaskStoppedError,
+};
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
 const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
@@ -56,353 +60,156 @@ const MAX_TCP_KEEPCNT: u8 = 127;
 
 type TcpSocketId<I> = tcp::TcpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
 
-/// Local end of a zircon socket pair which will be later provided to state
-/// machine inside Core.
-#[derive(Debug, Clone)]
-pub(crate) struct LocalZirconSocketAndNotifier(Arc<zx::Socket>, NeedsDataNotifier);
+#[derive(Debug)]
+pub(crate) struct UnconnectedSocketData {
+    zx_socket: Arc<zx::Socket>,
+    rx_task_sender: mpsc::UnboundedSender<ReceiveBufferReader>,
+    tx_task_sender: oneshot::Sender<SendBufferWriter>,
+}
 
-impl IntoBuffers<ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket>
-    for LocalZirconSocketAndNotifier
-{
-    fn into_buffers(
-        self,
-        buffer_sizes: BufferSizes,
-    ) -> (ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket) {
-        let Self(socket, notifier) = self;
+impl IntoBuffers<CoreReceiveBuffer, CoreSendBuffer> for UnconnectedSocketData {
+    fn into_buffers(self, buffer_sizes: BufferSizes) -> (CoreReceiveBuffer, CoreSendBuffer) {
+        let Self { zx_socket, rx_task_sender, tx_task_sender } = self;
         let BufferSizes { send, receive } = buffer_sizes;
-        notifier.schedule();
-        socket
+        zx_socket
             .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
             .expect("failed to signal connection established");
-        (
-            ReceiveBufferWithZirconSocket::new(Arc::clone(&socket), receive),
-            SendBufferWithZirconSocket::new(socket, notifier, send),
-        )
+
+        // If the tasks are stopped and we can't create buffers, create zero
+        // buffers as they'll report a 0 capacity back to TCP.
+        //
+        // We can't assert here since buffer creation on active opens might race
+        // with socket closure which stops the tasks.
+        let receive_buffer = CoreReceiveBuffer::new_ready(rx_task_sender, receive)
+            .unwrap_or_else(|TaskStoppedError| CoreReceiveBuffer::Zero);
+        let (send_buffer, send_writer) = CoreSendBuffer::new_ready(send);
+        let send_buffer = match tx_task_sender.send(send_writer) {
+            Ok(()) => send_buffer,
+            Err(SendBufferWriter { .. }) => CoreSendBuffer::Zero,
+        };
+        (receive_buffer, send_buffer)
     }
 }
 
 /// The peer end of the zircon socket that will later be vended to application,
 /// together with objects that are used to receive signals from application.
 #[derive(Debug)]
-pub(crate) struct PeerZirconSocketAndWatcher {
+pub(crate) struct PeerZirconSocketAndTaskData {
     peer: zx::Socket,
-    watcher: NeedsDataWatcher,
+    spawn_data: TaskSpawnData,
+}
+
+#[derive(Debug)]
+struct TaskSpawnData {
+    rx_task_receiver: mpsc::UnboundedReceiver<ReceiveBufferReader>,
+    tx_task_receiver: oneshot::Receiver<SendBufferWriter>,
     socket: Arc<zx::Socket>,
 }
 
-impl ListenerNotifier for LocalZirconSocketAndNotifier {
+impl ListenerNotifier for UnconnectedSocketData {
     fn new_incoming_connections(&mut self, count: usize) {
-        let Self(socket, _needs_data) = self;
+        let Self { zx_socket, .. } = self;
         let (clear, set) = if count == 0 {
             (ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE)
         } else {
             (zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
         };
 
-        socket.signal_peer(clear, set).expect("failed to signal for available connections")
+        zx_socket.signal_peer(clear, set).expect("failed to signal for available connections")
     }
 }
 
-static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<usize> = Lazy::new(|| {
-    let (local, _peer) = zx::Socket::create_stream();
-    local.info().unwrap().tx_buf_max
-});
-
 impl TcpBindingsTypes for BindingsCtx {
-    type ReceiveBuffer = ReceiveBufferWithZirconSocket;
-    type SendBuffer = SendBufferWithZirconSocket;
-    type ReturnedBuffers = PeerZirconSocketAndWatcher;
-    type ListenerNotifierOrProvidedBuffers = LocalZirconSocketAndNotifier;
+    type ReceiveBuffer = CoreReceiveBuffer;
+    type SendBuffer = CoreSendBuffer;
+    type ReturnedBuffers = PeerZirconSocketAndTaskData;
+    type ListenerNotifierOrProvidedBuffers = UnconnectedSocketData;
 
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,
     ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers) {
         let (local, peer) = zx::Socket::create_stream();
         let socket = Arc::new(local);
-        let notifier = NeedsDataNotifier::default();
-        let watcher = notifier.watcher();
-        let (rbuf, sbuf) =
-            LocalZirconSocketAndNotifier(Arc::clone(&socket), notifier).into_buffers(buffer_sizes);
-        (rbuf, sbuf, PeerZirconSocketAndWatcher { peer, socket, watcher })
+
+        let (rx_task_sender, rx_task_receiver) = mpsc::unbounded();
+        let (tx_task_sender, tx_task_receiver) = oneshot::channel();
+        let (receive_buffer, send_buffer) = UnconnectedSocketData {
+            zx_socket: Arc::clone(&socket),
+            rx_task_sender,
+            tx_task_sender,
+        }
+        .into_buffers(buffer_sizes);
+        let returned_buffers = PeerZirconSocketAndTaskData {
+            peer,
+            spawn_data: TaskSpawnData { socket, tx_task_receiver, rx_task_receiver },
+        };
+        (receive_buffer, send_buffer, returned_buffers)
     }
 
     fn default_buffer_sizes() -> BufferSizes {
-        static RING_BUFFER_DEFAULT_SIZE: Lazy<usize> =
-            Lazy::new(|| RingBuffer::default().target_capacity());
-        BufferSizes { receive: *ZIRCON_SOCKET_BUFFER_SIZE, send: *RING_BUFFER_DEFAULT_SIZE }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ReceiveBufferWithZirconSocket {
-    /// The Zircon socket whose other end is held by the peer.
-    socket: Arc<zx::Socket>,
-    zx_socket_capacity: usize,
-    // Invariant: `out_of_order` can never hold more bytes than
-    // `zx_socket_capacity`.
-    out_of_order: RingBuffer,
-}
-
-impl ReceiveBufferWithZirconSocket {
-    /// The minimum receive buffer size, in bytes.
-    ///
-    /// Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
-    const MIN_CAPACITY: usize = 256;
-
-    fn new(socket: Arc<zx::Socket>, target_capacity: usize) -> Self {
-        let info = socket.info().expect("failed to get socket info");
-        let zx_socket_capacity = info.tx_buf_max;
-        assert!(
-            zx_socket_capacity >= Self::MIN_CAPACITY,
-            "Zircon socket buffer is too small, {} < {}",
-            zx_socket_capacity,
-            Self::MIN_CAPACITY
-        );
-
-        let ring_buffer_size =
-            usize::min(usize::max(target_capacity, Self::MIN_CAPACITY), zx_socket_capacity);
-        let out_of_order = RingBuffer::new(ring_buffer_size);
-        Self { zx_socket_capacity, socket, out_of_order }
-    }
-}
-
-impl Buffer for ReceiveBufferWithZirconSocket {
-    fn capacity_range() -> (usize, usize) {
-        (Self::MIN_CAPACITY, *ZIRCON_SOCKET_BUFFER_SIZE)
-    }
-
-    fn limits(&self) -> BufferLimits {
-        let Self { socket, out_of_order, zx_socket_capacity } = self;
-        let BufferLimits { len: _, capacity: out_of_order_capacity } = out_of_order.limits();
-
-        debug_assert!(
-            *zx_socket_capacity >= out_of_order_capacity,
-            "ring buffer should never be this large; {} > {}",
-            out_of_order_capacity,
-            *zx_socket_capacity
-        );
-
-        let info = socket.as_ref().info().expect("failed to get socket info");
-        let len = info.tx_buf_size;
-        // Ensure that capacity is always at least as large as the length, but
-        // also reflects the requested capacity.
-        let capacity = usize::max(len, out_of_order_capacity);
-        BufferLimits { len, capacity }
-    }
-
-    fn target_capacity(&self) -> usize {
-        let Self { socket: _, zx_socket_capacity: _, out_of_order } = self;
-        out_of_order.target_capacity()
-    }
-
-    fn request_capacity(&mut self, size: usize) {
-        let Self { zx_socket_capacity, socket: _, out_of_order } = self;
-        let ring_buffer_size =
-            usize::min(usize::max(size, Self::MIN_CAPACITY), *zx_socket_capacity);
-
-        out_of_order.set_target_size(ring_buffer_size);
-    }
-}
-
-impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
-    fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
-        self.out_of_order.write_at(offset, data)
-    }
-
-    fn make_readable(&mut self, count: usize) {
-        self.out_of_order.make_readable(count);
-        let mut shut_rd = false;
-        let nread = self.out_of_order.read_with(|avail| {
-            let mut total = 0;
-            for chunk in avail {
-                trace_duration!(c"zx::Socket::write");
-                let written = match self.socket.as_ref().write(*chunk) {
-                    Ok(n) => n,
-                    Err(zx::Status::BAD_STATE | zx::Status::PEER_CLOSED) => {
-                        // These two status codes correspond two possible cases
-                        // where the socket has been shutdown for read:
-                        //   - BAD_STATE, the application has called `shutdown`,
-                        //     but fido is still holding onto the peer socket.
-                        //   - PEER_CLOSED, the application has called `close`,
-                        //     or the socket is implicitly closed because the
-                        //     application exits, fido is no longer holding onto
-                        //     the peer socket, nor do we hold it in our
-                        //     `SocketWorker` as it gets dropped after serving
-                        //     the last request.
-                        // In either case, we just discard the incoming bytes.
-                        shut_rd = true;
-                        return total;
-                    }
-                    Err(err) => panic!("failed to write into the zircon socket: {:?}", err),
-                };
-                assert_eq!(written, chunk.len());
-                total += chunk.len();
-            }
-            total
+        static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<usize> = Lazy::new(|| {
+            let (local, _peer) = zx::Socket::create_stream();
+            local.info().unwrap().tx_buf_max
         });
-        // TODO(https://fxbug.dev/42063684): Instead of inferring the state in
-        // Bindings, we can reclaim the memory more promptly by teaching Core
-        // about SHUT_RD.
-        if shut_rd {
-            let BufferLimits { len: _, capacity } = self.out_of_order.limits();
-            if capacity != 0 {
-                self.out_of_order = RingBuffer::new(0);
-            }
-            return;
-        }
-        assert_eq!(count, nread);
-    }
-}
-
-impl Drop for ReceiveBufferWithZirconSocket {
-    fn drop(&mut self) {
-        // Make sure the FDIO is aware that we are not writing anymore so that
-        // it can transition into the right state.
-        self.socket
-            .set_disposition(
-                /* disposition */ Some(zx::SocketWriteDisposition::Disabled),
-                /* peer_disposition */ None,
-            )
-            .expect("failed to set socket disposition");
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct SendBufferWithZirconSocket {
-    zx_socket_capacity: usize,
-    socket: Arc<zx::Socket>,
-    ready_to_send: RingBuffer,
-    notifier: NeedsDataNotifier,
-}
-
-impl Buffer for SendBufferWithZirconSocket {
-    fn capacity_range() -> (usize, usize) {
-        (Self::MIN_CAPACITY, Self::MAX_CAPACITY)
-    }
-
-    fn limits(&self) -> BufferLimits {
-        let Self { zx_socket_capacity, socket, ready_to_send, notifier } = self;
-        let info = socket.info().expect("failed to get socket info");
-
-        let BufferLimits { capacity: ready_to_send_capacity, len: ready_to_send_len } =
-            ready_to_send.limits();
-        let len = info.rx_buf_size + ready_to_send_len;
-        let capacity = *zx_socket_capacity + ready_to_send_capacity;
-
-        // Core checks for limits whenever `tcp::do_send` is hit. If it sees
-        // that there's no data in the send buffer, it'll end its attempt to
-        // send so we must make sure the watcher in the send task is hit when we
-        // observe zero bytes on the zircon socket from here.
-        if len == 0 {
-            notifier.schedule();
-        }
-        BufferLimits { capacity, len }
-    }
-
-    fn target_capacity(&self) -> usize {
-        let Self { zx_socket_capacity, socket: _, ready_to_send, notifier: _ } = self;
-        *zx_socket_capacity + ready_to_send.target_capacity()
-    }
-
-    fn request_capacity(&mut self, size: usize) {
-        let ring_buffer_size = usize::min(usize::max(size, Self::MIN_CAPACITY), Self::MAX_CAPACITY);
-
-        let Self { zx_socket_capacity: _, notifier: _, ready_to_send, socket: _ } = self;
-
-        ready_to_send.set_target_size(ring_buffer_size);
-
-        // Eagerly pull more data out of the Zircon socket into the ring buffer.
-        self.poll()
-    }
-}
-
-impl SendBufferWithZirconSocket {
-    /// The minimum send buffer size, in bytes.
-    ///
-    /// Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
-    const MIN_CAPACITY: usize = 2048;
-    /// The maximum send buffer size in bytes.
-    ///
-    /// 4MiB was picked to match Linux's behavior.
-    const MAX_CAPACITY: usize = 1 << 22;
-
-    fn new(socket: Arc<zx::Socket>, notifier: NeedsDataNotifier, target_capacity: usize) -> Self {
-        let ring_buffer_size =
-            usize::min(usize::max(target_capacity, Self::MIN_CAPACITY), Self::MAX_CAPACITY);
-        let ready_to_send = RingBuffer::new(ring_buffer_size);
-        let info = socket.info().expect("failed to get socket info");
-        let zx_socket_capacity = info.rx_buf_max;
-        Self { zx_socket_capacity, socket, ready_to_send, notifier }
-    }
-
-    fn poll(&mut self) {
-        let want_bytes = {
-            let BufferLimits { len, capacity } = self.ready_to_send.limits();
-            capacity - len
-        };
-        if want_bytes == 0 {
-            return;
-        }
-        let write_result =
-            self.ready_to_send.writable_regions().into_iter().try_fold(0, |acc, b| {
-                trace_duration!(c"zx::Socket::read");
-                match self.socket.read(b) {
-                    Ok(n) => {
-                        if n == b.len() {
-                            ControlFlow::Continue(acc + n)
-                        } else {
-                            ControlFlow::Break(acc + n)
-                        }
-                    }
-                    Err(
-                        zx::Status::SHOULD_WAIT | zx::Status::PEER_CLOSED | zx::Status::BAD_STATE,
-                    ) => ControlFlow::Break(acc),
-                    Err(e) => panic!("failed to read from the zircon socket: {:?}", e),
-                }
-            });
-        let (ControlFlow::Continue(bytes_written) | ControlFlow::Break(bytes_written)) =
-            write_result;
-
-        self.ready_to_send.make_readable(bytes_written);
-        if bytes_written < want_bytes {
-            debug_assert!(write_result.is_break());
-            self.notifier.schedule();
-        }
-    }
-}
-
-impl SendBuffer for SendBufferWithZirconSocket {
-    type Payload<'a> = FragmentedPayload<'a, 2>;
-
-    fn mark_read(&mut self, count: usize) {
-        self.ready_to_send.mark_read(count);
-        self.poll()
-    }
-
-    fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
-    where
-        F: FnOnce(FragmentedPayload<'a, 2>) -> R,
-    {
-        self.poll();
-        let Self { ready_to_send, zx_socket_capacity: _, notifier: _, socket: _ } = self;
-        // Since the reported readable bytes length includes the bytes in
-        // `socket`, a reasonable caller could try to peek at those. Since only
-        // the bytes in `ready_to_send` are peekable, don't pass through a
-        // request that would result in an out-of-bounds peek.
-        let BufferLimits { len, capacity: _ } = ready_to_send.limits();
-        if offset >= len {
-            f(FragmentedPayload::new_empty())
-        } else {
-            ready_to_send.peek_with(offset, f)
-        }
+        BufferSizes { receive: *ZIRCON_SOCKET_BUFFER_SIZE, send: *ZIRCON_SOCKET_BUFFER_SIZE }
     }
 }
 
 struct BindingData<I: IpExt> {
     id: TcpSocketId<I>,
     peer: zx::Socket,
-    local_socket_and_watcher: Option<(Arc<zx::Socket>, NeedsDataWatcher)>,
-    send_task_abort: Option<futures::channel::oneshot::Sender<()>>,
+    task_data: Option<TaskSpawnData>,
+    task_control: Option<TaskControl>,
+}
+
+#[derive(Debug)]
+struct TaskControl {
+    abort_handle: async_utils::event::Event,
+    send_shutdown: Option<oneshot::Sender<oneshot::Sender<()>>>,
+}
+
+impl TaskControl {
+    /// Shuts down the send task if it's still running, which flushes all the
+    /// pending bytes from the zircon socket into the core send buffer.
+    ///
+    /// Only returns when all the pending bytes are available to core.
+    ///
+    /// This function is very permissive with errors since shutdown might be
+    /// called multiple times and it could be racing with the send task, what
+    /// matters is that _when the send task is running_ all the bytes are
+    /// flushed properly and we properly synchronize on it.
+    async fn shutdown_send(&mut self) {
+        let Some(signal) = self.send_shutdown.take() else {
+            // Shutdown already called, do nothing.
+            return;
+        };
+        let (sender, receiver) = oneshot::channel();
+        match signal.send(sender) {
+            Ok(()) => {}
+            Err(_sender) => {
+                // Send task already dropped its shutdown listener so it must be
+                // shutting down already.
+                return;
+            }
+        }
+        match receiver.await {
+            Ok(()) => {}
+            Err(oneshot::Canceled) => {
+                // Race with send task finishing for other reasons, zircon
+                // socket must've been flushed already or connection was dropped
+                // from the peer side.
+            }
+        }
+    }
+
+    async fn shutdown_send_and_stop_tasks(mut self) {
+        self.shutdown_send().await;
+        let Self { abort_handle, send_shutdown } = self;
+        // Must've been handled by shutdown_send.
+        assert!(send_shutdown.is_none());
+        // Assert that event has not been signaled yet.
+        assert!(abort_handle.signal());
+    }
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -414,11 +221,21 @@ where
         let (local, peer) = zx::Socket::create_stream();
         let local = Arc::new(local);
         let SocketWorkerProperties {} = properties;
-        let notifier = NeedsDataNotifier::default();
-        let watcher = notifier.watcher();
-        let id =
-            ctx.api().tcp::<I>().create(LocalZirconSocketAndNotifier(Arc::clone(&local), notifier));
-        Self { id, peer, local_socket_and_watcher: Some((local, watcher)), send_task_abort: None }
+
+        let (rx_task_sender, rx_task_receiver) = mpsc::unbounded();
+        let (tx_task_sender, tx_task_receiver) = oneshot::channel();
+
+        let id = ctx.api().tcp::<I>().create(UnconnectedSocketData {
+            zx_socket: Arc::clone(&local),
+            tx_task_sender,
+            rx_task_sender,
+        });
+        Self {
+            id,
+            peer,
+            task_data: Some(TaskSpawnData { socket: local, tx_task_receiver, rx_task_receiver }),
+            task_control: None,
+        }
     }
 }
 
@@ -450,40 +267,34 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
         match args {
             InitialSocketState::Unbound => (),
             InitialSocketState::Connected => {
-                let Self { id, peer: _, local_socket_and_watcher, send_task_abort } = self;
-                let (socket, watcher) = local_socket_and_watcher
-                    .take()
-                    .expect("connected socket did not provide socket and watcher");
-                let sender = spawn_send_task(
-                    ctx.clone(),
-                    socket,
-                    watcher,
-                    id.clone(),
-                    &spawners.socket_scope,
-                );
-                assert_matches::assert_matches!(send_task_abort.replace(sender), None);
+                let Self { id, peer: _, task_data, task_control } = self;
+                let task_data =
+                    task_data.take().expect("connected socket did not provide socket and watcher");
+                let control =
+                    spawn_tasks(ctx.clone(), id.clone(), task_data, &spawners.socket_scope);
+                assert_matches::assert_matches!(task_control.replace(control), None);
             }
         }
     }
 
-    fn handle_request(
+    async fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
         spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
-        RequestHandler { ctx, data: self }.handle_request(request, spawners)
+        RequestHandler { ctx, data: self }.handle_request(request, spawners).await
     }
 
     async fn close(self, ctx: &mut Ctx) {
-        let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
-        ctx.api().tcp().close(id);
-        if let Some(send_task_abort) = send_task_abort {
-            // Signal the task to stop but drop the canceled error. The data
-            // notifier might have been closed in `close` or due to state
-            // machine progression.
-            send_task_abort.send(()).unwrap_or_else(|()| ());
+        let Self { id, peer: _, task_data: _, task_control } = self;
+        // We must shutdown the sender side before calling close so all the
+        // pending bytes in the zircon socket are flushed and available to core
+        // during the close procedure.
+        if let Some(task_control) = task_control {
+            task_control.shutdown_send_and_stop_tasks().await;
         }
+        ctx.api().tcp().close(id);
     }
 }
 
@@ -602,62 +413,41 @@ impl IntoErrno for OriginalDestinationError {
     }
 }
 
-/// Spawns a task that sends more data from the `socket` each time we observe
-/// a wakeup through the `watcher`.
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-fn spawn_send_task<I: IpExt>(
-    mut ctx: crate::bindings::Ctx,
-    socket: Arc<zx::Socket>,
-    mut watcher: NeedsDataWatcher,
+fn spawn_tasks<I: IpExt>(
+    ctx: crate::bindings::Ctx,
     id: TcpSocketId<I>,
+    data: TaskSpawnData,
     spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
-) -> futures::channel::oneshot::Sender<()> {
-    let (sender, abort) = futures::channel::oneshot::channel();
-    let abort = abort.map(|r| r.expect("send task abort dropped without signaling"));
-    let watch_fut = async move {
-        let mut signals = futures::future::OptionFuture::default();
-        loop {
-            let mut watcher_next = watcher.next().fuse();
+) -> TaskControl {
+    let TaskSpawnData { socket, rx_task_receiver, tx_task_receiver } = data;
+    let event = async_utils::event::Event::new();
 
-            // NB: Extract work out of the select macro because rustfmt
-            // doesn't like it.
-            enum Work {
-                Watcher(Option<()>),
-                Signals(zx::Signals),
-            }
-            let work = futures::select! {
-                w = watcher_next => Work::Watcher(w),
-                s = signals => {
-                    Work::Signals(s.expect("OptionFuture is only selected when non-empty"))
-                }
-            };
-            match work {
-                Work::Watcher(Some(())) => {
-                    // Only create a new signals wait if it's already
-                    // terminated, otherwise it means this is a spurious wakeup.
-                    if signals.is_terminated() {
-                        signals = Some(
-                            fasync::OnSignals::new(&*socket, zx::Signals::SOCKET_READABLE)
-                                .map(|r| r.expect("failed to observe signals on zircon socket")),
-                        )
-                        .into()
-                    }
-                }
-                Work::Watcher(None) => break,
-                Work::Signals(observed) => {
-                    assert!(observed.contains(zx::Signals::SOCKET_READABLE));
-                    ctx.api().tcp().do_send(&id);
-                }
-            }
-        }
-    };
+    let event_wait = event.wait();
+    let (send_shutdown, send_shutdown_receiver) = oneshot::channel();
+    let send_task = buffer::send_task(
+        socket.clone(),
+        buffer::SendTaskArgs { ctx: ctx.clone(), id: id.clone() },
+        send_shutdown_receiver,
+        tx_task_receiver,
+    );
     spawner.spawn(async move {
-        let watch_fut = pin!(watch_fut);
-        futures::future::select(watch_fut, abort)
+        let send_task = pin!(send_task);
+        futures::future::select(send_task, event_wait)
             .map(|_: futures::future::Either<((), _), ((), _)>| ())
             .await;
     });
-    sender
+
+    let event_wait = event.wait();
+    let receive_task =
+        buffer::receive_task(socket, buffer::ReceiveTaskArgs { ctx, id }, rx_task_receiver);
+    spawner.spawn(async move {
+        let receive_task = pin!(receive_task);
+        futures::future::select(receive_task, event_wait)
+            .map(|_: futures::future::Either<((), _), ((), _)>| ())
+            .await;
+    });
+    TaskControl { abort_handle: event, send_shutdown: Some(send_shutdown) }
 }
 
 struct RequestHandler<'a, I: IpExt> {
@@ -668,10 +458,7 @@ struct RequestHandler<'a, I: IpExt> {
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
         let (addr, port) =
             addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
@@ -684,19 +471,16 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         addr: fnet::SocketAddress,
         spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     ) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control }, ctx } = self;
 
         let addr = I::SocketAddress::from_sock_addr(addr)?;
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
         ctx.api().tcp().connect(id, ip, port).map_err(IntoErrno::into_errno)?;
-        if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
-            let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, id.clone(), spawner);
-            assert_matches::assert_matches!(send_task_abort.replace(sender), None);
+        if let Some(task_data) = self.data.task_data.take() {
+            let control = spawn_tasks::<I>(ctx.clone(), id.clone(), task_data, spawner);
+            assert_matches::assert_matches!(task_control.replace(control), None);
             Err(fposix::Errno::Einprogress)
         } else {
             Ok(())
@@ -704,10 +488,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         // The POSIX specification for `listen` [1] says
         //
         //   If listen() is called with a backlog argument value that is
@@ -735,10 +516,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let fidl = match ctx.api().tcp().get_info(id) {
             SocketInfo::Unbound(UnboundInfo { device: _ }) => {
                 Ok(<<I as IpSockAddrExt>::SocketAddress as SockAddr>::UNSPECIFIED)
@@ -755,10 +533,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         match ctx.api().tcp().get_info(id) {
             SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
             SocketInfo::Connection(info) => Ok({
@@ -778,17 +553,14 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         (Option<fnet::SocketAddress>, ClientEnd<fposix_socket::StreamSocketMarker>),
         fposix::Errno,
     > {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
 
         let (accepted, addr, peer) = ctx.api().tcp().accept(id).map_err(IntoErrno::into_errno)?;
         let addr = addr
             .map_zone(AllowBindingIdFromWeak)
             .into_fidl_with_ctx(ctx.bindings_ctx())
             .into_sock_addr();
-        let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
+        let PeerZirconSocketAndTaskData { peer, spawn_data } = peer;
         let (client, request_stream) = crate::bindings::socket::create_request_stream();
         peer.signal_handle(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
             .expect("failed to signal connection established");
@@ -797,34 +569,41 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             accepted,
             peer,
             request_stream,
-            socket,
-            watcher,
+            spawn_data,
             spawner,
         );
         Ok((want_addr.then_some(addr), client))
     }
 
     fn get_error(self) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         match ctx.api().tcp().get_socket_error(id) {
             Some(err) => Err(err.into_errno()),
             None => Ok(()),
         }
     }
 
-    fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+    async fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
+        let Self { data: BindingData { id, peer, task_data: _, task_control }, ctx } = self;
         let shutdown_recv = mode.contains(fposix_socket::ShutdownMode::READ);
         let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
         let shutdown_type = ShutdownType::from_send_receive(shutdown_send, shutdown_recv)
             .ok_or(fposix::Errno::Einval)?;
-        let is_conn = ctx.api().tcp().shutdown(id, shutdown_type).map_err(IntoErrno::into_errno)?;
+
+        // If shutdown send is requested and we have spawned tasks, then we must
+        // call shutdown send. This is valid because the only error possible
+        // here is NoConnection as shown by the match below, in which case the
+        // send task would either be done already or never spawned which means
+        // we can't get here.
+        if let (true, Some(task_control)) = (shutdown_send, task_control.as_mut()) {
+            task_control.shutdown_send().await;
+        }
+
+        let is_conn = ctx
+            .api()
+            .tcp()
+            .shutdown(id, shutdown_type)
+            .map_err(|e @ NoConnection| e.into_errno())?;
         if is_conn {
             let peer_disposition = shutdown_send.then_some(zx::SocketWriteDisposition::Disabled);
             let my_disposition = shutdown_recv.then_some(zx::SocketWriteDisposition::Disabled);
@@ -835,10 +614,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn set_bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let device = device
             .map(|name| {
                 ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
@@ -849,10 +625,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn bind_to_device_index(self, device: u64) -> Result<(), fposix::Errno> {
-        let Self {
-            ctx,
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-        } = self;
+        let Self { ctx, data: BindingData { id, peer: _, task_data: _, task_control: _ } } = self;
 
         // If `device` is 0, then this will clear the bound device.
         let device: Option<DeviceId<_>> = NonZeroU64::new(device)
@@ -863,20 +636,14 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn set_send_buffer_size(self, new_size: u64) {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         ctx.api().tcp().set_send_buffer_size(id, new_size);
     }
 
     fn send_buffer_size(self) -> u64 {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         ctx.api()
             .tcp()
             .send_buffer_size(id)
@@ -889,20 +656,14 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn set_receive_buffer_size(self, new_size: u64) {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         ctx.api().tcp().set_receive_buffer_size(id, new_size);
     }
 
     fn receive_buffer_size(self) -> u64 {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         ctx.api()
             .tcp()
             .receive_buffer_size(id)
@@ -915,18 +676,12 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         ctx.api().tcp().set_reuseaddr(id, value).map_err(IntoErrno::into_errno)
     }
 
     fn reuse_address(self) -> bool {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         ctx.api().tcp().reuseaddr(id)
     }
 
@@ -995,7 +750,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     /// If `Some(stream)` is returned in the `Continue` case, `stream` is a new
     /// stream of events that should be polled concurrently with the parent
     /// stream.
-    fn handle_request(
+    async fn handle_request(
         self,
         request: fposix_socket::StreamSocketRequest,
         spawners: &worker::TaskSpawnerCollection<crate::bindings::util::TaskWaitGroupSpawner>,
@@ -1003,10 +758,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         fposix_socket::StreamSocketCloseResponder,
         Option<fposix_socket::StreamSocketRequestStream>,
     > {
-        let Self {
-            data: BindingData { id: _, peer, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx: _,
-        } = self;
+        let Self { data: BindingData { id: _, peer, task_data: _, task_control: _ }, ctx: _ } =
+            self;
         match request {
             fposix_socket::StreamSocketRequest::Bind { addr, responder } => {
                 responder.send(self.bind(addr)).unwrap_or_log("failed to respond");
@@ -1174,7 +927,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Shutdown { mode, responder } => {
-                responder.send(self.shutdown(mode)).unwrap_or_log("failed to respond");
+                responder.send(self.shutdown(mode).await).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
                 debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
@@ -1548,18 +1301,12 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     }
 
     fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(self, f: F) -> R {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         ctx.api().tcp().with_socket_options_mut(id, f)
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
-        let Self {
-            data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
-            ctx,
-        } = self;
+        let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         ctx.api().tcp().with_socket_options(id, f)
     }
 }
@@ -1570,8 +1317,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     accepted: TcpSocketId<I>,
     peer: zx::Socket,
     request_stream: fposix_socket::StreamSocketRequestStream,
-    local_socket: Arc<zx::Socket>,
-    watcher: NeedsDataWatcher,
+    task_data: TaskSpawnData,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) {
     spawner.spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
@@ -1579,8 +1325,8 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
         move |_: &mut Ctx, SocketWorkerProperties {}| BindingData {
             id: accepted,
             peer,
-            local_socket_and_watcher: Some((local_socket, watcher)),
-            send_task_abort: None,
+            task_data: Some(task_data),
+            task_control: None,
         },
         SocketWorkerProperties {},
         request_stream,
@@ -1603,193 +1349,5 @@ where
     ) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
         let Self { ip, port } = self;
         Ok((ip, port).try_into_fidl_with_ctx(ctx)?)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use test_case::test_case;
-
-    use super::*;
-
-    const TEST_BYTES: &'static [u8] = b"Hello";
-
-    #[test]
-    fn receive_buffer() {
-        let (local, peer) = zx::Socket::create_stream();
-        let mut rbuf = ReceiveBufferWithZirconSocket::new(Arc::new(local), u16::MAX as usize);
-        assert_eq!(rbuf.write_at(0, &TEST_BYTES), TEST_BYTES.len());
-        assert_eq!(rbuf.write_at(TEST_BYTES.len() * 2, &TEST_BYTES), TEST_BYTES.len());
-        assert_eq!(rbuf.write_at(TEST_BYTES.len(), &TEST_BYTES), TEST_BYTES.len());
-        rbuf.make_readable(TEST_BYTES.len() * 3);
-        let mut buf = [0u8; TEST_BYTES.len() * 3];
-        assert_eq!(rbuf.limits().len, TEST_BYTES.len() * 3);
-        assert_eq!(peer.read(&mut buf), Ok(TEST_BYTES.len() * 3));
-        assert_eq!(&buf, b"HelloHelloHello");
-    }
-
-    #[test]
-    fn send_buffer() {
-        let (local, peer) = zx::Socket::create_stream();
-        let notifier = NeedsDataNotifier::default();
-        let mut sbuf =
-            SendBufferWithZirconSocket::new(Arc::new(local), notifier, u16::MAX as usize);
-        assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
-        assert_eq!(sbuf.limits().len, TEST_BYTES.len());
-        sbuf.peek_with(0, |avail| {
-            assert_eq!(avail, FragmentedPayload::new_contiguous(TEST_BYTES));
-        });
-        assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
-        assert_eq!(sbuf.limits().len, TEST_BYTES.len() * 2);
-        sbuf.mark_read(TEST_BYTES.len());
-        assert_eq!(sbuf.limits().len, TEST_BYTES.len());
-        sbuf.peek_with(0, |avail| {
-            assert_eq!(avail, FragmentedPayload::new_contiguous(TEST_BYTES));
-        });
-    }
-
-    #[test_case(0, SendBufferWithZirconSocket::MIN_CAPACITY; "below min")]
-    #[test_case(1 << 16, 1 << 16; "in range")]
-    #[test_case(1 << 32, SendBufferWithZirconSocket::MAX_CAPACITY; "above max")]
-    fn send_buffer_limits(target: usize, expected: usize) {
-        let (local, _peer) = zx::Socket::create_stream();
-        let notifier = NeedsDataNotifier::default();
-        let sbuf = SendBufferWithZirconSocket::new(Arc::new(local), notifier, target);
-        let ring_buffer_capacity = sbuf.limits().capacity - sbuf.socket.info().unwrap().rx_buf_max;
-        assert_eq!(ring_buffer_capacity, expected)
-    }
-
-    #[test]
-    fn send_buffer_peek_past_ring_buffer() {
-        let (local, peer) = zx::Socket::create_stream();
-        let mut sbuf = SendBufferWithZirconSocket::new(
-            Arc::new(local),
-            NeedsDataNotifier::default(),
-            SendBufferWithZirconSocket::MIN_CAPACITY,
-        );
-
-        // Fill the send buffer up completely.
-        const BYTES: [u8; 1024] = [1; 1024];
-        loop {
-            match peer.write(&BYTES) {
-                Ok(0) | Err(zx::Status::SHOULD_WAIT) => break,
-                Ok(_) => sbuf.poll(),
-                Err(e) => panic!("couldn't write: {:?}", e),
-            }
-        }
-
-        assert!(
-            sbuf.limits().len > SendBufferWithZirconSocket::MIN_CAPACITY,
-            "len includes zx socket"
-        );
-
-        // Peeking past the end of the ring buffer should not cause a crash.
-        sbuf.peek_with(SendBufferWithZirconSocket::MIN_CAPACITY, |payload| {
-            assert_eq!(payload, FragmentedPayload::new_empty())
-        })
-    }
-
-    const LARGE_PAYLOAD: [u8; 1 << 12] = [b'a'; 1 << 12];
-
-    /// Fills up the ring buffer and zircon socket.
-    fn fill(peer: &zx::Socket, sbuf: &mut SendBufferWithZirconSocket) {
-        while peer.write(&LARGE_PAYLOAD[..]).is_ok_and(|l| l == LARGE_PAYLOAD.len()) {
-            sbuf.poll();
-        }
-    }
-
-    #[test]
-    fn send_buffer_resize_empties_zircon_socket() {
-        // Regression test for https://fxbug.dev/42070294.
-        let (local, peer) = zx::Socket::create_stream();
-        let notifier = NeedsDataNotifier::default();
-        let mut sbuf = SendBufferWithZirconSocket::new(
-            Arc::new(local),
-            notifier,
-            SendBufferWithZirconSocket::MIN_CAPACITY,
-        );
-
-        // Fill up the ring buffer and zircon socket.
-        fill(&peer, &mut sbuf);
-
-        sbuf.request_capacity(SendBufferWithZirconSocket::MIN_CAPACITY + TEST_BYTES.len());
-        assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
-    }
-
-    #[test]
-    fn send_buffer_resize_down_capacity() {
-        // Regression test for https://fxbug.dev/42072481.
-        let (local, peer) = zx::Socket::create_stream();
-        let notifier = NeedsDataNotifier::default();
-        let mut sbuf = SendBufferWithZirconSocket::new(
-            Arc::new(local),
-            notifier,
-            SendBufferWithZirconSocket::MAX_CAPACITY,
-        );
-
-        // Fill up the ring buffer and zircon socket.
-        fill(&peer, &mut sbuf);
-
-        // Request a shrink of the send buffer.
-        let capacity_before = sbuf.limits().capacity;
-        sbuf.request_capacity(SendBufferWithZirconSocket::MIN_CAPACITY);
-
-        // Empty out the ring buffer and zircon socket by reading from them.
-        while {
-            let len = sbuf.peek_with(0, |payload| payload.len());
-            sbuf.mark_read(len);
-            len != 0
-        } {}
-
-        let capacity = sbuf.limits().capacity;
-        // The requested capacity isn't directly reflected in `cap` but we can
-        // assert that its change is equal to the requested change.
-        const EXPECTED_CAPACITY_DECREASE: usize =
-            SendBufferWithZirconSocket::MAX_CAPACITY - SendBufferWithZirconSocket::MIN_CAPACITY;
-        assert_eq!(
-            capacity,
-            capacity_before - EXPECTED_CAPACITY_DECREASE,
-            "capacity_before: {}, expected decrease: {}",
-            capacity_before,
-            EXPECTED_CAPACITY_DECREASE
-        );
-
-        // The socket's capacity is a measure of how many readable bytes it can
-        // hold. If the socket is implemented correctly, this loop will continue
-        // until the send buffer's ring buffer is full and the socket buffer is
-        // full, then exit.
-        while sbuf.limits().len < capacity {
-            let _: usize = peer.write(&LARGE_PAYLOAD[..]).expect("can write");
-            sbuf.poll();
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn send_buffer_installs_notifier_on_empty_limits_check() {
-        let (local, peer) = zx::Socket::create_stream();
-        let notifier = NeedsDataNotifier::default();
-        let mut watcher = notifier.watcher();
-        let sbuf = SendBufferWithZirconSocket::new(
-            Arc::new(local),
-            notifier,
-            SendBufferWithZirconSocket::MAX_CAPACITY,
-        );
-        // Watcher starts without pending data.
-        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Pending);
-
-        // Check initial limits, there's no data and the watcher should be
-        // asserted once.
-        let BufferLimits { len, capacity: _ } = sbuf.limits();
-        assert_eq!(len, 0);
-        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Ready(Some(())));
-        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Pending);
-
-        // Send data from the peer. Limits returns the available data and
-        // doesn't wake the watcher.
-        let peer_data = [1, 2, 3, 4];
-        assert_eq!(peer.write(&peer_data[..]).expect("write to peer"), peer_data.len());
-        let BufferLimits { len, capacity: _ } = sbuf.limits();
-        assert_eq!(len, peer_data.len());
-        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Pending);
     }
 }

@@ -118,6 +118,7 @@ impl Closed<Initial> {
             delayed_ack: _,
             fin_wait2_timeout: _,
             max_syn_retries,
+            ip_options: _,
         }: &SocketOptions,
     ) -> (SynSent<I, ActiveOpen>, Segment<()>) {
         let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
@@ -936,6 +937,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             delayed_ack: _,
             fin_wait2_timeout: _,
             max_syn_retries: _,
+            ip_options: _,
         }: &SocketOptions,
     ) -> Option<Segment<S::Payload<'_>>> {
         let Self {
@@ -1700,6 +1702,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             delayed_ack,
             fin_wait2_timeout,
             max_syn_retries: _,
+            ip_options: _,
         }: &SocketOptions,
         defunct: bool,
     ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>, DataAcked)
@@ -2115,7 +2118,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             });
                         let nwritten = rcv.buffer.write_at(offset, &data);
                         let readable = rcv.assembler.insert(seg_seq..seg_seq + nwritten);
-                        rcv.buffer.make_readable(readable);
+                        rcv.buffer.make_readable(readable, rcv.assembler.has_outstanding());
                         rcv_nxt = rcv.nxt();
                     }
                     // Per RFC 5681 Section 4.2:
@@ -2391,6 +2394,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             delayed_ack: _,
             fin_wait2_timeout: _,
             max_syn_retries: _,
+            ip_options: _,
         }: &SocketOptions,
     ) -> bool {
         let timed_out = match self {
@@ -2855,7 +2859,7 @@ mod test {
             let mut buffer = RingBuffer::new(cap);
             let nwritten = buffer.write_at(0, &data);
             assert_eq!(nwritten, data.len());
-            buffer.make_readable(nwritten);
+            buffer.make_readable(nwritten, false);
             buffer
         }
     }
@@ -2885,8 +2889,9 @@ mod test {
             0
         }
 
-        fn make_readable(&mut self, count: usize) {
+        fn make_readable(&mut self, count: usize, has_outstanding: bool) {
             assert_eq!(count, 0);
+            assert_eq!(has_outstanding, false);
         }
     }
 

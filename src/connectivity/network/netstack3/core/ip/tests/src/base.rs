@@ -59,7 +59,7 @@ use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
     FragmentTimerId, IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus,
-    Ipv6PresentAddressStatus, NextHop, RawMetric, ReceivePacketAction, ResolveRouteError,
+    Ipv6PresentAddressStatus, Marks, NextHop, RawMetric, ReceivePacketAction, ResolveRouteError,
     ResolvedRoute, RoutableIpAddr,
 };
 
@@ -1889,6 +1889,7 @@ fn do_route_lookup<I: IpExt>(
         local_ip,
         dest_ip,
         transparent,
+        &Marks::default(),
     )
     // Convert device IDs in any route so it's easier to compare.
     .map(|ResolvedRoute { src_addr, device, local_delivery_device, next_hop }| {

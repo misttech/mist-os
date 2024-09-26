@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 declare_args() {
@@ -204,7 +205,7 @@ metrics_registry("testapp_metrics_registry") {
   generate_binarypb = true
 }
 
-executable("cobalt_app_unittests") {
+cc_test_executable("cobalt_app_unittests") {
   testonly = true
   sources = [
     "aggregate_and_upload_impl_test.cc",

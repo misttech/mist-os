@@ -6,10 +6,8 @@ use crate::arch::vdso::VDSO_SIGRETURN_NAME;
 use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
-use fuchsia_runtime::{UtcTime, UtcTimeline};
-use fuchsia_zircon::{
-    ClockTransformation, {self as zx},
-};
+use fuchsia_runtime::{UtcClockTransform, UtcTime};
+use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use process_builder::elf_parse;
 use starnix_uapi::errors::Errno;
@@ -60,9 +58,9 @@ impl MemoryMappedVvar {
         vvar_data
     }
 
-    pub fn update_utc_data_transform(&self, new_transform: &ClockTransformation<UtcTimeline>) {
+    pub fn update_utc_data_transform(&self, new_transform: &UtcClockTransform) {
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
-        let old_transform = ClockTransformation {
+        let old_transform = UtcClockTransform {
             reference_offset: zx::MonotonicTime::from_nanos(
                 vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
             ),

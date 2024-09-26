@@ -21,7 +21,7 @@ use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::{mpsc, Arc};
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -193,6 +193,8 @@ fn create_test_init_task(
         &[],
     )
     .expect("failed to create first task");
+    init_task.mm().initialize_mmap_layout_for_test();
+
     let system_task =
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
@@ -244,6 +246,7 @@ pub fn create_task(
         None,
     )
     .expect("failed to create second task");
+    task.mm().initialize_mmap_layout_for_test();
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
@@ -279,7 +282,7 @@ pub fn map_object_anywhere<L, T>(
 ) -> UserAddress
 where
     L: LockEqualOrBefore<FileOpsCore>,
-    T: AsBytes + NoCell,
+    T: IntoBytes + Immutable,
 {
     let addr = map_memory_anywhere(locked, current_task, std::mem::size_of::<T>() as u64);
     current_task.write_object(addr.into(), object).expect("could not write object");
@@ -506,7 +509,7 @@ impl<'a> UserMemoryWriter<'a> {
     /// Writes `object` to the current address in the task's address space, incrementing the
     /// current address by the size of `object`. Returns the address at which the data starts.
     /// Panics on failure.
-    pub fn write_object<T: AsBytes + NoCell>(&mut self, object: &T) -> UserAddress {
+    pub fn write_object<T: IntoBytes + Immutable>(&mut self, object: &T) -> UserAddress {
         self.write(object.as_bytes())
     }
 

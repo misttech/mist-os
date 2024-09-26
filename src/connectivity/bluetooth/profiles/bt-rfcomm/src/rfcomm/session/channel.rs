@@ -512,7 +512,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::task::Poll;
     use std::pin::pin;
 
@@ -1030,7 +1030,7 @@ mod tests {
         let mut data_received_by_client = Box::pin(client.next());
 
         // After some time, the peer sends us user data with credits.
-        exec.set_fake_time(1.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
         let data1 = UserData { information: vec![0x12, 0x34, 0x56, 0x78, 0x90] };
         {
             let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
@@ -1063,7 +1063,7 @@ mod tests {
         });
 
         // After some time, the client holding the RFCOMM channel responds with data.
-        exec.set_fake_time(2.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(2).after_now());
         let data2 = UserData { information: vec![0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22] };
         {
             let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2.clone()));

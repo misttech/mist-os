@@ -11,11 +11,6 @@ use futures::prelude::*;
 use thiserror::Error;
 use tracing::{error, warn};
 
-/// This is an implementation of the [`omaha_client::storage::Storage`] trait that uses the Stash
-/// service on Fuchsia to store its data.
-///
-/// This data is erased when the device is factory reset.
-
 type Result<T> = std::result::Result<T, StashError>;
 
 #[derive(Debug, Error)]
@@ -30,6 +25,10 @@ pub enum StashError {
     NotAvailable,
 }
 
+/// This is an implementation of the [`omaha_client::storage::Storage`] trait that uses the Stash
+/// service on Fuchsia to store its data.
+///
+/// This data is erased when the device is factory reset.
 pub struct Stash {
     proxy: Option<StoreAccessorProxy>,
 }

@@ -5,7 +5,7 @@
 #include "buttons.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
-#include <fidl/fuchsia.input.interaction.observation/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
@@ -116,28 +116,36 @@ class LocalFakeGpio : public fake_gpio::FakeGpio {
   bool check_interrupt_mode_ = true;
 };
 
-class FakeAggregator : public fidl::Server<fuchsia_input_interaction_observation::Aggregator> {
+class FakeSystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
-  fidl::ProtocolHandler<fuchsia_input_interaction_observation::Aggregator> CreateHandler() {
+  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
     return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    fidl::kIgnoreBindingClosure);
   }
 
-  void ReportDiscreteActivity(ReportDiscreteActivityRequest& request,
-                              ReportDiscreteActivityCompleter::Sync& completer) override {
-    FDF_LOG(ERROR, "unexpected call to ReportDiscreteActivity");
+  void TakeWakeLease(TakeWakeLeaseRequest& request,
+                     TakeWakeLeaseCompleter::Sync& completer) override {
+    has_wake_lease_been_taken_ = true;
+    zx::eventpair wake_lease_remote, wake_lease_local;
+    zx::eventpair::create(0, &wake_lease_local, &wake_lease_remote);
+    wake_leases_.push_back(std::move(wake_lease_local));
+    completer.Reply(std::move(wake_lease_remote));
   }
 
-  void HandoffWake(HandoffWakeCompleter::Sync& completer) override {
-    num_handoff_wake_calls_++;
-    completer.Reply(zx::ok());
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    FDF_LOG(ERROR, "unexpected call to %s", name.c_str());
   }
 
-  size_t GetNumHandoffWakeCalls() const { return num_handoff_wake_calls_; }
+  size_t HasWakeLeaseBeenTaken() const { return has_wake_lease_been_taken_; }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
 
  private:
-  fidl::ServerBindingGroup<fuchsia_input_interaction_observation::Aggregator> bindings_;
-  size_t num_handoff_wake_calls_ = 0;
+  std::vector<zx::eventpair> wake_leases_;
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+  bool has_wake_lease_been_taken_ = false;
 };
 
 class ButtonsTestEnvironment : public fdf_testing::Environment {
@@ -165,18 +173,17 @@ class ButtonsTestEnvironment : public fdf_testing::Environment {
       fake_gpio_servers_[i].SetDefaultReadResponse(zx::ok(uint8_t{0u}));
     }
 
-    // Serve fake aggregator.
-    if (serve_aggregator_) {
-      return to_driver_vfs.component()
-          .AddUnmanagedProtocol<fuchsia_input_interaction_observation::Aggregator>(
-              fake_aggregator_.CreateHandler());
+    // Serve fake sag.
+    if (serve_sag_) {
+      return to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+          fake_sag_.CreateHandler());
     }
 
     return zx::ok();
   }
 
-  void Init(MetadataVersion metadata_version, bool serve_aggregator) {
-    serve_aggregator_ = serve_aggregator;
+  void Init(MetadataVersion metadata_version, bool serve_sag) {
+    serve_sag_ = serve_sag;
 
     // Serve metadata.
     cpp20::span<const buttons_button_config_t> buttons;
@@ -241,13 +248,13 @@ class ButtonsTestEnvironment : public fdf_testing::Environment {
 
   zx::interrupt fake_gpio_interrupts_[kMaxGpioServers];
   LocalFakeGpio fake_gpio_servers_[kMaxGpioServers]{};
-  FakeAggregator fake_aggregator_;
+  FakeSystemActivityGovernor fake_sag_;
 
  private:
   compat::DeviceServer device_server_;
   std::vector<std::string> buttons_names_;
   cpp20::span<const buttons_gpio_config_t> gpios_;
-  bool serve_aggregator_;
+  bool serve_sag_;
 };
 
 class ButtonsTestConfig final {
@@ -263,11 +270,10 @@ class ButtonsTest : public ::testing::Test {
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
-  zx::result<> Init(MetadataVersion metadata_version, bool suspend_enabled,
-                    bool serve_aggregator = true) {
+  zx::result<> Init(MetadataVersion metadata_version, bool suspend_enabled, bool serve_sag = true) {
     driver_test().RunInEnvironmentTypeContext(
-        [metadata_version, serve_aggregator](ButtonsTestEnvironment& env) {
-          env.Init(metadata_version, serve_aggregator);
+        [metadata_version, serve_sag](ButtonsTestEnvironment& env) {
+          env.Init(metadata_version, serve_sag);
         });
 
     return driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& start_args) {
@@ -347,7 +353,6 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();
-  size_t num_reports_so_far = 0;
 
   // Push.
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
@@ -363,7 +368,6 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     auto& reports = result->value()->reports;
 
     ASSERT_EQ(reports.count(), 1U);
-    num_reports_so_far += reports.count();
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -375,11 +379,9 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
 
-    driver_test().RunInEnvironmentTypeContext(
-        [suspend_enabled, num_reports_so_far](ButtonsTestEnvironment& env) {
-          EXPECT_EQ(env.fake_aggregator_.GetNumHandoffWakeCalls(),
-                    suspend_enabled ? num_reports_so_far : 0);
-        });
+    driver_test().RunInEnvironmentTypeContext([suspend_enabled](ButtonsTestEnvironment& env) {
+      EXPECT_EQ(env.fake_sag_.HasWakeLeaseBeenTaken(), suspend_enabled);
+    });
   }
 
   // Release.
@@ -395,7 +397,6 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     auto& reports = result->value()->reports;
 
     ASSERT_EQ(reports.count(), 1U);
-    num_reports_so_far += reports.count();
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -405,17 +406,15 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
 
-    driver_test().RunInEnvironmentTypeContext(
-        [suspend_enabled, num_reports_so_far](ButtonsTestEnvironment& env) {
-          EXPECT_EQ(env.fake_aggregator_.GetNumHandoffWakeCalls(),
-                    suspend_enabled ? num_reports_so_far : 0);
-        });
+    driver_test().RunInEnvironmentTypeContext([suspend_enabled](ButtonsTestEnvironment& env) {
+      EXPECT_EQ(env.fake_sag_.HasWakeLeaseBeenTaken(), suspend_enabled);
+    });
   }
 }
 
-TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutAggregator) {
+TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
   bool suspend_enabled = GetParam();
-  auto result = Init(kMetadataSingleButtonDirect, suspend_enabled, /* serve_aggregator= */ false);
+  auto result = Init(kMetadataSingleButtonDirect, suspend_enabled, /* serve_sag= */ false);
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();

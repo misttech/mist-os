@@ -103,6 +103,9 @@ type Environment struct {
 	// Dimensions gives the Swarming dimensions a test wishes to target.
 	Dimensions DimensionSet `json:"dimensions"`
 
+	// EmuDimensions gives the dimensions to configure the emulator with if targeting an emulator.
+	EmuDimensions map[string]any `json:"emu_dimensions,omitempty"`
+
 	// Tags are keys given to an environment on which the testsharder may filter.
 	Tags []string `json:"tags,omitempty"`
 

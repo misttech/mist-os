@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
+
 source_set("common_deps") {
   testonly = true
   sources = [
@@ -11,7 +13,7 @@ source_set("common_deps") {
   public_deps = [ "//src/ui/scenic/lib/view_tree:view_tree_snapshot" ]
 }
 
-executable("view_tree_test_bin") {
+cc_test_executable("view_tree_test_bin") {
   testonly = true
   sources = [
     "snapshot_dump_unittest.cc",
@@ -34,7 +36,7 @@ executable("view_tree_test_bin") {
   ]
 }
 
-executable("geometry_provider_test_bin") {
+cc_test_executable("geometry_provider_test_bin") {
   testonly = true
   sources = [ "geometry_provider_unittest.cc" ]
   deps = [

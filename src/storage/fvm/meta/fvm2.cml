@@ -4,6 +4,7 @@
 {
     include: [
         "//sdk/lib/trace/client.shard.cml",
+        "//src/storage/lib/fs_management/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

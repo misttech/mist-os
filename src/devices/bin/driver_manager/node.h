@@ -130,6 +130,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
+  // This is called when |node_ref_| is unbound from the dispatcher.
+  void OnNodeServerUnbound(fidl::UnbindInfo info);
+
   // NodeShutdownBridge
   // Exposed for testing.
   bool HasDriverComponent() const override {
@@ -324,22 +327,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     DriverState state = DriverState::kBinding;
   };
 
-  // Components needed to load a driver using dynamic linking.
-  struct DriverDynamicLinkerArgs {
-    static zx::result<DriverDynamicLinkerArgs> Create(
-        fuchsia_component_runner::wire::ComponentStartInfo start_info);
-
-    DriverDynamicLinkerArgs(std::string_view driver_soname, zx::vmo driver_file,
-                            fidl::ClientEnd<fuchsia_io::Directory> lib_dir)
-        : driver_soname(driver_soname),
-          driver_file(std::move(driver_file)),
-          lib_dir(std::move(lib_dir)) {}
-
-    std::string driver_soname;
-    zx::vmo driver_file;
-    fidl::ClientEnd<fuchsia_io::Directory> lib_dir;
-  };
-
   // fidl::WireServer<fuchsia_device::Controller>
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override;
@@ -441,7 +428,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void SynchronizePropertiesDict();
 
   void StartDriverWithDynamicLinker(
-      Node::DriverDynamicLinkerArgs args, std::string_view url,
+      DriverHost::DriverLoadArgs args, std::string_view url,
       fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
       fit::callback<void(zx::result<>)> cb);
 

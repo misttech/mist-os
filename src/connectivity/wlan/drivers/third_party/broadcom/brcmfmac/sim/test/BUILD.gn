@@ -12,6 +12,7 @@
 # OF THIS SOFTWARE.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("sim_test") {
   output_name = "sim_test"
@@ -34,7 +35,7 @@ source_set("sim_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("active_scan_test") {
+cc_test_executable("active_scan_test") {
   output_name = "active_scan_test"
   testonly = true
   sources = [ "active_scan_test.cc" ]
@@ -50,7 +51,7 @@ executable("active_scan_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("arp_test") {
+cc_test_executable("arp_test") {
   output_name = "arp_test"
   testonly = true
   sources = [ "arp_test.cc" ]
@@ -67,7 +68,7 @@ executable("arp_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("connect_test") {
+cc_test_executable("connect_test") {
   output_name = "connect_test"
   testonly = true
   sources = [ "connect_test.cc" ]
@@ -82,7 +83,7 @@ executable("connect_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("auth_test") {
+cc_test_executable("auth_test") {
   output_name = "auth_test"
   testonly = true
   sources = [ "auth_test.cc" ]
@@ -98,7 +99,7 @@ executable("auth_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("bad_entropy_test") {
+cc_test_executable("bad_entropy_test") {
   output_name = "bad_entropy_test"
   testonly = true
   sources = [ "bad_entropy_test.cc" ]
@@ -111,7 +112,7 @@ executable("bad_entropy_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("beacon_lost_test") {
+cc_test_executable("beacon_lost_test") {
   output_name = "beacon_lost_test"
   testonly = true
   sources = [ "beacon_lost_test.cc" ]
@@ -126,7 +127,7 @@ executable("beacon_lost_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("bootloader_mac_addr_test") {
+cc_test_executable("bootloader_mac_addr_test") {
   output_name = "bootloader_mac_addr_test"
   testonly = true
   sources = [ "bootloader_mac_addr_test.cc" ]
@@ -139,7 +140,7 @@ executable("bootloader_mac_addr_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("call_after_del_iface_test") {
+cc_test_executable("call_after_del_iface_test") {
   output_name = "call_after_del_iface_test"
   testonly = true
   sources = [ "call_after_del_iface_test.cc" ]
@@ -149,7 +150,7 @@ executable("call_after_del_iface_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("cc_test") {
+cc_test_executable("cc_test") {
   output_name = "cc_test"
   testonly = true
   sources = [ "cc_test.cc" ]
@@ -163,7 +164,7 @@ executable("cc_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("factory_device_test") {
+cc_test_executable("factory_device_test") {
   output_name = "factory_device_test"
   testonly = true
   sources = [ "factory_device_test.cc" ]
@@ -173,7 +174,7 @@ executable("factory_device_test") {
   ]
 }
 
-executable("channel_switch_test") {
+cc_test_executable("channel_switch_test") {
   output_name = "channel_switch_test"
   testonly = true
   sources = [ "channel_switch_test.cc" ]
@@ -187,7 +188,7 @@ executable("channel_switch_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("crash_recovery_test") {
+cc_test_executable("crash_recovery_test") {
   output_name = "crash_recovery_test"
   testonly = true
   sources = [ "crash_recovery_test.cc" ]
@@ -204,7 +205,7 @@ executable("crash_recovery_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("create_softap_test") {
+cc_test_executable("create_softap_test") {
   output_name = "create_softap_test"
   testonly = true
   sources = [ "create_softap_test.cc" ]
@@ -221,7 +222,7 @@ executable("create_softap_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("data_frame_test") {
+cc_test_executable("data_frame_test") {
   output_name = "data_frame_test"
   testonly = true
   sources = [ "data_frame_test.cc" ]
@@ -236,7 +237,7 @@ executable("data_frame_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("disconnect_test") {
+cc_test_executable("disconnect_test") {
   output_name = "disconnect_test"
   testonly = true
   sources = [ "disconnect_test.cc" ]
@@ -250,7 +251,7 @@ executable("disconnect_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("dynamic_if_test") {
+cc_test_executable("dynamic_if_test") {
   output_name = "dynamic_if_test"
   testonly = true
   sources = [ "dynamic_if_test.cc" ]
@@ -266,7 +267,7 @@ executable("dynamic_if_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("err_inject_test") {
+cc_test_executable("err_inject_test") {
   output_name = "err_inject_test"
   testonly = true
   sources = [ "err_inject_test.cc" ]
@@ -280,7 +281,7 @@ executable("err_inject_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("escan_params_test") {
+cc_test_executable("escan_params_test") {
   output_name = "escan_params_test"
   testonly = true
   sources = [ "escan_params_test.cc" ]
@@ -290,7 +291,7 @@ executable("escan_params_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("firmware_config_test") {
+cc_test_executable("firmware_config_test") {
   output_name = "firmware_config_test"
   testonly = true
   sources = [ "firmware_config_test.cc" ]
@@ -306,7 +307,7 @@ executable("firmware_config_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("reassoc_test") {
+cc_test_executable("reassoc_test") {
   output_name = "reassoc_test"
   testonly = true
   sources = [ "reassoc_test.cc" ]
@@ -316,7 +317,7 @@ executable("reassoc_test") {
   ]
 }
 
-executable("wmm_status_test") {
+cc_test_executable("wmm_status_test") {
   output_name = "wmm_status_test"
   testonly = true
   sources = [ "wmm_status_test.cc" ]
@@ -329,7 +330,7 @@ executable("wmm_status_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("wnm_test") {
+cc_test_executable("wnm_test") {
   output_name = "wnm_test"
   testonly = true
   sources = [ "wnm_test.cc" ]
@@ -339,7 +340,7 @@ executable("wnm_test") {
   ]
 }
 
-executable("ifc_query_test") {
+cc_test_executable("ifc_query_test") {
   output_name = "ifc_query_test"
   testonly = true
   sources = [ "ifc_query_test.cc" ]
@@ -352,7 +353,7 @@ executable("ifc_query_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("ifc_query_feature_support_test") {
+cc_test_executable("ifc_query_feature_support_test") {
   output_name = "ifc_query_feature_support_test"
   testonly = true
   sources = [ "ifc_query_feature_support_test.cc" ]
@@ -365,7 +366,7 @@ executable("ifc_query_feature_support_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("iovar_test") {
+cc_test_executable("iovar_test") {
   output_name = "iovar_test"
   testonly = true
   sources = [ "iovar_test.cc" ]
@@ -381,7 +382,7 @@ executable("iovar_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("lifecycle_test") {
+cc_test_executable("lifecycle_test") {
   output_name = "lifecycle_test"
   testonly = true
   sources = [ "lifecycle_test.cc" ]
@@ -391,7 +392,7 @@ executable("lifecycle_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("mfg_test") {
+cc_test_executable("mfg_test") {
   output_name = "mfg_test"
   testonly = true
   sources = [
@@ -415,7 +416,7 @@ executable("mfg_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("no_random_mac_test") {
+cc_test_executable("no_random_mac_test") {
   output_name = "no_random_mac_test"
   testonly = true
   sources = [ "no_random_mac_test.cc" ]
@@ -428,7 +429,7 @@ executable("no_random_mac_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("passive_scan_test") {
+cc_test_executable("passive_scan_test") {
   output_name = "passive_scan_test"
   testonly = true
   sources = [ "passive_scan_test.cc" ]
@@ -444,7 +445,7 @@ executable("passive_scan_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("phy_ps_mode_test") {
+cc_test_executable("phy_ps_mode_test") {
   output_name = "phy_ps_mode_test"
   testonly = true
   sources = [ "phy_ps_mode_test.cc" ]
@@ -458,7 +459,7 @@ executable("phy_ps_mode_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("phy_mac_roles_test") {
+cc_test_executable("phy_mac_roles_test") {
   output_name = "phy_mac_roles_test"
   testonly = true
   sources = [ "phy_mac_roles_test.cc" ]
@@ -472,7 +473,7 @@ executable("phy_mac_roles_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("scan_dwell_time_test") {
+cc_test_executable("scan_dwell_time_test") {
   output_name = "scan_dwell_time_test"
   testonly = true
   sources = [ "scan_dwell_time_test.cc" ]
@@ -486,7 +487,7 @@ executable("scan_dwell_time_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("scan_while_scanning_test") {
+cc_test_executable("scan_while_scanning_test") {
   output_name = "scan_while_scanning_test"
   testonly = true
   sources = [ "scan_while_scanning_test.cc" ]
@@ -499,7 +500,7 @@ executable("scan_while_scanning_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("set_keys_test") {
+cc_test_executable("set_keys_test") {
   output_name = "set_keys_test"
   testonly = true
   sources = [ "set_keys_test.cc" ]
@@ -512,7 +513,7 @@ executable("set_keys_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("set_multicast_test") {
+cc_test_executable("set_multicast_test") {
   output_name = "set_multicast_test"
   testonly = true
   sources = [ "set_multicast_test.cc" ]
@@ -525,7 +526,7 @@ executable("set_multicast_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("start_ap_while_scanning_test") {
+cc_test_executable("start_ap_while_scanning_test") {
   output_name = "start_ap_while_scanning_test"
   testonly = true
   sources = [ "start_ap_while_scanning_test.cc" ]
@@ -538,7 +539,7 @@ executable("start_ap_while_scanning_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("timeout_test") {
+cc_test_executable("timeout_test") {
   output_name = "timeout_test"
   testonly = true
   sources = [ "timeout_test.cc" ]

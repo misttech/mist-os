@@ -10,6 +10,8 @@
 #include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
 
+#include <ranges>
+
 #include "diagnostics.h"
 #include "runtime-module.h"
 
@@ -34,7 +36,23 @@ class LinkingSession {
 
   template <typename RetrieveFile>
   bool Link(Diagnostics& diag, Soname soname, RetrieveFile&& retrieve_file) {
-    return Load(diag, soname, std::forward<RetrieveFile>(retrieve_file)) && Relocate(diag);
+    if (!Load(diag, soname, std::forward<RetrieveFile>(retrieve_file))) {
+      return false;
+    }
+    // The root module for the dlopen-ed file is always the first module
+    // enqueued in this list.
+    RuntimeModule& root_module = runtime_modules_.front();
+    // Traverse the root module's tree to construct the list of modules whose
+    // symbols are used for relocations. On success, persist the list to the
+    // root module for future lookups by dlsym(), etc.
+    if (auto resolution_list = root_module.TraverseDeps(diag, root_module);
+        !resolution_list.is_empty()) {
+      if (Relocate(diag, resolution_list)) {
+        root_module.set_module_tree(std::move(resolution_list));
+        return true;
+      }
+    }
+    return false;
   }
 
   // The caller calls Commit() to finalize the LinkingSession after it has
@@ -83,11 +101,23 @@ class LinkingSession {
         return fit::error(true);
       }
 
-      if (module.Load(diag, *std::move(file))) {
-        // Create and enqueue a module for each dependency from the Load result
-        // so it can be processed and loaded in the future.
-        auto enqueue_dep = [this, &diag](const Soname& name) { return EnqueueModule(diag, name); };
-        if (std::all_of(module.dep_names().begin(), module.dep_names().end(), enqueue_dep)) {
+      if (auto dep_names = module.Load(diag, *std::move(file))) {
+        // Create and enqueue a module for each dependency, skipping
+        // dependencies that have already been enqueued. The module that was
+        // loaded will also store a reference to the dependency's RuntimeModule
+        // in its direct_deps list.
+        auto enqueue_dep = [this, &diag, &parent_list = module.runtime_module().direct_deps()](
+                               const Soname& name) {
+          if (std::find(session_modules_.begin(), session_modules_.end(), name) !=
+              session_modules_.end()) {
+            return true;
+          }
+          if (const RuntimeModule* dep = EnqueueModule(diag, name)) {
+            return parent_list.push_back(diag, "direct dependency container", dep);
+          }
+          return false;
+        };
+        if (std::ranges::all_of(*dep_names, enqueue_dep)) {
           return fit::ok();
         }
       }
@@ -117,51 +147,51 @@ class LinkingSession {
     return true;
   }
 
-  bool EnqueueModule(Diagnostics& diag, Soname soname) {
-    if (std::find(session_modules_.begin(), session_modules_.end(), soname) !=
-        session_modules_.end()) {
-      // The module was already added to session_modules_ in this LinkingSession.
-      return true;
+  // Create module data structures for `soname` and enqueue the modules onto
+  // this LinkingSession's bookkeeping lists.
+  const RuntimeModule* EnqueueModule(Diagnostics& diag, Soname soname) {
+    if (auto it = std::ranges::find(loaded_modules_, soname, &RuntimeModule::name);
+        it != loaded_modules_.end()) {
+      // Return a reference to the module if it was already loaded at startup or
+      // by a LinkingSession from a previous dlopen() call.
+      return &*it;
     }
-
-    // TODO(https://fxbug.dev/333573264): Check if the module was already
-    // loaded by a previous dlopen call or at startup and use that reference
-    // instead.
-
-    // TODO(https://fxbug.dev/338229987): This is just to make sure we're not
-    // exercising deps from modules already loaded yet.
-    assert(std::find(loaded_modules_.begin(), loaded_modules_.end(), soname) ==
-           loaded_modules_.end());
 
     fbl::AllocChecker module_ac;
     auto module = RuntimeModule::Create(module_ac, soname);
     if (!module_ac.check()) [[unlikely]] {
       diag.OutOfMemory("permanent module data structure", sizeof(RuntimeModule));
-      return false;
+      return nullptr;
     }
     fbl::AllocChecker session_module_ac;
     auto session_module = SessionModule::Create(session_module_ac, *module);
     if (!session_module_ac.check()) [[unlikely]] {
       diag.OutOfMemory("temporary module data structure", sizeof(SessionModule));
-      return false;
+      return nullptr;
     }
 
     runtime_modules_.push_back(std::move(module));
     session_modules_.push_back(std::move(session_module));
 
-    return true;
+    // Return a pointer to the RuntimeModule that was just created and enqueued.
+    return &runtime_modules_.back();
   }
 
-  // TODO(https://fxbug.dev/324136831): Include global modules.
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
-  bool Relocate(Diagnostics& diag) {
-    auto relocate_and_relro = [&](auto& session_module) -> bool {
+  bool Relocate(Diagnostics& diag, const ModuleRefList& resolution_list) {
+    // TODO(https://fxbug.dev/324136831): Include global modules.
+    // Relocate() expects a container of references.
+    auto resolution_list_view = std::views::transform(
+        resolution_list, [](const RuntimeModule* m) -> const RuntimeModule& { return *m; });
+
+    auto relocate_and_relro = [&](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, session_modules_) && session_module.ProtectRelro(diag);
+      return session_module.Relocate(diag, resolution_list_view) &&
+             session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
                        relocate_and_relro);
@@ -238,17 +268,17 @@ class LinkingSession<Loader>::SessionModule
   }
 
   // Load `file` into the system image, decode phdrs and save the metadata in
-  // the the ABI module. The Soname objects of the module's DT_NEEDEDs are
-  // decoded and stored for later dependency traversal.
+  // the the ABI module. A vector of Soname objects of the module's DT_NEEDEDs
+  // are returned to the caller.
   template <class File>
-  bool Load(Diagnostics& diag, File&& file) {
+  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file) {
     // Read the file header and program headers into stack buffers and map in
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.
     Loader loader;
     auto headers = decoded().LoadFromFile(diag, loader, std::forward<File>(file));
     if (!headers) [[unlikely]] {
-      return false;
+      return {};
     }
 
     Vector<size_type> needed_offsets;
@@ -258,7 +288,7 @@ class LinkingSession<Loader>::SessionModule
             diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
             NeededObserver(needed_offsets))) [[unlikely]] {
-      return false;
+      return {};
     }
 
     // After successfully loading the file, finalize the module's mapping by
@@ -266,33 +296,34 @@ class LinkingSession<Loader>::SessionModule
     // will be used to apply relro protections later.
     relro_ = decoded().CommitLoader(std::move(loader));
 
-    // TODO(https://fxbug.dev/324136435): The code that parses the names from
+    // TODO(https://fxbug.dev/366279579): The code that parses the names from
     // the symbol table be shared with <lib/ld/remote-decoded-module.h>.
-    assert(dep_names_.is_empty());
-    if (!dep_names_.reserve(diag, kNeededError, needed_offsets.size())) [[unlikely]] {
-      return false;
-    }
-    for (size_type offset : needed_offsets) {
-      std::string_view name = this->symbol_info().string(offset);
-      if (name.empty()) [[unlikely]] {
-        diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
-                         this->symbol_info().strtab().size());
-        return false;
+    Vector<Soname> dep_names;
+    if (dep_names.reserve(diag, kNeededError, needed_offsets.size())) [[likely]] {
+      for (size_type offset : needed_offsets) {
+        std::string_view name = this->symbol_info().string(offset);
+        if (name.empty()) [[unlikely]] {
+          diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
+                           this->symbol_info().strtab().size());
+          return {};
+        }
+        if (!dep_names.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
+          return {};
+        }
       }
-      if (!dep_names_.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
-        return false;
-      }
+      return std::move(dep_names);
     }
 
-    return true;
+    return {};
   }
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // ordered list of modules as needed.
-  bool Relocate(Diagnostics& diag, const SessionModuleList& ordered_modules) {
+  bool Relocate(Diagnostics& diag, const auto& ordered_modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
-    auto resolver = elfldltl::MakeSymbolResolver(*this, ordered_modules, diag, kNoTlsDesc);
+    auto resolver =
+        elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag, kNoTlsDesc);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
            elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
                                       resolver);
@@ -301,7 +332,7 @@ class LinkingSession<Loader>::SessionModule
   // Apply relro protections. `relro_` cannot be used after this call.
   bool ProtectRelro(Diagnostics& diag) { return std::move(relro_).Commit(diag); }
 
-  const Vector<Soname>& dep_names() const { return dep_names_; }
+  constexpr RuntimeModule& runtime_module() const { return runtime_module_; }
 
  private:
   // A SessionModule can only be created with SessionModule::Create...).
@@ -318,10 +349,6 @@ class LinkingSession<Loader>::SessionModule
   // The relro capability that is provided when the module is decoded and is
   // used to apply relro protections after the module is relocated.
   Relro relro_;
-
-  // The decoded Soname objects of the dependencies of this module, in the order
-  // that its corresponding DT_NEEDED offset appears in the dynamic phdr.
-  Vector<Soname> dep_names_;
 };
 
 }  // namespace dl

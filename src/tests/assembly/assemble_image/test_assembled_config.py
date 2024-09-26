@@ -9,7 +9,7 @@ import sys
 from run_assembly import run_product_assembly
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run ffx assembly with the provided arguments."
     )
@@ -56,12 +56,6 @@ def main():
         help="Path to stampfile for telling ninja we're done.",
     )
     parser.add_argument(
-        "--additional-packages-path",
-        type=pathlib.Path,
-        required=False,
-        help="Path to additional packages configuration.",
-    )
-    parser.add_argument(
         "--config",
         action="append",
         required=False,
@@ -70,8 +64,6 @@ def main():
     args = parser.parse_args()
 
     kwargs = {}
-    if args.additional_packages_path:
-        kwargs["additional_packages_path"] = args.additional_packages_path
     if args.config:
         kwargs["extra_config"] = args.config
 
@@ -89,3 +81,5 @@ def main():
 
     with open(args.stamp, "w") as f:
         pass  # creates the file
+
+    return 0

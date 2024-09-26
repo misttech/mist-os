@@ -60,7 +60,7 @@ struct ValidationContext<'a> {
     all_directories: HashSet<&'a Name>,
     all_runners: HashSet<&'a Name>,
     all_resolvers: HashSet<&'a Name>,
-    all_dictionaries: HashMap<&'a Name, Option<&'a DictionaryRef>>,
+    all_dictionaries: HashMap<&'a Name, &'a Capability>,
     all_configs: HashSet<&'a Name>,
     all_environment_names: HashSet<&'a Name>,
     all_capability_names: HashSet<&'a Name>,
@@ -144,7 +144,7 @@ impl<'a> ValidationContext<'a> {
         self.all_directories = self.document.all_directory_names().into_iter().collect();
         self.all_runners = self.document.all_runner_names().into_iter().collect();
         self.all_resolvers = self.document.all_resolver_names().into_iter().collect();
-        self.all_dictionaries = self.document.all_dictionaries_with_sources().into_iter().collect();
+        self.all_dictionaries = self.document.all_dictionaries().into_iter().collect();
         self.all_configs = self.document.all_config_names().into_iter().collect();
         self.all_environment_names = self.document.all_environment_names().into_iter().collect();
         self.all_capability_names = self.document.all_capability_names();
@@ -418,9 +418,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
             // The dictionary capability may depend on a dictionary it extends.
             if let Some(extends) = capability.extends.as_ref() {
-                if matches!(extends.root, RootDictionaryRef::Program) {
-                    self.features.check(Feature::DynamicDictionaries)?;
-                }
                 RouteFromSelfChecker {
                     capability_name: Some(OneOrMany::One(name)),
                     from: OneOrMany::One(extends.into()),
@@ -434,6 +431,18 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 for source in self.expand_source_dependencies(names, &extends.into()) {
                     self.add_strong_dep(source, target);
                 }
+            }
+            if capability.path.is_some() {
+                self.features.check(Feature::DynamicDictionaries)?;
+                if capability.extends.is_some() {
+                    return Err(Error::validate(
+                        "Dictionary capabilities do not support \"extends\" with \"path\"",
+                    ));
+                }
+                // If `path` is set that means the dictionary is provided by the program,
+                // which implies a dependency from `self` to the dictionary declaration.
+                let target = DependencyNode::Named(name);
+                self.add_strong_dep(DependencyNode::Self_, target);
             }
         }
         if capability.delivery.is_some() {
@@ -725,12 +734,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                             "`expose` dictionary path must begin with `self` or `#<child-name>`",
                         ));
                     }
-                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-                    RootDictionaryRef::Program => {
-                        return Err(Error::validate(
-                            "`expose` dictionary path must begin with `self` or `#<child-name>`",
-                        ));
-                    }
                 }
             }
         }
@@ -826,13 +829,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     RootDictionaryRef::Self_
                     | RootDictionaryRef::Named(_)
                     | RootDictionaryRef::Parent => {}
-                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-                    RootDictionaryRef::Program => {
-                        return Err(Error::validate(
-                            "`offer` dictionary path must begin with `self`, `parent`, or \
-                                `#<child-name>`",
-                        ));
-                    }
                 }
 
                 if offer.storage.is_some() {
@@ -926,12 +922,17 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 }
                 OfferToRef::OwnDictionary(ref to_target) => {
                     // Check that any referenced child actually exists.
-                    if self.all_dictionaries.contains_key(&to_target) {
-                        // Allowed.
-                    } else {
+                    let Some(d) = self.all_dictionaries.get(&to_target) else {
                         return Err(Error::validate(format!(
                             "\"offer\" has dictionary target \"{to}\" but \"{to_target}\" \
                                 is not a dictionary capability defined by this component"
+                        )));
+                    };
+                    if d.path.is_some() {
+                        return Err(Error::validate(format!(
+                            "\"offer\" has dictionary target \"{to}\" but \"{to_target}\" \
+                            sets \"path\". Therefore, it is a dynamic dictionary that \
+                            does not allow offers into it."
                         )));
                     }
                     to_target
@@ -1128,10 +1129,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
             AnyRef::Named(n) => {
                 sources.push(DependencyNode::Named(n));
-            }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            AnyRef::Program => {
-                sources.push(DependencyNode::Self_);
             }
             AnyRef::Parent | AnyRef::Void | AnyRef::Framework | AnyRef::Debug => {}
             AnyRef::OwnDictionary(_) => unreachable!("can't be a source"),
@@ -1657,7 +1654,7 @@ struct RouteFromSelfChecker<'a> {
     container: &'a dyn Container,
 
     /// Reference to [ValidationContext::all_dictionaries].
-    all_dictionaries: &'a HashMap<&'a Name, Option<&'a DictionaryRef>>,
+    all_dictionaries: &'a HashMap<&'a Name, &'a Capability>,
 
     /// The string name for the capability's type.
     typename: &'static str,
@@ -1811,8 +1808,6 @@ impl<'a> DependencyNode<'a> {
             RootDictionaryRef::Named(name) => Some(DependencyNode::Named(name)),
             RootDictionaryRef::Self_ => Some(DependencyNode::Self_),
             RootDictionaryRef::Parent => None,
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            RootDictionaryRef::Program => Some(DependencyNode::Self_),
         }
     }
 
@@ -3718,18 +3713,7 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "`expose` dictionary path must begin with `self` or `#<child-name>`"
         ),
-        test_cml_expose_from_dictionary_program(
-            json!({
-                "expose": [
-                    {
-                        "protocol": "pkg_protocol",
-                        "from": "program/a",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "`expose` dictionary path must begin with `self` or `#<child-name>`"
-        ),
-        test_cml_expose_protocol_from_collection_invalid(
+                test_cml_expose_protocol_from_collection_invalid(
             json!({
                 "collections": [ {
                     "name": "coll",
@@ -4155,24 +4139,6 @@ mod tests {
                 ],
             }),
             Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", \"#<collection-name>\", or a dictionary path"
-        ),
-        test_cml_offer_from_dictionary_program(
-            json!({
-                "offer": [
-                    {
-                        "protocol": "pkg_protocol",
-                        "from": "program/a",
-                        "to": "#child",
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "child",
-                        "url": "fuchsia-pkg://child",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "`offer` dictionary path must begin with `self`, `parent`, or `#<child-name>`"
         ),
         test_cml_offer_to_non_dictionary(
             json!({
@@ -7136,7 +7102,7 @@ mod tests {
                 "capabilities": [
                     {
                         "dictionary": "dict",
-                        "extends": "program/some/dir",
+                        "path": "/some/dir",
                     },
                 ],
             }),
@@ -7228,6 +7194,36 @@ mod tests {
                 ],
             }),
             Err(Error::Validate { err, .. }) if &err == "\"p\" is a duplicate \"offer\" target capability for \"self/dict\""
+        ),
+        test_cml_offer_to_dictionary_dynamic(
+            json!({
+                "offer": [
+                    {
+                        "protocol": "p",
+                        "from": "parent",
+                        "to": "self/dict",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "path": "/out/dir",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" has dictionary target \"self/dict\" but \"dict\" sets \"path\". Therefore, it is a dynamic dictionary that does not allow offers into it."
+        ),
+        test_cml_extend_dictionary_dynamic(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "extends": "parent/dict",
+                        "path": "/out/dir",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "Dictionary capabilities do not support \"extends\" with \"path\""
         ),
         test_cml_offer_dependency_cycle_from_dictionary(
             json!({
@@ -7433,7 +7429,7 @@ mod tests {
                     {
                         "dictionary": "dict",
                         // This should create a dependency self -> #dict
-                        "extends": "program/some/dir",
+                        "path": "/some/dir",
                     },
                 ],
                 "children": [

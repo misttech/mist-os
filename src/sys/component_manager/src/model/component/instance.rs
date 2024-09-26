@@ -40,9 +40,9 @@ use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-    ExposeDeclCommon, FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
+    FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
 };
-use cm_types::{Name, RelativePath};
+use cm_types::{Name, Path};
 use config_encoder::ConfigFields;
 use errors::{
     AddChildError, AddDynamicChildError, CapabilityProviderError, ComponentProviderError,
@@ -64,7 +64,6 @@ use tracing::warn;
 use vfs::directory::entry::SubNode;
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -470,7 +469,7 @@ impl ResolvedInstanceState {
         let path = capability_decl.path().expect("must have path").to_string();
         let path = fuchsia_fs::canonicalize_path(&path);
         let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
-        let relative_path = Path::validate_and_split(path).unwrap();
+        let relative_path = vfs::path::Path::validate_and_split(path).unwrap();
         let outgoing_dir_entry = component
             .get_outgoing()
             .try_into_directory_entry()
@@ -598,20 +597,11 @@ impl ResolvedInstanceState {
     /// backed by legacy routing, and hosts [`Open`]s instead of [`Router`]s. This [`Dict`] is used
     /// to generate the `exposed_dir`.
     pub async fn get_exposed_dict(&self) -> &Dict {
-        let exposes_needing_metadata: HashMap<Name, CapabilityTypeName> = self
-            .decl()
-            .exposes
-            .iter()
-            .filter(|e| matches!(e, cm_rust::ExposeDecl::Protocol(_)))
-            .map(|e| (e.target_name().clone(), CapabilityTypeName::from(e)))
-            .collect();
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
             let dict = Router::dict_routers_to_open(
-                &self.weak_component.clone().into(),
                 &component.execution_scope,
                 &self.sandbox.component_output_dict,
-                &exposes_needing_metadata,
             );
             Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
             dict
@@ -734,14 +724,6 @@ impl ResolvedInstanceState {
             // Auto-inherit the environment from this component instance.
             Arc::new(Environment::new_inheriting(component))
         }
-    }
-
-    pub fn environment_for_collection(
-        &self,
-        component: &Arc<ComponentInstance>,
-        collection: &CollectionDecl,
-    ) -> Arc<Environment> {
-        self.get_environment(component, collection.environment.as_ref())
     }
 
     /// Adds a new child component instance.
@@ -1184,7 +1166,13 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
+
         fn cm_unexpected() -> RouterError {
             RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
         }
@@ -1215,7 +1203,7 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        let capability = if request.debug {
+        let capability = if debug {
             CapabilitySource::Component(ComponentSource {
                 capability: self.capability_decl.clone().into(),
                 moniker: self.source.moniker.clone(),
@@ -1235,14 +1223,18 @@ impl Routable for CapabilityRequestedHook {
 
 struct ProgramRouter {
     component: WeakComponentInstance,
-    source_path: RelativePath,
+    source_path: Path,
     capability: ComponentCapability,
 }
 
 #[async_trait]
 impl Routable for ProgramRouter {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        if request.debug {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        if debug {
             let source = CapabilitySource::Component(ComponentSource {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
@@ -1251,6 +1243,7 @@ impl Routable for ProgramRouter {
                 .try_into()
                 .expect("failed to convert capability source to dictionary"));
         }
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         fn open_error(e: OpenOutgoingDirError) -> OpenError {
             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
         }
@@ -1291,7 +1284,7 @@ impl Routable for ProgramRouter {
 
 fn new_program_router(
     component: WeakComponentInstance,
-    source_path: RelativePath,
+    source_path: Path,
     capability: ComponentCapability,
 ) -> Router {
     Router::new(ProgramRouter { component: component, source_path: source_path, capability })

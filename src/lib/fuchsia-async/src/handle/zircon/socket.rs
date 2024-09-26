@@ -256,7 +256,7 @@ impl Stream for DatagramStream<&Socket> {
 mod tests {
     use super::*;
     use crate::{TestExecutor, Time, TimeoutExt, Timer};
-    use fuchsia_zircon::prelude::*;
+    use fuchsia_zircon as zx;
     use futures::future::{self, join};
     use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
     use futures::stream::TryStreamExt;
@@ -282,11 +282,12 @@ mod tests {
         // Note: if debugging a hang, you may want to lower the timeout to `300.millis()` to get
         // faster feedback. This is set to 10s rather than something shorter to avoid triggering
         // flakes if things happen to be slow.
-        let receiver = receive_future.on_timeout(Time::after(10.seconds()), || panic!("timeout"));
+        let receiver = receive_future
+            .on_timeout(Time::after(zx::Duration::from_seconds(10)), || panic!("timeout"));
 
         // Sends a message after the timeout has passed
         let sender = async move {
-            Timer::new(Time::after(100.millis())).await;
+            Timer::new(Time::after(zx::Duration::from_millis(100))).await;
             tx.write_all(bytes).await.expect("writing into socket");
             // close socket to signal no more bytes will be written
             drop(tx);

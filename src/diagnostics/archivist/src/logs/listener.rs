@@ -1,7 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use diagnostics_data::{LogsData, SeverityError};
+use diagnostics_data::LogsData;
 use diagnostics_message::error::MessageError;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_logger::{
@@ -213,12 +213,6 @@ pub enum ListenerError {
 
     #[error("error while forwarding unsafe log requests: {source}")]
     AsbestosIo { source: fidl::Error },
-
-    #[error(transparent)]
-    Severity {
-        #[from]
-        source: SeverityError,
-    },
 }
 
 #[cfg(test)]

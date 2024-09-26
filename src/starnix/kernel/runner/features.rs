@@ -30,7 +30,10 @@ use starnix_modules_gralloc::gralloc_device_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_input::uinput::register_uinput_device;
 #[cfg(not(feature = "starnix_lite"))]
-use starnix_modules_input::{EventProxyMode, InputDevice};
+use starnix_modules_input::{
+    EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
+    DEFAULT_TOUCH_DEVICE_ID,
+};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::magma_device_init;
 #[cfg(not(feature = "starnix_lite"))]
@@ -148,6 +151,8 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
             ("enable_suid", _) => features.kernel.enable_suid = true,
             #[cfg(not(feature = "starnix_lite"))]
+            ("io_uring", _) => features.kernel.io_uring = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }
@@ -221,11 +226,27 @@ pub fn run_container_features(
             InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
         let keyboard_device = InputDevice::new_keyboard(&kernel.inspect_node);
 
-        touch_device.clone().register(locked, &kernel.kthreads.system_task());
-        keyboard_device.clone().register(locked, &kernel.kthreads.system_task());
-        register_uinput_device(locked, &kernel.kthreads.system_task());
+        touch_device.clone().register(
+            locked,
+            &kernel.kthreads.system_task(),
+            DEFAULT_TOUCH_DEVICE_ID,
+        );
+        keyboard_device.clone().register(
+            locked,
+            &kernel.kthreads.system_task(),
+            DEFAULT_KEYBOARD_DEVICE_ID,
+        );
 
-        touch_device.start_touch_relay(&kernel, touch_source_client, EventProxyMode::WakeContainer);
+        let input_events_relay = InputEventsRelay::new();
+        input_events_relay.clone().start_relays(
+            &kernel,
+            EventProxyMode::WakeContainer,
+            touch_source_client,
+            touch_device.open_files.clone(),
+        );
+
+        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
+
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
         keyboard_device.start_button_relay(&kernel, registry_proxy, EventProxyMode::WakeContainer);
 

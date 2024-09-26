@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("event_unittests") {
+cc_test_executable("event_unittests") {
   output_name = "event_unittests"
 
   testonly = true
@@ -22,7 +23,7 @@ executable("event_unittests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("rx_tests") {
+cc_test_executable("rx_tests") {
   output_name = "rx_tests"
 
   testonly = true
@@ -40,7 +41,7 @@ executable("rx_tests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("frame_ie_tests") {
+cc_test_executable("frame_ie_tests") {
   output_name = "frame_ie_tests"
 
   testonly = true
@@ -58,7 +59,7 @@ executable("frame_ie_tests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("location_tests") {
+cc_test_executable("location_tests") {
   output_name = "location_tests"
 
   testonly = true
@@ -76,7 +77,7 @@ executable("location_tests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("trans_time_tests") {
+cc_test_executable("trans_time_tests") {
   output_name = "trans_time_tests"
 
   testonly = true

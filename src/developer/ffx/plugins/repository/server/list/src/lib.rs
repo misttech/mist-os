@@ -12,10 +12,8 @@ use fho::{
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::ServerStatus;
-use pkg::{
-    PathType, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, RegistrationConflictMode,
-    RepoStorageType, ServerMode,
-};
+use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
+use pkg::{PathType, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::net::SocketAddr;
@@ -27,8 +25,8 @@ pub struct PkgServerData {
     pub address: SocketAddr,
     pub repo_path: PathType,
     pub registration_aliases: Vec<String>,
-    pub registration_storage_type: RepoStorageType,
-    pub registration_alias_conflict_mode: RegistrationConflictMode,
+    pub registration_storage_type: RepositoryStorageType,
+    pub registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     pub server_mode: ServerMode,
     pub pid: u32,
 }
@@ -174,7 +172,7 @@ mod tests {
     use super::*;
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
-    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
+    use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryStorageType};
     use futures::channel::oneshot::channel;
     use std::net::SocketAddr;
     use std::process;
@@ -221,8 +219,8 @@ mod tests {
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
-            registration_storage_type: pkg::RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
             repo_config,
@@ -264,8 +262,8 @@ mod tests {
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
-            registration_storage_type: pkg::RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
             repo_config,
@@ -322,8 +320,8 @@ mod tests {
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
-            registration_storage_type: pkg::RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
             repo_config,
@@ -341,8 +339,8 @@ mod tests {
             address: addr,
             repo_path: pkg::PathType::File("/some/other/repo".into()),
             registration_aliases: vec![],
-            registration_storage_type: pkg::RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: pkg::RegistrationConflictMode::Replace,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             server_mode: pkg::ServerMode::Daemon,
             pid: process::id(),
             repo_config: repo_config_2,
@@ -383,8 +381,8 @@ mod tests {
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
-            registration_storage_type: pkg::RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
             repo_config,

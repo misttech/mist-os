@@ -24,6 +24,28 @@ async fn run_with_proxy_realm<
 ) {
     let (mock_dir, server_end) = fidl::endpoints::create_endpoints();
 
+    let proto_caps = [
+        fnet_migration::StateMarker::PROTOCOL_NAME,
+        fidl_fuchsia_process::LauncherMarker::PROTOCOL_NAME,
+    ]
+    .into_iter()
+    .map(|proto| {
+        fidl_fuchsia_netemul::Capability::ChildDep(fidl_fuchsia_netemul::ChildDep {
+            name: Some(MOCK_SERVICES_NAME.to_string()),
+            capability: Some(fidl_fuchsia_netemul::ExposedCapability::Protocol(proto.to_string())),
+            ..Default::default()
+        })
+    });
+
+    let config_caps = ["fuchsia.power.SuspendEnabled"].into_iter().map(|c| {
+        fidl_fuchsia_netemul::Capability::ChildDep(fidl_fuchsia_netemul::ChildDep {
+            // Route from void.
+            name: None,
+            capability: Some(fidl_fuchsia_netemul::ExposedCapability::Configuration(c.to_string())),
+            ..Default::default()
+        })
+    });
+
     let realm = sandbox
         .create_realm(
             "netstack-proxy",
@@ -34,28 +56,12 @@ async fn run_with_proxy_realm<
                     )),
                     name: Some(NETSTACK_PROXY_NAME.to_string()),
                     uses: Some(fidl_fuchsia_netemul::ChildUses::Capabilities(
-                        [
-                            fnet_migration::StateMarker::PROTOCOL_NAME,
-                            fidl_fuchsia_process::LauncherMarker::PROTOCOL_NAME,
-                        ]
-                        .into_iter()
-                        .map(|proto| {
-                            fidl_fuchsia_netemul::Capability::ChildDep(
-                                fidl_fuchsia_netemul::ChildDep {
-                                    name: Some(MOCK_SERVICES_NAME.to_string()),
-                                    capability: Some(
-                                        fidl_fuchsia_netemul::ExposedCapability::Protocol(
-                                            proto.to_string(),
-                                        ),
-                                    ),
-                                    ..Default::default()
-                                },
-                            )
-                        })
-                        .chain(std::iter::once(fidl_fuchsia_netemul::Capability::LogSink(
-                            fidl_fuchsia_netemul::Empty {},
-                        )))
-                        .collect(),
+                        proto_caps
+                            .chain(config_caps)
+                            .chain(std::iter::once(fidl_fuchsia_netemul::Capability::LogSink(
+                                fidl_fuchsia_netemul::Empty {},
+                            )))
+                            .collect(),
                     )),
                     exposes: Some(vec![
                         fidl_fuchsia_net_dhcp::ClientProviderMarker::PROTOCOL_NAME.to_string(),

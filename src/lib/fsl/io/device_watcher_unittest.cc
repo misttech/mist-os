@@ -4,12 +4,10 @@
 
 #include "src/lib/fsl/io/device_watcher.h"
 
-#include <fuchsia/io/cpp/fidl.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
-#include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fit/defer.h>
 
 #include <fbl/ref_ptr.h>
@@ -34,17 +32,15 @@ TEST_F(DeviceWatcher, IgnoreDot) {
   auto empty_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   fs::SynchronousVfs vfs(fs_loop.dispatcher());
 
-  fidl::InterfaceHandle<fuchsia::io::Directory> dir_handle;
-
-  auto request = dir_handle.NewRequest();
-  async::PostTask(fs_loop.dispatcher(), [&, request = std::move(request)]() mutable {
-    vfs.Serve(empty_dir, request.TakeChannel(), fs::VnodeConnectionOptions::ReadOnly());
+  auto [dir_client, dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  async::PostTask(fs_loop.dispatcher(), [&, server_end = std::move(dir_server)]() mutable {
+    vfs.ServeDirectory(empty_dir, std::move(server_end));
   });
 
   fdio_ns_t* ns;
   const char* kDevicePath = "/test-device-path";
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
-  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, kDevicePath, dir_handle.TakeChannel().release()));
+  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, kDevicePath, dir_client.TakeChannel().release()));
   auto defer_unbind = fit::defer([&]() { fdio_ns_unbind(ns, kDevicePath); });
   auto device_watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
       kDevicePath,

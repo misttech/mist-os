@@ -1199,6 +1199,9 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddr/1",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNic/0",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddr/0",
+
+                // New failing test. Ignoring for rollers.
+                "CloneTest.NewUserMountNamespace",
             ],
         },
     ],

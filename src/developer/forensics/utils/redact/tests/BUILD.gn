@@ -4,11 +4,12 @@
 
 import("//build/components/fuchsia_test_package.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("cache_unittest_exe") {
+cc_test_executable("cache_unittest_exe") {
   testonly = true
 
   sources = [ "cache_unittest.cc" ]
@@ -22,7 +23,7 @@ executable("cache_unittest_exe") {
   ]
 }
 
-executable("redactor_unittest_exe") {
+cc_test_executable("redactor_unittest_exe") {
   testonly = true
 
   sources = [ "redactor_unittest.cc" ]
@@ -36,7 +37,7 @@ executable("redactor_unittest_exe") {
   ]
 }
 
-executable("replacer_unittest_exe") {
+cc_test_executable("replacer_unittest_exe") {
   testonly = true
 
   sources = [ "replacer_unittest.cc" ]

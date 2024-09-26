@@ -194,7 +194,10 @@ impl Process {
         // elements of the slice. Every valid state for a u8 is also a valid state for
         // MaybeUninit<u8>, although the reverse is not true.
         let (actually_read, _) = self.read_memory_uninit(vaddr, unsafe {
-            std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut MaybeUninit<u8>, bytes.len())
+            std::slice::from_raw_parts_mut(
+                bytes.as_mut_ptr().cast::<MaybeUninit<u8>>(),
+                bytes.len(),
+            )
         })?;
         Ok(actually_read.len())
     }
@@ -220,7 +223,7 @@ impl Process {
                 self.raw_handle(),
                 vaddr,
                 // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
-                buffer.as_mut_ptr() as *mut u8,
+                buffer.as_mut_ptr().cast::<u8>(),
                 buffer.len(),
                 &mut actually_read,
             )
@@ -235,7 +238,7 @@ impl Process {
             // but as long as that assumption is valid them it's safe to assume this slice is init.
             unsafe {
                 std::slice::from_raw_parts_mut(
-                    initialized.as_mut_ptr() as *mut u8,
+                    initialized.as_mut_ptr().cast::<u8>(),
                     initialized.len(),
                 )
             },
@@ -305,12 +308,7 @@ impl Process {
     pub fn get_child(&self, koid: &Koid, rights: zx_rights_t) -> Result<Handle, Status> {
         let mut handle: zx_handle_t = Default::default();
         let status = unsafe {
-            sys::zx_object_get_child(
-                self.raw_handle(),
-                koid.raw_koid(),
-                rights,
-                &mut handle as *mut zx_handle_t,
-            )
+            sys::zx_object_get_child(self.raw_handle(), koid.raw_koid(), rights, &mut handle)
         };
         ok(status)?;
         Ok(unsafe { Handle::from_raw(handle) })

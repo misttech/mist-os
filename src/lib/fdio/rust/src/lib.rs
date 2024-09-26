@@ -618,6 +618,22 @@ pub fn get_vmo_exec_from_file(f: &File) -> Result<zx::Vmo, zx::Status> {
         let vmo = vmo.as_mut_ptr();
         unsafe { fdio_sys::fdio_get_vmo_exec(fd, vmo) }
     };
+    zx::Status::ok(status)?;
+    let vmo = unsafe { zx::Handle::from_raw(vmo.assume_init()) };
+    debug_assert!(!vmo.is_invalid(), "({:?}).is_invalid()", vmo);
+    Ok(zx::Vmo::from(vmo))
+}
+
+/// Get a read-only handle to the exact VMO used by the file system server to represent the file.
+/// This VMO will track size and content changes to the file.
+pub fn get_vmo_exact_from_file(f: &File) -> Result<zx::Vmo, zx::Status> {
+    let fd = f.as_raw_fd();
+    // we expect fdio to initialize this to a legal value.
+    let mut vmo = MaybeUninit::new(zx::Handle::invalid().raw_handle());
+    let status = {
+        let vmo = vmo.as_mut_ptr();
+        unsafe { fdio_sys::fdio_get_vmo_exact(fd, vmo) }
+    };
     let () = zx::Status::ok(status)?;
     let vmo = unsafe { vmo.assume_init() };
     let vmo = unsafe { zx::Handle::from_raw(vmo) };

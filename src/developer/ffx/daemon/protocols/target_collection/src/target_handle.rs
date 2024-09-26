@@ -132,6 +132,10 @@ impl TargetHandleInner {
                 let target_info = ffx::TargetInfo::from(&*self.target);
                 responder.send(&target_info).map_err(Into::into)
             }
+            ffx::TargetRequest::Disconnect { responder } => {
+                self.target.disconnect();
+                responder.send().map_err(Into::into)
+            }
         }
     }
 }

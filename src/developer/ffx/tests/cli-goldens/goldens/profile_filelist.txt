@@ -12,6 +12,7 @@ ffx/profile/heapdump/download.golden
 ffx/profile/heapdump/list.golden
 ffx/profile/heapdump/snapshot.golden
 ffx/profile/memory.golden
+ffx/profile/memory/components.golden
 ffx/profile/memory/signal.golden
 ffx/profile/network.golden
 ffx/profile/network/activity.golden

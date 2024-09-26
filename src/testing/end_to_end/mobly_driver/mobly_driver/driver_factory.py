@@ -4,7 +4,7 @@
 """Factory for initializing environment-specific MoblyDriver implementations."""
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 from mobly_driver.api import api_infra
 from mobly_driver.driver import base, common, infra, local
@@ -21,17 +21,16 @@ class DriverFactory:
 
     def __init__(
         self,
-        ffx_path: str,
+        honeydew_config: dict[str, Any],
         transport: str,
         multi_device: bool = False,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
-        ffx_subtools_search_path: Optional[str] = None,
         ssh_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
         Args:
-          ffx_path: absolute path to the FFX binary.
+          honeydew_config: Honeydew configuration.
           transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
           config_path: absolute path to the Mobly test config file.
@@ -39,12 +38,11 @@ class DriverFactory:
           ffx_subtools_search_path: absolute path to where to search for FFX plugins.
           ssh_path: absolute path to the SSH binary.
         """
-        self._ffx_path = ffx_path
+        self._honeydew_config = honeydew_config
         self._transport = transport
         self._multi_device = multi_device
         self._config_path = config_path
         self._params_path = params_path
-        self._ffx_subtools_search_path = ffx_subtools_search_path
         self._ssh_path = ssh_path
 
     def get_driver(self) -> base.BaseDriver:
@@ -59,20 +57,18 @@ class DriverFactory:
         botanist_config_path = os.getenv(api_infra.BOT_ENV_TESTBED_CONFIG)
         if not botanist_config_path:
             return local.LocalDriver(
-                ffx_path=self._ffx_path,
+                honeydew_config=self._honeydew_config,
                 transport=self._transport,
                 multi_device=self._multi_device,
                 config_path=self._config_path,
                 params_path=self._params_path,
-                ffx_subtools_search_path=self._ffx_subtools_search_path,
             )
         try:
             return infra.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],
-                ffx_path=self._ffx_path,
+                honeydew_config=self._honeydew_config,
                 transport=self._transport,
                 params_path=self._params_path,
-                ffx_subtools_search_path=self._ffx_subtools_search_path,
                 ssh_path=self._ssh_path,
             )
         except KeyError as e:

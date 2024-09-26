@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("test") {
   testonly = true
@@ -19,7 +20,7 @@ group("test") {
 # test_binary.zstd results from building this target under core.x64-release and compressing with
 # zstd.  For now, this is a manual process, which should be fine since it shouldn't need to change
 # very often.
-executable("test_binary") {
+cc_test_executable("test_binary") {
   testonly = true
   sources = [ "test_binary_main.cc" ]
   visibility = [ ":*" ]

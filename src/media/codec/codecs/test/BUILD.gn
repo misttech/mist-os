@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("test") {
   testonly = true
@@ -14,7 +15,7 @@ group("test") {
   ]
 }
 
-executable("codec_adapter_sw_test_bin") {
+cc_test_executable("codec_adapter_sw_test_bin") {
   output_name = "codec_adapter_sw_test"
   testonly = true
 
@@ -30,7 +31,7 @@ fuchsia_unittest_package("codec_adapter_sw_test") {
   deps = [ ":codec_adapter_sw_test_bin" ]
 }
 
-executable("timestamp_extrapolator_test_bin") {
+cc_test_executable("timestamp_extrapolator_test_bin") {
   output_name = "timestamp_extrapolator_tests"
 
   testonly = true
@@ -57,7 +58,7 @@ source_set("test_codec_packets") {
   ]
 }
 
-executable("chunk_input_stream_test_bin") {
+cc_test_executable("chunk_input_stream_test_bin") {
   output_name = "chunk_input_stream_tests"
 
   testonly = true
@@ -75,7 +76,7 @@ fuchsia_unittest_package("chunk_input_stream_tests") {
   deps = [ ":chunk_input_stream_test_bin" ]
 }
 
-executable("output_sink_test_bin") {
+cc_test_executable("output_sink_test_bin") {
   output_name = "output_sink_tests"
 
   testonly = true

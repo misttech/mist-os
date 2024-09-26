@@ -4,11 +4,12 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("snapshotter_integration_test_exe") {
+cc_test_executable("snapshotter_integration_test_exe") {
   testonly = true
 
   sources = [ "snapshotter_integration_test.cc" ]
@@ -24,7 +25,7 @@ executable("snapshotter_integration_test_exe") {
   ]
 }
 
-executable("snapshotter_unittest_exe") {
+cc_test_executable("snapshotter_unittest_exe") {
   testonly = true
 
   sources = [ "snapshotter_unittest.cc" ]

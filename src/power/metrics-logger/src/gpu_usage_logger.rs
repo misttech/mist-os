@@ -69,9 +69,10 @@ fn vmo_to_magma_total_time_query_result(vmo: zx::Vmo) -> Result<magma_total_time
         [0; MAGMA_TOTAL_TIME_QUERY_RESULT_SIZE];
     vmo.read(&mut buffer, 0)
         .map_err(|e| format_err!("Failed to read VMO into buffer with err: {:?}", e))?;
-    let result = magma_total_time_query_result::read_from(&buffer as &[u8]).ok_or(format_err!(
-        "Reads a copy of magma_total_time_query_result from VMO bytes failed."
-    ))?;
+    let result =
+        magma_total_time_query_result::read_from_bytes(&buffer as &[u8]).map_err(|_| {
+            format_err!("Reads a copy of magma_total_time_query_result from VMO bytes failed.")
+        })?;
     Ok(result)
 }
 

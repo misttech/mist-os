@@ -8,7 +8,7 @@ use std::num::NonZeroU16;
 use std::ops::RangeInclusive;
 
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
-use fidl_fuchsia_net_filter_ext::{Action, NatHook};
+use fidl_fuchsia_net_filter_ext::{Action, NatHook, PortRange};
 use heck::SnakeCase as _;
 use net_types::ip::IpAddress as _;
 use net_types::Witness as _;
@@ -178,7 +178,9 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
                 other: I::OTHER_SUBNET,
             },
             Ports { src: sock_addrs.client.port(), dst: original_dst.port() },
-            Action::Redirect { dst_port: change_dst_port.then_some(server_port..=server_port) },
+            Action::Redirect {
+                dst_port: change_dst_port.then_some(PortRange(server_port..=server_port)),
+            },
         )
         .await;
 
@@ -260,7 +262,9 @@ async fn redirect_local_egress<I: TestIpExt, M: Matcher>(
             &matcher,
             netstack.outgoing_subnets::<I>(),
             Ports { src: sock_addrs.client.port(), dst: original_dst.port() },
-            Action::Redirect { dst_port: change_dst_port.then_some(server_port..=server_port) },
+            Action::Redirect {
+                dst_port: change_dst_port.then_some(PortRange(server_port..=server_port)),
+            },
         )
         .await;
 

@@ -8,7 +8,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use fprint::TypeFingerprint;
 use serde::{Deserialize, Serialize};
 use static_assertions::assert_cfg;
-use zerocopy::{AsBytes as _, FromBytes as _};
+use zerocopy::{FromBytes as _, IntoBytes as _};
 
 /// For the foreseeable future, Fxfs will use 64-bit checksums.
 pub type Checksum = u64;
@@ -53,7 +53,7 @@ impl Checksums {
 
     pub fn maybe_as_ref(&self) -> Result<&[Checksum], Error> {
         assert_cfg!(target_endian = "little");
-        Checksum::slice_from(&self.sums).ok_or(FxfsError::Inconsistent.into())
+        <[Checksum]>::ref_from_bytes(&self.sums).map_err(|_| FxfsError::Inconsistent.into())
     }
 
     pub fn offset_by(&self, amount: usize) -> Self {

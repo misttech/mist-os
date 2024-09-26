@@ -36,6 +36,7 @@ test("zxio") {
     "test_file_server_base.h",
     "test_node_server.h",
     "test_socket_server.h",
+    "tranferable-test.cc",
     "tty-test.cc",
     "vmo-test.cc",
     "watcher-test.cc",

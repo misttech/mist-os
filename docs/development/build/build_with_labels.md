@@ -1,8 +1,5 @@
 # Build with GN labels
 
-Note: This feature is experimental is only enabled by setting and
-exporting `FX_BUILD_WITH_LABESL=1` in your environment.
-
 `fx build` can now build GN targets directly. To do so, simply use one or more
 GN target labels, with a `//` prefix on the command-line as in:
 

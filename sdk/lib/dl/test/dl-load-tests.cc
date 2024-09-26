@@ -459,10 +459,6 @@ TYPED_TEST(DlTests, OpenDepDirectly) {
   const std::string kFile = TestShlib("libhas-foo-v1");
   const std::string kDepFile = TestShlib("libld-dep-foo-v1");
 
-  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
-    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
-  }
-
   this->Needed({kFile, kDepFile});
 
   auto res1 = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -476,17 +472,19 @@ TYPED_TEST(DlTests, OpenDepDirectly) {
 
   // Test that dlsym will resolve the same symbol pointer from the shared
   // dependency between kFile (res1) and kDepFile (res2).
-  auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-  ASSERT_TRUE(sym1.value());
+  if constexpr (TestFixture::kDepModuleHasDepTree) {
+    auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
+    ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+    ASSERT_TRUE(sym1.value());
 
-  auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-  ASSERT_TRUE(sym2.value());
+    auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
+    ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+    ASSERT_TRUE(sym2.value());
 
-  EXPECT_EQ(sym1.value(), sym2.value());
+    EXPECT_EQ(sym1.value(), sym2.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
+    EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
+  }
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
@@ -598,10 +596,6 @@ TYPED_TEST(DlTests, LocalPrecedence) {
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
-  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
-    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
-  }
-
   this->Needed({kDepFile2});
 
   auto res1 = this->DlOpen(kDepFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -669,10 +663,6 @@ TYPED_TEST(DlTests, LocalPrecedenceTransitiveDeps) {
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
-  if (!TestFixture::kCanReuseLoadedDeps) {
-    GTEST_SKIP() << "test requires that fixture can reuse loaded dependencies";
-  }
-
   this->Needed({kDepFile1, kDepFile2});
 
   auto res1 = this->DlOpen(kDepFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -731,10 +721,6 @@ TYPED_TEST(DlTests, LoadedTransitiveDepOrder) {
   const std::string kDepFile4 = TestShlib("libld-dep-foo-v1");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
-
-  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
-    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
-  }
 
   this->Needed({kDepFile1, kDepFile2});
 
@@ -809,19 +795,17 @@ TYPED_TEST(DlTests, PrecedenceInDepResolution) {
   ASSERT_TRUE(res1.is_ok()) << res1.error_value();
   EXPECT_TRUE(res1.value());
 
-  if constexpr (TestFixture::kDlSymSupportsDeps) {
-    auto bar_v1 = this->DlSym(res1.value(), TestSym("bar_v1").c_str());
-    ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
-    ASSERT_TRUE(bar_v1.value());
+  auto bar_v1 = this->DlSym(res1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+  ASSERT_TRUE(bar_v1.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kReturnValueFromFooV1);
 
-    auto bar_v2 = this->DlSym(res1.value(), TestSym("bar_v2").c_str());
-    ASSERT_TRUE(bar_v2.is_ok()) << bar_v2.error_value();
-    ASSERT_TRUE(bar_v2.value());
+  auto bar_v2 = this->DlSym(res1.value(), TestSym("bar_v2").c_str());
+  ASSERT_TRUE(bar_v2.is_ok()) << bar_v2.error_value();
+  ASSERT_TRUE(bar_v2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(bar_v2.value()), kReturnValueFromFooV1);
-  }
+  EXPECT_EQ(RunFunction<int64_t>(bar_v2.value()), kReturnValueFromFooV1);
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
 }
@@ -859,22 +843,22 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
 
   EXPECT_EQ(RunFunction<int64_t>(foo.value()), kReturnValueFromRootModule);
 
-  if constexpr (TestFixture::kDlSymSupportsDeps) {
-    auto bar_v1 = this->DlSym(res1.value(), TestSym("bar_v1").c_str());
-    ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
-    ASSERT_TRUE(bar_v1.value());
+  auto bar_v1 = this->DlSym(res1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+  ASSERT_TRUE(bar_v1.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kReturnValueFromRootModule);
+  EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kReturnValueFromRootModule);
 
-    auto bar_v2 = this->DlSym(res1.value(), TestSym("bar_v2").c_str());
-    ASSERT_TRUE(bar_v2.is_ok()) << bar_v2.error_value();
-    ASSERT_TRUE(bar_v2.value());
+  auto bar_v2 = this->DlSym(res1.value(), TestSym("bar_v2").c_str());
+  ASSERT_TRUE(bar_v2.is_ok()) << bar_v2.error_value();
+  ASSERT_TRUE(bar_v2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(bar_v2.value()), kReturnValueFromRootModule);
+  EXPECT_EQ(RunFunction<int64_t>(bar_v2.value()), kReturnValueFromRootModule);
 
-    // Test that when we dlopen the dep directly, foo is resolved to the
-    // transitive dependency, while bar_v1/bar_v2 continue to use the root
-    // module's foo symbol.
+  // Test that when we dlopen the dep directly, foo is resolved to the
+  // transitive dependency, while bar_v1/bar_v2 continue to use the root
+  // module's foo symbol.
+  if constexpr (TestFixture::kDepModuleHasDepTree) {
     auto dep1 = this->DlOpen(kDepFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
     ASSERT_TRUE(dep1.is_ok()) << dep1.error_value();
     EXPECT_TRUE(dep1.value());

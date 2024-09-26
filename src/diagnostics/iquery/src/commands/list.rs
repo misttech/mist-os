@@ -173,7 +173,7 @@ impl Command for ListCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::{InspectDataBuilder, InspectHandleName};
+    use diagnostics_data::{InspectDataBuilder, InspectHandleName, Timestamp};
 
     #[fuchsia::test]
     fn components_from_inspect_data_uses_diagnostics_ready() {
@@ -181,28 +181,28 @@ mod tests {
             InspectDataBuilder::new(
                 "some_moniker".try_into().unwrap(),
                 "fake-url",
-                123456789800i64,
+                Timestamp::from_nanos(123456789800i64),
             )
             .with_name(InspectHandleName::filename("fake-file"))
             .build(),
             InspectDataBuilder::new(
                 "other_moniker".try_into().unwrap(),
                 "other-fake-url",
-                123456789900i64,
+                Timestamp::from_nanos(123456789900i64),
             )
             .with_name(InspectHandleName::filename("fake-file"))
             .build(),
             InspectDataBuilder::new(
                 "some_moniker".try_into().unwrap(),
                 "fake-url",
-                123456789910i64,
+                Timestamp::from_nanos(123456789910i64),
             )
             .with_name(InspectHandleName::filename("fake-file"))
             .build(),
             InspectDataBuilder::new(
                 "different_moniker".try_into().unwrap(),
                 "different-fake-url",
-                123456790990i64,
+                Timestamp::from_nanos(123456790990i64),
             )
             .with_name(InspectHandleName::filename("fake-file"))
             .build(),

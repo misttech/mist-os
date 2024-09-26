@@ -10,55 +10,87 @@ use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
 use std::hash::{Hash, Hasher};
 use std::{ops, time as stdtime};
 
-pub type MonotonicTime = Time<MonotonicTimeline>;
-pub type SyntheticTime = Time<SyntheticTimeline>;
+/// A timestamp from the monontonic clock. Does not advance while the system is suspended.
+pub type MonotonicTime = Time<MonotonicTimeline, NsUnit>;
 
-#[derive(Copy, Clone)]
+/// A timestamp from a user-defined clock with arbitrary behavior.
+pub type SyntheticTime = Time<SyntheticTimeline, NsUnit>;
+
+/// A timestamp from the boot clock. Advances while the system is suspended.
+pub type BootTime = Time<BootTimeline>;
+
+/// A timestamp from system ticks. Has an arbitrary unit that can be measured with
+/// `Ticks::per_second()`.
+pub type Ticks<T> = Time<T, TicksUnit>;
+
+/// A timestamp from system ticks on the monotonic timeline. Does not advance while the system is
+/// suspended.
+pub type MonotonicTicks = Time<MonotonicTimeline, TicksUnit>;
+
+/// A timestamp from system ticks on the boot timeline. Advances while the system is suspended.
+pub type BootTicks = Time<BootTimeline, TicksUnit>;
+
+/// A duration between two system ticks timestamps.
+pub type DurationTicks = Duration<TicksUnit>;
+
+/// A timestamp from the kernel. Generic over both the timeline and the units it is measured in.
 #[repr(transparent)]
-pub struct Time<T>(sys::zx_time_t, std::marker::PhantomData<T>);
+pub struct Time<T, U = NsUnit>(sys::zx_time_t, std::marker::PhantomData<(T, U)>);
 
-impl<T> Default for Time<T> {
+impl<T, U> Clone for Time<T, U> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T, U> Copy for Time<T, U> {}
+
+impl<T, U> Default for Time<T, U> {
     fn default() -> Self {
         Time(0, std::marker::PhantomData)
     }
 }
 
-impl<T> Hash for Time<T> {
+impl<T, U> Hash for Time<T, U> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl<T> PartialEq for Time<T> {
+impl<T, U> PartialEq for Time<T, U> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-impl<T> Eq for Time<T> {}
+impl<T, U> Eq for Time<T, U> {}
 
-impl<T> PartialOrd for Time<T> {
+impl<T, U> PartialOrd for Time<T, U> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
-impl<T> Ord for Time<T> {
+impl<T, U> Ord for Time<T, U> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
     }
 }
 
-impl<T> std::fmt::Debug for Time<T> {
+impl<T, U> std::fmt::Debug for Time<T, U> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Avoid line noise from the marker type but do include the timeline in the output.
         let timeline_name = std::any::type_name::<T>();
         let short_timeline_name =
             timeline_name.rsplit_once("::").map(|(_, n)| n).unwrap_or(timeline_name);
-        f.debug_tuple(&format!("Time<{short_timeline_name}>")).field(&self.0).finish()
+        let units_name = std::any::type_name::<U>();
+        let short_units_name = units_name.rsplit_once("::").map(|(_, n)| n).unwrap_or(units_name);
+        f.debug_tuple(&format!("Time<{short_timeline_name}, {short_units_name}>"))
+            .field(&self.0)
+            .finish()
     }
 }
 
 impl MonotonicTime {
-    /// Get the current monotonic time.
+    /// Get the current monotonic time which does not advance during system suspend.
     ///
     /// Wraps the
     /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
@@ -88,141 +120,229 @@ impl MonotonicTime {
     }
 }
 
+impl BootTime {
+    /// Get the current boot time which advances during system suspend.
+    ///
+    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
+    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
+    /// clock begins pausing during suspend.
+    pub fn get() -> Self {
+        // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
+        unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
+    }
+}
+
 impl<T: Timeline> Time<T> {
-    pub const INFINITE: Time<T> = Time(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
-    pub const INFINITE_PAST: Time<T> = Time(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
-    pub const ZERO: Time<T> = Time(0, std::marker::PhantomData);
+    pub const INFINITE: Time<T, NsUnit> = Time(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
+    pub const INFINITE_PAST: Time<T, NsUnit> =
+        Time(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
+    pub const ZERO: Time<T, NsUnit> = Time(0, std::marker::PhantomData);
 
     /// Returns the number of nanoseconds since the epoch contained by this `Time`.
     pub const fn into_nanos(self) -> i64 {
         self.0
     }
 
+    /// Return a strongly-typed `Time` from a raw number of nanoseconds.
     pub const fn from_nanos(nanos: i64) -> Self {
         Time(nanos, std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::Add<Duration> for Time<T> {
-    type Output = Time<T>;
-    fn add(self, dur: Duration) -> Self::Output {
-        Time::from_nanos(dur.into_nanos().saturating_add(self.into_nanos()))
+impl MonotonicTicks {
+    /// Read the number of high-precision timer ticks on the monotonic timeline. These ticks may be
+    /// processor cycles, high speed timer, profiling timer, etc. They do not advance while the
+    /// system is suspended.
+    ///
+    /// Wraps the
+    /// [zx_ticks_get](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_get.md)
+    /// syscall.
+    pub fn get() -> Self {
+        // SAFETY: FFI call that is always sound to call.
+        Self(unsafe { sys::zx_ticks_get() }, std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::Sub<Duration> for Time<T> {
-    type Output = Time<T>;
-    fn sub(self, dur: Duration) -> Self::Output {
-        Time::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
+impl BootTicks {
+    /// Read the number of high-precision timer ticks on the boot timeline. These ticks may be
+    /// processor cycles, high speed timer, profiling timer, etc. They advance while the
+    /// system is suspended.
+    ///
+    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
+    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
+    /// clock begins pausing during suspend.
+    pub fn get() -> Self {
+        // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
+        Self(MonotonicTicks::get().0, std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::Sub<Time<T>> for Time<T> {
-    type Output = Duration;
-    fn sub(self, other: Time<T>) -> Self::Output {
-        Duration::from_nanos(self.into_nanos().saturating_sub(other.into_nanos()))
+impl<T: Timeline> Ticks<T> {
+    /// Return the number of ticks contained by this `Ticks`.
+    pub const fn into_raw(self) -> i64 {
+        self.0
+    }
+
+    /// Return a strongly-typed `Ticks` from a raw number of system ticks.
+    pub const fn from_raw(raw: i64) -> Self {
+        Self(raw, std::marker::PhantomData)
+    }
+
+    /// Return the number of high-precision timer ticks in a second.
+    ///
+    /// Wraps the
+    /// [zx_ticks_per_second](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_per_second.md)
+    /// syscall.
+    pub fn per_second() -> i64 {
+        // SAFETY: FFI call that is always sound to call.
+        unsafe { sys::zx_ticks_per_second() }
     }
 }
 
-impl<T: Timeline> ops::AddAssign<Duration> for Time<T> {
-    fn add_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_add(dur.into_nanos());
+impl<T: Timeline, U: TimeUnit> ops::Add<Duration<U>> for Time<T, U> {
+    type Output = Time<T, U>;
+    fn add(self, dur: Duration<U>) -> Self::Output {
+        Self(self.0.saturating_add(dur.0), std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline> ops::SubAssign<Duration> for Time<T> {
-    fn sub_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_sub(dur.into_nanos());
+impl<T: Timeline, U: TimeUnit> ops::Sub<Duration<U>> for Time<T, U> {
+    type Output = Time<T, U>;
+    fn sub(self, dur: Duration<U>) -> Self::Output {
+        Self(self.0.saturating_sub(dur.0), std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline, U: TimeUnit> ops::Sub<Time<T, U>> for Time<T, U> {
+    type Output = Duration<U>;
+    fn sub(self, rhs: Time<T, U>) -> Self::Output {
+        Duration(self.0.saturating_sub(rhs.0), std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline, U: TimeUnit> ops::AddAssign<Duration<U>> for Time<T, U> {
+    fn add_assign(&mut self, dur: Duration<U>) {
+        self.0 = self.0.saturating_add(dur.0);
+    }
+}
+
+impl<T: Timeline, U: TimeUnit> ops::SubAssign<Duration<U>> for Time<T, U> {
+    fn sub_assign(&mut self, dur: Duration<U>) {
+        self.0 = self.0.saturating_sub(dur.0);
     }
 }
 
 /// A marker trait for times to prevent accidental comparison between different timelines.
 pub trait Timeline {}
 
+/// A marker type for the system's monotonic timeline which pauses during suspend.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonotonicTimeline;
 impl Timeline for MonotonicTimeline {}
 
+/// A marker type for the system's boot timeline which continues running during suspend.
+///
+/// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+/// not yet available in the stable vdso. This currently uses the monotonic clock which is
+/// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+/// suspend in the near future. This will be migrated to the boot clock before the monotonic
+/// clock begins pausing during suspend.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BootTimeline;
+impl Timeline for BootTimeline {}
+
+/// A marker type representing a synthetic timeline defined by a kernel clock object.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SyntheticTimeline;
 impl Timeline for SyntheticTimeline {}
 
+/// A marker trait for times and durations to prevent accidental comparison between different units.
+pub trait TimeUnit {}
+
+/// A marker type representing nanoseconds.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct NsUnit;
+impl TimeUnit for NsUnit {}
+
+/// A marker type representing system ticks.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct TicksUnit;
+impl TimeUnit for TicksUnit {}
+
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Duration(sys::zx_duration_t);
+pub struct Duration<U = NsUnit>(sys::zx_duration_t, std::marker::PhantomData<U>);
 
-impl From<stdtime::Duration> for Duration {
+impl From<stdtime::Duration> for Duration<NsUnit> {
     fn from(dur: stdtime::Duration) -> Self {
         Duration::from_seconds(dur.as_secs() as i64)
             + Duration::from_nanos(dur.subsec_nanos() as i64)
     }
 }
 
-impl<T: Timeline> ops::Add<Time<T>> for Duration {
-    type Output = Time<T>;
-    fn add(self, time: Time<T>) -> Self::Output {
-        Time::from_nanos(self.into_nanos().saturating_add(time.into_nanos()))
+impl<T: Timeline, U: TimeUnit> ops::Add<Time<T, U>> for Duration<U> {
+    type Output = Time<T, U>;
+    fn add(self, time: Time<T, U>) -> Self::Output {
+        Time(self.0.saturating_add(time.0), std::marker::PhantomData)
     }
 }
 
-impl ops::Add for Duration {
-    type Output = Duration;
-    fn add(self, dur: Duration) -> Duration {
-        Duration::from_nanos(self.into_nanos().saturating_add(dur.into_nanos()))
+impl<U: TimeUnit> ops::Add for Duration<U> {
+    type Output = Duration<U>;
+    fn add(self, rhs: Duration<U>) -> Self::Output {
+        Self(self.0.saturating_add(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl ops::Sub for Duration {
-    type Output = Duration;
-    fn sub(self, dur: Duration) -> Duration {
-        Duration::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
+impl<U: TimeUnit> ops::Sub for Duration<U> {
+    type Output = Duration<U>;
+    fn sub(self, rhs: Duration<U>) -> Duration<U> {
+        Self(self.0.saturating_sub(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl ops::AddAssign for Duration {
-    fn add_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_add(dur.into_nanos());
+impl<U: TimeUnit> ops::AddAssign for Duration<U> {
+    fn add_assign(&mut self, rhs: Duration<U>) {
+        self.0 = self.0.saturating_add(rhs.0);
     }
 }
 
-impl ops::SubAssign for Duration {
-    fn sub_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_sub(dur.into_nanos());
+impl<U: TimeUnit> ops::SubAssign for Duration<U> {
+    fn sub_assign(&mut self, rhs: Duration<U>) {
+        self.0 = self.0.saturating_sub(rhs.0);
     }
 }
 
-impl<T> ops::Mul<T> for Duration
-where
-    T: Into<i64>,
-{
+impl<T: Into<i64>, U: TimeUnit> ops::Mul<T> for Duration<U> {
     type Output = Self;
     fn mul(self, mul: T) -> Self {
-        Duration::from_nanos(self.0.saturating_mul(mul.into()))
+        Self(self.0.saturating_mul(mul.into()), std::marker::PhantomData)
     }
 }
 
-impl<T> ops::Div<T> for Duration
-where
-    T: Into<i64>,
-{
+impl<T: Into<i64>, U: TimeUnit> ops::Div<T> for Duration<U> {
     type Output = Self;
     fn div(self, div: T) -> Self {
-        Duration::from_nanos(self.0.saturating_div(div.into()))
+        Self(self.0.saturating_div(div.into()), std::marker::PhantomData)
     }
 }
 
-impl ops::Neg for Duration {
+impl<U: TimeUnit> ops::Neg for Duration<U> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Self(self.0.saturating_neg())
+        Self(self.0.saturating_neg(), std::marker::PhantomData)
     }
 }
 
-impl Duration {
-    pub const INFINITE: Duration = Duration(sys::zx_duration_t::MAX);
-    pub const INFINITE_PAST: Duration = Duration(sys::zx_duration_t::MIN);
-    pub const ZERO: Duration = Duration(0);
+impl Duration<NsUnit> {
+    pub const INFINITE: Duration = Duration(sys::zx_duration_t::MAX, std::marker::PhantomData);
+    pub const INFINITE_PAST: Duration = Duration(sys::zx_duration_t::MIN, std::marker::PhantomData);
+    pub const ZERO: Duration = Duration(0, std::marker::PhantomData);
 
     /// Sleep for the given amount of time.
     pub fn sleep(self) {
@@ -265,11 +385,11 @@ impl Duration {
     }
 
     pub const fn from_nanos(nanos: i64) -> Self {
-        Duration(nanos)
+        Duration(nanos, std::marker::PhantomData)
     }
 
     pub const fn from_micros(micros: i64) -> Self {
-        Duration(micros.saturating_mul(1_000))
+        Duration(micros.saturating_mul(1_000), std::marker::PhantomData)
     }
 
     pub const fn from_millis(millis: i64) -> Self {
@@ -289,78 +409,16 @@ impl Duration {
     }
 }
 
-pub trait DurationNum: Sized {
-    fn nanos(self) -> Duration;
-    fn micros(self) -> Duration;
-    fn millis(self) -> Duration;
-    fn seconds(self) -> Duration;
-    fn minutes(self) -> Duration;
-    fn hours(self) -> Duration;
-
-    // Singular versions to allow for `1.milli()` and `1.second()`, etc.
-    fn micro(self) -> Duration {
-        self.micros()
-    }
-    fn milli(self) -> Duration {
-        self.millis()
-    }
-    fn second(self) -> Duration {
-        self.seconds()
-    }
-    fn minute(self) -> Duration {
-        self.minutes()
-    }
-    fn hour(self) -> Duration {
-        self.hours()
-    }
-}
-
-// Note: this could be implemented for other unsized integer types, but it doesn't seem
-// necessary to support the usual case.
-impl DurationNum for i64 {
-    fn nanos(self) -> Duration {
-        Duration::from_nanos(self)
+impl Duration<TicksUnit> {
+    /// Return the raw number of ticks represented by this `Duration`.
+    pub const fn into_raw(self) -> i64 {
+        self.0
     }
 
-    fn micros(self) -> Duration {
-        Duration::from_micros(self)
+    /// Return a typed wrapper around the provided number of ticks.
+    pub const fn from_raw(raw: i64) -> Self {
+        Self(raw, std::marker::PhantomData)
     }
-
-    fn millis(self) -> Duration {
-        Duration::from_millis(self)
-    }
-
-    fn seconds(self) -> Duration {
-        Duration::from_seconds(self)
-    }
-
-    fn minutes(self) -> Duration {
-        Duration::from_minutes(self)
-    }
-
-    fn hours(self) -> Duration {
-        Duration::from_hours(self)
-    }
-}
-
-/// Read the number of high-precision timer ticks since boot. These ticks may be processor cycles,
-/// high speed timer, profiling timer, etc. They are not guaranteed to continue advancing when the
-/// system is asleep.
-///
-/// Wraps the
-/// [zx_ticks_get](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_get.md)
-/// syscall.
-pub fn ticks_get() -> i64 {
-    unsafe { sys::zx_ticks_get() }
-}
-
-/// Return the number of high-precision timer ticks in a second.
-///
-/// Wraps the
-/// [zx_ticks_per_second](https://fuchsia.dev/fuchsia-src/reference/syscalls/ticks_per_second.md)
-/// syscall.
-pub fn ticks_per_second() -> i64 {
-    unsafe { sys::zx_ticks_per_second() }
 }
 
 /// An object representing a Zircon timer, such as the one returned by
@@ -369,12 +427,18 @@ pub fn ticks_per_second() -> i64 {
 /// As essentially a subtype of `Handle`, it can be freely interconverted.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Timer(Handle);
-impl_handle_based!(Timer);
+// TODO(https://fxbug.dev/361661898) remove default type when FIDL understands mono vs. boot timers
+pub struct Timer<T = MonotonicTimeline>(Handle, std::marker::PhantomData<T>);
 
-impl Timer {
-    /// Create a timer, an object that can signal when a specified point in time has been reached.
-    /// Wraps the
+/// A timer that measures its deadlines against the monotonic clock.
+pub type MonotonicTimer = Timer<MonotonicTimeline>;
+
+/// A timer that measures its deadlines against the boot clock.
+pub type BootTimer = Timer<BootTimeline>;
+
+impl Timer<MonotonicTimeline> {
+    /// Create a timer, an object that can signal when a specified point on the monotonic clock has
+    /// been reached. Wraps the
     /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md)
     /// syscall.
     ///
@@ -392,18 +456,44 @@ impl Timer {
             .expect("timer creation always succeeds except with OOM or when job policy denies it");
         unsafe { Self::from(Handle::from_raw(out)) }
     }
+}
 
+impl Timer<BootTimeline> {
+    /// Create a timer, an object that can signal when a specified point on the boot clock has been
+    /// reached. Wraps the
+    /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md)
+    /// syscall.
+    ///
+    /// If the timer elapses while the system is suspended it will not wake the system.
+    ///
+    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
+    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
+    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
+    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
+    /// clock begins pausing during suspend.
+    ///
+    /// # Panics
+    ///
+    /// If the kernel reports no memory available to create a timer or the process' job policy
+    /// denies timer creation.
+    pub fn create() -> Self {
+        // TODO(https://fxbug.dev/328306129) change the clock ID to the boot clock
+        Self(MonotonicTimer::create().0, std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline> Timer<T> {
     /// Start a one-shot timer that will fire when `deadline` passes. Wraps the
     /// [zx_timer_set](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_set.md)
     /// syscall.
-    pub fn set(&self, deadline: MonotonicTime, slack: Duration) -> Result<(), Status> {
+    pub fn set(&self, deadline: Time<T>, slack: Duration<NsUnit>) -> Result<(), Status> {
         let status = unsafe {
             sys::zx_timer_set(self.raw_handle(), deadline.into_nanos(), slack.into_nanos())
         };
         ok(status)
     }
 
-    /// Cancels a pending timer that was started with start(). Wraps the
+    /// Cancels a pending timer that was started with set(). Wraps the
     /// [zx_timer_cancel](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_cancel.md)
     /// syscall.
     pub fn cancel(&self) -> Result<(), Status> {
@@ -412,6 +502,26 @@ impl Timer {
     }
 }
 
+impl<T: Timeline> AsHandleRef for Timer<T> {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        self.0.as_handle_ref()
+    }
+}
+
+impl<T: Timeline> From<Handle> for Timer<T> {
+    fn from(handle: Handle) -> Self {
+        Timer(handle, std::marker::PhantomData)
+    }
+}
+
+impl<T: Timeline> From<Timer<T>> for Handle {
+    fn from(x: Timer<T>) -> Handle {
+        x.0
+    }
+}
+
+impl<T: Timeline> HandleBased for Timer<T> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,41 +529,65 @@ mod tests {
 
     #[test]
     fn time_debug_repr_is_short() {
-        assert_eq!(format!("{:?}", MonotonicTime::from_nanos(0)), "Time<MonotonicTimeline>(0)");
-        assert_eq!(format!("{:?}", SyntheticTime::from_nanos(0)), "Time<SyntheticTimeline>(0)");
+        assert_eq!(
+            format!("{:?}", MonotonicTime::from_nanos(0)),
+            "Time<MonotonicTimeline, NsUnit>(0)"
+        );
+        assert_eq!(
+            format!("{:?}", SyntheticTime::from_nanos(0)),
+            "Time<SyntheticTimeline, NsUnit>(0)"
+        );
     }
 
     #[test]
     fn monotonic_time_increases() {
         let time1 = MonotonicTime::get();
-        1_000.nanos().sleep();
+        Duration::from_nanos(1_000).sleep();
         let time2 = MonotonicTime::get();
         assert!(time2 > time1);
     }
 
     #[test]
     fn ticks_increases() {
-        let ticks1 = ticks_get();
-        1_000.nanos().sleep();
-        let ticks2 = ticks_get();
+        let ticks1 = MonotonicTicks::get();
+        Duration::from_nanos(1_000).sleep();
+        let ticks2 = MonotonicTicks::get();
+        assert!(ticks2 > ticks1);
+    }
+
+    #[test]
+    fn boot_time_increases() {
+        let time1 = BootTime::get();
+        Duration::from_nanos(1_000).sleep();
+        let time2 = BootTime::get();
+        assert!(time2 > time1);
+    }
+
+    #[test]
+    fn boot_ticks_increases() {
+        let ticks1 = BootTicks::get();
+        Duration::from_nanos(1_000).sleep();
+        let ticks2 = BootTicks::get();
         assert!(ticks2 > ticks1);
     }
 
     #[test]
     fn tick_length() {
-        let sleep_time = 1.milli();
-        let ticks1 = ticks_get();
+        let sleep_time = Duration::from_millis(1);
+        let ticks1 = MonotonicTicks::get();
         sleep_time.sleep();
-        let ticks2 = ticks_get();
+        let ticks2 = MonotonicTicks::get();
 
         // The number of ticks should have increased by at least 1 ms worth
-        let sleep_ticks = (sleep_time.into_millis() as i64) * ticks_per_second() / 1000;
+        let sleep_ticks = DurationTicks::from_raw(
+            sleep_time.into_millis() * (MonotonicTicks::per_second() / 1000),
+        );
         assert!(ticks2 >= (ticks1 + sleep_ticks));
     }
 
     #[test]
     fn sleep() {
-        let sleep_ns = 1.millis();
+        let sleep_ns = Duration::from_millis(1);
         let time1 = MonotonicTime::get();
         sleep_ns.sleep();
         let time2 = MonotonicTime::get();
@@ -481,12 +615,12 @@ mod tests {
 
     #[test]
     fn timer_basic() {
-        let slack = 0.millis();
-        let ten_ms = 10.millis();
-        let five_secs = 5.seconds();
+        let slack = Duration::from_millis(0);
+        let ten_ms = Duration::from_millis(10);
+        let five_secs = Duration::from_seconds(5);
 
         // Create a timer
-        let timer = Timer::create();
+        let timer = MonotonicTimer::create();
 
         // Should not signal yet.
         assert_eq!(
@@ -496,6 +630,36 @@ mod tests {
 
         // Set it, and soon it should signal.
         assert_eq!(timer.set(Time::after(five_secs), slack), Ok(()));
+        assert_eq!(
+            timer.wait_handle(Signals::TIMER_SIGNALED, Time::INFINITE),
+            Ok(Signals::TIMER_SIGNALED)
+        );
+
+        // Cancel it, and it should stop signalling.
+        assert_eq!(timer.cancel(), Ok(()));
+        assert_eq!(
+            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            Err(Status::TIMED_OUT)
+        );
+    }
+
+    #[test]
+    fn boot_timer_basic() {
+        let slack = Duration::from_millis(0);
+        let ten_ms = Duration::from_millis(10);
+        let five_secs = Duration::from_seconds(5);
+
+        // Create a timer
+        let timer = BootTimer::create();
+
+        // Should not signal yet.
+        assert_eq!(
+            timer.wait_handle(Signals::TIMER_SIGNALED, Time::after(ten_ms)),
+            Err(Status::TIMED_OUT)
+        );
+
+        // Set it, and soon it should signal.
+        assert_eq!(timer.set(BootTime::get() + five_secs, slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Time::INFINITE),
             Ok(Signals::TIMER_SIGNALED)

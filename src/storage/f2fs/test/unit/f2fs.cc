@@ -252,7 +252,7 @@ TEST_F(StorageTest, LargeIOs) {
   size_t num_pages = large_buffer_size * 2;
   for (block_t i = 1; i <= num_pages; ++i) {
     LockedPage page;
-    vnode.GrabCachePage(i, &page);
+    vnode.GrabLockedPage(i, &page);
     page->ClearUptodate();
     page.Zero();
     *page->GetAddress<block_t>() = i;
@@ -267,7 +267,7 @@ TEST_F(StorageTest, LargeIOs) {
   std::vector<LockedPage> locked_pages;
   for (block_t i = 1; i <= num_pages; ++i) {
     LockedPage page;
-    vnode.GrabCachePage(i, &page);
+    vnode.GrabLockedPage(i, &page);
     page->ClearUptodate();
     ASSERT_EQ(*page->GetAddress<block_t>(), i);
     page.Zero();

@@ -4,7 +4,7 @@
 
 use test_realm_helpers::constants::DEFAULT_CLIENT_STA_ADDR;
 use wlan_common::ie::fake_ht_capabilities;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,

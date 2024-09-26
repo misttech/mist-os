@@ -202,4 +202,9 @@ message Static {
 
   // If true, enable remote builds for bazel on RBE.
   bool bazel_rbe_enable = 42;
+
+  // If set, bazel builds will stream build events to a service like
+  // Sponge or ResultStore.
+  // This value sets the GN arg `bazel_upload_build_events`.
+  string build_event_service = 43;
 }

@@ -23,12 +23,13 @@ use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
 use packet_formats::ip::{DscpAndEcn, IpPacket};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
+use crate::internal::routing::rules::{Mark, MarkDomain, Marks};
 use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
 use crate::socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions};
 use crate::DEFAULT_HOP_LIMITS;
@@ -50,7 +51,7 @@ pub trait RawIpSocketsBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     RawIpSocketsBindingsTypes + Sized
 {
     /// Called for each received IP packet that matches the provided socket.
-    fn receive_packet<B: ByteSlice>(
+    fn receive_packet<B: SplitByteSlice>(
         &self,
         socket: &RawIpSocketId<I, D::Weak, Self>,
         packet: &I::Packet<B>,
@@ -164,12 +165,18 @@ where
                 bound_device,
                 icmp_filter: _,
                 hop_limits,
+                multicast_loop,
                 system_checksums,
+                marks,
             } = state;
             let (remote_ip, device) = remote_ip
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(RawIpSocketSendToError::Zone)?;
-            let send_options = RawIpSocketSendOptions { hop_limits: &hop_limits };
+            let send_options = RawIpSocketSendOptions {
+                hop_limits: &hop_limits,
+                multicast_loop: *multicast_loop,
+                marks: &marks,
+            };
 
             let build_packet_fn =
                 |src_ip: IpDeviceAddr<I::Addr>| -> Result<RawIpBody<_, _>, RawIpSocketSendToError> {
@@ -320,6 +327,31 @@ where
         })
     }
 
+    /// Sets `multicast_loop` on the socket, returning the original value.
+    ///
+    /// When true, the socket will loop back all sent multicast traffic.
+    pub fn set_multicast_loop(&mut self, id: &RawIpApiSocketId<I, C>, value: bool) -> bool {
+        self.core_ctx()
+            .with_locked_state_mut(id, |state| core::mem::replace(&mut state.multicast_loop, value))
+    }
+
+    /// Gets the `multicast_loop` value on the socket.
+    pub fn get_multicast_loop(&mut self, id: &RawIpApiSocketId<I, C>) -> bool {
+        self.core_ctx().with_locked_state(id, |state| state.multicast_loop)
+    }
+
+    /// Sets the socket mark for the socket domain.
+    pub fn set_mark(&mut self, id: &RawIpApiSocketId<I, C>, domain: MarkDomain, mark: Mark) {
+        self.core_ctx().with_locked_state_mut(id, |state| {
+            *state.marks.get_mut(domain) = mark;
+        })
+    }
+
+    /// Gets the socket mark for the socket domain.
+    pub fn get_mark(&mut self, id: &RawIpApiSocketId<I, C>, domain: MarkDomain) -> Mark {
+        self.core_ctx().with_locked_state(id, |state| *state.marks.get(domain))
+    }
+
     /// Provides inspect data for raw IP sockets.
     pub fn inspect<N>(&mut self, inspector: &mut N)
     where
@@ -350,6 +382,8 @@ where
                             bound_device,
                             icmp_filter,
                             hop_limits: _,
+                            multicast_loop: _,
+                            marks: _,
                             system_checksums: _,
                         } = state;
                         if let Some(bound_device) = bound_device {
@@ -622,7 +656,7 @@ pub trait RawIpSocketMapContext<I: IpExt, BT: RawIpSocketsBindingsTypes>:
 /// A type that provides the raw IP socket functionality required by core.
 pub trait RawIpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Deliver a received IP packet to all appropriate raw IP sockets.
-    fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
+    fn deliver_packet_to_raw_ip_sockets<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &I::Packet<B>,
@@ -636,7 +670,7 @@ where
     BC: RawIpSocketsBindingsContext<I, CC::DeviceId>,
     CC: RawIpSocketMapContext<I, BC>,
 {
-    fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
+    fn deliver_packet_to_raw_ip_sockets<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &I::Packet<B>,
@@ -696,13 +730,19 @@ enum DeliveryOutcome {
 }
 
 /// Returns whether the given packet should be delivered to the given socket.
-fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
+fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: SplitByteSlice>(
     packet: &I::Packet<B>,
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
 ) -> DeliveryOutcome {
-    let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _, system_checksums } =
-        socket;
+    let RawIpSocketLockedState {
+        bound_device,
+        icmp_filter,
+        hop_limits: _,
+        marks: _,
+        multicast_loop: _,
+        system_checksums,
+    } = socket;
     // Verify the received device matches the socket's bound device, if any.
     if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
         return DeliveryOutcome::WrongDevice;
@@ -745,6 +785,8 @@ fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
 /// An implementation of [`SendOptions`] for raw IP sockets.
 struct RawIpSocketSendOptions<'a, I: Ip> {
     hop_limits: &'a SocketHopLimits<I>,
+    multicast_loop: bool,
+    marks: &'a Marks,
 }
 
 impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
@@ -753,8 +795,7 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
     }
 
     fn multicast_loop(&self) -> bool {
-        // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
-        false
+        self.multicast_loop
     }
 
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
@@ -763,6 +804,10 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
+    }
+
+    fn marks(&self) -> &Marks {
+        self.marks
     }
 }
 
@@ -858,7 +903,7 @@ mod test {
     impl<I: IpExt, D: Copy + FakeStrongDeviceId> RawIpSocketsBindingsContext<I, D>
         for FakeBindingsCtx<D>
     {
-        fn receive_packet<B: ByteSlice>(
+        fn receive_packet<B: SplitByteSlice>(
             &self,
             socket: &RawIpSocketId<I, D::Weak, Self>,
             packet: &I::Packet<B>,
@@ -1112,6 +1157,19 @@ mod test {
         assert_eq!(api.get_multicast_hop_limit(&sock), limit2);
         assert_eq!(api.set_multicast_hop_limit(&sock, None), Some(limit2));
         assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
+    }
+
+    #[ip_test(I)]
+    fn set_multicast_loop<I: IpExt + DualStackIpExt + TestIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        // NB: multicast loopback is enabled by default.
+        assert_eq!(api.get_multicast_loop(&sock), true);
+        assert_eq!(api.set_multicast_loop(&sock, false), true);
+        assert_eq!(api.get_multicast_loop(&sock), false);
+        assert_eq!(api.set_multicast_loop(&sock, true), false);
+        assert_eq!(api.get_multicast_loop(&sock), true);
     }
 
     #[ip_test(I)]
@@ -1434,5 +1492,26 @@ mod test {
         );
 
         assert_counters(api.core_ctx(), 1);
+    }
+
+    #[ip_test(I)]
+    #[test_case::test_matrix(
+        [MarkDomain::Mark1, MarkDomain::Mark2],
+        [None, Some(0), Some(1)]
+    )]
+    fn raw_ip_socket_marks<I: TestIpExt + DualStackIpExt + IpExt>(
+        domain: MarkDomain,
+        mark: Option<u32>,
+    ) {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let socket = api.create(RawIpSocketProtocol::Raw, Default::default());
+
+        // Doesn't have a mark by default.
+        assert_eq!(api.get_mark(&socket, domain), Mark(None));
+
+        let mark = Mark(mark);
+        // We can set and get back the mark.
+        api.set_mark(&socket, domain, mark);
+        assert_eq!(api.get_mark(&socket, domain), mark);
     }
 }

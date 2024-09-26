@@ -57,13 +57,17 @@ class AsyncIterator(Protocol[_T_co]):
         """Get the next element."""
 
 
-async def collect_iterator(iterator: AsyncIterator[_T_co]) -> list[_T_co]:
+async def collect_iterator(
+    iterator: AsyncIterator[_T_co], err_type: type | None = None
+) -> list[_T_co]:
     """Collect all elements from a FIDL iterator.
 
     Will check for errors during collection.
 
     Args:
         iterator: Iterator to collect elements from.
+        err_type: Error class for the result error. Defaults to None for no
+            error checking.
 
     Returns:
         All elements collected from iterator.
@@ -86,9 +90,9 @@ async def collect_iterator(iterator: AsyncIterator[_T_co]) -> list[_T_co]:
 
         # Check for error
         err = getattr(res, "err", None)
-        if err:
+        if err and err_type:
             raise errors.HoneydewWlanError(
-                f"{type(iterator).__name__}.GetNext() {type(err).__name__} {err}"
+                f"{type(iterator).__name__}.GetNext() {err_type.__name__} {err_type(err).name}"
             )
 
         elements.append(res)
@@ -114,6 +118,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         ffx: ffx_transport.FFX,
         fuchsia_controller: fc_transport.FuchsiaController,
         reboot_affordance: affordances_capable.RebootCapableDevice,
+        fuchsia_device_close: affordances_capable.FuchsiaDeviceClose,
     ) -> None:
         """Create a WLAN Policy Fuchsia Controller affordance.
 
@@ -122,16 +127,20 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             ffx: FFX transport.
             fuchsia_controller: Fuchsia Controller transport.
             reboot_affordance: Object that implements RebootCapableDevice.
+            fuchsia_device_close: Object that implements FuchsiaDeviceClose.
         """
         super().__init__()
         self._verify_supported(device_name, ffx)
 
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
+        self._fuchsia_device_close = fuchsia_device_close
         self._client_controller: ClientControllerState | None = None
 
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
+
+        self._fuchsia_device_close.register_for_on_device_close(self.close)
 
     def close(self) -> None:
         """Release handle on client controller.
@@ -311,7 +320,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         try:
             self._client_controller.proxy.get_saved_networks(
-                iterator=server,
+                iterator=server.take(),
             )
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
@@ -320,7 +329,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         return [
             NetworkConfig.from_fidl(config)
-            for resp in await collect_iterator(iterator)
+            for resp in await collect_iterator(
+                iterator, f_wlan_policy.ScanErrorCode
+            )
             for config in resp.configs
         ]
 
@@ -350,13 +361,15 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
-            TypeError: Return values not correct types.
+            TimeoutError: Reached timeout without any updates.
         """
         if self._client_controller is None:
             self.create_client_controller()
         assert self._client_controller is not None
 
-        return await self._client_controller.updates.get()
+        return await asyncio.wait_for(
+            self._client_controller.updates.get(), timeout
+        )
 
     def remove_all_networks(self) -> None:
         """Deletes all saved networks on the device.
@@ -494,7 +507,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         try:
             self._client_controller.proxy.scan_for_networks(
-                iterator=server,
+                iterator=server.take(),
             )
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
@@ -564,6 +577,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     async def start_client_connections(self) -> None:
         """Enables device to initiate connections to networks.
 
+        Either by auto-connecting to saved networks or acting on incoming calls
+        triggering connections.
+
         See fuchsia.wlan.policy/ClientController.StartClientConnections().
 
         Raises:
@@ -595,6 +611,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     # pylint: disable-next=invalid-overridden-method
     async def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.
+
+        Tears down any existing connections to WLAN networks and disables
+        initiation of new connections.
 
         See fuchsia.wlan.policy/ClientController.StopClientConnections().
 

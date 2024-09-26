@@ -20,7 +20,7 @@ use assembly_config_schema::{BoardInformation, DriverDetails, PackageDetails, Pa
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_file_relative_path::SupportsFileRelativePaths;
-use assembly_images_config::ImagesConfig;
+use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_named_file_map::NamedFileMap;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
@@ -48,6 +48,9 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// The name of the board that these images can be OTA'd to.
     board_name: String,
+
+    /// How to generate the filesystem image.
+    image_mode: FilesystemImageMode,
 
     /// All of the packages, in all package sets.
     packages: Packages,
@@ -96,10 +99,11 @@ pub struct ImageAssemblyConfigBuilder {
 }
 
 impl ImageAssemblyConfigBuilder {
-    pub fn new(build_type: BuildType, board_name: String) -> Self {
+    pub fn new(build_type: BuildType, board_name: String, image_mode: FilesystemImageMode) -> Self {
         Self {
             build_type,
             board_name,
+            image_mode,
             packages: Packages::default(),
             base_drivers: NamedMap::new("base_drivers"),
             boot_drivers: NamedMap::new("boot_drivers"),
@@ -145,7 +149,7 @@ impl ImageAssemblyConfigBuilder {
 
         // Add packages specified by the developer
         for package_details in packages {
-            let set = self.map_package_set(&package_details.set);
+            let set = self.map_package_set(&package_details.set, /*is_platform=*/ true)?;
             self.add_package_from_path(package_details.package, PackageOrigin::Developer, &set)
                 .context("Adding developer-specified package")?;
         }
@@ -440,36 +444,59 @@ impl ImageAssemblyConfigBuilder {
 
     /// Remap the package sets based on the build type (for the flexible set)
     /// and the developer_only_overrides (for the 'all_packages_in_base' flag)
-    fn map_package_set(&self, set: &PackageSet) -> PackageSet {
-        match (set, &self.build_type, &self.developer_only_options) {
-            // BootFS packages are always in BootFS.
-            (&PackageSet::Bootfs, _, _) => PackageSet::Bootfs,
-            // System packages are always system packages
-            (&PackageSet::System, _, _) => PackageSet::System,
-
-            // When the all_packages_in_base developer override option is
-            // enabled, that takes precedence over all the rest on eng and userdebug
-            // build-types.
-            (
-                _,
-                BuildType::Eng,
-                Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
-            )
-            | (
-                _,
-                BuildType::UserDebug,
-                Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
-            ) => PackageSet::Base,
-
-            // The Flexible package set is in Cache for eng builds, and base
-            // for user/userdebug.
-            (&PackageSet::Flexible, BuildType::Eng, _) => PackageSet::Cache,
-            (&PackageSet::Flexible, _, _) => PackageSet::Base,
-
-            // In all other cases, packages are just in their original
-            // package set.
-            (ps, _, _) => ps.clone(),
+    fn map_package_set(&self, set: &PackageSet, is_platform: bool) -> Result<PackageSet> {
+        // Ensure that the developer didn't set `all_packages_in_base` for
+        // configurations that do not support it.
+        if let Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }) =
+            self.developer_only_options
+        {
+            if self.image_mode == FilesystemImageMode::NoImage {
+                bail!("all_packages_in_base cannot be enabled for products without a filesystem (image_mode = no_image)");
+            }
+            if self.build_type == BuildType::User {
+                bail!("all_packages_in_base cannot be enabled for user products");
+            }
         }
+
+        Ok(
+            match (
+                set,
+                &self.build_type,
+                &self.developer_only_options,
+                &self.image_mode,
+                is_platform,
+            ) {
+                // BootFS packages are always in BootFS.
+                (&PackageSet::Bootfs, _, _, _, _) => PackageSet::Bootfs,
+                // System packages are always system packages
+                (&PackageSet::System, _, _, _, _) => PackageSet::System,
+
+                // When the all_packages_in_base developer override option is
+                // enabled, that takes precedence over all the rest on eng and userdebug
+                // build-types.
+                (
+                    _,
+                    _,
+                    Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
+                    _,
+                    _,
+                ) => PackageSet::Base,
+
+                // The Flexible package set is in Cache for eng builds, and base
+                // for user/userdebug.
+                (&PackageSet::Flexible, BuildType::Eng, _, _, _) => PackageSet::Cache,
+                (&PackageSet::Flexible, _, _, _, _) => PackageSet::Base,
+
+                // For product packages with no filesystem, we move the packages to bootfs.
+                (_, _, _, &FilesystemImageMode::NoImage, /*is_platform=*/ false) => {
+                    PackageSet::Bootfs
+                }
+
+                // In all other cases, packages are just in their original
+                // package set.
+                (ps, _, _, _, _) => ps.clone(),
+            },
+        )
     }
 
     /// Add a set of packages from a bundle, resolving each path to a package
@@ -482,7 +509,7 @@ impl ImageAssemblyConfigBuilder {
         for entry in packages {
             let manifest_path: Utf8PathBuf =
                 entry.package.clone().resolve_from_dir(&bundle_path)?.into();
-            let set = self.map_package_set(&entry.set);
+            let set = self.map_package_set(&entry.set, /*is_platform=*/ true)?;
             self.add_package_from_path(manifest_path, PackageOrigin::AIB, &set)?;
         }
 
@@ -508,7 +535,6 @@ impl ImageAssemblyConfigBuilder {
     /// so that any packages that are in conflict with the platform bundles are
     /// flagged as being the issue (and not the platform being the issue).
     pub fn add_product_packages(&mut self, packages: ProductPackagesConfig) -> Result<()> {
-        // Add the config data entries to the map
         self.add_product_packages_to_set(packages.base, PackageSet::Base)?;
         self.add_product_packages_to_set(packages.cache, PackageSet::Cache)?;
         Ok(())
@@ -520,6 +546,7 @@ impl ImageAssemblyConfigBuilder {
         entries: Vec<ProductPackageDetails>,
         to_package_set: PackageSet,
     ) -> Result<()> {
+        let to_package_set = self.map_package_set(&to_package_set, /*is_platform=*/ false)?;
         for entry in entries {
             // Load the PackageManifest from the given path, in order to get the
             // package name.
@@ -528,6 +555,14 @@ impl ImageAssemblyConfigBuilder {
 
             // Add the package to the set of packages in the assembly.
             self.add_package_from_path(entry.manifest, PackageOrigin::Product, &to_package_set)?;
+
+            // Config data cannot be added for packages destinated to bootfs.
+            if to_package_set == PackageSet::Bootfs && !entry.config_data.is_empty() {
+                bail!(
+                    "Config data cannot be added to {} because it is destined for bootfs",
+                    manifest.name()
+                );
+            }
 
             // Add the config data entries to the map
             for ProductConfigData { source, destination } in entry.config_data {
@@ -702,6 +737,7 @@ impl ImageAssemblyConfigBuilder {
         let Self {
             build_type: _,
             board_name,
+            image_mode,
             package_configs,
             domain_configs,
             mut packages,
@@ -717,7 +753,7 @@ impl ImageAssemblyConfigBuilder {
             board_driver_arguments,
             configuration_capabilities,
             devicetree,
-            developer_only_options,
+            developer_only_options: _,
             images_config,
         } = self;
 
@@ -915,9 +951,6 @@ impl ImageAssemblyConfigBuilder {
             .map(|e| FileEntry { source: e.source.clone(), destination: e.destination.to_string() })
             .collect();
 
-        let netboot_mode =
-            developer_only_options.is_some() && developer_only_options.unwrap().netboot_mode;
-
         // Construct a single "partial" config from the combined fields, and
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
         // final validation that it's complete.
@@ -938,7 +971,7 @@ impl ImageAssemblyConfigBuilder {
             board_name,
             board_driver_arguments,
             devicetree,
-            netboot_mode,
+            image_mode,
         };
         Ok(image_assembly_config)
     }
@@ -1043,7 +1076,7 @@ impl PackageEntry {
                 PackageOrigin::AIB => BootfsPackageDestination::FromAIB(name),
                 PackageOrigin::Board => BootfsPackageDestination::FromBoard(name),
                 PackageOrigin::Developer => BootfsPackageDestination::FromDeveloper(name),
-                PackageOrigin::Product => bail!("Products cannot add packages to bootfs  ({path})"),
+                PackageOrigin::Product => BootfsPackageDestination::FromProduct(name),
             }),
         };
 
@@ -1258,7 +1291,11 @@ mod tests {
             bootfs_files_package: None,
             ..AssemblyInputBundle::default()
         };
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder.add_parsed_bundle(outdir.as_ref().join("minimum_bundle"), minimum_bundle).unwrap();
         builder
     }
@@ -1268,7 +1305,11 @@ mod tests {
         let vars = TempdirPathsForTest::new();
         let tools = FakeToolProvider::default();
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder
             .add_parsed_bundle(
                 &vars.outdir,
@@ -1321,7 +1362,11 @@ mod tests {
         let vars = TempdirPathsForTest::new();
         let tools = FakeToolProvider::default();
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::UserDebug, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::UserDebug,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder
             .add_parsed_bundle(
                 &vars.outdir,
@@ -1369,7 +1414,11 @@ mod tests {
         let vars = TempdirPathsForTest::new();
         let tools = FakeToolProvider::default();
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::User, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::User,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder
             .add_parsed_bundle(
                 &vars.outdir,
@@ -1416,7 +1465,11 @@ mod tests {
         vars: &TempdirPathsForTest,
         bundles: Vec<AssemblyInputBundle>,
     ) -> ImageAssemblyConfigBuilder {
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
 
         // Write a file to the temp dir for use with config_data.
         std::fs::create_dir_all(&vars.config_data_target_package_dir).unwrap();
@@ -1858,7 +1911,11 @@ mod tests {
         let mut aib = make_test_assembly_bundle(root, root);
         duplicate_first(&mut aib.packages);
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         assert!(builder.add_parsed_bundle(root, aib).is_err());
     }
 
@@ -1882,7 +1939,11 @@ mod tests {
         let value = first_list.first().unwrap();
         second_list.push(value.clone());
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder.add_parsed_bundle(outdir, aib).unwrap();
         assert!(builder.add_parsed_bundle(outdir.join("second"), second_aib).is_err());
     }
@@ -1916,7 +1977,11 @@ mod tests {
             ],
             ..Default::default()
         };
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         assert!(builder.add_parsed_bundle(outdir, aib).is_err());
     }
 
@@ -1956,7 +2021,11 @@ mod tests {
             ..Default::default()
         };
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder.add_parsed_bundle(outdir, aib).ok();
         builder.add_parsed_bundle(outdir, aib2).ok();
         assert!(builder.build(outdir, &tools).is_err());
@@ -1996,7 +2065,11 @@ mod tests {
             }],
             ..Default::default()
         };
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder.add_parsed_bundle(outdir, aib).ok();
         assert!(builder.add_parsed_bundle(outdir, aib2).is_err());
     }
@@ -2026,7 +2099,11 @@ mod tests {
         first_aib.config_data.insert("base_package0".into(), vec![config_data_file_entry.clone()]);
         second_aib.config_data.insert("base_package0".into(), vec![config_data_file_entry]);
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
         builder.add_parsed_bundle(root, first_aib).unwrap();
         assert!(builder.add_parsed_bundle(root.join("second"), second_aib).is_err());
     }
@@ -2035,7 +2112,11 @@ mod tests {
     fn test_builder_allows_duplicate_packages_if_added_by_board_first() {
         let temp = TempDir::new().unwrap();
         let root = Utf8Path::from_path(temp.path()).unwrap();
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
 
         let board_package_path = root.join("board");
         let product_package_path = root.join("product");

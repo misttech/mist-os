@@ -8,11 +8,14 @@
 #include <lib/elfldltl/alloc-checker-container.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/ld/abi.h>
 #include <lib/ld/load.h>  // For ld::AbiModule
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/vector.h>
+
+#include "diagnostics.h"
 
 namespace dl {
 
@@ -30,6 +33,9 @@ using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<RuntimeModule>>;
 // return a boolean value to signify allocation success or failure.
 template <typename T>
 using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
+
+// A list of valid non-owning references to RuntimeModules.
+using ModuleRefList = Vector<const RuntimeModule*>;
 
 // TODO(https://fxbug.dev/324136831): comment on how RuntimeModule relates to
 // startup modules when the latter is supported.
@@ -56,6 +62,8 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   using Addr = Elf::Addr;
   using SymbolInfo = elfldltl::SymbolInfo<Elf>;
   using AbiModule = ld::AbiModule<>;
+  using TlsModule = ld::abi::Abi<>::TlsModule;
+  using size_type = Elf::size_type;
 
   // Not copyable, but movable.
   RuntimeModule(const RuntimeModule&) = delete;
@@ -85,7 +93,6 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   }
 
   constexpr AbiModule& module() { return abi_module_; }
-
   constexpr const AbiModule& module() const { return abi_module_; }
 
   constexpr Addr load_bias() const { return abi_module_.link_map.addr; }
@@ -93,6 +100,30 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   const SymbolInfo& symbol_info() const { return abi_module_.symbols; }
 
   size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
+
+  size_type tls_module_id() const { return abi_module_.tls_modid; }
+
+  constexpr bool uses_static_tls() const { return ld::ModuleUsesStaticTls(abi_module_); }
+
+  constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+
+  // This is a list of module references to this module's DT_NEEDEDs, i.e. the
+  // first level of dependencies in this module's module tree. If this list is
+  // empty, the module does not have any dependencies.
+  constexpr const ModuleRefList& direct_deps() const { return direct_deps_; }
+  constexpr ModuleRefList& direct_deps() { return direct_deps_; }
+
+  // This is the breadth-first ordered list of module references, representing
+  // this module's tree of modules. A reference to this module (the root) is
+  // always the first in this list. The other modules in this list are
+  // non-owning references to modules that were explicitly linked with this
+  // module; global modules that may have been used for relocations, but are not
+  // a DT_NEEDED of any dependency, are not included in this list.
+  // This list is set when dlopen() is called on this module.
+  constexpr const ModuleRefList& module_tree() const { return module_tree_; }
+  void set_module_tree(ModuleRefList module_tree) { module_tree_ = std::move(module_tree); }
+
+  ModuleRefList TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module);
 
  private:
   // A RuntimeModule can only be created with Module::Create...).
@@ -102,6 +133,9 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   Soname name_;
   AbiModule abi_module_;
+  size_type static_tls_bias_ = 0;
+  ModuleRefList direct_deps_;
+  ModuleRefList module_tree_;
 };
 
 }  // namespace dl

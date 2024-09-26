@@ -179,7 +179,13 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kReservedLow:
       case memalloc::Type::kTemporaryPhysHandoff:
       case memalloc::Type::kTestRamReserve:
+      case memalloc::Type::kUserboot:
+      case memalloc::Type::kVdso:
         return type;
+
+      // Truncated RAM should now be forgotten.
+      case memalloc::Type::kTruncatedRam:
+        return ktl::nullopt;
 
       default:
         ZX_DEBUG_ASSERT(type != memalloc::Type::kReserved);
@@ -274,21 +280,48 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   ktl::ignore = buffer.release();
 }
 
-void HandoffPrep::UsePackageFiles(const KernelStorage::Bootfs& kernel_package) {
-  SetVersionString(kernel_package);
+void HandoffPrep::UsePackageFiles(KernelStorage::Bootfs kernel_package) {
+  for (auto it = kernel_package.begin(); it != kernel_package.end(); ++it) {
+    ktl::span data = it->data;
+    if (it->name == "version-string.txt"sv) {
+      ktl::string_view version{reinterpret_cast<const char*>(data.data()), data.size()};
+      SetVersionString(version);
+    } else if (it->name == "vdso"sv) {
+      // TODO(https://fxbug.dev/42164859): Ideally we would just recharacterize
+      // `data` as a kVdso range. However, while TrampolineBoot is in use, this
+      // range might overlap with the fixed-address kernel image. Accordingly
+      // we side-step this by always copying the contents over to a newly
+      // allocated range guaranteed not to overlap.
+      size_t aligned_size = (data.size() + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE;
+      fbl::AllocChecker ac;
+      Allocation vdso = Allocation::New(ac, memalloc::Type::kVdso, aligned_size, ZX_PAGE_SIZE);
+      ZX_ASSERT(ac.check());
+      memcpy(vdso.get(), data.data(), data.size());
+      handoff_->vdso = MakePhysVmo(vdso.data(), "vdso/next"sv, data.size());
+      ktl::ignore = vdso.release();
+    } else if (it->name == "userboot"sv) {
+      // TODO(https://fxbug.dev/42164859): Ideally we would just recharacterize
+      // `data` as a kUserboot range. However, while TrampolineBoot is in use,
+      // this range might overlap with the fixed-address kernel image.
+      // Accordingly we side-step this by always copying the contents over to a
+      // newly allocated range guaranteed not to overlap.
+      size_t aligned_size = (data.size() + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE;
+      fbl::AllocChecker ac;
+      Allocation userboot =
+          Allocation::New(ac, memalloc::Type::kUserboot, aligned_size, ZX_PAGE_SIZE);
+      ZX_ASSERT(ac.check());
+      memcpy(userboot.get(), data.data(), data.size());
+      handoff_->userboot = MakePhysVmo(userboot.data(), "userboot"sv, data.size());
+      ktl::ignore = userboot.release();
+    }
+  }
+  if (auto result = kernel_package.take_error(); result.is_error()) {
+    zbitl::PrintBootfsError(result.error_value());
+  }
+  ZX_ASSERT_MSG(!handoff_->version_string.empty(), "no version.txt file in kernel package");
 }
 
-void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
-  // Fetch the version-string.txt file from the package.
-  ktl::string_view version;
-  if (auto it = kernel_package.find("version-string.txt"); it == kernel_package.end()) {
-    if (auto result = kernel_package.take_error(); result.is_error()) {
-      zbitl::PrintBootfsError(result.error_value());
-    }
-    ZX_PANIC("no version.txt file in kernel package");
-  } else {
-    version = {reinterpret_cast<const char*>(it->data.data()), it->data.size()};
-  }
+void HandoffPrep::SetVersionString(ktl::string_view version) {
   constexpr ktl::string_view kSpace = " \t\r\n";
   size_t skip = version.find_first_not_of(kSpace);
   size_t trim = version.find_last_not_of(kSpace);

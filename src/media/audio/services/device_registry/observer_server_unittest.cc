@@ -399,6 +399,18 @@ TEST_F(ObserverServerCodecTest, GetTopologiesUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  received_callback = false;
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](fidl::Result<fad::Observer::WatchPlugState>& result) {
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
 }
 
 // Verify GetElements if the driver does not support signalprocessing.
@@ -428,6 +440,18 @@ TEST_F(ObserverServerCodecTest, GetElementsUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  received_callback = false;
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](fidl::Result<fad::Observer::WatchPlugState>& result) {
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
 }
 
 /////////////////////
@@ -1530,6 +1554,18 @@ TEST_F(ObserverServerStreamConfigTest, GetTopologiesUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  received_callback = false;
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](fidl::Result<fad::Observer::WatchPlugState>& result) {
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
 }
 
 // Verify GetElements if the driver does not support signalprocessing.
@@ -1559,6 +1595,18 @@ TEST_F(ObserverServerStreamConfigTest, GetElementsUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  received_callback = false;
+  observer->client()->WatchPlugState().Then(
+      [&received_callback](fidl::Result<fad::Observer::WatchPlugState>& result) {
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer->client().is_valid());
 }
 
 }  // namespace

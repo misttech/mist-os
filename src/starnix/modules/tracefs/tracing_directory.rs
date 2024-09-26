@@ -4,7 +4,6 @@
 
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;
-use fuchsia_zircon::sys::zx_ticks_t;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::{
@@ -28,7 +27,7 @@ impl DynamicFileSource for TraceMarkerFileSource {
 
 pub struct TraceMarkerFile {
     source: DynamicFile<TraceMarkerFileSource>,
-    event_stacks: Mutex<HashMap<u64, Vec<(String, zx_ticks_t)>>>,
+    event_stacks: Mutex<HashMap<u64, Vec<(String, zx::MonotonicTicks)>>>,
 }
 
 impl TraceMarkerFile {
@@ -57,7 +56,7 @@ impl FileOps for TraceMarkerFile {
         if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
             let bytes = data.read_all()?;
             if let Ok(mut event_stacks) = self.event_stacks.lock() {
-                let now = zx::ticks_get();
+                let now = zx::MonotonicTicks::get();
                 if let Some(atrace_event) = ATraceEvent::parse(&String::from_utf8_lossy(&bytes)) {
                     match atrace_event {
                         ATraceEvent::Begin { pid, name } => {

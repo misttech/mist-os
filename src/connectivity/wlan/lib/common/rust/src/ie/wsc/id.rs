@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 #[repr(C, packed)]
 #[derive(
-    Eq, PartialEq, Hash, AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Copy, Clone, Debug,
+    Eq, PartialEq, Hash, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Copy, Clone, Debug,
 )]
 pub struct Id(pub [u8; 2]);
 

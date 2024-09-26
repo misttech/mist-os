@@ -61,10 +61,6 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
             .defaultval = false,
         },
         {
-            .key = "kernel.shell",
-            .defaultval = false,
-        },
-        {
             .key = "netsvc.disable",
             .defaultval = true,
         },
@@ -81,12 +77,10 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
     }
     const fidl::WireResponse response = result.value();
     const bool console_shell = response.values[0];
-    const bool kernel_shell = response.values[1];
-    // If the kernel console is running a shell we can't launch our own shell.
-    ret.run_shell = console_shell && !kernel_shell;
+    ret.run_shell = console_shell;
     ret.virtcon_disabled = config.virtcon_disabled();
-    const bool netsvc_disable = response.values[2];
-    const bool netsvc_netboot = response.values[3];
+    const bool netsvc_disable = response.values[1];
+    const bool netsvc_netboot = response.values[2];
     const bool netboot = !netsvc_disable && netsvc_netboot;
     ret.virtual_console_need_debuglog = netboot;
   }

@@ -59,8 +59,7 @@ TEST_F(SegmentManagerTest, BlkChaining) {
       blk_chain.push_back(read_page.GetPage<NodePage>().NextBlkaddrOfNode());
       read_page.SetDirty();
     }
-    WritebackOperation op = {.bSync = true};
-    fs_->GetNodeVnode().Writeback(op);
+    fs_->GetNodeVnode().Writeback(true, true);
 
     fs_->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), ni);
     ASSERT_NE(ni.blk_addr, kNullAddr);
@@ -95,8 +94,7 @@ TEST_F(SegmentManagerTest, DirtyToFree) TA_NO_THREAD_SAFETY_ANALYSIS {
       read_page.SetDirty();
     }
 
-    WritebackOperation op = {.bSync = true};
-    fs_->GetNodeVnode().Writeback(op);
+    fs_->GetNodeVnode().Writeback(true, true);
 
     if (fs_->GetSegmentManager().GetValidBlocks(fs_->GetSegmentManager().GetSegmentNumber(old_addr),
                                                 0) == 0) {
@@ -170,8 +168,7 @@ TEST_F(SegmentManagerTest, GetNewSegmentHeap) {
       fs_->GetNodeManager().GetNodePage(superblock_info.GetRootIno(), &read_page);
       read_page.SetDirty();
     }
-    WritebackOperation op = {.bSync = true};
-    fs_->GetNodeVnode().Writeback(op);
+    fs_->GetNodeVnode().Writeback(true, true);
 
     fs_->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), new_ni);
     ASSERT_NE(new_ni.blk_addr, kNullAddr);
@@ -434,8 +431,7 @@ TEST(SegmentManagerOptionTest, Section) TA_NO_THREAD_SAFETY_ANALYSIS {
       // Consume a block in the current section
       root_node_page.SetDirty();
     }
-    WritebackOperation op = {.bSync = true};
-    fs->GetNodeVnode().Writeback(op);
+    fs->GetNodeVnode().Writeback(true, true);
 
     fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), ni);
     ASSERT_NE(ni.blk_addr, kNullAddr);
@@ -489,8 +485,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
       root_node_page.SetDirty();
     }
 
-    WritebackOperation op = {.bSync = true};
-    fs->GetNodeVnode().Writeback(op);
+    fs->GetNodeVnode().Writeback(true, true);
 
     fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), new_ni);
     ASSERT_NE(new_ni.blk_addr, kNullAddr);
@@ -540,8 +535,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) TA_NO_THREAD_SAFETY_ANALYSIS
       ASSERT_NE(root_node_page, nullptr);
       root_node_page.SetDirty();
     }
-    WritebackOperation op = {.bSync = true};
-    fs->GetNodeVnode().Writeback(op);
+    fs->GetNodeVnode().Writeback(true, true);
 
     fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), new_ni);
     ASSERT_NE(new_ni.blk_addr, kNullAddr);
@@ -617,8 +611,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
     } else {
       ASSERT_EQ(ret, ZX_OK);
     }
-    WritebackOperation op = {.bSync = true};
-    file->Writeback(op);
+    file->Writeback(true, true);
   }
 
   // Since kMountForceLfs is on, f2fs doesn't allocate segments in ssr manner.

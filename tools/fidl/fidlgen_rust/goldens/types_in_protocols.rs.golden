@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -918,7 +914,10 @@ impl ProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -4333,13 +4332,9 @@ impl ProtocolEvent {
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
             0x51c5b06295c10c40 => {
-                let mut out = fidl::new_empty!(Basic);
-                fidl::encoding::Decoder::decode_into::<Basic>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventBasic {
                     uint8: out.uint8,
                     uint16: out.uint16,
@@ -4356,13 +4351,9 @@ impl ProtocolEvent {
                 }))
             }
             0x617c5410858734d5 => {
-                let mut out = fidl::new_empty!(Compound);
-                fidl::encoding::Decoder::decode_into::<Compound>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(Compound, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventCompound {
                     bits: out.bits,
                     enum_: out.enum_,
@@ -4374,13 +4365,9 @@ impl ProtocolEvent {
                 }))
             }
             0x51b76208b148f02e => {
-                let mut out = fidl::new_empty!(ArrayBasic);
-                fidl::encoding::Decoder::decode_into::<ArrayBasic>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(ArrayBasic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventArrayBasic {
                     array_uint8: out.array_uint8,
                     array_uint16: out.array_uint16,
@@ -4397,13 +4384,9 @@ impl ProtocolEvent {
                 }))
             }
             0x1e63a00079aa7415 => {
-                let mut out = fidl::new_empty!(ArrayCompound);
-                fidl::encoding::Decoder::decode_into::<ArrayCompound>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(ArrayCompound, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventArrayCompound {
                     array_bits: out.array_bits,
                     array_enum: out.array_enum,
@@ -4415,13 +4398,9 @@ impl ProtocolEvent {
                 }))
             }
             0x3f9d405e7191eff6 => {
-                let mut out = fidl::new_empty!(VectorBasic);
-                fidl::encoding::Decoder::decode_into::<VectorBasic>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(VectorBasic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventVectorBasic {
                     vector_uint8: out.vector_uint8,
                     vector_uint16: out.vector_uint16,
@@ -4438,13 +4417,9 @@ impl ProtocolEvent {
                 }))
             }
             0x53a1fc56e8b3cff3 => {
-                let mut out = fidl::new_empty!(VectorCompound);
-                fidl::encoding::Decoder::decode_into::<VectorCompound>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(VectorCompound, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventVectorCompound {
                     vector_bits: out.vector_bits,
                     vector_enum: out.vector_enum,
@@ -4456,13 +4431,9 @@ impl ProtocolEvent {
                 }))
             }
             0x17617b54dfa8d85d => {
-                let mut out = fidl::new_empty!(VectorOptional);
-                fidl::encoding::Decoder::decode_into::<VectorOptional>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(VectorOptional, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventVectorOptional {
                     opt_vector_uint8: out.opt_vector_uint8,
                     opt_vector_string: out.opt_vector_string,
@@ -4471,13 +4442,11 @@ impl ProtocolEvent {
                 }))
             }
             0x110b72cfebc4037e => {
-                let mut out = fidl::new_empty!(ArrayVectorNested);
-                fidl::encoding::Decoder::decode_into::<ArrayVectorNested>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out = fidl::new_empty!(
+                    ArrayVectorNested,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                );
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventArrayVectorNested {
                     array_array_uint8: out.array_array_uint8,
                     array_vector_uint8: out.array_vector_uint8,
@@ -4486,13 +4455,9 @@ impl ProtocolEvent {
                 }))
             }
             0x4fbde2864601698b => {
-                let mut out = fidl::new_empty!(Resource);
-                fidl::encoding::Decoder::decode_into::<Resource>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out =
+                    fidl::new_empty!(Resource, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((ProtocolEvent::EventResource {
                     handle: out.handle,
                     vmo: out.vmo,
@@ -4600,13 +4565,9 @@ impl futures::Stream for ProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x7c311f0d9e662df9 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(Basic);
-                    fidl::encoding::Decoder::decode_into::<Basic>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayBasic {
                         uint8: req.uint8,
@@ -4627,13 +4588,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x205b92db5139c88f => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(Basic);
-                    fidl::encoding::Decoder::decode_into::<Basic>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayBasic {
                         uint8: req.uint8,
@@ -4657,13 +4614,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x459eaa5d11b9ff93 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorBasic {
                         responder: ProtocolErrorBasicResponder {
@@ -4674,13 +4629,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x2bc2bc3a9237c6cc => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(Compound);
-                    fidl::encoding::Decoder::decode_into::<Compound>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(Compound, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayCompound {
                         bits: req.bits,
@@ -4696,13 +4647,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x79f279c7201da131 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(Compound);
-                    fidl::encoding::Decoder::decode_into::<Compound>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(Compound, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayCompound {
                         bits: req.bits,
@@ -4721,13 +4668,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x29817d89a19ec77d => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorCompound {
                         responder: ProtocolErrorCompoundResponder {
@@ -4738,13 +4683,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x62e2ebcadf35ca19 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(ArrayBasic);
-                    fidl::encoding::Decoder::decode_into::<ArrayBasic>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(ArrayBasic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayArrayBasic {
                         array_uint8: req.array_uint8,
@@ -4765,13 +4706,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x49ad7a74e28ba114 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(ArrayBasic);
-                    fidl::encoding::Decoder::decode_into::<ArrayBasic>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(ArrayBasic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayArrayBasic {
                         array_uint8: req.array_uint8,
@@ -4795,13 +4732,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0xf0dbde9626fff79 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorArrayBasic {
                         responder: ProtocolErrorArrayBasicResponder {
@@ -4812,13 +4747,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x464948bae1bda09d => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(ArrayCompound);
-                    fidl::encoding::Decoder::decode_into::<ArrayCompound>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ArrayCompound,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayArrayCompound {
                         array_bits: req.array_bits,
@@ -4834,13 +4767,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0xbcae616f8e1ea7b => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(ArrayCompound);
-                    fidl::encoding::Decoder::decode_into::<ArrayCompound>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ArrayCompound,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayArrayCompound {
                         array_bits: req.array_bits,
@@ -4859,13 +4790,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x52257f80e29c1a04 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorArrayCompound {
                         responder: ProtocolErrorArrayCompoundResponder {
@@ -4876,13 +4805,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x4f907dde77464657 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(VectorBasic);
-                    fidl::encoding::Decoder::decode_into::<VectorBasic>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        VectorBasic,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayVectorBasic {
                         vector_uint8: req.vector_uint8,
@@ -4903,13 +4830,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x7860cb3ed8362e74 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(VectorBasic);
-                    fidl::encoding::Decoder::decode_into::<VectorBasic>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        VectorBasic,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayVectorBasic {
                         vector_uint8: req.vector_uint8,
@@ -4933,13 +4858,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0xc27f841d6313f72 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorVectorBasic {
                         responder: ProtocolErrorVectorBasicResponder {
@@ -4950,13 +4873,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x19baae42829dbe90 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(VectorCompound);
-                    fidl::encoding::Decoder::decode_into::<VectorCompound>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        VectorCompound,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayVectorCompound {
                         vector_bits: req.vector_bits,
@@ -4972,13 +4893,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x371140db701b23b4 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(VectorCompound);
-                    fidl::encoding::Decoder::decode_into::<VectorCompound>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        VectorCompound,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayVectorCompound {
                         vector_bits: req.vector_bits,
@@ -4997,13 +4916,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x760e278628f7a985 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorVectorCompound {
                         responder: ProtocolErrorVectorCompoundResponder {
@@ -5014,13 +4931,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x153c6b333c21c52f => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(VectorOptional);
-                    fidl::encoding::Decoder::decode_into::<VectorOptional>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        VectorOptional,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayVectorOptional {
                         opt_vector_uint8: req.opt_vector_uint8,
@@ -5033,13 +4948,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0xe4b620aaafd73f3 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(VectorOptional);
-                    fidl::encoding::Decoder::decode_into::<VectorOptional>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        VectorOptional,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayVectorOptional {
                         opt_vector_uint8: req.opt_vector_uint8,
@@ -5055,13 +4968,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x58e75cf86e2d715e => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorVectorOptional {
                         responder: ProtocolErrorVectorOptionalResponder {
@@ -5072,13 +4983,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x520dc9cb9b9b5ed7 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(ArrayVectorNested);
-                    fidl::encoding::Decoder::decode_into::<ArrayVectorNested>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ArrayVectorNested,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayArrayVectorNested {
                         array_array_uint8: req.array_array_uint8,
@@ -5091,13 +5000,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x4a438ce0948817dc => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(ArrayVectorNested);
-                    fidl::encoding::Decoder::decode_into::<ArrayVectorNested>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        ArrayVectorNested,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayArrayVectorNested {
                         array_array_uint8: req.array_array_uint8,
@@ -5113,13 +5020,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x7e168d89e1dac8a7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorArrayVectorNested {
                         responder: ProtocolErrorArrayVectorNestedResponder {
@@ -5130,13 +5035,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x5af4795a9ed3a022 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(Resource);
-                    fidl::encoding::Decoder::decode_into::<Resource>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(Resource, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::OneWayResource {
                         handle: req.handle,
@@ -5172,13 +5073,9 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x1904824a11c6ad5b => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(Resource);
-                    fidl::encoding::Decoder::decode_into::<Resource>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req =
+                        fidl::new_empty!(Resource, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::TwoWayResource {
                         handle: req.handle,
@@ -5217,13 +5114,11 @@ impl futures::Stream for ProtocolRequestStream {
                 }
                 0x5b28634d603175b6 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        fidl::encoding::EmptyPayload,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::ErrorResource {
                         responder: ProtocolErrorResourceResponder {
@@ -6490,6 +6385,16 @@ impl fidl::endpoints::ControlHandle for ProtocolControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -8912,18 +8817,16 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for Bits {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for Bits {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for Bits {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8933,7 +8836,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Bits {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Bits {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::empty()
@@ -8942,7 +8845,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8979,18 +8882,16 @@ mod internal {
     impl fidl::encoding::ValueTypeMarker for Enum {
         type Borrowed<'a> = Self;
         #[inline(always)]
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
             *value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Self> for Enum {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for Enum {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9000,7 +8901,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Enum {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Enum {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::unknown()
@@ -9009,7 +8910,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9018,6 +8919,13 @@ mod internal {
 
             *self = Self::from_primitive_allow_unknown(prim);
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for ArrayBasic {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -9034,26 +8942,20 @@ mod internal {
             384
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ArrayBasic {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ArrayBasic> for &ArrayBasic {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ArrayBasic, D>
+        for &ArrayBasic
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ArrayBasic>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ArrayBasic>::encode(
+            fidl::encoding::Encode::<ArrayBasic, D>::encode(
                 (
                     <fidl::encoding::Array<u8, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_uint8),
                     <fidl::encoding::Array<u16, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_uint16),
@@ -9073,27 +8975,29 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::Array<u8, 5>>,
-            T1: fidl::encoding::Encode<fidl::encoding::Array<u16, 5>>,
-            T2: fidl::encoding::Encode<fidl::encoding::Array<u32, 5>>,
-            T3: fidl::encoding::Encode<fidl::encoding::Array<u64, 5>>,
-            T4: fidl::encoding::Encode<fidl::encoding::Array<i8, 5>>,
-            T5: fidl::encoding::Encode<fidl::encoding::Array<i16, 5>>,
-            T6: fidl::encoding::Encode<fidl::encoding::Array<i32, 5>>,
-            T7: fidl::encoding::Encode<fidl::encoding::Array<i64, 5>>,
-            T8: fidl::encoding::Encode<fidl::encoding::Array<f32, 5>>,
-            T9: fidl::encoding::Encode<fidl::encoding::Array<f64, 5>>,
-            T10: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedString, 5>>,
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::Array<u8, 5>, D>,
+            T1: fidl::encoding::Encode<fidl::encoding::Array<u16, 5>, D>,
+            T2: fidl::encoding::Encode<fidl::encoding::Array<u32, 5>, D>,
+            T3: fidl::encoding::Encode<fidl::encoding::Array<u64, 5>, D>,
+            T4: fidl::encoding::Encode<fidl::encoding::Array<i8, 5>, D>,
+            T5: fidl::encoding::Encode<fidl::encoding::Array<i16, 5>, D>,
+            T6: fidl::encoding::Encode<fidl::encoding::Array<i32, 5>, D>,
+            T7: fidl::encoding::Encode<fidl::encoding::Array<i64, 5>, D>,
+            T8: fidl::encoding::Encode<fidl::encoding::Array<f32, 5>, D>,
+            T9: fidl::encoding::Encode<fidl::encoding::Array<f64, 5>, D>,
+            T10: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedString, 5>, D>,
             T11: fidl::encoding::Encode<
                 fidl::encoding::Array<fidl::encoding::Optional<fidl::encoding::UnboundedString>, 5>,
+                D,
             >,
-        > fidl::encoding::Encode<ArrayBasic>
+        > fidl::encoding::Encode<ArrayBasic, D>
         for (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9137,26 +9041,27 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ArrayBasic {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ArrayBasic {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                array_uint8: fidl::new_empty!(fidl::encoding::Array<u8, 5>),
-                array_uint16: fidl::new_empty!(fidl::encoding::Array<u16, 5>),
-                array_uint32: fidl::new_empty!(fidl::encoding::Array<u32, 5>),
-                array_uint64: fidl::new_empty!(fidl::encoding::Array<u64, 5>),
-                array_int8: fidl::new_empty!(fidl::encoding::Array<i8, 5>),
-                array_int16: fidl::new_empty!(fidl::encoding::Array<i16, 5>),
-                array_int32: fidl::new_empty!(fidl::encoding::Array<i32, 5>),
-                array_int64: fidl::new_empty!(fidl::encoding::Array<i64, 5>),
-                array_float32: fidl::new_empty!(fidl::encoding::Array<f32, 5>),
-                array_float64: fidl::new_empty!(fidl::encoding::Array<f64, 5>),
-                array_string: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedString, 5>),
+                array_uint8: fidl::new_empty!(fidl::encoding::Array<u8, 5>, D),
+                array_uint16: fidl::new_empty!(fidl::encoding::Array<u16, 5>, D),
+                array_uint32: fidl::new_empty!(fidl::encoding::Array<u32, 5>, D),
+                array_uint64: fidl::new_empty!(fidl::encoding::Array<u64, 5>, D),
+                array_int8: fidl::new_empty!(fidl::encoding::Array<i8, 5>, D),
+                array_int16: fidl::new_empty!(fidl::encoding::Array<i16, 5>, D),
+                array_int32: fidl::new_empty!(fidl::encoding::Array<i32, 5>, D),
+                array_int64: fidl::new_empty!(fidl::encoding::Array<i64, 5>, D),
+                array_float32: fidl::new_empty!(fidl::encoding::Array<f32, 5>, D),
+                array_float64: fidl::new_empty!(fidl::encoding::Array<f64, 5>, D),
+                array_string: fidl::new_empty!(fidl::encoding::Array<fidl::encoding::UnboundedString, 5>, D),
                 array_opt_string: fidl::new_empty!(
                     fidl::encoding::Array<
                         fidl::encoding::Optional<fidl::encoding::UnboundedString>,
                         5,
-                    >
+                    >,
+                    D
                 ),
             }
         }
@@ -9164,7 +9069,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9215,25 +9120,33 @@ mod internal {
                     padding_start: offset + 176 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(fidl::encoding::Array<u8, 5>, &mut self.array_uint8, decoder, offset + 0, _depth)?;
-            fidl::decode!(fidl::encoding::Array<u16, 5>, &mut self.array_uint16, decoder, offset + 6, _depth)?;
-            fidl::decode!(fidl::encoding::Array<u32, 5>, &mut self.array_uint32, decoder, offset + 16, _depth)?;
-            fidl::decode!(fidl::encoding::Array<u64, 5>, &mut self.array_uint64, decoder, offset + 40, _depth)?;
-            fidl::decode!(fidl::encoding::Array<i8, 5>, &mut self.array_int8, decoder, offset + 80, _depth)?;
-            fidl::decode!(fidl::encoding::Array<i16, 5>, &mut self.array_int16, decoder, offset + 86, _depth)?;
-            fidl::decode!(fidl::encoding::Array<i32, 5>, &mut self.array_int32, decoder, offset + 96, _depth)?;
-            fidl::decode!(fidl::encoding::Array<i64, 5>, &mut self.array_int64, decoder, offset + 120, _depth)?;
-            fidl::decode!(fidl::encoding::Array<f32, 5>, &mut self.array_float32, decoder, offset + 160, _depth)?;
-            fidl::decode!(fidl::encoding::Array<f64, 5>, &mut self.array_float64, decoder, offset + 184, _depth)?;
-            fidl::decode!(fidl::encoding::Array<fidl::encoding::UnboundedString, 5>, &mut self.array_string, decoder, offset + 224, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u8, 5>, D, &mut self.array_uint8, decoder, offset + 0, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u16, 5>, D, &mut self.array_uint16, decoder, offset + 6, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u32, 5>, D, &mut self.array_uint32, decoder, offset + 16, _depth)?;
+            fidl::decode!(fidl::encoding::Array<u64, 5>, D, &mut self.array_uint64, decoder, offset + 40, _depth)?;
+            fidl::decode!(fidl::encoding::Array<i8, 5>, D, &mut self.array_int8, decoder, offset + 80, _depth)?;
+            fidl::decode!(fidl::encoding::Array<i16, 5>, D, &mut self.array_int16, decoder, offset + 86, _depth)?;
+            fidl::decode!(fidl::encoding::Array<i32, 5>, D, &mut self.array_int32, decoder, offset + 96, _depth)?;
+            fidl::decode!(fidl::encoding::Array<i64, 5>, D, &mut self.array_int64, decoder, offset + 120, _depth)?;
+            fidl::decode!(fidl::encoding::Array<f32, 5>, D, &mut self.array_float32, decoder, offset + 160, _depth)?;
+            fidl::decode!(fidl::encoding::Array<f64, 5>, D, &mut self.array_float64, decoder, offset + 184, _depth)?;
+            fidl::decode!(fidl::encoding::Array<fidl::encoding::UnboundedString, 5>, D, &mut self.array_string, decoder, offset + 224, _depth)?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Optional<fidl::encoding::UnboundedString>, 5>,
+                D,
                 &mut self.array_opt_string,
                 decoder,
                 offset + 304,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for ArrayCompound {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -9250,26 +9163,20 @@ mod internal {
             328
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ArrayCompound {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ArrayCompound> for &ArrayCompound {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ArrayCompound, D>
+        for &ArrayCompound
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ArrayCompound>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ArrayCompound>::encode(
+            fidl::encoding::Encode::<ArrayCompound, D>::encode(
                 (
                     <fidl::encoding::Array<Bits, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_bits),
                     <fidl::encoding::Array<Enum, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_enum),
@@ -9284,19 +9191,23 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::Array<Bits, 5>>,
-            T1: fidl::encoding::Encode<fidl::encoding::Array<Enum, 5>>,
-            T2: fidl::encoding::Encode<fidl::encoding::Array<Struct, 5>>,
-            T3: fidl::encoding::Encode<fidl::encoding::Array<Table, 5>>,
-            T4: fidl::encoding::Encode<fidl::encoding::Array<Union, 5>>,
-            T5: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>>,
-            T6: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>>,
-        > fidl::encoding::Encode<ArrayCompound> for (T0, T1, T2, T3, T4, T5, T6)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::Array<Bits, 5>, D>,
+            T1: fidl::encoding::Encode<fidl::encoding::Array<Enum, 5>, D>,
+            T2: fidl::encoding::Encode<fidl::encoding::Array<Struct, 5>, D>,
+            T3: fidl::encoding::Encode<fidl::encoding::Array<Table, 5>, D>,
+            T4: fidl::encoding::Encode<fidl::encoding::Array<Union, 5>, D>,
+            T5: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>, D>,
+            T6: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>,
+                D,
+            >,
+        > fidl::encoding::Encode<ArrayCompound, D> for (T0, T1, T2, T3, T4, T5, T6)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9319,20 +9230,22 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ArrayCompound {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ArrayCompound {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                array_bits: fidl::new_empty!(fidl::encoding::Array<Bits, 5>),
-                array_enum: fidl::new_empty!(fidl::encoding::Array<Enum, 5>),
-                array_struct: fidl::new_empty!(fidl::encoding::Array<Struct, 5>),
-                array_table: fidl::new_empty!(fidl::encoding::Array<Table, 5>),
-                array_union: fidl::new_empty!(fidl::encoding::Array<Union, 5>),
+                array_bits: fidl::new_empty!(fidl::encoding::Array<Bits, 5>, D),
+                array_enum: fidl::new_empty!(fidl::encoding::Array<Enum, 5>, D),
+                array_struct: fidl::new_empty!(fidl::encoding::Array<Struct, 5>, D),
+                array_table: fidl::new_empty!(fidl::encoding::Array<Table, 5>, D),
+                array_union: fidl::new_empty!(fidl::encoding::Array<Union, 5>, D),
                 array_opt_struct: fidl::new_empty!(
-                    fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>
+                    fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>,
+                    D
                 ),
                 array_opt_union: fidl::new_empty!(
-                    fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>
+                    fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>,
+                    D
                 ),
             }
         }
@@ -9340,7 +9253,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9355,13 +9268,14 @@ mod internal {
                     padding_start: offset + 40 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(fidl::encoding::Array<Bits, 5>, &mut self.array_bits, decoder, offset + 0, _depth)?;
-            fidl::decode!(fidl::encoding::Array<Enum, 5>, &mut self.array_enum, decoder, offset + 20, _depth)?;
-            fidl::decode!(fidl::encoding::Array<Struct, 5>, &mut self.array_struct, decoder, offset + 40, _depth)?;
-            fidl::decode!(fidl::encoding::Array<Table, 5>, &mut self.array_table, decoder, offset + 48, _depth)?;
-            fidl::decode!(fidl::encoding::Array<Union, 5>, &mut self.array_union, decoder, offset + 128, _depth)?;
+            fidl::decode!(fidl::encoding::Array<Bits, 5>, D, &mut self.array_bits, decoder, offset + 0, _depth)?;
+            fidl::decode!(fidl::encoding::Array<Enum, 5>, D, &mut self.array_enum, decoder, offset + 20, _depth)?;
+            fidl::decode!(fidl::encoding::Array<Struct, 5>, D, &mut self.array_struct, decoder, offset + 40, _depth)?;
+            fidl::decode!(fidl::encoding::Array<Table, 5>, D, &mut self.array_table, decoder, offset + 48, _depth)?;
+            fidl::decode!(fidl::encoding::Array<Union, 5>, D, &mut self.array_union, decoder, offset + 128, _depth)?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Boxed<Struct>, 5>,
+                D,
                 &mut self.array_opt_struct,
                 decoder,
                 offset + 208,
@@ -9369,12 +9283,20 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::OptionalUnion<Union>, 5>,
+                D,
                 &mut self.array_opt_union,
                 decoder,
                 offset + 248,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for ArrayVectorNested {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -9391,26 +9313,20 @@ mod internal {
             144
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ArrayVectorNested {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ArrayVectorNested> for &ArrayVectorNested {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ArrayVectorNested, D>
+        for &ArrayVectorNested
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ArrayVectorNested>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<ArrayVectorNested>::encode(
+            fidl::encoding::Encode::<ArrayVectorNested, D>::encode(
                 (
                     <fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_array_uint8),
                     <fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5> as fidl::encoding::ValueTypeMarker>::borrow(&self.array_vector_uint8),
@@ -9422,18 +9338,26 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>>,
-            T1: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>>,
-            T2: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>>,
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>, D>,
+            T1: fidl::encoding::Encode<
+                fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>,
+                D,
+            >,
+            T2: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>,
+                D,
+            >,
             T3: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                D,
             >,
-        > fidl::encoding::Encode<ArrayVectorNested> for (T0, T1, T2, T3)
+        > fidl::encoding::Encode<ArrayVectorNested, D> for (T0, T1, T2, T3)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9453,21 +9377,25 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ArrayVectorNested {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ArrayVectorNested {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
                 array_array_uint8: fidl::new_empty!(
-                    fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>
+                    fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>,
+                    D
                 ),
                 array_vector_uint8: fidl::new_empty!(
-                    fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>
+                    fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>,
+                    D
                 ),
                 vector_array_uint8: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>,
+                    D
                 ),
                 vector_vector_uint8: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                    D
                 ),
             }
         }
@@ -9475,7 +9403,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9492,6 +9420,7 @@ mod internal {
             }
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::Array<u8, 5>, 5>,
+                D,
                 &mut self.array_array_uint8,
                 decoder,
                 offset + 0,
@@ -9499,6 +9428,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Array<fidl::encoding::UnboundedVector<u8>, 5>,
+                D,
                 &mut self.array_vector_uint8,
                 decoder,
                 offset + 32,
@@ -9506,6 +9436,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::Array<u8, 5>>,
+                D,
                 &mut self.vector_array_uint8,
                 decoder,
                 offset + 112,
@@ -9513,12 +9444,20 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<u8>>,
+                D,
                 &mut self.vector_vector_uint8,
                 decoder,
                 offset + 128,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for Basic {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -9535,26 +9474,18 @@ mod internal {
             80
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Basic {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Basic> for &Basic {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Basic, D> for &Basic {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Basic>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Basic>::encode(
+            fidl::encoding::Encode::<Basic, D>::encode(
                 (
                     <u8 as fidl::encoding::ValueTypeMarker>::borrow(&self.uint8),
                     <u16 as fidl::encoding::ValueTypeMarker>::borrow(&self.uint16),
@@ -9574,24 +9505,25 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u8>,
-            T1: fidl::encoding::Encode<u16>,
-            T2: fidl::encoding::Encode<u32>,
-            T3: fidl::encoding::Encode<u64>,
-            T4: fidl::encoding::Encode<i8>,
-            T5: fidl::encoding::Encode<i16>,
-            T6: fidl::encoding::Encode<i32>,
-            T7: fidl::encoding::Encode<i64>,
-            T8: fidl::encoding::Encode<f32>,
-            T9: fidl::encoding::Encode<f64>,
-            T10: fidl::encoding::Encode<fidl::encoding::UnboundedString>,
-            T11: fidl::encoding::Encode<fidl::encoding::Optional<fidl::encoding::UnboundedString>>,
-        > fidl::encoding::Encode<Basic> for (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u8, D>,
+            T1: fidl::encoding::Encode<u16, D>,
+            T2: fidl::encoding::Encode<u32, D>,
+            T3: fidl::encoding::Encode<u64, D>,
+            T4: fidl::encoding::Encode<i8, D>,
+            T5: fidl::encoding::Encode<i16, D>,
+            T6: fidl::encoding::Encode<i32, D>,
+            T7: fidl::encoding::Encode<i64, D>,
+            T8: fidl::encoding::Encode<f32, D>,
+            T9: fidl::encoding::Encode<f64, D>,
+            T10: fidl::encoding::Encode<fidl::encoding::UnboundedString, D>,
+            T11: fidl::encoding::Encode<fidl::encoding::Optional<fidl::encoding::UnboundedString>, D>,
+        > fidl::encoding::Encode<Basic, D> for (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9627,23 +9559,24 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Basic {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Basic {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                uint8: fidl::new_empty!(u8),
-                uint16: fidl::new_empty!(u16),
-                uint32: fidl::new_empty!(u32),
-                uint64: fidl::new_empty!(u64),
-                int8: fidl::new_empty!(i8),
-                int16: fidl::new_empty!(i16),
-                int32: fidl::new_empty!(i32),
-                int64: fidl::new_empty!(i64),
-                float32: fidl::new_empty!(f32),
-                float64: fidl::new_empty!(f64),
-                string: fidl::new_empty!(fidl::encoding::UnboundedString),
+                uint8: fidl::new_empty!(u8, D),
+                uint16: fidl::new_empty!(u16, D),
+                uint32: fidl::new_empty!(u32, D),
+                uint64: fidl::new_empty!(u64, D),
+                int8: fidl::new_empty!(i8, D),
+                int16: fidl::new_empty!(i16, D),
+                int32: fidl::new_empty!(i32, D),
+                int64: fidl::new_empty!(i64, D),
+                float32: fidl::new_empty!(f32, D),
+                float64: fidl::new_empty!(f64, D),
+                string: fidl::new_empty!(fidl::encoding::UnboundedString, D),
                 opt_string: fidl::new_empty!(
-                    fidl::encoding::Optional<fidl::encoding::UnboundedString>
+                    fidl::encoding::Optional<fidl::encoding::UnboundedString>,
+                    D
                 ),
             }
         }
@@ -9651,7 +9584,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9684,18 +9617,19 @@ mod internal {
                     padding_start: offset + 32 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u8, &mut self.uint8, decoder, offset + 0, _depth)?;
-            fidl::decode!(u16, &mut self.uint16, decoder, offset + 2, _depth)?;
-            fidl::decode!(u32, &mut self.uint32, decoder, offset + 4, _depth)?;
-            fidl::decode!(u64, &mut self.uint64, decoder, offset + 8, _depth)?;
-            fidl::decode!(i8, &mut self.int8, decoder, offset + 16, _depth)?;
-            fidl::decode!(i16, &mut self.int16, decoder, offset + 18, _depth)?;
-            fidl::decode!(i32, &mut self.int32, decoder, offset + 20, _depth)?;
-            fidl::decode!(i64, &mut self.int64, decoder, offset + 24, _depth)?;
-            fidl::decode!(f32, &mut self.float32, decoder, offset + 32, _depth)?;
-            fidl::decode!(f64, &mut self.float64, decoder, offset + 40, _depth)?;
+            fidl::decode!(u8, D, &mut self.uint8, decoder, offset + 0, _depth)?;
+            fidl::decode!(u16, D, &mut self.uint16, decoder, offset + 2, _depth)?;
+            fidl::decode!(u32, D, &mut self.uint32, decoder, offset + 4, _depth)?;
+            fidl::decode!(u64, D, &mut self.uint64, decoder, offset + 8, _depth)?;
+            fidl::decode!(i8, D, &mut self.int8, decoder, offset + 16, _depth)?;
+            fidl::decode!(i16, D, &mut self.int16, decoder, offset + 18, _depth)?;
+            fidl::decode!(i32, D, &mut self.int32, decoder, offset + 20, _depth)?;
+            fidl::decode!(i64, D, &mut self.int64, decoder, offset + 24, _depth)?;
+            fidl::decode!(f32, D, &mut self.float32, decoder, offset + 32, _depth)?;
+            fidl::decode!(f64, D, &mut self.float64, decoder, offset + 40, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedString,
+                D,
                 &mut self.string,
                 decoder,
                 offset + 48,
@@ -9703,12 +9637,20 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Optional<fidl::encoding::UnboundedString>,
+                D,
                 &mut self.opt_string,
                 decoder,
                 offset + 64,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for Compound {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -9725,26 +9667,18 @@ mod internal {
             72
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Compound {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Compound> for &Compound {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Compound, D> for &Compound {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Compound>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Compound>::encode(
+            fidl::encoding::Encode::<Compound, D>::encode(
                 (
                     <Bits as fidl::encoding::ValueTypeMarker>::borrow(&self.bits),
                     <Enum as fidl::encoding::ValueTypeMarker>::borrow(&self.enum_),
@@ -9759,19 +9693,20 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<Bits>,
-            T1: fidl::encoding::Encode<Enum>,
-            T2: fidl::encoding::Encode<Struct>,
-            T3: fidl::encoding::Encode<Table>,
-            T4: fidl::encoding::Encode<Union>,
-            T5: fidl::encoding::Encode<fidl::encoding::Boxed<Struct>>,
-            T6: fidl::encoding::Encode<fidl::encoding::OptionalUnion<Union>>,
-        > fidl::encoding::Encode<Compound> for (T0, T1, T2, T3, T4, T5, T6)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<Bits, D>,
+            T1: fidl::encoding::Encode<Enum, D>,
+            T2: fidl::encoding::Encode<Struct, D>,
+            T3: fidl::encoding::Encode<Table, D>,
+            T4: fidl::encoding::Encode<Union, D>,
+            T5: fidl::encoding::Encode<fidl::encoding::Boxed<Struct>, D>,
+            T6: fidl::encoding::Encode<fidl::encoding::OptionalUnion<Union>, D>,
+        > fidl::encoding::Encode<Compound, D> for (T0, T1, T2, T3, T4, T5, T6)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9794,24 +9729,24 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Compound {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Compound {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                bits: fidl::new_empty!(Bits),
-                enum_: fidl::new_empty!(Enum),
-                struct_: fidl::new_empty!(Struct),
-                table: fidl::new_empty!(Table),
-                union: fidl::new_empty!(Union),
-                opt_struct: fidl::new_empty!(fidl::encoding::Boxed<Struct>),
-                opt_union: fidl::new_empty!(fidl::encoding::OptionalUnion<Union>),
+                bits: fidl::new_empty!(Bits, D),
+                enum_: fidl::new_empty!(Enum, D),
+                struct_: fidl::new_empty!(Struct, D),
+                table: fidl::new_empty!(Table, D),
+                union: fidl::new_empty!(Union, D),
+                opt_struct: fidl::new_empty!(fidl::encoding::Boxed<Struct>, D),
+                opt_union: fidl::new_empty!(fidl::encoding::OptionalUnion<Union>, D),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9826,13 +9761,14 @@ mod internal {
                     padding_start: offset + 8 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(Bits, &mut self.bits, decoder, offset + 0, _depth)?;
-            fidl::decode!(Enum, &mut self.enum_, decoder, offset + 4, _depth)?;
-            fidl::decode!(Struct, &mut self.struct_, decoder, offset + 8, _depth)?;
-            fidl::decode!(Table, &mut self.table, decoder, offset + 16, _depth)?;
-            fidl::decode!(Union, &mut self.union, decoder, offset + 32, _depth)?;
+            fidl::decode!(Bits, D, &mut self.bits, decoder, offset + 0, _depth)?;
+            fidl::decode!(Enum, D, &mut self.enum_, decoder, offset + 4, _depth)?;
+            fidl::decode!(Struct, D, &mut self.struct_, decoder, offset + 8, _depth)?;
+            fidl::decode!(Table, D, &mut self.table, decoder, offset + 16, _depth)?;
+            fidl::decode!(Union, D, &mut self.union, decoder, offset + 32, _depth)?;
             fidl::decode!(
                 fidl::encoding::Boxed<Struct>,
+                D,
                 &mut self.opt_struct,
                 decoder,
                 offset + 48,
@@ -9840,12 +9776,22 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::OptionalUnion<Union>,
+                D,
                 &mut self.opt_union,
                 decoder,
                 offset + 56,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ResourceTypeMarker for Resource {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
         }
     }
 
@@ -9862,26 +9808,23 @@ mod internal {
             456
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for Resource {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Resource> for &mut Resource {
+    unsafe impl fidl::encoding::Encode<Resource, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut Resource
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Resource>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Resource>::encode(
+            fidl::encoding::Encode::<Resource, fidl::encoding::DefaultFuchsiaResourceDialect>::encode(
                 (
                     <fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.handle),
                     <fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648> as fidl::encoding::ResourceTypeMarker>::take_or_borrow(&mut self.vmo),
@@ -9922,6 +9865,7 @@ mod internal {
                     { fidl::ObjectType::NONE.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T1: fidl::encoding::Encode<
                 fidl::encoding::HandleType<
@@ -9929,16 +9873,19 @@ mod internal {
                     { fidl::ObjectType::VMO.into_raw() },
                     2147483648,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T2: fidl::encoding::Encode<
                 fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T3: fidl::encoding::Encode<
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T4: fidl::encoding::Encode<ResourceStruct>,
-            T5: fidl::encoding::Encode<ResourceTable>,
-            T6: fidl::encoding::Encode<ResourceUnion>,
+            T4: fidl::encoding::Encode<ResourceStruct, fidl::encoding::DefaultFuchsiaResourceDialect>,
+            T5: fidl::encoding::Encode<ResourceTable, fidl::encoding::DefaultFuchsiaResourceDialect>,
+            T6: fidl::encoding::Encode<ResourceUnion, fidl::encoding::DefaultFuchsiaResourceDialect>,
             T7: fidl::encoding::Encode<
                 fidl::encoding::Optional<
                     fidl::encoding::HandleType<
@@ -9947,6 +9894,7 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T8: fidl::encoding::Encode<
                 fidl::encoding::Optional<
@@ -9956,19 +9904,28 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T9: fidl::encoding::Encode<
                 fidl::encoding::Optional<
                     fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T10: fidl::encoding::Encode<
                 fidl::encoding::Optional<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T11: fidl::encoding::Encode<fidl::encoding::Boxed<ResourceStruct>>,
-            T12: fidl::encoding::Encode<fidl::encoding::OptionalUnion<ResourceUnion>>,
+            T11: fidl::encoding::Encode<
+                fidl::encoding::Boxed<ResourceStruct>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T12: fidl::encoding::Encode<
+                fidl::encoding::OptionalUnion<ResourceUnion>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             T13: fidl::encoding::Encode<
                 fidl::encoding::Array<
                     fidl::encoding::HandleType<
@@ -9978,6 +9935,7 @@ mod internal {
                     >,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T14: fidl::encoding::Encode<
                 fidl::encoding::Array<
@@ -9988,22 +9946,34 @@ mod internal {
                     >,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T15: fidl::encoding::Encode<
                 fidl::encoding::Array<
                     fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T16: fidl::encoding::Encode<
                 fidl::encoding::Array<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T17: fidl::encoding::Encode<fidl::encoding::Array<ResourceStruct, 5>>,
-            T18: fidl::encoding::Encode<fidl::encoding::Array<ResourceTable, 5>>,
-            T19: fidl::encoding::Encode<fidl::encoding::Array<ResourceUnion, 5>>,
+            T17: fidl::encoding::Encode<
+                fidl::encoding::Array<ResourceStruct, 5>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T18: fidl::encoding::Encode<
+                fidl::encoding::Array<ResourceTable, 5>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T19: fidl::encoding::Encode<
+                fidl::encoding::Array<ResourceUnion, 5>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             T20: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::HandleType<
@@ -10012,6 +9982,7 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T21: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
@@ -10021,21 +9992,33 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T22: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
             T23: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
             >,
-            T24: fidl::encoding::Encode<fidl::encoding::UnboundedVector<ResourceStruct>>,
-            T25: fidl::encoding::Encode<fidl::encoding::UnboundedVector<ResourceTable>>,
-            T26: fidl::encoding::Encode<fidl::encoding::UnboundedVector<ResourceUnion>>,
-        > fidl::encoding::Encode<Resource>
+            T24: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<ResourceStruct>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T25: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<ResourceTable>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+            T26: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<ResourceUnion>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+        > fidl::encoding::Encode<Resource, fidl::encoding::DefaultFuchsiaResourceDialect>
         for (
             T0,
             T1,
@@ -10069,7 +10052,10 @@ mod internal {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10116,21 +10102,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Resource {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for Resource {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>),
-                vmo: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>),
+                handle: fidl::new_empty!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                vmo: fidl::new_empty!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect),
                 client_end: fidl::new_empty!(
-                    fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>
+                    fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 server_end: fidl::new_empty!(
-                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>
+                    fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                struct_: fidl::new_empty!(ResourceStruct),
-                table: fidl::new_empty!(ResourceTable),
-                union: fidl::new_empty!(ResourceUnion),
+                struct_: fidl::new_empty!(
+                    ResourceStruct,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                table: fidl::new_empty!(
+                    ResourceTable,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                union: fidl::new_empty!(
+                    ResourceUnion,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
                 opt_handle: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::HandleType<
@@ -10138,7 +10135,8 @@ mod internal {
                             { fidl::ObjectType::NONE.into_raw() },
                             2147483648,
                         >,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 opt_vmo: fidl::new_empty!(
                     fidl::encoding::Optional<
@@ -10147,20 +10145,29 @@ mod internal {
                             { fidl::ObjectType::VMO.into_raw() },
                             2147483648,
                         >,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 opt_client_end: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 opt_server_end: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                opt_struct: fidl::new_empty!(fidl::encoding::Boxed<ResourceStruct>),
-                opt_union: fidl::new_empty!(fidl::encoding::OptionalUnion<ResourceUnion>),
+                opt_struct: fidl::new_empty!(
+                    fidl::encoding::Boxed<ResourceStruct>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                opt_union: fidl::new_empty!(
+                    fidl::encoding::OptionalUnion<ResourceUnion>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
                 array_handle: fidl::new_empty!(
                     fidl::encoding::Array<
                         fidl::encoding::HandleType<
@@ -10169,7 +10176,8 @@ mod internal {
                             2147483648,
                         >,
                         5,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 array_vmo: fidl::new_empty!(
                     fidl::encoding::Array<
@@ -10179,23 +10187,26 @@ mod internal {
                             2147483648,
                         >,
                         5,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 array_client_end: fidl::new_empty!(
                     fidl::encoding::Array<
                         fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                         5,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 array_server_end: fidl::new_empty!(
                     fidl::encoding::Array<
                         fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                         5,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                array_struct: fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>),
-                array_table: fidl::new_empty!(fidl::encoding::Array<ResourceTable, 5>),
-                array_union: fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>),
+                array_struct: fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                array_table: fidl::new_empty!(fidl::encoding::Array<ResourceTable, 5>, fidl::encoding::DefaultFuchsiaResourceDialect),
+                array_union: fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>, fidl::encoding::DefaultFuchsiaResourceDialect),
                 vector_handle: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::HandleType<
@@ -10203,7 +10214,8 @@ mod internal {
                             { fidl::ObjectType::NONE.into_raw() },
                             2147483648,
                         >,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 vector_vmo: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
@@ -10212,28 +10224,43 @@ mod internal {
                             { fidl::ObjectType::VMO.into_raw() },
                             2147483648,
                         >,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 vector_client_end: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
                 vector_server_end: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-                    >
+                    >,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
                 ),
-                vector_struct: fidl::new_empty!(fidl::encoding::UnboundedVector<ResourceStruct>),
-                vector_table: fidl::new_empty!(fidl::encoding::UnboundedVector<ResourceTable>),
-                vector_union: fidl::new_empty!(fidl::encoding::UnboundedVector<ResourceUnion>),
+                vector_struct: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<ResourceStruct>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                vector_table: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<ResourceTable>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
+                vector_union: fidl::new_empty!(
+                    fidl::encoding::UnboundedVector<ResourceUnion>,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                ),
             }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10257,10 +10284,11 @@ mod internal {
                     padding_start: offset + 176 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.handle, decoder, offset + 0, _depth)?;
-            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, &mut self.vmo, decoder, offset + 4, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.handle, decoder, offset + 0, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Vmo, { fidl::ObjectType::VMO.into_raw() }, 2147483648>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.vmo, decoder, offset + 4, _depth)?;
             fidl::decode!(
                 fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.client_end,
                 decoder,
                 offset + 8,
@@ -10268,14 +10296,36 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.server_end,
                 decoder,
                 offset + 12,
                 _depth
             )?;
-            fidl::decode!(ResourceStruct, &mut self.struct_, decoder, offset + 16, _depth)?;
-            fidl::decode!(ResourceTable, &mut self.table, decoder, offset + 24, _depth)?;
-            fidl::decode!(ResourceUnion, &mut self.union, decoder, offset + 40, _depth)?;
+            fidl::decode!(
+                ResourceStruct,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                &mut self.struct_,
+                decoder,
+                offset + 16,
+                _depth
+            )?;
+            fidl::decode!(
+                ResourceTable,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                &mut self.table,
+                decoder,
+                offset + 24,
+                _depth
+            )?;
+            fidl::decode!(
+                ResourceUnion,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                &mut self.union,
+                decoder,
+                offset + 40,
+                _depth
+            )?;
             fidl::decode!(
                 fidl::encoding::Optional<
                     fidl::encoding::HandleType<
@@ -10284,6 +10334,7 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.opt_handle,
                 decoder,
                 offset + 56,
@@ -10297,6 +10348,7 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.opt_vmo,
                 decoder,
                 offset + 60,
@@ -10306,6 +10358,7 @@ mod internal {
                 fidl::encoding::Optional<
                     fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.opt_client_end,
                 decoder,
                 offset + 64,
@@ -10315,6 +10368,7 @@ mod internal {
                 fidl::encoding::Optional<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.opt_server_end,
                 decoder,
                 offset + 68,
@@ -10322,6 +10376,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Boxed<ResourceStruct>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.opt_struct,
                 decoder,
                 offset + 72,
@@ -10329,6 +10384,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::OptionalUnion<ResourceUnion>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.opt_union,
                 decoder,
                 offset + 80,
@@ -10343,6 +10399,7 @@ mod internal {
                     >,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.array_handle,
                 decoder,
                 offset + 96,
@@ -10357,6 +10414,7 @@ mod internal {
                     >,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.array_vmo,
                 decoder,
                 offset + 116,
@@ -10367,6 +10425,7 @@ mod internal {
                     fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.array_client_end,
                 decoder,
                 offset + 136,
@@ -10377,14 +10436,15 @@ mod internal {
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                     5,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.array_server_end,
                 decoder,
                 offset + 156,
                 _depth
             )?;
-            fidl::decode!(fidl::encoding::Array<ResourceStruct, 5>, &mut self.array_struct, decoder, offset + 176, _depth)?;
-            fidl::decode!(fidl::encoding::Array<ResourceTable, 5>, &mut self.array_table, decoder, offset + 184, _depth)?;
-            fidl::decode!(fidl::encoding::Array<ResourceUnion, 5>, &mut self.array_union, decoder, offset + 264, _depth)?;
+            fidl::decode!(fidl::encoding::Array<ResourceStruct, 5>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.array_struct, decoder, offset + 176, _depth)?;
+            fidl::decode!(fidl::encoding::Array<ResourceTable, 5>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.array_table, decoder, offset + 184, _depth)?;
+            fidl::decode!(fidl::encoding::Array<ResourceUnion, 5>, fidl::encoding::DefaultFuchsiaResourceDialect, &mut self.array_union, decoder, offset + 264, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::HandleType<
@@ -10393,6 +10453,7 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_handle,
                 decoder,
                 offset + 344,
@@ -10406,6 +10467,7 @@ mod internal {
                         2147483648,
                     >,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_vmo,
                 decoder,
                 offset + 360,
@@ -10415,6 +10477,7 @@ mod internal {
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_client_end,
                 decoder,
                 offset + 376,
@@ -10424,6 +10487,7 @@ mod internal {
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<ProtocolMarker>>,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_server_end,
                 decoder,
                 offset + 392,
@@ -10431,6 +10495,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<ResourceStruct>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_struct,
                 decoder,
                 offset + 408,
@@ -10438,6 +10503,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<ResourceTable>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_table,
                 decoder,
                 offset + 424,
@@ -10445,12 +10511,22 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<ResourceUnion>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 &mut self.vector_union,
                 decoder,
                 offset + 440,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ResourceTypeMarker for ResourceStruct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
         }
     }
 
@@ -10467,20 +10543,18 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for ResourceStruct {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ResourceStruct> for &mut ResourceStruct {
+    unsafe impl
+        fidl::encoding::Encode<ResourceStruct, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut ResourceStruct
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10490,7 +10564,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ResourceStruct {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for ResourceStruct
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self
@@ -10499,7 +10575,10 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10508,6 +10587,13 @@ mod internal {
                 0 => Ok(()),
                 _ => Err(fidl::Error::Invalid),
             }
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for Struct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -10524,20 +10610,12 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Struct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Struct> for &Struct {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Struct, D> for &Struct {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10547,7 +10625,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Struct {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Struct {
         #[inline(always)]
         fn new_empty() -> Self {
             Self
@@ -10556,7 +10634,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10565,6 +10643,13 @@ mod internal {
                 0 => Ok(()),
                 _ => Err(fidl::Error::Invalid),
             }
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for VectorBasic {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -10581,26 +10666,20 @@ mod internal {
             192
         }
     }
-    impl fidl::encoding::ValueTypeMarker for VectorBasic {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<VectorBasic> for &VectorBasic {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<VectorBasic, D>
+        for &VectorBasic
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<VectorBasic>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<VectorBasic>::encode(
+            fidl::encoding::Encode::<VectorBasic, D>::encode(
                 (
                     <fidl::encoding::UnboundedVector<u8> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_uint8),
                     <fidl::encoding::UnboundedVector<u16> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_uint16),
@@ -10620,31 +10699,34 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u8>>,
-            T1: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u16>>,
-            T2: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u32>>,
-            T3: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u64>>,
-            T4: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i8>>,
-            T5: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i16>>,
-            T6: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i32>>,
-            T7: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i64>>,
-            T8: fidl::encoding::Encode<fidl::encoding::UnboundedVector<f32>>,
-            T9: fidl::encoding::Encode<fidl::encoding::UnboundedVector<f64>>,
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u8>, D>,
+            T1: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u16>, D>,
+            T2: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u32>, D>,
+            T3: fidl::encoding::Encode<fidl::encoding::UnboundedVector<u64>, D>,
+            T4: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i8>, D>,
+            T5: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i16>, D>,
+            T6: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i32>, D>,
+            T7: fidl::encoding::Encode<fidl::encoding::UnboundedVector<i64>, D>,
+            T8: fidl::encoding::Encode<fidl::encoding::UnboundedVector<f32>, D>,
+            T9: fidl::encoding::Encode<fidl::encoding::UnboundedVector<f64>, D>,
             T10: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                D,
             >,
             T11: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Optional<fidl::encoding::UnboundedString>,
                 >,
+                D,
             >,
-        > fidl::encoding::Encode<VectorBasic>
+        > fidl::encoding::Encode<VectorBasic, D>
         for (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10668,27 +10750,29 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for VectorBasic {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for VectorBasic {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                vector_uint8: fidl::new_empty!(fidl::encoding::UnboundedVector<u8>),
-                vector_uint16: fidl::new_empty!(fidl::encoding::UnboundedVector<u16>),
-                vector_uint32: fidl::new_empty!(fidl::encoding::UnboundedVector<u32>),
-                vector_uint64: fidl::new_empty!(fidl::encoding::UnboundedVector<u64>),
-                vector_int8: fidl::new_empty!(fidl::encoding::UnboundedVector<i8>),
-                vector_int16: fidl::new_empty!(fidl::encoding::UnboundedVector<i16>),
-                vector_int32: fidl::new_empty!(fidl::encoding::UnboundedVector<i32>),
-                vector_int64: fidl::new_empty!(fidl::encoding::UnboundedVector<i64>),
-                vector_float32: fidl::new_empty!(fidl::encoding::UnboundedVector<f32>),
-                vector_float64: fidl::new_empty!(fidl::encoding::UnboundedVector<f64>),
+                vector_uint8: fidl::new_empty!(fidl::encoding::UnboundedVector<u8>, D),
+                vector_uint16: fidl::new_empty!(fidl::encoding::UnboundedVector<u16>, D),
+                vector_uint32: fidl::new_empty!(fidl::encoding::UnboundedVector<u32>, D),
+                vector_uint64: fidl::new_empty!(fidl::encoding::UnboundedVector<u64>, D),
+                vector_int8: fidl::new_empty!(fidl::encoding::UnboundedVector<i8>, D),
+                vector_int16: fidl::new_empty!(fidl::encoding::UnboundedVector<i16>, D),
+                vector_int32: fidl::new_empty!(fidl::encoding::UnboundedVector<i32>, D),
+                vector_int64: fidl::new_empty!(fidl::encoding::UnboundedVector<i64>, D),
+                vector_float32: fidl::new_empty!(fidl::encoding::UnboundedVector<f32>, D),
+                vector_float64: fidl::new_empty!(fidl::encoding::UnboundedVector<f64>, D),
                 vector_string: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>
+                    fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                    D
                 ),
                 vector_opt_string: fidl::new_empty!(
                     fidl::encoding::UnboundedVector<
                         fidl::encoding::Optional<fidl::encoding::UnboundedString>,
-                    >
+                    >,
+                    D
                 ),
             }
         }
@@ -10696,7 +10780,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10704,6 +10788,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::UnboundedVector<u8>,
+                D,
                 &mut self.vector_uint8,
                 decoder,
                 offset + 0,
@@ -10711,6 +10796,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<u16>,
+                D,
                 &mut self.vector_uint16,
                 decoder,
                 offset + 16,
@@ -10718,6 +10804,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<u32>,
+                D,
                 &mut self.vector_uint32,
                 decoder,
                 offset + 32,
@@ -10725,6 +10812,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<u64>,
+                D,
                 &mut self.vector_uint64,
                 decoder,
                 offset + 48,
@@ -10732,6 +10820,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<i8>,
+                D,
                 &mut self.vector_int8,
                 decoder,
                 offset + 64,
@@ -10739,6 +10828,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<i16>,
+                D,
                 &mut self.vector_int16,
                 decoder,
                 offset + 80,
@@ -10746,6 +10836,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<i32>,
+                D,
                 &mut self.vector_int32,
                 decoder,
                 offset + 96,
@@ -10753,6 +10844,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<i64>,
+                D,
                 &mut self.vector_int64,
                 decoder,
                 offset + 112,
@@ -10760,6 +10852,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<f32>,
+                D,
                 &mut self.vector_float32,
                 decoder,
                 offset + 128,
@@ -10767,6 +10860,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<f64>,
+                D,
                 &mut self.vector_float64,
                 decoder,
                 offset + 144,
@@ -10774,6 +10868,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+                D,
                 &mut self.vector_string,
                 decoder,
                 offset + 160,
@@ -10783,12 +10878,20 @@ mod internal {
                 fidl::encoding::UnboundedVector<
                     fidl::encoding::Optional<fidl::encoding::UnboundedString>,
                 >,
+                D,
                 &mut self.vector_opt_string,
                 decoder,
                 offset + 176,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for VectorCompound {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -10805,26 +10908,20 @@ mod internal {
             112
         }
     }
-    impl fidl::encoding::ValueTypeMarker for VectorCompound {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<VectorCompound> for &VectorCompound {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<VectorCompound, D>
+        for &VectorCompound
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<VectorCompound>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<VectorCompound>::encode(
+            fidl::encoding::Encode::<VectorCompound, D>::encode(
                 (
                     <fidl::encoding::UnboundedVector<Bits> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_bits),
                     <fidl::encoding::UnboundedVector<Enum> as fidl::encoding::ValueTypeMarker>::borrow(&self.vector_enum),
@@ -10839,21 +10936,26 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Bits>>,
-            T1: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Enum>>,
-            T2: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Struct>>,
-            T3: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Table>>,
-            T4: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Union>>,
-            T5: fidl::encoding::Encode<fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>>,
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Bits>, D>,
+            T1: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Enum>, D>,
+            T2: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Struct>, D>,
+            T3: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Table>, D>,
+            T4: fidl::encoding::Encode<fidl::encoding::UnboundedVector<Union>, D>,
+            T5: fidl::encoding::Encode<
+                fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>,
+                D,
+            >,
             T6: fidl::encoding::Encode<
                 fidl::encoding::UnboundedVector<fidl::encoding::OptionalUnion<Union>>,
+                D,
             >,
-        > fidl::encoding::Encode<VectorCompound> for (T0, T1, T2, T3, T4, T5, T6)
+        > fidl::encoding::Encode<VectorCompound, D> for (T0, T1, T2, T3, T4, T5, T6)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10872,20 +10974,22 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for VectorCompound {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for VectorCompound {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
-                vector_bits: fidl::new_empty!(fidl::encoding::UnboundedVector<Bits>),
-                vector_enum: fidl::new_empty!(fidl::encoding::UnboundedVector<Enum>),
-                vector_struct: fidl::new_empty!(fidl::encoding::UnboundedVector<Struct>),
-                vector_table: fidl::new_empty!(fidl::encoding::UnboundedVector<Table>),
-                vector_union: fidl::new_empty!(fidl::encoding::UnboundedVector<Union>),
+                vector_bits: fidl::new_empty!(fidl::encoding::UnboundedVector<Bits>, D),
+                vector_enum: fidl::new_empty!(fidl::encoding::UnboundedVector<Enum>, D),
+                vector_struct: fidl::new_empty!(fidl::encoding::UnboundedVector<Struct>, D),
+                vector_table: fidl::new_empty!(fidl::encoding::UnboundedVector<Table>, D),
+                vector_union: fidl::new_empty!(fidl::encoding::UnboundedVector<Union>, D),
                 vector_opt_struct: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>,
+                    D
                 ),
                 vector_opt_union: fidl::new_empty!(
-                    fidl::encoding::UnboundedVector<fidl::encoding::OptionalUnion<Union>>
+                    fidl::encoding::UnboundedVector<fidl::encoding::OptionalUnion<Union>>,
+                    D
                 ),
             }
         }
@@ -10893,7 +10997,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10901,6 +11005,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::UnboundedVector<Bits>,
+                D,
                 &mut self.vector_bits,
                 decoder,
                 offset + 0,
@@ -10908,6 +11013,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<Enum>,
+                D,
                 &mut self.vector_enum,
                 decoder,
                 offset + 16,
@@ -10915,6 +11021,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<Struct>,
+                D,
                 &mut self.vector_struct,
                 decoder,
                 offset + 32,
@@ -10922,6 +11029,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<Table>,
+                D,
                 &mut self.vector_table,
                 decoder,
                 offset + 48,
@@ -10929,6 +11037,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<Union>,
+                D,
                 &mut self.vector_union,
                 decoder,
                 offset + 64,
@@ -10936,6 +11045,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>,
+                D,
                 &mut self.vector_opt_struct,
                 decoder,
                 offset + 80,
@@ -10943,12 +11053,20 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::OptionalUnion<Union>>,
+                D,
                 &mut self.vector_opt_union,
                 decoder,
                 offset + 96,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for VectorOptional {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -10965,26 +11083,20 @@ mod internal {
             64
         }
     }
-    impl fidl::encoding::ValueTypeMarker for VectorOptional {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<VectorOptional> for &VectorOptional {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<VectorOptional, D>
+        for &VectorOptional
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<VectorOptional>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<VectorOptional>::encode(
+            fidl::encoding::Encode::<VectorOptional, D>::encode(
                 (
                     <fidl::encoding::Optional<fidl::encoding::UnboundedVector<u8>> as fidl::encoding::ValueTypeMarker>::borrow(&self.opt_vector_uint8),
                     <fidl::encoding::Optional<fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>> as fidl::encoding::ValueTypeMarker>::borrow(&self.opt_vector_string),
@@ -10996,26 +11108,33 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<fidl::encoding::Optional<fidl::encoding::UnboundedVector<u8>>>,
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<
+                fidl::encoding::Optional<fidl::encoding::UnboundedVector<u8>>,
+                D,
+            >,
             T1: fidl::encoding::Encode<
                 fidl::encoding::Optional<
                     fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
                 >,
+                D,
             >,
             T2: fidl::encoding::Encode<
                 fidl::encoding::Optional<fidl::encoding::UnboundedVector<Struct>>,
+                D,
             >,
             T3: fidl::encoding::Encode<
                 fidl::encoding::Optional<
                     fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>,
                 >,
+                D,
             >,
-        > fidl::encoding::Encode<VectorOptional> for (T0, T1, T2, T3)
+        > fidl::encoding::Encode<VectorOptional, D> for (T0, T1, T2, T3)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11031,25 +11150,29 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for VectorOptional {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for VectorOptional {
         #[inline(always)]
         fn new_empty() -> Self {
             Self {
                 opt_vector_uint8: fidl::new_empty!(
-                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u8>>
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<u8>>,
+                    D
                 ),
                 opt_vector_string: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
-                    >
+                    >,
+                    D
                 ),
                 opt_vector_struct: fidl::new_empty!(
-                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<Struct>>
+                    fidl::encoding::Optional<fidl::encoding::UnboundedVector<Struct>>,
+                    D
                 ),
                 opt_vector_opt_struct: fidl::new_empty!(
                     fidl::encoding::Optional<
                         fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>,
-                    >
+                    >,
+                    D
                 ),
             }
         }
@@ -11057,7 +11180,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11065,6 +11188,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::Optional<fidl::encoding::UnboundedVector<u8>>,
+                D,
                 &mut self.opt_vector_uint8,
                 decoder,
                 offset + 0,
@@ -11074,6 +11198,7 @@ mod internal {
                 fidl::encoding::Optional<
                     fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
                 >,
+                D,
                 &mut self.opt_vector_string,
                 decoder,
                 offset + 16,
@@ -11081,6 +11206,7 @@ mod internal {
             )?;
             fidl::decode!(
                 fidl::encoding::Optional<fidl::encoding::UnboundedVector<Struct>>,
+                D,
                 &mut self.opt_vector_struct,
                 decoder,
                 offset + 32,
@@ -11090,6 +11216,7 @@ mod internal {
                 fidl::encoding::Optional<
                     fidl::encoding::UnboundedVector<fidl::encoding::Boxed<Struct>>,
                 >,
+                D,
                 &mut self.opt_vector_opt_struct,
                 decoder,
                 offset + 48,
@@ -11106,6 +11233,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ResourceTypeMarker for ResourceTable {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ResourceTable {
         type Owned = Self;
 
@@ -11119,19 +11255,16 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for ResourceTable {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ResourceTable> for &mut ResourceTable {
+    unsafe impl fidl::encoding::Encode<ResourceTable, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut ResourceTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11155,7 +11288,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ResourceTable {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for ResourceTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -11163,7 +11296,10 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11203,6 +11339,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Table {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Table {
         type Owned = Self;
 
@@ -11216,19 +11359,11 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Table {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Table> for &Table {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Table, D> for &Table {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11252,7 +11387,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Table {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Table {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -11260,7 +11395,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11293,6 +11428,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ResourceTypeMarker for ResourceUnion {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
+        ) -> Self::Borrowed<'a> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ResourceUnion {
         type Owned = Self;
 
@@ -11306,27 +11450,27 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ResourceTypeMarker for ResourceUnion {
-        type Borrowed<'a> = &'a mut Self;
-        fn take_or_borrow<'a>(
-            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ResourceUnion> for &mut ResourceUnion {
+    unsafe impl fidl::encoding::Encode<ResourceUnion, fidl::encoding::DefaultFuchsiaResourceDialect>
+        for &mut ResourceUnion
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<ResourceUnion>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                ResourceUnion::B(ref val) => fidl::encoding::encode_in_envelope::<bool>(
+                ResourceUnion::B(ref val) => fidl::encoding::encode_in_envelope::<
+                    bool,
+                    fidl::encoding::DefaultFuchsiaResourceDialect,
+                >(
                     <bool as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -11337,7 +11481,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ResourceUnion {
+    impl fidl::encoding::Decode<Self, fidl::encoding::DefaultFuchsiaResourceDialect> for ResourceUnion {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11346,7 +11490,10 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<
+                '_,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11381,11 +11528,21 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = ResourceUnion::B(fidl::new_empty!(bool));
+                        *self = ResourceUnion::B(fidl::new_empty!(
+                            bool,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        ));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let ResourceUnion::B(ref mut val) = self {
-                        fidl::decode!(bool, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(
+                            bool,
+                            fidl::encoding::DefaultFuchsiaResourceDialect,
+                            val,
+                            decoder,
+                            _inner_offset,
+                            depth
+                        )?;
                     } else {
                         unreachable!()
                     }
@@ -11408,6 +11565,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for Union {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Union {
         type Owned = Self;
 
@@ -11421,27 +11585,19 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Union {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Union> for &Union {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Union, D> for &Union {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Union>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                Union::B(ref val) => fidl::encoding::encode_in_envelope::<bool>(
+                Union::B(ref val) => fidl::encoding::encode_in_envelope::<bool, D>(
                     <bool as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder,
                     offset + 8,
@@ -11452,7 +11608,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Union {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Union {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11461,7 +11617,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11496,11 +11652,11 @@ mod internal {
                         // Do nothing, read the value into the object
                     } else {
                         // Initialize `self` to the right variant
-                        *self = Union::B(fidl::new_empty!(bool));
+                        *self = Union::B(fidl::new_empty!(bool, D));
                     }
                     #[allow(irrefutable_let_patterns)]
                     if let Union::B(ref mut val) = self {
-                        fidl::decode!(bool, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(bool, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

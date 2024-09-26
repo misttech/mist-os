@@ -88,35 +88,6 @@ enum class ModeType {
   kModeLfs,
 };
 
-// A utility class, trying to set an atomic flag.
-// If it succeeds to newly set the flag, it clears the flag in ~FlagGuard()
-// where it also wakes threads waiting for the flag if |wake_waiters_| is set.
-// If not, it does nothing when it is deleted.
-class FlagGuard {
- public:
-  FlagGuard() = delete;
-  FlagGuard(const FlagGuard &) = delete;
-  FlagGuard &operator=(const FlagGuard &) = delete;
-  FlagGuard(FlagGuard &&flag) = delete;
-  FlagGuard &operator=(FlagGuard &&flag) = delete;
-  explicit FlagGuard(std::atomic_flag *flag, bool wake_waiters = false) : flag_(flag) {
-    // Release-acquire ordering between the writeback (loader) and others such as checkpoint and gc.
-    acquired_ = !flag_->test_and_set(std::memory_order_acquire);
-  }
-  ~FlagGuard() {
-    if (acquired_) {
-      // Release-acquire ordering between the writeback (loader) and others such as checkpoint and
-      // gc.
-      flag_->clear(std::memory_order_release);
-    }
-  }
-  explicit operator bool() const { return acquired_; }
-
- private:
-  std::atomic_flag *flag_ = nullptr;
-  bool acquired_ = false;
-};
-
 class SuperblockInfo {
  public:
   // Not copyable or moveable

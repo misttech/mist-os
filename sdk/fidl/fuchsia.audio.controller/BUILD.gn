@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.audio.controller") {
   sdk_category = "partner_internal"
+  stable = false
   sdk_area = "Media"
 
   sources = [

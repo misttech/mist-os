@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use crate::tunnel::TunnelManager;
-use crate::{config as pkg_config, metrics};
+use crate::{config as pkg_config, metrics, PkgServerInfo};
 use async_lock::RwLock;
 use fidl_fuchsia_developer_ffx_ext::{
     RepositoryError, RepositoryRegistrationAliasConflictMode, RepositoryTarget,
 };
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
+use fidl_fuchsia_pkg_ext::MirrorConfigBuilder;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use fuchsia_hyper::{new_https_client, HttpsClient};
@@ -22,7 +23,7 @@ use fuchsia_url::RepositoryUrl;
 use fuchsia_zircon_status::Status;
 use futures::FutureExt as _;
 use protocols::prelude::Context;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -323,6 +324,168 @@ pub async fn update_repository(
             _ => ffx::RepositoryError::IoError,
         }
     })
+}
+
+pub async fn register_target_with_repo_instance(
+    repo_proxy: RepositoryManagerProxy,
+    rewrite_engine_proxy: EngineProxy,
+    repo_target_info: &RepositoryTarget,
+    target: &ffx::TargetInfo,
+    repo_server_listen_addr: SocketAddr,
+    repo_instance: &PkgServerInfo,
+    alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
+) -> Result<(), ffx::RepositoryError> {
+    let repo_name: &str = &repo_target_info.repo_name;
+    let target_ssh_host_address = target.ssh_host_address.clone();
+    let target_nodename = target.nodename.clone().ok_or_else(|| {
+        tracing::error!("target {:?} does not have a nodename", repo_target_info.target_identifier);
+        ffx::RepositoryError::TargetCommunicationFailure
+    })?;
+
+    tracing::info!(
+        "Registering repository {:?} for target {:?}",
+        repo_name,
+        repo_target_info.target_identifier
+    );
+
+    // Before we register the repository, we need to decide which address the
+    // target device should use to reach the repository. If the server is
+    // running on a loopback device, then a tunnel will be created for the
+    // device to access the server.
+    let (_, repo_host_addr) = create_repo_host(
+        repo_server_listen_addr,
+        target_ssh_host_address.ok_or_else(|| {
+            tracing::error!(
+                "target {:?} does not have a host address",
+                repo_target_info.target_identifier
+            );
+            ffx::RepositoryError::TargetCommunicationFailure
+        })?,
+    );
+
+    let aliases = {
+        // Use the repository aliases if the registration doesn't have any.
+        let aliases: BTreeSet<String> = if let Some(aliases) = &repo_target_info.aliases {
+            aliases.clone()
+        } else {
+            BTreeSet::<String>::from_iter(
+                repo_instance.registration_aliases.iter().map(String::to_string),
+            )
+        };
+
+        // If the registration conflict mode is ErrorOut, read the aliases from the device
+        // and determine if any of the aliases are pointing to a different repository.
+        if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
+            let alias_repos = read_alias_repos(rewrite_engine_proxy.clone()).await?;
+            for alias in &aliases {
+                if let Some(repos) = alias_repos.get(alias) {
+                    if !repos.contains(&repo_name.to_string()) {
+                        tracing::error!(
+                            "Alias registration conflict for {alias} replaced by {} ",
+                            repos.join(", ")
+                        );
+                        return Err(ffx::RepositoryError::ConflictingRegistration);
+                    }
+                }
+            }
+        }
+        // Checking for registration alias conflicts.
+        let check_alias_conflict = pkg_config::check_registration_alias_conflict(
+            repo_name,
+            target_nodename.as_str(),
+            aliases.clone().into_iter().collect(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("{e}");
+            ffx::RepositoryError::ConflictingRegistration
+        });
+        if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
+            check_alias_conflict?
+        }
+
+        aliases
+    };
+
+    let mut config = repo_instance.repo_config.clone();
+    let mirrors = repo_instance.repo_config.mirrors();
+    let mut subscribe = false;
+    //remove all the mirrors, there should only be one placeholder
+    for m in mirrors {
+        subscribe = subscribe || m.subscribe();
+        config.remove_mirror(m.mirror_url());
+    }
+    // now add repo_host_addr as the mirror
+    let mirror_url = format!("http://{repo_host_addr}/{}", repo_instance.name);
+    let mirror_url: http::Uri = mirror_url.parse().map_err(|err| {
+        tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
+        ffx::RepositoryError::InvalidUrl
+    })?;
+
+    let mut mirror = MirrorConfigBuilder::new(mirror_url.clone()).map_err(|err| {
+        tracing::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
+        ffx::RepositoryError::InvalidUrl
+    })?;
+    mirror = mirror.subscribe(subscribe);
+    config.insert_mirror(mirror.build());
+
+    match repo_proxy.add(&config.into()).await {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => {
+            tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
+            return Err(ffx::RepositoryError::RepositoryManagerError);
+        }
+        Err(err) => {
+            tracing::error!("failed to add config: {:#?}", err);
+            return Err(ffx::RepositoryError::TargetCommunicationFailure);
+        }
+    }
+
+    if !aliases.is_empty() {
+        let () = create_aliases_fidl(rewrite_engine_proxy, repo_name, &aliases).await?;
+    }
+
+    Ok(())
+}
+
+async fn read_alias_repos(
+    engine_proxy: EngineProxy,
+) -> Result<HashMap<String, Vec<String>>, ffx::RepositoryError> {
+    let (rule_iterator, rule_iterator_server) = fidl::endpoints::create_proxy().map_err(|e| {
+        tracing::error!("Failed creating endpoint to list rules: {e}");
+        ffx::RepositoryError::RewriteEngineError
+    })?;
+
+    engine_proxy.list(rule_iterator_server).map_err(|e| {
+        tracing::error!("Failed to list rules: {e}");
+        ffx::RepositoryError::RewriteEngineError
+    })?;
+
+    let mut alias_to_repo: HashMap<String, Vec<String>> = HashMap::new();
+
+    let mut rules: Vec<Rule> = vec![];
+    loop {
+        let rule = rule_iterator.next().await.map_err(|e| {
+            tracing::error!("Failed iterating while listing rules: {e}");
+            ffx::RepositoryError::RewriteEngineError
+        })?;
+        if rule.is_empty() {
+            break;
+        }
+        rules.extend(rule.into_iter().map(|r| r.try_into().unwrap()));
+    }
+
+    for r in rules {
+        let alias = r.host_match();
+        let repo = r.host_replacement();
+        if let Some(repo_list) = alias_to_repo.get_mut(alias) {
+            repo_list.push(repo.to_string());
+        } else {
+            alias_to_repo.insert(alias.into(), vec![repo.into()]);
+        }
+    }
+
+    Ok(alias_to_repo)
 }
 
 pub async fn register_target_with_fidl_proxies(

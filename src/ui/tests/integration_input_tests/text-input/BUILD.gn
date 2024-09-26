@@ -5,6 +5,7 @@
 # By and large copied from //src/ui/tests/integration_input_tests/factory-reset-handler.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("text-input") {
   testonly = true
@@ -24,7 +25,7 @@ group("tests") {
   ]
 }
 
-executable("text-input-test-bin") {
+cc_test_executable("text-input-test-bin") {
   testonly = true
   sources = [ "text-input-test.cc" ]
   output_name = "text-input-test"

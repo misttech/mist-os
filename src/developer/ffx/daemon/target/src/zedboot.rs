@@ -20,7 +20,7 @@ use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::num::NonZeroU16;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// Zedboot discovery port (must be a nonzero u16)
 const DISCOVERY_ZEDBOOT_ADVERT_PORT: &str = "discovery.zedboot.advert_port";
@@ -172,9 +172,9 @@ pub enum ZedbootConvertError {
 
 /// A newtype for NetbootPacket so we can implement traits for it respecting the
 /// orphan rules.
-struct ZedbootPacket<B: ByteSlice>(NetbootPacket<B>);
+struct ZedbootPacket<B: SplitByteSlice>(NetbootPacket<B>);
 
-impl<B: ByteSlice> TryIntoTargetEventInfo for ZedbootPacket<B> {
+impl<B: SplitByteSlice> TryIntoTargetEventInfo for ZedbootPacket<B> {
     type Error = ZedbootConvertError;
 
     fn try_into_target_event_info(self, src: SocketAddr) -> Result<Description, Self::Error> {

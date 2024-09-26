@@ -9,7 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use diagnostics_data::{
     Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
-    LogsData, Timestamp, Timezone,
+    LogsData, Timezone,
 };
 use ffx_writer::ToolIO;
 use futures_util::future::Either;
@@ -20,6 +20,8 @@ use std::fmt::Display;
 use std::io::Write;
 use std::time::Duration;
 use thiserror::Error;
+
+pub use diagnostics_data::Timestamp;
 
 pub const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
 
@@ -88,17 +90,11 @@ pub trait Symbolize {
     async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry>;
 }
 
-async fn handle_value<S>(one: Data<Logs>, boot_ts: i64, symbolizer: &S) -> Option<LogEntry>
+async fn handle_value<S>(one: Data<Logs>, boot_ts: Timestamp, symbolizer: &S) -> Option<LogEntry>
 where
     S: Symbolize + ?Sized,
 {
-    let entry = LogEntry {
-        timestamp: {
-            let monotonic = one.metadata.timestamp;
-            Timestamp::from(monotonic + boot_ts)
-        },
-        data: one.into(),
-    };
+    let entry = LogEntry { timestamp: one.metadata.timestamp + boot_ts, data: one.into() };
     symbolizer.symbolize(entry).await
 }
 
@@ -138,10 +134,10 @@ where
 
 pub trait BootTimeAccessor {
     /// Sets the boot timestamp in nanoseconds since the Unix epoch.
-    fn set_boot_timestamp(&mut self, _boot_ts_nanos: i64);
+    fn set_boot_timestamp(&mut self, _boot_ts_nanos: Timestamp);
 
     /// Returns the boot timestamp in nanoseconds since the Unix epoch.
-    fn get_boot_timestamp(&self) -> i64;
+    fn get_boot_timestamp(&self) -> Timestamp;
 }
 
 /// Timestamp filter which is either either monotonic-based or UTC-based.
@@ -165,12 +161,12 @@ impl DeviceOrLocalTimestamp {
         rtc.as_ref()
             .filter(|value| !value.is_now)
             .map(|value| DeviceOrLocalTimestamp {
-                timestamp: Timestamp::from(value.naive_utc().timestamp_nanos_opt().unwrap()),
+                timestamp: Timestamp::from_nanos(value.naive_utc().timestamp_nanos_opt().unwrap()),
                 is_monotonic: false,
             })
             .or_else(|| {
                 monotonic.map(|value| DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(value.as_nanos() as i64),
+                    timestamp: Timestamp::from_nanos(value.as_nanos() as i64),
                     is_monotonic: true,
                 })
             })
@@ -213,12 +209,12 @@ where
     writer: W,
     filters: LogFilterCriteria,
     options: LogFormatterOptions,
-    boot_ts_nanos: Option<i64>,
+    boot_ts_nanos: Option<Timestamp>,
 }
 
 /// Converts from UTC time to monotonic time.
-fn utc_to_monotonic(boot_ts: i64, utc: i64) -> Timestamp {
-    Timestamp::from(utc - boot_ts)
+fn utc_to_monotonic(boot_ts: Timestamp, utc: i64) -> Timestamp {
+    Timestamp::from_nanos(utc - boot_ts.into_nanos())
 }
 
 #[async_trait(?Send)]
@@ -260,21 +256,21 @@ impl<W> BootTimeAccessor for DefaultLogFormatter<W>
 where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
-    fn set_boot_timestamp(&mut self, boot_ts_nanos: i64) {
+    fn set_boot_timestamp(&mut self, boot_ts_nanos: Timestamp) {
         match &mut self.options.display {
             Some(LogTextDisplayOptions {
                 time_format: LogTimeDisplayFormat::WallTime { ref mut offset, .. },
                 ..
             }) => {
-                *offset = boot_ts_nanos;
+                *offset = boot_ts_nanos.into_nanos();
             }
             _ => (),
         }
         self.boot_ts_nanos = Some(boot_ts_nanos);
     }
-    fn get_boot_timestamp(&self) -> i64 {
+    fn get_boot_timestamp(&self) -> Timestamp {
         debug_assert!(self.boot_ts_nanos.is_some());
-        self.boot_ts_nanos.unwrap_or(0)
+        self.boot_ts_nanos.unwrap_or(Timestamp::from_nanos(0))
     }
 }
 
@@ -366,7 +362,7 @@ where
         };
         if timestamp.is_monotonic {
             callback(
-                &utc_to_monotonic(self.get_boot_timestamp(), *log_entry.timestamp),
+                &utc_to_monotonic(self.get_boot_timestamp(), log_entry.timestamp.into_nanos()),
                 &timestamp.timestamp,
             )
         } else {
@@ -437,10 +433,10 @@ mod test {
     }
 
     impl BootTimeAccessor for FakeFormatter {
-        fn set_boot_timestamp(&mut self, _boot_ts_nanos: i64) {}
+        fn set_boot_timestamp(&mut self, _boot_ts_nanos: Timestamp) {}
 
-        fn get_boot_timestamp(&self) -> i64 {
-            0
+        fn get_boot_timestamp(&self) -> Timestamp {
+            Timestamp::from_nanos(0)
         }
     }
 
@@ -503,16 +499,16 @@ mod test {
         };
         let mut formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
-        formatter.set_boot_timestamp(1234);
-        assert_eq!(formatter.get_boot_timestamp(), 1234);
+        formatter.set_boot_timestamp(Timestamp::from_nanos(1234));
+        assert_eq!(formatter.get_boot_timestamp(), Timestamp::from_nanos(1234));
 
         // Boot timestamp is supported when using JSON output (for filtering)
         let buffers = TestBuffers::default();
         let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions { display: None, ..Default::default() };
         let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), output, options);
-        formatter.set_boot_timestamp(1234);
-        assert_eq!(formatter.get_boot_timestamp(), 1234);
+        formatter.set_boot_timestamp(Timestamp::from_nanos(1234));
+        assert_eq!(formatter.get_boot_timestamp(), Timestamp::from_nanos(1234));
     }
 
     #[fuchsia::test]
@@ -521,7 +517,7 @@ mod test {
         let mut formatter = FakeFormatter::new();
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(0),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -541,7 +537,10 @@ mod test {
         .unwrap();
         assert_eq!(
             formatter.logs,
-            vec![LogEntry { data: LogData::TargetLog(target_log), timestamp: Timestamp::from(0) }]
+            vec![LogEntry {
+                data: LogData::TargetLog(target_log),
+                timestamp: Timestamp::from_nanos(0)
+            }]
         );
     }
 
@@ -552,7 +551,7 @@ mod test {
         let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
         let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(0),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -562,7 +561,7 @@ mod test {
         .build();
         let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(1),
+            timestamp: Timestamp::from_nanos(1),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -582,8 +581,14 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry { data: LogData::TargetLog(target_log_0), timestamp: Timestamp::from(0) },
-                LogEntry { data: LogData::TargetLog(target_log_1), timestamp: Timestamp::from(1) }
+                LogEntry {
+                    data: LogData::TargetLog(target_log_0),
+                    timestamp: Timestamp::from_nanos(0)
+                },
+                LogEntry {
+                    data: LogData::TargetLog(target_log_1),
+                    timestamp: Timestamp::from_nanos(1)
+                }
             ]
         );
     }
@@ -599,22 +604,22 @@ mod test {
             stdout,
             LogFormatterOptions {
                 since: Some(DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(1),
+                    timestamp: Timestamp::from_nanos(1),
                     is_monotonic: true,
                 }),
                 until: Some(DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(3),
+                    timestamp: Timestamp::from_nanos(3),
                     is_monotonic: true,
                 }),
                 ..Default::default()
             },
         );
-        formatter.set_boot_timestamp(0);
+        formatter.set_boot_timestamp(Timestamp::from_nanos(0));
 
         let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
         let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(0),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -622,7 +627,7 @@ mod test {
         .build();
         let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(1),
+            timestamp: Timestamp::from_nanos(1),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -630,7 +635,7 @@ mod test {
         .build();
         let target_log_2 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(2),
+            timestamp: Timestamp::from_nanos(2),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -640,7 +645,7 @@ mod test {
         .build();
         let target_log_3 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(3),
+            timestamp: Timestamp::from_nanos(3),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -676,10 +681,10 @@ mod test {
         );
     }
 
-    fn make_log_with_timestamp(timestamp: i32) -> LogsData {
+    fn make_log_with_timestamp(timestamp: i64) -> LogsData {
         LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(timestamp),
+            timestamp: Timestamp::from_nanos(timestamp),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -700,11 +705,11 @@ mod test {
             stdout,
             LogFormatterOptions {
                 since: Some(DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(1),
+                    timestamp: Timestamp::from_nanos(1),
                     is_monotonic: false,
                 }),
                 until: Some(DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(3),
+                    timestamp: Timestamp::from_nanos(3),
                     is_monotonic: false,
                 }),
                 display: Some(LogTextDisplayOptions {
@@ -714,7 +719,7 @@ mod test {
                 ..Default::default()
             },
         );
-        formatter.set_boot_timestamp(1);
+        formatter.set_boot_timestamp(Timestamp::from_nanos(1));
 
         let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
         let logs = (0..4).map(|i| make_log_with_timestamp(i)).collect::<Vec<_>>();
@@ -739,7 +744,7 @@ mod test {
 
     fn logs_data_builder() -> LogsDataBuilder {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: Timestamp::from(default_ts().as_nanos() as i64),
+            timestamp: Timestamp::from_nanos(default_ts().as_nanos() as i64),
             component_url: Some("component_url".into()),
             moniker: "some/moniker".try_into().unwrap(),
             severity: diagnostics_data::Severity::Warn,
@@ -754,7 +759,7 @@ mod test {
 
     fn log_entry() -> LogEntry {
         LogEntry {
-            timestamp: 0.into(),
+            timestamp: Timestamp::from_nanos(0),
             data: LogData::TargetLog(
                 logs_data_builder().add_tag("tag1").add_tag("tag2").set_message("message").build(),
             ),
@@ -809,14 +814,10 @@ mod test {
         );
     }
 
-    fn emit_log(
-        sender: &mut fuchsia_zircon::Socket,
-        msg: &str,
-        timestamp_nanos: i32,
-    ) -> Data<Logs> {
+    fn emit_log(sender: &mut fuchsia_zircon::Socket, msg: &str, timestamp: i64) -> Data<Logs> {
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(timestamp_nanos),
+            timestamp: Timestamp::from_nanos(timestamp),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })
@@ -854,9 +855,18 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry { data: LogData::TargetLog(target_log_0), timestamp: Timestamp::from(0) },
-                LogEntry { data: LogData::TargetLog(target_log_2), timestamp: Timestamp::from(2) },
-                LogEntry { data: LogData::TargetLog(target_log_4), timestamp: Timestamp::from(4) }
+                LogEntry {
+                    data: LogData::TargetLog(target_log_0),
+                    timestamp: Timestamp::from_nanos(0)
+                },
+                LogEntry {
+                    data: LogData::TargetLog(target_log_2),
+                    timestamp: Timestamp::from_nanos(2)
+                },
+                LogEntry {
+                    data: LogData::TargetLog(target_log_4),
+                    timestamp: Timestamp::from_nanos(4)
+                }
             ],
         );
     }
@@ -871,10 +881,10 @@ mod test {
             output,
             LogFormatterOptions { ..Default::default() },
         );
-        formatter.set_boot_timestamp(0);
+        formatter.set_boot_timestamp(Timestamp::from_nanos(0));
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
-            timestamp_nanos: Timestamp::from(0),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
         })

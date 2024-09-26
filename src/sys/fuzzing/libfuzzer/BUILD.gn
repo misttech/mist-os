@@ -95,6 +95,10 @@ expect_includes("libfuzzer_includes") {
   includes = [ "default.shard.cml" ]
 }
 
+expect_includes("libfuzzer_starnix_includes") {
+  includes = [ "starnix.shard.cml" ]
+}
+
 fuchsia_component("test-realm") {
   visibility = [ ":*" ]
   testonly = true

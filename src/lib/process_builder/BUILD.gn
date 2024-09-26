@@ -7,6 +7,7 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
@@ -89,7 +90,7 @@ user_basic_redirect("static_pie_test.basic") {
 }
 
 if (toolchain_environment == "user.basic") {
-  executable("static_pie_test_util") {
+  cc_test_executable("static_pie_test_util") {
     visibility = [ ":*" ]
     sources = [ "test-utils/static_pie_test_util.cc" ]
 

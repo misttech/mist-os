@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::ops;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Representation of N IEEE 802.11 TimeUnits.
 /// A TimeUnit is defined as 1024 micro seconds.
@@ -11,10 +11,10 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 /// and can easily overflow. However, there is usually no need to ever work with TUs > 0xFFFF.
 #[repr(C)]
 #[derive(
-    AsBytes,
-    FromZeros,
+    IntoBytes,
+    KnownLayout,
     FromBytes,
-    NoCell,
+    Immutable,
     Copy,
     Clone,
     Debug,
@@ -66,7 +66,7 @@ impl TimeUnit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
 
     #[fuchsia::test]
     fn one_time_unit_conversion_to_microseconds() {
@@ -82,14 +82,14 @@ mod tests {
 
     #[fuchsia::test]
     fn one_time_unit_conversion_to_duration() {
-        assert_eq!(zx::Duration::from(TimeUnit(1)), 1024.micros());
+        assert_eq!(zx::Duration::from(TimeUnit(1)), zx::Duration::from_micros(1024));
     }
 
     #[fuchsia::test]
     fn time_unit_conversion_to_duration_is_linear() {
-        assert_eq!(zx::Duration::from(TimeUnit(0)), 0.micros());
-        assert_eq!(zx::Duration::from(TimeUnit(1)), 1024.micros());
-        assert_eq!(zx::Duration::from(TimeUnit(200)), 204800.micros());
+        assert_eq!(zx::Duration::from(TimeUnit(0)), zx::Duration::from_micros(0));
+        assert_eq!(zx::Duration::from(TimeUnit(1)), zx::Duration::from_micros(1024));
+        assert_eq!(zx::Duration::from(TimeUnit(200)), zx::Duration::from_micros(204800));
     }
 
     #[fuchsia::test]

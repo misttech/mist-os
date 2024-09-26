@@ -6,21 +6,14 @@
 
 use crate::security;
 use crate::security::selinux_hooks::XATTR_NAME_SELINUX;
-use crate::security::{SecurityId, SecurityServer};
+use crate::security::SecurityServer;
+use crate::task::CurrentTask;
 use crate::testing::AutoReleasableTask;
-use crate::vfs::{FsNode, NamespaceNode, XattrOp};
+use crate::vfs::{NamespaceNode, XattrOp};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use std::sync::Arc;
-
-/// Returns the security id currently stored in `fs_node`, if any. This API should only be used
-/// by code that is responsible for controlling the cached security id; e.g., to check its
-/// current value before engaging logic that may compute a new value. Access control enforcement
-/// code should use `get_effective_fs_node_security_id()`, *not* this function.
-pub fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
-    fs_node.info().security_state.sid
-}
 
 /// Creates a new file named "file" under the root of the filesystem.
 /// As currently implemented this will exercise the file-labeling scheme
@@ -28,7 +21,7 @@ pub fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
 /// clear both the file's cached `SecurityId` and its extended attribute.
 pub fn create_unlabeled_test_file(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &AutoReleasableTask,
+    current_task: &CurrentTask,
 ) -> NamespaceNode {
     let namespace_node = create_test_file(locked, current_task);
     assert!(security::fs_node_setsecurity(
@@ -47,7 +40,7 @@ pub fn create_unlabeled_test_file(
 /// filesystem by the current policy.
 pub fn create_test_file(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &AutoReleasableTask,
+    current_task: &CurrentTask,
 ) -> NamespaceNode {
     current_task
         .fs()

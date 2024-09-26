@@ -42,7 +42,7 @@ use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
     error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct
 /// passed is larger than the kernel knows about, the excess must be zeros. Similarly, if the

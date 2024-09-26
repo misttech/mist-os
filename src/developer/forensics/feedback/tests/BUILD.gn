@@ -4,11 +4,12 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("annotation_manager_unittest_exe") {
+cc_test_executable("annotation_manager_unittest_exe") {
   testonly = true
 
   sources = [ "annotation_manager_unittest.cc" ]
@@ -24,7 +25,7 @@ executable("annotation_manager_unittest_exe") {
   ]
 }
 
-executable("attachment_manager_unittest_exe") {
+cc_test_executable("attachment_manager_unittest_exe") {
   testonly = true
 
   sources = [ "attachment_manager_unittest.cc" ]
@@ -59,7 +60,7 @@ executable("attachment_manager_unittest_exe") {
   ]
 }
 
-executable("annotation_metrics_unittest_exe") {
+cc_test_executable("annotation_metrics_unittest_exe") {
   testonly = true
 
   sources = [ "annotation_metrics_unittest.cc" ]
@@ -75,7 +76,7 @@ executable("annotation_metrics_unittest_exe") {
   ]
 }
 
-executable("attachment_metrics_unittest_exe") {
+cc_test_executable("attachment_metrics_unittest_exe") {
   testonly = true
 
   # "attachment_metrics_unittest_exe" is rather generic for the default_output_dir that is set
@@ -96,7 +97,7 @@ executable("attachment_metrics_unittest_exe") {
   ]
 }
 
-executable("board_info_provider_unittest_exe") {
+cc_test_executable("board_info_provider_unittest_exe") {
   testonly = true
 
   sources = [ "board_info_provider_unittest.cc" ]
@@ -110,7 +111,7 @@ executable("board_info_provider_unittest_exe") {
   ]
 }
 
-executable("config_unittest_exe") {
+cc_test_executable("config_unittest_exe") {
   testonly = true
 
   sources = [ "config_unittest.cc" ]
@@ -125,7 +126,7 @@ executable("config_unittest_exe") {
   ]
 }
 
-executable("current_channel_provider_unittest_exe") {
+cc_test_executable("current_channel_provider_unittest_exe") {
   testonly = true
 
   sources = [ "current_channel_provider_unittest.cc" ]
@@ -139,7 +140,7 @@ executable("current_channel_provider_unittest_exe") {
   ]
 }
 
-executable("data_register_unittest_exe") {
+cc_test_executable("data_register_unittest_exe") {
   testonly = true
 
   sources = [ "data_register_unittest.cc" ]
@@ -155,7 +156,7 @@ executable("data_register_unittest_exe") {
   ]
 }
 
-executable("device_id_provider_unittest_exe") {
+cc_test_executable("device_id_provider_unittest_exe") {
   testonly = true
 
   # "device_id_provider_unittest" is used elsewhere in Forensics.
@@ -175,7 +176,7 @@ executable("device_id_provider_unittest_exe") {
   ]
 }
 
-executable("encode_unittest_exe") {
+cc_test_executable("encode_unittest_exe") {
   testonly = true
 
   sources = [ "encode_unittest.cc" ]
@@ -189,7 +190,7 @@ executable("encode_unittest_exe") {
   ]
 }
 
-executable("fidl_provider_unittest_exe") {
+cc_test_executable("fidl_provider_unittest_exe") {
   testonly = true
 
   sources = [ "fidl_provider_unittest.cc" ]
@@ -206,7 +207,7 @@ executable("fidl_provider_unittest_exe") {
   ]
 }
 
-executable("file_backed_provider_unittest_exe") {
+cc_test_executable("file_backed_provider_unittest_exe") {
   testonly = true
 
   sources = [ "file_backed_provider_unittest.cc" ]
@@ -227,7 +228,7 @@ executable("file_backed_provider_unittest_exe") {
   ]
 }
 
-executable("inspect_unittest_exe") {
+cc_test_executable("inspect_unittest_exe") {
   testonly = true
 
   sources = [ "inspect_unittest.cc" ]
@@ -249,7 +250,7 @@ executable("inspect_unittest_exe") {
   ]
 }
 
-executable("intl_provider_unittest_exe") {
+cc_test_executable("intl_provider_unittest_exe") {
   testonly = true
 
   sources = [ "intl_provider_unittest.cc" ]
@@ -267,7 +268,7 @@ executable("intl_provider_unittest_exe") {
   ]
 }
 
-executable("previous_boot_log_unittest_exe") {
+cc_test_executable("previous_boot_log_unittest_exe") {
   testonly = true
 
   sources = [ "previous_boot_log_unittest.cc" ]
@@ -288,7 +289,7 @@ executable("previous_boot_log_unittest_exe") {
   ]
 }
 
-executable("kernel_log_integration_test_exe") {
+cc_test_executable("kernel_log_integration_test_exe") {
   testonly = true
 
   sources = [ "kernel_log_integration_test.cc" ]
@@ -310,7 +311,7 @@ executable("kernel_log_integration_test_exe") {
   ]
 }
 
-executable("last_reboot_unittest_exe") {
+cc_test_executable("last_reboot_unittest_exe") {
   testonly = true
 
   sources = [ "last_reboot_unittest.cc" ]
@@ -332,7 +333,7 @@ executable("last_reboot_unittest_exe") {
   ]
 }
 
-executable("main_service_unittest_exe") {
+cc_test_executable("main_service_unittest_exe") {
   testonly = true
 
   # "main_service_unittest_exe" is used a bunch in Forensics.
@@ -355,7 +356,7 @@ executable("main_service_unittest_exe") {
   ]
 }
 
-executable("namespace_init_unittest_exe") {
+cc_test_executable("namespace_init_unittest_exe") {
   testonly = true
 
   # "namespace_init_unittest_exe" is also used by feedback-data.
@@ -380,7 +381,7 @@ executable("namespace_init_unittest_exe") {
   ]
 }
 
-executable("prod_configs_unittest_exe") {
+cc_test_executable("prod_configs_unittest_exe") {
   testonly = true
 
   # "prod_configs_unittest_exe" exists in //src/developer/forensics/crash_reports/BUILD.gn
@@ -397,7 +398,7 @@ executable("prod_configs_unittest_exe") {
   ]
 }
 
-executable("product_info_provider_unittest_exe") {
+cc_test_executable("product_info_provider_unittest_exe") {
   testonly = true
 
   sources = [ "product_info_provider_unittest.cc" ]
@@ -411,7 +412,7 @@ executable("product_info_provider_unittest_exe") {
   ]
 }
 
-executable("redactor_factory_unittest_exe") {
+cc_test_executable("redactor_factory_unittest_exe") {
   testonly = true
 
   sources = [ "redactor_factory_unittest.cc" ]
@@ -425,7 +426,7 @@ executable("redactor_factory_unittest_exe") {
   ]
 }
 
-executable("startup_annotations_unittest_exe") {
+cc_test_executable("startup_annotations_unittest_exe") {
   testonly = true
 
   sources = [ "startup_annotations_unittest.cc" ]
@@ -446,7 +447,7 @@ executable("startup_annotations_unittest_exe") {
   ]
 }
 
-executable("stop_signals_unittest_exe") {
+cc_test_executable("stop_signals_unittest_exe") {
   testonly = true
 
   sources = [ "stop_signals_unittest.cc" ]
@@ -460,7 +461,7 @@ executable("stop_signals_unittest_exe") {
   ]
 }
 
-executable("system_log_unittest_exe") {
+cc_test_executable("system_log_unittest_exe") {
   testonly = true
 
   sources = [ "system_log_unittest.cc" ]
@@ -482,7 +483,7 @@ executable("system_log_unittest_exe") {
   ]
 }
 
-executable("target_channel_provider_unittest_exe") {
+cc_test_executable("target_channel_provider_unittest_exe") {
   testonly = true
 
   sources = [ "target_channel_provider_unittest.cc" ]
@@ -496,7 +497,7 @@ executable("target_channel_provider_unittest_exe") {
   ]
 }
 
-executable("time_provider_unittest_exe") {
+cc_test_executable("time_provider_unittest_exe") {
   testonly = true
 
   sources = [ "time_provider_unittest.cc" ]
@@ -512,7 +513,7 @@ executable("time_provider_unittest_exe") {
   ]
 }
 
-executable("ui_state_provider_unittest_exe") {
+cc_test_executable("ui_state_provider_unittest_exe") {
   testonly = true
 
   sources = [ "ui_state_provider_unittest.cc" ]

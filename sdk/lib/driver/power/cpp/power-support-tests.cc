@@ -14,6 +14,7 @@
 #include <lib/async/default.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/power-support.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/power/cpp/testing/fake_topology.h>
 #include <lib/driver/power/cpp/testing/fidl_bound_server.h>
@@ -41,7 +42,7 @@
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
 
-#include "sdk/lib/driver/power/cpp/power-support.h"
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace power_lib_test {
 
@@ -1673,3 +1674,5 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
 // TODO(https://fxbug.dev/328527466) This dependency is invalid because it has
 // no level deps add a test that checks we return a proper error
 }  // namespace power_lib_test
+
+#endif

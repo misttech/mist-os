@@ -145,15 +145,8 @@ pub struct FsNode {
     /// Used if, and only if, the node has a mode of FileMode::IFIFO.
     pub fifo: Option<PipeHandle>,
 
-    /// The socket located at this node, if any.
-    ///
-    /// Used if, and only if, the node has a mode of FileMode::IFSOCK.
-    ///
-    /// The `OnceCell` is initialized when a new socket node is created:
-    ///   - in `Socket::new` (e.g., from `sys_socket`)
-    ///   - in `sys_bind`, before the node is given a name (i.e., before it could be accessed by
-    ///     others)
-    socket: OnceCell<SocketHandle>,
+    /// The UNIX domain socket bound to this node, if any.
+    bound_socket: OnceCell<SocketHandle>,
 
     /// A RwLock to synchronize append operations for this node.
     ///
@@ -250,9 +243,7 @@ impl FsNodeInfo {
         }
         // Clear the setuid and setgid bits if the file is executable and a regular file.
         if self.mode.is_reg() {
-            if self.mode.intersects(FileMode::IXUSR | FileMode::IXGRP | FileMode::IXOTH) {
-                self.mode &= !FileMode::ISUID;
-            }
+            self.mode &= !FileMode::ISUID;
             self.clear_sgid_bit();
         }
         self.time_status_change = utc::utc_now();
@@ -1211,7 +1202,7 @@ impl FsNode {
                 fs,
                 node_id,
                 fifo,
-                socket: Default::default(),
+                bound_socket: Default::default(),
                 info: RwLock::new(info),
                 append_lock: Default::default(),
                 flock_info: Default::default(),
@@ -1861,23 +1852,16 @@ impl FsNode {
         Ok(())
     }
 
-    /// Associates the provided socket with this file node.
-    ///
-    /// `set_socket` must be called before it is possible to look up `self`, since user space should
-    ///  not be able to look up this node and find the socket missing.
-    ///
-    /// Note that it is a fatal error to call this method if a socket has already been bound for
-    /// this node.
-    ///
-    /// # Parameters
-    /// - `socket`: The socket to store in this file node.
-    pub fn set_socket(&self, socket: SocketHandle) {
-        assert!(self.socket.set(socket).is_ok());
+    /// Returns the UNIX domain socket bound to this node, if any.
+    pub fn bound_socket(&self) -> Option<&SocketHandle> {
+        self.bound_socket.get()
     }
 
-    /// Returns the socket associated with this node, if such a socket exists.
-    pub fn socket(&self) -> Option<&SocketHandle> {
-        self.socket.get()
+    /// Register the provided socket as the UNIX domain socket bound to this node.
+    ///
+    /// It is a fatal error to call this method again if it has already been called on this node.
+    pub fn set_bound_socket(&self, socket: SocketHandle) {
+        assert!(self.bound_socket.set(socket).is_ok());
     }
 
     pub fn update_attributes<L, F>(

@@ -60,6 +60,7 @@ logrotate3 "${{_LOG_DIR}}/workspace-events.log"
 # Detect manually provided config options that involve the proxies.
 # TODO: This method doesn't work if the same configs are indirectly enabled.
 has_remote_config=
+siblings_link_template=
 proxy_overrides=()
 for arg in "$@"
 do
@@ -68,10 +69,14 @@ do
     --config=sponge | --config=sponge_infra) # Sponge build event service
       [[ "${{BAZEL_sponge_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_sponge_socket_path" )
+        siblings_link_template="http://sponge/invocations/"
       ;;
     --config=resultstore | --config=resultstore_infra) # Resultstore build event service
       [[ "${{BAZEL_resultstore_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
+        # Note: go/fxbtx uses project=rbe-fuchsia-prod
+        # (currently configured: rbe_project={rbe_project})
+        siblings_link_template="http://go/fxbtx/"
       ;;
     --config=remote | --config=remote_cache_only)  # Remote build execution service
       has_remote_config=true
@@ -87,7 +92,7 @@ build_metadata_opts=()
 [[ "${{BUILDBUCKET_ID-NOT_SET}}" == "NOT_SET" ]] || {{
   build_metadata_opts+=(
     "--build_metadata=BUILDBUCKET_ID=$BUILDBUCKET_ID"
-    "--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=BUILDBUCKET_ID:$BUILDBUCKET_ID"
+    "--build_metadata=SIBLING_BUILDS_LINK=${{siblings_link_template}}?q=BUILDBUCKET_ID:$BUILDBUCKET_ID"
   )
   case "$BUILDBUCKET_ID" in
     */led/*)
@@ -105,7 +110,7 @@ build_metadata_opts=()
 [[ "${{FX_BUILD_UUID-NOT_SET}}" == "NOT_SET" ]] ||
   build_metadata_opts+=(
     "--build_metadata=FX_BUILD_UUID=$FX_BUILD_UUID"
-    "--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:$FX_BUILD_UUID"
+    "--build_metadata=SIBLING_BUILDS_LINK=${{siblings_link_template}}?q=FX_BUILD_UUID:$FX_BUILD_UUID"
   )
   # search for siblings
 

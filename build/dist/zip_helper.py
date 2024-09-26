@@ -7,6 +7,7 @@
 # See //docs/development/build/build_system/internals/manifest_formats.md
 
 import json
+import sys
 from argparse import ArgumentParser
 from os import path
 from zipfile import ZipFile
@@ -32,7 +33,7 @@ parser.add_argument(
 )
 
 
-def main():
+def main() -> int:
     args = parser.parse_args()
     with ZipFile(args.zip) as archive:
         archive.extractall(args.output_dir)
@@ -53,6 +54,8 @@ def main():
             f.write(" ".join(depfile_data))
             f.write(f": {args.zip}\n")
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

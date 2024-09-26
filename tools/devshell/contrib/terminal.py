@@ -41,7 +41,7 @@ class Terminal:
     @classmethod
     def _print(cls, *args: Any, **kwargs: Any) -> None:
         if not cls.suppress:
-            print(args, kwargs)
+            print(*args, **kwargs)
 
     @classmethod
     def fatal(cls, text: str) -> int:

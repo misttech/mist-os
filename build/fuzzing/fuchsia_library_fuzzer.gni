@@ -28,12 +28,24 @@ template("fuchsia_library_fuzzer") {
     fuzzer_name = invoker.output_name
   }
 
+  # 'expect_includes_deps': A list option that defines which include paths should
+  # be incorporated into the fuzzer manifest. This ensures that specific headers
+  # are included during fuzzer generation, particularly from dependencies that
+  # are necessary for proper compilation and testing.
+  expect_includes_deps = []
+  if (defined(invoker.expect_includes_deps)) {
+    expect_includes_deps = invoker.expect_includes_deps
+  } else {
+    expect_includes_deps = [ "//src/sys/fuzzing/libfuzzer:libfuzzer_includes" ]
+  }
+
   library_fuzzer(fuzzer_target) {
     output_name = fuzzer_name
     forward_variables_from(invoker,
                            "*",
                            [
                              "configs",
+                             "expect_includes_deps",
                              "output_name",
                              "target_type",
                              "visibility",
@@ -46,9 +58,9 @@ template("fuchsia_library_fuzzer") {
     testonly = true
     forward_variables_from(invoker, [ "visibility" ])
     deps = [
-      ":$fuzzer_target",
-      "//src/sys/fuzzing/libfuzzer",
-    ]
+             ":$fuzzer_target",
+             "//src/sys/fuzzing/libfuzzer:engine-bin",
+           ] + expect_includes_deps
   }
 }
 

@@ -16,7 +16,7 @@ use crate::wire_convert::*;
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream};
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use service::VirtSoundService;
@@ -31,7 +31,7 @@ pub(crate) struct DeadlineProfileConfig {
 
 // Currently requesting 0.5ms of CPU every 5ms.
 pub(crate) static DEADLINE_PROFILE: Lazy<DeadlineProfileConfig> =
-    Lazy::new(|| DeadlineProfileConfig { period: 5.millis() });
+    Lazy::new(|| DeadlineProfileConfig { period: zx::Duration::from_millis(5) });
 
 // There are no defined features. See: 5.14.3 Feature Bits
 // https://www.kraxel.org/virtio/virtio-v1.1-cs01-sound-v8.html#x1-4980003

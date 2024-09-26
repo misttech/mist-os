@@ -955,11 +955,11 @@ mod tests {
     async fn test_merge_size_records() {
         let left = &[Item::new(
             ObjectKey::attribute(1, 0, AttributeKey::Attribute),
-            ObjectValue::attribute(5),
+            ObjectValue::attribute(5, false),
         )];
         let right = &[Item::new(
             ObjectKey::attribute(1, 0, AttributeKey::Attribute),
-            ObjectValue::attribute(10),
+            ObjectValue::attribute(10, false),
         )];
         let tree = LSMTree::new(merge, Box::new(NullCache {}));
         test_merge(&tree, left, right, left).await;
@@ -969,11 +969,11 @@ mod tests {
     async fn test_different_attributes_not_merged() {
         let left = Item::new(
             ObjectKey::attribute(1, 0, AttributeKey::Attribute),
-            ObjectValue::attribute(5),
+            ObjectValue::attribute(5, false),
         );
         let right = Item::new(
             ObjectKey::attribute(1, 1, AttributeKey::Attribute),
-            ObjectValue::attribute(10),
+            ObjectValue::attribute(10, false),
         );
         let tree = LSMTree::new(merge, Box::new(NullCache {}));
         test_merge(&tree, &[left.clone()], &[right.clone()], &[left, right]).await;
@@ -1026,7 +1026,7 @@ mod tests {
                 ),
                 Item::new(
                     ObjectKey::attribute(1, 0, AttributeKey::Attribute),
-                    ObjectValue::attribute(100),
+                    ObjectValue::attribute(100, false),
                 ),
                 other_object.clone(),
             ],

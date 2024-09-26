@@ -262,7 +262,8 @@ impl SamplingInterval {
         // the [0, 60) interval. OTOH, timestamp at 61s mark would fall into the [60, 120) interval.
         // We see that `1 / 60 == 30 / 60` (integer division), whereas `1 / 60 != 61 / 60`.
         let resumed_interval_has_elapsed = (end / interval) > (start / interval);
-        let num_skipped_intervals = (end / interval) - Integer::div_ceil(&start, &interval);
+        let num_skipped_intervals =
+            usize::try_from((end / interval) - (start / interval) - 1).unwrap_or(0);
 
         let pending_interval_fill_sample_count = if resumed_interval_has_elapsed {
             // If the pending interval is a new one, simply calculate how many sampling periods
@@ -299,7 +300,7 @@ impl SamplingInterval {
                     usize::try_from(self.sampling_period_count).unwrap_or(usize::MAX)
                 ),
             }))
-            .take(usize::try_from(num_skipped_intervals).unwrap_or(0)),
+            .take(num_skipped_intervals),
             // The pending interval falls on the end timestamp and so includes the associated
             // sample.
             Some(IntervalExpiration::Pending(PendingInterval {
@@ -455,11 +456,10 @@ mod tests {
         let sampling_interval = SamplingInterval::new(120, 6, Duration::from_seconds(10));
         let mut last = ObservationTime {
             last_update_timestamp: Timestamp::from_nanos(71_000_000_000),
-            last_sample_timestamp: Timestamp::from_nanos(-1),
+            last_sample_timestamp: None,
         };
 
         // Tick in the same sampling period that did not have a sample.
-        // (last sample at -1 nano)
         let tick = last.tick(Timestamp::from_nanos(75_000_000_000), true).unwrap();
         let expirations: Vec<_> =
             sampling_interval.fold_and_get_expirations(tick, SAMPLE).collect();
@@ -541,6 +541,30 @@ mod tests {
             IntervalExpiration::Pending(PendingInterval {
                 fill_sample_count: None,
                 sample: SAMPLE,
+            }),
+        ];
+        assert_eq!(expirations, expected);
+    }
+
+    #[test]
+    fn sampling_interval_fold_and_get_expirations_at_time_boundary() {
+        let sampling_interval = SamplingInterval::new(120, 1, Duration::from_seconds(10));
+        let mut last = ObservationTime {
+            last_update_timestamp: Timestamp::from_nanos(0),
+            last_sample_timestamp: None,
+        };
+
+        // Tick in the new time interval.
+        let tick = last.tick(Timestamp::from_nanos(10_000_000_000), false).unwrap();
+        let expirations: Vec<_> =
+            sampling_interval.fold_and_get_expirations(tick, PhantomData::<u64>).collect();
+        let expected = vec![
+            IntervalExpiration::Elapsed(ElapsedInterval {
+                fill_sample_count: NonZeroUsize::new(1),
+            }),
+            IntervalExpiration::Pending(PendingInterval {
+                fill_sample_count: None,
+                sample: PhantomData::<u64>,
             }),
         ];
         assert_eq!(expirations, expected);

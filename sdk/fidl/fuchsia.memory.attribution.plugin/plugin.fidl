@@ -33,7 +33,9 @@ type Snapshot = table {
 };
 
 /// Globally-unique identifier used to refer to a specific [`Principal`]..
-alias PrincipalIdentifier = uint64;
+type PrincipalIdentifier = struct {
+    id uint64;
+};
 
 /// Holds the list of resources attributed to a Principal (subject) by another Principal (source).
 type Attribution = table {

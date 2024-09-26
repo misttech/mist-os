@@ -10,6 +10,7 @@ group("tests") {
     "contrib:tests",
     "llcpp/tests",
     "rust:tests",
+    "rust_next:tests",
     "//sdk/lib/fidl/cpp/tests",
   ]
 }

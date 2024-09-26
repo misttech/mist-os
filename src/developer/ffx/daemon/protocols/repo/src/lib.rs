@@ -14,6 +14,7 @@ use fidl_fuchsia_developer_ffx_ext::{
 };
 use fidl_fuchsia_net_ext::SocketAddress;
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
+use fidl_fuchsia_pkg_ext::RepositoryStorageType;
 use fidl_fuchsia_pkg_rewrite::{EngineMarker as RewriteEngineMarker, EngineProxy};
 use fidl_fuchsia_pkg_rewrite_ext::RuleConfig;
 use fuchsia_repo::repo_client::RepoClient;
@@ -966,8 +967,8 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
                         &addr,
                         repo_path.into(),
                         aliases.into_iter().map(ToString::to_string).collect(),
-                        ffx::RepositoryStorageType::Ephemeral.into(),
-                        ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
+                        RepositoryStorageType::Ephemeral,
+                        RepositoryRegistrationAliasConflictMode::Replace.into(),
                         repo_config,
                     )
                     .await

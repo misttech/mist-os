@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("integration") {
   testonly = true
   deps = [ ":package" ]
 }
 
-executable("accessor2logger_test_bin") {
+cc_test_executable("accessor2logger_test_bin") {
   testonly = true
   sources = [ "test.cc" ]
   deps = [

@@ -375,4 +375,12 @@ closed protocol Target {
     strict Reboot(struct {
         state TargetRebootState;
     }) -> () error TargetRebootError;
+
+    /// Tells the daemon to disconnect from the target.
+    /// This is useful when the client knows any connection to the target
+    /// is stale, e.g. during a reboot test.
+    ///
+    /// Returns:
+    /// * Nothing on success.
+    strict Disconnect() -> ();
 };

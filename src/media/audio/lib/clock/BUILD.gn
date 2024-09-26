@@ -4,6 +4,7 @@
 # Clock-related utility functions, for audio tests, tools or drivers
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("clock") {
   sources = [
@@ -52,7 +53,7 @@ source_set("clock") {
   ]
 }
 
-executable("unittest_bin") {
+cc_test_executable("unittest_bin") {
   visibility = [ ":*" ]
   testonly = true
   output_name = "audio_lib_clock_unittests"

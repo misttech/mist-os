@@ -50,6 +50,10 @@ fidl_testdata_info = [
   {
     name = "aliases"
     target = "//tools/fidl/fidlc/testdata/aliases:test.aliases"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "anonymous"
@@ -60,6 +64,10 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
+    ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -106,6 +114,9 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
       "fidlgen_go",
+
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -131,6 +142,10 @@ fidl_testdata_info = [
     build_denylist = [
       # TODO(https://fxbug.dev/42068210): Unused import error.
       "fidlgen_go",
+    ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -213,6 +228,9 @@ fidl_testdata_info = [
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
+
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -234,6 +252,10 @@ fidl_testdata_info = [
     name = "handles"
     target = "//tools/fidl/fidlc/testdata:test.handles"
     build_denylist = [ "fidlgen_libfuzzer" ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "handles_in_types"
@@ -264,6 +286,10 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "new_type"
@@ -287,6 +313,10 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "padding"
@@ -302,6 +332,10 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "protocol_layouts"
@@ -313,6 +347,9 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42068207): Re-enable when fixed.
       "fidlgen_go",
+
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -328,6 +365,10 @@ fidl_testdata_info = [
     name = "protocol_payloads"
     target =
         "//tools/fidl/fidlc/testdata/protocol_payloads:test.protocolpayloads"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "protocol_request"
@@ -346,6 +387,10 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "protocols"
@@ -360,6 +405,10 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
+    ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -392,6 +441,9 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42121485): Syzkaller does not support enum member references
       # in struct defaults.
       "fidlgen_syzkaller",
+
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -401,6 +453,10 @@ fidl_testdata_info = [
   {
     name = "transitive_dependencies"
     target = "//tools/fidl/fidlc/testdata/transitive_dependencies:test.transitivedependencies"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "transitive_dependencies_compose"
@@ -416,6 +472,10 @@ fidl_testdata_info = [
   {
     name = "types_in_protocols"
     target = "//tools/fidl/fidlc/testdata:test.typesinprotocols"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "union"
@@ -436,6 +496,10 @@ fidl_testdata_info = [
   {
     name = "unknown_interactions"
     target = "//tools/fidl/fidlc/testdata:test.unknowninteractions"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "vectors"
@@ -460,6 +524,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
       "fidlgen_rust",
+      "fidlgen_rust_next",
       "fidlgen_syzkaller",
     ]
   },
@@ -474,6 +539,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
       "fidlgen_rust",
+      "fidlgen_rust_next",
       "fidlgen_syzkaller",
     ]
   },
@@ -488,6 +554,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
       "fidlgen_rust",
+      "fidlgen_rust_next",
       "fidlgen_syzkaller",
     ]
   },

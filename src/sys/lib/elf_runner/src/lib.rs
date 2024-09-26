@@ -462,7 +462,7 @@ impl ElfRunner {
             .await
             .is_ok();
         let clock_transformation = utc_clock_started
-            .then(|| utc_clock_dup.get_details().map(|details| details.mono_to_synthetic).ok())
+            .then(|| utc_clock_dup.get_details().map(|details| details.reference_to_synthetic).ok())
             .flatten();
         if let Some(clock_transformation) = clock_transformation {
             let utc_timestamp = clock_transformation

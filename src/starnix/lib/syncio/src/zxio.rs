@@ -15,7 +15,7 @@
 //!
 //!    ./src/starnix/lib/syncio/generate.py
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub const EPERM: u32 = 1;
 pub const ENOENT: u32 = 2;
@@ -471,7 +471,7 @@ pub const IPV6_RTHDR_TYPE_0: u32 = 0;
 pub type zx_rights_t = u32;
 pub type time_t = ::std::os::raw::c_long;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct timespec {
     pub tv_sec: time_t,
     pub tv_nsec: ::std::os::raw::c_long,
@@ -1121,7 +1121,7 @@ impl Default for msghdr {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct cmsghdr {
     pub cmsg_len: socklen_t,
     pub cmsg_level: ::std::os::raw::c_int,
@@ -1280,12 +1280,16 @@ extern "C" {
 pub type in_port_t = u16;
 pub type in_addr_t = u32;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, IntoBytes, KnownLayout, FromBytes, Immutable,
+)]
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, IntoBytes, KnownLayout, FromBytes, Immutable,
+)]
 pub struct sockaddr_in {
     pub sin_family: sa_family_t,
     pub sin_port: in_port_t,
@@ -1293,12 +1297,12 @@ pub struct sockaddr_in {
     pub sin_zero: [u8; 8usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct in6_addr {
     pub __in6_union: in6_addr__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub union in6_addr__bindgen_ty_1 {
     pub __s6_addr: [u8; 16usize],
     pub __s6_addr16: [u16; 8usize],
@@ -1341,7 +1345,7 @@ impl Default for sockaddr_in6 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct in6_pktinfo {
     pub ipi6_addr: in6_addr,
     pub ipi6_ifindex: ::std::os::raw::c_uint,
@@ -1357,7 +1361,7 @@ impl Default for in6_pktinfo {
 }
 pub type suseconds_t = ::std::os::raw::c_long;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,

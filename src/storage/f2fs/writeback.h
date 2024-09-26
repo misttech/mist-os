@@ -9,9 +9,8 @@
 
 namespace f2fs {
 
-// F2fs flushes dirty pages when the number of dirty data pages exceeds a half of
-// |kMaxDirtyDataPages|.
-// TODO: When memorypressure is available on fs-tests, we can remove it.
+// F2fs flushes dirty pages when the number of dirty pages >= |kMaxDirtyDataPages| if memorypressure
+// is unavailable.
 constexpr int kMaxDirtyDataPages = 51200;
 
 // This class is final because there might be background threads running when its destructor runs
@@ -61,6 +60,7 @@ class Writer final {
   std::unique_ptr<StorageBufferPool> pool_;
   BcacheMapper *const bcache_mapper_ = nullptr;
   fpromise::sequencer sequencer_;
+  fpromise::sequencer writeback_sequencer_;
   // An executor for tasks that write writeback pages to backing storage.
   fs::BackgroundExecutor executor_;
   // An executor for tasks that allocate blocks for dirty pages.

@@ -52,21 +52,22 @@ use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
-    __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, iocb, itimerspec, off_t,
-    pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, AT_EACCESS,
-    AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
-    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
-    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
-    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX, F_ADD_SEALS,
-    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN, F_GETOWN_EX,
-    F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID,
-    F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC,
-    IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
-    MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
-    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
-    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
-    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
-    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
+    __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params, iocb,
+    itimerspec, off_t, pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi,
+    uid_t, AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
+    AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
+    CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
+    EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX,
+    F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
+    F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
+    F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
+    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB,
+    MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE,
+    PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM,
+    POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
+    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
+    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
+    XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -3061,13 +3062,45 @@ pub fn sys_io_destroy(
     mm_state.aio_contexts.destroy_context(ctx_id)
 }
 
+pub fn sys_io_uring_setup(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _entries: u32,
+    _params: UserRef<io_uring_params>,
+) -> Result<FdNumber, Errno> {
+    error!(ENOSYS)
+}
+
+pub fn sys_io_uring_enter(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _fd: FdNumber,
+    _to_submit: u32,
+    _min_complete: u32,
+    _flags: u32,
+    _sig: UserRef<sigset_t>,
+) -> Result<FdNumber, Errno> {
+    error!(ENOSYS)
+}
+
+pub fn sys_io_uring_register(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _fd: FdNumber,
+    _opcode: u32,
+    _arg: UserAddress,
+    _nr_args: usize,
+) -> Result<FdNumber, Errno> {
+    error!(ENOSYS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::testing::*;
     use starnix_uapi::vfs::default_statfs;
     use starnix_uapi::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     #[::fuchsia::test]
     async fn test_sys_lseek() -> Result<(), Errno> {

@@ -11,7 +11,7 @@ use crate::append::{Append, BufferTooSmall};
 use crate::error::FrameWriteError;
 use crate::organization::Oui;
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 macro_rules! validate {
     ( $condition:expr, $fmt:expr $(, $args:expr)* $(,)? ) => {

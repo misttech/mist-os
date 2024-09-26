@@ -331,7 +331,7 @@ zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned 
     const size_t block_index = start_bidx + ofs_in_node;
     // Keeps as long as dir vnodes use discardable vmos.
     if (vnode_or->IsReg()) {
-      if (auto err = vnode_or->GrabCachePage(block_index, &data_page); err != ZX_OK) {
+      if (auto err = vnode_or->GrabLockedPage(block_index, &data_page); err != ZX_OK) {
         continue;
       }
     } else if (auto err = vnode_or->GetLockedDataPage(block_index, &data_page); err != ZX_OK) {

@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -13,7 +14,7 @@ group("tests") {
   ]
 }
 
-executable("system_monitor_integration_test_bin") {
+cc_test_executable("system_monitor_integration_test_bin") {
   testonly = true
   output_name = "system_monitor_integration_test"
 
@@ -46,7 +47,7 @@ fuchsia_test_package("system_monitor_integration_test") {
   }
 }
 
-executable("system_monitor_unittest_bin") {
+cc_test_executable("system_monitor_unittest_bin") {
   testonly = true
   sources = [ "system_monitor_unittest.cc" ]
   deps = [

@@ -5,12 +5,22 @@
 
 import os
 import unittest
+from typing import Any
 from unittest import mock
 
 from mobly_driver import driver_factory
 from mobly_driver.api import api_infra
 from mobly_driver.driver import base, common, infra, local
 from parameterized import parameterized
+
+_HONEYDEW_CONFIG: dict[str, Any] = {
+    "transports": {
+        "ffx": {
+            "path": "/ffx/path",
+            "subtools_search_path": "subtools/search/path",
+        }
+    }
+}
 
 
 class DriverFactoryTest(unittest.TestCase):
@@ -43,7 +53,7 @@ class DriverFactoryTest(unittest.TestCase):
     ) -> None:
         """Test case to ensure driver resolution success"""
         factory = driver_factory.DriverFactory(
-            ffx_path="ffx/path", transport="transport"
+            honeydew_config=_HONEYDEW_CONFIG, transport="transport"
         )
         with mock.patch.dict(os.environ, test_env, clear=True):
             driver = factory.get_driver()
@@ -52,7 +62,7 @@ class DriverFactoryTest(unittest.TestCase):
     def test_get_driver_unexpected_env_raises_exception(self) -> None:
         """Test case to ensure exception is raised on unexpected env"""
         factory = driver_factory.DriverFactory(
-            ffx_path="ffx/path", transport="transport"
+            honeydew_config=_HONEYDEW_CONFIG, transport="transport"
         )
 
         # Undefined "api_infra.BOT_ENV_TEST_OUTDIR".

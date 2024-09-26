@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.phy") {
   sdk_category = "partner"
+  stable = false
   sdk_area = "Drivers"
   sources = [ "usb-phy.fidl" ]
   contains_drivers = true

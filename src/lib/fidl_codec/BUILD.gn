@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 import("//third_party/protobuf/proto_library.gni")
 
@@ -73,7 +74,7 @@ proto_library("value_proto") {
   deps = [ "//third_party/protobuf:protobuf_full" ]
 }
 
-executable("fidl_codec_test_bin") {
+cc_test_executable("fidl_codec_test_bin") {
   testonly = true
   sources = [
     "builtin_semantic_test.cc",

@@ -176,6 +176,13 @@ if (allowed_device_types == []) {
 #         element-wise subsets of the test platform entries defined in
 #         //build/testing/platforms.gni.
 #
+#       emu_dimensions (optional)
+#         [scope] Dimensions to configure emulator with. This only applies if
+#         dimensions specify an emulator device type. Valid dimensions are:
+#
+#           cores (optional)
+#             [int] The number of cores to configure the emulator with.
+#
 #       tags (optional)
 #         [list of strings] keys on which tests may be grouped. Tests with
 #         given tags will be run (1) together, and (2) only with support from

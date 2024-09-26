@@ -18,7 +18,7 @@ use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::{self as component};
 use fuchsia_trace::duration;
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::future::{Either, Future};
 use futures::StreamExt;
@@ -642,7 +642,7 @@ impl App {
             let mut frame_count = 0;
             app.app_init_common().await?;
             loop {
-                let timeout = Timer::new(500_i64.millis().after_now());
+                let timeout = Timer::new(zx::Duration::from_millis(500_i64).after_now());
                 let either = futures::future::select(timeout, internal_receiver.next());
                 let resolved = either.await;
                 match resolved {

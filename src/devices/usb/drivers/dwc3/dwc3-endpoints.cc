@@ -177,7 +177,7 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
 zx_status_t Dwc3::UserEpCancelAll(UserEndpoint& uep) {
   RequestQueue to_complete;
   {
-    fbl::AutoLock lock(&uep.lock);
+    fbl::AutoLock lock(&uep.ep.lock);
     to_complete = UserEpCancelAllLocked(uep);
   }
 
@@ -221,7 +221,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     UserEndpoint* const uep = get_user_endpoint(ep_num);
     ZX_DEBUG_ASSERT(uep != nullptr);
 
-    fbl::AutoLock lock{&uep->lock};
+    fbl::AutoLock lock{&uep->ep.lock};
     std::swap(req, uep->ep.current_req);
 
     if (req) {
@@ -254,7 +254,7 @@ void Dwc3::HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
   UserEndpoint* const uep = get_user_endpoint(ep_num);
   ZX_DEBUG_ASSERT(uep != nullptr);
 
-  fbl::AutoLock lock(&uep->lock);
+  fbl::AutoLock lock(&uep->ep.lock);
   uep->ep.got_not_ready = true;
   UserEpQueueNext(*uep);
 }
@@ -267,7 +267,7 @@ void Dwc3::HandleEpTransferStartedEvent(uint8_t ep_num, uint32_t rsrc_id) {
     UserEndpoint* const uep = get_user_endpoint(ep_num);
     ZX_DEBUG_ASSERT(uep != nullptr);
 
-    fbl::AutoLock lock(&uep->lock);
+    fbl::AutoLock lock(&uep->ep.lock);
     uep->ep.rsrc_id = rsrc_id;
   }
 }

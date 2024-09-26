@@ -43,9 +43,8 @@ struct WritebackOperation {
   pgoff_t to_write = kPgOffMax;  // The number of dirty Pages to be written.
   bool bSync = false;            // If true, FileCache::Writeback() waits for writeback Pages to be
                                  // written to disk.
-  bool bReleasePages =
-      true;  // If true, it releases clean Pages while traversing FileCache::page_tree_.
-  bool bReclaim = false;             // If true, it is invoked for memory reclaim.
+  bool bReclaim =
+      false;  // If true, it releases inactive Pages while traversing FileCache::page_tree_.
   VnodeCallback if_vnode = nullptr;  // If set, it determines which vnodes are subject to writeback.
   PageCallback if_page = nullptr;    // If set, it determines which Pages are subject to writeback.
   PageTaggingCallback page_cb =
@@ -87,13 +86,10 @@ class Page : public PageRefCounted<Page>,
   VnodeF2fs &GetVnode() const;
   FileCache &GetFileCache() const;
   VmoManager &GetVmoManager() const;
-  // A caller is allowed to access |this| via address_ after GetPage().
-  // Calling it ensures that VmoManager creates and maintains a vmo called VmoNode that
-  // |this| will use. When VmoManager does not have the corresponding VmoNode, it creates
-  // a discardable vmo and tracks a reference count to the vmo.
-  // The vmo keeps VMO_OP_LOCK as long as any corresponding RefPtr<Page> exists. The mapping
-  // also keeps with its vmo.
-  zx_status_t GetPage();
+  // If it runs on a discardable VMO, this method ensures that a associated VMO keeps with its
+  // mapping until |this| is evicted from FileCache. If it is backed on a pager's VMO, it does
+  // nothing.
+  zx_status_t GetVmo();
   zx_status_t VmoOpUnlock(bool evict = false);
   zx::result<bool> VmoOpLock();
 
@@ -305,36 +301,32 @@ class FileCache {
 
   // It returns a locked Page corresponding to |index| from |page_tree_|.
   // If there is no Page, it creates and returns a locked Page.
-  zx_status_t GetPage(pgoff_t index, LockedPage *out) __TA_EXCLUDES(tree_lock_);
+  zx_status_t GetLockedPage(pgoff_t index, LockedPage *out) __TA_EXCLUDES(tree_lock_);
   // It returns locked pages corresponding to |page_offsets| from |page_tree_|.
   // If kInvalidPageOffset is included in |page_offsets|, the corresponding Page will be a null
   // page.
   // If there is no corresponding Page in |page_tree_|, it creates a new Page.
-  zx::result<std::vector<LockedPage>> GetPages(const std::vector<pgoff_t> &page_offsets)
+  zx::result<std::vector<LockedPage>> GetLockedPages(const std::vector<pgoff_t> &page_offsets)
       __TA_EXCLUDES(tree_lock_);
   // It returns locked Pages corresponding to [start - end) from |page_tree_|.
-  zx::result<std::vector<LockedPage>> GetPages(pgoff_t start, pgoff_t end)
+  zx::result<std::vector<LockedPage>> GetLockedPages(pgoff_t start, pgoff_t end)
+      __TA_EXCLUDES(tree_lock_);
+  // It does the same thing as the above methods except that it returns unlocked Pages.
+  zx::result<std::vector<fbl::RefPtr<Page>>> GetPages(const pgoff_t start, const pgoff_t end)
       __TA_EXCLUDES(tree_lock_);
   // It returns locked Pages corresponding to [start - end) from |page_tree_|.
   // If there is no corresponding Page, the returned page will be a null page.
-  zx::result<std::vector<LockedPage>> FindPages(pgoff_t start, pgoff_t end)
-      __TA_EXCLUDES(tree_lock_);
-  LockedPage GetNewPage(pgoff_t index) __TA_REQUIRES(tree_lock_);
+  std::vector<LockedPage> FindLockedPages(pgoff_t start, pgoff_t end) __TA_EXCLUDES(tree_lock_);
   // It returns an unlocked Page corresponding to |index| from |page_tree|.
   // If it fails to find the Page in |page_tree_|, it returns ZX_ERR_NOT_FOUND.
   zx_status_t FindPage(pgoff_t index, fbl::RefPtr<Page> *out) __TA_EXCLUDES(tree_lock_);
-  // It tries to write out dirty Pages that meets |operation| in |page_tree_|.
-  pgoff_t Writeback(WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
-  // It tries to write out all dirty Pages from dirty_page_list_.
-  pgoff_t WritebackFromDirtyList(const WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
 
   // It invalidates Pages within the range of |start| to |end| in |page_tree_|. If |zero| is set,
   // the data of the corresponding pages are zeored. Then, it evicts all Pages within the range and
   // returns them locked.
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
                                           bool zero = true) __TA_EXCLUDES(tree_lock_);
-  // It removes all Pages from |page_tree_|. It should be called when no one can get access to
-  // |vnode_|. (e.g., fbl_recycle()) It assumes that all active Pages are under writeback.
+  // It invalidates all Pages from |page_tree_|.
   void Reset() __TA_EXCLUDES(tree_lock_);
   // Clear all dirty pages.
   void ClearDirtyPages() __TA_EXCLUDES(tree_lock_);
@@ -349,8 +341,8 @@ class FileCache {
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
 
-  // It returns a set of locked dirty Pages that meet |operation|.
-  std::vector<LockedPage> GetLockedDirtyPages(const WritebackOperation &operation)
+  // It returns a set of dirty Pages that meet |operation|.
+  std::vector<fbl::RefPtr<Page>> FindDirtyPages(const WritebackOperation &operation)
       __TA_EXCLUDES(tree_lock_);
   // It evicts every clean, inactive  page.
   void EvictCleanPages() __TA_EXCLUDES(tree_lock_);
@@ -359,27 +351,35 @@ class FileCache {
   void WaitOnWriteback(Page &page) __TA_EXCLUDES(flag_lock_, tree_lock_);
   void NotifyWriteback(PageList pages) __TA_EXCLUDES(flag_lock_, tree_lock_);
 
+  size_t GetSize() __TA_EXCLUDES(tree_lock_);
+
  private:
   // Unless |page| is locked, it returns a locked |page|. If |page| is already locked,
   // it waits for |page| to be unlocked. While waiting, |tree_lock_| keeps unlocked to avoid
   // possible deadlock problems and to allow other page requests. When it gets the locked |page|, it
   // acquires |tree_lock_| again and returns the locked |page| if |page| still belongs to
   // |page_tree_|;
-  zx::result<LockedPage> GetLockedPage(fbl::RefPtr<Page> page) __TA_REQUIRES(tree_lock_);
+  zx::result<LockedPage> GetLockedPageUnsafe(fbl::RefPtr<Page> page) __TA_REQUIRES(tree_lock_);
   zx::result<LockedPage> GetLockedPageFromRawUnsafe(Page *raw_page) __TA_REQUIRES(tree_lock_);
-  zx::result<LockedPage> GetPageUnsafe(const pgoff_t index) __TA_REQUIRES(tree_lock_);
-  zx_status_t AddPageUnsafe(const fbl::RefPtr<Page> &page) __TA_REQUIRES(tree_lock_);
+  fbl::RefPtr<Page> AddNewPageUnsafe(pgoff_t index) __TA_REQUIRES(tree_lock_);
   zx_status_t EvictUnsafe(Page *page) __TA_REQUIRES(tree_lock_);
   // It returns all Pages from |page_tree_| within the range of |start| to |end|.
   // If there is no corresponding Page in page_tree_, the Page will not be included in the returned
   // vector. Therefore, returned vector's size could be smaller than |end - start|.
-  std::vector<LockedPage> GetLockedPagesUnsafe(pgoff_t start = 0, pgoff_t end = kPgOffMax)
+  std::vector<LockedPage> FindLockedPagesUnsafe(pgoff_t start = 0, pgoff_t end = kPgOffMax)
       __TA_REQUIRES(tree_lock_);
   // It returns all Pages from |page_tree_| corresponds to |page_offsets|.
   // If there is no corresponding Page in page_tree_ or if page_offset is kInvalidPageOffset,
   // the corresponding page will be null LockedPage in the returned vector.
-  // Therefore, returned vector's size is same as |page_offsets.size()|.
-  std::vector<LockedPage> GetLockedPagesUnsafe(const std::vector<pgoff_t> &page_offsets)
+  // The returned vector's size is the same as |page_offsets.size()|.
+  std::vector<LockedPage> FindLockedPagesUnsafe(const std::vector<pgoff_t> &page_offsets)
+      __TA_REQUIRES(tree_lock_);
+  std::vector<fbl::RefPtr<Page>> FindPagesUnsafe(pgoff_t start = 0, pgoff_t end = kPgOffMax)
+      __TA_REQUIRES(tree_lock_);
+
+  zx::result<std::vector<LockedPage>> GetLockedPagesUnsafe(pgoff_t start, pgoff_t end)
+      __TA_REQUIRES(tree_lock_);
+  zx::result<std::vector<fbl::RefPtr<Page>>> GetPagesUnsafe(pgoff_t start, pgoff_t end)
       __TA_REQUIRES(tree_lock_);
 
   using PageTreeTraits = fbl::DefaultKeyedObjectTraits<pgoff_t, Page>;

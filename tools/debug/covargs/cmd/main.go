@@ -34,11 +34,12 @@ import (
 )
 
 const (
-	shardSize              = 1000
-	symbolCacheSize        = 100
-	cloudFetchMaxAttempts  = 2
-	cloudFetchRetryBackoff = 500 * time.Millisecond
-	cloudFetchTimeout      = 60 * time.Second
+	shardSize                              = 1000
+	symbolCacheSize                        = 100
+	cloudFetchMaxAttempts                  = 2
+	cloudFetchRetryBackoff                 = 500 * time.Millisecond
+	cloudFetchTimeout                      = 60 * time.Second
+	llvmProfdataDebuginfodSupportedVersion = "clang"
 )
 
 var (
@@ -213,10 +214,20 @@ func mergeProfiles(ctx context.Context, tempDir string, profiles map[string]stri
 		mergedProfileFile := filepath.Join(tempDir, fmt.Sprintf("merged%s.profdata", version))
 		args := []string{
 			"merge",
-			"--failure-mode=any",
 			"--sparse",
 			"--output", mergedProfileFile,
 		}
+
+		useDebugInfod := false
+		// Use debuginfod during profile merging if it is enabled.
+		if len(debuginfodServers) > 0 && version == llvmProfdataDebuginfodSupportedVersion {
+			useDebugInfod = true
+			// TODO(https://fxbug.dev/359885449): Switch to --failure-mode=any by default when missing build id issue is resolved.
+			args = append(args, "--debuginfod", "--correlate=binary", "--failure-mode=all")
+		} else {
+			args = append(args, "--failure-mode=any")
+		}
+
 		if numThreads != 0 {
 			args = append(args, "--num-threads", strconv.Itoa(numThreads))
 		}
@@ -227,8 +238,15 @@ func mergeProfiles(ctx context.Context, tempDir string, profiles map[string]stri
 		if !ok {
 			return "", fmt.Errorf("no llvm-profdata has been specified for version %q", version)
 		}
-		mergeCmd := Action{Path: llvmProfData, Args: args}
-		data, err := mergeCmd.Run(ctx)
+
+		mergeCmd := exec.Command(llvmProfData, args...)
+		logger.Debugf(ctx, "%s\n", mergeCmd)
+		if useDebugInfod {
+			if err := setDebuginfodEnv(mergeCmd); err != nil {
+				return "", fmt.Errorf("failed to set debuginfod environment: %w", err)
+			}
+		}
+		data, err := mergeCmd.CombinedOutput()
 		if err != nil {
 			return "", fmt.Errorf("%s failed with %v:\n%s", mergeCmd.String(), err, string(data))
 		}

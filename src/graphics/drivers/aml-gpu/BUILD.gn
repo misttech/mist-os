@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -80,7 +81,7 @@ fuchsia_driver_package("aml-gpu-package") {
   driver_components = [ ":aml-gpu" ]
 }
 
-executable("aml-gpu-test-bin") {
+cc_test_executable("aml-gpu-test-bin") {
   testonly = true
   output_name = "aml-gpu-test"
   sources = [ "aml-gpu-test.cc" ]

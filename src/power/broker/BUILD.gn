@@ -30,6 +30,8 @@ rustc_binary("bin") {
   # a binary named `power_broker_bin_test`.
   with_unit_tests = true
 
+  configs += [ "//build/config/rust:bootfs" ]
+
   deps = [
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//src/lib/async-utils",

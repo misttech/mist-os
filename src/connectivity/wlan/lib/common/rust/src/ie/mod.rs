@@ -17,7 +17,7 @@ mod rates_writer;
 mod reader;
 mod write;
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 pub use constants::*;
 pub use fake_ies::*;
@@ -31,7 +31,7 @@ pub use reader::*;
 pub use write::*;
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
 pub struct Header {
     pub id: Id,
     pub body_len: u8,

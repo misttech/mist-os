@@ -113,7 +113,7 @@ pub struct BlockServer {
     file: OpenedNode<FxFile>,
     scope: ExecutionScope,
     server_channel: Option<zx::Channel>,
-    maybe_server_fifo: Mutex<Option<zx::Fifo>>,
+    maybe_server_fifo: Mutex<Option<zx::Fifo<BlockFifoResponse, BlockFifoRequest>>>,
     message_groups: Mutex<FifoMessageGroups>,
     vmos: Mutex<BTreeMap<u16, zx::Vmo>>,
 }
@@ -308,7 +308,7 @@ impl BlockServer {
                         let () = match request {
                             block::SessionRequest::GetFifo { responder } => {
                                 match self.maybe_server_fifo.lock().unwrap().take() {
-                                    Some(fifo) => responder.send(Ok(fifo))?,
+                                    Some(fifo) => responder.send(Ok(fifo.downcast()))?,
                                     None => {
                                         responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?
                                     }
@@ -553,12 +553,12 @@ impl BlockServer {
 
         // Create a fifo pair
         let (server_fifo, client_fifo) =
-            zx::Fifo::create(16, std::mem::size_of::<BlockFifoRequest>())?;
+            zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16)?;
         self.maybe_server_fifo = Mutex::new(Some(client_fifo));
 
         // Handling requests from fifo
         let fifo_future = async {
-            let fifo = fasync::Fifo::<BlockFifoRequest, BlockFifoResponse>::from_fifo(server_fifo);
+            let fifo = fasync::Fifo::from_fifo(server_fifo);
             loop {
                 match fifo.read_entry().await {
                     Ok(request) => {

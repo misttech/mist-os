@@ -37,7 +37,7 @@ use wlan_common::time::TimeUnit;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm};
 use wlan_frame_writer::{append_frame_to, write_frame, write_frame_with_fixed_slice};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -499,7 +499,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         Ok(())
     }
 
-    pub fn on_eth_frame_tx<B: ByteSlice>(
+    pub fn on_eth_frame_tx<B: SplitByteSlice>(
         &mut self,
         bytes: B,
         async_id: trace::Id,
@@ -633,7 +633,7 @@ impl Client {
     /// Only management and data frames should be processed. Furthermore, the source address should
     /// be the BSSID the client associated to and the receiver address should either be non-unicast
     /// or the client's MAC address.
-    fn should_handle_frame<B: ByteSlice>(&self, mac_frame: &mac::MacFrame<B>) -> bool {
+    fn should_handle_frame<B: SplitByteSlice>(&self, mac_frame: &mac::MacFrame<B>) -> bool {
         wtrace::duration!(c"Client::should_handle_frame");
 
         // Technically, |transmitter_addr| and |receiver_addr| would be more accurate but using src
@@ -690,7 +690,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     /// Delivers a single MSDU to the STA's underlying device. The MSDU is delivered as an
     /// Ethernet II frame.
     /// Returns Err(_) if writing or delivering the Ethernet II frame failed.
-    fn deliver_msdu<B: ByteSlice>(&mut self, msdu: mac::Msdu<B>) -> Result<(), Error> {
+    fn deliver_msdu<B: SplitByteSlice>(&mut self, msdu: mac::Msdu<B>) -> Result<(), Error> {
         let mac::Msdu { dst_addr, src_addr, llc_frame } = msdu;
 
         let mut packet = [0u8; mac::MAX_ETH_FRAME_LEN];
@@ -1056,7 +1056,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     /// Called when an arbitrary frame was received over the air.
-    pub async fn on_mac_frame<B: ByteSlice>(
+    pub async fn on_mac_frame<B: SplitByteSlice>(
         &mut self,
         bytes: B,
         rx_info: fidl_softmac::WlanRxInfo,
@@ -1068,7 +1068,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info, async_id).await);
     }
 
-    pub fn on_eth_frame_tx<B: ByteSlice>(
+    pub fn on_eth_frame_tx<B: SplitByteSlice>(
         &mut self,
         frame: B,
         async_id: trace::Id,
@@ -1118,7 +1118,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .unwrap_or_else(|e| error!("error sending MLME-CONNECT.confirm: {}", e));
     }
 
-    fn send_connect_conf_success<B: ByteSlice>(
+    fn send_connect_conf_success<B: SplitByteSlice>(
         &mut self,
         association_id: mac::Aid,
         association_ies: B,
@@ -1239,7 +1239,7 @@ pub struct ParsedAssociateResp {
 }
 
 impl ParsedAssociateResp {
-    pub fn parse<B: ByteSlice>(assoc_resp_frame: &mac::AssocRespFrame<B>) -> Self {
+    pub fn parse<B: SplitByteSlice>(assoc_resp_frame: &mac::AssocRespFrame<B>) -> Self {
         let mut parsed = ParsedAssociateResp {
             association_id: assoc_resp_frame.assoc_resp_hdr.aid,
             capabilities: assoc_resp_frame.assoc_resp_hdr.capabilities,

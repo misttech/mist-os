@@ -8,6 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/image-format/image_format.h>
 #include <stdint.h>
 #include <zircon/assert.h>
@@ -484,57 +485,63 @@ void GdcDevice::GdcReleaseFrame(uint32_t task_index, uint32_t buffer_index) {
 
 // static
 zx_status_t GdcDevice::Setup(void* /*ctx*/, zx_device_t* parent, std::unique_ptr<GdcDevice>* out) {
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
-    return ZX_ERR_NO_RESOURCES;
+  fdf::PDev pdev;
+  {
+    zx::result pdev_client =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                          "pdev");
+    if (pdev_client.is_error()) {
+      zxlogf(ERROR, "Failed to connect to pdev: %s", pdev_client.status_string());
+      return pdev_client.status_value();
+    }
+    pdev = fdf::PDev{std::move(pdev_client.value())};
   }
 
-  std::optional<fdf::MmioBuffer> clk_mmio;
-  zx_status_t status = pdev.MapMmio(kHiu, &clk_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio failed");
-    return status;
+  zx::result clk_mmio = pdev.MapMmio(kHiu);
+  if (clk_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map clk mmio: %s", clk_mmio.status_string());
+    return clk_mmio.status_value();
+    ;
   }
 
-  std::optional<fdf::MmioBuffer> gdc_mmio;
-  status = pdev.MapMmio(kGdc, &gdc_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio failed");
-    return status;
+  zx::result gdc_mmio = pdev.MapMmio(kGdc);
+  if (clk_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map gdc mmio: %s", gdc_mmio.status_string());
+    return clk_mmio.status_value();
+    ;
   }
 
-  zx::interrupt gdc_irq;
-  status = pdev.GetInterrupt(0, &gdc_irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.GetInterrupt failed");
-    return status;
+  zx::result gdc_irq = pdev.GetInterrupt(0);
+  if (gdc_irq.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", gdc_irq.status_string());
+    return gdc_irq.status_value();
+    ;
   }
 
   zx::port port;
-  status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
+  zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
   if (status != ZX_OK) {
     zxlogf(ERROR, "port create failed");
     return status;
   }
 
-  status = gdc_irq.bind(port, kPortKeyIrqMsg, 0 /*options*/);
+  status = gdc_irq->bind(port, kPortKeyIrqMsg, 0 /*options*/);
   if (status != ZX_OK) {
     zxlogf(ERROR, "interrupt bind failed");
     return status;
   }
 
-  zx::bti bti;
-  status = pdev.GetBti(0, &bti);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not obtain bti");
-    return status;
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
+    ;
   }
 
   std::stack<zx::vmo> gdc_config_contig_vmos;
   for (uint32_t i = 0; i < kGdcConfigurationBufferCount; i++) {
     zx::vmo vmo;
-    status = zx::vmo::create_contiguous(bti, kGdcConfigurationSize, 0, &vmo);
+    status = zx::vmo::create_contiguous(bti.value(), kGdcConfigurationSize, 0, &vmo);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Unable to create contiguous memory for GDC configuration VMO");
       return ZX_ERR_NO_MEMORY;
@@ -544,7 +551,7 @@ zx_status_t GdcDevice::Setup(void* /*ctx*/, zx_device_t* parent, std::unique_ptr
 
   auto gdc_device = std::make_unique<GdcDevice>(
       parent, std::move(*clk_mmio), std::move(*gdc_mmio), std::move(gdc_config_contig_vmos),
-      std::move(gdc_irq), std::move(bti), std::move(port));
+      std::move(gdc_irq.value()), std::move(bti.value()), std::move(port));
   gdc_device->InitClocks();
 
   status = gdc_device->StartThread();

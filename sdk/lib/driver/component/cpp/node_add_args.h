@@ -80,12 +80,6 @@ fuchsia_driver_framework::wire::Offer MakeOffer2(
 
 #endif  //  FUCHSIA_API_LEVEL_AT_LEAST(18)
 
-inline fuchsia_driver_framework::NodeProperty MakeProperty(uint32_t key, uint32_t value) {
-  return fuchsia_driver_framework::NodeProperty{
-      {.key = fuchsia_driver_framework::NodePropertyKey::WithIntValue(key),
-       .value = fuchsia_driver_framework::NodePropertyValue::WithIntValue(value)}};
-}
-
 inline fuchsia_driver_framework::NodeProperty MakeProperty(std::string_view key,
                                                            std::string_view value) {
   return fuchsia_driver_framework::NodeProperty{

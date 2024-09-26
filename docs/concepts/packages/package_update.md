@@ -97,9 +97,20 @@ build generates and serves a [TUF][TUF-home] file tree.
 
 The update agent on the target does not initially know where to look for
 updates. To connect the agent on the target to the HTTP server running on the
-development host, it must be told the IP address of the development host.  The
-host HTTP server is started and the update agent is configured by calling `fx
-serve -v`.  `fx serve` will run the update server and is often what people use.
+development host, it must be told the IP address of the development host.
+
+By default, the repository server will automatically register itself with the
+default target. This behavior can be disabled by using the `--no-device` option
+when starting the server.
+
+The registration can be:
+
+* Inspected using [`ffx target repository list`][ffx-target-repo-list]
+* Updated using [`ffx target repository register`][ffx-target-repo-register]
+* Removed using [`ffx target repository deregister`][ffx-target-repo-deregister]
+
+The host HTTP server is started and the update agent is configured by calling `fx
+serve -v`. `fx serve` will run the update server and is often what people use.
 `-v` is recommended because the command will print more output, which may assist
 with debugging. If the host connects successfully to the target you will see the
 message `Ready to push packages!` in the shell on your host.
@@ -188,3 +199,6 @@ root hash and put in a directory at the root of the TUF file tree called 'blobs'
 [pkg-doc]: /docs/development/build/build_system/fuchsia_build_system_overview.md "Build overview"
 [paver]: /docs/development/build/fx.md#what-is-paving "Fuchsia paving"
 [fuchsia-build]: /docs/get-started/learn/build/build-system.md "Build system"
+[ffx-target-repo-list]: https://fuchsia.dev/reference/tools/sdk/ffx#ffx_target_repository_list
+[ffx-target-repo-register]: https://fuchsia.dev/reference/tools/sdk/ffx#ffx_target_repository_register
+[ffx-target-repo-deregister]: https://fuchsia.dev/reference/tools/sdk/ffx#ffx_target_repository_deregister

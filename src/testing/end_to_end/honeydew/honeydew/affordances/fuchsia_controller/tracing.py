@@ -20,8 +20,11 @@ from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing import custom_types
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
+    "TraceProvisioner": custom_types.FidlEndpoint(
+        "/core/trace_manager", "fuchsia.tracing.controller.Provisioner"
+    ),
     "TracingController": custom_types.FidlEndpoint(
-        "/core/trace_manager", "fuchsia.tracing.controller.Controller"
+        "/core/trace_manager", "fuchsia.tracing.controller.Session"
     ),
 }
 
@@ -41,10 +44,10 @@ class Tracing(tracing.Tracing):
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
         self._trace_controller_proxy: (
-            f_tracingcontroller.Controller.Client | None
+            f_tracingcontroller.Session.Client | None
         )
 
-        self._trace_socket: fc.Socket | None
+        self._trace_socket: AsyncSocket | None
         self._session_initialized: bool
         self._tracing_active: bool
 
@@ -107,16 +110,19 @@ class Tracing(tracing.Tracing):
         _LOGGER.info("Initializing trace session on '%s'", self._name)
 
         assert self._trace_controller_proxy is None
-        self._trace_controller_proxy = f_tracingcontroller.Controller.Client(
+        trace_provisioner_proxy = f_tracingcontroller.Provisioner.Client(
             self._fc_transport.connect_device_proxy(
-                _FC_PROXIES["TracingController"]
+                _FC_PROXIES["TraceProvisioner"]
             )
         )
+        client, server = fc.Channel.create()
+
         trace_socket_server, trace_socket_client = fc.Socket.create()
 
         try:
             # 1-way FIDL calls do not return a Coroutine, so async isn't needed
-            self._trace_controller_proxy.initialize_tracing(
+            trace_provisioner_proxy.initialize_tracing(
+                controller=server.take(),
                 config=f_tracingcontroller.TraceConfig(
                     categories=categories,
                     buffer_size_megabytes_hint=buffer_size,
@@ -128,6 +134,9 @@ class Tracing(tracing.Tracing):
             raise errors.FuchsiaControllerError(
                 "fuchsia.tracing.controller.Initialize FIDL Error"
             ) from status
+        self._trace_controller_proxy = f_tracingcontroller.Session.Client(
+            client
+        )
         self._trace_socket = AsyncSocket(trace_socket_client)
         self._session_initialized = True
 
@@ -186,11 +195,20 @@ class Tracing(tracing.Tracing):
 
         try:
             assert self._trace_controller_proxy is not None
-            asyncio.run(
+            stop_tracing_result = asyncio.run(
                 self._trace_controller_proxy.stop_tracing(
                     options=f_tracingcontroller.StopOptions(write_results=True)
                 )
             )
+            if stop_tracing_result.response is not None:
+                stop_tracing_response = stop_tracing_result.response
+                provider_stats = stop_tracing_response.result.provider_stats
+                for p in provider_stats:
+                    if p.records_dropped and p.records_dropped > 0:
+                        _LOGGER.warning(
+                            "%s records were dropped for %s!"
+                            % (p.records_dropped, p.name)
+                        )
         except fc.ZxStatus as status:
             raise errors.FuchsiaControllerError(
                 "fuchsia.tracing.controller.Stop FIDL Error"
@@ -198,13 +216,10 @@ class Tracing(tracing.Tracing):
         self._tracing_active = False
 
     def terminate(self) -> None:
-        """Terminates the trace session without saving the trace.
-
-        Raises:
-           errors.FuchsiaStateError: When trace session is not initialized.
-           errors.FuchsiaControllerError: On FIDL communication failure.
-        """
-        self._terminate(download=False)
+        """Terminates the trace session without saving the trace."""
+        if self._trace_controller_proxy is not None:
+            self._trace_controller_proxy.channel.close()
+        self._reset_state()
 
     def terminate_and_download(
         self, directory: str, trace_file: str | None = None
@@ -227,9 +242,13 @@ class Tracing(tracing.Tracing):
          Raises:
             errors.FuchsiaStateError: When trace session is not initialized or
                 already started.
-            errors.FuchsiaControllerError: On FIDL communication failure.
         """
-        trace_buffer: bytes = self._terminate(download=True)
+        if not self._session_initialized:
+            raise errors.FuchsiaStateError(
+                "Cannot download: Trace session is not "
+                f"initialized on {self._name}"
+            )
+        trace_buffer: bytes = asyncio.run(self._drain_socket())
 
         _LOGGER.info("Collecting trace on '%s'...", self._name)
         directory = os.path.abspath(directory)
@@ -250,7 +269,7 @@ class Tracing(tracing.Tracing):
 
         return trace_file_path
 
-    async def _drain_socket_async(self) -> bytes:
+    async def _drain_socket(self) -> bytes:
         """Drains all of the bytes from the trace socket, until it closes.
 
         Returns:
@@ -261,90 +280,11 @@ class Tracing(tracing.Tracing):
         """
         assert self._trace_socket is not None
 
-        try:
-            return await self._trace_socket.read_all()
-        except fc.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
-                "Error reading fuchsia.tracing.controller socket"
-            ) from status
+        socket_task = asyncio.get_running_loop().create_task(
+            self._trace_socket.read_all()
+        )
+        self.terminate()
 
-    async def _terminate_and_drain_async(self, download: bool) -> bytes:
-        """Concurrently terminates the trace session and (optionally) reads the
-        trace data from the trace socket.
+        trace_buffer: bytes = await socket_task
 
-        Args:
-            download: True if the method should drain the socket, False to skip
-                downloading data from the socket.
-
-        Returns:
-            Bytes read from the socket.
-
-        Raises:
-            ExceptionGroup: If any concurrent tasks failed.
-        """
-        assert self._trace_controller_proxy is not None
-
-        drain_task: asyncio.Task | None = None  # type: ignore[type-arg]
-        async with asyncio.TaskGroup() as tg:
-            if download:
-                drain_task = tg.create_task(self._drain_socket_async())
-            terminate_result_blob = tg.create_task(
-                self._trace_controller_proxy.terminate_tracing(
-                    options=f_tracingcontroller.TerminateOptions(
-                        write_results=download
-                    )
-                )
-            )
-
-        if terminate_result_blob is not None:
-            controller_terminate_tracing_response = (
-                terminate_result_blob.result().response
-            )
-            terminate_result = controller_terminate_tracing_response["result"]
-            provider_stats = terminate_result.provider_stats
-            for p in provider_stats:
-                if p.records_dropped and p.records_dropped > 0:
-                    _LOGGER.warning(
-                        "%s records were dropped for %s!",
-                        p.records_dropped,
-                        p.name,
-                    )
-
-        if drain_task is not None:
-            return drain_task.result()
-        return bytes()
-
-    def _terminate(self, download: bool) -> bytes:
-        """Terminates the trace session and optionally reads the trace data from
-        the trace socket.
-
-        Args:
-            download: True if the method should drain the socket, False to skip
-                downloading data from the socket.
-
-        Returns:
-            Bytes read from the socket.
-
-        Raises:
-            errors.FuchsiaStateError: When trace session is not initialized.
-            errors.FuchsiaControllerError: When reading from the socket failed.
-        """
-        if not self._session_initialized:
-            raise errors.FuchsiaStateError(
-                "Cannot terminate: Trace session is "
-                f"not initialized on {self._name}"
-            )
-        _LOGGER.info("Terminating trace session on '%s'", self._name)
-
-        try:
-            socket_bytes = asyncio.run(
-                self._terminate_and_drain_async(download=download)
-            )
-        except ExceptionGroup as grp:
-            raise errors.FuchsiaControllerError(
-                "fuchsia.tracing.controller.Terminate FIDL Error"
-            ) from grp
-        finally:
-            self._reset_state()
-
-        return socket_bytes
+        return trace_buffer

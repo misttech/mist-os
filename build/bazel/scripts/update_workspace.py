@@ -888,6 +888,7 @@ common --enable_bzlmod=false
         output_base=os.path.relpath(output_base_dir, topdir),
         output_user_root=os.path.relpath(output_user_root, topdir),
         download_config_file="download_config_file",
+        rbe_project=build_config["rbe_project"],
     )
     generated.add_file("bazel", bazel_launcher_content, executable=True)
 

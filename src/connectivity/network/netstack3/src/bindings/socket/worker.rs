@@ -81,7 +81,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     ///   same worker, as part of initiating a new workflow on the same socket
     ///   ("clone"). If `(_, Some(_)))`, a task spawned while handling the
     ///   request is being yielded to be polled to completion by the caller.
-    fn handle_request(
+    async fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
@@ -234,7 +234,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 Some(Ok(t)) => t,
             };
             let Self { ctx, data } = &mut self;
-            match data.handle_request(ctx, request, &spawners) {
+            match data.handle_request(ctx, request, &spawners).await {
                 ControlFlow::Continue(stream) => {
                     if let Some(stream) = stream {
                         request_streams.push(stream.into_future());

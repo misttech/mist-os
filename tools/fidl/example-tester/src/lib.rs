@@ -8,11 +8,10 @@ use component_events::matcher::*;
 use component_events::sequence::*;
 use diagnostics_data::{Data, Logs};
 use diagnostics_reader::ArchiveReader;
-use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
-use fuchsia_zircon::DurationNum;
 use regex::Regex;
 use std::future::Future;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Represents a component under test. The `name` is the test-local name assigned to the component,
 /// whereas the path is the relative path to its component manifest (ex: "#meta/client.cm").
@@ -404,6 +403,6 @@ Please copy the output between the '===' bounds into the golden file at {} in th
             );
             assert_eq!(logs, golden_logs)
         }
-        fasync::Timer::new(fasync::Time::after(500.millis())).await;
+        fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(500))).await;
     }
 }

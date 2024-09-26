@@ -176,7 +176,7 @@ mod test {
         assert_eq!(many, OneOrMany::Many(vec![1, 2, 3]));
     }
 
-    const BOOT_TS: u64 = 98765432000000000;
+    const BOOT_TS: i64 = 98765432000000000;
 
     #[fuchsia::test]
     async fn test_json_decoder() {
@@ -190,7 +190,7 @@ mod test {
             component_url: None,
             moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+            timestamp: Timestamp::from_nanos(BOOT_TS),
         })
         .set_message("Hello world!")
         .add_tag("Some tag")
@@ -217,7 +217,7 @@ mod test {
             component_url: None,
             moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+            timestamp: Timestamp::from_nanos(BOOT_TS),
         })
         .set_message("Hello world!")
         .add_tag("Some tag")
@@ -244,7 +244,7 @@ mod test {
                     component_url: None,
                     moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+                    timestamp: Timestamp::from_nanos(BOOT_TS),
                 })
                 .set_message(format!("Hello world! {}", value))
                 .add_tag("Some tag")
@@ -280,7 +280,7 @@ mod test {
             component_url: None,
             moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+            timestamp: Timestamp::from_nanos(BOOT_TS),
         })
         .set_message(format!("Hello world! {}", "h".repeat(CHAR_COUNT)))
         .add_tag("Some tag")
@@ -307,7 +307,7 @@ mod test {
             component_url: None,
             moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+            timestamp: Timestamp::from_nanos(BOOT_TS),
         })
         .set_message("Hello world!")
         .add_tag("Some tag")

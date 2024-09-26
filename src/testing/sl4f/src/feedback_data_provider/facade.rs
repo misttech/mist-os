@@ -7,7 +7,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_feedback::{DataProviderMarker, GetSnapshotParameters};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::DurationNum;
+use fuchsia_zircon as zx;
 
 /// Facade providing access to feedback interface.
 #[derive(Debug)]
@@ -22,7 +22,7 @@ impl FeedbackDataProviderFacade {
         let data_provider =
             connect_to_protocol::<DataProviderMarker>().context("connect to DataProvider")?;
         let params = GetSnapshotParameters {
-            collection_timeout_per_data: Some(2.minutes().into_nanos()),
+            collection_timeout_per_data: Some(zx::Duration::from_minutes(2).into_nanos()),
             ..Default::default()
         };
         let snapshot = data_provider.get_snapshot(params).await.context("get snapshot")?;

@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/357825314): NodeExt and TimeProperty would benefit from being generic over
+// the timeline, so that callers can choose whether to use Monotonic, Boot or something else.
+
 //! Utilities and wrappers providing higher level functionality for Inspect Nodes and properties.
 
 mod list;

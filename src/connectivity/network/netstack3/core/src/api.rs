@@ -155,6 +155,7 @@ where
     {
         let Self(ctx) = self;
         let (core_ctx, bindings_ctx) = ctx.contexts();
+
         core_ctx.handle_timer(bindings_ctx, dispatch, timer)
     }
 }

@@ -120,6 +120,58 @@ import("//build/testing/host_test_data.gni")
 #    be present.
 #    Type: object
 #
+#  honeydew_config (optional)
+#    JSON dict containing the honeydew configuration.
+#    Type: object
+#    Format:
+#     {
+#       transports = {
+#         <transport_name> = {
+#           <key1> = <value1>
+#           <key2> = <value2>
+#           ...
+#         }
+#         ...
+#       }
+#       affordances = {
+#         <affordance_name> = {
+#           <key1> = <value1>
+#           <key2> = <value2>
+#           ...
+#         }
+#         ...
+#       }
+#       ...
+#     }
+#    Example:
+#     {
+#       transports = {
+#         ffx = {
+#           timeout = 30
+#         }
+#         fuchsia-controller = {
+#           use_daemon = true
+#         }
+#       }
+#       affordances = {
+#         bluetooth = {
+#           "implementation" = "fuchsia-controller"
+#         }
+#         wlan = {
+#           "implementation" = "sl4f"
+#         }
+#       }
+#     }
+#   Note:
+#     Mobly-Driver on receiving this information from python_mobly_test, will update the dict with
+#     the following FFX related information:
+#         ffx = {
+#           bin_path =" <path>"  # Path where FFX binary can be found
+#           subtools_path = "<path>"  # Path where FFX subtools can be found
+#         }
+#     Even if these keys are present in the original user specified honeydew_config, they will be
+#     over written by mobly-driver with appropriate information.
+#
 #  transport (required)
 #    Transport to be used by HoneyDew while performing majority of the
 #    host-target interactions. Valid values are "fuchsia-controller" and "fuchsia-controller-preferred".
@@ -341,6 +393,34 @@ template("python_mobly_test") {
     ]
 
     _additional_deps += [ ":${_param_yaml_data_target}" ]
+  }
+
+  if (defined(invoker.honeydew_config)) {
+    _generated_honeydew_config_target =
+        "${target_name}_generated_honeydew_config"
+    _honeydew_config_source =
+        "${target_gen_dir}/${target_name}_honeydew_config.json"
+    generated_file(_generated_honeydew_config_target) {
+      output_conversion = "json"
+      contents = invoker.honeydew_config
+      outputs = [ _honeydew_config_source ]
+    }
+    _honeydew_config_deps = [ ":${_generated_honeydew_config_target}" ]
+
+    _honeydew_config_json_data_target = "${_test_name}_honeydew_config_data"
+    host_test_data(_honeydew_config_json_data_target) {
+      testonly = _testonly
+      sources = [ _honeydew_config_source ]
+      outputs = [ "${_test_dir}/honeydew_config.json" ]
+      deps = _honeydew_config_deps
+    }
+
+    _common_host_test_args += [
+      "--honeydew-config-json-path",
+      rebase_path("${_test_dir}/honeydew_config.json", root_build_dir),
+    ]
+
+    _additional_deps += [ ":${_honeydew_config_json_data_target}" ]
   }
 
   group("${target_name}.binary_and_config") {

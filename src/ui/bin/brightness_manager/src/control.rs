@@ -13,7 +13,7 @@ use fidl_fuchsia_ui_brightness::{
 };
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_zircon::sys::ZX_ERR_NOT_SUPPORTED;
-use fuchsia_zircon::{Duration, DurationNum};
+use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::{AbortHandle, Abortable};
 use futures::lock::Mutex;
@@ -104,7 +104,7 @@ lazy_static! {
     static ref GET_BRIGHTNESS_FAILED_FIRST: Arc<Mutex<bool>> = Arc::new(Mutex::new(true));
     static ref LAST_SET_BRIGHTNESS: Arc<Mutex<f32>> = Arc::new(Mutex::new(1.0));
     static ref BRIGHTNESS_CHANGE_DURATION: Arc<Mutex<Duration>> =
-        Arc::new(Mutex::new(BRIGHTNESS_CHANGE_DURATION_MS.millis()));
+        Arc::new(Mutex::new(Duration::from_millis(BRIGHTNESS_CHANGE_DURATION_MS)));
 }
 
 pub struct WatcherCurrentResponder {
@@ -726,6 +726,7 @@ mod tests {
     use anyhow::format_err;
     use async_trait::async_trait;
     use fuchsia_async::TestExecutor;
+    use fuchsia_zircon as zx;
     use futures::executor::block_on;
     use futures::pin_mut;
 
@@ -1077,7 +1078,7 @@ mod tests {
             0.4,
             0.42,
             control.backlight,
-            500.millis(),
+            zx::Duration::from_millis(500),
             control.current_sender_channel,
         );
         pin_mut!(future);
@@ -1085,7 +1086,7 @@ mod tests {
         for _i in 1..10 {
             assert!(exec.run_until_stalled(&mut future).is_pending());
             if let Some(deadline) = exec.wake_next_timer() {
-                let deadline = deadline.into_nanos().nanos();
+                let deadline = zx::Duration::from_nanos(deadline.into_nanos());
                 assert_eq!(50, deadline.into_millis());
             } else {
                 panic!("Timer has no value");
@@ -1125,7 +1126,7 @@ mod tests {
             0.0006,
             0.0001,
             control.backlight,
-            10.seconds(),
+            zx::Duration::from_seconds(10),
             control.current_sender_channel,
         );
         pin_mut!(future);
@@ -1133,9 +1134,9 @@ mod tests {
         for _i in 1..2 {
             assert!(exec.run_until_stalled(&mut future).is_pending());
             if let Some(deadline) = exec.wake_next_timer() {
-                let deadline = deadline.into_nanos().nanos();
-                assert!(deadline > 4500.millis());
-                assert!(deadline < 5000.millis());
+                let deadline = zx::Duration::from_nanos(deadline.into_nanos());
+                assert!(deadline > zx::Duration::from_millis(4500));
+                assert!(deadline < zx::Duration::from_millis(5000));
             } else {
                 panic!("Timer has no value");
             }

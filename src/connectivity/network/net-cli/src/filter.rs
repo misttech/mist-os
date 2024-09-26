@@ -508,7 +508,9 @@ pub(super) async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
                                         "specified one end of dst port range but not the other"
                                     ))
                                 }
-                                (Some(min), Some(max)) => Some(min..=max),
+                                (Some(min), Some(max)) => {
+                                    Some(fnet_filter_ext::PortRange(min..=max))
+                                }
                             };
                             fnet_filter_ext::Action::Redirect { dst_port }
                         }

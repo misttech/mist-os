@@ -15,7 +15,7 @@
 use super::user_address::UserAddress;
 use linux_uapi as uapi;
 pub use uapi::*;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub use uapi::__SIGRTMIN as SIGRTMIN;
 
@@ -88,7 +88,7 @@ pub const UMOUNT_NOFOLLOW: u32 = 8;
 
 pub type socklen_t = u32;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct ucred {
     pub pid: pid_t,
@@ -96,7 +96,7 @@ pub struct ucred {
     pub gid: gid_t,
 }
 
-#[derive(Debug, Default, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct msghdr {
     pub msg_name: UserAddress,
@@ -109,7 +109,9 @@ pub struct msghdr {
     pub msg_flags: u64,
 }
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell, Eq, PartialEq)]
+#[derive(
+    Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable, Eq, PartialEq,
+)]
 #[repr(packed)]
 pub struct cmsghdr {
     pub cmsg_len: usize,
@@ -117,7 +119,7 @@ pub struct cmsghdr {
     pub cmsg_type: u32,
 }
 
-#[derive(Debug, Default, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct mmsghdr {
     pub msg_hdr: msghdr,
@@ -125,7 +127,7 @@ pub struct mmsghdr {
     pub __reserved: [u8; 4usize],
 }
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct linger {
     pub l_onoff: i32,
@@ -136,7 +138,7 @@ pub const EFD_CLOEXEC: u32 = O_CLOEXEC;
 pub const EFD_NONBLOCK: u32 = O_NONBLOCK;
 pub const EFD_SEMAPHORE: u32 = 1;
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct pselect6_sigmask {
     pub ss: UserAddress,

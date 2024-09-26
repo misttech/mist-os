@@ -4,8 +4,6 @@
 
 use crate::capability::CapabilityProvider;
 use crate::model::component::WeakComponentInstance;
-use ::routing::component_instance::ComponentInstanceInterface;
-use ::routing::DictExt;
 use async_trait::async_trait;
 use clonable_error::ClonableError;
 use cm_rust::{Availability, CapabilityTypeName};
@@ -16,7 +14,9 @@ use moniker::Moniker;
 use router_error::RouterError;
 use routing::availability::AvailabilityMetadata;
 use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
+use routing::component_instance::ComponentInstanceInterface;
 use routing::error::{ComponentInstanceError, RoutingError};
+use routing::DictExt;
 use sandbox::{Dict, RemotableCapability, Request};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -59,7 +59,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .decl()
             .capabilities
             .iter()
-            .filter(|e| matches!(e, cm_rust::CapabilityDecl::Protocol(_)))
             .map(|e| (e.name().clone(), CapabilityTypeName::from(e)))
             .collect();
         let metadata = Dict::new();
@@ -80,7 +79,8 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 &self.name,
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
-                Request { target: self.target.clone().into(), debug: false, metadata },
+                Some(Request { target: self.target.clone().into(), metadata }),
+                false,
             )
             .await?
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {

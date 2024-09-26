@@ -18,7 +18,6 @@ config("enable-dfv2-compat-logging") {
 
 zx_library("dev-operation") {
   sdk = "source"
-  sdk_name = "dev-operation"
   sdk_headers = [
     "lib/operation/operation.h",
     "lib/operation/helpers/algorithm.h",
@@ -38,7 +37,6 @@ zx_library("dev-operation") {
 
 zx_library("dev-operation-dfv2-compat-logging") {
   sdk = "source"
-  sdk_name = "dev-operation"
   sdk_headers = [
     "lib/operation/operation.h",
     "lib/operation/helpers/algorithm.h",

@@ -4,7 +4,7 @@
 
 use linux_uapi::{__IncompleteArrayField, __u32, __u8};
 use serde::{Deserialize, Serialize};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FscryptOutput {
@@ -12,7 +12,7 @@ pub struct FscryptOutput {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default, FromBytes, FromZeros, NoCell, AsBytes)]
+#[derive(Copy, Clone, Default, KnownLayout, FromBytes, Immutable, IntoBytes)]
 pub struct fscrypt_remove_key_arg {
     pub key_spec: fscrypt_key_specifier,
     pub removal_status_flags: __u32,
@@ -20,7 +20,7 @@ pub struct fscrypt_remove_key_arg {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes, FromZeros, NoCell, AsBytes)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable, IntoBytes)]
 pub struct fscrypt_key_specifier {
     pub type_: __u32,
     pub __reserved: __u32,
@@ -28,7 +28,7 @@ pub struct fscrypt_key_specifier {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes, FromZeros, NoCell, AsBytes)]
+#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable, IntoBytes)]
 pub union fscrypt_key_specifier__bindgen_ty_1 {
     pub __reserved: [__u8; 32usize],
     pub descriptor: fscrypt_descriptor,
@@ -36,14 +36,14 @@ pub union fscrypt_key_specifier__bindgen_ty_1 {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default, FromBytes, FromZeros, NoCell, AsBytes)]
+#[derive(Copy, Clone, Default, KnownLayout, FromBytes, Immutable, IntoBytes)]
 pub struct fscrypt_descriptor {
     pub value: [__u8; 8usize],
     pub __bindgen_padding_0: [u8; 24usize],
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default, FromBytes, FromZeros, NoCell, AsBytes)]
+#[derive(Copy, Clone, Default, KnownLayout, FromBytes, Immutable, IntoBytes)]
 pub struct fscrypt_identifier {
     pub value: [__u8; 16usize],
     pub __bindgen_padding_0: [u8; 16usize],
@@ -69,7 +69,7 @@ impl Default for fscrypt_key_specifier {
 }
 
 #[repr(C)]
-#[derive(Clone, FromBytes, FromZeros, NoCell, AsBytes)]
+#[derive(Clone, KnownLayout, FromBytes, Immutable, IntoBytes)]
 pub struct fscrypt_add_key_arg {
     pub key_spec: fscrypt_key_specifier,
     pub raw_size: __u32,

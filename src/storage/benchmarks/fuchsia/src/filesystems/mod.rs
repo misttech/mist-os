@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use delivery_blob::{CompressionMode, Type1Blob};
-use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
 use fs_management::FSConfig;
 use fuchsia_merkle::Hash;
@@ -91,6 +91,7 @@ impl FsManagementFilesystemInstance {
             let vol = serving_filesystem
                 .create_volume(
                     "default",
+                    CreateOptions::default(),
                     MountOptions {
                         crypt: fs.config().crypt_client().map(|c| c.into()),
                         as_blob: Some(as_blob),

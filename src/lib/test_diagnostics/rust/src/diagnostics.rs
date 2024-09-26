@@ -288,7 +288,7 @@ mod tests {
 
     fn get_json_data(value: i64) -> String {
         let data = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: Timestamp::from(0).into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("fake-url".into()),
             moniker: ExtendedMoniker::parse_str("test/moniker").unwrap(),
             severity: Severity::Info,

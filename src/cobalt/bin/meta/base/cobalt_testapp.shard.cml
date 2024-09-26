@@ -15,6 +15,10 @@
             name: "sysinfo",
             url: "fuchsia-boot:///#meta/sysinfo.cm",
         },
+        {
+            name: "fake_channel_control",
+            url: "#meta/fake-channel-control.cm",
+        },
     ],
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
@@ -71,6 +75,11 @@
             protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
             to: [ "#sysinfo" ],
+        },
+        {
+            protocol: "fuchsia.update.channel.Provider",
+            from: "#fake_channel_control",
+            to: [ "#realm_builder" ],
         },
     ],
 }

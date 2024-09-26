@@ -11,6 +11,7 @@
 #include <bits.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/arch/cache.h>
 #include <lib/arch/intrin.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
@@ -2350,7 +2351,7 @@ void ArmVmICacheConsistencyManager::Finish() {
   }
   // Under the assumption our icache is VIPT then as we do not know all the virtual aliases of the
   // sections we cleaned our only option is to dump the entire icache.
-  __asm__ volatile("ic ialluis" ::: "memory");
+  arch::InvalidateGlobalInstructionCache();
   __isb(ARM_MB_SY);
   need_invalidate_ = false;
 }

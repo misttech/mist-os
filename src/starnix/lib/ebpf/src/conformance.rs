@@ -487,7 +487,7 @@ pub mod test {
                             assert_eq!(byte_str.as_rule(), Rule::RAW_VALUE);
                             let value =
                                 u64::from_str_radix(byte_str.as_str(), HEXADECIMAL_BASE).unwrap();
-                            instructions.push(bpf_insn::read_from(value.as_bytes()).unwrap());
+                            instructions.push(bpf_insn::read_from_bytes(value.as_bytes()).unwrap());
                         }
                         raw = Some(instructions);
                     }

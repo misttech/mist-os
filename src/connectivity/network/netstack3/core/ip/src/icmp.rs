@@ -43,7 +43,7 @@ use packet_formats::icmp::{
 use packet_formats::ip::{DscpAndEcn, IpPacket, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header, Ipv4OnlyMeta};
 use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{
     AddressStatus, IpDeviceStateContext, IpLayerHandler, IpPacketDestination, IpSendFrameError,
@@ -301,7 +301,7 @@ pub trait IcmpHandlerIpExt: IpExt {
     fn received_source_as_icmp_source(src: Self::RecvSrcAddr) -> Option<Self::SourceAddress>;
 
     /// An IP-specific constructor for TtlExpired ICMP errors.
-    fn new_ttl_expired<B: ByteSlice>(
+    fn new_ttl_expired<B: SplitByteSlice>(
         proto: Self::Proto,
         header_len: usize,
         meta: <Self::Packet<B> as IpPacket<B, Self>>::VersionSpecificMeta,
@@ -318,7 +318,7 @@ impl IcmpHandlerIpExt for Ipv4 {
     fn received_source_as_icmp_source(src: Ipv4Addr) -> Option<SpecifiedAddr<Ipv4Addr>> {
         SpecifiedAddr::new(src)
     }
-    fn new_ttl_expired<B: ByteSlice>(
+    fn new_ttl_expired<B: SplitByteSlice>(
         proto: Ipv4Proto,
         header_len: usize,
         Ipv4OnlyMeta { id: _, fragment_type }: Ipv4OnlyMeta,
@@ -340,7 +340,7 @@ impl IcmpHandlerIpExt for Ipv6 {
             Ipv6SourceAddr::Unspecified => None,
         }
     }
-    fn new_ttl_expired<B: ByteSlice>(
+    fn new_ttl_expired<B: SplitByteSlice>(
         proto: Ipv6Proto,
         header_len: usize,
         _meta: (),
@@ -1137,7 +1137,7 @@ fn send_neighbor_advertisement<
 }
 
 fn receive_ndp_packet<
-    B: ByteSlice,
+    B: SplitByteSlice,
     BC: IcmpBindingsContext,
     CC: InnerIcmpv6Context<BC>
         + Ipv6DeviceHandler<BC>
@@ -1772,7 +1772,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
 fn receive_icmpv4_error<
     BC: IcmpBindingsContext,
     CC: InnerIcmpv4Context<BC>,
-    B: ByteSlice,
+    B: SplitByteSlice,
     M: IcmpMessage<Ipv4, Body<B> = OriginalPacket<B>>,
 >(
     core_ctx: &mut CC,
@@ -1814,7 +1814,7 @@ fn receive_icmpv4_error<
 fn receive_icmpv6_error<
     BC: IcmpBindingsContext,
     CC: InnerIcmpv6Context<BC>,
-    B: ByteSlice,
+    B: SplitByteSlice,
     M: IcmpMessage<Ipv6, Body<B> = OriginalPacket<B>>,
 >(
     core_ctx: &mut CC,
@@ -2854,6 +2854,7 @@ mod tests {
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
+    use crate::internal::routing::rules::Marks;
     use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
@@ -3270,6 +3271,7 @@ mod tests {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,
+            marks: &Marks,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
             self.ip_socket_ctx.new_ip_socket(
                 bindings_ctx,
@@ -3278,6 +3280,7 @@ mod tests {
                 remote_ip,
                 proto,
                 transparent,
+                marks,
             )
         }
 
@@ -3301,8 +3304,9 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             socket: &IpSock<I, Self::WeakDeviceId>,
+            marks: &Marks,
         ) {
-            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket)
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, marks)
         }
     }
 
@@ -3402,7 +3406,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn receive_mld_packet<B: ByteSlice>(
+        fn receive_mld_packet<B: SplitByteSlice>(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device: &FakeDeviceId,

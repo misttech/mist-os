@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::fmt;
+use std::ops::Range;
 
 pub const MEM_MAJOR: u32 = 1;
 pub const TTY_ALT_MAJOR: u32 = 5;
@@ -10,9 +11,16 @@ pub const LOOP_MAJOR: u32 = 7;
 pub const MISC_MAJOR: u32 = 10;
 pub const INPUT_MAJOR: u32 = 13;
 pub const FB_MAJOR: u32 = 29;
-// TODO(tbodt): Use the rest of the range of majors marked as RESERVED FOR DYNAMIC ASSIGMENT in
-// devices.txt.
-pub const DYN_MAJOR: u32 = 234;
+
+// These minor device numbers in the MISC major device appear to be dynamically allocated.
+// The lower bound is taken from observing /proc/misc an Android device. The upper bound is
+// taken from the value of /dev/beep in devices.txt.
+pub const MISC_DYNANIC_MINOR_RANGE: Range<u32> = 52..128;
+
+// TODO: The range for dynamic character devices actually goes all the way to 254, but we
+// still have a few hardcoded devices registered at high numbers. We can expand this range
+// to 254 once we dynamically allocate those devices.
+pub const DYN_MAJOR_RANGE: Range<u32> = 234..251;
 
 pub const REMOTE_BLOCK_MAJOR: u32 = 251;
 // Unclear if this device number is assigned dynamically, but this value is what abarth observed
@@ -22,7 +30,7 @@ pub const ZRAM_MAJOR: u32 = 252;
 // This value is observed from dmsetup.
 pub const DEVICE_MAPPER_MAJOR: u32 = 254;
 
-#[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct DeviceType(u64);
 
 impl DeviceType {
@@ -65,12 +73,20 @@ impl DeviceType {
         )
     }
 
+    pub const fn new_range(major: u32, minor: Range<u32>) -> Range<DeviceType> {
+        Self::new(major, minor.start)..Self::new(major, minor.end)
+    }
+
     pub const fn from_bits(dev: u64) -> DeviceType {
         DeviceType(dev)
     }
 
     pub const fn bits(&self) -> u64 {
         self.0
+    }
+
+    pub fn next_minor(&self) -> Option<DeviceType> {
+        self.minor().checked_add(1).map(|minor| DeviceType::new(self.major(), minor))
     }
 
     pub const fn major(&self) -> u32 {
@@ -85,6 +101,18 @@ impl DeviceType {
 impl fmt::Display for DeviceType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}:{}", self.major(), self.minor())
+    }
+}
+
+impl std::cmp::PartialOrd for DeviceType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for DeviceType {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.major(), self.minor()).cmp(&(other.major(), other.minor()))
     }
 }
 

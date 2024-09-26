@@ -25,6 +25,11 @@ from honeydew.interfaces.affordances import (
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 
+# TODO: b/354239403: This can not be done today, but probably should be done at
+# some point:
+# import fidl.fuchsia_power_observability as fobs
+# Then, replace all labels appearing in constants.fidl with strings from there.
+
 _INPUT_ARGS: dict[str, object] = {
     "device_name": "fuchsia-emulator",
 }
@@ -84,7 +89,7 @@ _SAG_INSPECT_DATA_BEFORE: list[dict[str, Any]] = [
                     "success_count": 0,
                     "fail_count": 0,
                     "last_failed_error": 0,
-                    "last_time_in_suspend": -1,
+                    "last_time_in_suspend_ns": -1,
                     "last_time_in_suspend_operations": -1,
                 },
                 "fuchsia.inspect.Health": {
@@ -100,7 +105,7 @@ _SAG_INSPECT_DATA_BEFORE: list[dict[str, Any]] = [
 _SAG_SUSPEND_STATS_AFTER: dict[str, int] = {
     "fail_count": 0,
     "last_failed_error": 0,
-    "last_time_in_suspend": 3053743875,
+    "last_time_in_suspend_ns": 3053743875,
     "last_time_in_suspend_operations": 188959,
     "success_count": 1,
 }
@@ -129,18 +134,18 @@ _FSH_INSPECT_DATA_AFTER: list[dict[str, Any]] = deepcopy(
     _FSH_INSPECT_DATA_BEFORE
 )
 _FSH_INSPECT_DATA_AFTER[0]["payload"]["root"]["suspend_events"] = {
-    "0": {"suspended": 73886828041},
-    "1": {"resumed": 75687395083},
+    "0": {"attempted_at_ns": 73886828041},
+    "1": {"resumed_at_ns": 75687395083},
 }
 
 SUSPEND_RESUME_EVENTS_AFTER_FAIL_2: dict[str, dict[str, int]] = {
-    "0": {"suspended": 75687395083},
-    "1": {"resumed": 73886828041},
+    "0": {"attempted_at_ns": 75687395083},
+    "1": {"resumed_at_ns": 73886828041},
 }
 
 SUSPEND_RESUME_EVENTS_AFTER_FAIL_3: dict[str, dict[str, int]] = {
-    "0": {"suspended": 73886828041},
-    "1": {"resumed": 79886828041},
+    "0": {"attempted_at_ns": 73886828041},
+    "1": {"resumed_at_ns": 79886828041},
 }
 
 

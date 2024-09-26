@@ -9,6 +9,7 @@ ffx_plugin("ffx_daemon_plugin") {
   edition = "2021"
   plugin_deps = [
     "crash:ffx_crash",
+    "disconnect:ffx_daemon_disconnect",
     "echo:ffx_echo",
     "hang:ffx_hang",
     "log:ffx_daemon_log",

@@ -4,7 +4,7 @@
 
 """Rule for assembling a Fuchsia product."""
 
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyDeveloperOverridesInfo",
@@ -18,6 +18,7 @@ load(
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
+# DEPRECATED
 PACKAGE_MODE = struct(
     DISK = "disk",
     EMBED_IN_ZBI = "embed-in-zbi",
@@ -28,12 +29,12 @@ PACKAGE_MODE = struct(
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
 set -e
 mkdir -p $FFX_ISOLATE_DIR
-{ffx_assembly_args} \
+$FFX \
+    --config "assembly_enabled=true,sdk.root=$SDK_ROOT" \
     --isolate-dir $FFX_ISOLATE_DIR \
     assembly \
     create-system \
     --image-assembly-config $PRODUCT_ASSEMBLY_OUTDIR/image_assembly.json \
-    {mode_arg} \
     --outdir $OUTDIR
 """
 
@@ -93,7 +94,9 @@ def _fuchsia_product_assembly_impl(ctx):
     ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
-    ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
+    ffx_invocation = [
+        ffx_tool.path,
+        "--config \"assembly_enabled=true,sdk.root=" + ctx.attr._sdk_manifest.label.workspace_root + "\"",
         "--isolate-dir",
         ffx_isolate_dir.path,
         "assembly",
@@ -109,8 +112,6 @@ def _fuchsia_product_assembly_impl(ctx):
         "--package-validation",
         ctx.attr.package_validation,
     ]
-    if ctx.attr.package_mode:
-        ffx_invocation.extend(["--mode", ctx.attr.package_mode])
 
     if ctx.attr.legacy_bundle:
         legacy_bundle = ctx.attr.legacy_bundle[FuchsiaLegacyBundleInfo]
@@ -198,10 +199,6 @@ _fuchsia_product_assembly = rule(
             providers = [FuchsiaBoardConfigInfo],
             mandatory = True,
         ),
-        "package_mode": attr.string(
-            doc = "Mode indicating where to place packages.",
-            values = [PACKAGE_MODE.DISK, PACKAGE_MODE.EMBED_IN_ZBI, PACKAGE_MODE.BOOTFS],
-        ),
         "legacy_bundle": attr.label(
             doc = "Legacy AIB for this product.",
             providers = [FuchsiaLegacyBundleInfo],
@@ -252,12 +249,10 @@ def _fuchsia_product_create_system_impl(ctx):
     ffx_inputs += ctx.files.product_assembly
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
-    shell_src = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE.format(
-        ffx_assembly_args = " ".join(get_ffx_assembly_args(fuchsia_toolchain)),
-        mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else "",
-    )
-
+    shell_src = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE
     shell_env = {
+        "FFX": ffx_tool.path,
+        "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
         "PRODUCT_ASSEMBLY_OUTDIR": product_assembly_out.path,
@@ -302,9 +297,6 @@ _fuchsia_product_create_system = rule(
             providers = [FuchsiaProductAssemblyInfo],
             mandatory = True,
         ),
-        "package_mode": attr.string(
-            doc = "Mode indicating where to place packages.",
-        ),
         "_sdk_manifest": attr.label(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
@@ -327,13 +319,11 @@ def fuchsia_product(
         product_config = product_config,
         platform_artifacts = platform_artifacts,
         legacy_bundle = legacy_bundle,
-        package_mode = package_mode,
         package_validation = package_validation,
     )
 
     _fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
-        package_mode = package_mode,
         **kwargs
     )

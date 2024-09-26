@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 fuchsia_unittest_package("amlogic_decoder_integration_tests") {
   manifest = "meta/amlogic_decoder_integration_tests.cml"
@@ -18,7 +19,7 @@ fuchsia_unittest_package("amlogic_decoder_integration_tests") {
   test_type = "device"
 }
 
-executable("amlogic_decoder_integration_tests_bin") {
+cc_test_executable("amlogic_decoder_integration_tests_bin") {
   output_name = "amlogic_decoder_integration_tests"
   testonly = true
 

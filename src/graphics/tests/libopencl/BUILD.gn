@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/resource.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("src") {
   testonly = true
@@ -24,7 +25,7 @@ source_set("src") {
   ]
 }
 
-executable("libopencl_test_bin") {
+cc_test_executable("libopencl_test_bin") {
   testonly = true
   output_name = "libopencl_test"
 

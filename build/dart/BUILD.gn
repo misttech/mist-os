@@ -57,6 +57,8 @@ group("dart_allowlist") {
 }
 
 python_binary("gen_dart_package_config") {
+  # TODO(b/367413842): Enable MyPy type checking
+  enable_mypy = false
   main_source = "gen_dart_package_config.py"
   deps = [ "//third_party/pyyaml:yaml" ]
 }

@@ -26,7 +26,7 @@ use crate::format::SerializedType1Blob;
 use serde::{Deserialize, Serialize};
 use static_assertions::assert_eq_size;
 use thiserror::Error;
-use zerocopy::{AsBytes, Ref};
+use zerocopy::{IntoBytes, Ref};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -190,8 +190,8 @@ impl DeliveryBlobHeader {
     /// **WARNING**: This function does not verify that the payload is complete. Only the full
     /// header of a delivery blob are required to be present in `data`.
     pub fn parse(data: &[u8]) -> Result<Option<DeliveryBlobHeader>, DeliveryBlobError> {
-        let Some((serialized_header, _metadata_and_payload)) =
-            Ref::<_, format::SerializedHeader>::new_unaligned_from_prefix(data)
+        let Ok((serialized_header, _metadata_and_payload)) =
+            Ref::<_, format::SerializedHeader>::from_prefix(data)
         else {
             return Ok(None);
         };
@@ -318,8 +318,7 @@ impl Type1Blob {
     /// **WARNING**: This function does not verify that the payload is complete. Only the full
     /// header and metadata portion of a delivery blob are required to be present in `data`.
     pub fn parse(data: &[u8]) -> Result<Option<(Type1Blob, &[u8])>, DeliveryBlobError> {
-        let Some((serialized_header, payload)) =
-            Ref::<_, SerializedType1Blob>::new_unaligned_from_prefix(data)
+        let Ok((serialized_header, payload)) = Ref::<_, SerializedType1Blob>::from_prefix(data)
         else {
             return Ok(None);
         };

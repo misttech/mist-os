@@ -298,7 +298,7 @@ impl TestHelper {
     async fn wait_for_wlan_softmac_start(&mut self) {
         let (sender, receiver) = oneshot::channel::<()>();
         self.run_until_complete_or_timeout(
-            120.seconds(),
+            zx::Duration::from_seconds(120),
             "receive a WlanSoftmacStart event",
             event::on_start_mac(event::once(|_, _| sender.send(()))),
             receiver,
@@ -431,13 +431,13 @@ impl RetryWithBackoff {
     pub fn new(timeout: zx::Duration) -> Self {
         RetryWithBackoff {
             deadline: Time::after(timeout),
-            prev_delay: 0.millis(),
-            next_delay: 1.millis(),
-            max_delay: i64::MAX.nanos(),
+            prev_delay: zx::Duration::from_millis(0),
+            next_delay: zx::Duration::from_millis(1),
+            max_delay: zx::Duration::INFINITE,
         }
     }
     pub fn infinite_with_max_interval(max_delay: zx::Duration) -> Self {
-        Self { deadline: Time::INFINITE, max_delay, ..Self::new(0.nanos()) }
+        Self { deadline: Time::INFINITE, max_delay, ..Self::new(zx::Duration::from_nanos(0)) }
     }
 
     /// Return Err if the deadline was exceeded when this function was called.
@@ -454,7 +454,7 @@ impl RetryWithBackoff {
         // prevents misusing them after the sleep since they are all
         // no longer correct after the clock moves.
         {
-            if Time::after(0.millis()) > self.deadline {
+            if Time::after(zx::Duration::from_millis(0)) > self.deadline {
                 if verbose {
                     info!("Skipping sleep. Deadline exceeded.");
                 }
@@ -475,7 +475,9 @@ impl RetryWithBackoff {
         if self.next_delay < self.max_delay {
             let next_delay = std::cmp::min(
                 self.max_delay,
-                self.prev_delay.into_nanos().saturating_add(self.next_delay.into_nanos()).nanos(),
+                zx::Duration::from_nanos(
+                    self.prev_delay.into_nanos().saturating_add(self.next_delay.into_nanos()),
+                ),
             );
             self.prev_delay = self.next_delay;
             self.next_delay = next_delay;

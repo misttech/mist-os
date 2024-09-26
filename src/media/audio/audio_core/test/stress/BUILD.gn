@@ -3,10 +3,11 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/media/audio/audio_core/package.gni")
 import("//src/media/audio/hardware.gni")
 
-executable("audio-core-stress-tests-bin") {
+cc_test_executable("audio-core-stress-tests-bin") {
   sources = [ "loopback_stress_test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",

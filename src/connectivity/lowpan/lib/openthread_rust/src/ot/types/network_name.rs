@@ -53,8 +53,9 @@ impl NetworkName {
         }
 
         sa::assert_eq_size!(u8, ::std::os::raw::c_char);
-        let slice =
-            zerocopy::Ref::<_, [::std::os::raw::c_char]>::new_slice(slice).unwrap().into_slice();
+        let slice = zerocopy::Ref::into_ref(
+            zerocopy::Ref::<_, [::std::os::raw::c_char]>::from_bytes(slice).unwrap(),
+        );
 
         let mut ret = NetworkName::default();
         ret.0.m8[0..len].clone_from_slice(slice);
@@ -70,7 +71,7 @@ impl NetworkName {
 
     /// Returns the network name as a byte slice with no trailing zeros.
     pub fn as_slice(&self) -> &[u8] {
-        use zerocopy::AsBytes as _;
+        use zerocopy::IntoBytes as _;
 
         sa::assert_eq_size!(u8, ::std::os::raw::c_char);
         self.0.m8[0..self.len()].as_bytes()

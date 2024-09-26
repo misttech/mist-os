@@ -14,6 +14,7 @@
 
 import("//build/bind/bind.gni")
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("stub_device") {
   testonly = true
@@ -40,7 +41,7 @@ source_set("device_inspect_utils") {
   ]
 }
 
-executable("bcmdhd_crossdriver_test") {
+cc_test_executable("bcmdhd_crossdriver_test") {
   output_name = "bcmdhd_crossdriver_test"
   testonly = true
   sources = [ "bcmdhd_crossdriver_test.cc" ]
@@ -51,7 +52,7 @@ executable("bcmdhd_crossdriver_test") {
   ]
 }
 
-executable("bits_test") {
+cc_test_executable("bits_test") {
   output_name = "bits_test"
   testonly = true
   sources = [
@@ -64,7 +65,7 @@ executable("bits_test") {
   ]
 }
 
-executable("brcmu_utils_test") {
+cc_test_executable("brcmu_utils_test") {
   output_name = "brcmu_utils_test"
   testonly = true
   sources = [ "brcmu_utils_test.cc" ]
@@ -75,7 +76,7 @@ executable("brcmu_utils_test") {
   ]
 }
 
-executable("channel_conversion_test") {
+cc_test_executable("channel_conversion_test") {
   output_name = "channel_conversion_test"
   testonly = true
   sources = [ "channel_conversion_test.cc" ]
@@ -85,7 +86,7 @@ executable("channel_conversion_test") {
   ]
 }
 
-executable("cfg80211_test") {
+cc_test_executable("cfg80211_test") {
   output_name = "cfg80211_test"
   testonly = true
   sources = [ "cfg80211_test.cc" ]
@@ -100,7 +101,7 @@ executable("cfg80211_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("debug_test") {
+cc_test_executable("debug_test") {
   output_name = "debug_test"
   testonly = true
   sources = [ "debug_test.cc" ]
@@ -112,7 +113,7 @@ executable("debug_test") {
   ]
 }
 
-executable("device_inspect_test") {
+cc_test_executable("device_inspect_test") {
   output_name = "device_inspect_test"
   testonly = true
   sources = [
@@ -135,7 +136,7 @@ executable("device_inspect_test") {
   ]
 }
 
-executable("intrusive_list_test") {
+cc_test_executable("intrusive_list_test") {
   output_name = "intrusive_list_test"
   testonly = true
   sources = [ "intrusive_list_test.cc" ]
@@ -146,7 +147,7 @@ executable("intrusive_list_test") {
   ]
 }
 
-executable("task_queue_test") {
+cc_test_executable("task_queue_test") {
   output_name = "task_queue_test"
   testonly = true
   sources = [ "task_queue_test.cc" ]
@@ -159,7 +160,7 @@ executable("task_queue_test") {
   ]
 }
 
-executable("timer_test") {
+cc_test_executable("timer_test") {
   output_name = "timer_test"
   testonly = true
   sources = [ "timer_test.cc" ]
@@ -172,7 +173,7 @@ executable("timer_test") {
   ]
 }
 
-executable("workqueue_test") {
+cc_test_executable("workqueue_test") {
   output_name = "workqueue_test"
   testonly = true
   sources = [ "workqueue_test.cc" ]

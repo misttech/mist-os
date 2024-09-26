@@ -500,7 +500,7 @@ mod types {
     use super::{netdev, AllocKind, Error, Result};
     use std::fmt::Debug;
     use std::num::TryFromIntError;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     /// The identifier of a descriptor.
     ///
@@ -513,7 +513,7 @@ mod types {
     ///
     /// Also since DESCID_NO_NEXT(u16::MAX) is used to signal the end of a free
     /// list, there should be no [`DescId`] holding that value.
-    #[derive(PartialEq, Eq, FromZeros, FromBytes, AsBytes, NoCell)]
+    #[derive(PartialEq, Eq, KnownLayout, FromBytes, IntoBytes, Immutable)]
     #[repr(transparent)]
     pub(in crate::session) struct DescId<K: AllocKind>(u16, std::marker::PhantomData<K>);
 

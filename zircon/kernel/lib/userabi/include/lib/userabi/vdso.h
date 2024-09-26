@@ -25,8 +25,10 @@ class VDso : public RoDso {
   //
   // The RoDso VMO is created in vmo_kernel_handles[Variant::NEXT]
   // with the VDso variants in the other slots.
-  static const VDso* Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
-                            KernelHandle<VmObjectDispatcher>* time_values_handle);
+  static const VDso* Create(
+      fbl::RefPtr<VmObject> next,
+      ktl::span<KernelHandle<VmObjectDispatcher>, userboot::kNumVdsoVariants> vmo_kernel_handles,
+      KernelHandle<VmObjectDispatcher>* time_values_handle);
 
   static bool vmo_is_vdso(const fbl::RefPtr<VmObject>& vmo) {
 #ifdef KERNEL_NO_USERABI
@@ -58,16 +60,23 @@ class VDso : public RoDso {
   // be called on system resume to update the amount of time the system spent in a suspended state.
   static void SetMonotonicTicksOffset(zx_ticks_t new_offset);
 
+  fbl::RefPtr<VmObjectDispatcher> dispatcher() const {
+    return variant_vmo_[variant_index(Variant::NEXT)];
+  }
+
+  zx_rights_t vmo_rights() const { return vmo_rights_; }
+
  private:
   using Variant = userboot::VdsoVariant;
 
-  VDso(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles);
+  explicit VDso(fbl::RefPtr<VmObject> next);
+
   void CreateVariant(Variant, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle);
   void CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_handle);
   zx_status_t MapTimeValuesVmo(Variant, const fbl::RefPtr<VmObject>& vdso_vmo);
 
   bool vmo_is_vdso_impl(const fbl::RefPtr<VmObject>& vmo_ref) const {
-    if (vmo_ref == vmo()->vmo())
+    if (vmo_ref == vmo())
       return true;
     for (const auto& v : variant_vmo_) {
       if (vmo_ref == v->vmo())
@@ -84,6 +93,7 @@ class VDso : public RoDso {
   fbl::RefPtr<VmObjectDispatcher> variant_vmo_[static_cast<size_t>(Variant::COUNT)];
   KernelMappedVmo variant_time_mappings_[static_cast<size_t>(Variant::COUNT)];
   fasttime::internal::TimeValues* time_values_[static_cast<size_t>(Variant::COUNT)];
+  zx_rights_t vmo_rights_;
 
   static const VDso* instance_;
 };

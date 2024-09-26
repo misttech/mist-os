@@ -12,10 +12,9 @@ use fidl_fuchsia_net_filter_ext::{
     RuleId,
 };
 use fuchsia_async::DurationExt as _;
-use fuchsia_zircon::DurationNum as _;
 use {
     fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated, fuchsia_zircon as zx,
 };
 
 use anyhow::{bail, Context as _};
@@ -297,7 +296,7 @@ macro_rules! cas_filter_rules {
                     if retry < FILTER_CAS_RETRY_MAX - 1 =>
                 {
                     fuchsia_async::Timer::new(
-                        FILTER_CAS_RETRY_INTERVAL_MILLIS.millis().after_now(),
+                        zx::Duration::from_millis(FILTER_CAS_RETRY_INTERVAL_MILLIS).after_now(),
                     )
                     .await;
                 }

@@ -12,7 +12,7 @@ use crate::object_store::allocator::{AllocatorItem, Reservation};
 use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
 use crate::object_store::object_record::{
     ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40,
-    ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
+    ObjectItemV41, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use anyhow::Error;
@@ -76,12 +76,30 @@ pub struct TransactionLocks<'a>(pub WriteGuard<'a>);
 /// transaction, these are stored as a set which allows some mutations to be deduplicated and found
 /// (and we require custom comparison functions below).  For example, we need to be able to find
 /// object size changes.
-pub type Mutation = MutationV40;
+pub type Mutation = MutationV41;
 
 #[derive(
     Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum MutationV41 {
+    ObjectStore(ObjectStoreMutationV41),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutationV32),
+    // Indicates the beginning of a flush.  This would typically involve sealing a tree.
+    BeginFlush,
+    // Indicates the end of a flush.  This would typically involve replacing the immutable layers
+    // with compacted ones.
+    EndFlush,
+    // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKeyV40),
+    CreateInternalDir(u64),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(MutationV41)]
 pub enum MutationV40 {
     ObjectStore(ObjectStoreMutationV40),
     EncryptedObjectStore(Box<[u8]>),
@@ -183,11 +201,19 @@ impl Mutation {
 // We have custom comparison functions for mutations that just use the key, rather than the key and
 // value that would be used by default so that we can deduplicate and find mutations (see
 // get_object_mutation below).
-pub type ObjectStoreMutation = ObjectStoreMutationV40;
+pub type ObjectStoreMutation = ObjectStoreMutationV41;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[migrate_nodefault]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct ObjectStoreMutationV41 {
+    pub item: ObjectItemV41,
+    pub op: OperationV32,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV41)]
 pub struct ObjectStoreMutationV40 {
     pub item: ObjectItemV40,
     pub op: OperationV32,

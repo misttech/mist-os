@@ -24,21 +24,21 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     [string] The API area responsible for maintaining this library.
 #     See //build/sdk/sdk_atom.gni.
 #
-#   api (optional)
-#     Path to the file representing the API of this library.
+#     Override path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
-#     explicitly acknowledged. It is mandatory for publication categories of
-#     "partner" or "public".
-#     Defaults to "<SDK name>.api".
+#     explicitly acknowledged.
+#     If not specified, the path will be "<SDK name>.api".
+#     Only allowed when `no_headers` is false.
 #
-#   symbols_api (optional)
+#   symbols_api
 #     Path to the ifs file containing the public symbols of this library.
 #     This file is used to ensure modifications to the library's ABI are
-#     explicitly acknowledged. It is mandatory for publication categories of
-#     "partner" or "public".
+#     explicitly acknowledged.
 #
 #   no_headers (optional)
-#     Whether to include the library's headers in the SDK.
+#     Specifies that the library's headers are NOT included in the SDK.
+#     When true, the API modification acknowledgement mechanism is disabled.
+#     (Only the `symbols_api` mechanism will be used.)
 #     Defaults to false.
 #
 #   libcxx_linkage (optional)
@@ -140,7 +140,27 @@ set_defaults("sdk_shared_library") {
 }
 
 template("sdk_shared_library") {
+  assert(!defined(invoker.stable), "Libraries are always stable.")
   assert(defined(invoker.category), "Must define an SDK category")
+
+  # Only categories that are included in an IDK makes sense.
+  valid_categories = [
+    # "excluded" is deprecated.
+    # "experimental" is deprecated.
+    # "internal" does not apply to shared libraries.
+    # "cts" is only for ABI compatibility and thus not applicable.
+    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    "partner",
+    # "public" is not yet implemented.
+  ]
+  assert(
+      valid_categories + [ invoker.category ] - [ invoker.category ] !=
+          valid_categories,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
+
+  assert(
+      defined(invoker.symbols_api),
+      "Must define path to an ifs file. See comment in //build/cpp/verify_public_symbols.gni")
 
   output_name = target_name
   if (defined(invoker.output_name)) {
@@ -156,12 +176,17 @@ template("sdk_shared_library") {
 
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
-  if ((invoker.category == "partner" || invoker.category == "public") &&
-      !no_headers) {
-    api_reference = "${atom_name}.api"
+  if (!no_headers) {
+    # TODO(https://fxbug.dev/366221510): Move this to where it is used.
     if (defined(invoker.api)) {
       api_reference = invoker.api
+    } else {
+      api_reference = "${atom_name}.api"
     }
+  } else {
+    assert(
+        !defined(invoker.api),
+        "`no_header` targets do not require/support modification acknowledgement.")
   }
 
   main_target_name = target_name
@@ -229,13 +254,13 @@ template("sdk_shared_library") {
       }
     }
 
-    # Ensure that 'sdk_shared_library()' targets in the 'partner' or 'public'
-    # category that are not testonly are included in the SDK shared_library
-    # allowlist. The allowlist target's `visibility` list ensures that the
-    # target using this template is in the allowlist.
-    if (invoker.category == "partner" || invoker.category == "public") {
-      deps += [ "//build/sdk:sdk_shared_libraries_allowlist" ]
-    }
+    # Ensure that 'sdk_shared_library()' targets are included in the  allowlist.
+    # The allowlist target's `visibility` list ensures that the target using
+    # this template is in the allowlist.
+    assert(
+        invoker.category == "partner",
+        "Create a separate allowlist when adding support for other categories.")
+    deps += [ "//build/sdk:sdk_shared_libraries_allowlist" ]
   }
 
   # Base path for source files of this library in SDKs.
@@ -275,7 +300,7 @@ template("sdk_shared_library") {
 
   # Process headers.
   all_headers = []
-  if ((defined(invoker.public) || defined(invoker.sources)) && !no_headers) {
+  if (!no_headers) {
     if (defined(invoker.public)) {
       all_headers += invoker.public
     }
@@ -295,6 +320,10 @@ template("sdk_shared_library") {
       }
     }
   }
+  assert(
+      all_headers != [] || no_headers,
+      "Library does not contain any headers or sources. If this is intentional, set `no_headers = true`")
+
   sdk_metadata_headers = []
   sdk_header_files = []
   foreach(header, all_headers) {
@@ -331,25 +360,21 @@ template("sdk_shared_library") {
   lib_name = "lib${output_name}.so"
   link_lib = "${sdk_prebuilt_base_for_target_api_level}/lib/${lib_name}"
   dist_lib = "${sdk_prebuilt_base_for_target_api_level}/dist/${lib_name}"
-  sdk_files = sdk_header_files + [
-                {
-                  source = "${shared_out_dir}/link_stub/${lib_name}"
-                  dest = link_lib
-                },
-                {
-                  source = "${shared_out_dir}/${lib_name}"
-                  dest = dist_lib
-                },
-              ]
-
-  if (defined(invoker.symbols_api)) {
-    sdk_files += [
-      {
-        source = get_path_info(invoker.symbols_api, "abspath")
-        dest = "${file_base}/" + get_path_info(invoker.symbols_api, "file")
-      },
-    ]
-  }
+  sdk_files =
+      sdk_header_files + [
+        {
+          source = "${shared_out_dir}/link_stub/${lib_name}"
+          dest = link_lib
+        },
+        {
+          source = "${shared_out_dir}/${lib_name}"
+          dest = dist_lib
+        },
+        {
+          source = get_path_info(invoker.symbols_api, "abspath")
+          dest = "${file_base}/" + get_path_info(invoker.symbols_api, "file")
+        },
+      ]
 
   if (generate_plasa_artifacts) {
     _plasa_artifacts_target_name = "${main_target_name}_plasa"
@@ -416,9 +441,7 @@ template("sdk_shared_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
-    if (defined(invoker.symbols_api)) {
-      args += [ "--ifs" ] + [ get_path_info(invoker.symbols_api, "file") ]
-    }
+    args += [ "--ifs" ] + [ get_path_info(invoker.symbols_api, "file") ]
     if (current_build_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
@@ -433,23 +456,14 @@ template("sdk_shared_library") {
     headers = all_headers
   }
 
-  # Don't verify the public symbols for non-publicized APIs.
-  # TODO(abrachet): Make this required for all libraries.
-  if (invoker.category == "partner" || invoker.category == "public") {
-    assert(
-        defined(invoker.symbols_api),
-        "Must define path to an ifs file. See comment in //build/cpp/verify_public_symbols.gni")
-    main_target_dir = get_label_info(":${main_target_name}", "dir")
+  main_target_dir = get_label_info(":${main_target_name}", "dir")
+  verify_public_symbols_target_name = "${target_name}_sdk_verify_public_symbols"
+  verify_public_symbols(verify_public_symbols_target_name) {
+    current = "${shared_out_dir}/lib${output_name}.ifs"
+    reference = invoker.symbols_api
+    library_name = main_target_dir
 
-    verify_public_symbols_target_name =
-        "${target_name}_sdk_verify_public_symbols"
-    verify_public_symbols(verify_public_symbols_target_name) {
-      current = "${shared_out_dir}/lib${output_name}.ifs"
-      reference = invoker.symbols_api
-      library_name = main_target_dir
-
-      deps = [ shared_lib_target ]
-    }
+    deps = [ shared_lib_target ]
   }
 
   sdk_atom(manifest_target_name) {
@@ -463,7 +477,8 @@ template("sdk_shared_library") {
 
     category = invoker.category
 
-    if (defined(api_reference) && !no_headers) {
+    if (defined(api_reference)) {
+      assert(!no_headers)
       api = api_reference
 
       api_contents = sdk_header_files
@@ -484,13 +499,11 @@ template("sdk_shared_library") {
     non_sdk_deps = [
       ":${metadata_target_name}",
       ":${verify_pragma_target_name}",
+      ":${verify_public_symbols_target_name}",
       shared_lib_target,
     ]
     if (generate_plasa_artifacts) {
       non_sdk_deps += [ ":${_plasa_artifacts_target_name}" ]
-    }
-    if (category == "partner" || category == "public") {
-      non_sdk_deps += [ ":${verify_public_symbols_target_name}" ]
     }
 
     # Explicitly add non-public dependencies, in case some of the source files

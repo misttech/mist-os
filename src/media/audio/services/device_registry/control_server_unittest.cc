@@ -505,6 +505,23 @@ TEST_F(ControlServerCodecTest, GetTopologiesUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
+  received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->state());
+        EXPECT_TRUE(ValidateCodecFormatInfo(*result->state()));
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
@@ -536,6 +553,23 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
+  received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->state());
+        EXPECT_TRUE(ValidateCodecFormatInfo(*result->state()));
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
@@ -1773,6 +1807,22 @@ TEST_F(ControlServerStreamConfigTest, GetTopologiesUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  received_callback = false;
+  control->client()
+      ->SetGain({{
+          .target_state = fad::GainState{{.gain_db = -1.0f}},
+      }})
+      .Then([&received_callback](fidl::Result<fad::Control::SetGain>& result) {
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
@@ -1804,6 +1854,22 @@ TEST_F(ControlServerStreamConfigTest, GetElementsUnsupported) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+
+  // After this failing call, the binding should still be usable.
+  received_callback = false;
+  control->client()
+      ->SetGain({{
+          .target_state = fad::GainState{{.gain_db = -1.0f}},
+      }})
+      .Then([&received_callback](fidl::Result<fad::Control::SetGain>& result) {
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(control->client().is_valid());
+
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }

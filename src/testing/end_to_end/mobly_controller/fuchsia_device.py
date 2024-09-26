@@ -4,6 +4,7 @@
 """Mobly Controller for Fuchsia Device"""
 
 import logging
+from copy import deepcopy
 from typing import Any
 
 import honeydew
@@ -40,7 +41,6 @@ def create(
             * name - Device name returned by `ffx target list`.
             * transport - Transport to be used to perform the host-target
                 interactions.
-            * ffx_path - Absolute path to FFX binary to use for the device.
     Returns:
         A list of FuchsiaDevice objects.
     """
@@ -50,7 +50,7 @@ def create(
     )
 
     test_logs_dir: str = _get_log_directory()
-    ffx_path: str = _get_ffx_path(configs)
+    ffx_config: dict[str, Any] = _get_ffx_config(configs)
 
     # Call `FfxConfig.setup` before calling `create_device` as
     # `create_device` results in calling an FFX command and we
@@ -69,13 +69,14 @@ def create(
     # Right fix for all such cases is to use separate ffx config per device.
     # This support will be added when needed in future.
     _FFX_CONFIG_OBJ.setup(
-        binary_path=ffx_path,
+        binary_path=ffx_config["path"],
         isolate_dir=None,
         logs_dir=f"{test_logs_dir}/ffx/",
-        logs_level=_FFX_CONFIG_LOGS_LEVEL,
-        enable_mdns=_enable_mdns(configs),
-        subtools_search_path=_get_ffx_subtools_search_path(configs),
-        proxy_timeout_secs=_FFX_CONFIG_PROXY_TIMEOUT_SECS,
+        logs_level=ffx_config["logs_level"],
+        enable_mdns=ffx_config["enable_mdns"],
+        subtools_search_path=ffx_config.get("subtools_search_path"),
+        proxy_timeout_secs=ffx_config["proxy_timeout_secs"],
+        ssh_keepalive_timeout=ffx_config.get("ssh_keepalive_timeout"),
     )
 
     fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice] = []
@@ -91,6 +92,7 @@ def create(
                 ),
                 transport=device_config["transport"],
                 ffx_config=_FFX_CONFIG_OBJ.get_config(),
+                config=device_config["honeydew_config"],
             )
         )
     return fuchsia_devices
@@ -176,6 +178,7 @@ def _enable_mdns(configs: list[dict[str, Any]]) -> bool:
     return False
 
 
+# LINT.IfChange
 def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     """Validates and parses mobly configuration associated with FuchsiaDevice.
 
@@ -209,6 +212,9 @@ def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
 
     if "transport" not in config:
         raise RuntimeError("Missing transport field in the config")
+
+    if "honeydew_config" not in config:
+        raise RuntimeError("Missing Honeydew config field in the config")
 
     device_config: dict[str, Any] = {}
 
@@ -247,6 +253,9 @@ def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     return device_config
 
 
+# LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/run_lacewing_test.py)
+
+
 def _get_log_directory() -> str:
     """Returns the path to the directory where logs should be stored.
 
@@ -260,37 +269,48 @@ def _get_log_directory() -> str:
     )
 
 
-def _get_ffx_path(configs: list[dict[str, Any]]) -> str:
-    """Returns the path to the FFX binary to use.
+def _get_ffx_config(configs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Read the FFX configuration from the FuchsiaDevice config and validate the mandatory config.
 
     Args:
       configs: list of dicts. Each dict representing a configuration for a
             Fuchsia device.
 
     Returns:
-        Absolute path to FFX.
+        Dict pointing to FFX configuration.
     """
-    # FFX CLI is currently global and not localized to the individual devices so
-    # just return the the first "ffx_path" encountered.
+    ffx_config: dict[str, Any] = {}
+
+    # FFX config is currently global and not localized to the individual devices so
+    # just return the the first ffx config encountered.
     for config in configs:
-        if "ffx_path" in config:
-            return config["ffx_path"]
-    raise RuntimeError("No FFX path found in any device config")
+        try:
+            ffx_config = deepcopy(
+                config["honeydew_config"]["transports"]["ffx"]
+            )
+        except KeyError:
+            pass
+    if not ffx_config:
+        raise RuntimeError("No FFX config found in any of the device config")
 
+    if "path" not in ffx_config:
+        raise RuntimeError("No FFX path found in device config")
 
-def _get_ffx_subtools_search_path(configs: list[dict[str, Any]]) -> str | None:
-    """Returns the ffx subtools search path to use.
+    if "logs_level" not in ffx_config:
+        ffx_config["logs_level"] = _FFX_CONFIG_LOGS_LEVEL
 
-    Args:
-      configs: list of dicts. Each dict representing a configuration for a
-            Fuchsia device.
+    if "proxy_timeout_secs" not in ffx_config:
+        ffx_config["proxy_timeout_secs"] = _FFX_CONFIG_PROXY_TIMEOUT_SECS
 
-    Returns:
-        Absolute path to the subtools search path, or None.
-    """
-    # FFX CLI is currently global and not localized to the individual devices so
-    # just return the the first "ffx_path" encountered.
-    for config in configs:
-        if "ffx_subtools_search_path" in config:
-            return config["ffx_subtools_search_path"]
-    return None
+    for ffx_config_key in ["proxy_timeout_secs", "ssh_keepalive_timeout"]:
+        if ffx_config_key in ffx_config:
+            try:
+                ffx_config[ffx_config_key] = int(ffx_config[ffx_config_key])
+            except (TypeError, ValueError) as err:
+                raise RuntimeError(
+                    f"Invalid value sent in '{ffx_config_key}'. Please pass a int value"
+                ) from err
+
+    ffx_config["enable_mdns"] = _enable_mdns(configs)
+
+    return ffx_config

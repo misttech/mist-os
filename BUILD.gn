@@ -101,6 +101,7 @@ build_api_module("tests") {
 group("default") {
   testonly = true
   deps = [
+    #"//:build_only",
     "//:host",
     "//zircon/kernel:boot_tests",
 
@@ -116,7 +117,7 @@ group("default") {
     #"//src/lib/mistos-bootfs:tests",
     #"//src/lib/mistos-logger:tests",
     #"//src/starnix_lite:tests",
-    "//src/starnix_lite",
+    #"//src/starnix_lite",
 
     #"//src/starnix_lite/lib/usercopy:tests",
 
@@ -127,7 +128,7 @@ group("default") {
     #"//zircon/tools:tests",
 
     # Generate ZBIs used to run on target
-    "//build/images/mistos",
+    #"//build/images/mistos",
   ]
 }
 

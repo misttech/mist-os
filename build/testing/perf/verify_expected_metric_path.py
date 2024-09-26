@@ -6,6 +6,7 @@ an allowlisted directory."""
 
 import argparse
 import os.path
+import sys
 
 ALLOWED_METRICS_DIR_PATHS = [
     "//src/tests/end_to_end/perf/expected_metric_names",
@@ -13,7 +14,7 @@ ALLOWED_METRICS_DIR_PATHS = [
 ]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--expected-metric-names-filepath",
@@ -36,6 +37,8 @@ def main():
 
     with open(args.output_file, "w") as f:
         f.write("Verified!\n")
+
+    return 0
 
 
 if __name__ == "__main__":

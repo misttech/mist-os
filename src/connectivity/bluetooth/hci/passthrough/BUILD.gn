@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("bt_hci_passthrough_bind") {
   rules = "meta/bt_hci_passthrough.bind"
@@ -48,7 +49,7 @@ fuchsia_driver_package("passthrough") {
   driver_components = [ ":driver" ]
 }
 
-executable("tests_executable") {
+cc_test_executable("tests_executable") {
   testonly = true
   output_name = "bt-hci-passthrough-tests"
   sources = [ "passthrough_test.cc" ]

@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use crate::{MAX_TAGS, MAX_TAG_LEN, MIN_PACKET_SIZE};
-use diagnostics_data::SeverityError;
 use diagnostics_log_encoding::parse::ParseError;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum MessageError {
-    #[error(transparent)]
-    InvalidSeverity(#[from] SeverityError),
     #[error("unrecognized value type encountered")]
     UnrecognizedValue,
     #[error("wrong value type encountered, expected integer, found {found} {value}")]
@@ -44,7 +41,6 @@ impl PartialEq for MessageError {
                 index == i2 && len == l2
             }
             (OutOfBounds, OutOfBounds) => true,
-            (InvalidSeverity(a), InvalidSeverity(b)) => a == b,
             _ => false,
         }
     }

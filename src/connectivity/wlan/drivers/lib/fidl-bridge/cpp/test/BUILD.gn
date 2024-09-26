@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("fidl_bridge_test_bin") {
+cc_test_executable("fidl_bridge_test_bin") {
   testonly = true
   sources = [ "fidl_bridge_test.cc" ]
   deps = [

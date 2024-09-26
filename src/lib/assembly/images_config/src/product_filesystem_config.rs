@@ -70,7 +70,7 @@ impl Default for FormatDataOnCorruption {
 
 /// Whether the filesystem should be placed in a separate partition, in a
 /// ramdisk, or nonexistent.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, JsonSchema, Clone, Copy)]
 #[serde(deny_unknown_fields)]
 pub enum FilesystemImageMode {
     /// No filesystem image should be generated.

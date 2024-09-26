@@ -2,33 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_starnix_gralloc as fgralloc;
-use fuchsia_async::LocalExecutor;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     fileops_impl_noop_sync, FileObject, FileOps, InputBuffer, OutputBuffer, SeekTarget,
 };
 use starnix_logging::{log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{errno, error};
-use std::sync::Arc;
 use virtgralloc::{
     virtgralloc_SetVulkanModeResult, virtgralloc_VulkanMode, virtgralloc_set_vulkan_mode,
     VIRTGRALLOC_IOCTL_SET_VULKAN_MODE, VIRTGRALLOC_SET_VULKAN_MODE_RESULT_SUCCESS,
 };
+use {fidl_fuchsia_starnix_gralloc as fgralloc, fuchsia_zircon as zx};
 
 pub struct GrallocFile {
-    mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterProxy>>,
+    mode_setter: fgralloc::VulkanModeSetterSynchronousProxy,
 }
 
 impl GrallocFile {
-    pub fn new_file(
-        mode_setter: Arc<Mutex<fgralloc::VulkanModeSetterProxy>>,
-    ) -> Result<Box<dyn FileOps>, Errno> {
+    pub fn new_file(current_task: &CurrentTask) -> Result<Box<dyn FileOps>, Errno> {
+        let mode_setter = current_task
+            .kernel()
+            .connect_to_protocol_at_container_svc::<fgralloc::VulkanModeSetterMarker>()
+            .expect("gralloc feature requires fuchsia.starnix.gralloc.VulkanModeSetter protocol in container /svc dir, and a corresponding server")
+            .into_sync_proxy();
         Ok(Box::new(Self { mode_setter }))
     }
 
@@ -54,22 +55,14 @@ impl GrallocFile {
         // failure other than just logging and then ignoring it, which would only make the overall
         // broken situation more confusing that just using expect() here. Under normal operation,
         // this is only called once early in boot.
-        let mutex_guard = self.mode_setter.lock();
-        let response_future =
-            mutex_guard.set_vulkan_mode(&fgralloc::VulkanModeSetterSetVulkanModeRequest {
-                vulkan_mode: Some(vulkan_mode),
-                ..Default::default()
-            });
-        // Avoid holding the lock while we wait for the server; in principle this allows us to be
-        // making other requests while this one completes, but currently that won't happen under
-        // normal operation.
-        drop(mutex_guard);
-
-        // This happens up to once per container boot, so we may as well create and drop a
-        // LocalExecutor (vs. creating a separate dedicated thread up front that would stick around
-        // after it's no longer needed).
-        let mut exec = LocalExecutor::new();
-        exec.run_singlethreaded(response_future)
+        self.mode_setter
+            .set_vulkan_mode(
+                &fgralloc::VulkanModeSetterSetVulkanModeRequest {
+                    vulkan_mode: Some(vulkan_mode),
+                    ..Default::default()
+                },
+                zx::MonotonicTime::INFINITE,
+            )
             .expect("gralloc feature requires working VulkanModeSetter")
             .expect("gralloc feature requires VulkanModeSetter to set mode");
 

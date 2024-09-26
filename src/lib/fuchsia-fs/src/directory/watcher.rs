@@ -239,7 +239,7 @@ mod tests {
     use crate::OpenFlags;
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_zircon::prelude::*;
+    use fuchsia_zircon as zx;
     use futures::prelude::*;
     use std::fmt::Debug;
     use std::fs::File;
@@ -261,7 +261,9 @@ mod tests {
         ERR: Debug,
     {
         let f = s.next();
-        let f = f.on_timeout(500.millis().after_now(), || panic!("timeout waiting for watcher"));
+        let f = f.on_timeout(zx::Duration::from_millis(500).after_now(), || {
+            panic!("timeout waiting for watcher")
+        });
         f.map(|next| {
             next.expect("the stream yielded no next item")
                 .unwrap_or_else(|e| panic!("Error waiting for watcher: {:?}", e))

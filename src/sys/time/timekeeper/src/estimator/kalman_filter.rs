@@ -4,12 +4,11 @@
 
 use crate::estimator::frequency_to_adjust_ppm;
 use crate::time_source::Sample;
-use crate::Config;
+use crate::{Config, UtcTransform};
 use anyhow::{anyhow, Error};
-use fuchsia_runtime::{UtcTime, UtcTimeline};
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
-use time_util::Transform;
 
 /// The minimum covariance allowed for the UTC estimate in nanoseconds squared. This helps the
 /// kalman filter not drink its own bathwater after receiving very low uncertainly updates from a
@@ -135,11 +134,11 @@ impl KalmanFilter {
         self.estimate_1 = frequency;
     }
 
-    /// Returns a `Transform` describing the estimated synthetic time and error as a function
+    /// Returns a `UtcTransform` describing the estimated synthetic time and error as a function
     /// of the monotonic time.
-    pub fn transform(&self) -> Transform<UtcTimeline> {
-        Transform {
-            monotonic_offset: self.monotonic,
+    pub fn transform(&self) -> UtcTransform {
+        UtcTransform {
+            reference_offset: self.monotonic,
             synthetic_offset: self.utc(),
             rate_adjust_ppm: frequency_to_adjust_ppm(self.estimate_1),
             error_bound_at_offset: ERROR_BOUND_FACTOR as u64 * self.covariance_00.sqrt() as u64,
@@ -169,7 +168,6 @@ mod test {
     use super::*;
     use crate::make_test_config;
     use test_util::assert_near;
-    use zx::DurationNum;
 
     const TIME_1: zx::MonotonicTime = zx::MonotonicTime::from_nanos(10_000_000_000);
     const TIME_2: zx::MonotonicTime = zx::MonotonicTime::from_nanos(20_000_000_000);
@@ -189,8 +187,8 @@ mod test {
         let transform = filter.transform();
         assert_eq!(
             transform,
-            Transform {
-                monotonic_offset: TIME_1,
+            UtcTransform {
+                reference_offset: TIME_1,
                 synthetic_offset: UtcTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
                 rate_adjust_ppm: 0,
                 error_bound_at_offset: 2 * SQRT_COV_1,
@@ -201,10 +199,10 @@ mod test {
         assert_eq!(transform.synthetic(TIME_2).into_nanos(), (TIME_2 + OFFSET_1).into_nanos());
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
-        assert_eq!(transform.error_bound(TIME_1 - 1.second()), 2 * SQRT_COV_1);
+        assert_eq!(transform.error_bound(TIME_1 - zx::Duration::from_seconds(1)), 2 * SQRT_COV_1);
         // Later time should have a higher bound.
         assert_eq!(
-            transform.error_bound(TIME_1 + 1.second()),
+            transform.error_bound(TIME_1 + zx::Duration::from_seconds(1)),
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
         assert_eq!(filter.monotonic(), TIME_1);
@@ -286,8 +284,8 @@ mod test {
         assert_near!(filter.covariance_00, 1252245957276901.8, 1.0);
         assert_eq!(
             filter.transform(),
-            Transform {
-                monotonic_offset: zx::MonotonicTime::from_nanos(201_000000000),
+            UtcTransform {
+                reference_offset: zx::MonotonicTime::from_nanos(201_000000000),
                 synthetic_offset: UtcTime::from_nanos(10201_000000000),
                 rate_adjust_ppm: 0,
                 error_bound_at_offset: 70774174,
@@ -304,8 +302,8 @@ mod test {
         assert_near!(filter.covariance_00, 1252245957276901.8, 1.0);
         assert_eq!(
             filter.transform(),
-            Transform {
-                monotonic_offset: zx::MonotonicTime::from_nanos(201_000000000),
+            UtcTransform {
+                reference_offset: zx::MonotonicTime::from_nanos(201_000000000),
                 synthetic_offset: UtcTime::from_nanos(10201_000000000),
                 rate_adjust_ppm: -100,
                 error_bound_at_offset: 70774174,

@@ -68,7 +68,7 @@ class VmoDiscardable : public VmoMapping {
   ~VmoDiscardable();
 
   // It ensures that |vmo_| keeps VMO_OP_LOCK as long as any Pages refer to it
-  // by calling Page::GetPage(). When a valid page gets a new access to a |this|,
+  // by calling Page::GetVmo(). When a valid page gets a new access to a |this|,
   // it increases VmoMapping::active_pages_, and then decreases VmoMapping::active_pages_
   // in Unlock() as a active page is truncated. When VmoMapping::active_pages_ reaches
   // zero, Unlock() does VMO_OP_UNLOCK for page reclaim.
@@ -81,7 +81,7 @@ class VmoDiscardable : public VmoMapping {
 
  private:
   // It tracks which Page has been decommitted by kernel during |vmo_| unlocked.
-  // When a bit is 0, a caller (i.e., Page::GetPage()) clears the kUptodate flag of the
+  // When a bit is 0, a caller (i.e., Page::GetVmo()) clears the kUptodate flag of the
   // corresponding Page and fill the Page with data read from disk.
   std::vector<bool> page_bitmap_;
 };

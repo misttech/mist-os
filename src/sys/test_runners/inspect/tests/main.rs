@@ -5,6 +5,7 @@
 use anyhow::{Context as _, Error};
 use diagnostics_data::{
     hierarchy, Data, DiagnosticsHierarchy, InspectDataBuilder, InspectHandleName, Property,
+    Timestamp,
 };
 use fake_archive_accessor::FakeArchiveAccessor;
 use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
@@ -139,47 +140,63 @@ async fn launch_and_test_sample_test() {
         "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/sample_inspect_tests.cm";
 
     let fake_data = vec![
-        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
-            .with_hierarchy(hierarchy! {
-                root: {
-                    version: "1.0",
-                }
-            })
-            .with_name(InspectHandleName::filename("fake-file-name"))
-            .build(),
-        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
-            .with_hierarchy(hierarchy! {
-                root: {
-                    events: {
-                        event_counts: {
-                            log_sink_requested: 2i64,
-                        }
+        InspectDataBuilder::new(
+            "bootstrap/archivist".try_into().unwrap(),
+            "no-url",
+            Timestamp::from_nanos(0),
+        )
+        .with_hierarchy(hierarchy! {
+            root: {
+                version: "1.0",
+            }
+        })
+        .with_name(InspectHandleName::filename("fake-file-name"))
+        .build(),
+        InspectDataBuilder::new(
+            "bootstrap/archivist".try_into().unwrap(),
+            "no-url",
+            Timestamp::from_nanos(0),
+        )
+        .with_hierarchy(hierarchy! {
+            root: {
+                events: {
+                    event_counts: {
+                        log_sink_requested: 2i64,
                     }
                 }
-            })
-            .with_name(InspectHandleName::filename("fake-file-name"))
-            .build(),
+            }
+        })
+        .with_name(InspectHandleName::filename("fake-file-name"))
+        .build(),
         // Inject one that is missing data to ensure we retry correctly.
-        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
-            .with_hierarchy(hierarchy! {
-                root: {}
-            })
-            .with_name(InspectHandleName::filename("fake-file-name"))
-            .build(),
-        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
-            .with_hierarchy(hierarchy! {
-                root: {
-                    events: {
-                        recent_events: {
-                            "0": {
-                                event: "log_sink_requested",
-                            }
+        InspectDataBuilder::new(
+            "bootstrap/archivist".try_into().unwrap(),
+            "no-url",
+            Timestamp::from_nanos(0),
+        )
+        .with_hierarchy(hierarchy! {
+            root: {}
+        })
+        .with_name(InspectHandleName::filename("fake-file-name"))
+        .build(),
+        InspectDataBuilder::new(
+            "bootstrap/archivist".try_into().unwrap(),
+            "no-url",
+            Timestamp::from_nanos(0),
+        )
+        .with_hierarchy(hierarchy! {
+            root: {
+                events: {
+                    recent_events: {
+                        "0": {
+                            event: "log_sink_requested",
                         }
                     }
                 }
-            })
-            .with_name(InspectHandleName::filename("fake-file-name"))
-            .build(),
+            }
+        })
+        .with_name(InspectHandleName::filename("fake-file-name"))
+        .build(),
     ]
     .into_iter()
     .map(|d| serde_json::to_string_pretty(&d))
@@ -249,7 +266,7 @@ fn create_example_data(opts: ExampleDataOpts) -> Data<diagnostics_data::Inspect>
     .into_iter()
     .filter_map(|v| v)
     .collect();
-    InspectDataBuilder::new("example".try_into().unwrap(), "no-url", 0)
+    InspectDataBuilder::new("example".try_into().unwrap(), "no-url", Timestamp::from_nanos(0))
         .with_hierarchy(DiagnosticsHierarchy::new("root", properties, vec![]))
         .with_name(InspectHandleName::filename("fake-file-name"))
         .build()

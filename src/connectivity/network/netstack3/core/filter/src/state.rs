@@ -96,6 +96,31 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
         /// destination port of the packet will not be rewritten.
         dst_port: Option<RangeInclusive<NonZeroU16>>,
     },
+    /// A special case of source NAT (SNAT) that reassigns the source IP address
+    /// of the packet to an address that is assigned to the outgoing interface.
+    ///
+    /// This is a terminal action for all NAT routines on the current hook. If
+    /// no address is assigned to the outgoing interface, the packet will be
+    /// dropped.
+    ///
+    /// This action is only valid in the EGRESS hook. If a source port range is
+    /// specified, this action is only valid in a rule that ensures the presence
+    /// of a TCP or UDP header by matching on the transport protocol, so that
+    /// the source port can be rewritten.
+    ///
+    /// This is analogous to the `masquerade` statement in Netfilter.
+    Masquerade {
+        /// The optional range of source ports used to rewrite the packet.
+        ///
+        /// The source port will be rewritten if necessary to ensure the
+        /// packet's flow does not conflict with an existing tracked connection.
+        /// Note that the source port may be rewritten whether or not this range
+        /// is specified.
+        ///
+        /// If specified, this overrides the default behavior and restricts the
+        /// range of possible values to which the source port can be rewritten.
+        src_port: Option<RangeInclusive<NonZeroU16>>,
+    },
 }
 
 /// Transparently intercept the packet and deliver it to a local socket without
@@ -123,7 +148,8 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for Action<I, DeviceClass, ()> {
             | Self::Drop
             | Self::Return
             | Self::TransparentProxy(_)
-            | Self::Redirect { .. } => {
+            | Self::Redirect { .. }
+            | Self::Masquerade { .. } => {
                 format!("{self:?}")
             }
             Self::Jump(UninstalledRoutine { routine: _, id }) => {

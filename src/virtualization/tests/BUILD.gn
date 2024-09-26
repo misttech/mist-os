@@ -4,6 +4,7 @@
 
 import("//build/cipd.gni")
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/media/audio/audio_core/package.gni")
 import("//src/virtualization/buildtools/linux_paths.gni")
 import("//src/virtualization/buildtools/romfs_image.gni")
@@ -89,7 +90,7 @@ group("test_images") {
   ]
 }
 
-executable("virtualization_core_tests") {
+cc_test_executable("virtualization_core_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -128,7 +129,7 @@ fuchsia_test_package("virtualization_core_tests_pkg") {
   }
 }
 
-executable("virtualization_shutdown_tests") {
+cc_test_executable("virtualization_shutdown_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -165,7 +166,7 @@ fuchsia_test_package("virtualization_shutdown_tests_pkg") {
   }
 }
 
-executable("virtualization_balloon_tests") {
+cc_test_executable("virtualization_balloon_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -206,7 +207,7 @@ fuchsia_test_package("virtualization_balloon_tests_pkg") {
   }
 }
 
-executable("virtualization_block_tests") {
+cc_test_executable("virtualization_block_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -245,7 +246,7 @@ fuchsia_test_package("virtualization_block_tests_pkg") {
   }
 }
 
-executable("virtualization_gpu_tests") {
+cc_test_executable("virtualization_gpu_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -285,7 +286,7 @@ fuchsia_test_package("virtualization_gpu_tests_pkg") {
   }
 }
 
-executable("virtualization_input_tests") {
+cc_test_executable("virtualization_input_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -323,7 +324,7 @@ fuchsia_test_package("virtualization_input_tests_pkg") {
   }
 }
 
-executable("virtualization_net_tests") {
+cc_test_executable("virtualization_net_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -361,7 +362,7 @@ fuchsia_test_package("virtualization_net_tests_pkg") {
   }
 }
 
-executable("virtualization_sound_tests") {
+cc_test_executable("virtualization_sound_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -403,7 +404,7 @@ audio_core_test_package("virtualization_sound_tests_pkg") {
       [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 }
 
-executable("virtualization_vsock_tests") {
+cc_test_executable("virtualization_vsock_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -440,7 +441,7 @@ fuchsia_test_package("virtualization_vsock_tests_pkg") {
   }
 }
 
-executable("virtualization_mem_tests") {
+cc_test_executable("virtualization_mem_tests") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -555,7 +556,7 @@ resource("linux_extras_img") {
   deps = [ ":extras" ]
 }
 
-executable("termina_container_tests") {
+cc_test_executable("termina_container_tests") {
   visibility = [ ":*" ]
   testonly = true
 

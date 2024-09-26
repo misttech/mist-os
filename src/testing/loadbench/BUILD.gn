@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 
 source_set("lib") {
@@ -49,7 +50,7 @@ fuchsia_shell_package("loadbench") {
   deps = [ ":bin" ]
 }
 
-executable("loadbench_unittests") {
+cc_test_executable("loadbench_unittests") {
   testonly = true
 
   sources = [

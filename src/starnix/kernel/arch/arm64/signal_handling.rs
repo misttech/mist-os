@@ -17,7 +17,7 @@ use starnix_uapi::{
     __NR_restart_syscall, _aarch64_ctx, error, esr_context, fpsimd_context, sigaction, sigaltstack,
     sigcontext, siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 /// The size of the red zone.
 pub const RED_ZONE_SIZE: u64 = 0;
@@ -155,7 +155,7 @@ fn get_sigcontext_data(
         fpcr: extended_pstate.get_arm64_fpcr(),
         vregs: *extended_pstate.get_arm64_qregs(),
     };
-    fpsimd.write_to_prefix(&mut result);
+    let _ = fpsimd.write_to_prefix(&mut result);
 
     // TODO(b/313465152): Save ESR with `esr_context` and `ESR_MAGIC`. The register is read-only,
     // but the signal handler may still need to read it from `sigcontext`.
@@ -174,42 +174,42 @@ fn parse_sigcontext_data(
     let mut offset: usize = 0;
     loop {
         match _aarch64_ctx::read_from_prefix(&data[offset..]) {
-            Some(_aarch64_ctx { magic: 0, size: 0 }) => break,
+            Ok((_aarch64_ctx { magic: 0, size: 0 }, _)) => break,
 
-            Some(_aarch64_ctx { magic: FPSIMD_MAGIC, size: FPSIMD_CONTEXT_SIZE })
+            Ok((_aarch64_ctx { magic: FPSIMD_MAGIC, size: FPSIMD_CONTEXT_SIZE }, _))
                 if found_fpsimd =>
             {
                 log_debug!("Found duplicate `fpsimd_context` in `sigcontext`");
                 return error!(EINVAL);
             }
 
-            Some(_aarch64_ctx { magic: FPSIMD_MAGIC, size: FPSIMD_CONTEXT_SIZE }) => {
+            Ok((_aarch64_ctx { magic: FPSIMD_MAGIC, size: FPSIMD_CONTEXT_SIZE }, _)) => {
                 found_fpsimd = true;
 
                 // Set Q registers.
-                let fpsimd = fpsimd_context::read_from_prefix(&data[offset..])
+                let (fpsimd, _) = fpsimd_context::read_from_prefix(&data[offset..])
                     .expect("Failed to get fpsimd_context from array");
                 extended_pstate.set_arm64_state(&fpsimd.vregs, fpsimd.fpsr, fpsimd.fpcr);
 
                 offset += FPSIMD_CONTEXT_SIZE as usize;
             }
 
-            Some(_aarch64_ctx { magic: FPSIMD_MAGIC, size }) => {
+            Ok((_aarch64_ctx { magic: FPSIMD_MAGIC, size }, _)) => {
                 log_debug!("Invalid size for `fpsimd_context` in `sigcontext`: {}", size);
                 return error!(EINVAL);
             }
 
-            Some(_aarch64_ctx { magic: ESR_MAGIC, size: ESR_CONTEXT_SIZE }) => {
+            Ok((_aarch64_ctx { magic: ESR_MAGIC, size: ESR_CONTEXT_SIZE }, _)) => {
                 // ESR register is read-only so we can skip it.
                 offset += ESR_CONTEXT_SIZE as usize;
             }
 
-            Some(_aarch64_ctx { magic: ESR_MAGIC, size }) => {
+            Ok((_aarch64_ctx { magic: ESR_MAGIC, size }, _)) => {
                 log_debug!("Invalid size for `fpsimd_context` in `sigcontext`: {}", size);
                 return error!(EINVAL);
             }
 
-            Some(_aarch64_ctx { magic: EXTRA_MAGIC, size }) => {
+            Ok((_aarch64_ctx { magic: EXTRA_MAGIC, size }, _)) => {
                 if size as usize <= std::mem::size_of::<_aarch64_ctx>() {
                     log_debug!("Invalid size for `EXTRA_MAGIC` section in `sigcontext`");
                     return error!(EINVAL);
@@ -219,7 +219,7 @@ fn parse_sigcontext_data(
                 offset += ESR_CONTEXT_SIZE as usize;
             }
 
-            Some(_aarch64_ctx { magic, size }) => {
+            Ok((_aarch64_ctx { magic, size }, _)) => {
                 log_debug!(
                     "Unrecognized sectionin `sigcontext` (magic: 0x{:x}. size: {})",
                     magic,
@@ -228,7 +228,7 @@ fn parse_sigcontext_data(
                 return error!(EINVAL);
             }
 
-            None => return error!(EINVAL),
+            Err(_) => return error!(EINVAL),
         };
     }
 

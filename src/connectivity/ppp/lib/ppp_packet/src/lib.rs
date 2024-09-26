@@ -20,7 +20,7 @@ use packet::{
 };
 use thiserror::Error;
 use zerocopy::byteorder::network_endian::{U16, U32};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 /// The type of error that occurred while attempting to parse a packet.
 #[derive(Error, Debug, PartialEq)]
@@ -36,7 +36,7 @@ pub enum ParseError {
     ExcessBodyBytes,
 }
 
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct PppHeader {
     protocol: U16,
@@ -54,18 +54,18 @@ pub struct PppPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> PppPacket<B> {
+impl<B: SplitByteSlice> PppPacket<B> {
     /// Extract the protocol from the wire format.
     pub fn protocol(&self) -> u16 {
         self.header.protocol()
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for PppPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for PppPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {
@@ -99,7 +99,7 @@ impl PacketBuilder for PppPacketBuilder {
     }
 }
 
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct ControlProtocolHeader {
     code: u8,
@@ -127,7 +127,7 @@ pub struct ControlProtocolPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> ControlProtocolPacket<B> {
+impl<B: SplitByteSlice> ControlProtocolPacket<B> {
     /// Extract the code from the wire format.
     pub fn code(&self) -> u8 {
         self.header.code()
@@ -139,11 +139,11 @@ impl<B: ByteSlice> ControlProtocolPacket<B> {
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for ControlProtocolPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for ControlProtocolPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {
@@ -152,7 +152,7 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for ControlProtocolPacket<B> {
             .ok_or(ParseError::InsufficientHeaderBytes)?;
 
         let body_length = (header.length() as usize)
-            .checked_sub(header.bytes().len())
+            .checked_sub(Ref::bytes(&header).len())
             .ok_or(ParseError::InsufficientBodyBytes)?;
 
         let padding = buffer.len().checked_sub(body_length).ok_or(ParseError::ExcessBodyBytes)?;
@@ -211,7 +211,7 @@ pub struct ConfigurationPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for ConfigurationPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for ConfigurationPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -247,7 +247,7 @@ pub struct TerminationPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for TerminationPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for TerminationPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -283,7 +283,7 @@ pub struct CodeRejectPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for CodeRejectPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for CodeRejectPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -314,7 +314,7 @@ impl PacketBuilder for CodeRejectPacketBuilder {
     fn serialize(&self, _target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {}
 }
 
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct ProtocolRejectHeader {
     rejected_protocol: U16,
@@ -332,18 +332,18 @@ pub struct ProtocolRejectPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> ProtocolRejectPacket<B> {
+impl<B: SplitByteSlice> ProtocolRejectPacket<B> {
     /// Extract the rejected protocol from the wire format.
     pub fn rejected_protocol(&self) -> u16 {
         self.header.rejected_protocol()
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for ProtocolRejectPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for ProtocolRejectPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {
@@ -383,7 +383,7 @@ impl PacketBuilder for ProtocolRejectPacketBuilder {
     }
 }
 
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct EchoDiscardHeader {
     magic_number: U32,
@@ -401,18 +401,18 @@ pub struct EchoDiscardPacket<B> {
     body: B,
 }
 
-impl<B: ByteSlice> EchoDiscardPacket<B> {
+impl<B: SplitByteSlice> EchoDiscardPacket<B> {
     /// Extract the magic number from the wire format.
     pub fn magic_number(&self) -> u32 {
         self.header.magic_number()
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for EchoDiscardPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for EchoDiscardPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {

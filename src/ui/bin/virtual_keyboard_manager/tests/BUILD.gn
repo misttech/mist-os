@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 
 group("tests") {
@@ -37,7 +38,7 @@ fuchsia_test_package("virtual_keyboard_tests") {
   }
 }
 
-executable("virtual_keyboard_unittests_bin") {
+cc_test_executable("virtual_keyboard_unittests_bin") {
   testonly = true
   output_name = "virtual_keyboard_unittests"
 
@@ -58,7 +59,7 @@ executable("virtual_keyboard_unittests_bin") {
   ]
 }
 
-executable("focus_dispatcher_unittests_bin") {
+cc_test_executable("focus_dispatcher_unittests_bin") {
   testonly = true
   output_name = "focus_dispatcher_unittests"
 

@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -280,13 +276,11 @@ impl futures::Stream for SubRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x68a61c2a230db8b8 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(SuperFooRequest);
-                    fidl::encoding::Decoder::decode_into::<SuperFooRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        SuperFooRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<SuperFooRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = SubControlHandle { inner: this.inner.clone() };
                     Ok(SubRequest::Foo {
                         s: req.s,
@@ -349,6 +343,16 @@ impl fidl::endpoints::ControlHandle for SubControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -664,13 +668,11 @@ impl futures::Stream for Super_RequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x68a61c2a230db8b8 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(SuperFooRequest);
-                    fidl::encoding::Decoder::decode_into::<SuperFooRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        SuperFooRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<SuperFooRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = Super_ControlHandle { inner: this.inner.clone() };
                     Ok(Super_Request::Foo {
                         s: req.s,
@@ -733,6 +735,16 @@ impl fidl::endpoints::ControlHandle for Super_ControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -804,6 +816,13 @@ impl Super_FooResponder {
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for SuperFooRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for SuperFooRequest {
         type Owned = Self;
 
@@ -817,26 +836,20 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for SuperFooRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<SuperFooRequest> for &SuperFooRequest {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<SuperFooRequest, D>
+        for &SuperFooRequest
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<SuperFooRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<SuperFooRequest>::encode(
+            fidl::encoding::Encode::<SuperFooRequest, D>::encode(
                 (<fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
                     &self.s,
                 ),),
@@ -846,13 +859,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<fidl::encoding::UnboundedString>>
-        fidl::encoding::Encode<SuperFooRequest> for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl::encoding::UnboundedString, D>,
+        > fidl::encoding::Encode<SuperFooRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -865,16 +880,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for SuperFooRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for SuperFooRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { s: fidl::new_empty!(fidl::encoding::UnboundedString) }
+            Self { s: fidl::new_empty!(fidl::encoding::UnboundedString, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -882,12 +897,20 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl::encoding::UnboundedString,
+                D,
                 &mut self.s,
                 decoder,
                 offset + 0,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for SuperFooResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -913,20 +936,14 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for SuperFooResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<SuperFooResponse> for &SuperFooResponse {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<SuperFooResponse, D>
+        for &SuperFooResponse
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -942,11 +959,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i64>> fidl::encoding::Encode<SuperFooResponse> for (T0,) {
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i64, D>>
+        fidl::encoding::Encode<SuperFooResponse, D> for (T0,)
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -959,16 +978,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for SuperFooResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for SuperFooResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { y: fidl::new_empty!(i64) }
+            Self { y: fidl::new_empty!(i64, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {

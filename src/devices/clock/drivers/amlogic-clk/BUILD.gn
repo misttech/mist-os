@@ -26,34 +26,53 @@ driver_bind_rules("aml-clk-bind") {
   ]
 }
 
-fuchsia_driver("amlogic-clk-driver") {
+source_set("amlogic-clk-driver-source") {
   output_name = "amlogic-clk"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "aml-a1-blocks.h",
+    "aml-a5-blocks.h",
+    "aml-axg-blocks.h",
+    "aml-clk-blocks.h",
+    "aml-clk-blocks.h",
     "aml-clk.cc",
+    "aml-clk.h",
     "aml-fclk-rates.cc",
+    "aml-fclk.h",
+    "aml-g12a-blocks.h",
+    "aml-g12b-blocks.h",
+    "aml-gxl-blocks.h",
+    "aml-sm1-blocks.h",
   ]
-  deps = [
-    ":aml-clk-bind",
+  public_deps = [
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
-    "//sdk/lib/fidl",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
+  ]
+  deps = [
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/mmio",
+    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver("amlogic-clk-driver") {
+  output_name = "amlogic-clk"
+  deps = [
+    ":aml-clk-bind",
+    ":amlogic-clk-driver-source",
   ]
 }
 
@@ -71,33 +90,13 @@ fuchsia_driver_package("package") {
 
 test("amlogic-clk-test-bin") {
   output_name = "amlogic-clk-test"
-  sources = [
-    "aml-clk-test.cc",
-    "aml-clk.cc",
-    "aml-fclk-rates.cc",
-  ]
+  sources = [ "aml-clk-test.cc" ]
   deps = [
-    ":aml-clk-bind",
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
+    ":amlogic-clk-driver-source",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/no_ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }

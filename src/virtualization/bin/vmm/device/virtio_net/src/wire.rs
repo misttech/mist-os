@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use num_derive::FromPrimitive;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub use zerocopy::byteorder::little_endian::U16 as LE16;
 
@@ -20,7 +20,7 @@ pub const TX_QUEUE_IDX: u16 = 1;
 // Note that this combines the legacy and current headers into one structure (equivalent to when
 // VIRTIO_F_VERSION_1 is set).
 #[repr(C, packed)]
-#[derive(Default, Debug, AsBytes, FromZeros, FromBytes, NoCell, PartialEq)]
+#[derive(Default, Debug, IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq)]
 pub struct VirtioNetHeader {
     pub flags: u8,
     pub gso_type: u8,

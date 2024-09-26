@@ -12,10 +12,10 @@
 #include <unordered_set>
 #include <utility>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/controller_allowlist_passthrough.h"
-#include "src/devices/bin/driver_manager/pkg_utils.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -185,11 +185,6 @@ fit::result<fdf::wire::NodeError> ValidateSymbols(std::vector<fdf::NodeSymbol>& 
     }
   }
   return fit::ok();
-}
-
-std::string_view GetFilename(std::string_view path) {
-  size_t index = path.rfind('/');
-  return index == std::string_view::npos ? path : path.substr(index + 1);
 }
 
 }  // namespace
@@ -981,6 +976,36 @@ void Node::AddChild(fuchsia_driver_framework::NodeAddArgs args,
       });
 }
 
+void Node::OnNodeServerUnbound(fidl::UnbindInfo info) {
+  node_ref_.reset();
+  // If the unbind is initiated from us, we don't need to do anything to handle
+  // the closure.
+  if (info.is_user_initiated()) {
+    return;
+  }
+
+  // IF the driver fails to bind to the node, don't remove the node.
+  if (driver_component_->state == DriverState::kBinding) {
+    LOGF(WARNING, "The driver for node %s failed to bind.", name().c_str());
+    return;
+  }
+
+  if (GetNodeState() == NodeState::kRunning) {
+    // If the node is running but this node closure has happened, then we want to restart
+    // the node if it has the host_restart_on_crash_ enabled on it.
+    if (host_restart_on_crash_) {
+      LOGF(INFO, "Restarting node %s due to node closure while running.", name().c_str());
+      RestartNode();
+      return;
+    }
+
+    LOGF(WARNING, "fdf::Node binding for node %s closed while the node was running: %s",
+         name().c_str(), info.FormatDescription().c_str());
+  }
+
+  Remove(RemovalSet::kAll, nullptr);
+}
+
 void Node::Remove(RemoveCompleter::Sync& completer) {
   LOGF(DEBUG, "Remove() Fidl call for %s", name().c_str());
   Remove(RemovalSet::kAll, nullptr);
@@ -1123,9 +1148,9 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     symbols = this->symbols();
   }
 
-  std::optional<DriverDynamicLinkerArgs> dynamic_linker_args;
+  std::optional<DriverHost::DriverLoadArgs> dynamic_linker_args;
   if (use_dynamic_linker) {
-    auto result = DriverDynamicLinkerArgs::Create(start_info);
+    auto result = DriverHost::DriverLoadArgs::Create(start_info);
     if (result.is_error()) {
       cb(result.take_error());
       return;
@@ -1173,37 +1198,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   // Bind the Node associated with the driver.
   auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
-  node_ref_.emplace(
-      dispatcher_, std::move(server_end), this, [](Node* node, fidl::UnbindInfo info) {
-        node->node_ref_.reset();
-        // If the unbind is initiated from us, we don't need to do anything to handle
-        // the closure.
-        if (info.is_user_initiated()) {
-          return;
-        }
-
-        // IF the driver fails to bind to the node, don't remove the node.
-        if (node->driver_component_->state == DriverState::kBinding) {
-          LOGF(WARNING, "The driver for node %s failed to bind.", node->name().c_str());
-          return;
-        }
-
-        if (node->GetNodeState() == NodeState::kRunning) {
-          // If the node is running but this node closure has happened, then we want to restart
-          // the node if it has the host_restart_on_crash_ enabled on it.
-          if (node->host_restart_on_crash_) {
-            LOGF(INFO, "Restarting node %s due to node closure while running.",
-                 node->name().c_str());
-            node->RestartNode();
-            return;
-          }
-
-          LOGF(WARNING, "fdf::Node binding for node %s closed while the node was running: %s",
-               node->name().c_str(), info.FormatDescription().c_str());
-        }
-
-        node->Remove(RemovalSet::kAll, nullptr);
-      });
+  node_ref_.emplace(dispatcher_, std::move(server_end), this,
+                    [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
@@ -1233,47 +1229,18 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
                               });
 }
 
-// static
-zx::result<Node::DriverDynamicLinkerArgs> Node::DriverDynamicLinkerArgs::Create(
-    fuchsia_component_runner::wire::ComponentStartInfo start_info) {
-  fuchsia_data::wire::Dictionary wire_program = start_info.program();
-  zx::result<std::string> binary = fdf_internal::ProgramValue(wire_program, "binary");
-  if (binary.is_error()) {
-    LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
-    return binary.take_error();
-  }
-
-  auto pkg = fdf_internal::NsValue(start_info.ns(), "/pkg");
-  if (pkg.is_error()) {
-    LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
-    return pkg.take_error();
-  }
-
-  auto driver_file = pkg_utils::OpenPkgFile(*pkg, *binary);
-  if (driver_file.is_error()) {
-    LOGF(ERROR, "Failed to open driver file: %s", driver_file.status_string());
-    return driver_file.take_error();
-  }
-
-  auto lib_dir = pkg_utils::OpenLibDir(*pkg);
-  if (lib_dir.is_error()) {
-    LOGF(ERROR, "Failed to open driver libs dir: %s", lib_dir.status_string());
-    return lib_dir.take_error();
-  }
-
-  return zx::ok(DriverDynamicLinkerArgs(std::string(GetFilename(*binary)), std::move(*driver_file),
-                                        std::move(*lib_dir)));
-}
-
 void Node::StartDriverWithDynamicLinker(
-    DriverDynamicLinkerArgs args, std::string_view url,
+    DriverHost::DriverLoadArgs args, std::string_view url,
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
     fit::callback<void(zx::result<>)> cb) {
+  auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
+  node_ref_.emplace(dispatcher_, std::move(server_end), this,
+                    [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
+
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints.client));
-  driver_host_.value()->StartWithDynamicLinker(args.driver_soname, std::move(args.driver_file),
-                                               std::move(args.lib_dir),
+  driver_host_.value()->StartWithDynamicLinker(std::move(client_end), name_, std::move(args),
                                                std::move(driver_endpoints.server), std::move(cb));
 }
 
@@ -1430,27 +1397,21 @@ void Node::SetAndPublishInspect() {
   constexpr char kDeviceTypeString[] = "Device";
   constexpr char kCompositeDeviceTypeString[] = "Composite Device";
 
-  std::vector<zx_device_prop_t> property_vector;
+  cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> property_vector;
   uint32_t protocol_id = 0;
   if (type_ == NodeType::kNormal) {
-    const auto node_properties = GetNodeProperties();
-    ZX_ASSERT_MSG(node_properties.has_value(), "Non-composite node \"%s\" missing node properties",
+    auto properties = GetNodeProperties();
+    ZX_ASSERT_MSG(properties.has_value(), "Non-composite node \"%s\" missing node properties",
                   name_.c_str());
-    for (auto& node_property : node_properties.value()) {
-      if (node_property.key.is_int_value() && node_property.value.is_int_value()) {
-        auto key = node_property.key.int_value();
-        auto value = node_property.value.int_value();
-        property_vector.push_back(zx_device_prop_t{
-            .id = static_cast<uint16_t>(key),
-            .value = value,
-        });
-        // TODO(b/361852885): Remove this hardcoded value once integer based keys are
-        // removed.
-        if (key == 0x01 /* BIND_PROTOCOL */) {
-          protocol_id = value;
+    for (auto& node_property : properties.value()) {
+      if (node_property.key.is_string_value() && node_property.value.is_int_value()) {
+        if (node_property.key.string_value().get() == bind_fuchsia::PROTOCOL) {
+          protocol_id = node_property.value.int_value();
         }
       }
     }
+
+    property_vector = properties.value();
   }
 
   inspect_.SetStaticValues(MakeTopologicalPath(), protocol_id,

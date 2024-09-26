@@ -12,6 +12,15 @@ from mobly_driver.api import api_ffx
 from mobly_driver.driver import common, local
 from parameterized import parameterized
 
+_HONEYDEW_CONFIG: dict[str, Any] = {
+    "transports": {
+        "ffx": {
+            "path": "/ffx/path",
+            "subtools_search_path": "subtools/search/path",
+        }
+    }
+}
+
 
 class LocalDriverTest(unittest.TestCase):
     """Local Driver tests"""
@@ -25,7 +34,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for successful config generation from file"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
             config_path="config/path",
@@ -46,7 +55,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for successful config without params generation"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
             config_path="config/path",
@@ -67,7 +76,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for exception being raised on invalid YAML content"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
             config_path="config/path",
@@ -84,7 +93,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for exception being raised for invalid path"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
             config_path="/does/not/exist",
@@ -118,7 +127,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for successful env config generation"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
         )
@@ -168,7 +177,7 @@ class LocalDriverTest(unittest.TestCase):
         )
 
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
             multi_device=True,
@@ -216,7 +225,7 @@ class LocalDriverTest(unittest.TestCase):
         )
 
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
             multi_device=False,
@@ -245,7 +254,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for exception being raised when no devices are found"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
         )
@@ -263,7 +272,7 @@ class LocalDriverTest(unittest.TestCase):
     ) -> None:
         """Test case for exception being raised from discovery failure"""
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
         )
@@ -289,7 +298,7 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for exception being raised from invalid discovery output"""
         mock_check_output.return_value = discovery_output
         driver = local.LocalDriver(
-            ffx_path="ffx/path",
+            honeydew_config=_HONEYDEW_CONFIG,
             transport="transport",
             output_path="output/path",
         )

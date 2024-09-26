@@ -98,15 +98,17 @@ TEST_F(AshmemTest, DefaultProtections) {
 TEST_F(AshmemTest, NoAccessBeforeSetSize) {
   auto fd = Open();
   ASSERT_TRUE(fd.is_valid());
+  const size_t kMapSize = PAGE_SIZE;
 
   // No size, fail
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr == MAP_FAILED && errno == EINVAL);
 
   // With size, succeed
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallSucceeds());
-  addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
-  EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
+  addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
@@ -129,10 +131,11 @@ TEST_F(AshmemTest, SetSizeOverflow) {
   ASSERT_TRUE(fd.is_valid());
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, LARGE_NUMBER_OF_PAGES), SyscallSucceeds());
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -146,14 +149,15 @@ TEST_F(AshmemTest, SetSizeMisaligned) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE + 1), SyscallSucceeds());
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_SIZE), SyscallSucceedsWithValue((int)PAGE_SIZE + 1));
 
-  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 2 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_WRITE, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
   // This will not segfault because size rounds up to two pages despite reporting PAGE_SIZE + 1
-  for (size_t i = 0; i < 2 * PAGE_SIZE; i++) {
+  for (size_t i = 0; i < kMapSize; i++) {
     reinterpret_cast<volatile uint8_t *>(addr)[i] = 0;
   }
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -162,12 +166,13 @@ TEST_F(AshmemTest, NoChangeSizeAfterMap) {
   auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallSucceeds());
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, 3 * PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -175,9 +180,10 @@ TEST_F(AshmemTest, NoChangeSizeAfterMunmap) {
   auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallSucceeds());
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, 3 * PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
@@ -190,11 +196,12 @@ TEST_F(AshmemTest, MapOutOfBounds) {
   auto fd = CreateRegion(nullptr, 3 * PAGE_SIZE);
 
   // Fill up data
-  void *addr = mmap(nullptr, 3 * PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0);
-  for (size_t i = 0; i < 3 * PAGE_SIZE / sizeof(int); i++) {
+  const size_t kMapSize = 3 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  for (size_t i = 0; i < kMapSize / sizeof(int); i++) {
     ((int *)addr)[i] = (int)i;
   }
-  ASSERT_THAT(munmap(addr, 3 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
   // Too big
   // Ashmem region:     [    3 pages    ]
@@ -222,7 +229,7 @@ TEST_F(AshmemTest, MapOutOfBounds) {
     ASSERT_EQ(val, ((int *)addr)[i]);
   }
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -232,14 +239,15 @@ TEST_F(AshmemTest, NoChangeNameAfterMap) {
   char buf[256];
   auto fd = CreateRegion(name, PAGE_SIZE);
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_NAME, "goodbye"), SyscallFailsWithErrno(EINVAL));
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_GET_NAME, buf), SyscallSucceeds());
   EXPECT_STREQ("hello world!", buf);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -248,9 +256,10 @@ TEST_F(AshmemTest, NoChangeNameAfterMunmap) {
   char buf[256];
   auto fd = CreateRegion(name, PAGE_SIZE);
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_NAME, "goodbye"), SyscallFailsWithErrno(EINVAL));
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_GET_NAME, buf), SyscallSucceeds());
@@ -263,11 +272,12 @@ TEST_F(AshmemTest, NoChangeNameAfterMunmap) {
 TEST_F(AshmemTest, NoSetNameAfterMap) {
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_NAME, "test"), SyscallFailsWithErrno(EINVAL));
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -313,12 +323,13 @@ TEST_F(AshmemTest, DecreaseProtections) {
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallSucceeds());
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_READ | PROT_WRITE), SyscallSucceeds());
 
-  void *addr_rw = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr_rw = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr_rw != MAP_FAILED && addr_rw != nullptr);
 
   // Decrease protections
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_READ), SyscallSucceeds());
-  void *addr_r = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  void *addr_r = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr_r != MAP_FAILED && addr_r != nullptr);
 
   // Not retroactive; we can still write through addr_rw
@@ -327,33 +338,34 @@ TEST_F(AshmemTest, DecreaseProtections) {
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_GET_PROT_MASK), SyscallSucceedsWithValue(PROT_READ));
 
-  ASSERT_THAT(munmap(addr_rw, PAGE_SIZE), SyscallSucceeds());
-  ASSERT_THAT(munmap(addr_r, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_rw, kMapSize), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_r, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
 // Mapping with protections not allowed by the region will fail
 TEST_F(AshmemTest, MapProtectionsAgree) {
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  const size_t kMapSize = PAGE_SIZE;
 
   // PROT_READ | PROT_WRITE
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_READ | PROT_WRITE), SyscallSucceeds());
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
-  addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
-  addr = mmap(nullptr, PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  addr = mmap(nullptr, kMapSize, PROT_WRITE, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
   // PROT_READ
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_READ), SyscallSucceeds());
 
-  addr = mmap(nullptr, PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  addr = mmap(nullptr, kMapSize, PROT_WRITE, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr == MAP_FAILED && errno == EINVAL);
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
@@ -372,11 +384,12 @@ TEST_F(AshmemTest, MalformedProtections) {
 
 TEST_F(AshmemTest, MapPrivate) {
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  const size_t kMapSize = PAGE_SIZE;
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd.get(), 0);
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd.get(), 0);
   EXPECT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -396,11 +409,12 @@ TEST_F(AshmemTest, NoFileOpBeforeMap) {
 TEST_F(AshmemTest, WriteFileOp) {
   char in[] = "hello world!";
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(write(fd.get(), in, sizeof(in)), SyscallFailsWithErrno(EINVAL));
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -409,8 +423,9 @@ TEST_F(AshmemTest, ReadFileOp) {
   char in[] = "hello world!";
   char out[256] = {0};
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  const size_t kMapSize = PAGE_SIZE;
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   strcpy((char *)addr, in);
@@ -418,7 +433,7 @@ TEST_F(AshmemTest, ReadFileOp) {
   EXPECT_THAT(read(fd.get(), out, sizeof(in)), SyscallSucceedsWithValue(sizeof(in)));
   EXPECT_STREQ(out, in);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -427,7 +442,8 @@ TEST_F(AshmemTest, ReadFileOp) {
 TEST_F(AshmemTest, LseekFileOp) {
   auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
 
-  void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 4 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   uint8_t *data = (uint8_t *)addr;
 
   // Initialize ashmem
@@ -446,7 +462,7 @@ TEST_F(AshmemTest, LseekFileOp) {
   EXPECT_THAT(lseek(fd.get(), -(int)PAGE_SIZE, SEEK_CUR),
               SyscallSucceedsWithValue(3 * PAGE_SIZE - 99));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -459,7 +475,8 @@ TEST_F(AshmemTest, ReadFileOpProt) {
   int status = ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_WRITE | PROT_EXEC);
   ASSERT_EQ(0, status);
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   strcpy((char *)addr, in);
@@ -467,7 +484,7 @@ TEST_F(AshmemTest, ReadFileOpProt) {
   EXPECT_THAT(read(fd.get(), out, sizeof(in)), SyscallSucceedsWithValue(sizeof(in)));
   EXPECT_STREQ(out, in);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -479,9 +496,10 @@ TEST_F(AshmemTest, FileOffsetLocal) {
   auto fd_1 = CreateRegion(nullptr, PAGE_SIZE);
   auto fd_2 = CreateRegion(nullptr, PAGE_SIZE);
 
-  void *addr_1 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_1.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr_1 = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd_1.get(), 0);
   ASSERT_TRUE(addr_1 != MAP_FAILED && addr_1 != nullptr);
-  void *addr_2 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_2.get(), 0);
+  void *addr_2 = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd_2.get(), 0);
   ASSERT_TRUE(addr_2 != MAP_FAILED && addr_2 != nullptr);
 
   strcpy((char *)addr_1, in);
@@ -500,8 +518,8 @@ TEST_F(AshmemTest, FileOffsetLocal) {
   EXPECT_STREQ(out_1, "world");
   EXPECT_STREQ(out_2, "hello");
 
-  ASSERT_THAT(munmap(addr_1, PAGE_SIZE), SyscallSucceeds());
-  ASSERT_THAT(munmap(addr_2, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_1, kMapSize), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_2, kMapSize), SyscallSucceeds());
 
   ASSERT_THAT(close(fd_1.get()), SyscallSucceeds());
   ASSERT_THAT(close(fd_2.get()), SyscallSucceeds());
@@ -512,13 +530,14 @@ TEST_F(AshmemTest, StSizeAlwaysZero) {
   struct stat st;
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(fstat(fd.get(), &st), SyscallSucceeds());
   EXPECT_EQ(0, st.st_size);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -531,13 +550,14 @@ TEST_F(AshmemTest, NoPinBeforeMap) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallFailsWithErrno(EINVAL));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin), SyscallFailsWithErrno(EINVAL));
 
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -545,9 +565,10 @@ TEST_F(AshmemTest, NoPinBeforeMap) {
 TEST_F(AshmemTest, PinAfterMunmap) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -562,13 +583,14 @@ TEST_F(AshmemTest, DefaultPin) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin),
               SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -580,7 +602,8 @@ TEST_F(AshmemTest, BasicPinBehavior) {
   ashmem_pin pin_middle = {.offset = PAGE_SIZE, .len = 2 * PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
-  void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 4 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
@@ -595,7 +618,7 @@ TEST_F(AshmemTest, BasicPinBehavior) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_right),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
-  ASSERT_THAT(munmap(addr, 4 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -605,7 +628,8 @@ TEST_F(AshmemTest, NoPinOutOfBounds) {
   ashmem_pin pin_overflow = {.offset = 0, .len = 2 * PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_out_of_bounds), SyscallFailsWithErrno(EINVAL));
@@ -617,7 +641,7 @@ TEST_F(AshmemTest, NoPinOutOfBounds) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_overflow), SyscallFailsWithErrno(EINVAL));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_overflow), SyscallFailsWithErrno(EINVAL));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -626,14 +650,15 @@ TEST_F(AshmemTest, NoPinMisaligned) {
   ashmem_pin pin = {.offset = 1, .len = PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
-  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 2 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallFailsWithErrno(EINVAL));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallFailsWithErrno(EINVAL));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin), SyscallFailsWithErrno(EINVAL));
 
-  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -708,7 +733,8 @@ TEST_F(AshmemTest, MessyPinning) {
   };
 
   auto fd = CreateRegion(nullptr, 25 * PAGE_SIZE);
-  void *addr = mmap(nullptr, 25 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 25 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   // Apply pins and unpins
@@ -723,7 +749,7 @@ TEST_F(AshmemTest, MessyPinning) {
                 SyscallSucceedsWithValue(operation.expected));
   }
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -733,7 +759,8 @@ TEST_F(AshmemTest, PinStatusOverlap) {
   ashmem_pin pin_total = {.offset = 0, .len = 2 * PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
-  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 2 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
@@ -741,7 +768,7 @@ TEST_F(AshmemTest, PinStatusOverlap) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_total),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
-  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -750,7 +777,8 @@ TEST_F(AshmemTest, PinUnsignedOverflow) {
   ashmem_pin pin = {.offset = 2 * PAGE_SIZE, .len = (uint32_t)1048575 * PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
-  void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = 4 * PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   int status = ioctl(fd.get(), ASHMEM_PIN, pin);
@@ -763,7 +791,7 @@ TEST_F(AshmemTest, PinUnsignedOverflow) {
   EXPECT_EQ(-1, status);
   EXPECT_EQ(EFAULT, errno);
 
-  ASSERT_THAT(munmap(addr, 4 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -778,7 +806,8 @@ TEST_F(AshmemTest, NoPurgeBeforeMap) {
 TEST_F(AshmemTest, Purge) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -786,15 +815,16 @@ TEST_F(AshmemTest, Purge) {
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
 // Purge when no intervals are unpinned
 TEST_F(AshmemTest, PinAndPurge) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+  const size_t kMapSize = PAGE_SIZE;
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
@@ -802,7 +832,7 @@ TEST_F(AshmemTest, PinAndPurge) {
               SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -810,7 +840,8 @@ TEST_F(AshmemTest, PinAndPurge) {
 TEST_F(AshmemTest, PugeAndUnpin) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -818,7 +849,7 @@ TEST_F(AshmemTest, PugeAndUnpin) {
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -826,7 +857,8 @@ TEST_F(AshmemTest, PugeAndUnpin) {
 TEST_F(AshmemTest, PurgeTwice) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -837,7 +869,7 @@ TEST_F(AshmemTest, PurgeTwice) {
               SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -848,7 +880,8 @@ TEST_F(AshmemTest, PurgeOverlap) {
   ashmem_pin pin_total = {.offset = 0, .len = 2 * PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
-  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
@@ -860,7 +893,7 @@ TEST_F(AshmemTest, PurgeOverlap) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_total), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_left), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
 
-  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -870,7 +903,8 @@ TEST_F(AshmemTest, PurgeIsZeroed) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
   char *out = (char *)addr;
 
@@ -889,7 +923,7 @@ TEST_F(AshmemTest, PurgeIsZeroed) {
     EXPECT_EQ('\0', out[i]);
   }
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -898,7 +932,8 @@ TEST_F(AshmemTest, IgnoreGetterInput) {
   ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_WRITE), SyscallSucceeds());
@@ -918,7 +953,7 @@ TEST_F(AshmemTest, IgnoreGetterInput) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, "hello"),
               SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -926,22 +961,23 @@ TEST_F(AshmemTest, IgnoreGetterInput) {
 TEST_F(AshmemTest, Fork) {
   char input[] = "hello world!";
   auto fd = CreateRegion(nullptr, PAGE_SIZE);
-  void *parent_map = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *parent_map = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(parent_map != MAP_FAILED && parent_map != nullptr);
 
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
-    void *child_map = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+    void *child_map = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
     ASSERT_TRUE(child_map != MAP_FAILED && child_map != nullptr);
     char *shared_msg = (char *)child_map;
     strcpy(shared_msg, input);
     shared_msg[sizeof(input)] = '\0';
-    ASSERT_THAT(munmap(child_map, PAGE_SIZE), SyscallSucceeds());
+    ASSERT_THAT(munmap(child_map, kMapSize), SyscallSucceeds());
   });
 
   ASSERT_TRUE(helper.WaitForChildren());
   EXPECT_STREQ((char *)parent_map, input);
-  ASSERT_THAT(munmap(parent_map, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(parent_map, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -954,9 +990,10 @@ TEST_F(AshmemTest, ForkSetSize) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
     ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, 2 * PAGE_SIZE), SyscallSucceeds());
-    void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+    const size_t kMapSize = 2 * PAGE_SIZE;
+    void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
     ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
-    ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+    ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   });
 
   ASSERT_TRUE(helper.WaitForChildren());
@@ -970,7 +1007,8 @@ TEST_F(AshmemTest, ForkPurge) {
   ashmem_pin pin_right = {.offset = PAGE_SIZE, .len = PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
-  void *parent_map = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *parent_map = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(parent_map != MAP_FAILED && parent_map != nullptr);
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -984,16 +1022,17 @@ TEST_F(AshmemTest, ForkPurge) {
   ASSERT_TRUE(helper.WaitForChildren());
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_left), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_right), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
-  ASSERT_THAT(munmap(parent_map, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(parent_map, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
 // Fork, child reduces permissions, parent is affected
 TEST_F(AshmemTest, ForkProt) {
   auto fd = CreateRegion(0, PAGE_SIZE);
-  void *addr_rw = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr_rw = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr_rw != MAP_FAILED && addr_rw != nullptr);
-  ASSERT_THAT(munmap(addr_rw, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_rw, kMapSize), SyscallSucceeds());
 
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess(
@@ -1006,9 +1045,9 @@ TEST_F(AshmemTest, ForkProt) {
   EXPECT_TRUE(addr_rw == MAP_FAILED);
 
   // Reduced prot map succeeds
-  void *addr_r = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  void *addr_r = mmap(nullptr, kMapSize, PROT_READ, MAP_SHARED, fd.get(), 0);
   EXPECT_TRUE(addr_r != MAP_FAILED && addr_r != nullptr);
-  ASSERT_THAT(munmap(addr_r, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_r, kMapSize), SyscallSucceeds());
 
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
@@ -1018,7 +1057,8 @@ TEST_F(AshmemTest, ForkLseek) {
   char in[] = "hello world";
   char out[256] = {0};
   auto fd = CreateRegion(0, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   strcpy((char *)addr, in);
@@ -1031,7 +1071,7 @@ TEST_F(AshmemTest, ForkLseek) {
 
   EXPECT_STREQ("world", out);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -1040,7 +1080,8 @@ TEST_F(AshmemTest, ForkRead) {
   char in[] = "hello world";
   char out[256] = {0};
   auto fd = CreateRegion(0, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   test_helper::ForkHelper helper;
@@ -1051,19 +1092,20 @@ TEST_F(AshmemTest, ForkRead) {
 
   EXPECT_STREQ("hello", out);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
 // Ashmem regions are backed by independent VMOs
 TEST_F(AshmemTest, DistinctAshmemVMO) {
   auto fd_1 = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr_1 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_1.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr_1 = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd_1.get(), 0);
   ASSERT_TRUE(addr_1 != MAP_FAILED && addr_1 != nullptr);
   int *data_1 = (int *)addr_1;
 
   auto fd_2 = CreateRegion(nullptr, PAGE_SIZE);
-  void *addr_2 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_2.get(), 0);
+  void *addr_2 = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd_2.get(), 0);
   ASSERT_TRUE(addr_2 != MAP_FAILED && addr_1 != nullptr);
   int *data_2 = (int *)addr_2;
 
@@ -1073,8 +1115,8 @@ TEST_F(AshmemTest, DistinctAshmemVMO) {
   EXPECT_EQ(1, *data_1);
   EXPECT_EQ(2, *data_2);
 
-  ASSERT_THAT(munmap(addr_1, PAGE_SIZE), SyscallSucceeds());
-  ASSERT_THAT(munmap(addr_2, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_1, kMapSize), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_2, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd_1.get()), SyscallSucceeds());
   ASSERT_THAT(close(fd_2.get()), SyscallSucceeds());
 }
@@ -1124,7 +1166,8 @@ TEST_F(AshmemTest, MalformedFileIDs) {
 TEST_F(AshmemTest, ProcMaps) {
   char name[] = "hello";
   auto fd = CreateRegion(name, PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  const size_t kMapSize = PAGE_SIZE;
+  void *addr = mmap(nullptr, kMapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
   std::ifstream proc_maps("/proc/self/maps", std::ios::in);
   ASSERT_TRUE(proc_maps.good());
@@ -1141,7 +1184,7 @@ TEST_F(AshmemTest, ProcMaps) {
 
   EXPECT_TRUE(has_ashmap);
 
-  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
   proc_maps.close();
 }

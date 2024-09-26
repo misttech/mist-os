@@ -26,6 +26,6 @@ where
     fn arbitrary_from_bytes(u: &mut Unstructured<'a>) -> Result<Self> {
         let mut bytes = vec![0u8; std::mem::size_of::<A>()];
         u.fill_buffer(&mut bytes)?;
-        Ok(Self::read_from(&*bytes).unwrap())
+        Ok(Self::read_from_bytes(&*bytes).unwrap())
     }
 }

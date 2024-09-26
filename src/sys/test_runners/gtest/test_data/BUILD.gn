@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 # We don't have gunit in-tree, so this main function will replace all gunit
 # flags with gtest flags and run the tests using gtest framework.
@@ -19,7 +20,7 @@ source_set("gunit_main") {
   public_deps = [ "//third_party/googletest:gtest" ]
 }
 
-executable("echo_gtest_client") {
+cc_test_executable("echo_gtest_client") {
   testonly = true
   sources = [ "echo_test.cc" ]
 
@@ -46,7 +47,7 @@ template("executable_gtest_gunit") {
   gtest_target = "gtest_${target_name}"
   gunit_target = "gunit_${target_name}"
 
-  executable(gtest_target) {
+  cc_test_executable(gtest_target) {
     forward_variables_from(invoker, "*")
 
     if (!defined(deps)) {
@@ -65,7 +66,7 @@ template("executable_gtest_gunit") {
   }
 }
 
-executable("death_gtest") {
+cc_test_executable("death_gtest") {
   testonly = true
   sources = [ "death_test.cc" ]
 
@@ -110,14 +111,14 @@ fuchsia_component("gtest_runner_sample_tests_component") {
   deps = [ ":gtest_runner_sample_tests" ]
 }
 
-executable("gtest_runner_test_with_custom_args") {
+cc_test_executable("gtest_runner_test_with_custom_args") {
   testonly = true
   sources = [ "gtest_with_custom_args.cc" ]
 
   deps = [ "//src/lib/testing/loop_fixture" ]
 }
 
-executable("gunit_runner_test_with_custom_args") {
+cc_test_executable("gunit_runner_test_with_custom_args") {
   testonly = true
   sources = [ "gunit_with_custom_args.cc" ]
 
@@ -157,7 +158,7 @@ fuchsia_component("huge_gtest_component") {
   deps = [ ":gtest_huge_runner_example" ]
 }
 
-executable("concurrency_test_driver_gtest") {
+cc_test_executable("concurrency_test_driver_gtest") {
   testonly = true
   sources = [ "concurrency_test_driver.cc" ]
 

@@ -6,7 +6,6 @@ import("//build/fidl/fidl.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
 fidl("fuchsia.memory.attribution") {
-  sdk_category = "public"
   sources = [ "attribution.fidl" ]
   sdk_area = "Diagnostics"
 

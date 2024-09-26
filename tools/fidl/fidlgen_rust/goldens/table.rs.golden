@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -166,6 +162,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for EmptyTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for EmptyTable {
         type Owned = Self;
 
@@ -179,19 +182,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for EmptyTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<EmptyTable> for &EmptyTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<EmptyTable, D>
+        for &EmptyTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -215,7 +212,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for EmptyTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for EmptyTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -223,7 +220,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -263,6 +260,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ExtensionTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ExtensionTable {
         type Owned = Self;
 
@@ -276,19 +280,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ExtensionTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ExtensionTable> for &ExtensionTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ExtensionTable, D>
+        for &ExtensionTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -312,7 +310,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ExtensionTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ExtensionTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -320,7 +318,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -369,6 +367,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for NewerSimpleTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for NewerSimpleTable {
         type Owned = Self;
 
@@ -382,19 +387,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for NewerSimpleTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<NewerSimpleTable> for &NewerSimpleTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<NewerSimpleTable, D>
+        for &NewerSimpleTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -428,7 +427,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.x.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -451,7 +450,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.y.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -474,7 +473,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.z.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -487,7 +486,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for NewerSimpleTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for NewerSimpleTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -495,7 +494,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -547,8 +546,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -590,8 +589,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.y.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.y.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -633,8 +632,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.z.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.z.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -667,6 +666,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for OlderSimpleTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for OlderSimpleTable {
         type Owned = Self;
 
@@ -680,19 +686,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for OlderSimpleTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<OlderSimpleTable> for &OlderSimpleTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<OlderSimpleTable, D>
+        for &OlderSimpleTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -726,7 +726,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.x.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -739,7 +739,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for OlderSimpleTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for OlderSimpleTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -747,7 +747,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -799,8 +799,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -839,6 +839,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for ReverseOrdinalTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for ReverseOrdinalTable {
         type Owned = Self;
 
@@ -852,19 +859,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for ReverseOrdinalTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<ReverseOrdinalTable> for &ReverseOrdinalTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<ReverseOrdinalTable, D>
+        for &ReverseOrdinalTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -898,7 +899,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.z.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -921,7 +922,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.y.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -944,7 +945,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.x.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -957,7 +958,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for ReverseOrdinalTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for ReverseOrdinalTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -965,7 +966,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1017,8 +1018,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.z.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.z.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -1060,8 +1061,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.y.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.y.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -1103,8 +1104,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -1140,6 +1141,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for SimpleTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for SimpleTable {
         type Owned = Self;
 
@@ -1153,19 +1161,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for SimpleTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<SimpleTable> for &SimpleTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<SimpleTable, D>
+        for &SimpleTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1199,7 +1201,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.x.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1222,7 +1224,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.y.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1235,7 +1237,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for SimpleTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for SimpleTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -1243,7 +1245,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1295,8 +1297,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -1338,8 +1340,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.y.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.y.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -1561,6 +1563,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for SixtyFourOrdinalTable {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for SixtyFourOrdinalTable {
         type Owned = Self;
 
@@ -1574,19 +1583,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for SixtyFourOrdinalTable {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<SixtyFourOrdinalTable> for &SixtyFourOrdinalTable {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<SixtyFourOrdinalTable, D>
+        for &SixtyFourOrdinalTable
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -1620,7 +1623,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v1.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1643,7 +1646,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v2.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1666,7 +1669,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v3.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1689,7 +1692,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v4.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1712,7 +1715,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v5.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1735,7 +1738,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v6.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1758,7 +1761,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v7.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1781,7 +1784,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v8.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1804,7 +1807,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v9.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1827,7 +1830,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v10.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1850,7 +1853,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v11.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1873,7 +1876,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v12.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1896,7 +1899,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v13.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1919,7 +1922,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v14.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1942,7 +1945,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v15.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1965,7 +1968,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v16.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -1988,7 +1991,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v17.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2011,7 +2014,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v18.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2034,7 +2037,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v19.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2057,7 +2060,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v20.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2080,7 +2083,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v21.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2103,7 +2106,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v22.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2126,7 +2129,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v23.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2149,7 +2152,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v24.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2172,7 +2175,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v25.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2195,7 +2198,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v26.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2218,7 +2221,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v27.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2241,7 +2244,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v28.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2264,7 +2267,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v29.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2287,7 +2290,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v30.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2310,7 +2313,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v31.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2333,7 +2336,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v32.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2356,7 +2359,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v33.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2379,7 +2382,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v34.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2402,7 +2405,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v35.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2425,7 +2428,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v36.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2448,7 +2451,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v37.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2471,7 +2474,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v38.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2494,7 +2497,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v39.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2517,7 +2520,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v40.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2540,7 +2543,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v41.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2563,7 +2566,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v42.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2586,7 +2589,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v43.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2609,7 +2612,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v44.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2632,7 +2635,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v45.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2655,7 +2658,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v46.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2678,7 +2681,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v47.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2701,7 +2704,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v48.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2724,7 +2727,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v49.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2747,7 +2750,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v50.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2770,7 +2773,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v51.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2793,7 +2796,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v52.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2816,7 +2819,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v53.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2839,7 +2842,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v54.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2862,7 +2865,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v55.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2885,7 +2888,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v56.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2908,7 +2911,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v57.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2931,7 +2934,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v58.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2954,7 +2957,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v59.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -2977,7 +2980,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v60.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3000,7 +3003,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v61.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3023,7 +3026,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v62.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3046,7 +3049,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.v63.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3069,7 +3072,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<ExtensionTable>(
+            fidl::encoding::encode_in_envelope_optional::<ExtensionTable, D>(
                 self.v64.as_ref().map(<ExtensionTable as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -3082,7 +3085,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for SixtyFourOrdinalTable {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for SixtyFourOrdinalTable {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -3090,7 +3093,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -3142,8 +3145,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v1.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v1.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3185,8 +3188,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v2.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v2.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3228,8 +3231,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v3.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v3.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3271,8 +3274,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v4.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v4.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3314,8 +3317,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v5.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v5.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3357,8 +3360,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v6.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v6.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3400,8 +3403,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v7.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v7.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3443,8 +3446,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v8.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v8.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3486,8 +3489,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v9.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v9.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3529,8 +3532,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v10.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v10.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3572,8 +3575,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v11.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v11.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3615,8 +3618,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v12.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v12.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3658,8 +3661,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v13.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v13.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3701,8 +3704,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v14.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v14.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3744,8 +3747,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v15.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v15.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3787,8 +3790,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v16.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v16.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3830,8 +3833,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v17.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v17.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3873,8 +3876,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v18.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v18.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3916,8 +3919,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v19.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v19.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -3959,8 +3962,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v20.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v20.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4002,8 +4005,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v21.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v21.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4045,8 +4048,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v22.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v22.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4088,8 +4091,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v23.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v23.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4131,8 +4134,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v24.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v24.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4174,8 +4177,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v25.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v25.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4217,8 +4220,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v26.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v26.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4260,8 +4263,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v27.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v27.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4303,8 +4306,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v28.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v28.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4346,8 +4349,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v29.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v29.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4389,8 +4392,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v30.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v30.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4432,8 +4435,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v31.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v31.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4475,8 +4478,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v32.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v32.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4518,8 +4521,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v33.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v33.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4561,8 +4564,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v34.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v34.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4604,8 +4607,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v35.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v35.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4647,8 +4650,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v36.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v36.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4690,8 +4693,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v37.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v37.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4733,8 +4736,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v38.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v38.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4776,8 +4779,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v39.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v39.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4819,8 +4822,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v40.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v40.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4862,8 +4865,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v41.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v41.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4905,8 +4908,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v42.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v42.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4948,8 +4951,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v43.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v43.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -4991,8 +4994,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v44.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v44.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5034,8 +5037,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v45.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v45.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5077,8 +5080,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v46.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v46.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5120,8 +5123,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v47.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v47.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5163,8 +5166,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v48.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v48.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5206,8 +5209,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v49.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v49.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5249,8 +5252,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v50.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v50.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5292,8 +5295,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v51.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v51.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5335,8 +5338,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v52.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v52.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5378,8 +5381,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v53.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v53.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5421,8 +5424,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v54.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v54.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5464,8 +5467,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v55.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v55.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5507,8 +5510,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v56.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v56.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5550,8 +5553,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v57.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v57.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5593,8 +5596,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v58.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v58.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5636,8 +5639,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v59.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v59.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5679,8 +5682,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v60.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v60.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5722,8 +5725,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v61.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v61.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5765,8 +5768,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v62.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v62.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5808,8 +5811,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v63.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v63.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5851,8 +5854,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.v64.get_or_insert_with(|| fidl::new_empty!(ExtensionTable));
-                fidl::decode!(ExtensionTable, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.v64.get_or_insert_with(|| fidl::new_empty!(ExtensionTable, D));
+                fidl::decode!(ExtensionTable, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -5885,6 +5888,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for TableWithAttributes {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for TableWithAttributes {
         type Owned = Self;
 
@@ -5898,19 +5908,13 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for TableWithAttributes {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<TableWithAttributes> for &TableWithAttributes {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<TableWithAttributes, D>
+        for &TableWithAttributes
+    {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -5944,7 +5948,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i64>(
+            fidl::encoding::encode_in_envelope_optional::<i64, D>(
                 self.x.as_ref().map(<i64 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -5957,7 +5961,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for TableWithAttributes {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for TableWithAttributes {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -5965,7 +5969,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -6017,8 +6021,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64));
-                fidl::decode!(i64, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.x.get_or_insert_with(|| fidl::new_empty!(i64, D));
+                fidl::decode!(i64, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);

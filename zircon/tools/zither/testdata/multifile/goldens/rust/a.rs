@@ -7,10 +7,10 @@
 
 #![allow(unused_imports)]
 
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 #[repr(u32)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, IntoBytes, PartialEq)]
 pub enum A {
     Member = 0,
 }

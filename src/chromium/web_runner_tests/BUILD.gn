@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 import("//src/chromium/web_runner_tests/generate_web_runner_tests.gni")
 
@@ -37,7 +38,7 @@ source_set("mock_server") {
   ]
 }
 
-executable("web_runner_integration_tests_bin") {
+cc_test_executable("web_runner_integration_tests_bin") {
   testonly = true
 
   sources = [ "web_runner_integration_tests.cc" ]

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 
 /// Struct used to count remaining time BSS has not been detected. Used to determine
 /// when trigger auto deauth.
@@ -28,12 +28,12 @@ impl LostBssCounter {
         Self {
             beacon_period: beacon_period.clone(),
             full_timeout: beacon_period * full_timeout_beacon_count as i64,
-            time_since_last_beacon: 0.nanos(),
+            time_since_last_beacon: zx::Duration::from_nanos(0),
         }
     }
 
     pub fn reset(&mut self) {
-        self.time_since_last_beacon = 0.nanos();
+        self.time_since_last_beacon = zx::Duration::from_nanos(0);
     }
 
     /// In the most typical use case, a full association status check interval is added when
@@ -96,10 +96,10 @@ mod tests {
     fn test_add_time_uninterrupted() {
         let mut counter = LostBssCounter::start(TEST_BEACON_PERIOD, TEST_TIMEOUT_BCN_COUNT);
         // about to timeout but not yet.
-        counter.add_time(TEST_BEACON_PERIOD * TEST_TIMEOUT_BCN_COUNT - 1.nanos());
+        counter.add_time(TEST_BEACON_PERIOD * TEST_TIMEOUT_BCN_COUNT - zx::Duration::from_nanos(1));
         assert!(!counter.should_deauthenticate());
         // any more time will trigger auto deauth
-        counter.add_time(1.nanos());
+        counter.add_time(zx::Duration::from_nanos(1));
         assert!(counter.should_deauthenticate());
     }
 

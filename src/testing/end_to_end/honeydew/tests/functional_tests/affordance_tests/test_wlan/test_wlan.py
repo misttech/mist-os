@@ -12,6 +12,7 @@ from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, signals, test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing.netstack import InterfaceProperties
 from honeydew.typing.wlan import (
     ClientStatusConnected,
     ClientStatusConnecting,
@@ -21,6 +22,11 @@ from honeydew.typing.wlan import (
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# Time to wait for a WLAN interface to become available.
+WLAN_INTERFACE_TIMEOUT = 60
+
+# Time to wait for country code change to take effect.
 TIME_TO_WAIT_FOR_COUNTRY_CODE = 10
 
 
@@ -37,15 +43,28 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-        self.access_points: list[
+        access_points: list[
             access_point.AccessPoint
-        ] = self.register_controller(access_point)
+        ] | None = self.register_controller(
+            access_point, required=False, min_number=0
+        )
 
-        if len(self.access_points) < 1:
-            raise signals.TestAbortClass(
-                "At least one access point is required"
-            )
-        self.access_point: access_point.AccessPoint = self.access_points[0]
+        self.access_point: access_point.AccessPoint | None = (
+            access_points[0] if access_points else None
+        )
+
+        # Wait for a WLAN interface to become available.
+        interfaces: list[InterfaceProperties] = []
+        end_time = time.time() + WLAN_INTERFACE_TIMEOUT
+        while time.time() < end_time:
+            interfaces = self.device.netstack.list_interfaces()
+            for interface in interfaces:
+                if "wlan" in interface.name:
+                    return
+            time.sleep(1)  # Prevent denial-of-service
+        asserts.abort_class(
+            f"Expected presence of a WLAN interface, got {interfaces}"
+        )
 
     def test_iface_methods(self) -> None:
         """Test case for device wlan iface methods.
@@ -129,6 +148,9 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan.disconnect()
             * wlan.status()
         """
+        if not self.access_point:
+            raise signals.TestSkip("Access point required for this test")
+
         test_ssid = "test"
         access_point.setup_ap(
             access_point=self.access_point,

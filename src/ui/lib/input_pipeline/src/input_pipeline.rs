@@ -24,7 +24,12 @@ use std::sync::{Arc, LazyLock};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Use a self incremental u32 unique id for device_id.
-static NEXT_DEVICE_ID: LazyLock<AtomicU32> = LazyLock::new(|| AtomicU32::new(1));
+///
+/// device id start from 10 to avoid conflict with default devices in Starnix.
+/// Currently, Starnix using 0 and 1 as default devices' id. Starnix need to
+/// use default devices to deliver events from physical devices until we have
+/// API to expose device changes to UI clients.
+static NEXT_DEVICE_ID: LazyLock<AtomicU32> = LazyLock::new(|| AtomicU32::new(10));
 
 /// Each time this function is invoked, it returns the current value of its
 /// internal counter (serving as a unique id for device_id) and then increments
@@ -1036,7 +1041,7 @@ mod tests {
         // Assert that one mouse device with accurate device id was found.
         let bindings_hashmap = bindings.lock().await;
         assert_eq!(bindings_hashmap.len(), 1);
-        let bindings_vector = bindings_hashmap.get(&1);
+        let bindings_vector = bindings_hashmap.get(&10);
         assert!(bindings_vector.is_some());
         assert_eq!(bindings_vector.unwrap().len(), 1);
         let boxed_mouse_binding = bindings_vector.unwrap().get(0);
@@ -1044,7 +1049,7 @@ mod tests {
         assert_eq!(
             boxed_mouse_binding.unwrap().get_device_descriptor(),
             input_device::InputDeviceDescriptor::Mouse(mouse_binding::MouseDeviceDescriptor {
-                device_id: 1,
+                device_id: 10,
                 absolute_x_range: None,
                 absolute_y_range: None,
                 wheel_v_range: None,

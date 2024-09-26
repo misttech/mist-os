@@ -36,6 +36,8 @@ impl AsRef<str> for EventType {
 pub struct Event {
     /// The contents of the event.
     pub payload: EventPayload,
+    // TODO(https://fxbug.dev/357825314): this should be boot time ideally, but the CF API returns
+    // Monotonic atm.
     pub timestamp: zx::MonotonicTime,
 }
 
@@ -85,10 +87,10 @@ impl std::fmt::Debug for LogSinkRequestedPayload {
 #[derive(Debug, ValidFidlTable)]
 #[fidl_table_src(fcomponent::EventHeader)]
 pub struct ValidatedEventHeader {
-    pub event_type: fcomponent::EventType,
-    pub component_url: String,
-    pub moniker: String,
-    pub timestamp: i64,
+    event_type: fcomponent::EventType,
+    component_url: String,
+    moniker: String,
+    timestamp: i64,
 }
 
 #[derive(Debug, ValidFidlTable)]

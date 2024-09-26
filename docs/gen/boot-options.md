@@ -925,7 +925,7 @@ The option allows a notice to be printed when the root job is either terminated,
 
 **Default:** `false`
 
-Tells the kernel to start its own shell on the kernel console instead of a userspace sh.
+Tells the kernel to start its own shell on the kernel console instead of starting userspace.
 
 ### kernel.shell.script=\<string>
 

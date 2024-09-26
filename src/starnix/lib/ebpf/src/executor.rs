@@ -10,7 +10,7 @@ use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 pub fn execute_with_arguments<C: EbpfRunContext>(
     program: &EbpfProgram<C>,

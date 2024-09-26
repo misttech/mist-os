@@ -73,7 +73,7 @@ use std::task::{ready, Context, Poll};
 use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 #[derive(Debug)]
 pub struct GuestInitiated {
@@ -1694,9 +1694,10 @@ mod tests {
             // For each chain, parse and validate the header, and then append the data section to
             // the received_bytes vector for eventual comparison.
             assert_eq!(result.len(), usize::try_from(used_chain.written()).unwrap());
-            let header =
-                VirtioVsockHeader::read_from(&result[..std::mem::size_of::<VirtioVsockHeader>()])
-                    .expect("failed to read header");
+            let header = VirtioVsockHeader::read_from_bytes(
+                &result[..std::mem::size_of::<VirtioVsockHeader>()],
+            )
+            .expect("failed to read header");
 
             assert_eq!(header.src_cid.get(), key.host_cid.into());
             assert_eq!(header.dst_cid.get(), key.guest_cid.into());
@@ -2032,8 +2033,8 @@ mod tests {
         let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len as usize) };
 
         // Only part of the chain was filled due to the allowable guest credit.
-        let header =
-            VirtioVsockHeader::read_from(&slice[..header_size]).expect("failed to read header");
+        let header = VirtioVsockHeader::read_from_bytes(&slice[..header_size])
+            .expect("failed to read header");
         assert_eq!(header.len.get(), 5);
         received_bytes.extend_from_slice(&slice[header_size..]);
 
@@ -2087,8 +2088,8 @@ mod tests {
             used_chain.data_iter().next().expect("there should be one filled descriptor");
         let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len as usize) };
 
-        let header =
-            VirtioVsockHeader::read_from(&slice[..header_size]).expect("failed to read header");
+        let header = VirtioVsockHeader::read_from_bytes(&slice[..header_size])
+            .expect("failed to read header");
         assert_eq!(header.len.get(), 4);
         received_bytes.extend_from_slice(&slice[header_size..]);
 

@@ -4,13 +4,14 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 visibility = [ ":*" ]
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("last_reboot_info_provider_unittest_exe") {
+cc_test_executable("last_reboot_info_provider_unittest_exe") {
   testonly = true
 
   # "last_reboot_info_provider_unittest" is also used by feedback-data.
@@ -29,7 +30,7 @@ executable("last_reboot_info_provider_unittest_exe") {
   ]
 }
 
-executable("reporter_unittest_exe") {
+cc_test_executable("reporter_unittest_exe") {
   testonly = true
 
   sources = [ "reporter_unittest.cc" ]

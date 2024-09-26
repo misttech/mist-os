@@ -249,7 +249,7 @@ mod tests {
     mod stdout {
         use super::*;
         use fuchsia_async::TestExecutor;
-        use fuchsia_zircon::DurationNum;
+        use fuchsia_zircon as zx;
         use pretty_assertions::assert_eq;
         use std::ops::Add;
 
@@ -321,7 +321,7 @@ mod tests {
             assert_eq!(executor.run_until_stalled(&mut timeout_task), Poll::Pending);
             assert_eq!(*output.lock(), b"");
 
-            executor.set_fake_time(executor.now().add(6.seconds()));
+            executor.set_fake_time(executor.now().add(zx::Duration::from_seconds(6)));
             executor.wake_next_timer();
             assert_eq!(executor.run_until_stalled(&mut timeout_task), Poll::Ready(()));
             assert_eq!(*output.lock(), b"message1message2");

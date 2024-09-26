@@ -4,7 +4,7 @@
 
 use core::ops::Deref;
 
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::BufferView;
 
@@ -52,7 +52,7 @@ impl<T> MaybeParsed<T, T> {
     /// is moved into one of the two `MaybeParsed` variants.
     pub fn new_with_min_len(bytes: T, min_len: usize) -> Self
     where
-        T: ByteSlice,
+        T: SplitByteSlice,
     {
         if bytes.len() >= min_len {
             MaybeParsed::Complete(bytes)
@@ -82,7 +82,7 @@ impl<C, I> MaybeParsed<C, I> {
     pub fn take_from_buffer_with<BV: BufferView<I>, F>(buf: &mut BV, n: usize, map: F) -> Self
     where
         F: FnOnce(I) -> C,
-        I: ByteSlice,
+        I: SplitByteSlice,
     {
         if let Some(v) = buf.take_front(n) {
             MaybeParsed::Complete(map(v))
@@ -201,7 +201,7 @@ mod tests {
         #[cfg(test)]
         pub fn take_from_buffer<BV: BufferView<T>>(buff: &mut BV, n: usize) -> Self
         where
-            T: ByteSlice,
+            T: SplitByteSlice,
         {
             if let Some(v) = buff.take_front(n) {
                 MaybeParsed::Complete(v)

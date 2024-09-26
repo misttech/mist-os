@@ -30,7 +30,10 @@ use power_broker_client::{
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
-use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend};
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
+    fidl_fuchsia_power_suspend as fsuspend,
+};
 
 const SUSPEND_FAILURE_RETRY_DELAY: zx::Duration = zx::Duration::from_seconds(1);
 
@@ -214,7 +217,7 @@ impl ExecutionStateManager {
             }
 
             self._inspect_node.borrow_mut().add_entry(|node| {
-                node.record_int("suspended", zx::MonotonicTime::get().into_nanos());
+                node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
             });
             // LINT.IfChange
             tracing::info!("Suspending");
@@ -244,10 +247,10 @@ impl ExecutionStateManager {
                 if let Some(Ok(Ok(SuspendResponse { suspend_duration: Some(duration), .. }))) =
                     response
                 {
-                    node.record_int("resumed", time);
-                    node.record_int("duration", duration);
+                    node.record_int(fobs::SUSPEND_RESUMED_AT, time);
+                    node.record_int(fobs::SUSPEND_LAST_TIMESTAMP, duration);
                 } else {
-                    node.record_int("suspend_failed", time);
+                    node.record_int(fobs::SUSPEND_FAILED_AT, time);
                 }
             });
 
@@ -331,20 +334,20 @@ impl SuspendStatsManager {
             ..Default::default()
         };
 
-        let success_count_node =
-            inspect_node.create_uint("success_count", *stats.success_count.as_ref().unwrap_or(&0));
-        let fail_count_node =
-            inspect_node.create_uint("fail_count", *stats.fail_count.as_ref().unwrap_or(&0));
+        let success_count_node = inspect_node
+            .create_uint(fobs::SUSPEND_SUCCESS_COUNT, *stats.success_count.as_ref().unwrap_or(&0));
+        let fail_count_node = inspect_node
+            .create_uint(fobs::SUSPEND_FAIL_COUNT, *stats.fail_count.as_ref().unwrap_or(&0));
         let last_failed_error_node = inspect_node.create_int(
-            "last_failed_error",
+            fobs::SUSPEND_LAST_FAILED_ERROR,
             (*stats.last_failed_error.as_ref().unwrap_or(&0i32)).into(),
         );
         let last_time_in_suspend_node = inspect_node.create_int(
-            "last_time_in_suspend",
+            fobs::SUSPEND_LAST_TIMESTAMP,
             *stats.last_time_in_suspend.as_ref().unwrap_or(&-1i64),
         );
         let last_time_in_suspend_operations_node = inspect_node.create_int(
-            "last_time_in_suspend_operations",
+            fobs::SUSPEND_LAST_DURATION,
             *stats.last_time_in_suspend_operations.as_ref().unwrap_or(&-1i64),
         );
 
@@ -672,7 +675,8 @@ impl SystemActivityGovernor {
             None
         };
 
-        let suspend_stats = SuspendStatsManager::new(inspect_root.create_child("suspend_stats"));
+        let suspend_stats =
+            SuspendStatsManager::new(inspect_root.create_child(fobs::SUSPEND_STATS_NODE));
         let execution_state_manager = Rc::new(ExecutionStateManager::new(
             execution_state,
             suspender,
@@ -744,7 +748,7 @@ impl SystemActivityGovernor {
 
         fasync::Task::local(async move {
             let unhandled_suspend_failures_node =
-                this.inspect_root.create_uint("unhandled_suspend_failures", 0);
+                this.inspect_root.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
             let mut suspend_result = SuspendResult::Success;
             loop {
                 tracing::debug!("awaiting suspend signals");

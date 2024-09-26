@@ -50,7 +50,7 @@ fit::closure DriverTransportWriteOperation::MakeCallback(zx_status_t status) {
 }  // namespace internal
 
 AmlUart::AmlUart(
-    ddk::PDevFidl pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
+    fdf::PDev pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
     fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
     std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher, bool power_control_enabled,
     std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end,
@@ -306,17 +306,19 @@ zx_status_t AmlUart::Enable(bool enable) {
 
   if (enable && !enabled_) {
     if (power_control_enabled_) {
-      zx_status_t status = pdev_.GetInterrupt(0, ZX_INTERRUPT_WAKE_VECTOR, &irq_);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
-        return status;
+      zx::result irq = pdev_.GetInterrupt(0, ZX_INTERRUPT_WAKE_VECTOR);
+      if (irq.is_error()) {
+        zxlogf(ERROR, "Failed to get pdev: %s", irq.status_string());
+        return irq.status_value();
       }
+      irq_ = std::move(irq.value());
     } else {
-      zx_status_t status = pdev_.GetInterrupt(0, 0, &irq_);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
-        return status;
+      zx::result irq = pdev_.GetInterrupt(0, 0);
+      if (irq.is_error()) {
+        zxlogf(ERROR, "Failed to get pdev: %s", irq.status_string());
+        return irq.status_value();
       }
+      irq_ = std::move(irq.value());
     }
 
     EnableLocked(true);

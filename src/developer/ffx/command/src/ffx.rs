@@ -10,7 +10,7 @@ use camino::Utf8PathBuf;
 use ffx_command_error::bug;
 use ffx_config::environment::ExecutableKind;
 use ffx_config::logging::LogDestination;
-use ffx_config::{EnvironmentContext, FfxConfigBacked};
+use ffx_config::{AssertNoEnvError, EnvironmentContext, FfxConfigBacked};
 use ffx_metrics::{enhanced_analytics, sanitize};
 use ffx_writer::Format;
 use std::collections::HashMap;
@@ -410,6 +410,26 @@ impl Ffx {
 
         // If we're given an isolation setting, use that. Otherwise do a normal detection of the environment.
         match (self, env_vars.get("FFX_ISOLATE_DIR").map(PathBuf::from)) {
+            (Ffx { core: true, .. }, _) => match EnvironmentContext::core(exe_kind, runtime_args) {
+                Ok(env) => Ok(env),
+                // TODO(b/368047122): This is some unfortunately awkward error conversion code that
+                // can't be done inside the config library as implementing
+                // `From<ffx_command::Error>` would create a circular dependency. Ideally the
+                // `ffx_command::Error` struct should just be put into its own micro-crate in order
+                // to deal with this issue.
+                //
+                // The long and short of it is: it's a user error if env variables were found, a
+                // bug if it's anything else.
+                Err(root_error) => match root_error.downcast::<AssertNoEnvError>() {
+                    Ok(anee) => match anee {
+                        u @ AssertNoEnvError::Unexpected(_) => Err(anyhow::Error::from(u).into()),
+                        evf @ AssertNoEnvError::EnvVariablesFound(..) => {
+                            Err(crate::Error::User(evf.into()))
+                        }
+                    },
+                    Err(e) => Err(e.into()),
+                },
+            },
             (Ffx { env_root: Some(domain_root), isolate_dir: Some(isolate_root), .. }, _) => {
                 EnvironmentContext::config_domain_root(
                     exe_kind,

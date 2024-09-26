@@ -13,7 +13,7 @@ use wlan_common::ie::rsn::akm::Akm;
 use wlan_common::ie::rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, GROUP_CIPHER_SUITE, TKIP};
 use wlan_common::ie::rsn::rsne::{RsnCapabilities, Rsne};
 use wlan_common::ie::wpa::WpaIe;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 pub mod esssa;
 #[cfg(test)]
@@ -158,9 +158,9 @@ impl NegotiatedProtection {
 }
 
 /// Wraps an EAPOL key frame to enforces successful decryption before the frame can be used.
-pub struct EncryptedKeyData<B: ByteSlice>(eapol::KeyFrameRx<B>);
+pub struct EncryptedKeyData<B: SplitByteSlice>(eapol::KeyFrameRx<B>);
 
-impl<B: ByteSlice> EncryptedKeyData<B> {
+impl<B: SplitByteSlice> EncryptedKeyData<B> {
     /// Yields a tuple of the captured EAPOL Key frame and its decrypted key data if encryption
     /// was successful. Otherwise, an Error is returned.
     pub fn decrypt(
@@ -179,9 +179,9 @@ impl<B: ByteSlice> EncryptedKeyData<B> {
 
 /// Wraps an EAPOL key frame to enforce successful MIC verification before the frame can be used.
 #[derive(Debug)]
-pub struct WithUnverifiedMic<B: ByteSlice>(eapol::KeyFrameRx<B>);
+pub struct WithUnverifiedMic<B: SplitByteSlice>(eapol::KeyFrameRx<B>);
 
-impl<B: ByteSlice> WithUnverifiedMic<B> {
+impl<B: SplitByteSlice> WithUnverifiedMic<B> {
     /// Yields the captured EAPOL Key frame if the MIC was successfully verified.
     /// The Key frame is wrapped to enforce decryption of potentially encrypted key data.
     /// Returns an Error if the MIC is invalid.
@@ -211,7 +211,7 @@ impl<B: ByteSlice> WithUnverifiedMic<B> {
 
 /// Carries an EAPOL Key frame and requires MIC verification if the MIC bit of the frame's info
 /// field is set.
-pub enum UnverifiedKeyData<B: ByteSlice> {
+pub enum UnverifiedKeyData<B: SplitByteSlice> {
     Encrypted(EncryptedKeyData<B>),
     NotEncrypted(eapol::KeyFrameRx<B>),
 }
@@ -219,12 +219,12 @@ pub enum UnverifiedKeyData<B: ByteSlice> {
 /// EAPOL Key frames carried in this struct comply with IEEE Std 802.11-2016, 12.7.2.
 /// Neither the Key Frame's MIC nor its key data were verified at this point.
 #[derive(Debug)]
-pub enum Dot11VerifiedKeyFrame<B: ByteSlice> {
+pub enum Dot11VerifiedKeyFrame<B: SplitByteSlice> {
     WithUnverifiedMic(WithUnverifiedMic<B>),
     WithoutMic(eapol::KeyFrameRx<B>),
 }
 
-impl<B: ByteSlice> Dot11VerifiedKeyFrame<B> {
+impl<B: SplitByteSlice> Dot11VerifiedKeyFrame<B> {
     // [`key_replay_counter`] is the current value of the Key Replay Counter[1] in either the
     // Supplicant or Authenticator. The Supplicant initializes its Key Replay Counter to 0 and
     // updates the counter to the counter value contained in each valid message from the

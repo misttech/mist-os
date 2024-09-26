@@ -1166,6 +1166,11 @@ impl MessageBuf {
         self.bytes.resize(n_bytes, 0);
     }
 
+    /// Ensure that the allocation for the message's bytes is as small as possible.
+    pub fn shrink_bytes_to_fit(&mut self) {
+        self.bytes.shrink_to_fit();
+    }
+
     /// Get a reference to the bytes of the message buffer, as a `&[u8]` slice.
     pub fn bytes(&self) -> &[u8] {
         self.bytes.as_slice()
@@ -1252,6 +1257,11 @@ impl MessageBufEtc {
             return;
         }
         self.bytes.resize(n_bytes, 0);
+    }
+
+    /// Ensure that the allocation for the message's bytes is as small as possible.
+    pub fn shrink_bytes_to_fit(&mut self) {
+        self.bytes.shrink_to_fit();
     }
 
     /// Get a reference to the bytes of the message buffer, as a `&[u8]` slice.
@@ -1589,6 +1599,41 @@ pub struct HandleDisposition<'a> {
     pub rights: Rights,
     /// Result of attempting to write this handle disposition.
     pub result: Status,
+}
+
+impl<'a> HandleDisposition<'a> {
+    /// Create a new HandleDisposition.
+    pub fn new(
+        handle_op: HandleOp<'a>,
+        object_type: ObjectType,
+        rights: Rights,
+        result: Status,
+    ) -> Self {
+        Self { handle_op, object_type, rights, result }
+    }
+
+    /// Return the raw handle number for this disposition.
+    pub fn raw_handle(&self) -> crate::emulated_handle::zx_handle_t {
+        match &self.handle_op {
+            HandleOp::Move(h) => h.raw_handle(),
+            HandleOp::Duplicate(h) => h.raw_handle(),
+        }
+    }
+
+    /// Take the current handle operation, leaving an invalid handle in its place.
+    pub fn take_op(&mut self) -> HandleOp<'a> {
+        std::mem::replace(&mut self.handle_op, HandleOp::Move(Handle::invalid()))
+    }
+
+    /// Returns whether the handle operation is to move the handle or not.
+    pub fn is_move(&self) -> bool {
+        matches!(&self.handle_op, HandleOp::Move(..))
+    }
+
+    /// Returns whether the handle operation is to duplicate the handle or not.
+    pub fn is_duplicate(&self) -> bool {
+        matches!(&self.handle_op, HandleOp::Duplicate(..))
+    }
 }
 
 /// HandleInfo represents a handle with additional metadata.

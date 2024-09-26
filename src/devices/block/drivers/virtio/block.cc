@@ -10,6 +10,8 @@
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/clock.h>
+#include <lib/zx/time.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,6 +47,10 @@ void BlockDevice::txn_complete(block_txn_t* txn, zx_status_t status) {
   if (txn->pmt != ZX_HANDLE_INVALID) {
     zx_pmt_unpin(txn->pmt);
     txn->pmt = ZX_HANDLE_INVALID;
+  }
+  {
+    std::lock_guard<std::mutex> lock(watchdog_lock_);
+    blk_req_start_timestamps_[txn->req_index] = zx::time::infinite();
   }
   txn->completion_cb(txn->cookie, status, &txn->op);
 }
@@ -90,7 +96,9 @@ BlockDevice::BlockDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<B
     : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {
   sync_completion_reset(&txn_signal_);
   sync_completion_reset(&worker_signal_);
-
+  for (auto& time : blk_req_start_timestamps_) {
+    time = zx::time::infinite();
+  }
   memset(&blk_req_buf_, 0, sizeof(blk_req_buf_));
 }
 
@@ -163,12 +171,24 @@ zx_status_t BlockDevice::Init() {
   StartIrqThread();
   DriverStatusOk();
 
-  auto thread_entry = [](void* ctx) {
+  auto worker_thread_entry = [](void* ctx) {
     auto bd = static_cast<BlockDevice*>(ctx);
     bd->WorkerThread();
     return ZX_OK;
   };
-  int ret = thrd_create_with_name(&worker_thread_, thread_entry, this, "virtio-block-worker");
+  int ret =
+      thrd_create_with_name(&worker_thread_, worker_thread_entry, this, "virtio-block-worker");
+  if (ret != thrd_success) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  auto watchdog_thread_entry = [](void* ctx) {
+    auto bd = static_cast<BlockDevice*>(ctx);
+    bd->WatchdogThread();
+    return ZX_OK;
+  };
+  ret = thrd_create_with_name(&watchdog_thread_, watchdog_thread_entry, this,
+                              "virtio-block-watchdog");
   if (ret != thrd_success) {
     return ZX_ERR_INTERNAL;
   }
@@ -185,12 +205,15 @@ zx_status_t BlockDevice::Init() {
 }
 
 void BlockDevice::DdkRelease() {
+  thrd_join(watchdog_thread_, nullptr);
   thrd_join(worker_thread_, nullptr);
   io_buffer_release(&blk_req_buf_);
   virtio::Device::Release();
 }
 
 void BlockDevice::DdkUnbind(ddk::UnbindTxn txn) {
+  watchdog_shutdown_.store(true);
+  sync_completion_signal(&watchdog_signal_);
   worker_shutdown_.store(true);
   sync_completion_signal(&worker_signal_);
   sync_completion_signal(&txn_signal_);
@@ -403,6 +426,11 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
     virtio_dump_desc(desc);
   }
 
+  {
+    std::lock_guard<std::mutex> lock(watchdog_lock_);
+    blk_req_start_timestamps_[req_index] = zx::clock::get_monotonic();
+  }
+
   *idx = i;
   return ZX_OK;
 }
@@ -579,6 +607,28 @@ void BlockDevice::WorkerThread() {
     // pending transactions (including the flush) to complete before continuing.
     if (do_flush) {
       FlushPendingTxns();
+    }
+  }
+}
+
+void BlockDevice::WatchdogThread() {
+  for (;;) {
+    sync_completion_wait(&watchdog_signal_, kWatchdogInterval.get());
+    if (watchdog_shutdown_.load()) {
+      return;
+    }
+    zx::time now = zx::clock::get_monotonic();
+    {
+      std::lock_guard<std::mutex> lock(watchdog_lock_);
+      int idx = 0;
+      for (const auto& start_time : blk_req_start_timestamps_) {
+        if (now - kWatchdogInterval >= start_time) {
+          // Round down to the interval
+          zx::duration latency = ((now - start_time) / kWatchdogInterval) * kWatchdogInterval;
+          zxlogf(WARNING, "txn %d has not completed after %" PRIu64 "s!", idx, latency.to_secs());
+        }
+        idx += 1;
+      }
     }
   }
 }

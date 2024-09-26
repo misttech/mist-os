@@ -6,87 +6,129 @@
 
 use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
+use std::mem::MaybeUninit;
+use zerocopy::{FromBytes, IntoBytes};
 
 /// An object representing a Zircon fifo.
 ///
 /// As essentially a subtype of `Handle`, it can be freely interconverted.
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+///
+/// Encodes the element type in the type. Defaults to `()` for the entry type to allow for untyped
+/// IPC. Use `Fifo::cast()` to convert an IPC-transferred fifo to one of the specific type required
+/// that will support reads and writes.
 #[repr(transparent)]
-pub struct Fifo(Handle);
-impl_handle_based!(Fifo);
+pub struct Fifo<R = UnspecifiedFifoElement, W = R>(Handle, std::marker::PhantomData<(R, W)>);
 
-impl Fifo {
+impl<R: IntoBytes + FromBytes, W: IntoBytes + FromBytes> Fifo<R, W> {
     /// Create a pair of fifos and return their endpoints. Writing to one endpoint enqueues an
-    /// element into the fifo from which the opposing endpoint reads. Wraps the
+    /// element into the fifo from which the opposing endpoint reads.
+    ///
+    /// Wraps the
     /// [zx_fifo_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_create.md)
     /// syscall.
-    pub fn create(elem_count: usize, elem_size: usize) -> Result<(Fifo, Fifo), Status> {
+    pub fn create(elem_count: usize) -> Result<(Self, Fifo<W, R>), Status> {
+        if std::mem::size_of::<R>() != std::mem::size_of::<W>() {
+            return Err(Status::INVALID_ARGS);
+        }
         let mut out0 = 0;
         let mut out1 = 0;
         let options = 0;
-        let status =
-            unsafe { sys::zx_fifo_create(elem_count, elem_size, options, &mut out0, &mut out1) };
+
+        // SAFETY: this is a basic FFI call, and the mutable references are valid pointers.
+        let status = unsafe {
+            sys::zx_fifo_create(elem_count, std::mem::size_of::<R>(), options, &mut out0, &mut out1)
+        };
         ok(status)?;
-        unsafe { Ok((Self::from(Handle::from_raw(out0)), Self::from(Handle::from_raw(out1)))) }
+
+        // SAFETY: if the above call succeeded, these are valid handle numbers.
+        unsafe { Ok((Fifo::from(Handle::from_raw(out0)), Fifo::from(Handle::from_raw(out1)))) }
     }
 
-    /// Attempts to write some number of elements into the fifo. The length of `bytes` must be
-    /// divisible by `elem_size`, which must match the fifo's element size.
-    /// On success, returns the number of elements actually written.
+    /// Attempts to write some number of elements into the fifo. On success, returns the number of
+    /// elements actually written.
     ///
     /// Wraps
     /// [zx_fifo_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_write.md).
-    pub fn write(&self, elem_size: usize, bytes: &[u8]) -> Result<usize, Status> {
-        let count = bytes.len() / elem_size;
-        debug_assert!(
-            count * elem_size == bytes.len(),
-            "bytes.len() must be divisible by elem_size"
-        );
-        unsafe { self.write_ptr(elem_size, bytes.as_ptr(), count) }
+    pub fn write(&self, buf: &[W]) -> Result<usize, Status> {
+        // SAFETY: this pointer is valid for the length of the slice
+        unsafe { self.write_raw(buf.as_ptr(), buf.len()) }
     }
 
-    /// Attempts to write some number of elements into the fifo. `bytes` must
-    /// be at least `elem_size * count` bytes long. On success, returns the
-    /// number of elements actually written.
+    /// Attempts to write a single element into the fifo.
+    ///
+    /// Wraps
+    /// [zx_fifo_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_write.md).
+    pub fn write_one(&self, elem: &W) -> Result<(), Status> {
+        // SAFETY: this pointer is valid for a single element
+        unsafe { self.write_raw(elem, 1).map(|n| debug_assert_eq!(n, 1)) }
+    }
+
+    /// Attempts to write some number of elements into the fifo. On success, returns the number of
+    /// elements actually written.
     ///
     /// Wraps
     /// [zx_fifo_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_write.md).
     ///
     /// # Safety
     ///
-    /// The caller is responsible for ensuring `bytes` points to valid and
-    /// initialized memory at least `elem_size * count` bytes long.
-    #[allow(unsafe_op_in_unsafe_fn)]
-    pub unsafe fn write_ptr(
-        &self,
-        elem_size: usize,
-        bytes: *const u8,
-        count: usize,
-    ) -> Result<usize, Status> {
+    /// The caller is responsible for ensuring `buf` is valid to write to for `count` elements.
+    pub unsafe fn write_raw(&self, buf: *const W, count: usize) -> Result<usize, Status> {
         let mut actual_count = 0;
-        let status =
-            sys::zx_fifo_write(self.raw_handle(), elem_size, bytes, count, &mut actual_count);
+        // SAFETY: safety requirements for this call are upheld by our caller.
+        let status = unsafe {
+            sys::zx_fifo_write(
+                self.raw_handle(),
+                std::mem::size_of::<W>(),
+                buf.cast::<u8>(),
+                count,
+                &mut actual_count,
+            )
+        };
         ok(status).map(|()| actual_count)
     }
 
-    /// Attempts to read some number of elements out of the fifo. The length of `bytes` must be
-    /// divisible by `elem_size`, which must match the fifo's element size.
-    /// On success, returns the number of elements actually read.
+    /// Attempts to read some elements out of the fifo. On success, returns the number of elements
+    /// actually read.
     ///
     /// Wraps
     /// [zx_fifo_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_read.md).
-    pub fn read(&self, elem_size: usize, bytes: &mut [u8]) -> Result<usize, Status> {
-        let count = bytes.len() / elem_size;
-        debug_assert!(
-            count * elem_size == bytes.len(),
-            "bytes.len() must be divisible by elem_size"
-        );
-        unsafe { self.read_ptr(elem_size, bytes.as_mut_ptr(), count) }
+    pub fn read(&self, buf: &mut [R]) -> Result<usize, Status> {
+        // SAFETY: the pointer is valid for the length of the slice
+        unsafe { self.read_raw(buf.as_mut_ptr(), buf.len()) }
     }
 
-    /// Attempts to read some number of elements out of the fifo. `bytes` must
-    /// be at least `elem_size * count` bytes long. On success, returns the
-    /// number of elements actually read.
+    /// Attempts to read a single element out of the fifo.
+    ///
+    /// Wraps
+    /// [zx_fifo_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_read.md).
+    pub fn read_one(&self) -> Result<R, Status> {
+        let mut elem = MaybeUninit::uninit();
+
+        // SAFETY: the reference is valid to write to, and this call will not read from the bytes.
+        let valid_count = unsafe { self.read_raw(elem.as_mut_ptr(), 1)? };
+        debug_assert_eq!(valid_count, 1);
+
+        // SAFETY: if the previous call succeeded, the kernel has initialized this value.
+        Ok(unsafe { elem.assume_init() })
+    }
+
+    /// Attempts to read some number of elements out of the fifo. On success, returns a slice of
+    /// initialized elements.
+    ///
+    /// Wraps
+    /// [zx_fifo_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_read.md).
+    pub fn read_uninit(&self, bytes: &mut [MaybeUninit<R>]) -> Result<&mut [R], Status> {
+        // SAFETY: the slice is valid to write to for its entire length, and this call will not
+        // read from the bytes
+        let valid_count = unsafe { self.read_raw(bytes.as_mut_ptr().cast::<R>(), bytes.len())? };
+        let (valid, _uninit) = bytes.split_at_mut(valid_count);
+
+        // SAFETY: the kernel initialized all bytes, strip out MaybeUninit
+        unsafe { Ok(std::slice::from_raw_parts_mut(valid.as_mut_ptr().cast::<R>(), valid.len())) }
+    }
+
+    /// Attempts to read some number of elements out of the fifo. On success, returns the number of
+    /// elements actually read.
     ///
     /// Wraps
     /// [zx_fifo_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/fifo_read.md).
@@ -94,20 +136,104 @@ impl Fifo {
     /// # Safety
     ///
     /// The caller is responsible for ensuring `bytes` points to valid (albeit
-    /// not necessarily initialized) memory at least `elem_size * count` bytes
-    /// long.
-    pub unsafe fn read_ptr(
-        &self,
-        elem_size: usize,
-        bytes: *mut u8,
-        count: usize,
-    ) -> Result<usize, Status> {
+    /// not necessarily initialized) memory at least `len` bytes long.
+    pub unsafe fn read_raw(&self, buf: *mut R, count: usize) -> Result<usize, Status> {
         let mut actual_count = 0;
-        let status =
-            sys::zx_fifo_read(self.raw_handle(), elem_size, bytes, count, &mut actual_count);
+        // SAFETY: this call's invariants must be upheld by our caller.
+        let status = unsafe {
+            sys::zx_fifo_read(
+                self.raw_handle(),
+                std::mem::size_of::<R>(),
+                buf.cast::<u8>(),
+                count,
+                &mut actual_count,
+            )
+        };
         ok(status).map(|()| actual_count)
     }
 }
+
+impl Fifo<UnspecifiedFifoElement> {
+    /// Give a `Fifo` specific read/write types. The size of `R2` and `W2` must match
+    /// the element size the underlying handle was created with for reads and writes to succeed.
+    pub fn cast<R2, W2>(self) -> Fifo<R2, W2> {
+        Fifo::<R2, W2>::from(self.0)
+    }
+}
+
+impl<R, W> Fifo<R, W> {
+    /// Convert a fifo from having a specific element type to a fifo without any element type that
+    /// will not support reads or writes.
+    pub fn downcast(self) -> Fifo {
+        Fifo::from(self.0)
+    }
+}
+
+impl<R, W> AsHandleRef for Fifo<R, W> {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        self.0.as_handle_ref()
+    }
+}
+
+impl<R, W> From<Handle> for Fifo<R, W> {
+    fn from(handle: Handle) -> Self {
+        Self(handle, std::marker::PhantomData)
+    }
+}
+
+impl<R, W> From<Fifo<R, W>> for Handle {
+    fn from(x: Fifo<R, W>) -> Handle {
+        x.0
+    }
+}
+
+impl<R: FromBytes + IntoBytes, W: FromBytes + IntoBytes> From<Fifo> for Fifo<R, W> {
+    fn from(untyped: Fifo) -> Self {
+        untyped.cast()
+    }
+}
+
+impl<R, W> HandleBased for Fifo<R, W> {}
+
+impl<R, W> std::fmt::Debug for Fifo<R, W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let read_name = std::any::type_name::<R>();
+        let (_, short_read_name) = read_name.rsplit_once("::").unwrap();
+        let write_name = std::any::type_name::<W>();
+        let (_, short_write_name) = write_name.rsplit_once("::").unwrap();
+        f.debug_tuple(&format!("Fifo<{short_read_name}, {short_write_name}>"))
+            .field(&self.0)
+            .finish()
+    }
+}
+
+impl<R, W> std::cmp::PartialEq for Fifo<R, W> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<R, W> std::cmp::Eq for Fifo<R, W> {}
+
+impl<R, W> std::cmp::PartialOrd for Fifo<R, W> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+impl<R, W> std::cmp::Ord for Fifo<R, W> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<R, W> std::hash::Hash for Fifo<R, W> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+/// The default element for fifos, does not support reading or writing. Only used for IPC transfer.
+#[derive(Copy, Clone, Debug)]
+pub struct UnspecifiedFifoElement;
 
 #[cfg(test)]
 mod tests {
@@ -115,31 +241,28 @@ mod tests {
 
     #[test]
     fn fifo_basic() {
-        let (fifo1, fifo2) = Fifo::create(4, 2).unwrap();
+        let (fifo1, fifo2) = Fifo::<[u8; 2]>::create(4).unwrap();
 
         // Trying to write less than one element should fail.
-        assert_eq!(fifo1.write(2, b""), Err(Status::OUT_OF_RANGE));
-        // Trying to write using a wrong elem_size should fail
-        assert_eq!(fifo1.write(1, b"hi"), Err(Status::OUT_OF_RANGE));
+        assert_eq!(fifo1.write(&[]), Err(Status::OUT_OF_RANGE));
 
         // Should write one element "he"
-        assert_eq!(fifo1.write(2, b"he").unwrap(), 1);
+        fifo1.write_one(b"he").unwrap();
 
         // Should write three elements "ll" "o " "wo" and drop the rest as it is full.
-        assert_eq!(fifo1.write(2, b"llo worlds").unwrap(), 3);
+        assert_eq!(fifo1.write(&[*b"ll", *b"o ", *b"wo", *b"rl", *b"ds"]).unwrap(), 3);
 
         // Now that the fifo is full any further attempts to write should fail.
-        assert_eq!(fifo1.write(2, b"blahblah"), Err(Status::SHOULD_WAIT));
+        assert_eq!(fifo1.write(&[*b"bl", *b"ah", *b"bl", *b"ah"]), Err(Status::SHOULD_WAIT));
 
-        // Reading with a wrong elem_size should fail
-        let mut read_vec = vec![0; 8];
-        assert_eq!(fifo2.read(1, &mut read_vec), Err(Status::OUT_OF_RANGE));
+        assert_eq!(fifo2.read_one().unwrap(), *b"he");
 
-        // Read all 4 entries from the other end.
-        assert_eq!(fifo2.read(2, &mut read_vec).unwrap(), 4);
-        assert_eq!(read_vec, b"hello wo");
+        // Read remaining 3 entries from the other end.
+        let mut read_vec = vec![[0; 2]; 8];
+        assert_eq!(fifo2.read(&mut read_vec).unwrap(), 3);
+        assert_eq!(read_vec, &[*b"ll", *b"o ", *b"wo", [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]);
 
         // Reading again should fail as the fifo is empty.
-        assert_eq!(fifo2.read(2, &mut read_vec), Err(Status::SHOULD_WAIT));
+        assert_eq!(fifo2.read(&mut read_vec), Err(Status::SHOULD_WAIT));
     }
 }

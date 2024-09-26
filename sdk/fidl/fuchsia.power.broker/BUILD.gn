@@ -5,7 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.power.broker") {
-  sdk_category = "internal"
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Power"
   sources = [ "broker.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 
@@ -13,11 +15,14 @@ fidl("fuchsia.power.broker") {
   visibility = [
     "//examples/power/*",
     "//sdk:*",
+    "//sdk/fidl:*",
     "//sdk/fidl/fuchsia.hardware.hrtimer/*:*",
     "//sdk/fidl/fuchsia.power.system/*:*",
     "//sdk/fidl/fuchsia.power.topology.test/*:*",
     "//sdk/fidl/fuchsia.session.power/*:*",
     "//sdk/lib/driver/power/cpp/*:*",
+    "//src/connectivity/network/netstack3:*",
+    "//src/connectivity/network/tests/integration/power:*",
     "//src/developer/forensics/*:*",
     "//src/devices/block/drivers/aml-sdmmc/*:*",
     "//src/devices/block/drivers/sdmmc/*:*",
@@ -32,6 +37,7 @@ fidl("fuchsia.power.broker") {
     "//src/power/testing/client:*",
     "//src/power/testing/fake-broker/*:*",
     "//src/power/testing/fake-hrtimer/*:*",
+    "//src/power/testing/system-integration/msd-arm-mali/test:*",
     "//src/power/topology-test-daemon/*:*",
     "//src/session/bin/*",
     "//src/session/tests/session_manager:*",

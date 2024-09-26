@@ -4,7 +4,7 @@
 
 use crate::capability::{BuiltinCapability, CapabilityProvider, InternalCapabilityProvider};
 use crate::model::component::WeakComponentInstance;
-use crate::model::resolver::{self, Resolver};
+use crate::model::resolver::Resolver;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl::endpoints::{ClientEnd, Proxy, ServerEnd};
@@ -13,7 +13,7 @@ use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::{PackageName, PackageVariant};
 use futures::TryStreamExt;
 use routing::capability_source::InternalCapability;
-use routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use routing::resolving::{self, ComponentAddress, ResolvedComponent, ResolverError};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -386,9 +386,9 @@ impl Resolver for FuchsiaBootResolver {
                 anyhow::format_err!("missing manifest from resolved component").into(),
             )
         })?;
-        let decl = resolver::read_and_validate_manifest(&decl)?;
+        let decl = resolving::read_and_validate_manifest(&decl)?;
         let config_values = if let Some(cv) = config_values {
-            Some(resolver::read_and_validate_config_values(&cv)?)
+            Some(resolving::read_and_validate_config_values(&cv)?)
         } else {
             None
         };
@@ -662,7 +662,7 @@ mod tests {
 
         let url = "fuchsia-boot:///#meta/has_config.cm".parse().unwrap();
         let err = resolver
-            .resolve(&ComponentAddress::from(&url, &root).await.unwrap())
+            .resolve(&ComponentAddress::from_url(&url, &root).await.unwrap())
             .await
             .unwrap_err();
         assert_matches!(err, ResolverError::ConfigValuesIo { .. });
@@ -696,7 +696,7 @@ mod tests {
         )
         .await;
         let url = "fuchsia-boot:///#meta/invalid.cm".parse().unwrap();
-        let res = resolver.resolve(&ComponentAddress::from(&url, &root).await.unwrap()).await;
+        let res = resolver.resolve(&ComponentAddress::from_url(&url, &root).await.unwrap()).await;
         assert_matches!(res, Err(ResolverError::ManifestInvalid { .. }));
     }
 }

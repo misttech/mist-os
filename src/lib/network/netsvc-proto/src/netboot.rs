@@ -17,7 +17,7 @@ use packet::{
 };
 use std::num::NonZeroU16;
 use zerocopy::byteorder::little_endian::U32;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 // Re-export witness type.
 pub use witness::ErrorValue;
@@ -199,7 +199,7 @@ pub enum ParseError {
 }
 
 #[repr(C)]
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug)]
 struct MessageHead {
     magic: U32,
     cookie: U32,
@@ -209,13 +209,13 @@ struct MessageHead {
 
 /// A netboot packet.
 #[derive(Debug)]
-pub struct NetbootPacket<B: ByteSlice> {
+pub struct NetbootPacket<B: SplitByteSlice> {
     command: OpcodeOrErr,
     message: Ref<B, MessageHead>,
     payload: B,
 }
 
-impl<B: ByteSlice> NetbootPacket<B> {
+impl<B: SplitByteSlice> NetbootPacket<B> {
     pub fn command(&self) -> OpcodeOrErr {
         self.command
     }
@@ -233,7 +233,7 @@ impl<B: ByteSlice> NetbootPacket<B> {
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for NetbootPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for NetbootPacket<B> {
     type Error = ParseError;
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {

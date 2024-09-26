@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-executable("msd_virtio_gpu_integration_tests") {
+import("//build/testing/cc_test_executable.gni")
+
+cc_test_executable("msd_virtio_gpu_integration_tests") {
   testonly = true
 
   sources = [ "test_query.cc" ]

@@ -1335,33 +1335,33 @@ mod tests {
         fn entry<I: Ip, D>(
             d: D,
             s: Subnet<I::Addr>,
-            m: Metric,
             g: Option<SpecifiedAddr<I::Addr>>,
+            m: Metric,
         ) -> Entry<I::Addr, D> {
             Entry { device: d, subnet: s, metric: m, gateway: g }
         }
 
         // Expect the routing table to be sorted by longest matching prefix,
-        // followed by metric, followed by on/off link, followed by insertion
+        // followed by on/off link, followed by metric, followed by insertion
         // order.
         // Note that the test adds entries for `DEVICE_B` after `DEVICE_A`.
         let expected_table = [
-            entry::<I, _>(DEVICE_A, more_specific_sub, lower_metric, on_link),
-            entry::<I, _>(DEVICE_B, more_specific_sub, lower_metric, on_link),
-            entry::<I, _>(DEVICE_A, more_specific_sub, lower_metric, off_link),
-            entry::<I, _>(DEVICE_B, more_specific_sub, lower_metric, off_link),
-            entry::<I, _>(DEVICE_A, more_specific_sub, higher_metric, on_link),
-            entry::<I, _>(DEVICE_B, more_specific_sub, higher_metric, on_link),
-            entry::<I, _>(DEVICE_A, more_specific_sub, higher_metric, off_link),
-            entry::<I, _>(DEVICE_B, more_specific_sub, higher_metric, off_link),
-            entry::<I, _>(DEVICE_A, less_specific_sub, lower_metric, on_link),
-            entry::<I, _>(DEVICE_B, less_specific_sub, lower_metric, on_link),
-            entry::<I, _>(DEVICE_A, less_specific_sub, lower_metric, off_link),
-            entry::<I, _>(DEVICE_B, less_specific_sub, lower_metric, off_link),
-            entry::<I, _>(DEVICE_A, less_specific_sub, higher_metric, on_link),
-            entry::<I, _>(DEVICE_B, less_specific_sub, higher_metric, on_link),
-            entry::<I, _>(DEVICE_A, less_specific_sub, higher_metric, off_link),
-            entry::<I, _>(DEVICE_B, less_specific_sub, higher_metric, off_link),
+            entry::<I, _>(DEVICE_A, more_specific_sub, on_link, lower_metric),
+            entry::<I, _>(DEVICE_B, more_specific_sub, on_link, lower_metric),
+            entry::<I, _>(DEVICE_A, more_specific_sub, on_link, higher_metric),
+            entry::<I, _>(DEVICE_B, more_specific_sub, on_link, higher_metric),
+            entry::<I, _>(DEVICE_A, more_specific_sub, off_link, lower_metric),
+            entry::<I, _>(DEVICE_B, more_specific_sub, off_link, lower_metric),
+            entry::<I, _>(DEVICE_A, more_specific_sub, off_link, higher_metric),
+            entry::<I, _>(DEVICE_B, more_specific_sub, off_link, higher_metric),
+            entry::<I, _>(DEVICE_A, less_specific_sub, on_link, lower_metric),
+            entry::<I, _>(DEVICE_B, less_specific_sub, on_link, lower_metric),
+            entry::<I, _>(DEVICE_A, less_specific_sub, on_link, higher_metric),
+            entry::<I, _>(DEVICE_B, less_specific_sub, on_link, higher_metric),
+            entry::<I, _>(DEVICE_A, less_specific_sub, off_link, lower_metric),
+            entry::<I, _>(DEVICE_B, less_specific_sub, off_link, lower_metric),
+            entry::<I, _>(DEVICE_A, less_specific_sub, off_link, higher_metric),
+            entry::<I, _>(DEVICE_B, less_specific_sub, off_link, higher_metric),
         ];
         let device_a_routes = expected_table
             .iter()

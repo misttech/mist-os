@@ -43,11 +43,11 @@ pub struct ResolvedElfState {
 /// implement them as well.
 #[derive(Debug, Default, Clone)]
 pub struct FsNodeState {
-    sid: Option<SecurityId>,
+    label: selinux_hooks::FsNodeLabel,
 }
 
 /// Opaque structure holding security state for a [`crate::vfs::Filesystem`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FileSystemState {
     state: selinux_hooks::FileSystemState,
 }

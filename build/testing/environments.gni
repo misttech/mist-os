@@ -180,6 +180,13 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+qemu_1cpu_env = {
+  forward_variables_from(qemu_env, "*")
+  emu_dimensions = {
+    cores = 1
+  }
+}
+
 sherlock_env = {
   dimensions = {
     device_type = "Sherlock"

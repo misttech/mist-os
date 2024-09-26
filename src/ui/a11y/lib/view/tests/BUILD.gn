@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -17,7 +18,7 @@ group("integration-tests") {
   ]
 }
 
-executable("view_tests") {
+cc_test_executable("view_tests") {
   output_name = "view_tests"
 
   testonly = true
@@ -53,7 +54,7 @@ executable("view_tests") {
   ]
 }
 
-executable("flatland-a11y-view-test-bin") {
+cc_test_executable("flatland-a11y-view-test-bin") {
   testonly = true
   sources = [ "flatland_a11y_view_test.cc" ]
   output_name = "flatland-a11y-view-test"
@@ -100,7 +101,7 @@ fuchsia_test_package("flatland-a11y-view-test") {
   }
 }
 
-executable("flatland-scene-integration-test-bin") {
+cc_test_executable("flatland-scene-integration-test-bin") {
   testonly = true
   sources = [ "flatland_scene_integration_test.cc" ]
   output_name = "flatland-scene-integration-test"

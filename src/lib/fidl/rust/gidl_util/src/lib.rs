@@ -4,7 +4,7 @@
 
 //! This crate contains utility functions used in GIDL tests and benchmarks.
 
-use fidl::encoding::{Context, Decode, Decoder, TypeMarker};
+use fidl::encoding::{Context, Decode, Decoder, DefaultFuchsiaResourceDialect, TypeMarker};
 use fidl::{AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights};
 use fuchsia_zircon_status::Status;
 use fuchsia_zircon_types as zx_types;
@@ -121,17 +121,11 @@ pub fn get_handle_koid(handle_info: &zx_types::zx_handle_info_t) -> zx_types::zx
     handle.basic_info().unwrap().koid.raw_koid()
 }
 
-/// Converts a `HandleDisposition` to a raw `zx_handle_t`.
-pub fn to_zx_handle_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_t {
-    match &hd.handle_op {
-        HandleOp::Move(handle) => handle.raw_handle(),
-        HandleOp::Duplicate(handle_ref) => handle_ref.raw_handle(),
-    }
-}
-
 /// Converts a `HandleDisposition` to a raw `zx_handle_disposition_t`.
-pub fn to_zx_handle_disposition_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_disposition_t {
-    match &hd.handle_op {
+pub fn to_zx_handle_disposition_t(
+    mut hd: HandleDisposition<'_>,
+) -> zx_types::zx_handle_disposition_t {
+    match hd.take_op() {
         HandleOp::Move(handle) => zx_types::zx_handle_disposition_t {
             operation: zx_types::ZX_HANDLE_OP_MOVE,
             handle: handle.raw_handle(),
@@ -200,7 +194,10 @@ pub fn decode_value<T: TypeMarker>(
     context: Context,
     bytes: &[u8],
     handles: &mut [HandleInfo],
-) -> T::Owned {
+) -> T::Owned
+where
+    T::Owned: Decode<T, DefaultFuchsiaResourceDialect>,
+{
     let mut value = T::Owned::new_empty();
     Decoder::decode_with_context::<T>(context, bytes, handles, &mut value).expect(
         "failed decoding for the GIDL decode() function (not a regular decode test failure!)",

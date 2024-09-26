@@ -38,6 +38,10 @@
             url: "fuzz-test-runner#meta/fuzz-test-runner.cm",
         },
         {
+            name: "fuzz_starnix_test_runner",
+            url: "fuzz-test-runner#meta/fuzz-starnix-test-runner.cm",
+        },
+        {
             name: "g3_dart_jit_product_runner",
             url: "fuchsia-pkg://fuchsia.com/g3_dart_jit_product_runner#meta/g3_dart_jit_product_runner.cm",
         },
@@ -315,6 +319,7 @@
                 "#elf_test_create_raw_processes_ambient_exec_runner",
                 "#elf_test_create_raw_processes_runner",
                 "#elf_test_runner",
+                "#fuzz_starnix_test_runner",
                 "#fuzz_test_runner",
                 "#go_test_runner",
                 "#gtest_runner",
@@ -334,6 +339,7 @@
                 "#elf_test_create_raw_processes_ambient_exec_runner",
                 "#elf_test_create_raw_processes_runner",
                 "#elf_test_runner",
+                "#fuzz_starnix_test_runner",
                 "#fuzz_test_runner",
                 "#go_test_runner",
                 "#gtest_runner",
@@ -348,6 +354,11 @@
             protocol: "fuchsia.fuzzer.Registrar",
             from: "parent",
             to: "#fuzz_test_runner",
+        },
+        {
+            protocol: "fuchsia.fuzzer.Registrar",
+            from: "parent",
+            to: "#fuzz_starnix_test_runner",
         },
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",

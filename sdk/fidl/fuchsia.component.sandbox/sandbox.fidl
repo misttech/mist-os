@@ -479,9 +479,11 @@ type InstanceToken = resource struct {
 /// A request for a route.
 @available(added=HEAD)
 type RouteRequest = resource table {
-    /// The component that is requesting the capability.
+    /// The component that is requesting the capability. May be omitted for a default request
+    /// (see [Router.Route]).
     1: requesting InstanceToken;
-    /// Metadata associated with this capability request.
+    /// Metadata associated with this capability request. May be omitted for a default request
+    /// (see [Router.Route]).
     2: metadata DictionaryRef;
 };
 
@@ -498,6 +500,13 @@ type RouterError = flexible enum : uint32 {
 @discoverable
 @available(added=HEAD)
 open protocol Router {
+    /// Requests a capability from this [Router]. Subsequent calls to [Router] are not required to
+    /// return duplicates of the same capability.
+    ///
+    /// [RouteRequest] supplies information about the component requesting the capability and
+    /// metadata about the capability to request. If the [Router] supports it, [RouteRequest] may be
+    /// empty in which case the [Router] will infer the request. If the [Router] does not support
+    /// this, an attempt to pass an empty request should return `RouterError.INVALID_ARGS`.
     flexible Route(RouteRequest) -> (resource struct {
         capability Capability;
     }) error RouterError;

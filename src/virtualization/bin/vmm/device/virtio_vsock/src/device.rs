@@ -24,7 +24,7 @@ use std::rc::Rc;
 use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct VsockDevice {
@@ -473,9 +473,9 @@ impl VsockDevice {
                 err
             )
         })?;
-        match VirtioVsockHeader::read_from(header_buf.as_slice()) {
-            Some(header) => Ok(header),
-            None => Err(anyhow!("Failed to deserialize VirtioVsockHeader")),
+        match VirtioVsockHeader::read_from_bytes(header_buf.as_slice()) {
+            Ok(header) => Ok(header),
+            Err(_) => Err(anyhow!("Failed to deserialize VirtioVsockHeader")),
         }
     }
 
@@ -768,7 +768,7 @@ mod tests {
         let (data, len) = used_chain.data_iter().next().unwrap();
         let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len as usize) };
 
-        let header = VirtioVsockHeader::read_from(slice).unwrap();
+        let header = VirtioVsockHeader::read_from_bytes(slice).unwrap();
 
         assert_eq!(header.src_cid.get(), HOST_CID.into());
         assert_eq!(header.dst_cid.get(), DEFAULT_GUEST_CID.into());
@@ -818,7 +818,7 @@ mod tests {
         let (data, len) = used_chain.data_iter().next().unwrap();
         let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len as usize) };
 
-        let header = VirtioVsockHeader::read_from(slice).unwrap();
+        let header = VirtioVsockHeader::read_from_bytes(slice).unwrap();
 
         assert_eq!(header.src_cid.get(), HOST_CID.into());
         assert_eq!(header.dst_cid.get(), DEFAULT_GUEST_CID.into());
@@ -890,8 +890,8 @@ mod tests {
             let (data, len) = used_chain.data_iter().next().expect("nothing on chain");
             let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len as usize) };
 
-            let header =
-                VirtioVsockHeader::read_from(slice).expect("failed to read header from slice");
+            let header = VirtioVsockHeader::read_from_bytes(slice)
+                .expect("failed to read header from slice");
             assert_eq!(OpType::try_from(header.op.get()).unwrap(), OpType::Request);
 
             // Respond to the request, which requires the automatically chosen host port.
@@ -1069,7 +1069,8 @@ mod tests {
         let (data, len) = used_chain.data_iter().next().expect("nothing on chain");
         let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len as usize) };
 
-        let header = VirtioVsockHeader::read_from(slice).expect("failed to read header from slice");
+        let header =
+            VirtioVsockHeader::read_from_bytes(slice).expect("failed to read header from slice");
 
         assert_eq!(header.src_port.get(), host_port);
         assert_eq!(header.src_cid.get(), HOST_CID.into());

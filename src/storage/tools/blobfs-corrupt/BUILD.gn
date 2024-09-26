@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 executable("blobfs-corrupt") {
   sources = [ "main.cc" ]
@@ -17,7 +18,7 @@ executable("blobfs-corrupt") {
   ]
 }
 
-executable("blobfs-corrupt-test") {
+cc_test_executable("blobfs-corrupt-test") {
   testonly = true
   output_name = "blobfs-corrupt-test"
   sources = [ "test/corrupt_blob_test.cc" ]

@@ -18,6 +18,8 @@ class ProviderImpl : public fuchsia::buildinfo::Provider {
   std::unique_ptr<std::string> product_config_;
   std::unique_ptr<std::string> board_config_;
   std::unique_ptr<std::string> version_;
+  std::unique_ptr<std::string> platform_version_;
+  std::unique_ptr<std::string> product_version_;
   std::unique_ptr<std::string> latest_commit_date_;
 };
 

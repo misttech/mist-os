@@ -7,9 +7,17 @@ use ffx_core::ffx_command;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
-#[argh(subcommand, name = "remove", description = "")]
+#[argh(
+    subcommand,
+    name = "remove",
+    description = "Remove repository from deamon server configuration."
+)]
 pub struct RemoveCommand {
     /// name of the repository to remove.
     #[argh(positional)]
-    pub name: String,
+    pub name: Option<String>,
+
+    /// remove all repositories
+    #[argh(switch)]
+    pub all: bool,
 }

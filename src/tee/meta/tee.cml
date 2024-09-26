@@ -1,0 +1,53 @@
+// Copyright 2024 The Fuchsia Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This is the root of the Trusted Execution Environment for microfuchsia.
+{
+    children: [
+        {
+            name: "binder-proxy",
+            url: "fuchsia-boot:///binder-proxy#meta/binder-proxy.cm",
+
+            // TODO: The binder proxy expose will service over a virtio socket and need
+            // to start up eagerly in order to register a listening socket.
+            // startup: "eager",
+        },
+        {
+            name: "ta-manager",
+            url: "fuchsia-boot:///ta-manager#meta/ta-manager.cm",
+        },
+        {
+            name: "ta-manager-config",
+            url: "fuchsia-boot:///ta-manager-config#meta/ta-manager-config.cm",
+        },
+    ],
+    offer: [
+        {
+            // TODO: This should only be present in debugging configurations.
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#binder-proxy",
+                "#ta-manager",
+                "#ta-manager-config",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.vsock.Connector" ],
+            from: "parent",
+            to: [ "#binder-proxy" ],
+        },
+        {
+            directory: "ta",
+            from: "#ta-manager",
+            to: "#binder-proxy",
+        },
+        {
+            directory: "config",
+            from: "#ta-manager-config",
+            to: [ "#ta-manager" ],
+            rights: [ "r*" ],
+        },
+    ],
+}

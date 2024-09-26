@@ -8,18 +8,20 @@ use crate::capability_source::{CapabilitySource, ComponentCapability, ComponentS
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet};
+use async_trait::async_trait;
 use cm_rust::NativeIntoFidl;
-use cm_types::{IterablePath, RelativePath};
+use cm_types::{IterablePath, Path, RelativePath};
 use futures::{future, FutureExt};
 use itertools::Itertools;
 use moniker::ChildName;
+use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Routable, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
 
 pub type ProgramRouterFn<C> =
-    dyn Fn(WeakComponentInstanceInterface<C>, RelativePath, ComponentCapability) -> Router;
+    dyn Fn(WeakComponentInstanceInterface<C>, Path, ComponentCapability) -> Router;
 pub type OutgoingDirRouterFn<C> =
     dyn Fn(&Arc<C>, &cm_rust::ComponentDecl, &cm_rust::CapabilityDecl) -> Router;
 
@@ -123,86 +125,150 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
     declared_dictionaries: &Dict,
     new_program_router: &ProgramRouterFn<C>,
 ) {
-    let dict = Dict::new();
     let router;
+    let declared_dict;
     if let Some(source) = decl.source.as_ref() {
+        // Dictionary derived from another dictionary (`extends` in cml).
         let source_path = decl
             .source_dictionary
             .as_ref()
             .expect("source_dictionary must be set if source is set");
-        let source_dict_router = match &source {
-            cm_rust::DictionarySource::Parent => component_input.capabilities().lazy_get(
-                source_path.to_owned(),
-                RoutingError::use_from_parent_not_found(
-                    component.moniker(),
-                    source_path.iter_segments().join("/"),
-                ),
-            ),
-            cm_rust::DictionarySource::Self_ => {
-                weak_reference_program_output_router(component.as_weak()).lazy_get(
-                    source_path.to_owned(),
-                    RoutingError::use_from_self_not_found(
-                        component.moniker(),
-                        source_path.iter_segments().join("/"),
-                    ),
-                )
-            }
-            cm_rust::DictionarySource::Child(child_ref) => {
-                assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
-                let child_name =
-                    ChildName::parse(child_ref.name.as_str()).expect("invalid child name");
-                match child_component_output_dictionary_routers.get(&child_name) {
-                    Some(output_dictionary_router) => output_dictionary_router.clone().lazy_get(
-                        source_path.to_owned(),
-                        RoutingError::BedrockSourceDictionaryExposeNotFound {
-                            moniker: component.moniker().clone(),
-                        },
-                    ),
-                    None => Router::new_error(RoutingError::use_from_child_instance_not_found(
-                        &child_name,
-                        component.moniker(),
-                        source_path.iter_segments().join("/"),
-                    )),
-                }
-            }
-            cm_rust::DictionarySource::Program => new_program_router(
-                component.as_weak(),
-                source_path.clone(),
-                ComponentCapability::Dictionary(decl.clone()),
-            ),
-        };
+        let dict = Dict::new();
         router = make_dict_extending_router(
             dict.clone(),
-            source_dict_router,
-            CapabilitySource::Component(ComponentSource {
-                capability: ComponentCapability::Dictionary(decl.clone()),
-                moniker: component.moniker().clone(),
-            }),
+            source,
+            source_path,
+            component,
+            child_component_output_dictionary_routers,
+            decl,
+            component_input,
         );
+        declared_dict = Some(dict);
+    } else if let Some(source_path) = decl.source_path.as_ref() {
+        // Dictionary backed by program's outgoing directory.
+        router = new_program_router(
+            component.as_weak(),
+            source_path.clone(),
+            ComponentCapability::Dictionary(decl.clone()),
+        );
+        declared_dict = None;
     } else {
-        router = Router::new_ok(dict.clone());
+        let dict = Dict::new();
+        router = make_simple_dict_router(dict.clone(), component, decl);
+        declared_dict = Some(dict);
     }
-    match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
-        Ok(()) => (),
-        Err(e) => warn!("failed to add {} to declared dicts: {e:?}", decl.name),
-    };
+    if let Some(dict) = declared_dict {
+        match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
+            Ok(()) => (),
+            Err(e) => warn!("failed to add {} to declared dicts: {e:?}", decl.name),
+        };
+    }
     match program_output_dict.insert_capability(&decl.name, router.into()) {
         Ok(()) => (),
         Err(e) => warn!("failed to add {} to program output dict: {e:?}", decl.name),
     }
 }
 
+/// Makes a [Router] that always returns the given dictionary.
+fn make_simple_dict_router<C: ComponentInstanceInterface + 'static>(
+    dict: Dict,
+    component: &Arc<C>,
+    decl: &cm_rust::DictionaryDecl,
+) -> Router {
+    struct DictRouter {
+        dict: Dict,
+        source: CapabilitySource,
+    }
+    #[async_trait]
+    impl Routable for DictRouter {
+        async fn route(
+            &self,
+            _request: Option<Request>,
+            debug: bool,
+        ) -> Result<Capability, RouterError> {
+            if debug {
+                Ok(self
+                    .source
+                    .clone()
+                    .try_into()
+                    .expect("failed to convert capability source to dictionary"))
+            } else {
+                Ok(self.dict.clone().into())
+            }
+        }
+    }
+    let source = CapabilitySource::Component(ComponentSource {
+        capability: ComponentCapability::Dictionary(decl.clone()),
+        moniker: component.moniker().clone(),
+    });
+    Router::new(DictRouter { dict, source })
+}
+
 /// Returns a [Router] that returns a [Dict] whose contents are these union of `dict` and the
 /// [Dict] returned by `source_dict_router`.
 ///
 /// This algorithm returns a new [Dict] each time, leaving `dict` unmodified.
-fn make_dict_extending_router(
+fn make_dict_extending_router<C: ComponentInstanceInterface + 'static>(
+    dict: Dict,
+    source: &cm_rust::DictionarySource,
+    source_path: &RelativePath,
+    component: &Arc<C>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    decl: &cm_rust::DictionaryDecl,
+    component_input: &ComponentInput,
+) -> Router {
+    let source_dict_router = match source {
+        cm_rust::DictionarySource::Parent => component_input.capabilities().lazy_get(
+            source_path.to_owned(),
+            RoutingError::use_from_parent_not_found(
+                component.moniker(),
+                source_path.iter_segments().join("/"),
+            ),
+        ),
+        cm_rust::DictionarySource::Self_ => {
+            weak_reference_program_output_router(component.as_weak()).lazy_get(
+                source_path.to_owned(),
+                RoutingError::use_from_self_not_found(
+                    component.moniker(),
+                    source_path.iter_segments().join("/"),
+                ),
+            )
+        }
+        cm_rust::DictionarySource::Child(child_ref) => {
+            assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
+            let child_name = ChildName::parse(child_ref.name.as_str()).expect("invalid child name");
+            match child_component_output_dictionary_routers.get(&child_name) {
+                Some(output_dictionary_router) => output_dictionary_router.clone().lazy_get(
+                    source_path.to_owned(),
+                    RoutingError::BedrockSourceDictionaryExposeNotFound {
+                        moniker: component.moniker().clone(),
+                    },
+                ),
+                None => Router::new_error(RoutingError::use_from_child_instance_not_found(
+                    &child_name,
+                    component.moniker(),
+                    source_path.iter_segments().join("/"),
+                )),
+            }
+        }
+    };
+    make_dict_extending_router_inner(
+        dict,
+        source_dict_router,
+        CapabilitySource::Component(ComponentSource {
+            capability: ComponentCapability::Dictionary(decl.clone()),
+            moniker: component.moniker().clone(),
+        }),
+    )
+}
+
+fn make_dict_extending_router_inner(
     dict: Dict,
     source_dict_router: Router,
     source: CapabilitySource,
 ) -> Router {
-    let route_fn = move |request: Request| {
-        if request.debug {
+    let route_fn = move |request: Option<Request>, debug: bool| {
+        if debug {
             return future::ok(
                 source
                     .clone()
@@ -215,7 +281,8 @@ fn make_dict_extending_router(
         let dict = dict.clone();
         let source_moniker = source.source_moniker();
         async move {
-            let source_dict = match source_dict_router.route(request).await? {
+            let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
+            let source_dict = match source_dict_router.route(Some(request), debug).await? {
                 Capability::Dictionary(d) => Some(d),
                 // Optional from void.
                 cap @ Capability::Unit(_) => return Ok(cap),
@@ -255,12 +322,13 @@ fn make_dict_extending_router(
 fn weak_reference_program_output_router<C: ComponentInstanceInterface + 'static>(
     weak_component: WeakComponentInstanceInterface<C>,
 ) -> Router {
-    Router::new(move |request: Request| {
+    Router::new(move |request: Option<Request>, debug: bool| {
         let weak_component = weak_component.clone();
         async move {
+            let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
             let component = weak_component.upgrade().map_err(RoutingError::from)?;
             let sandbox = component.component_sandbox().await.map_err(RoutingError::from)?;
-            sandbox.program_output_dict.route(request).await
+            sandbox.program_output_dict.route(Some(request), debug).await
         }
         .boxed()
     })

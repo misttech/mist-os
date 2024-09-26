@@ -7,6 +7,8 @@ import("//build/python/python_action.gni")
 import("//build/python/python_binary.gni")
 
 python_binary("sdk_ir") {
+  # TODO(b/367413842): Enable MyPy type checking
+  enable_mypy = false
   main_source = "sdk_ir.py"
   sources = [ "merge.py" ]
   deps = [ "//build/python/modules/depfile" ]

@@ -73,7 +73,6 @@ def asyncmethod(
         coro = func(*args, **kwargs)
         try:
             loop = getattr(args[0], "_async_adapter_loop")  # args[0] == self
-            return loop.run_until_complete(coro)
         except AttributeError as e:
             raise AsyncAdapterError(
                 "`asyncmethod` was used outside of an `AsyncAdapter`. "
@@ -83,5 +82,7 @@ def asyncmethod(
                 + "seeing this exception, put `AsyncAdapter` first in your "
                 + "inheritance order."
             ) from e
+
+        return loop.run_until_complete(coro)
 
     return wrapper

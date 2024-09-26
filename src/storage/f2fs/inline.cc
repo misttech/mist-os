@@ -138,7 +138,7 @@ size_t Dir::RoomInInlineDir(const PageBitmap &bits, size_t slots) {
 
 zx_status_t Dir::ConvertInlineDir() {
   LockedPage page;
-  if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
+  if (zx_status_t ret = GrabLockedPage(0, &page); ret != ZX_OK) {
     return ret;
   }
 
@@ -359,7 +359,7 @@ zx_status_t File::ConvertInlineData() {
   }
   LockedPage page;
   if (TestFlag(InodeInfoFlag::kDataExist)) {
-    if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
+    if (zx_status_t ret = GrabLockedPage(0, &page); ret != ZX_OK) {
       return ret;
     }
   }

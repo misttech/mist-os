@@ -40,9 +40,9 @@ TEST_F(BitmapTest, GetBitmap) {
   ASSERT_TRUE(test_dir2.is_ok());
 
   LockedPage dir_page1, file_page, dir_page2, dir1_node_page;
-  ASSERT_EQ(test_dir1->GrabCachePage(0, &dir_page1), ZX_OK);
-  ASSERT_EQ(test_dir2->GrabCachePage(0, &dir_page2), ZX_OK);
-  ASSERT_EQ(test_file->GrabCachePage(0, &file_page), ZX_OK);
+  ASSERT_EQ(test_dir1->GrabLockedPage(0, &dir_page1), ZX_OK);
+  ASSERT_EQ(test_dir2->GrabLockedPage(0, &dir_page2), ZX_OK);
+  ASSERT_EQ(test_file->GrabLockedPage(0, &file_page), ZX_OK);
 
   auto bits = test_file->GetBitmap(file_page.CopyRefPtr());
   ASSERT_EQ(bits.status_value(), ZX_ERR_NOT_SUPPORTED);
@@ -72,7 +72,7 @@ TEST_F(BitmapTest, BasicOp) {
   ASSERT_TRUE(file.is_ok());
 
   LockedPage page;
-  ASSERT_EQ(file->GrabCachePage(0, &page), ZX_OK);
+  ASSERT_EQ(file->GrabLockedPage(0, &page), ZX_OK);
   size_t size = GetBitSize(page->Size());
   size_t off = size;
   PageBitmap bits(page.CopyRefPtr(), page->GetAddress(), off);

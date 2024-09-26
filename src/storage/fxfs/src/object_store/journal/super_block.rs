@@ -38,7 +38,7 @@ use crate::object_store::journal::{
     JournalCheckpoint, JournalCheckpointV32, JournalHandle as _, BLOCK_SIZE,
 };
 use crate::object_store::object_record::{
-    ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40,
+    ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40, ObjectItemV41,
 };
 use crate::object_store::transaction::{AssocObj, Options};
 use crate::object_store::tree::MajorCompactable;
@@ -208,19 +208,27 @@ impl<'de> Deserialize<'de> for UuidWrapper {
     }
 }
 
-pub type SuperBlockRecord = SuperBlockRecordV40;
+pub type SuperBlockRecord = SuperBlockRecordV41;
 
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub enum SuperBlockRecordV40 {
+pub enum SuperBlockRecordV41 {
     // When reading the super-block we know the initial extent, but not subsequent extents, so these
     // records need to exist to allow us to completely read the super-block.
     Extent(Range<u64>),
 
     // Following the super-block header are ObjectItem records that are to be replayed into the root
     // parent object store.
-    ObjectItem(ObjectItemV40),
+    ObjectItem(ObjectItemV41),
 
     // Marks the end of the full super-block.
+    End,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(SuperBlockRecordV41)]
+pub enum SuperBlockRecordV40 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV40),
     End,
 }
 
@@ -731,7 +739,6 @@ mod tests {
                     &mut transaction,
                     HandleOptions::default(),
                     None,
-                    None,
                 )
                 .await
                 .expect("create_object failed")
@@ -846,7 +853,6 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await
             .expect("create_object failed");
@@ -915,7 +921,6 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await
             .expect("create_object failed");
@@ -978,7 +983,6 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await
             .expect("create_object failed");
@@ -1031,15 +1035,10 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_parent_store();
-        let handle = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        let handle =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
 
         store
@@ -1059,7 +1058,6 @@ mod tests {
                 &root_store,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await

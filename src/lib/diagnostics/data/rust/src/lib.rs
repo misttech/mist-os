@@ -22,7 +22,7 @@ use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::Hash;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Add, Deref};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -34,9 +34,6 @@ pub use moniker::ExtendedMoniker;
 
 #[cfg(target_os = "fuchsia")]
 mod logs_legacy;
-
-#[cfg(target_os = "fuchsia")]
-pub use crate::logs_legacy::*;
 
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
@@ -162,7 +159,7 @@ impl Metadata for InspectMetadata {
     type Error = InspectError;
 
     fn timestamp(&self) -> Timestamp {
-        Timestamp(self.timestamp)
+        self.timestamp
     }
 
     fn errors(&self) -> Option<&[Self::Error]> {
@@ -188,7 +185,7 @@ impl Metadata for LogsMetadata {
     type Error = LogError;
 
     fn timestamp(&self) -> Timestamp {
-        Timestamp(self.timestamp)
+        self.timestamp
     }
 
     fn errors(&self) -> Option<&[Self::Error]> {
@@ -204,34 +201,28 @@ impl Metadata for LogsMetadata {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Timestamp(i64);
 
+impl Timestamp {
+    /// Returns the number of nanoseconds associated with this timestamp.
+    pub fn into_nanos(self) -> i64 {
+        self.0
+    }
+
+    /// Constructs a timestamp from the given nanoseconds.
+    pub fn from_nanos(nanos: i64) -> Self {
+        Self(nanos)
+    }
+}
+
+impl Add<Timestamp> for Timestamp {
+    type Output = Timestamp;
+    fn add(self, rhs: Timestamp) -> Self::Output {
+        Timestamp(self.0 + rhs.0)
+    }
+}
+
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-// i32 here because it's the default for a bare integer literal w/o a type suffix
-impl From<i32> for Timestamp {
-    fn from(nanos: i32) -> Timestamp {
-        Timestamp(nanos as i64)
-    }
-}
-
-impl From<i64> for Timestamp {
-    fn from(nanos: i64) -> Timestamp {
-        Timestamp(nanos)
-    }
-}
-
-impl Into<i64> for Timestamp {
-    fn into(self) -> i64 {
-        self.0
-    }
-}
-
-impl Into<Duration> for Timestamp {
-    fn into(self) -> Duration {
-        Duration::from_nanos(self.0 as u64)
     }
 }
 
@@ -240,30 +231,16 @@ mod zircon {
     use super::*;
     use fuchsia_zircon as zx;
 
-    impl From<zx::MonotonicTime> for Timestamp {
-        fn from(t: zx::MonotonicTime) -> Timestamp {
+    impl From<zx::BootTime> for Timestamp {
+        fn from(t: zx::BootTime) -> Timestamp {
             Timestamp(t.into_nanos())
         }
     }
 
-    impl Into<zx::MonotonicTime> for Timestamp {
-        fn into(self) -> zx::MonotonicTime {
-            zx::MonotonicTime::from_nanos(self.0)
+    impl Into<zx::BootTime> for Timestamp {
+        fn into(self) -> zx::BootTime {
+            zx::BootTime::from_nanos(self.0)
         }
-    }
-}
-
-impl Deref for Timestamp {
-    type Target = i64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Timestamp {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -282,8 +259,8 @@ pub struct InspectMetadata {
     /// The url with which the component was launched.
     pub component_url: FlyStr,
 
-    /// Monotonic time in nanos.
-    pub timestamp: i64,
+    /// Boot time in nanos.
+    pub timestamp: Timestamp,
 
     /// When set to true, the data was escrowed. Otherwise, the data was fetched live from the
     /// source component at runtime. When absent, it means the value is false.
@@ -313,11 +290,16 @@ pub struct LogsMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub component_url: Option<FlyStr>,
 
-    /// Monotonic time in nanos.
-    pub timestamp: i64,
+    /// Boot time in nanos.
+    pub timestamp: Timestamp,
 
     /// Severity of the message.
     pub severity: Severity,
+
+    /// Raw severity if any. This will typically be unset unless the log message carries a severity
+    /// that differs from the standard values of each severity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw_severity: Option<u8>,
 
     /// Tags to add at the beginning of the message
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -358,9 +340,12 @@ impl LogsMetadata {
         self.component_url.as_ref().map(|s| s.as_str())
     }
 
-    // TODO(https://fxbug.dev/346806346): transitional, remove.
-    pub fn timestamp_nanos(&self) -> i64 {
-        self.timestamp
+    /// Returns the raw severity of this log.
+    pub fn raw_severity(&self) -> u8 {
+        match self.raw_severity {
+            Some(s) => s,
+            None => self.severity as u8,
+        }
     }
 }
 
@@ -368,42 +353,93 @@ impl LogsMetadata {
 // NOTE: this is only duplicated because we can't get Serialize/Deserialize on the FIDL type
 // LINT.IfChange
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[repr(u8)]
 pub enum Severity {
     /// Trace records include detailed information about program execution.
     #[serde(rename = "TRACE", alias = "Trace", alias = "trace")]
-    Trace,
+    Trace = 0x10,
 
     /// Debug records include development-facing information about program execution.
     #[serde(rename = "DEBUG", alias = "Debug", alias = "debug")]
-    Debug,
+    Debug = 0x20,
 
     /// Info records include general information about program execution. (default)
     #[serde(rename = "INFO", alias = "Info", alias = "info")]
-    Info,
+    Info = 0x30,
 
     /// Warning records include information about potentially problematic operations.
     #[serde(rename = "WARN", alias = "Warn", alias = "warn")]
-    Warn,
+    Warn = 0x40,
 
     /// Error records include information about failed operations.
     #[serde(rename = "ERROR", alias = "Error", alias = "error")]
-    Error,
+    Error = 0x50,
 
     /// Fatal records convey information about operations which cause a program's termination.
     #[serde(rename = "FATAL", alias = "Fatal", alias = "fatal")]
-    Fatal,
+    Fatal = 0x60,
 }
 // LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
 
-impl TryFrom<i32> for Severity {
-    type Error = anyhow::Error;
+impl Severity {
+    /// Returns a severity and also the raw severity if it's  not an exact match of a severity value.
+    pub fn parse_exact(raw_severity: u8) -> (Option<u8>, Severity) {
+        if raw_severity == Severity::Trace as u8 {
+            (None, Severity::Trace)
+        } else if raw_severity == Severity::Debug as u8 {
+            (None, Severity::Debug)
+        } else if raw_severity == Severity::Info as u8 {
+            (None, Severity::Info)
+        } else if raw_severity == Severity::Warn as u8 {
+            (None, Severity::Warn)
+        } else if raw_severity == Severity::Error as u8 {
+            (None, Severity::Error)
+        } else if raw_severity == Severity::Fatal as u8 {
+            (None, Severity::Fatal)
+        } else {
+            (Some(raw_severity), Severity::from(raw_severity))
+        }
+    }
+}
 
-    fn try_from(value: i32) -> Result<Self, anyhow::Error> {
-        u8::try_from(value)
-            .ok()
-            .and_then(|num| FidlSeverity::from_primitive(num))
-            .map(|s| Severity::from(s))
-            .ok_or(format_err!("invalid severity number: {}", value))
+impl From<u8> for Severity {
+    fn from(value: u8) -> Severity {
+        match value {
+            0x00..=0x10 => Severity::Trace,
+            0x11..=0x20 => Severity::Debug,
+            0x21..=0x30 => Severity::Info,
+            0x31..=0x40 => Severity::Warn,
+            0x41..=0x50 => Severity::Error,
+            0x51.. => Severity::Fatal,
+        }
+    }
+}
+
+impl From<i8> for Severity {
+    fn from(value: i8) -> Severity {
+        match value {
+            0x00..=0x10 => Severity::Trace,
+            0x11..=0x20 => Severity::Debug,
+            0x21..=0x30 => Severity::Info,
+            0x31..=0x40 => Severity::Warn,
+            0x41..=0x50 => Severity::Error,
+            0x51.. => Severity::Fatal,
+            _ => Severity::Trace,
+        }
+    }
+}
+
+impl From<i32> for Severity {
+    fn from(value: i32) -> Severity {
+        match value {
+            0x00..=0x10 => Severity::Trace,
+            0x11..=0x20 => Severity::Debug,
+            0x21..=0x30 => Severity::Info,
+            0x31..=0x40 => Severity::Warn,
+            0x41..=0x50 => Severity::Error,
+            0x51.. => Severity::Fatal,
+            _ => Severity::Trace,
+        }
     }
 }
 
@@ -607,7 +643,11 @@ pub struct InspectDataBuilder {
 }
 
 impl InspectDataBuilder {
-    pub fn new(moniker: ExtendedMoniker, component_url: impl Into<FlyStr>, timestamp: i64) -> Self {
+    pub fn new(
+        moniker: ExtendedMoniker,
+        component_url: impl Into<FlyStr>,
+        timestamp: impl Into<Timestamp>,
+    ) -> Self {
         Self {
             data: Data {
                 data_source: DataSource::Inspect,
@@ -618,7 +658,7 @@ impl InspectDataBuilder {
                     errors: None,
                     name: InspectHandleName::name(DEFAULT_TREE_NAME.clone()),
                     component_url: component_url.into(),
-                    timestamp,
+                    timestamp: timestamp.into(),
                     escrowed: false,
                 },
             },
@@ -674,8 +714,8 @@ pub struct LogsDataBuilder {
     args: BuilderArgs,
     /// List of KVPs from the user
     keys: Vec<Property<LogsField>>,
-    /// The message verbosity
-    raw_severity: Option<i64>,
+    /// Raw severity.
+    raw_severity: Option<u8>,
 }
 
 /// Arguments used to create a new [`LogsDataBuilder`].
@@ -683,7 +723,7 @@ pub struct BuilderArgs {
     /// The moniker for the component
     pub moniker: ExtendedMoniker,
     /// The timestamp of the message in nanoseconds
-    pub timestamp_nanos: Timestamp,
+    pub timestamp: Timestamp,
     /// The component URL
     pub component_url: Option<FlyStr>,
     /// The message severity
@@ -731,6 +771,12 @@ impl LogsDataBuilder {
         self
     }
 
+    /// Overrides the severity set through the args with a raw severity.
+    pub fn set_raw_severity(mut self, severity: u8) -> Self {
+        self.raw_severity = Some(severity);
+        self
+    }
+
     /// Sets the number of rolled out messages.
     /// If value is greater than zero, a RolledOutLogs error
     /// will also be added to the list of errors or updated if
@@ -755,9 +801,10 @@ impl LogsDataBuilder {
         self
     }
 
-    /// Sets the severity of the log.
+    /// Sets the severity of the log. This will unset the raw severity.
     pub fn set_severity(mut self, severity: Severity) -> Self {
         self.args.severity = severity;
+        self.raw_severity = None;
         self
     }
 
@@ -765,13 +812,6 @@ impl LogsDataBuilder {
     #[must_use = "You must call build on your builder to consume its result"]
     pub fn set_pid(mut self, value: u64) -> Self {
         self.pid = Some(value);
-        self
-    }
-
-    /// Sets the raw severity level
-    #[must_use = "You must call build on your builder to consume its result"]
-    pub fn override_raw_severity(mut self, value: i64) -> Self {
-        self.raw_severity = Some(value);
         self
     }
 
@@ -788,9 +828,6 @@ impl LogsDataBuilder {
         if let Some(msg) = self.msg {
             args.push(LogsProperty::String(LogsField::MsgStructured, msg));
         }
-        if let Some(raw_severity) = self.raw_severity {
-            args.push(LogsProperty::Int(LogsField::RawSeverity, raw_severity));
-        }
         let mut payload_fields = vec![DiagnosticsHierarchy::new("message", args, vec![])];
         if !self.keys.is_empty() {
             let val = DiagnosticsHierarchy::new("keys", self.keys, vec![]);
@@ -798,14 +835,17 @@ impl LogsDataBuilder {
         }
         let mut payload = LogsHierarchy::new("root", vec![], payload_fields);
         payload.sort();
+        let (raw_severity, severity) =
+            self.raw_severity.map(Severity::parse_exact).unwrap_or((None, self.args.severity));
         let mut ret = LogsData::for_logs(
             self.args.moniker,
             Some(payload),
-            self.args.timestamp_nanos,
+            self.args.timestamp,
             self.args.component_url,
-            self.args.severity,
+            severity,
             self.errors,
         );
+        ret.metadata.raw_severity = raw_severity;
         ret.metadata.file = self.file;
         ret.metadata.line = self.line;
         ret.metadata.pid = self.pid;
@@ -875,9 +915,10 @@ impl Data<Logs> {
             data_source: DataSource::Logs,
             payload,
             metadata: LogsMetadata {
-                timestamp: *(timestamp.into()),
+                timestamp: timestamp.into(),
                 component_url: component_url,
                 severity: severity.into(),
+                raw_severity: None,
                 errors,
                 file: None,
                 line: None,
@@ -888,6 +929,19 @@ impl Data<Logs> {
                 size_bytes: None,
             },
         }
+    }
+
+    /// Sets the severity from a raw severity number. Overrides the severity to match the raw
+    /// severity.
+    pub fn set_raw_severity(&mut self, raw_severity: u8) {
+        self.metadata.raw_severity = Some(raw_severity);
+        self.metadata.severity = Severity::from(raw_severity);
+    }
+
+    /// Sets the severity of the log. This will unset the raw severity.
+    pub fn set_severity(&mut self, severity: Severity) {
+        self.metadata.severity = severity;
+        self.metadata.raw_severity = None;
     }
 
     /// Returns the string log associated with the message, if one exists.
@@ -931,7 +985,6 @@ impl Data<Logs> {
                 LogsProperty::String(LogsField::Tag, _tag) => None,
                 LogsProperty::String(LogsField::ProcessId, _tag) => None,
                 LogsProperty::String(LogsField::ThreadId, _tag) => None,
-                LogsProperty::String(LogsField::RawSeverity, _tag) => None,
                 LogsProperty::String(LogsField::Dropped, _tag) => None,
                 LogsProperty::String(LogsField::Msg, _tag) => None,
                 LogsProperty::String(LogsField::FilePath, _tag) => None,
@@ -1016,23 +1069,6 @@ impl Data<Logs> {
         self.metadata.tags.as_ref()
     }
 
-    /// The message's severity.
-    #[cfg(target_os = "fuchsia")]
-    pub fn legacy_severity(&self) -> LegacySeverity {
-        if let Some(raw_severity) = self.raw_severity() {
-            LegacySeverity::RawSeverity(raw_severity)
-        } else {
-            match self.metadata.severity {
-                Severity::Trace => LegacySeverity::Trace,
-                Severity::Debug => LegacySeverity::Debug,
-                Severity::Info => LegacySeverity::Info,
-                Severity::Warn => LegacySeverity::Warn,
-                Severity::Error => LegacySeverity::Error,
-                Severity::Fatal => LegacySeverity::Fatal,
-            }
-        }
-    }
-
     /// Returns the severity level of this log.
     pub fn severity(&self) -> Severity {
         self.metadata.severity
@@ -1064,37 +1100,6 @@ impl Data<Logs> {
                 })
             })
             .flatten()
-    }
-
-    /// If the log has a raw severity, returns its value.
-    pub fn raw_severity(&self) -> Option<i8> {
-        self.payload_message().and_then(|payload| {
-            payload
-                .properties
-                .iter()
-                .filter_map(|property| match property {
-                    LogsProperty::Int(LogsField::RawSeverity, verbosity) => Some(*verbosity as i8),
-                    _ => None,
-                })
-                .next()
-        })
-    }
-
-    /// Sets the raw severity of a log.
-    pub fn set_raw_severity(&mut self, raw_severity: i8) {
-        if let Some(payload_message) = self.payload_message_mut() {
-            payload_message
-                .properties
-                .push(LogsProperty::Int(LogsField::RawSeverity, raw_severity.into()));
-        }
-    }
-
-    #[cfg(target_os = "fuchsia")]
-    pub(crate) fn non_legacy_contents(&self) -> Box<dyn Iterator<Item = &LogsProperty> + '_> {
-        match self.payload_keys() {
-            None => Box::new(std::iter::empty()),
-            Some(payload) => Box::new(payload.properties.iter()),
-        }
     }
 
     /// Returns the component nam. This only makes sense for v1 components.
@@ -1240,18 +1245,19 @@ pub enum LogTimeDisplayFormat {
 }
 
 impl LogTimeDisplayFormat {
-    fn write_timestamp(&self, f: &mut fmt::Formatter<'_>, time: i64) -> fmt::Result {
+    fn write_timestamp(&self, f: &mut fmt::Formatter<'_>, time: Timestamp) -> fmt::Result {
         const NANOS_IN_SECOND: i64 = 1_000_000_000;
 
         match self {
             // Don't try to print a human readable string if it's going to be in 1970, fall back
             // to monotonic.
             Self::Original | Self::WallTime { offset: 0, .. } => {
-                let time: Duration = Duration::from_nanos(time as u64);
+                let time: Duration =
+                    Duration::from_nanos(time.into_nanos().try_into().unwrap_or(0));
                 write!(f, "[{:05}.{:06}]", time.as_secs(), time.as_micros() % MICROS_IN_SEC)?;
             }
             Self::WallTime { tz, offset } => {
-                let adjusted = time + offset;
+                let adjusted = time.into_nanos() + offset;
                 let seconds = adjusted / NANOS_IN_SECOND;
                 let rem_nanos = (adjusted % NANOS_IN_SECOND) as u32;
                 let formatted = tz.format(seconds, rem_nanos);
@@ -1296,7 +1302,6 @@ impl Deref for LogTextPresenter<'_> {
 impl fmt::Display for LogTextPresenter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.options.color.begin_record(f, self.log.severity())?;
-
         self.options.time_format.write_timestamp(f, self.metadata.timestamp)?;
 
         if self.options.show_metadata {
@@ -1404,7 +1409,6 @@ pub enum LogsField {
     ThreadId,
     Dropped,
     Tag,
-    RawSeverity,
     Msg,
     MsgStructured,
     FilePath,
@@ -1419,7 +1423,6 @@ impl fmt::Display for LogsField {
             LogsField::ThreadId => write!(f, "tid"),
             LogsField::Dropped => write!(f, "num_dropped"),
             LogsField::Tag => write!(f, "tag"),
-            LogsField::RawSeverity => write!(f, "raw_severity"),
             LogsField::Msg => write!(f, "message"),
             LogsField::MsgStructured => write!(f, "value"),
             LogsField::FilePath => write!(f, "file_path"),
@@ -1443,27 +1446,10 @@ pub const TAG_LABEL: &str = "tag";
 pub const MESSAGE_LABEL_STRUCTURED: &str = "value";
 /// The label for the message in the log payload.
 pub const MESSAGE_LABEL: &str = "message";
-/// The label for the raw severity of a log.
-pub const RAW_SEVERITY_LABEL: &str = "raw_severity";
 /// The label for the file associated with a log line.
 pub const FILE_PATH_LABEL: &str = "file";
 /// The label for the line number in the file associated with a log line.
 pub const LINE_NUMBER_LABEL: &str = "line";
-
-impl LogsField {
-    /// Whether the logs field is legacy or not.
-    pub fn is_legacy(&self) -> bool {
-        matches!(
-            self,
-            LogsField::ProcessId
-                | LogsField::ThreadId
-                | LogsField::Dropped
-                | LogsField::Tag
-                | LogsField::Msg
-                | LogsField::RawSeverity
-        )
-    }
-}
 
 impl AsRef<str> for LogsField {
     fn as_ref(&self) -> &str {
@@ -1473,7 +1459,6 @@ impl AsRef<str> for LogsField {
             Self::Dropped => DROPPED_LABEL,
             Self::Tag => TAG_LABEL,
             Self::Msg => MESSAGE_LABEL,
-            Self::RawSeverity => RAW_SEVERITY_LABEL,
             Self::FilePath => FILE_PATH_LABEL,
             Self::LineNumber => LINE_NUMBER_LABEL,
             Self::MsgStructured => MESSAGE_LABEL_STRUCTURED,
@@ -1492,7 +1477,6 @@ where
             PID_LABEL => Self::ProcessId,
             TID_LABEL => Self::ThreadId,
             DROPPED_LABEL => Self::Dropped,
-            RAW_SEVERITY_LABEL => Self::RawSeverity,
             TAG_LABEL => Self::Tag,
             MESSAGE_LABEL => Self::Msg,
             FILE_PATH_LABEL => Self::FilePath,
@@ -1607,11 +1591,14 @@ mod tests {
         };
 
         hierarchy.sort();
-        let json_schema =
-            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-                .with_hierarchy(hierarchy)
-                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-                .build();
+        let json_schema = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_hierarchy(hierarchy)
+        .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+        .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1637,11 +1624,14 @@ mod tests {
 
     #[fuchsia::test]
     fn test_errorful_json_inspect_formatting() {
-        let json_schema =
-            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-                .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
-                .build();
+        let json_schema = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+        .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
+        .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1674,8 +1664,12 @@ mod tests {
 
     #[fuchsia::test]
     fn test_filter_returns_none_on_empty_hierarchy() {
-        let data =
-            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64).build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
     }
@@ -1688,9 +1682,13 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("b/c/d/e".try_into().unwrap(), TEST_URL, 123456i64)
-            .with_hierarchy(hierarchy)
-            .build();
+        let data = InspectDataBuilder::new(
+            "b/c/d/e".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_hierarchy(hierarchy)
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
     }
@@ -1703,9 +1701,13 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-            .with_hierarchy(hierarchy)
-            .build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_hierarchy(hierarchy)
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
 
         assert_eq!(data.filter(&selectors).expect("FIlter OK"), None);
@@ -1720,10 +1722,14 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-            .with_hierarchy(hierarchy)
-            .build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+        .with_hierarchy(hierarchy)
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:root:x"]);
 
         let expected_json = json!({
@@ -1754,7 +1760,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 0.into(),
+            timestamp: Timestamp::from_nanos(0),
         });
         //let tree = builder.build();
         let expected_json = json!({
@@ -1786,7 +1792,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 0.into(),
+            timestamp: Timestamp::from_nanos(0),
         })
         .set_message("app")
         .set_file("test file.cc")
@@ -1835,7 +1841,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1860,7 +1866,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_duplicate_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1886,7 +1892,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_duplicate_moniker_and_no_other_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1911,7 +1917,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_partial_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("test/moniker").unwrap(),
             severity: Severity::Info,
@@ -1939,7 +1945,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_exclude_metadata() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1967,7 +1973,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_exclude_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1995,7 +2001,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_exclude_file() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2023,7 +2029,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_include_color_by_severity() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Error,
@@ -2051,7 +2057,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_highlight_line() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2079,7 +2085,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_wall_time() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2116,7 +2122,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_dropped_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2150,7 +2156,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_rolled_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2184,7 +2190,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_dropped_and_rolled_counts() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2219,7 +2225,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_no_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2255,7 +2261,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("a/b").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 123.into(),
+            timestamp: Timestamp::from_nanos(123),
         })
         .build();
         let original_data: LogsData = serde_json::from_value(original_json).unwrap();
@@ -2288,7 +2294,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("a/b").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 123.into(),
+            timestamp: Timestamp::from_nanos(123),
         })
         .build();
         let original_data: LogsData = serde_json::from_value(original_json).unwrap();

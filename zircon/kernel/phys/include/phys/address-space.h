@@ -102,10 +102,12 @@ class AddressSpace {
   // operated upon separately.
   static constexpr bool kDualSpaces = !ktl::is_same_v<LowerPaging, UpperPaging>;
 
-  static constexpr MapSettings kMmioMapSettings = {
-      .access = {.readable = true, .writable = true},
-      .memory = kArchMmioMemoryType,
-  };
+  static MapSettings MmioMapSettings() {
+    return {
+        .access = {.readable = true, .writable = true},
+        .memory = ArchMmioMemoryType(),
+    };
+  }
 
   static constexpr MapSettings NormalMapSettings(arch::AccessPermissions access) {
     return {.access = access, .memory = kArchNormalMemoryType};

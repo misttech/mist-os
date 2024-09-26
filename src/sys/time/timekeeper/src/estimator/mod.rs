@@ -8,14 +8,12 @@ mod kalman_filter;
 use crate::diagnostics::{Diagnostics, Event};
 use crate::enums::{FrequencyDiscardReason, Track};
 use crate::time_source::Sample;
-use crate::Config;
+use crate::{Config, UtcTransform};
 use chrono::prelude::*;
 use frequency::FrequencyEstimator;
-use fuchsia_runtime::UtcTimeline;
 use fuchsia_zircon as zx;
 use kalman_filter::KalmanFilter;
 use std::sync::Arc;
-use time_util::Transform;
 use tracing::{info, warn};
 
 /// The maximum change in Kalman filter estimate that can occur before we discard any previous
@@ -129,9 +127,9 @@ impl<D: Diagnostics> Estimator<D> {
         }
     }
 
-    /// Returns a `Transform` describing the estimated synthetic time and error as a function
+    /// Returns a `UtcTransform` describing the estimated synthetic time and error as a function
     /// of the monotonic time.
-    pub fn transform(&self) -> Transform<UtcTimeline> {
+    pub fn transform(&self) -> UtcTransform {
         self.filter.transform()
     }
 }
@@ -142,7 +140,7 @@ mod test {
     use crate::diagnostics::FakeDiagnostics;
     use crate::make_test_config;
     use fuchsia_runtime::UtcTime;
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
     use test_util::assert_near;
 
     // Note: we need to ensure the absolute times are not near the January 1st leap second.
@@ -206,10 +204,10 @@ mod test {
         assert_eq!(transform.synthetic(TIME_2).into_nanos(), (TIME_2 + OFFSET_1).into_nanos());
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
-        assert_eq!(transform.error_bound(TIME_1 - 1.second()), 2 * SQRT_COV_1);
+        assert_eq!(transform.error_bound(TIME_1 - zx::Duration::from_seconds(1)), 2 * SQRT_COV_1);
         // Later time should have a higher bound.
         assert_eq!(
-            transform.error_bound(TIME_1 + 1.second()),
+            transform.error_bound(TIME_1 + zx::Duration::from_seconds(1)),
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
     }
@@ -231,7 +229,7 @@ mod test {
         ));
 
         // Expected offset is biased slightly towards the second estimate.
-        let expected_offset = 88_8002_580_002.nanos();
+        let expected_offset = zx::Duration::from_nanos(88_8002_580_002);
         let expected_sqrt_cov = 15_556_529u64;
         assert_eq!(
             estimator.transform().synthetic(TIME_3).into_nanos(),
@@ -318,7 +316,7 @@ mod test {
         let mut samples = Vec::<Sample>::new();
         {
             let test_frequency = 1.000003;
-            let utc_spacing = 1.hour() + 1.millis();
+            let utc_spacing = zx::Duration::from_hours(1) + zx::Duration::from_millis(1);
             let monotonic_spacing =
                 zx::Duration::from_nanos((utc_spacing.into_nanos() as f64 / test_frequency) as i64);
             for i in 1..48 {
@@ -346,13 +344,13 @@ mod test {
             // We calculated the new frequency after consuming the first window outside the first
             // day (i=23) and it begins to help on the next sample (i=24).
             let expected_error = match i {
-                0 => 11.millis(),
-                _ if i <= 23 => 12.millis(),
-                24 => 2.millis(),
-                _ => 0.millis(),
+                0 => zx::Duration::from_millis(11),
+                _ if i <= 23 => zx::Duration::from_millis(12),
+                24 => zx::Duration::from_millis(2),
+                _ => zx::Duration::from_millis(0),
             };
 
-            assert_near!(error, expected_error, 1.millis());
+            assert_near!(error, expected_error, zx::Duration::from_millis(1));
             estimator.update(sample);
         }
     }

@@ -4,15 +4,19 @@
 
 //! Safe bindings for the driver runtime channel stable ABI
 
+use core::future::Future;
 use fuchsia_zircon::Status;
 
 use crate::fdf_sys::*;
-use crate::{Arena, ArenaBox, DriverHandle, Message, MixedHandle};
+use crate::{Arena, ArenaBox, DispatcherRef, DriverHandle, Message, MixedHandle};
 
 use core::marker::PhantomData;
 use core::mem::{size_of_val, MaybeUninit};
 use core::num::NonZero;
+use core::pin::Pin;
 use core::ptr::{null_mut, NonNull};
+use core::task::{Context, Poll, Waker};
+use std::sync::{Arc, Mutex};
 
 pub use crate::fdf_sys::fdf_handle_t;
 
@@ -164,6 +168,29 @@ impl<T: ?Sized + 'static> Channel<T> {
         };
         Ok(Some(unsafe { Message::new_unchecked(arena, data_ptr, handles_ptr) }))
     }
+
+    /// Reads a message from the channel asynchronously
+    ///
+    /// # Panic
+    ///
+    /// Panics if this is not run from a driver framework dispatcher.
+    fn read_raw<'a>(&'a self, dispatcher: DispatcherRef<'a>) -> ReadMessageRawFut<'a, T> {
+        ReadMessageRawFut {
+            op: Arc::new(ReadMessageRawOp {
+                read_op: fdf_channel_read {
+                    // SAFETY: the lifetime of this future is constrained by the lifetime of the
+                    // channel through lifetime `'a`, and the read op will be cancelled if this
+                    // future is dropped before being fulfilled.
+                    channel: unsafe { self.0.get_raw() }.get(),
+                    handler: Some(ReadMessageRawOp::handler),
+                    ..Default::default()
+                },
+                waker: Mutex::new(None),
+            }),
+            channel: self,
+            dispatcher,
+        }
+    }
 }
 
 impl<T> Channel<T> {
@@ -171,6 +198,16 @@ impl<T> Channel<T> {
     pub fn try_read<'a>(&self) -> Result<Option<Message<T>>, Status> {
         // read a message from the channel
         let Some(message) = self.try_read_raw()? else {
+            return Ok(None);
+        };
+        // SAFETY: It is an invariant of Channel<T> that messages sent or received are always of
+        // type T.
+        Ok(Some(unsafe { message.cast_unchecked() }))
+    }
+
+    /// Reads an object of type `T` and a handle set from the channel asynchronously
+    pub async fn read(&self, dispatcher: DispatcherRef<'_>) -> Result<Option<Message<T>>, Status> {
+        let Some(message) = self.read_raw(dispatcher).await? else {
             return Ok(None);
         };
         // SAFETY: It is an invariant of Channel<T> that messages sent or received are always of
@@ -190,6 +227,20 @@ impl Channel<[u8]> {
         // type [u8].
         Ok(Some(unsafe { message.assume_init() }))
     }
+
+    /// Reads a slice of type `T` and a handle set from the channel asynchronously
+    pub async fn read_bytes(
+        &self,
+        dispatcher: DispatcherRef<'_>,
+    ) -> Result<Option<Message<[u8]>>, Status> {
+        // read a message from the channel
+        let Some(message) = self.read_raw(dispatcher).await? else {
+            return Ok(None);
+        };
+        // SAFETY: It is an invariant of Channel<[u8]> that messages sent or received are always of
+        // type [u8].
+        Ok(Some(unsafe { message.assume_init() }))
+    }
 }
 
 impl<T> From<Channel<T>> for MixedHandle {
@@ -198,12 +249,122 @@ impl<T> From<Channel<T>> for MixedHandle {
     }
 }
 
+/// This struct is shared between the future and the driver runtime, with the first field
+/// being managed by the driver runtime and the second by the future. It will be held by two
+/// [`Arc`]s, one for each of the future and the runtime.
+///
+/// The future's [`Arc`] will be dropped when the future is either fulfilled or cancelled through
+/// normal [`Drop`] of the future.
+///
+/// The runtime's [`Arc`]'s dropping varies depending on whether the dispatcher it was registered on
+/// was synchronized or not, and whether it was cancelled or not. The callback will only ever be
+/// called *up to* one time.
+///
+/// If the dispatcher is synchronized, then the callback will *only* be called on fulfillment of the
+/// read wait.
+#[repr(C)]
+struct ReadMessageRawOp {
+    /// This must be at the start of the struct so that `ReadMessageRawOp` can be cast to and from `fdf_channel_read`.
+    read_op: fdf_channel_read,
+    waker: Mutex<Option<Waker>>,
+}
+
+impl ReadMessageRawOp {
+    unsafe extern "C" fn handler(
+        _dispatcher: *mut fdf_dispatcher,
+        read_op: *mut fdf_channel_read,
+        _status: i32,
+    ) {
+        // SAFETY: When setting up the read op, we incremented the refcount of the `Arc` to allow
+        // for this handler to reconstitute it.
+        let op: Arc<Self> = unsafe { Arc::from_raw(read_op.cast()) };
+        let waker = op
+            .waker
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Channel read handler somehow called with no waker registered");
+        waker.wake()
+    }
+}
+
+struct ReadMessageRawFut<'a, T: ?Sized + 'static> {
+    op: Arc<ReadMessageRawOp>,
+    channel: &'a Channel<T>,
+    dispatcher: DispatcherRef<'a>,
+}
+
+impl<'a, T: ?Sized + 'static> Future for ReadMessageRawFut<'a, T> {
+    type Output = Result<Option<Message<[MaybeUninit<u8>]>>, Status>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut waker_lock = self.op.waker.lock().unwrap();
+
+        match self.channel.try_read_raw() {
+            Ok(res) => Poll::Ready(Ok(res)),
+            Err(Status::SHOULD_WAIT) => {
+                // if we haven't yet set a waker, that means we haven't started the wait operation
+                // yet.
+                if waker_lock.replace(cx.waker().clone()).is_none() {
+                    // increment the reference count of the read op to account for the copy that will be given to
+                    // `fdf_channel_wait_async`.
+                    let op = Arc::into_raw(self.op.clone());
+                    // SAFETY: the `ReadMessageRawOp` starts with an `fdf_channel_read` struct and
+                    // has `repr(C)` layout, so is safe to be cast to the latter.
+                    let res = Status::ok(unsafe {
+                        fdf_channel_wait_async(self.dispatcher.0.as_ptr(), op.cast_mut().cast(), 0)
+                    });
+                    match res {
+                        Ok(()) => {}
+                        Err(e) => return Poll::Ready(Err(e)),
+                    }
+                }
+                Poll::Pending
+            }
+            Err(e) => Poll::Ready(Err(e)),
+        }
+    }
+}
+
+impl<'a, T: ?Sized + 'static> Drop for ReadMessageRawFut<'a, T> {
+    fn drop(&mut self) {
+        let mut waker_lock = self.op.waker.lock().unwrap();
+        if waker_lock.is_none() {
+            // if there's no waker either the callback has already fired or we never waited on this
+            // future in the first place, so just leave it be.
+            return;
+        }
+
+        // SAFETY: since we hold a lifetimed-reference to the channel object here, the channel must
+        // be valid.
+        let res = Status::ok(unsafe { fdf_channel_cancel_wait(self.channel.0.get_raw().get()) });
+        match res {
+            Ok(_) => {}
+            Err(Status::NOT_FOUND) => {
+                // the callback is already being called or the wait was already cancelled, so just
+                // return and leave it.
+                return;
+            }
+            Err(e) => panic!("Unexpected error {e:?} cancelling driver channel read wait"),
+        }
+        // steal the waker so it doesn't get called, if there is one.
+        waker_lock.take();
+        // SAFETY: if the channel was waited on by a synchronized dispatcher, and the cancel was
+        // successful, the callback will not be called and we will have to free the `Arc` that the
+        // callback would have consumed.
+        if !self.dispatcher.is_unsynchronized() {
+            unsafe { Arc::decrement_strong_count(Arc::as_ptr(&self.op)) };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::mpsc;
 
+    use crate::test::with_raw_dispatcher;
     use crate::tests::DropSender;
-    use crate::MixedHandleType;
+    use crate::{Dispatcher, MixedHandleType};
 
     use super::*;
 
@@ -224,6 +385,23 @@ mod tests {
             first.write_with_data(arena.clone(), |arena| arena.insert_slice(&[9, 10, 11, 12])),
             Err(Status::from_raw(ZX_ERR_PEER_CLOSED))
         );
+    }
+
+    #[test]
+    fn send_and_receive_bytes_asynchronously() {
+        with_raw_dispatcher("channel async", |dispatcher| {
+            let arena = Arena::new().unwrap();
+            let (fin_tx, fin_rx) = mpsc::channel();
+            let (first, second) = Channel::create().unwrap();
+
+            dispatcher
+                .spawn_task(async move {
+                    fin_tx.send(first.read_bytes(dispatcher.as_ref()).await.unwrap()).unwrap();
+                })
+                .unwrap();
+            second.write_with_data(arena, |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
+            assert_eq!(fin_rx.recv().unwrap().unwrap().data().unwrap(), &[1, 2, 3, 4]);
+        });
     }
 
     #[test]
@@ -275,5 +453,96 @@ mod tests {
             .write_with_data(Arena::new().unwrap(), |arena| arena.insert("boom".to_string()))
             .unwrap();
         assert_eq!(inner_second.try_read().unwrap().unwrap().data().unwrap(), &"boom".to_string());
+    }
+
+    async fn ping(dispatcher: &Dispatcher, chan: Channel<u8>) {
+        println!("starting ping!");
+        chan.write_with_data(Arena::new().unwrap(), |arena| arena.insert(0)).unwrap();
+        while let Ok(Some(msg)) = chan.read(dispatcher.as_ref()).await {
+            let next = *msg.data().unwrap();
+            println!("ping! {next}");
+            chan.write_with_data(msg.take_arena(), |arena| arena.insert(next + 1)).unwrap();
+        }
+    }
+
+    async fn pong(dispatcher: &Dispatcher, fin_tx: std::sync::mpsc::Sender<()>, chan: Channel<u8>) {
+        println!("starting pong!");
+        while let Some(msg) = chan.read(dispatcher.as_ref()).await.unwrap() {
+            let next = *msg.data().unwrap();
+            println!("pong! {next}");
+            if next > 10 {
+                println!("bye!");
+                break;
+            }
+            chan.write_with_data(msg.take_arena(), |arena| arena.insert(next + 1)).unwrap();
+        }
+        fin_tx.send(()).unwrap();
+    }
+
+    #[test]
+    fn async_ping_pong() {
+        with_raw_dispatcher("async ping pong", |dispatcher| {
+            let (fin_tx, fin_rx) = mpsc::channel();
+            let (ping_chan, pong_chan) = Channel::create().unwrap();
+            dispatcher.spawn_task(ping(&dispatcher, ping_chan)).unwrap();
+            dispatcher.spawn_task(pong(&dispatcher, fin_tx, pong_chan)).unwrap();
+
+            fin_rx.recv().expect("to receive final value");
+        });
+    }
+
+    #[test]
+    fn async_ping_pong_on_fuchsia_async() {
+        with_raw_dispatcher("async ping pong", |dispatcher| {
+            let (fin_tx, fin_rx) = mpsc::channel();
+            let (ping_chan, pong_chan) = Channel::create().unwrap();
+
+            dispatcher
+                .post_task_sync(|_status| {
+                    let rust_async_dispatcher = crate::DispatcherBuilder::new()
+                        .name("fuchsia-async")
+                        .allow_thread_blocking()
+                        .create()
+                        .expect("failure creating blocking dispatcher for rust async");
+
+                    dispatcher.spawn_task(pong(&dispatcher, fin_tx, pong_chan)).unwrap();
+                    rust_async_dispatcher
+                        .post_task_sync(|_| {
+                            let mut executor = fuchsia_async::LocalExecutor::new();
+                            executor.run_singlethreaded(ping(&dispatcher, ping_chan));
+                        })
+                        .unwrap();
+                })
+                .unwrap();
+
+            fin_rx.recv().expect("to receive final value");
+        });
+    }
+
+    #[test]
+    fn early_cancel_future() {
+        with_raw_dispatcher("early cancellation", |dispatcher| {
+            let (fin_tx, fin_rx) = mpsc::channel();
+            let (a, b) = Channel::create().unwrap();
+            dispatcher
+                .spawn_task(async move {
+                    // create, poll, and then immediately drop a read future for channel `a`
+                    // so that it properly sets up the wait.
+                    let fut = a.read(dispatcher.as_ref());
+                    futures::pin_mut!(fut);
+                    let Poll::Pending = futures::poll!(fut.as_mut()) else {
+                        panic!("expected pending state after polling channel read once");
+                    };
+                    drop(fut);
+                    b.write_with_data(Arena::new().unwrap(), |arena| arena.insert(1)).unwrap();
+                    assert_eq!(
+                        a.read(dispatcher.as_ref()).await.unwrap().unwrap().data(),
+                        Some(&1)
+                    );
+                    fin_tx.send(()).unwrap();
+                })
+                .unwrap();
+            fin_rx.recv().unwrap();
+        })
     }
 }

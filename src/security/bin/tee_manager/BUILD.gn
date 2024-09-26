@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 
 group("tests") {
@@ -94,7 +95,7 @@ fuchsia_test_package("optee_test") {
   }
 }
 
-executable("optee_test_bin") {
+cc_test_executable("optee_test_bin") {
   testonly = true
   output_name = "optee_test"
 
@@ -126,7 +127,7 @@ fuchsia_test_package("optee_smoke_test") {
   }
 }
 
-executable("optee_smoke_test_bin") {
+cc_test_executable("optee_smoke_test_bin") {
   testonly = true
   output_name = "optee_smoke_test"
 

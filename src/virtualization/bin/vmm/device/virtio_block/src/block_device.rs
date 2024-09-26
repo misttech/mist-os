@@ -120,9 +120,9 @@ fn read_header<'a, 'b, N: DriverNotify, M: DriverMem>(
     let mut header_buf: [u8; std::mem::size_of::<wire::VirtioBlockHeader>()] =
         [0; std::mem::size_of::<wire::VirtioBlockHeader>()];
     chain.read_exact(&mut header_buf)?;
-    // read_from should not fail since we've sized the buffer appropriately. Any failures here are
-    // unexpected.
-    Ok(wire::VirtioBlockHeader::read_from(header_buf.as_slice())
+    // read_from_bytes should not fail since we've sized the buffer
+    // appropriately. Any failures here are unexpected.
+    Ok(wire::VirtioBlockHeader::read_from_bytes(header_buf.as_slice())
         .expect("Failed to deserialize VirtioBlockHeader."))
 }
 

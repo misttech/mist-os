@@ -122,9 +122,10 @@ class FanControllerTest : public zxtest::Test {
     zx::channel channel0, channel1;
 
     // Serve up the emulated fan directory
-    ASSERT_EQ(zx::channel::create(0, &channel0, &channel1), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(dir_, std::move(channel0), fs::VnodeConnectionOptions::ReadOnly()), ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(ns_, fan_controller::kFanDirectory, channel1.release()), ZX_OK);
+    auto [dir_client, dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(dir_, std::move(dir_server)), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(ns_, fan_controller::kFanDirectory, dir_client.TakeChannel().release()),
+              ZX_OK);
 
     auto endpoints = fidl::Endpoints<fuchsia_thermal::ClientStateConnector>::Create();
     client_state_.emplace(std::move(endpoints.server));

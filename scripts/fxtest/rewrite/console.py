@@ -107,6 +107,7 @@ class ConsoleState:
             event.TestSuiteStatus, typing.Set[str]
         ] = defaultdict(set)
         self.exec_env: environment.ExecutionEnvironment | None = None
+        self.ended_due_to_error = False
 
 
 class ConsoleOutput:
@@ -206,6 +207,25 @@ class ConsoleOutput:
                 f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
             )
 
+            def print_tests(prefix: str, names: list[str]) -> None:
+                for name in names:
+                    print(statusinfo.error_highlight(f"{prefix}: {name}"))
+
+            print_tests(
+                "FAILED TO START",
+                sorted(
+                    state.test_results[event.TestSuiteStatus.FAILED_TO_START]
+                ),
+            )
+            print_tests(
+                "TIMEOUT",
+                sorted(state.test_results[event.TestSuiteStatus.TIMEOUT]),
+            )
+            print_tests(
+                "FAILED",
+                sorted(state.test_results[event.TestSuiteStatus.FAILED]),
+            )
+
         if state.end_duration is not None:
             print(
                 statusinfo.dim(
@@ -228,7 +248,11 @@ class ConsoleOutput:
                 )
             )
 
-        if state.active_durations and not flags.is_replay():
+        if (
+            state.active_durations
+            and not state.ended_due_to_error
+            and not flags.is_replay()
+        ):
             print(
                 statusinfo.error_highlight(
                     "BUG: Durations still active at exit:", style=flags.style
@@ -545,6 +569,7 @@ async def _console_event_loop(
             )
             if next_event.id == event.GLOBAL_RUN_ID:
                 state.end_duration = elapsed_time
+                state.ended_due_to_error = next_event.error is not None
 
         if flags.verbose:
             # In verbose mode, refuse to print too many output characters

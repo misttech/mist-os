@@ -38,8 +38,16 @@ class HttpRequestError(TransportError):
     """Exception for errors raised by HTTP requests running on host machine."""
 
 
+class HttpTimeoutError(HttpRequestError, TimeoutError):
+    """Exception for errors raised by HTTP requests timing out on host machine."""
+
+
 class Sl4fError(TransportError):
     """Exception for errors raised by SL4F requests."""
+
+
+class Sl4fTimeoutError(Sl4fError, TimeoutError):
+    """Exception for errors raised by SL4F request timeouts."""
 
 
 class SerialError(TransportError):
@@ -99,7 +107,11 @@ class HoneydewDataResourceError(HoneydewError):
 
 
 class HoneydewWlanError(HoneydewError):
-    """Raised by wlan.Wlan class."""
+    """Raised by WLAN affordances."""
+
+
+class HoneydewNetstackError(HoneydewError):
+    """Raised by netstack affordances."""
 
 
 class NetworkInterfaceNotFoundError(HoneydewError):

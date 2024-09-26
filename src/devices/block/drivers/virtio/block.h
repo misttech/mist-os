@@ -11,6 +11,7 @@
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
+#include <lib/zx/time.h>
 #include <stdlib.h>
 #include <zircon/compiler.h>
 
@@ -67,6 +68,7 @@ class BlockDevice : public Device,
  private:
   void SignalWorker(block_txn_t* txn);
   void WorkerThread();
+  void WatchdogThread();
   void FlushPendingTxns();
   void CleanupPendingTxns();
 
@@ -100,6 +102,13 @@ class BlockDevice : public Device,
   uint32_t blk_req_bitmap_ = 0;
   static_assert(blk_req_count <= sizeof(blk_req_bitmap_) * CHAR_BIT, "");
 
+  // When a transaction is enqueued, its start time (in the monotonic clock) is recorded, and the
+  // timestamp is cleared when the transaction completes.  A watchdog task will fire after a
+  // configured interval, and all timestamps will be checked against a deadline; if any exceed the
+  // deadline an error is logged.
+  std::mutex watchdog_lock_;
+  zx::time blk_req_start_timestamps_[blk_req_count] __TA_GUARDED(watchdog_lock_);
+
   size_t alloc_blk_req() {
     size_t i = 0;
     if (blk_req_bitmap_ != 0) {
@@ -123,6 +132,11 @@ class BlockDevice : public Device,
   list_node worker_txn_list_ = LIST_INITIAL_VALUE(worker_txn_list_);
   sync_completion_t worker_signal_;
   std::atomic_bool worker_shutdown_ = false;
+
+  thrd_t watchdog_thread_;
+  static constexpr zx::duration kWatchdogInterval = zx::sec(10);
+  sync_completion_t watchdog_signal_;
+  std::atomic_bool watchdog_shutdown_ = false;
 
   bool supports_discard_ = false;
 };

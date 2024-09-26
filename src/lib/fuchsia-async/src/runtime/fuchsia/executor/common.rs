@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
-use super::instrumentation::{Collector, LocalCollector, WakeupReason};
+use super::super::timer::{TimerHandle, TimerHeap};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeRef;
 use super::time::Time;
@@ -15,7 +14,6 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::future::Future;
 use std::mem::ManuallyDrop;
-use std::panic::Location;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 use std::task::{Context, RawWaker, RawWakerVTable, Waker};
@@ -29,21 +27,8 @@ pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 pub(crate) const MAIN_TASK_ID: usize = 0;
 
 thread_local!(
-    static EXECUTOR: RefCell<Option<(ScopeRef, TimerHeap)>> = RefCell::new(None)
+    static EXECUTOR: RefCell<Option<ScopeRef>> = RefCell::new(None)
 );
-
-pub(crate) fn with_local_timer_heap<F, R>(f: F) -> R
-where
-    F: FnOnce(&mut TimerHeap) -> R,
-{
-    EXECUTOR.with(|e| {
-        (f)(&mut e
-            .borrow_mut()
-            .as_mut()
-            .expect("can't get timer heap before fuchsia_async::Executor is initialized")
-            .1)
-    })
-}
 
 pub enum ExecutorTime {
     RealTime,
@@ -70,16 +55,18 @@ fn make_threads_state(sleeping: u8, notified: u8) -> u16 {
     sleeping as u16 | ((notified as u16) << 8)
 }
 
+#[cfg(test)]
+static ACTIVE_EXECUTORS: AtomicUsize = AtomicUsize::new(0);
+
 pub(crate) struct Executor {
     pub(super) port: zx::Port,
+    monotonic_timers: Arc<TimerHeap<Time>>,
     pub(super) done: AtomicBool,
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
     task_count: AtomicUsize,
     pub(super) ready_tasks: SegQueue<Arc<Task>>,
     time: ExecutorTime,
-    pub(super) collector: Collector,
-    pub(super) source: Option<&'static Location<'static>>,
     // The low byte is the number of threads currently sleeping. The high byte is the number of
     // of wake-up notifications pending.
     pub(super) threads_state: AtomicU16,
@@ -91,24 +78,25 @@ pub(crate) struct Executor {
 }
 
 impl Executor {
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn new(time: ExecutorTime, is_local: bool, num_threads: u8) -> Self {
-        #[cfg(trace_level_logging)]
-        let source = Some(Location::caller());
-        #[cfg(not(trace_level_logging))]
-        let source = None;
+        #[cfg(test)]
+        ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
 
-        let collector = Collector::new();
+        let mut receivers: PacketReceiverMap<Arc<dyn PacketReceiver>> = PacketReceiverMap::new();
+        let monotonic_timers = receivers.insert(|key| {
+            let timers = Arc::new(TimerHeap::new(key, matches!(time, ExecutorTime::FakeTime(_))));
+            (timers.clone(), timers)
+        });
+
         Executor {
             port: zx::Port::create(),
+            monotonic_timers,
             done: AtomicBool::new(false),
             is_local,
-            receivers: Mutex::new(PacketReceiverMap::new()),
+            receivers: Mutex::new(receivers),
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
             ready_tasks: SegQueue::new(),
             time,
-            collector,
-            source,
             threads_state: AtomicU16::new(0),
             num_threads,
             polled: AtomicU64::new(0),
@@ -116,27 +104,21 @@ impl Executor {
         }
     }
 
-    pub fn set_local(root_scope: ScopeRef, timers: TimerHeap) {
+    pub fn set_local(root_scope: ScopeRef) {
         EXECUTOR.with(|e| {
             let mut e = e.borrow_mut();
             assert!(e.is_none(), "Cannot create multiple Fuchsia Executors");
-            *e = Some((root_scope, timers));
+            *e = Some(root_scope);
         });
     }
 
-    fn poll_ready_tasks(&self, local_collector: &mut LocalCollector<'_>) -> PollReadyTasksResult {
+    fn poll_ready_tasks(&self) -> PollReadyTasksResult {
         loop {
             for _ in 0..16 {
                 let Some(task) = self.ready_tasks.pop() else {
                     return PollReadyTasksResult::NoneReady;
                 };
                 let complete = self.try_poll(&task);
-                local_collector.task_polled(
-                    task.id,
-                    task.source(),
-                    complete,
-                    self.ready_tasks.len(),
-                );
                 if complete && task.id == MAIN_TASK_ID {
                     return PollReadyTasksResult::MainTaskCompleted;
                 }
@@ -162,7 +144,6 @@ impl Executor {
         }
     }
 
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn(self: &Arc<Self>, scope: &ScopeRef, future: AtomicFuture<'static>) -> usize {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = {
@@ -172,12 +153,10 @@ impl Executor {
             }
             task
         };
-        self.collector.task_created(next_id, task.source());
         task.wake();
         next_id
     }
 
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local<F: Future<Output = R> + 'static, R: 'static>(
         self: &Arc<Self>,
         scope: &ScopeRef,
@@ -199,7 +178,6 @@ impl Executor {
     /// Spawns the main future.
     pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeRef, future: AtomicFuture<'static>) {
         let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
-        self.collector.task_created(MAIN_TASK_ID, task.source());
         if !root_scope.insert_task(MAIN_TASK_ID, task.clone()) {
             panic!("Could not spawn main task");
         }
@@ -262,7 +240,7 @@ impl Executor {
         }
     }
 
-    pub fn deliver_packet(&self, key: usize, packet: zx::Packet) {
+    pub fn deliver_packet(&self, key: u64, packet: zx::Packet) {
         let receiver = match self.receivers.lock().get(key) {
             // Clone the `Arc` so that we don't hold the lock
             // any longer than absolutely necessary.
@@ -287,6 +265,7 @@ impl Executor {
             }
             ExecutorTime::FakeTime(t) => t.store(new.into_nanos(), Ordering::Relaxed),
         }
+        self.monotonic_timers.maybe_notify(new);
     }
 
     pub fn is_real_time(&self) -> bool {
@@ -383,8 +362,8 @@ impl Executor {
         // Drop all of the uncompleted tasks
         while let Some(_) = self.ready_tasks.pop() {}
 
-        // Synthetic main task marked completed
-        self.collector.task_completed(MAIN_TASK_ID, self.source);
+        // Unregister the timer receiver so that we can perform the check below.
+        self.receivers.lock().remove(self.monotonic_timers.port_key());
 
         // Do not allow any receivers to outlive the executor. That's very likely a bug waiting to
         // happen. See discussion above.
@@ -420,13 +399,11 @@ impl Executor {
     // LINT.IfChange
     pub fn worker_lifecycle<const UNTIL_STALLED: bool>(self: &Arc<Executor>) {
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
-        let mut local_collector = self.collector.create_local_collector();
-
         loop {
             // Keep track of whether we are considered asleep.
             let mut sleeping = false;
 
-            match self.poll_ready_tasks(&mut local_collector) {
+            match self.poll_ready_tasks() {
                 PollReadyTasksResult::NoneReady => {
                     // No more tasks, indicate we are sleeping. We use SeqCst ordering because we
                     // want this change here to happen *before* we check ready_tasks below. This
@@ -457,27 +434,22 @@ impl Executor {
             enum Work {
                 None,
                 Packet(zx::Packet),
-                Timer(TimeWaker),
                 Stalled,
             }
 
             let mut notified = false;
-            let work = with_local_timer_heap(|timer_heap| {
+            let work = {
                 // If we're considered awake choose INFINITE_PAST which will make the wait call
-                // return immediately. Otherwise choose a deadline from the timers.
+                // return immediately.  Otherwise, wait until a packet arrives.
                 let deadline = if !sleeping || UNTIL_STALLED {
-                    Time::INFINITE_PAST
+                    zx::Time::INFINITE_PAST
                 } else {
-                    timer_heap.next_deadline().map(|t| t.time()).unwrap_or(Time::INFINITE)
+                    zx::Time::INFINITE
                 };
 
-                local_collector.will_wait();
-
-                // into_zx: we are using real time, so the time is a monotonic time.
-                match self.port.wait(deadline.into_zx()) {
+                match self.port.wait(deadline) {
                     Ok(packet) => {
                         if packet.key() == TASK_READY_WAKEUP_ID {
-                            local_collector.woke_up(WakeupReason::Notification);
                             notified = true;
                             Work::None
                         } else {
@@ -485,28 +457,17 @@ impl Executor {
                         }
                     }
                     Err(zx::Status::TIMED_OUT) => {
-                        if !sleeping {
+                        if !UNTIL_STALLED || !sleeping {
                             Work::None
-                        } else if UNTIL_STALLED {
-                            // Fire timers if using fake time.
-                            if !self.is_real_time() {
-                                if let Some(deadline) = timer_heap.next_deadline().map(|t| t.time())
-                                {
-                                    if deadline <= self.now() {
-                                        return Work::Timer(timer_heap.pop().unwrap());
-                                    }
-                                }
-                            }
-                            Work::Stalled
                         } else {
-                            Work::Timer(timer_heap.pop().unwrap())
+                            Work::Stalled
                         }
                     }
                     Err(status) => {
                         panic!("Error calling port wait: {:?}", status);
                     }
                 }
-            });
+            };
 
             let threads_state_sub = make_threads_state(sleeping as u8, notified as u8);
             if threads_state_sub > 0 {
@@ -515,12 +476,7 @@ impl Executor {
 
             match work {
                 Work::Packet(packet) => {
-                    local_collector.woke_up(WakeupReason::Io);
-                    self.deliver_packet(packet.key() as usize, packet);
-                }
-                Work::Timer(timer) => {
-                    local_collector.woke_up(WakeupReason::Deadline);
-                    timer.wake();
+                    self.deliver_packet(packet.key(), packet);
                 }
                 Work::None => {}
                 Work::Stalled => return,
@@ -554,6 +510,18 @@ impl Executor {
             _ => false,
         }
     }
+
+    /// Returns the monotonic timers.
+    pub fn monotonic_timers(&self) -> &TimerHeap<Time> {
+        &self.monotonic_timers
+    }
+}
+
+#[cfg(test)]
+impl Drop for Executor {
+    fn drop(&mut self) {
+        ACTIVE_EXECUTORS.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 /// A handle to an executor.
@@ -578,7 +546,7 @@ impl EHandle {
     /// If called outside the context of an active async executor.
     pub fn local() -> Self {
         let root_scope = EXECUTOR
-            .with(|e| e.borrow().as_ref().map(|x| x.0.clone()))
+            .with(|e| e.borrow().as_ref().map(|x| x.clone()))
             .expect("Fuchsia Executor must be created first");
 
         EHandle { root_scope }
@@ -607,18 +575,17 @@ impl EHandle {
     where
         T: PacketReceiver,
     {
-        let key = self.inner().receivers.lock().insert(receiver.clone()) as u64;
-
-        ReceiverRegistration { ehandle: self.clone(), key, receiver }
+        self.inner().receivers.lock().insert(|key| {
+            (receiver.clone(), ReceiverRegistration { ehandle: self.clone(), key, receiver })
+        })
     }
 
     #[inline(always)]
-    pub(super) fn inner(&self) -> &Arc<Executor> {
+    pub(crate) fn inner(&self) -> &Arc<Executor> {
         &self.root_scope.executor()
     }
 
     pub(crate) fn deregister_receiver(&self, key: u64) {
-        let key = key as usize;
         let mut lock = self.inner().receivers.lock();
         if lock.contains(key) {
             lock.remove(key);
@@ -628,14 +595,12 @@ impl EHandle {
         }
     }
 
-    pub(crate) fn register_timer(time: Time, handle: TimerHandle) {
-        with_local_timer_heap(|timer_heap| {
-            timer_heap.add_timer(time, handle);
-        });
+    pub(crate) fn register_timer(&self, time: Time, handle: TimerHandle) {
+        let executor = self.root_scope.executor();
+        executor.monotonic_timers.add_timer(time, handle);
     }
 
     /// See `Inner::spawn`.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub(crate) fn spawn<R: Send + 'static>(
         &self,
         scope: &ScopeRef,
@@ -648,13 +613,11 @@ impl EHandle {
     ///
     /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
     /// may be run on either a singlethreaded or multithreaded executor.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
         self.inner().spawn(self.root_scope(), AtomicFuture::new(future, true));
     }
 
     /// See `Inner::spawn_local`.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub(crate) fn spawn_local<R: 'static>(
         &self,
         scope: &ScopeRef,
@@ -668,7 +631,6 @@ impl EHandle {
     /// This is similar to the `spawn_detached` method, but tasks spawned using this method do not
     /// have to be threads-safe (implement the `Send` trait). In return, this method requires that
     /// this executor is a LocalExecutor.
-    #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
         self.inner().spawn_local(self.root_scope(), future, true);
     }
@@ -678,20 +640,11 @@ pub(super) struct Task {
     id: usize,
     pub(super) future: AtomicFuture<'static>,
     pub(super) scope: ScopeRef,
-    #[cfg(trace_level_logging)]
-    source: &'static Location<'static>,
 }
 
 impl Task {
-    #[cfg_attr(trace_level_logging, track_caller)]
     fn new(id: usize, scope: ScopeRef, future: AtomicFuture<'static>) -> Arc<Self> {
-        let this = Arc::new(Self {
-            id,
-            future,
-            scope,
-            #[cfg(trace_level_logging)]
-            source: Location::caller(),
-        });
+        let this = Arc::new(Self { id, future, scope });
 
         // Take a weak reference now to be used as a waker.
         let _ = Arc::downgrade(&this).into_raw();
@@ -704,15 +657,6 @@ impl Task {
             self.scope.executor().ready_tasks.push(self.clone());
             self.scope.executor().notify_task_ready();
         }
-    }
-
-    fn source(&self) -> Option<&'static Location<'static>> {
-        #[cfg(trace_level_logging)]
-        {
-            Some(self.source)
-        }
-        #[cfg(not(trace_level_logging))]
-        None
     }
 }
 
@@ -763,5 +707,19 @@ fn waker_drop(weak_raw: *const ()) {
     // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
     unsafe {
         Weak::from_raw(weak_raw as *const Task);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ACTIVE_EXECUTORS;
+    use crate::SendExecutor;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn test_no_leaks() {
+        std::thread::spawn(|| SendExecutor::new(1).run(async {})).join().unwrap();
+
+        assert_eq!(ACTIVE_EXECUTORS.load(Ordering::Relaxed), 0);
     }
 }

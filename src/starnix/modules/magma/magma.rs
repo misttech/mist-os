@@ -35,7 +35,7 @@ use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
     fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx, vk_sys as vk,
@@ -65,7 +65,7 @@ pub fn read_magma_command_and_type(
 /// # Parameters
 /// - `current_task`: The task to which the memory belongs.
 /// - `command`: The command struct that contains the pointers to the control and response structs.
-pub fn read_control_and_response<C: Default + AsBytes + FromBytes, R: Default>(
+pub fn read_control_and_response<C: Default + IntoBytes + FromBytes, R: Default>(
     current_task: &CurrentTask,
     command: &virtmagma_ioctl_args_magma_command,
 ) -> Result<(C, R), Errno> {
@@ -401,8 +401,8 @@ pub fn get_image_info(
 }
 
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Copy, Clone, Default, Debug)]
-/// `StarnixPollItem` exists to be able to `AsBytes` and `FromBytes` the union that exists in
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Copy, Clone, Default, Debug)]
+/// `StarnixPollItem` exists to be able to `IntoBytes` and `FromBytes` the union that exists in
 /// `magma_poll_item_t`.
 pub struct StarnixPollItem {
     pub semaphore_or_handle: u64,

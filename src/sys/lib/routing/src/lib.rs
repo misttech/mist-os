@@ -56,6 +56,7 @@ pub use bedrock::dict_ext::DictExt;
 pub use bedrock::lazy_get::LazyGet;
 pub use bedrock::weak_instance_token_ext::{test_invalid_instance_token, WeakInstanceTokenExt};
 pub use bedrock::with_availability::WithAvailability;
+pub use bedrock::with_default::WithDefault;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -160,8 +161,7 @@ impl RouteRequest {
                 Ok(Self::ExposeConfig(e.clone()))
             }
             ExposeDecl::Dictionary(_) => {
-                // TODO(https://fxbug.dev/301674053) implement dictionary routing and make this
-                // method From instead of TryFrom.
+                // Only bedrock routing supports dictionaries, the legacy RouteRequest does not.
                 Err(RoutingError::unsupported_capability_type(
                     moniker.clone(),
                     CapabilityTypeName::Dictionary,
@@ -471,12 +471,8 @@ async fn perform_route<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let request = Request {
-        target: WeakComponentInstanceInterface::new(target).into(),
-        debug: true,
-        metadata,
-    };
-    let capability = router.route(request).await?;
+    let request = Request { target: WeakComponentInstanceInterface::new(target).into(), metadata };
+    let capability = router.route(Some(request), true).await?;
     Ok(RouteSource::new(capability.try_into().unwrap()))
 }
 

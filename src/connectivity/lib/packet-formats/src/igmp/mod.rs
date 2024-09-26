@@ -31,7 +31,7 @@ use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, InnerPacketBuilder,
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use self::messages::IgmpMessageType;
 use crate::error::ParseError;
@@ -51,7 +51,15 @@ pub trait MessageType<B> {
     ///
     /// These are the bytes immediately following the checksum bytes in an IGMP
     /// message. Most IGMP messages' `FixedHeader` is an IPv4 address.
-    type FixedHeader: Sized + Copy + Clone + FromBytes + AsBytes + NoCell + Unaligned + Debug;
+    type FixedHeader: Sized
+        + Copy
+        + Clone
+        + FromBytes
+        + IntoBytes
+        + KnownLayout
+        + Immutable
+        + Unaligned
+        + Debug;
 
     /// The variable-length body for the message type.
     type VariableBody: Sized;
@@ -85,7 +93,7 @@ pub trait MessageType<B> {
         bytes: BV,
     ) -> Result<Self::VariableBody, ParseError>
     where
-        B: ByteSlice;
+        B: SplitByteSlice;
 
     /// Retrieves the underlying bytes of `VariableBody`.
     // Note: this is delegating the responsibility of getting
@@ -96,7 +104,7 @@ pub trait MessageType<B> {
     // `Records`.
     fn body_bytes(body: &Self::VariableBody) -> &[u8]
     where
-        B: ByteSlice;
+        B: SplitByteSlice;
 }
 
 /// Trait for treating the max_resp_code field of `HeaderPrefix`.
@@ -172,7 +180,7 @@ impl<B, M: MessageType<B>> IgmpPacketBuilder<B, M> {
             bytes.take_obj_front_zero::<M::FixedHeader>().expect("too few bytes for IGMP message");
         *header = self.message_header;
 
-        let checksum = compute_checksum_fragmented(&header_prefix, &header.bytes(), &body);
+        let checksum = compute_checksum_fragmented(&header_prefix, &Ref::bytes(&header), &body);
         header_prefix.checksum = checksum;
     }
 }
@@ -219,7 +227,7 @@ where
 ///
 /// Note that even though `max_rsp_time` is part of `HeaderPrefix`, it is not
 /// meaningful or used in every message.
-#[derive(Default, Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(Default, Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct HeaderPrefix {
     msg_type: u8,
@@ -245,13 +253,13 @@ impl HeaderPrefix {
 /// it holds the 3 IGMP message parts and is characterized by the
 /// `MessageType` trait.
 #[derive(Debug)]
-pub struct IgmpMessage<B: ByteSlice, M: MessageType<B>> {
+pub struct IgmpMessage<B: SplitByteSlice, M: MessageType<B>> {
     prefix: Ref<B, HeaderPrefix>,
     header: Ref<B, M::FixedHeader>,
     body: M::VariableBody,
 }
 
-impl<B: ByteSlice, M: MessageType<B>> IgmpMessage<B, M> {
+impl<B: SplitByteSlice, M: MessageType<B>> IgmpMessage<B, M> {
     /// Construct a builder with the same contents as this packet.
     pub fn builder(&self) -> IgmpPacketBuilder<B, M> {
         IgmpPacketBuilder::new_with_resp_time(*self.header, self.max_response_time())
@@ -283,25 +291,25 @@ fn compute_checksum_fragmented<BB: packet::Fragment>(
     c.checksum()
 }
 
-impl<B: ByteSlice, M: MessageType<B>> IgmpMessage<B, M> {
+impl<B: SplitByteSlice, M: MessageType<B>> IgmpMessage<B, M> {
     fn compute_checksum(header_prefix: &HeaderPrefix, header: &[u8], body: &[u8]) -> [u8; 2] {
         let mut body = [body];
         compute_checksum_fragmented(header_prefix, header, &body.as_fragmented_byte_slice())
     }
 }
 
-impl<B: ByteSlice, M: MessageType<B, FixedHeader = Ipv4Addr>> IgmpMessage<B, M> {
+impl<B: SplitByteSlice, M: MessageType<B, FixedHeader = Ipv4Addr>> IgmpMessage<B, M> {
     /// Returns the group address.
     pub fn group_addr(&self) -> Ipv4Addr {
         *self.header
     }
 }
 
-impl<B: ByteSlice, M: MessageType<B>> ParsablePacket<B, ()> for IgmpMessage<B, M> {
+impl<B: SplitByteSlice, M: MessageType<B>> ParsablePacket<B, ()> for IgmpMessage<B, M> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.prefix.bytes().len() + self.header.bytes().len();
+        let header_len = Ref::bytes(&self.prefix).len() + Ref::bytes(&self.header).len();
         ParseMetadata::from_packet(header_len, M::body_bytes(&self.body).len(), 0)
     }
 
@@ -314,7 +322,7 @@ impl<B: ByteSlice, M: MessageType<B>> ParsablePacket<B, ()> for IgmpMessage<B, M
             .take_obj_front::<M::FixedHeader>()
             .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
 
-        let checksum = Self::compute_checksum(&prefix, &header.bytes(), buffer.as_ref());
+        let checksum = Self::compute_checksum(&prefix, &Ref::bytes(&header), buffer.as_ref());
         if checksum != [0, 0] {
             return debug_err!(
                 Err(ParseError::Checksum),
@@ -357,8 +365,9 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(
     // a single Ipv4Address
     let long_message =
         bytes.len() > (core::mem::size_of::<HeaderPrefix>() + core::mem::size_of::<Ipv4Addr>());
-    let (header, _) = Ref::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes)
-        .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
+    let (header, _) = Ref::<_, HeaderPrefix>::from_prefix(bytes).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| debug_err!(ParseError::Format, "too few bytes for header"),
+    )?;
     let msg_type = MessageType::try_from(header.msg_type).map_err(|_| {
         debug_err!(ParseError::NotSupported, "unrecognized message type: {:x}", header.msg_type,)
     })?;
@@ -376,7 +385,10 @@ mod tests {
     use crate::ipv4::options::{Ipv4Option, Ipv4OptionData};
     use crate::ipv4::{Ipv4Header, Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions};
 
-    fn serialize_to_bytes<B: ByteSlice + Debug, M: MessageType<B, VariableBody = ()> + Debug>(
+    fn serialize_to_bytes<
+        B: SplitByteSlice + Debug,
+        M: MessageType<B, VariableBody = ()> + Debug,
+    >(
         igmp: &IgmpMessage<B, M>,
         src_ip: Ipv4Addr,
         dst_ip: Ipv4Addr,

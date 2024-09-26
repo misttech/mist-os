@@ -12,7 +12,7 @@ use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet, Icmpv6PacketRaw};
 use packet_formats::ip::{IpPacket, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::Ipv4Packet;
 use packet_formats::ipv6::Ipv6Packet;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// Errors that may occur while validating/generating a checksum.
 #[derive(GenericOverIp)]
@@ -25,7 +25,7 @@ pub(super) enum ChecksumError {
 }
 
 /// Returns true if the given [`IpPacket`] has a valid checksum.
-pub(super) fn has_valid_checksum<I: IpExt, B: ByteSlice>(packet: &I::Packet<B>) -> bool {
+pub(super) fn has_valid_checksum<I: IpExt, B: SplitByteSlice>(packet: &I::Packet<B>) -> bool {
     match I::map_ip(
         packet,
         |packet| validate_ipv4_checksum(packet),
@@ -46,7 +46,7 @@ pub(super) fn has_valid_checksum<I: IpExt, B: ByteSlice>(packet: &I::Packet<B>) 
 }
 
 /// Returns `Ok(())` if the given [`Ipv4Packet`] has a valid checksum.
-fn validate_ipv4_checksum<B: ByteSlice>(packet: &Ipv4Packet<B>) -> Result<(), ChecksumError> {
+fn validate_ipv4_checksum<B: SplitByteSlice>(packet: &Ipv4Packet<B>) -> Result<(), ChecksumError> {
     match packet.proto() {
         Ipv4Proto::Icmp
         | Ipv4Proto::Igmp
@@ -58,7 +58,7 @@ fn validate_ipv4_checksum<B: ByteSlice>(packet: &Ipv4Packet<B>) -> Result<(), Ch
 }
 
 /// Returns `Ok(())` if the given [`Ipv4Packet`] has a valid checksum.
-fn validate_ipv6_checksum<B: ByteSlice>(packet: &Ipv6Packet<B>) -> Result<(), ChecksumError> {
+fn validate_ipv6_checksum<B: SplitByteSlice>(packet: &Ipv6Packet<B>) -> Result<(), ChecksumError> {
     match packet.proto() {
         Ipv6Proto::Icmpv6 => {
             // Parsing validates the checksum.

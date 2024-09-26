@@ -127,7 +127,6 @@ pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
     pub board_info: &'a BoardInformation,
-    pub ramdisk_image: bool,
     pub gendir: Utf8PathBuf,
     pub resource_dir: Utf8PathBuf,
 }
@@ -899,7 +898,6 @@ impl ConfigurationContext<'_> {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
-            ramdisk_image: false,
             gendir: Utf8PathBuf::new(),
             resource_dir: Utf8PathBuf::new(),
         }
@@ -1176,7 +1174,6 @@ mod tests {
                 provided_features: vec!["feature_a".into(), "feature_b".into()],
                 ..Default::default()
             },
-            ramdisk_image: false,
             gendir: "gendir".into(),
             resource_dir: "resources".into(),
         };
@@ -1198,7 +1195,6 @@ mod tests {
                 provided_features: vec!["feature_a".into(), "feature_b".into()],
                 ..Default::default()
             },
-            ramdisk_image: false,
             gendir: "gendir".into(),
             resource_dir: "resources".into(),
         };
@@ -1224,7 +1220,6 @@ mod tests {
                 provided_features: vec!["feature_a".into(), "feature_b".into()],
                 ..Default::default()
             },
-            ramdisk_image: false,
             gendir: "gendir".into(),
             resource_dir: "resources".into(),
         };

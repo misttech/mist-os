@@ -19,7 +19,7 @@ use wlan_common::ie::rsn::cipher::Cipher;
 use wlan_common::ie::rsn::rsne::Rsne;
 use wlan_common::ie::rsn::suite_filter::DEFAULT_GROUP_MGMT_CIPHER;
 use wlan_statemachine::StateMachine;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 #[derive(Debug, PartialEq)]
 pub enum MessageNumber {
@@ -69,9 +69,9 @@ impl From<u64> for SupplicantKeyReplayCounter {
 
 /// Struct which carries EAPOL key frames which comply with IEEE Std 802.11-2016, 12.7.2 and
 /// IEEE Std 802.11-2016, 12.7.6.
-pub struct FourwayHandshakeFrame<B: ByteSlice>(Dot11VerifiedKeyFrame<B>);
+pub struct FourwayHandshakeFrame<B: SplitByteSlice>(Dot11VerifiedKeyFrame<B>);
 
-impl<B: ByteSlice> FourwayHandshakeFrame<B> {
+impl<B: SplitByteSlice> FourwayHandshakeFrame<B> {
     pub fn from_verified(
         frame: Dot11VerifiedKeyFrame<B>,
         role: Role,
@@ -115,7 +115,7 @@ impl<B: ByteSlice> FourwayHandshakeFrame<B> {
     }
 }
 
-impl<B: ByteSlice> std::ops::Deref for FourwayHandshakeFrame<B> {
+impl<B: SplitByteSlice> std::ops::Deref for FourwayHandshakeFrame<B> {
     type Target = Dot11VerifiedKeyFrame<B>;
 
     fn deref(&self) -> &Dot11VerifiedKeyFrame<B> {
@@ -332,7 +332,7 @@ impl Fourway {
         Ok(fourway)
     }
 
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: Dot11VerifiedKeyFrame<B>,
@@ -408,7 +408,7 @@ impl Fourway {
 
 // Verbose and explicit verification of Message 1 to 4 against IEEE Std 802.11-2016, 12.7.6.2.
 
-fn validate_message_1<B: ByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), Error> {
+fn validate_message_1<B: SplitByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), Error> {
     let key_info = frame.key_frame_fields.key_info();
     // IEEE Std 802.11-2016, 12.7.2 b.4)
     rsn_ensure!(!key_info.install(), Error::InvalidInstallBitValue(MessageNumber::Message1.into()));
@@ -454,7 +454,7 @@ fn validate_message_1<B: ByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), 
     Ok(())
 }
 
-fn validate_message_2<B: ByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), Error> {
+fn validate_message_2<B: SplitByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), Error> {
     let key_info = frame.key_frame_fields.key_info();
     // IEEE Std 802.11-2016, 12.7.2 b.4)
     rsn_ensure!(!key_info.install(), Error::InvalidInstallBitValue(MessageNumber::Message2.into()));
@@ -495,7 +495,7 @@ fn validate_message_2<B: ByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), 
     Ok(())
 }
 
-fn validate_message_3<B: ByteSlice>(
+fn validate_message_3<B: SplitByteSlice>(
     frame: &eapol::KeyFrameRx<B>,
     nonce: Option<&[u8]>,
 ) -> Result<(), Error> {
@@ -552,7 +552,7 @@ fn validate_message_3<B: ByteSlice>(
     Ok(())
 }
 
-fn validate_message_4<B: ByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), Error> {
+fn validate_message_4<B: SplitByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), Error> {
     let key_info = frame.key_frame_fields.key_info();
     // IEEE Std 802.11-2016, 12.7.2 b.4)
     rsn_ensure!(!key_info.install(), Error::InvalidInstallBitValue(MessageNumber::Message4.into()));
@@ -588,7 +588,7 @@ fn validate_message_4<B: ByteSlice>(frame: &eapol::KeyFrameRx<B>) -> Result<(), 
     Ok(())
 }
 
-fn message_number<B: ByteSlice>(rx_frame: &eapol::KeyFrameRx<B>) -> MessageNumber {
+fn message_number<B: SplitByteSlice>(rx_frame: &eapol::KeyFrameRx<B>) -> MessageNumber {
     // IEEE does not specify how to determine a frame's message number in the 4-Way Handshake
     // sequence. However, it's important to know a frame's message number to do further
     // validations. To derive the message number the key info field is used.

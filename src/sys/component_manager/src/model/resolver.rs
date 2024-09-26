@@ -2,20 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::open_capability;
-use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
-use ::routing::RouteRequest;
 use async_trait::async_trait;
-use cm_rust::{ConfigValueSource, FidlIntoNative, ResolverRegistration};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::error;
-use {
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_mem as fmem,
-};
 
 /// Resolves a component URL to its content.
 #[async_trait]
@@ -32,7 +22,7 @@ pub trait Resolver: std::fmt::Debug {
 /// Resolves a component URL using a resolver selected based on the URL's scheme.
 #[derive(Debug, Default)]
 pub struct ResolverRegistry {
-    resolvers: HashMap<String, Box<dyn Resolver + Send + Sync + 'static>>,
+    resolvers: HashMap<String, Arc<dyn Resolver + Send + Sync + 'static>>,
 }
 
 impl ResolverRegistry {
@@ -43,7 +33,7 @@ impl ResolverRegistry {
     pub fn register(
         &mut self,
         scheme: String,
-        resolver: Box<dyn Resolver + Send + Sync + 'static>,
+        resolver: Arc<dyn Resolver + Send + Sync + 'static>,
     ) {
         // ComponentDecl validation checks that there aren't any duplicate schemes.
         assert!(
@@ -52,17 +42,11 @@ impl ResolverRegistry {
         );
     }
 
-    /// Creates and populates a `ResolverRegistry` with `RemoteResolvers` that
-    /// have been registered with an environment.
-    pub fn from_decl(decl: &[ResolverRegistration], parent: &Arc<ComponentInstance>) -> Self {
-        let mut registry = ResolverRegistry::new();
-        for resolver in decl {
-            registry.register(
-                resolver.scheme.clone().into(),
-                Box::new(RemoteResolver::new(resolver.clone(), parent.as_weak())),
-            );
-        }
-        registry
+    /// Removes all resolvers from this registry, returning an iterator for these resolvers.
+    pub fn drain<'a>(
+        &'a mut self,
+    ) -> impl Iterator<Item = (String, Arc<dyn Resolver + Send + Sync + 'static>)> + 'a {
+        self.resolvers.drain()
     }
 }
 
@@ -80,102 +64,13 @@ impl Resolver for ResolverRegistry {
     }
 }
 
-/// A resolver whose implementation lives in an external component. The source
-/// of the resolver is determined through capability routing.
-#[derive(Debug)]
-pub struct RemoteResolver {
-    registration: ResolverRegistration,
-    component: WeakComponentInstance,
-}
-
-impl RemoteResolver {
-    pub fn new(registration: ResolverRegistration, component: WeakComponentInstance) -> Self {
-        RemoteResolver { registration, component }
-    }
-}
-
-// TODO(61288): Implement some sort of caching of the routed capability. Multiple
-// component URL resolutions should be possible on a single channel.
-#[async_trait]
-impl Resolver for RemoteResolver {
-    async fn resolve(
-        &self,
-        component_address: &ComponentAddress,
-    ) -> Result<ResolvedComponent, ResolverError> {
-        let component = self.component.upgrade().map_err(ResolverError::routing_error)?;
-        let proxy: fresolution::ResolverProxy =
-            open_capability(&RouteRequest::Resolver(self.registration.clone()), &component)
-                .await
-                .map_err(ResolverError::routing_error)?;
-        let (component_url, some_context) = component_address.to_url_and_context();
-        let component = if component_address.is_relative_path() {
-            let context = some_context.ok_or_else(|| {
-                error!(url=%component_url, "calling resolve_with_context() with absolute");
-                ResolverError::RelativeUrlMissingContext(component_url.to_string())
-            })?;
-            proxy
-                .resolve_with_context(component_url, &context.into())
-                .await
-                .map_err(ResolverError::fidl_error)??
-        } else {
-            proxy.resolve(component_url).await.map_err(ResolverError::fidl_error)??
-        };
-        let decl_buffer: fmem::Data = component.decl.ok_or(ResolverError::RemoteInvalidData)?;
-        let decl = read_and_validate_manifest(&decl_buffer)?;
-        let config_values = match &decl.config {
-            Some(config) => match config.value_source {
-                ConfigValueSource::PackagePath(_) => Some(read_and_validate_config_values(
-                    &component.config_values.ok_or(ResolverError::RemoteInvalidData)?,
-                )?),
-                ConfigValueSource::Capabilities(_) => None,
-            },
-            None => None,
-        };
-        let resolved_url = component.url.ok_or(ResolverError::RemoteInvalidData)?;
-        let context_to_resolve_children = component.resolution_context.map(Into::into);
-        let abi_revision = component.abi_revision.map(Into::into);
-        Ok(ResolvedComponent {
-            resolved_url,
-            context_to_resolve_children,
-            decl,
-            package: component.package.map(TryInto::try_into).transpose()?,
-            config_values,
-            abi_revision,
-        })
-    }
-}
-
-pub fn read_and_validate_manifest(
-    data: &fmem::Data,
-) -> Result<cm_rust::ComponentDecl, ResolverError> {
-    let bytes = mem_util::bytes_from_data(data).map_err(ResolverError::manifest_invalid)?;
-    read_and_validate_manifest_bytes(&bytes)
-}
-
-pub fn read_and_validate_manifest_bytes(
-    bytes: &[u8],
-) -> Result<cm_rust::ComponentDecl, ResolverError> {
-    let component_decl: fdecl::Component =
-        fidl::unpersist(bytes).map_err(ResolverError::manifest_invalid)?;
-    cm_fidl_validator::validate(&component_decl).map_err(ResolverError::manifest_invalid)?;
-    Ok(component_decl.fidl_into_native())
-}
-
-pub fn read_and_validate_config_values(
-    data: &fmem::Data,
-) -> Result<cm_rust::ConfigValuesData, ResolverError> {
-    let bytes = mem_util::bytes_from_data(&data).map_err(ResolverError::config_values_invalid)?;
-    let values = fidl::unpersist(&bytes).map_err(ResolverError::fidl_error)?;
-    cm_fidl_validator::validate_values_data(&values)
-        .map_err(|e| ResolverError::config_values_invalid(e))?;
-    Ok(values.fidl_into_native())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::builtin_environment::RootComponentInputBuilder;
+    use crate::model::component::instance::InstanceState;
     use crate::model::component::manager::ComponentManagerInstance;
-    use crate::model::component::WeakExtendedInstance;
+    use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance};
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
     use anyhow::{format_err, Error};
@@ -183,15 +78,18 @@ mod tests {
     use async_trait::async_trait;
     use cm_rust::NativeIntoFidl;
     use cm_rust_testing::new_decl_from_json;
-    use fidl_fuchsia_component_decl as fdecl;
+    use cm_util::TaskGroup;
     use hooks::Hooks;
     use lazy_static::lazy_static;
     use moniker::Moniker;
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::environment::{DebugRegistry, RunnerRegistry};
-    use routing::resolving::ComponentResolutionContext;
+    use routing::resolving::{
+        read_and_validate_config_values, read_and_validate_manifest, ComponentResolutionContext,
+    };
     use serde_json::json;
     use std::sync::{Mutex, Weak};
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_mem as fmem};
 
     #[derive(Debug)]
     struct MockOkResolver {
@@ -313,13 +211,19 @@ mod tests {
     }
 
     async fn new_root_component(
-        environment: Environment,
+        mut environment: Environment,
+        task_group: &TaskGroup,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
         component_url: &str,
     ) -> Arc<ComponentInstance> {
+        let mut root_input_builder =
+            RootComponentInputBuilder::new(task_group.as_weak(), context.runtime_config());
+        for (resolver_name, resolver) in environment.drain_resolvers() {
+            root_input_builder.add_resolver(resolver_name, resolver);
+        }
         ComponentInstance::new_root(
-            ComponentInput::default(),
+            root_input_builder.build(),
             environment,
             context,
             component_manager_instance,
@@ -329,6 +233,7 @@ mod tests {
     }
 
     async fn new_component(
+        input: ComponentInput,
         environment: Arc<Environment>,
         moniker: Moniker,
         component_url: &str,
@@ -341,7 +246,7 @@ mod tests {
         persistent_storage: bool,
     ) -> Arc<ComponentInstance> {
         ComponentInstance::new(
-            ComponentInput::default(),
+            input,
             environment,
             moniker,
             0,
@@ -357,6 +262,26 @@ mod tests {
         .await
     }
 
+    async fn get_input(component: &Arc<ComponentInstance>) -> ComponentInput {
+        match &*component.lock_state().await {
+            InstanceState::Unresolved(state) => state.component_input.clone(),
+            InstanceState::Resolved(state) | InstanceState::Started(state, _) => {
+                state.sandbox.component_input.clone()
+            }
+            _ => panic!("unexpected state"),
+        }
+    }
+
+    async fn resolve_component(
+        url: &cm_types::Url,
+        component: &Arc<ComponentInstance>,
+    ) -> Result<ResolvedComponent, ResolverError> {
+        let component_address = ComponentAddress::from_url(url, &component)
+            .await
+            .expect("failed to make component address");
+        component.perform_resolve(None, &component_address).await
+    }
+
     fn address_from_absolute_url(url: &str) -> ComponentAddress {
         ComponentAddress::from_absolute_url(&url.parse().unwrap()).unwrap()
     }
@@ -365,7 +290,7 @@ mod tests {
         url: &str,
         instance: &Arc<ComponentInstance>,
     ) -> Result<ComponentAddress, ResolverError> {
-        ComponentAddress::from(&url.parse().unwrap(), instance).await
+        ComponentAddress::from_url(&url.parse().unwrap(), instance).await
     }
 
     #[fuchsia_async::run_until_stalled(test)]
@@ -373,14 +298,14 @@ mod tests {
         let mut registry = ResolverRegistry::new();
         registry.register(
             "foo".to_string(),
-            Box::new(MockOkResolver {
+            Arc::new(MockOkResolver {
                 expected_url: "foo://url".to_string(),
                 resolved_url: "foo://resolved".to_string(),
             }),
         );
         registry.register(
             "bar".to_string(),
-            Box::new(MockErrorResolver {
+            Arc::new(MockErrorResolver {
                 expected_url: "bar://url".to_string(),
                 error: Box::new(|_| {
                     ResolverError::manifest_not_found(format_err!("not available"))
@@ -388,8 +313,10 @@ mod tests {
             }),
         );
 
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             Environment::empty(),
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm",
@@ -432,8 +359,8 @@ mod tests {
             MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
         let resolver_b =
             MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
-        registry.register("fuchsia-pkg".to_string(), Box::new(resolver_a));
-        registry.register("fuchsia-pkg".to_string(), Box::new(resolver_b));
+        registry.register("fuchsia-pkg".to_string(), Arc::new(resolver_a));
+        registry.register("fuchsia-pkg".to_string(), Arc::new(resolver_b));
     }
 
     #[fuchsia::test]
@@ -443,8 +370,8 @@ mod tests {
             MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
         let resolver_b =
             MockOkResolver { expected_url: "".to_string(), resolved_url: "".to_string() };
-        registry.register("fuchsia-pkg".to_string(), Box::new(resolver_a));
-        registry.register("fuchsia-boot".to_string(), Box::new(resolver_b));
+        registry.register("fuchsia-pkg".to_string(), Arc::new(resolver_a));
+        registry.register("fuchsia-boot".to_string(), Arc::new(resolver_b));
     }
 
     lazy_static! {
@@ -582,8 +509,10 @@ mod tests {
             ResolverRegistry::new(),
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
@@ -616,7 +545,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-pkg".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -626,14 +555,17 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
         )
         .await;
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
@@ -678,7 +610,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-boot".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -688,14 +620,17 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///package#meta/comp.cm",
         )
         .await;
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
@@ -739,7 +674,7 @@ mod tests {
 
         resolver.register(
             "cast".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -749,14 +684,17 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000/package#meta/comp.cm",
         )
         .await;
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
@@ -799,7 +737,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-pkg".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -809,8 +747,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -818,6 +758,7 @@ mod tests {
         .await;
 
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -831,10 +772,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child
-            .environment
-            .resolve(&ComponentAddress::from(&child.component_url, &child).await?)
-            .await?;
+        let resolved = resolve_component(&child.component_url, &child).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
@@ -865,7 +803,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-pkg".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -875,8 +813,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -884,6 +824,7 @@ mod tests {
         .await;
 
         let child_one = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -898,6 +839,7 @@ mod tests {
         .await;
 
         let child_two = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child2.cm",
@@ -911,10 +853,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child_two
-            .environment
-            .resolve(&ComponentAddress::from(&child_two.component_url, &child_two).await?)
-            .await?;
+        let resolved = resolve_component(&child_two.component_url, &child_two).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
@@ -939,7 +878,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-boot".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -949,8 +888,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/my-root.cm",
@@ -958,6 +899,7 @@ mod tests {
         .await;
 
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -971,10 +913,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child
-            .environment
-            .resolve(&ComponentAddress::from(&child.component_url, &child).await?)
-            .await?;
+        let resolved = resolve_component(&child.component_url, &child).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
@@ -999,7 +938,7 @@ mod tests {
 
         resolver.register(
             "cast".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -1009,8 +948,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000#meta/my-root.cm",
@@ -1018,6 +959,7 @@ mod tests {
         .await;
 
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -1031,10 +973,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child
-            .environment
-            .resolve(&ComponentAddress::from(&child.component_url, &child).await?)
-            .await?;
+        let resolved = resolve_component(&child.component_url, &child).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
@@ -1052,8 +991,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "#meta/my-root.cm",
@@ -1061,6 +1002,7 @@ mod tests {
         .await;
 
         let child = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -1074,7 +1016,7 @@ mod tests {
         )
         .await;
 
-        let result = ComponentAddress::from(&child.component_url, &child).await;
+        let result = ComponentAddress::from_url(&child.component_url, &child).await;
         assert_matches!(result, Err(ResolverError::Internal(..)));
         Ok(())
     }
@@ -1102,7 +1044,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-pkg".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -1112,8 +1054,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -1121,6 +1065,7 @@ mod tests {
         .await;
 
         let child_one = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "my-subpackage#meta/my-child.cm",
@@ -1135,6 +1080,7 @@ mod tests {
         .await;
 
         let child_two = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child/child2")?,
             "#meta/my-child2.cm",
@@ -1148,10 +1094,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child_two
-            .environment
-            .resolve(&ComponentAddress::from(&child_two.component_url, &child_two).await?)
-            .await?;
+        let resolved = resolve_component(&child_two.component_url, &child_two).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
@@ -1186,7 +1129,7 @@ mod tests {
 
         resolver.register(
             "fuchsia-pkg".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -1196,8 +1139,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -1205,6 +1150,7 @@ mod tests {
         .await;
 
         let child_one = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "my-subpackage#meta/my-child.cm",
@@ -1219,6 +1165,7 @@ mod tests {
         .await;
 
         let child_two = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child/child2")?,
             "#meta/my-child2.cm",
@@ -1233,6 +1180,7 @@ mod tests {
         .await;
 
         let child_three = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/child/child2/child3")?,
             "#meta/my-child3.cm",
@@ -1246,10 +1194,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child_three
-            .environment
-            .resolve(&ComponentAddress::from(&child_three.component_url, &child_three).await?)
-            .await?;
+        let resolved = resolve_component(&child_three.component_url, &child_three).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);
@@ -1289,11 +1234,11 @@ mod tests {
 
         resolver.register(
             "fuchsia-pkg".to_string(),
-            Box::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
+            Arc::new(MockMultipleOkResolver::new(expected_urls_and_contexts.clone())),
         );
         resolver.register(
             "realm-builder".to_string(),
-            Box::new(MockOkResolver {
+            Arc::new(MockOkResolver {
                 expected_url: "realm-builder://0/my-realm".to_string(),
                 resolved_url: "realm-builder://0/my-realm".to_string(),
             }),
@@ -1307,8 +1252,10 @@ mod tests {
             DebugRegistry::default(),
         );
 
+        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
+            &task_group,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -1316,6 +1263,7 @@ mod tests {
         .await;
 
         let realm = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/realm/child")?,
             "realm-builder://0/my-realm",
@@ -1330,6 +1278,7 @@ mod tests {
         .await;
 
         let child_one = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/realm/child")?,
             "my-subpackage1#meta/sub1.cm",
@@ -1344,6 +1293,7 @@ mod tests {
         .await;
 
         let child_two = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/realm/child/child2")?,
             "#meta/sub1-child.cm",
@@ -1358,6 +1308,7 @@ mod tests {
         .await;
 
         let child_three = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/realm/child/child2/child3")?,
             "my-subpackage2#meta/sub2.cm",
@@ -1372,6 +1323,7 @@ mod tests {
         .await;
 
         let child_four = new_component(
+            get_input(&root).await,
             root.environment.clone(),
             Moniker::parse_str("root/realm/child/child2/child3/child4")?,
             "#meta/sub2-child.cm",
@@ -1385,10 +1337,7 @@ mod tests {
         )
         .await;
 
-        let resolved = child_four
-            .environment
-            .resolve(&ComponentAddress::from(&child_four.component_url, &child_four).await?)
-            .await?;
+        let resolved = resolve_component(&child_four.component_url, &child_four).await?;
         let expected = expected_urls_and_contexts.as_slice().last().unwrap();
         assert_eq!(&resolved.resolved_url, &expected.resolved_url);
         assert_eq!(&resolved.context_to_resolve_children, &expected.context_to_resolve_children);

@@ -132,14 +132,19 @@ import("//build/testing/host_test_data.gni")
 #   enable_banjo (optional flag, default to false)
 #     Set to true to enable Banjo bindings for this library.
 #
+#   enable_rust_next (optional flag, default to false)
+#     Set to true to enable next-generation Rust bindings for this library
+#
 #   enable_zither (optional flag, default to false)
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
 #
-#   stable (optional flag, default to false)
+#   stable (optional flag)
 #     Whether this library is stabilized.
 #     When true, `versioned` defaults to "fuchsia" and an .api file is
 #     generated. When false, the atom is marked as unstable in the final IDK.
+#     Must be specified when `sdk_category` is defined and not "internal";
+#     otherwise, must not be specified.
 #
 #   applicable_licenses
 #   public_deps
@@ -181,12 +186,15 @@ template("fidl") {
   # These bindings are not:
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
   enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
+  enable_rust_next =
+      defined(invoker.enable_rust_next) && invoker.enable_rust_next
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
 
   not_needed([
                "enable_bindlib",
                "enable_cpp",
                "enable_rust",
+               "enable_rust_next",
                "enable_banjo",
                "enable_hlcpp",
                "enable_zither",
@@ -349,8 +357,6 @@ template("fidl") {
     }
   }
 
-  not_needed(invoker, [ "sources" ])
-
   if (is_go_toolchain) {
     # Only import the fidl_go() template when in the Go toolchain.
     import("//build/go/fidl_go.gni")
@@ -369,17 +375,13 @@ template("fidl") {
     }
     not_needed(invoker,
                [
+                 "contains_drivers",
+                 "fuzzers",
+                 "golden_fuzzer",
                  "sdk_category",
-                 "sdk_area",
-                 "sources",
                ])
   }
 
-  non_go_only = [
-    "contains_drivers",
-    "fuzzers",
-    "golden_fuzzer",
-  ]
   if (is_fidl_toolchain || toolchain_variant.supports_cpp ||
       toolchain_variant.supports_rust) {
     # The C, C++, and Rust bindings are compiled in their own toolchain, from
@@ -394,19 +396,30 @@ template("fidl") {
       # Define the cpp bindings.
       fidl_cpp_family(target_name) {
         forward_variables_from(invoker,
-                               non_go_only + [
-                                     "applicable_licenses",
-                                     "testonly",
-                                     "visibility",
-                                     "public_deps",
-                                     "sdk_category",
-                                   ])
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                                 "contains_drivers",
+                                 "fuzzers",
+                                 "golden_fuzzer",
+                               ])
         forward_variables_from(common_parameters, "*")
         enable_hlcpp = enable_hlcpp
         enable_cpp = enable_cpp
+
+        # SDK atom aliases are only relevant in the default toolchain when an
+        # the library is in an SDK category.
+        declare_sdk_atom_aliases = current_toolchain == default_toolchain &&
+                                   defined(invoker.sdk_category)
       }
-    } else {
-      not_needed([ "non_go_only" ])
+
+      if (!is_fidl_toolchain) {
+        # Checking if the parameter is defined is insufficient to avoid
+        # "Assignment had no effect."
+        not_needed(invoker, [ "sdk_category" ])
+      }
     }
 
     if (enable_rust && (is_fidl_toolchain || toolchain_variant.supports_rust)) {
@@ -444,6 +457,28 @@ template("fidl") {
           deps += [ "//sdk:marker-${marker_category}" ]
         }
         fidl_gen_dir += "/rust"
+      }
+    }
+
+    if (enable_rust_next &&
+        (is_fidl_toolchain || toolchain_variant.supports_rust)) {
+      # Only import the fidl_rust_next() template if in a rust-capable toolchain and
+      # rust bindings are to be defined.
+      import("//build/rust/fidl_rust_next.gni")
+
+      # Define the Rust bindings.
+      fidl_rust_next("${target_name}_rust_next") {
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                                 "disable_rustdoc",
+                               ])
+        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        deps = []
+        fidl_gen_dir += "/rust_next"
       }
     } else {
       not_needed(invoker, [ "disable_rustdoc" ])
@@ -505,10 +540,9 @@ template("fidl") {
       not_needed(invoker, [ "sources" ])
     }
   } else {
-    not_needed(invoker,
-               non_go_only + [
-                     "sources",
-                     "disable_rustdoc",
-                   ])
+    if (!is_fidl_toolchain) {
+      not_needed(invoker, [ "sources" ])
+    }
+    not_needed(invoker, [ "disable_rustdoc" ])
   }
 }

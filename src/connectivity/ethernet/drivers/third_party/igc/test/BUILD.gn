@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 config("config_test") {
   visibility = [ ":*" ]
   defines = [ "IGC_TEST" ]
 }
 
-executable("igc_interface_tests") {
+cc_test_executable("igc_interface_tests") {
   output_name = "igc_interface_tests"
   testonly = true
   sources = [ "igc_interface_tests.cc" ]

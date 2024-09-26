@@ -241,12 +241,12 @@ impl HandlesToWrite {
                         .map(|(handle, rights)| {
                             let ShuttingDownHandle::Ready(handle) = handle else { unreachable!() };
 
-                            zx::HandleDisposition {
-                                handle_op: zx::HandleOp::Move(handle.into()),
-                                object_type: zx::ObjectType::NONE,
+                            zx::HandleDisposition::new(
+                                zx::HandleOp::Move(handle.into()),
+                                zx::ObjectType::NONE,
                                 rights,
-                                result: zx::Status::OK,
-                            }
+                                zx::Status::OK,
+                            )
                         })
                         .collect(),
                 );

@@ -11,7 +11,7 @@ use anyhow::{anyhow, Context as _, Error};
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use fdio::{SpawnAction, SpawnOptions};
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_merkle::Hash;
 use fuchsia_zircon::prelude::*;
@@ -161,6 +161,7 @@ impl BlobfsRamdiskBuilder {
                     let _: &mut fs_management::filesystem::ServingVolume = fs
                         .create_volume(
                             FXFS_BLOB_VOLUME_NAME,
+                            CreateOptions::default(),
                             MountOptions { as_blob: Some(true), ..MountOptions::default() },
                         )
                         .await

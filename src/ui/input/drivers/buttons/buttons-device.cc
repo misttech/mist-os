@@ -7,23 +7,63 @@
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/zx/clock.h>
 
+#include <cstddef>
+
 #include <fbl/alloc_checker.h>
 
 namespace buttons {
 
-void InputIntegration::ReportInterrupt() {
-  if (!aggregator_client_.has_value()) {
+PowerIntegration::PowerIntegration(
+    async_dispatcher_t* dispatcher,
+    fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client)
+    : dispatcher_(dispatcher) {
+  if (!sag_client) {
     return;
   }
 
-  fidl::WireResult result = aggregator_client_.value()->HandoffWake();
-  if (!result.ok() || result->is_error()) {
+  auto client = fidl::WireSyncClient(std::move(sag_client));
+  if (client.is_valid()) {
+    sag_client_ = std::move(client);
+  } else {
     FDF_LOG(
         WARNING,
-        "Failed to handoff wake, system may incorrectly enter suspend: %s. Will not attempt again.",
-        result.status_string());
-    aggregator_client_.reset();
+        "Failed to create fuchsia.power.system.ActivityGovernor client; system may incorrectly enter suspend.");
   }
+}
+
+void PowerIntegration::AcquireWakeLease() {
+  if (!sag_client_) {
+    return;
+  }
+
+  if (lease_) {
+    // If already holding a lease, cancel the current timeout.
+    lease_task_.Cancel();
+  } else {
+    // If not holding a lease, take one.
+    auto result_lease = sag_client_->TakeWakeLease({"buttons-driver-wake"});
+    if (!result_lease.ok()) {
+      FDF_LOG(
+          WARNING,
+          "Failed to take wake lease, system may incorrectly enter suspend: %s. Will not attempt again.",
+          result_lease.status_string());
+      sag_client_ = {};
+      return;
+    }
+
+    lease_ = std::move(result_lease->token);
+    FDF_LOG(INFO, "Buttons driver created a wake lease due to recent input.");
+  }
+
+  lease_task_.PostDelayed(dispatcher_, kLeaseTimeout);
+}
+
+void PowerIntegration::ClosureHandler() {
+  // Drops the lease and resets handler
+  FDF_LOG(
+      INFO,
+      "Buttons driver is dropping the wake lease due to not receiving any input in the last 100ms.");
+  lease_.reset();
 }
 
 void ButtonsDevice::ButtonsInputReport::ToFidlInputReport(
@@ -154,11 +194,7 @@ int ButtonsDevice::Thread() {
         packet.key < (kPortKeyInterruptStart + buttons_.size())) {
       uint32_t type = static_cast<uint32_t>(packet.key - kPortKeyInterruptStart);
       if (gpios_[type].config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
-        // Before we ack the irq we must report the interrupt to the input
-        // stack. In systems where power framework is available, this prompts
-        // the input stack to create its own wake lease so that the system does
-        //  not suspend before the event can be processed.
-        input_integration_.ReportInterrupt();
+        power_integration_.AcquireWakeLease();
 
         // We need to reconfigure the GPIO to catch the opposite polarity.
         auto reconfig_result = ReconfigurePolarity(type, packet.key);
@@ -511,11 +547,11 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
 
 ButtonsDevice::ButtonsDevice(async_dispatcher_t* dispatcher,
                              fbl::Array<buttons_button_config_t> buttons, fbl::Array<Gpio> gpios,
-                             InputIntegration input_integration)
+                             fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client)
     : dispatcher_(dispatcher),
       buttons_(std::move(buttons)),
       gpios_(std::move(gpios)),
-      input_integration_(std::move(input_integration)) {
+      power_integration_(PowerIntegration(dispatcher, std::move(sag_client))) {
   ZX_ASSERT(Init() == ZX_OK);
 }
 

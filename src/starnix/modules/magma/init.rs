@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use crate::MagmaFile;
-use starnix_core::device::kobject::DeviceMetadata;
-use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
@@ -30,18 +28,14 @@ where
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    let starnix_class =
-        registry.objects.get_or_create_class("starnix".into(), registry.objects.virtual_bus());
-
-    let magma_type: DeviceType =
-        registry.register_dyn_chrdev(create_magma_device).expect("magma device register failed.");
-
-    registry.add_device(
-        locked,
-        current_task,
-        "magma0".into(),
-        DeviceMetadata::new("magma0".into(), magma_type, DeviceMode::Char),
-        starnix_class,
-        DeviceDirectory::new,
-    );
+    registry
+        .register_dyn_device(
+            locked,
+            current_task,
+            "magma0".into(),
+            registry.objects.starnix_class(),
+            DeviceDirectory::new,
+            create_magma_device,
+        )
+        .expect("can register magma0");
 }

@@ -73,7 +73,6 @@ pub fn define_configuration(
     platform: &PlatformConfig,
     product: &ProductConfig,
     board_info: &BoardInformation,
-    ramdisk_image: bool,
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
 ) -> anyhow::Result<CompletedConfiguration> {
@@ -98,7 +97,6 @@ pub fn define_configuration(
                 feature_set_level,
                 build_type,
                 board_info,
-                ramdisk_image,
                 gendir,
                 resource_dir,
             },
@@ -302,7 +300,7 @@ fn configure_subsystems(
 
     driver_framework::DriverFrameworkSubsystemConfig::define_configuration(
         &context_base.for_subsystem("driver_framework"),
-        &platform.driver_framework,
+        &(&platform.driver_framework, &platform.storage),
         builder,
     )
     .context("Configuring the 'driver_framework' subsystem")?;
@@ -469,7 +467,7 @@ fn configure_subsystems(
 
     trusted_apps::TrustedAppsSubsystem::define_configuration(
         &context_base.for_subsystem("trusted_apps"),
-        &product.trusted_apps,
+        &(&product.trusted_apps, platform.storage.filesystems.image_mode),
         builder,
     )
     .context("Configuring the 'trusted_apps' subsystem")?;
@@ -523,7 +521,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let AssemblyConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
         let result =
-            define_configuration(&platform, &product, &BoardInformation::default(), false, "", "");
+            define_configuration(&platform, &product, &BoardInformation::default(), "", "");
 
         assert!(result.is_err());
     }

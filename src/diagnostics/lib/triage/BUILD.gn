@@ -23,14 +23,16 @@ lib_deps = [
   "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:serde_json5",
 ]
+
 if (is_fuchsia) {
-  lib_deps += [ "//third_party/rust_crates:tracing" ]
+  lib_deps += [ "//src/lib/diagnostics/inspect/contrib/rust" ]
 }
 
 library_sources = [
   "src/act.rs",
   "src/act_structured.rs",
   "src/config.rs",
+  "src/inspect_logger.rs",
   "src/lib.rs",
   "src/metrics.rs",
   "src/metrics/arithmetic.rs",

@@ -680,6 +680,13 @@ zx_status_t zxio_create_with_type(zxio_storage_t* storage, zxio_object_type_t ty
       }
       return zxio_vmo_init(storage, std::move(vmo), std::move(stream));
     }
+    case ZXIO_OBJECT_TYPE_TRANSFERABLE: {
+      zx::channel channel(va_arg(args, zx_handle_t));
+      if (storage == nullptr || !channel.is_valid()) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      return zxio_transferable_init(storage, std::move(channel));
+    }
   }
   return ZX_ERR_NOT_SUPPORTED;
 }

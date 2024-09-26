@@ -3387,3 +3387,16 @@
   reviewers: ['alizhang@google.com', 'adamperry@google.com', 'brunodalbo@google.com', 'crjohns@google.com', 'fmil@google.com', 'gmtr@google.com', 'johngro@google.com', 'maniscalco@google.com', 'miguelfrde@google.com', 'tgales@google.com', 'tmandry@google.com']
   submitted: '2024-08-16'
   reviewed: '2024-09-11'
+
+- name: 'RFC-0260'
+  title: 'Kernel Boot Time Support'
+  short_description: 'Enumerates the Zircon API changes needed to support the boot timeline.'
+  authors: ['rudymathu@google.com']
+  file: '0260_kernel_boot_time_support.md'
+  area: ['Kernel']
+  issue: ['328306129']
+  gerrit_change_id: ['1066674']
+  status: 'Accepted'
+  reviewers: ['adamperry@google.com', 'andresoportus@google.com', 'fmil@google.com', 'gkalsi@google.com', 'harshanv@google.com', 'johngro@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'miguelfrde@google.com', 'tgales@google.com', 'tmandry@google.com']
+  submitted: '2024-06-14'
+  reviewed: '2024-09-25'

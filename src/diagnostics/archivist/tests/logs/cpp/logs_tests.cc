@@ -94,11 +94,8 @@ TEST_F(LoggerIntegrationTest, ListenFiltered) {
       FUCHSIA_LOG_INFO - 5,   // Legacy "verbosity" (v=5)
       FUCHSIA_LOG_INFO - 4,   // Legacy "verbosity" (v=4)
       FUCHSIA_LOG_INFO - 3,   // Legacy "verbosity" (v=3)
-      0,                      // Legacy severity (INFO)
       FUCHSIA_LOG_INFO,       // 0x30
-      1,                      // Legacy severity (WARN)
       FUCHSIA_LOG_WARNING,    // Legacy severity (WARNING)
-      2,                      // Legacy severity (ERROR)
       FUCHSIA_LOG_ERROR,      // 0x50
   };
 
@@ -110,11 +107,8 @@ TEST_F(LoggerIntegrationTest, ListenFiltered) {
       FUCHSIA_LOG_INFO - 5,   // Legacy "verbosity" (v=5)
       FUCHSIA_LOG_INFO - 4,   // Legacy "verbosity" (v=4)
       FUCHSIA_LOG_INFO - 3,   // Legacy "verbosity" (v=3)
-      FUCHSIA_LOG_INFO,       // Legacy severity (INFO)
       FUCHSIA_LOG_INFO,       // 0x30
-      FUCHSIA_LOG_WARNING,    // 0x40
       FUCHSIA_LOG_WARNING,    // Legacy severity (WARNING)
-      FUCHSIA_LOG_ERROR,      // Legacy severity (ERROR)
       FUCHSIA_LOG_ERROR,      // 0x50
   };
   fuchsia_logging::LogSettingsBuilder builder;

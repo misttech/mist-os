@@ -12,7 +12,7 @@ use fidl_fuchsia_hardware_bluetooth::{
 };
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use futures::{ready, Stream, StreamExt};
 use std::fmt;
 use std::pin::Pin;
@@ -96,7 +96,7 @@ impl Snooper {
         let vendor_sync = client_end_vendor.into_sync_proxy();
 
         let snoop_client = vendor_sync
-            .open_snoop(fasync::Time::after(3.seconds()).into())?
+            .open_snoop(fasync::Time::after(zx::Duration::from_seconds(3)).into())?
             .map_err(|e| format_err!("Failed opening Snoop with {e:?}"))?;
 
         Ok(Snooper::from_client(snoop_client, path))

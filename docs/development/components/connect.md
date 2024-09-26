@@ -1,7 +1,8 @@
 # Connect components
 
-This document demonstrates how to connect components together using capabilities
-and additional tools for parent components to manage their children.
+This document demonstrates how to connect [components][glossary.component]
+together using capabilities and additional tools for parent components to manage
+their children.
 
 ## Concepts
 
@@ -87,6 +88,7 @@ to begin receiving incoming requests:
     ```
 
 *   {C++}
+
     ```cpp
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/cpp/echo_server/main.cc" region_tag="handler" adjust_indentation="auto" highlight="1,2,3,4,5,6" %}
 

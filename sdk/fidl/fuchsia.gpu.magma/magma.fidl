@@ -544,3 +544,9 @@ open protocol PowerElementProvider {
         2: actual_hz uint64;
     }) error zx.Status;
 };
+
+@available(added=HEAD)
+service Service {
+    device client_end:Device;
+    power_element_provider client_end:PowerElementProvider;
+};

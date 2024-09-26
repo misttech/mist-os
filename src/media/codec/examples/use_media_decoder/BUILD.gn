@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("use_media_decoder_source_set") {
   testonly = true
@@ -74,7 +75,7 @@ fuchsia_component("tee_manager") {
 
 # This test target uses the AAC decoder the same way as the example program and
 # then also verifies the output data (without writing an output file).
-executable("use_aac_decoder_test") {
+cc_test_executable("use_aac_decoder_test") {
   testonly = true
   output_name = "use_aac_decoder_test"
 

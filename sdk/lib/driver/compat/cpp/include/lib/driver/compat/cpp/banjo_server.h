@@ -10,6 +10,8 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/function.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+
 namespace compat {
 
 class BanjoServer final {
@@ -18,7 +20,7 @@ class BanjoServer final {
       : proto_id_(proto_id), ctx_(ctx), ops_(ops) {}
 
   fuchsia_driver_framework::NodeProperty property() const {
-    return fdf::MakeProperty(1 /*BIND_PROTOCOL */, proto_id_);
+    return fdf::MakeProperty(bind_fuchsia::PROTOCOL, proto_id_);
   }
 
   DeviceServer::SpecificGetBanjoProtoCb callback() {

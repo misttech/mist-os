@@ -23,6 +23,7 @@ use crate::range::RangeExt;
 use crate::round::{round_down, round_up};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use assert_matches::assert_matches;
+use bit_vec::BitVec;
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{try_join, TryStreamExt};
 use fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet};
@@ -81,6 +82,13 @@ impl MaybeChecksums {
         match self {
             Self::None => ExtentMode::Raw,
             Self::Fletcher(sums) => ExtentMode::Cow(Checksums::fletcher(sums)),
+        }
+    }
+
+    pub fn into_option(self) -> Option<Vec<Checksum>> {
+        match self {
+            Self::None => None,
+            Self::Fletcher(sums) => Some(sums),
         }
     }
 }
@@ -706,7 +714,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let item = self.store().tree().find(&key).await?;
         let size = match item {
             Some(item) if item.key == key => match item.value {
-                ObjectValue::Attribute { size } => size,
+                ObjectValue::Attribute { size, .. } => size,
                 _ => bail!(FxfsError::Inconsistent),
             },
             _ => return Ok(0),
@@ -882,7 +890,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let mut iter = merger.query(Query::FullRange(&key)).await?;
         let (mut buffer, size) = match iter.get() {
             Some(item) if item.key == &key => match item.value {
-                ObjectValue::Attribute { size } => {
+                ObjectValue::Attribute { size, .. } => {
                     // TODO(https://fxbug.dev/42073113): size > max buffer size
                     (
                         store
@@ -1105,6 +1113,183 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         self.update_allocated_size(transaction, allocated, deallocated).await
     }
 
+    /// Write data to overwrite extents with the provided set of ranges. This makes a strong
+    /// assumption that the ranges are actually going to be already allocated overwrite extents and
+    /// will error out or do something wrong if they aren't. It also assumes the ranges passed to
+    /// it are sorted.
+    pub async fn multi_overwrite<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        attr_id: u64,
+        ranges: &[Range<u64>],
+        mut buf: MutableBufferRef<'_>,
+    ) -> Result<(), Error> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+        let block_size = self.block_size();
+        let store = self.store();
+        let tree = store.tree();
+        let store_id = store.store_object_id();
+
+        if let Some(keys) = self.get_or_create_keys(transaction).await? {
+            let mut slice = buf.as_mut_slice();
+            for r in ranges {
+                let l = r.end - r.start;
+                let (head, tail) = slice.split_at_mut(l as usize);
+                // TODO(https://fxbug.dev/42174708): Support key_id != 0.
+                keys.encrypt(r.start, 0, head)?;
+                slice = tail;
+            }
+        }
+
+        let mut range_iter = ranges.into_iter();
+        // There should be at least one range if the buffer has data in it
+        let mut target_range = range_iter.next().unwrap().clone();
+        let mut mutations = Vec::new();
+        let writes = FuturesUnordered::new();
+
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger
+            .query(Query::FullRange(&ObjectKey::attribute(
+                self.object_id(),
+                attr_id,
+                AttributeKey::Extent(ExtentKey::search_key_from_offset(target_range.start)),
+            )))
+            .await?;
+
+        loop {
+            match iter.get() {
+                Some(ItemRef {
+                    key:
+                        ObjectKey {
+                            object_id,
+                            data:
+                                ObjectKeyData::Attribute(
+                                    attribute_id,
+                                    AttributeKey::Extent(ExtentKey { range }),
+                                ),
+                        },
+                    value: ObjectValue::Extent(ExtentValue::Some { device_offset, mode, .. }),
+                    ..
+                }) if *object_id == self.object_id() && *attribute_id == attr_id => {
+                    // If this extent ends before the target range starts (not possible on the
+                    // first loop because of the query parameters but possible on further loops),
+                    // advance until we find a the next one we care about.
+                    if range.end <= target_range.start {
+                        iter.advance().await?;
+                        continue;
+                    }
+                    // The ranges passed to this function should already by allocated, so
+                    // extent records should exist for them.
+                    if range.start > target_range.start {
+                        return Err(anyhow!(FxfsError::Inconsistent)).with_context(|| {
+                            format!(
+                            "multi_overwrite failed: target range ({}, {}) starts before first \
+                            extent found at ({}, {})",
+                            target_range.start,
+                            target_range.end,
+                            range.start,
+                            range.end,
+                        )
+                        });
+                    }
+                    let mut bitmap = match mode {
+                        ExtentMode::Raw | ExtentMode::Cow(_) => {
+                            return Err(anyhow!(FxfsError::Inconsistent)).with_context(|| {
+                                format!(
+                                    "multi_overwrite failed: \
+                            extent from ({}, {}) which overlaps target range ({}, {}) had the \
+                            wrong extent mode",
+                                    range.start, range.end, target_range.start, target_range.end,
+                                )
+                            })
+                        }
+                        ExtentMode::OverwritePartial(bitmap) => {
+                            Some((bitmap.clone(), BitVec::from_elem(bitmap.len(), false)))
+                        }
+                        ExtentMode::Overwrite => None,
+                    };
+                    loop {
+                        let offset_within_extent = target_range.start - range.start;
+                        let write_device_offset = *device_offset + offset_within_extent;
+                        let block_offset_within_extent = offset_within_extent / block_size;
+                        let write_end = min(range.end, target_range.end);
+                        let write_length = write_end - target_range.start;
+                        let (current_buf, remaining_buf) = buf.split_at_mut(write_length as usize);
+                        writes.push(async move {
+                            let maybe_checksums = self
+                                .write_aligned(current_buf.as_ref(), write_device_offset)
+                                .await?;
+                            Ok::<_, Error>(maybe_checksums.into_option().map(|checksums| {
+                                (
+                                    write_device_offset..(write_device_offset + write_length),
+                                    checksums,
+                                )
+                            }))
+                        });
+                        if let Some((_, write_bitmap)) = &mut bitmap {
+                            for i in block_offset_within_extent
+                                ..block_offset_within_extent + write_length / block_size
+                            {
+                                write_bitmap.set(i as usize, true);
+                            }
+                        }
+                        buf = remaining_buf;
+                        target_range.start += write_length;
+                        if target_range.start == target_range.end {
+                            match range_iter.next() {
+                                None => break,
+                                Some(next_range) => target_range = next_range.clone(),
+                            }
+                        }
+                        if range.end <= target_range.start {
+                            break;
+                        }
+                    }
+                    if let Some((mut bitmap, write_bitmap)) = bitmap {
+                        if bitmap.or(&write_bitmap) {
+                            let mode = if bitmap.all() {
+                                ExtentMode::Overwrite
+                            } else {
+                                ExtentMode::OverwritePartial(bitmap)
+                            };
+                            mutations.push(Mutation::merge_object(
+                                ObjectKey::extent(self.object_id(), attr_id, range.clone()),
+                                ObjectValue::Extent(ExtentValue::new(*device_offset, mode)),
+                            ))
+                        }
+                    }
+                    if target_range.start == target_range.end {
+                        break;
+                    }
+                    iter.advance().await?;
+                }
+                // We've either run past the end of the existing extents or something is wrong with
+                // the tree. The main section should break if it finishes the ranges, so either
+                // case, this is an error.
+                _ => bail!(anyhow!(FxfsError::Internal).context(
+                    "found a non-extent object record while there were still ranges to process"
+                )),
+            }
+        }
+
+        let checksums = writes
+            .try_filter_map(|x| futures::future::ok(x))
+            .try_collect::<Vec<(Range<u64>, Vec<Checksum>)>>()
+            .await?;
+        for (r, c) in checksums {
+            transaction.add_checksum(r, c);
+        }
+
+        for m in mutations {
+            transaction.add(store_id, m);
+        }
+
+        Ok(())
+    }
+
     /// Writes an attribute that should not already exist and therefore does not require trimming.
     /// Breaks up the write into multiple transactions if `data.len()` is larger than `batch_size`.
     /// If writing the attribute requires multiple transactions, adds the attribute to the
@@ -1122,7 +1307,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(data.len() as u64),
+                ObjectValue::attribute(data.len() as u64, false),
             ),
         );
         let chunks = data.chunks(batch_size);
@@ -1182,7 +1367,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .await?
         {
             match item.value {
-                ObjectValue::Attribute { size } => (data.len() as u64) < size,
+                ObjectValue::Attribute { size: _, has_overwrite_extents: true } => {
+                    bail!(anyhow!(FxfsError::Inconsistent)
+                        .context("write_attr on an attribute with overwrite extents"))
+                }
+                ObjectValue::Attribute { size, .. } => (data.len() as u64) < size,
                 _ => bail!(FxfsError::Inconsistent),
             }
         } else {
@@ -1197,7 +1386,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(data.len() as u64),
+                ObjectValue::attribute(data.len() as u64, false),
             ),
         );
         if should_trim {
@@ -1524,7 +1713,6 @@ mod tests {
             &mut transaction,
             HandleOptions::default(),
             Some(&InsecureCrypt::new()),
-            None,
         )
         .await
         .expect("create_object failed");
@@ -2152,7 +2340,7 @@ mod tests {
             object.store().store_object_id,
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(object.object_id(), attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(block_size * 2),
+                ObjectValue::attribute(block_size * 2, false),
             ),
         );
         transaction.commit().await.unwrap();

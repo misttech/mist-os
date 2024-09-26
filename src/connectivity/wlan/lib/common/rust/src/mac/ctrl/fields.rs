@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use ieee80211::{Bssid, MacAddr};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // IEEE Std 802.11-2016, 9.3.1.5
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq, Clone, Copy, Debug,
+)]
 #[repr(C, packed)]
 pub struct PsPoll {
     pub masked_aid: u16,

@@ -119,6 +119,8 @@ def fuchsia_package(
     # register another driver.
     disable_repository_name = kwargs.pop("disable_repository_name", None)
 
+    package_repository_name = kwargs.pop("package_repository_name", None)
+
     # Fuchsia packages are only compatible with the fuchsia OS.
     target_compat = kwargs.pop("target_compatible_with", [])
     if _FUCHSIA_OS_PLATFORM not in target_compat:
@@ -131,6 +133,7 @@ def fuchsia_package(
         name = processed_binaries,
         deps = _deps_to_search,
         tags = tags + ["manual"],
+        **kwargs
     )
 
     collected_resources = "%s_fuchsia_package.resources" % name
@@ -138,6 +141,7 @@ def fuchsia_package(
         name = collected_resources,
         deps = _deps_to_search,
         tags = tags + ["manual"],
+        **kwargs
     )
 
     _build_fuchsia_package(
@@ -153,6 +157,7 @@ def fuchsia_package(
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
+        package_repository_name = package_repository_name,
         target_compatible_with = target_compat,
         tags = tags + ["manual"],
         **kwargs
@@ -163,10 +168,11 @@ def fuchsia_package(
         package = "%s_fuchsia_package" % name,
         component_run_tags = [label_name(c) for c in components],
         tools = {tool: tool for tool in tools},
+        package_repository_name = package_repository_name,
         disable_repository_name = disable_repository_name,
         # TODO(b/339099331) fuchsia_packages that are testonly shouldn't have the
         # full set of tasks.
-        is_test = kwargs.pop("testonly", False),
+        is_test = kwargs.get("testonly", False),
         tags = tags,
         **kwargs
     )
@@ -646,6 +652,10 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
             If this value is not set we will fall back to the cpu setting to determine
             the correct platform.
             """,
+        ),
+        "hack_ignore_cpp": attr.bool(
+            doc = "This value is no longer used and will be removed shortly.",
+            default = False,
         ),
         "_fuchsia_sdk_debug_symbols": attr.label(
             doc = "Include debug symbols from @fuchsia_sdk.",

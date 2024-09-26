@@ -7,11 +7,11 @@ to the protocol to interact with the parent.
 
 ## Building
 
-To include the driver to your build, append `--with //examples/drivers:drivers` to your `fx
+To include the driver to your build, append `--with //examples/drivers/transport:driver` to your `fx
 set` command. For example:
 
 ```bash
-$ fx set core.x64 --with //examples/drivers:drivers
+$ fx set core.x64 --with //examples/drivers/transport/driver:drivers
 $ fx build
 ```
 
@@ -77,7 +77,7 @@ Include the tests to your build by appending `--with //examples/drivers:tests` t
 set` command. For example:
 
 ```bash
-$ fx set core.x64 --with //examples/drivers:drivers --with //examples:tests
+$ fx set core.x64 --with //examples/drivers/transport/driver/v2:driver-transport-test
 $ fx build
 ```
 

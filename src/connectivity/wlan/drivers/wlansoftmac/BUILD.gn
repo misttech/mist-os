@@ -81,6 +81,8 @@ test("good-driver-tests") {
     ":source_set",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.ethernet:fuchsia.ethernet_cpp",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

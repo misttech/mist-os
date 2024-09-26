@@ -143,6 +143,9 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
             ):
                 fuchsia_device.system_power_state_controller.idle_suspend_timer_based_resume(
                     duration=self.user_params["resume_timer_duration_sec"],
+                    verify_duration=self.user_params.get(
+                        "verify_duration", True
+                    ),
                 )
             elif fuchsia_device_operation == FuchsiaDeviceOperation.SOFT_REBOOT:
                 fuchsia_device.reboot()

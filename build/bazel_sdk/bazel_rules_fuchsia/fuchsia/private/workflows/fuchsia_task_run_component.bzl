@@ -28,9 +28,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     if not component.is_test and ctx.attr.test_realm:
         fail("`test_realm` is not applicable to non-test components.")
 
-    component_name = component.name
     url = "fuchsia-pkg://%s/%s#%s" % (repo, package, manifest)
-    moniker = ctx.attr.moniker or "/core/ffx-laboratory:%s" % component_name
     if component.is_driver:
         args = [
             "--ffx",
@@ -83,7 +81,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
                 "--ffx",
                 sdk.ffx,
                 "--moniker",
-                moniker,
+                component.moniker,
                 "--url",
                 url,
                 "--package-manifest",
@@ -107,9 +105,6 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             doc = "The package containing the component.",
             providers = [FuchsiaPackageInfo],
             mandatory = True,
-        ),
-        "moniker": attr.string(
-            doc = "The moniker to run the component in. Only used for non-test non-driver components.",
         ),
         "run_tag": attr.string(
             doc = """The run tag associated with this component.

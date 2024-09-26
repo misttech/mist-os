@@ -268,8 +268,9 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
                        << (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag) ? "set."
                                                                               : "not set.");
     }
-    if (!IsDir()) {
-      file_cache_->Reset();
+    // Clear cache when memory pressure is high.
+    if (fs()->GetMemoryStatus(MemoryStatus::kNeedReclaim)) {
+      CleanupCache();
     }
     fs()->GetVCache().Downgrade(this);
   } else {
@@ -754,6 +755,11 @@ uint64_t VnodeF2fs::GetSize() const {
   return vmo_manager().GetContentSize();
 }
 
+bool VnodeF2fs::NeedInodeWrite() const {
+  fs::SharedLock lock(mutex_);
+  return TestFlag(InodeInfoFlag::kSyncInode) || GetSize() != checkpointed_size_;
+}
+
 zx_status_t VnodeF2fs::SyncFile(bool datasync) {
   if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
@@ -763,33 +769,23 @@ zx_status_t VnodeF2fs::SyncFile(bool datasync) {
     return ZX_OK;
   }
 
-  Writeback();
-  bool need_cp = NeedToCheckpoint();
-  if (need_cp) {
-    fs()->SyncFs();
-    ClearFlag(InodeInfoFlag::kNeedCp);
-    if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
-      return ZX_ERR_BAD_STATE;
+  if (NeedToCheckpoint()) {
+    return fs()->SyncFile(*this);
+  }
+
+  fs::SharedLock lock(f2fs::GetGlobalLock());
+  WritebackOperation op;
+  Writeback(op);
+  if (!datasync || NeedInodeWrite()) {
+    LockedPage page;
+    if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &page); ret != ZX_OK) {
+      return ret;
     }
-  } else {
-    fs::SharedLock lock(f2fs::GetGlobalLock());
-    if (datasync) {
-      fs::SharedLock lock(mutex_);
-      if (GetSize() != checkpointed_size_) {
-        SetFlag(InodeInfoFlag::kSyncInode);
-      }
-    }
-    if (!datasync || TestFlag(InodeInfoFlag::kSyncInode)) {
-      LockedPage page;
-      if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &page); ret != ZX_OK) {
-        return ret;
-      }
-      UpdateInodePage(page, true);
-    }
-    fs()->GetNodeManager().FsyncNodePages(Ino());
-    if (!GetDirtyPageCount()) {
-      ClearDirty();
-    }
+    UpdateInodePage(page, true);
+  }
+  fs()->GetNodeManager().FsyncNodePages(Ino());
+  if (!GetDirtyPageCount()) {
+    ClearDirty();
   }
   return ZX_OK;
 }
@@ -1159,22 +1155,25 @@ zx::result<LockedPage> VnodeF2fs::NewInodePage() {
 // fs()->RemoveDirtyDirInode(this);
 pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
   pgoff_t nwritten = 0;
-  std::vector<LockedPage> pages = file_cache_->GetLockedDirtyPages(operation);
+  std::vector<fbl::RefPtr<Page>> pages = file_cache_->FindDirtyPages(operation);
+  pgoff_t last_key = pages.size() ? pages.back()->GetKey() : kInvalidPageOffset;
   PageList pages_to_disk;
   for (auto &page : pages) {
-    page.WaitOnWriteback();
-    block_t addr = GetBlockAddr(page);
+    // GetBlockAddr() returns kNullAddr when |page| is invalidated before |locked_page|.
+    LockedPage locked_page(std::move(page));
+    locked_page.WaitOnWriteback();
+    block_t addr = GetBlockAddr(locked_page);
     ZX_DEBUG_ASSERT(addr != kNewAddr);
     if (addr == kNullAddr) {
-      page.release();
+      locked_page.release();
       continue;
     }
-    page.SetWriteback(addr);
+    locked_page.SetWriteback(addr);
     if (operation.page_cb) {
       // |page_cb| conducts additional process for the last page of node and meta vnodes.
-      operation.page_cb(page.CopyRefPtr(), page.get() == pages.back().get());
+      operation.page_cb(locked_page.CopyRefPtr(), locked_page->GetKey() == last_key);
     }
-    pages_to_disk.push_back(page.release());
+    pages_to_disk.push_back(locked_page.release());
     ++nwritten;
 
     if (!(nwritten % kDefaultBlocksPerSegment)) {
@@ -1192,9 +1191,10 @@ pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
   return nwritten;
 }
 
-void VnodeF2fs::CleanupPages() {
+void VnodeF2fs::CleanupCache() {
   file_cache_->EvictCleanPages();
   vmo_manager_->Reset();
+  dir_entry_cache_.Reset();
 }
 
 // Set multimedia files as cold files for hot/cold data separation

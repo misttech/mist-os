@@ -55,6 +55,9 @@ class Fixed {
   // Returns the maximum value of this fixed point format.
   static constexpr Fixed Max() { return FromRaw(Format::Max); }
 
+  // Returns the smallest positive value of this fixed point format.
+  static constexpr Fixed Epsilon() { return FromRaw(1); }
+
   // Fixed is default constructible without a default value, which is the same
   // as for plain integer types. This is permitted in constexpr contexts as
   // long as the underling integer member |value_| is initialized before use.

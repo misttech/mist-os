@@ -387,7 +387,7 @@ impl NumberFormat for f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::InspectDataBuilder;
+    use diagnostics_data::{InspectDataBuilder, Timestamp};
     use test_case::test_case;
 
     #[fuchsia::test]
@@ -828,9 +828,13 @@ mod tests {
 
     #[fuchsia::test]
     fn render_escrowed_data() {
-        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), "test-url", 123456i64)
-            .escrowed(true)
-            .build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            "test-url",
+            Timestamp::from_nanos(123456i64),
+        )
+        .escrowed(true)
+        .build();
         let mut buf = String::new();
         output_schema(&mut buf, &data).unwrap();
         let expected = r#"a/b/c/d:

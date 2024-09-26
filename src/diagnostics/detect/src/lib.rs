@@ -16,8 +16,9 @@ use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{self as inspect, NumericProperty};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{Inspect, WithInspect};
-use fuchsia_triage::SnapshotTrigger;
+use fuchsia_triage::{inspect_logger, SnapshotTrigger};
 use futures::StreamExt;
 use glob::glob;
 use injectable_time::MonotonicTime;
@@ -34,6 +35,8 @@ const PROGRAM_CONFIG_PATH: &str = "/config/data/config.json";
 const SIGNATURE_PREFIX: &str = "fuchsia-detect-";
 // Minimum time between sending any particular signature (except in test mode)
 const MINIMUM_SIGNATURE_INTERVAL_NANOS: i64 = 3600 * 1_000_000_000;
+// The max number of warnings to store (for example, "Snapshot trigger was not boolean"...)
+const WARNING_LIST_MAX_SIZE: usize = 100;
 
 /// The name of the subcommand and the logs-tag.
 pub const PROGRAM_NAME: &str = "detect";
@@ -192,6 +195,11 @@ pub async fn main() -> Result<(), Error> {
     inspector
         .root()
         .record_child("config", |config_node| component_config.record_inspect(config_node));
+
+    inspect_logger::set_log_list_node(BoundedListNode::new(
+        inspector.root().create_child("triage_warnings"),
+        WARNING_LIST_MAX_SIZE,
+    ));
 
     let stats = Stats::new().with_inspect(inspector.root(), "stats")?;
     let mode = match component_config.test_only {

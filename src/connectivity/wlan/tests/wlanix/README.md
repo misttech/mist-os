@@ -17,3 +17,6 @@ destroying an iface, or connecting and disconnecting from the same network.
 
 Failures in more complex cases should refer to these tests as a reference for
 expected platform behavior.
+
+> Note: If you have `//vendor/google` in your source tree, you may find
+> non-public test targets built from sources in this directory.

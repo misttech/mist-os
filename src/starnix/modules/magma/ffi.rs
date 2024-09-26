@@ -59,7 +59,7 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_buffer::UserBuffer;
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned
 /// Vec.
@@ -298,7 +298,7 @@ pub fn device_release(
 /// `WireDescriptor` matches the struct used by libmagma_virt to encode some fields of the magma
 /// command descriptor.
 #[repr(C)]
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Default, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Default, Debug)]
 struct WireDescriptor {
     resource_count: u32,
     command_buffer_count: u32,

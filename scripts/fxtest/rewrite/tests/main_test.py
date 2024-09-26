@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import asyncio
 import contextlib
 import gzip
 import io
@@ -9,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import tempfile
 import typing
 import unittest
@@ -147,12 +149,24 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patch.stop)
         return m
 
-    def _mock_run_command(self, return_code: int) -> mock.MagicMock:
-        m = mock.AsyncMock(
-            return_value=mock.MagicMock(
+    def _mock_run_command(
+        self,
+        return_code: int,
+        async_handler: (
+            typing.Callable[[typing.Any, typing.Any], typing.Awaitable[None]]
+            | None
+        ) = None,
+    ) -> mock.MagicMock:
+        async def handler(
+            *args: typing.Any, **kwargs: typing.Any
+        ) -> typing.Any:
+            if async_handler is not None:
+                await async_handler(*args, **kwargs)
+            return mock.MagicMock(
                 return_code=return_code, stdout="", stderr="", was_timeout=False
             )
-        )
+
+        m = mock.AsyncMock(side_effect=handler)
         patch = mock.patch("main.execution.run_command", m)
         patch.start()
         self.addCleanup(patch.stop)
@@ -285,6 +299,126 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(selection_events), 1)
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), 1)
+
+    async def test_cancel_before_tests_run(self) -> None:
+        """Test that SIGINT before tests start running immediately stops execution"""
+
+        self._mock_run_command(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base([])
+
+        ready_to_kill = asyncio.Event()
+
+        # Make builds hang for a long time, signalling that we should
+        # trigger a SIGINT at the point the build starts.
+        async def build_handler(_: typing.Any) -> bool:
+            ready_to_kill.set()
+            await asyncio.sleep(3600)
+            return False
+
+        build_patch = mock.patch(
+            "main.AsyncMain._do_build",
+            mock.AsyncMock(side_effect=build_handler),
+        )
+        build_patch.start()
+        self.addCleanup(build_patch.stop)
+
+        recorder = event.EventRecorder()
+        main_task = asyncio.Task(
+            main.async_main_wrapper(
+                args.parse_args(["--simple"]), recorder=recorder
+            )
+        )
+
+        await ready_to_kill.wait()
+        os.kill(os.getpid(), signal.SIGINT)
+
+        ret = await main_task
+        self.assertEqual(ret, 1)
+        errors = {e.error async for e in recorder.iter() if e.error is not None}
+        self.assertIsSubset({"Terminated due to interrupt"}, errors)
+
+    async def test_cancel_tests_wraps_up(self) -> None:
+        """Test that SIGINT while tests are running allows them to wrap up and prints output"""
+
+        ready_to_kill = asyncio.Event()
+
+        async def command_handler(
+            *args: typing.Any, **kwargs: typing.Any
+        ) -> None:
+            event: asyncio.Event = kwargs.get("abort_signal")  # type: ignore
+            assert event is not None
+            ready_to_kill.set()
+            await event.wait()
+
+        _command_mock = self._mock_run_command(
+            15, async_handler=command_handler
+        )
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base([])
+
+        recorder = event.EventRecorder()
+        main_task = asyncio.Task(
+            main.async_main_wrapper(
+                args.parse_args(["--simple", "--no-build"]), recorder=recorder
+            )
+        )
+
+        await ready_to_kill.wait()
+        os.kill(os.getpid(), signal.SIGINT)
+
+        ret = await main_task
+        self.assertEqual(ret, 1)
+        errors = {e.error async for e in recorder.iter() if e.error is not None}
+        self.assertIsSubset({"Failed to run all tests"}, errors)
+
+        aborted_cases = {
+            (payload_event.status, payload_event.message)
+            async for e in recorder.iter()
+            if (payload := e.payload) is not None
+            and (payload_event := payload.test_suite_ended) is not None
+        }
+        self.assertSetEqual(
+            aborted_cases,
+            {
+                (
+                    event.TestSuiteStatus.ABORTED,
+                    "Test suite aborted due to user interrupt.",
+                )
+            },
+        )
+
+    async def test_double_sigint_cancels_everything(self) -> None:
+        """Test that sending SIGINT twice cancels all tasks, no matter how long running"""
+
+        ready_to_kill = asyncio.Event()
+
+        async def command_handler(
+            *args: typing.Any, **kwargs: typing.Any
+        ) -> None:
+            ready_to_kill.set()
+            await asyncio.sleep(3600)
+
+        _command_mock = self._mock_run_command(
+            15, async_handler=command_handler
+        )
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base([])
+
+        recorder = event.EventRecorder()
+        main_task = asyncio.Task(
+            main.async_main_wrapper(
+                args.parse_args(["--simple", "--no-build"]), recorder=recorder
+            )
+        )
+
+        await ready_to_kill.wait()
+        os.kill(os.getpid(), signal.SIGINT)
+        await asyncio.sleep(0.5)
+        os.kill(os.getpid(), signal.SIGINT)
+
+        ret = await main_task
+        self.assertEqual(ret, 1)
 
     @parameterized.expand(
         [

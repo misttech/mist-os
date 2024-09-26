@@ -3003,8 +3003,18 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
   if (!brcmf_test_bit(brcmf_scan_status_bit_t::BUSY, &cfg->scan_status)) {
     return;
   }
-  fuchsia_wlan_fullmac_wire::WlanFullmacScanResult result = {};
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    BRCMF_ERR(
+        "Failed to create Arena in WlanFullmacIfc::OnScanResult(). "
+        "status=%s",
+        arena.status_string());
+    return;
+  }
+  auto scan_result_builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest::Builder(*arena);
   fuchsia_wlan_common::BssType bss_type = fuchsia_wlan_common::BssType::kInfrastructure;
+  fuchsia_wlan_common::wire::BssDescription bss;
 
   if ((capability & IEEE80211_BCN_CAPS_ESS) && !(capability & IEEE80211_BCN_CAPS_IBSS)) {
     bss_type = fuchsia_wlan_common::BssType::kInfrastructure;
@@ -3014,39 +3024,32 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
     bss_type = fuchsia_wlan_common::BssType::kMesh;
   }
 
-  result.txn_id = ndev->scan_txn_id;
-  result.timestamp_nanos = zx::clock::get_monotonic().get();
-  memcpy(result.bss.bssid.data(), bssid, ETH_ALEN);
-  result.bss.bss_type = bss_type;
-  result.bss.beacon_period = 0;
-  result.bss.capability_info = capability;
-  result.bss.channel.primary = static_cast<uint8_t>(channel);
-  result.bss.channel.cbw = chn_bw;
-  result.bss.rssi_dbm = std::min<int16_t>(0, std::max<int16_t>(-255, rssi_dbm));
-  result.bss.snr_db = static_cast<int8_t>(snr_db);
-  result.bss.ies = ::fidl::VectorView<uint8_t>::FromExternal(ie, ie_len);
+  scan_result_builder.txn_id(ndev->scan_txn_id);
+  scan_result_builder.timestamp_nanos(zx::clock::get_monotonic().get());
+  memcpy(bss.bssid.data(), bssid, ETH_ALEN);
+  bss.bss_type = bss_type;
+  bss.beacon_period = 0;
+  bss.capability_info = capability;
+  bss.channel.primary = static_cast<uint8_t>(channel);
+  bss.channel.cbw = chn_bw;
+  bss.rssi_dbm = std::min<int16_t>(0, std::max<int16_t>(-255, rssi_dbm));
+  bss.snr_db = static_cast<int8_t>(snr_db);
+  bss.ies = ::fidl::VectorView<uint8_t>::FromExternal(ie, ie_len);
+  scan_result_builder.bss(bss);
 
-  BRCMF_DBG(SCAN, "Returning scan result id: %lu, channel: %d, dbm: %d", result.txn_id, channel,
-            result.bss.rssi_dbm);
+  BRCMF_DBG(SCAN, "Returning scan result id: %lu, channel: %d, dbm: %d", ndev->scan_txn_id, channel,
+            bss.rssi_dbm);
 #if !defined(NDEBUG)
-  auto ssid = brcmf_find_ssid_in_ies(result.bss.ies.data(), result.bss.ies.count());
+  auto ssid = brcmf_find_ssid_in_ies(bss.ies.data(), bss.ies.count());
   BRCMF_DBG(SCAN, "  ssid: " FMT_SSID, FMT_SSID_VECT(ssid));
 #endif /* !defined(NDEBUG) */
   ndev->scan_num_results++;
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    BRCMF_ERR(
-        "Failed to create Arena in WlanFullmacIfc::OnScanResult(). "
-        "status=%s",
-        arena.status_string());
-    return;
-  }
-  auto status = ndev->if_proto.buffer(*arena)->OnScanResult(result);
+  auto status = ndev->if_proto.buffer(*arena)->OnScanResult(scan_result_builder.Build());
   if (!status.ok()) {
     BRCMF_ERR(
         "Failed to WlanScanResult up in WlanFullmacIfc::OnScanResult(). "
         "result.status: %s, txn_id=%zu",
-        status.status_string(), result.txn_id);
+        status.status_string(), ndev->scan_txn_id);
     return;
   }
 }

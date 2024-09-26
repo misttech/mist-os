@@ -66,11 +66,12 @@ void apic_send_mask_ipi(uint8_t vector, cpu_mask_t mask, enum apic_interrupt_del
 void apic_issue_eoi();
 
 zx_status_t apic_timer_set_oneshot(uint32_t count, uint8_t divisor, bool masked);
-void apic_timer_set_tsc_deadline(uint64_t deadline, bool masked);
+void apic_timer_set_tsc_deadline(uint64_t deadline);
 uint32_t apic_timer_current_count();
 void apic_timer_mask();
 void apic_timer_unmask();
 void apic_timer_stop();
+void apic_timer_tsc_deadline_init();
 
 void apic_pmi_mask();
 void apic_pmi_unmask();

@@ -33,6 +33,8 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     return false;
   }
 
+  zx::event hardware_element_assertive_token;
+
   for (const auto& config : configs.value()) {
     auto tokens = fdf_power::GetDependencyTokens(*parent_device->incoming(), config);
     if (tokens.is_error()) {
@@ -53,9 +55,6 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
       return false;
     }
 
-    assertive_power_dep_tokens_.push_back(std::move(description.assertive_token));
-    opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token));
-
     if (config.element.name == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =
           std::move(description.element_control_client.value());
@@ -67,15 +66,62 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client.value()),
           fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      description.assertive_token.duplicate(ZX_RIGHT_SAME_RIGHTS,
+                                            &hardware_element_assertive_token);
 
     } else {
       MAGMA_LOG(INFO, "Got unexpected power element %s", config.element.name.c_str());
     }
+    assertive_power_dep_tokens_.push_back(std::move(description.assertive_token));
+    opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token));
   }
   if (!hardware_power_lessor_client_.is_valid()) {
     MAGMA_LOG(INFO, "No %s element, disabling power framework", kHardwarePowerElementName);
     return false;
   }
+
+  {
+    fdf_power::PowerElementConfiguration config = {
+        .element = {.name = kOnReadyForWorkPowerElementName,
+                    .levels =
+                        {
+                            {.level = 0,
+                             .name = "off",
+                             .transitions = {{.target_level = 1, .latency_us = 0}}},
+                            {.level = 1,
+                             .name = "on",
+                             .transitions = {{.target_level = 0, .latency_us = 0}}},
+                        }},
+        .dependencies = {{
+            .child = kOnReadyForWorkPowerElementName,
+            .parent = fdf_power::ParentElement::WithInstanceName(kHardwarePowerElementName),
+            .level_deps = {{.child_level = 1, .parent_level = kPoweredUpPowerLevel}},
+            .strength = fdf_power::RequirementType::kAssertive,
+        }}};
+
+    fdf_power::TokenMap tokens;
+    tokens[fdf_power::ParentElement::WithInstanceName(kHardwarePowerElementName)] =
+        std::move(hardware_element_assertive_token);
+
+    fdf_power::ElementDesc description =
+        fdf_power::ElementDescBuilder(config, std::move(tokens)).Build();
+    auto result = fdf_power::AddElement(power_broker.value(), description);
+    if (result.is_error()) {
+      MAGMA_LOG(ERROR, "Failed to add power element: %u",
+                static_cast<uint8_t>(result.error_value()));
+      return false;
+    }
+    on_ready_for_work_token_ = std::move(description.assertive_token);
+    on_ready_for_work_control_client_end_ = std::move(description.element_control_client.value());
+    on_ready_for_work_runner_.emplace(
+        std::move(description.required_level_client.value()),
+        std::move(description.current_level_client.value()),
+        [](uint8_t new_level) { return fit::ok(new_level); },
+        [](fdf_power::ElementRunnerError error) {},
+        fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    on_ready_for_work_runner_->RunPowerElement();
+  }
+
   CheckRequiredLevel();
   MAGMA_LOG(INFO, "Using power framework to manage GPU power");
 
@@ -182,3 +228,10 @@ bool FuchsiaPowerManager::DisablePower() {
 }
 
 bool FuchsiaPowerManager::LeaseIsRequested() { return lease_control_client_end_.is_valid(); }
+
+FuchsiaPowerManager::PowerGoals FuchsiaPowerManager::GetPowerGoals() {
+  PowerGoals goals;
+  on_ready_for_work_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &goals.on_ready_for_work_token);
+
+  return goals;
+}

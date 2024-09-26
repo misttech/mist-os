@@ -13,6 +13,7 @@ rustc_staticlib("wlan-fullmac-mlme-c") {
 
   deps = [
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
+    "//src/connectivity/wlan/lib/ffi-transport:wlan-ffi-transport",
     "//src/connectivity/wlan/lib/mlme/fullmac:wlan-fullmac-mlme",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon",
@@ -22,15 +23,6 @@ rustc_staticlib("wlan-fullmac-mlme-c") {
   public = [ "bindings.h" ]
 
   sources = [ "src/lib.rs" ]
-}
-
-source_set("wlan-fullmac-mlme-c-stub") {
-  testonly = true
-  public = [
-    "bindings.h",
-    "testing/bindings_stubs.h",
-  ]
-  sources = [ "testing/bindings_stubs.cc" ]
 }
 
 fuchsia_unittest_package("wlan-fullmac-mlme-c-tests") {

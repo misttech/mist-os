@@ -32,7 +32,8 @@ pub trait DictExt {
         &self,
         moniker: impl Into<ExtendedMoniker> + Send,
         path: &'a impl IterablePath,
-        request: Request,
+        request: Option<Request>,
+        debug: bool,
     ) -> Result<Option<Capability>, RouterError>;
 }
 
@@ -129,11 +130,13 @@ impl DictExt for Dict {
         &self,
         moniker: impl Into<ExtendedMoniker> + Send,
         path: &'a impl IterablePath,
-        request: Request,
+        request: Option<Request>,
+        debug: bool,
     ) -> Result<Option<Capability>, RouterError> {
         let mut current_capability: Capability = self.clone().into();
         let moniker = moniker.into();
-        for next_name in path.iter_segments() {
+        let num_segments = path.iter_segments().count();
+        for (next_idx, next_name) in path.iter_segments().enumerate() {
             // We have another name but no subdictionary, so exit.
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
@@ -146,7 +149,16 @@ impl DictExt for Dict {
             let Some(capability) = capability else { return Ok(None) };
 
             // Resolve the capability, this is a noop if it's not a router.
-            current_capability = capability.route(request.try_clone()?).await?;
+            let debug = if next_idx < num_segments - 1 {
+                // If `request.debug` is true, that should only apply to the capability at `path`.
+                // Since we're not looking up the final path segment, set `debug = false`, to
+                // obtain the actual Dict and not its debug info.
+                false
+            } else {
+                debug
+            };
+            let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+            current_capability = capability.route(request, debug).await?;
         }
         Ok(Some(current_capability))
     }

@@ -10,7 +10,7 @@ use fidl_fuchsia_testing::{
 use fidl_fuchsia_testing_deadline::DeadlineId;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum, Peered};
+use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::FutureExt;
 use tracing::{debug, error, trace, warn};
@@ -335,7 +335,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
     }
 
     fn increment(&mut self, increment: &Increment) {
-        let dur = match increment {
+        let dur = zx::Duration::from_nanos(match increment {
             Increment::Determined(d) => *d,
             Increment::Random(rr) => {
                 if let Ok(v) = u64::try_from(rr.min_rand).and_then(|min| {
@@ -348,8 +348,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
                     DEFAULT_INCREMENTS_MS
                 }
             }
-        }
-        .nanos();
+        });
         trace!("incrementing mock clock {:?} => {:?}", increment, dur);
         self.time += dur;
         let () = self.check_events();
@@ -426,7 +425,7 @@ async fn handle_control_events<T: FakeClockObserver>(
                 } else {
                     // stop free running if we are
                     stop_free_running(&mock_clock);
-                    start_free_running(&mock_clock, real.nanos(), increment);
+                    start_free_running(&mock_clock, zx::Duration::from_nanos(real), increment);
                     responder.send(Ok(()))
                 }
             }
@@ -522,8 +521,8 @@ async fn main() -> Result<(), Error> {
     let mock_clock = Arc::new(Mutex::new(FakeClock::<()>::new()));
     start_free_running(
         &mock_clock,
-        DEFAULT_INCREMENTS_MS.millis(),
-        Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+        zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+        Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
     );
     let m1 = Arc::clone(&mock_clock);
 
@@ -567,7 +566,7 @@ mod tests {
     #[fuchsia::test]
     fn test_event_heap() {
         let time = zx::MonotonicTime::get();
-        let after = time + 10.millis();
+        let after = time + zx::Duration::from_millis(10);
         let e1 = PendingEvent { time, event: 0 };
         let e2 = PendingEvent { time: after, event: 1 };
         let mut heap = BinaryHeap::new();
@@ -581,7 +580,7 @@ mod tests {
     fn test_simple_increments() {
         let mut mock_clock = FakeClock::<()>::new();
         let begin = mock_clock.time;
-        let skip = 10.millis();
+        let skip = zx::Duration::from_millis(10);
         mock_clock.increment(&Increment::Determined(skip.into_nanos()));
         assert_eq!(mock_clock.time, begin + skip);
     }
@@ -589,8 +588,8 @@ mod tests {
     #[fuchsia::test]
     fn test_random_increments() {
         let mut mock_clock = FakeClock::<()>::new();
-        let min = 10.nanos();
-        let max = 20.nanos();
+        let min = zx::Duration::from_nanos(10);
+        let max = zx::Duration::from_nanos(20);
         for _ in 0..200 {
             let begin = mock_clock.time;
             let allowed = (begin + min).into_nanos()..(begin + max).into_nanos();
@@ -625,9 +624,17 @@ mod tests {
         let mut mock_clock = clock_handle.lock().unwrap();
         let (e1, cli1) = zx::EventPair::create();
         let time = mock_clock.time;
-        mock_clock.install_event(Arc::clone(&clock_handle), time + 10.millis(), e1);
+        mock_clock.install_event(
+            Arc::clone(&clock_handle),
+            time + zx::Duration::from_millis(10),
+            e1,
+        );
         let (e2, cli2) = zx::EventPair::create();
-        mock_clock.install_event(Arc::clone(&clock_handle), time + 20.millis(), e2);
+        mock_clock.install_event(
+            Arc::clone(&clock_handle),
+            time + zx::Duration::from_millis(20),
+            e2,
+        );
         let (e3, cli3) = zx::EventPair::create();
         mock_clock.install_event(Arc::clone(&clock_handle), time, e3);
         // only e3 should've signalled immediately:
@@ -635,11 +642,11 @@ mod tests {
         assert!(!check_signaled(&cli2));
         assert!(check_signaled(&cli3));
         // increment clock by 10 millis:
-        mock_clock.increment(&Increment::Determined(10.millis().into_nanos()));
+        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
         assert!(check_signaled(&cli1));
         assert!(!check_signaled(&cli2));
         // increment clock by another 10 millis and check that e2 is signaled
-        mock_clock.increment(&Increment::Determined(10.millis().into_nanos()));
+        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
         assert!(check_signaled(&cli3));
     }
 
@@ -649,22 +656,22 @@ mod tests {
         let event = {
             let mut mock_clock = clock_handle.lock().unwrap();
             let (event, client) = zx::EventPair::create();
-            let sched = mock_clock.time + 10.millis();
+            let sched = mock_clock.time + zx::Duration::from_millis(10);
             mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
             client
         };
 
         start_free_running(
             &clock_handle,
-            DEFAULT_INCREMENTS_MS.millis(),
-            Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
         let _ = fasync::OnSignals::new(&event, zx::Signals::EVENT_SIGNALED).await.unwrap();
         stop_free_running(&clock_handle);
 
         // after free running has ended, timer must not be updating anymore:
         let bef = clock_handle.lock().unwrap().time;
-        fasync::Timer::new(zx::MonotonicTime::after(30.millis())).await;
+        fasync::Timer::new(zx::MonotonicTime::after(zx::Duration::from_millis(30))).await;
         assert_eq!(clock_handle.lock().unwrap().time, bef);
     }
 
@@ -690,7 +697,7 @@ mod tests {
         let event = {
             let mut mock_clock = clock_handle.lock().unwrap();
             let (event, client) = zx::EventPair::create();
-            let sched = mock_clock.time + 10.millis();
+            let sched = mock_clock.time + zx::Duration::from_millis(10);
             mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
             client
         };
@@ -707,28 +714,28 @@ mod tests {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
         let mut mock_clock = clock_handle.lock().unwrap();
         let (event, client) = zx::EventPair::create();
-        let sched = mock_clock.time + 10.millis();
+        let sched = mock_clock.time + zx::Duration::from_millis(10);
         mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
         assert!(!check_signaled(&client));
         // now reschedule the same event:
-        let sched = mock_clock.time + 20.millis();
+        let sched = mock_clock.time + zx::Duration::from_millis(20);
         mock_clock.reschedule_event(sched, client.get_koid().unwrap());
         println!("{:?}", mock_clock.pending_events);
         assert!(!check_signaled(&client));
         // advance time and ensure that we don't fire the event
-        mock_clock.increment(&Increment::Determined(10.millis().into_nanos()));
+        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
         assert!(!check_signaled(&client));
-        mock_clock.increment(&Increment::Determined(10.millis().into_nanos()));
+        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
         assert!(check_signaled(&client));
         // clear the signal, reschedule once more and see that it gets hit again.
         client.signal_handle(zx::Signals::EVENTPAIR_SIGNALED, zx::Signals::NONE).unwrap();
         assert!(!check_signaled(&client));
-        let sched = mock_clock.time + 10.millis();
+        let sched = mock_clock.time + zx::Duration::from_millis(10);
         mock_clock.reschedule_event(sched, client.get_koid().unwrap());
         // not yet signaled...
         assert!(!check_signaled(&client));
         // increment once again and it should be signaled then:
-        mock_clock.increment(&Increment::Determined(10.millis().into_nanos()));
+        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
         assert!(check_signaled(&client));
     }
 
@@ -746,8 +753,8 @@ mod tests {
             .expect("set stop point failed");
         let () = start_free_running(
             &clock_handle,
-            DEFAULT_INCREMENTS_MS.millis(),
-            Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
         // Checking for the stop point should signal the event pair.
         assert!(clock_handle.lock().unwrap().check_stop_point(&StopPoint {
@@ -758,7 +765,8 @@ mod tests {
         let () = stop_free_running(&clock_handle);
 
         // A deadline set to expire in the future stops time when the deadline is reached.
-        let future_deadline_timeout = clock_handle.lock().unwrap().time + 10.millis();
+        let future_deadline_timeout =
+            clock_handle.lock().unwrap().time + zx::Duration::from_millis(10);
         let () = clock_handle.lock().unwrap().add_named_deadline(PendingDeadlineExpireEvent {
             deadline_id: DEADLINE_ID.into(),
             deadline: future_deadline_timeout,
@@ -777,8 +785,8 @@ mod tests {
             .expect("set stop point failed");
         let () = start_free_running(
             &clock_handle,
-            DEFAULT_INCREMENTS_MS.millis(),
-            Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
         assert_eq!(
             fasync::OnSignals::new(&client_event, zx::Signals::EVENTPAIR_SIGNALED).await.unwrap()
@@ -794,8 +802,8 @@ mod tests {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
         let () = start_free_running(
             &clock_handle,
-            DEFAULT_INCREMENTS_MS.millis(),
-            Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
         // Checking for an unregistered stop point should not stop time.
         assert!(!clock_handle.lock().unwrap().check_stop_point(&StopPoint {
@@ -816,8 +824,8 @@ mod tests {
             .expect("set stop point failed");
         let () = start_free_running(
             &clock_handle,
-            DEFAULT_INCREMENTS_MS.millis(),
-            Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
         drop(client_event);
         assert!(!clock_handle.lock().unwrap().check_stop_point(&StopPoint {
@@ -829,8 +837,10 @@ mod tests {
 
         // If we set two EXPIRED points and drop the handle of the earlier one, time should stop
         // on the later stop point.
-        let future_deadline_timeout_1 = clock_handle.lock().unwrap().time + 10.millis();
-        let future_deadline_timeout_2 = clock_handle.lock().unwrap().time + 20.millis();
+        let future_deadline_timeout_1 =
+            clock_handle.lock().unwrap().time + zx::Duration::from_millis(10);
+        let future_deadline_timeout_2 =
+            clock_handle.lock().unwrap().time + zx::Duration::from_millis(20);
         let () = clock_handle.lock().unwrap().add_named_deadline(PendingDeadlineExpireEvent {
             deadline_id: DEADLINE_ID.into(),
             deadline: future_deadline_timeout_1,
@@ -866,8 +876,8 @@ mod tests {
         drop(client_event_1);
         let () = start_free_running(
             &clock_handle,
-            DEFAULT_INCREMENTS_MS.millis(),
-            Increment::Determined(DEFAULT_INCREMENTS_MS.millis().into_nanos()),
+            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
         assert_eq!(
             fasync::OnSignals::new(&client_event_2, zx::Signals::EVENTPAIR_SIGNALED).await.unwrap()
@@ -979,7 +989,7 @@ mod tests {
             let deadline = fake_clock_proxy
                 .create_named_deadline(
                     &DEADLINE_ID.into(),
-                    deadline_time_millis.millis().into_nanos(),
+                    zx::Duration::from_millis(deadline_time_millis).into_nanos(),
                 )
                 .await
                 .expect("failed to create named deadline");

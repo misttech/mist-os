@@ -851,7 +851,8 @@ impl VecInputBuffer {
         if end > self.buffer.len() {
             return error!(EINVAL);
         }
-        let obj = T::read_from(&self.buffer[self.bytes_read..end]).ok_or_else(|| errno!(EINVAL))?;
+        let obj =
+            T::read_from_bytes(&self.buffer[self.bytes_read..end]).map_err(|_| errno!(EINVAL))?;
         self.bytes_read = end;
         debug_assert!(self.bytes_read <= self.buffer.len());
         Ok(obj)

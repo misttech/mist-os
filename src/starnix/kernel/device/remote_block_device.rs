@@ -54,8 +54,7 @@ impl RemoteBlockDevice {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let device_name = FsString::from(format!("remoteblk-{name}"));
-        let virtual_block_class =
-            registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
+        let virtual_block_class = registry.objects.virtual_block_class();
         let backing_memory_size = backing_memory.get_content_size() as usize;
         let device = Arc::new(Self {
             name: name.to_owned(),
@@ -225,7 +224,12 @@ pub fn remote_block_device_init(_locked: &mut Locked<'_, Unlocked>, current_task
     current_task
         .kernel()
         .device_registry
-        .register_major(REMOTE_BLOCK_MAJOR, open_remote_block_device, DeviceMode::Block)
+        .register_major(
+            "remote-block".into(),
+            DeviceMode::Block,
+            REMOTE_BLOCK_MAJOR,
+            open_remote_block_device,
+        )
         .expect("remote block device register failed.");
 }
 
@@ -279,6 +283,7 @@ impl RemoteBlockDeviceRegistry {
 
 #[cfg(test)]
 mod tests {
+    use super::remote_block_device_init;
     use crate::mm::MemoryAccessor as _;
     use crate::testing::{create_kernel_task_and_unlocked, map_object_anywhere};
     use crate::vfs::{Anon, SeekTarget, VecInputBuffer, VecOutputBuffer};
@@ -290,6 +295,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_remote_block_device_registry() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        remote_block_device_init(&mut locked, &current_task);
         let registry = kernel.remote_block_device_registry.clone();
 
         registry
@@ -309,11 +315,13 @@ mod tests {
 
         file.ioctl(&mut locked, &current_task, BLKGETSIZE64, arg_addr.into())
             .expect("ioctl failed");
-        let value = u64::read_from(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
+        let value =
+            u64::read_from_bytes(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
         assert_eq!(value, 1024);
 
         file.ioctl(&mut locked, &current_task, BLKGETSIZE, arg_addr.into()).expect("ioctl failed");
-        let value = u64::read_from(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
+        let value =
+            u64::read_from_bytes(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
         assert_eq!(value, 2);
 
         let mut buf = VecOutputBuffer::new(512);
@@ -333,6 +341,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_past_eof() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        remote_block_device_init(&mut locked, &current_task);
         let registry = kernel.remote_block_device_registry.clone();
 
         registry

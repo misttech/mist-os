@@ -82,10 +82,10 @@ zx::result<> DeviceInspect::Publish() {
   return zx::ok();
 }
 
-void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
-                                    const std::string& type,
-                                    const cpp20::span<const zx_device_prop_t>& properties,
-                                    const std::string& driver_url) {
+void DeviceInspect::SetStaticValues(
+    const std::string& topological_path, uint32_t protocol_id, const std::string& type,
+    const cpp20::span<const fuchsia_driver_framework::wire::NodeProperty>& properties,
+    const std::string& driver_url) {
   protocol_id_ = protocol_id;
   device_node_.CreateString("topological_path", topological_path, &static_values_);
   device_node_.CreateUint("protocol_id", protocol_id, &static_values_);
@@ -100,11 +100,44 @@ void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_
   }
 
   for (uint32_t i = 0; i < properties.size(); ++i) {
-    const zx_device_prop_t* p = &properties[i];
-    auto property = properties_array.CreateChild(std::to_string(i));
-    property.CreateUint("value", p->value, &static_values_);
-    property.CreateString("id", std::to_string(p->id), &static_values_);
-    static_values_.emplace(std::move(property));
+    auto inspect_property = properties_array.CreateChild(std::to_string(i));
+    auto& property = properties[i];
+    switch (property.key.Which()) {
+      case fuchsia_driver_framework::wire::NodePropertyKey::Tag::kIntValue:
+        inspect_property.CreateUint("key", property.key.int_value(), &static_values_);
+        break;
+      case fuchsia_driver_framework::wire::NodePropertyKey::Tag::kStringValue: {
+        inspect_property.CreateString("key", std::string(property.key.string_value().get()),
+                                      &static_values_);
+        break;
+      }
+      default: {
+        inspect_property.CreateString("key", "UNKNOWN KEY TYPE", &static_values_);
+        break;
+      }
+    }
+
+    switch (property.value.Which()) {
+      case fuchsia_driver_framework::wire::NodePropertyValue::Tag::kStringValue:
+        inspect_property.CreateString("value", std::string(property.value.string_value().get()),
+                                      &static_values_);
+        break;
+      case fuchsia_driver_framework::wire::NodePropertyValue::Tag::kIntValue:
+        inspect_property.CreateUint("value", property.value.int_value(), &static_values_);
+        break;
+      case fuchsia_driver_framework::wire::NodePropertyValue::Tag::kEnumValue:
+        inspect_property.CreateString("value", std::string(property.value.enum_value().get()),
+                                      &static_values_);
+        break;
+      case fuchsia_driver_framework::wire::NodePropertyValue::Tag::kBoolValue:
+        inspect_property.CreateBool("value", property.value.bool_value(), &static_values_);
+        break;
+      default: {
+        inspect_property.CreateString("value", "UNKNOWN VALUE TYPE", &static_values_);
+        break;
+      }
+    }
+    static_values_.emplace(std::move(inspect_property));
   }
 
   // Place the node into value list as props will not change in the lifetime of the device.

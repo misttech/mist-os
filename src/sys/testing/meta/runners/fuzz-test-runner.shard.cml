@@ -8,27 +8,43 @@
             name: "fuzz_test_runner",
             url: "fuchsia-pkg://fuchsia.com/fuzz-test-runner#meta/fuzz-test-runner.cm",
         },
+        {
+            name: "fuzz_starnix_test_runner",
+            url: "fuchsia-pkg://fuchsia.com/fuzz-test-runner#meta/fuzz-starnix-test-runner.cm",
+        },
     ],
     offer: [
         {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
-            to: [ "#fuzz_test_runner" ],
+            to: [
+                "#fuzz_starnix_test_runner",
+                "#fuzz_test_runner",
+            ],
         },
         {
             protocol: "fuchsia.test.runner.LibraryLoaderCacheBuilder",
             from: "#lib_loader_cache",
-            to: [ "#fuzz_test_runner" ],
+            to: [
+                "#fuzz_starnix_test_runner",
+                "#fuzz_test_runner",
+            ],
         },
         {
             protocol: "fuchsia.fuzzer.Registrar",
             from: "parent",
-            to: "#fuzz_test_runner",
+            to: [
+                "#fuzz_starnix_test_runner",
+                "#fuzz_test_runner",
+            ],
         },
         {
             protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
-            to: [ "#fuzz_test_runner" ],
+            to: [
+                "#fuzz_starnix_test_runner",
+                "#fuzz_test_runner",
+            ],
         },
     ],
 }

@@ -3,6 +3,7 @@
 
 import("//build/compiled_action.gni")
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("constants") {
   sources = [ "constants.h" ]
@@ -59,7 +60,7 @@ group("tests") {
   deps = [ ":audio_mixer_unittests" ]
 }
 
-executable("mixer_unittest_bin") {
+cc_test_executable("mixer_unittest_bin") {
   testonly = true
   output_name = "audio_mixer_unittests"
 

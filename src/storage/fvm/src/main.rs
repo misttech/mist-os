@@ -4,6 +4,7 @@
 
 mod device;
 mod mapping;
+mod zxcrypt;
 
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use block_client::{
@@ -11,30 +12,38 @@ use block_client::{
 };
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo};
-use device::{Device, VmoIdWrapper};
+use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs_startup::{
-    CreateOptions, MountOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
-    VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
+    CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, FormatOptions, MountOptions,
+    StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
+    VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
+use fs_management::filesystem::{BlockConnector, Filesystem};
+use fs_management::{ComponentType, FSConfig, Options};
 use fuchsia_runtime::HandleType;
-use futures::future::try_join_all;
-use futures::stream::TryStreamExt;
+use futures::future::BoxFuture;
+use futures::stream::{FuturesUnordered, TryStreamExt as _};
 use mapping::{Mapping, MappingExt as _};
+use regex::Regex;
 use sha2::{Digest, Sha256};
+use static_assertions::const_assert;
+use std::alloc;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Formatter;
 use std::future::Future;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
-use zerocopy::{FromBytes, FromZeroes, IntoBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
@@ -49,7 +58,7 @@ const BLOCK_SIZE: u64 = 8192;
 const MAX_SLICE_COUNT: u64 = u32::MAX as u64;
 
 #[repr(C)]
-#[derive(Clone, Copy, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Copy, KnownLayout, FromBytes, IntoBytes, Immutable)]
 struct Header {
     magic: u64,
     major_version: u64,
@@ -88,7 +97,7 @@ impl Header {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Copy, KnownLayout, FromBytes, IntoBytes, Immutable)]
 struct PartitionEntry {
     type_guid: [u8; 16],
     guid: [u8; 16],
@@ -126,7 +135,7 @@ impl PartitionEntry {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Copy, KnownLayout, FromBytes, IntoBytes, Immutable)]
 struct SliceEntry(u64);
 
 impl SliceEntry {
@@ -145,6 +154,9 @@ impl SliceEntry {
 
 struct Fvm {
     device: Arc<Device>,
+
+    // The slize size in blocks.
+    slice_blocks: u64,
 
     // We use an async lock to make it easier to mediate safe access to the metadata.  When we
     // mutate the metadata, we need to hold a lock whilst writing the metadata (which is done using
@@ -182,8 +194,8 @@ impl Metadata {
         device: &RemoteBlockClient,
         offset: u64,
     ) -> Result<Self, Error> {
-        let header =
-            Header::ref_from_prefix(header_block).ok_or(anyhow!("Block size too small"))?;
+        let (header, _) =
+            Header::ref_from_prefix(header_block).map_err(|_| anyhow!("Block size too small"))?;
         ensure!(header.magic == MAGIC, "Magic mismatch");
         ensure!(
             header.slice_size > 0 && header.slice_size % BLOCK_SIZE == 0,
@@ -193,8 +205,8 @@ impl Metadata {
         // Read the vpartition and allocation table.
         // TODO(https://fxbug.dev/357467643): Check sizes
         let allocation_size = header.allocation_size()?;
-
         let part_table_size = header.vpartition_table_size as usize;
+
         let mut buffer = vec![0; part_table_size + allocation_size];
         device.read_at(MutableBufferSlice::Memory(&mut buffer), offset + BLOCK_SIZE).await?;
 
@@ -204,28 +216,28 @@ impl Metadata {
         header_copy.hash = [0; 32];
         hasher.update(header_copy.as_bytes());
         hasher.update(&header_block[std::mem::size_of::<Header>()..]);
-        hasher.update(buffer.as_slice());
+        hasher.update(&buffer);
 
         if hasher.finalize().as_slice() != header.hash {
             return Err(zx::Status::IO_DATA_INTEGRITY).context("Hash mismatch");
         }
 
-        let partitions: BTreeMap<_, _> = buffer.as_slice()[..part_table_size]
+        let partitions: BTreeMap<_, _> = buffer[..part_table_size]
             .chunks_exact(std::mem::size_of::<PartitionEntry>())
             .enumerate()
             .skip(1) // The first partition is unused.
             .filter_map(|(index, e)| {
-                let partition = PartitionEntry::read_from(e).unwrap();
+                let partition = PartitionEntry::read_from_bytes(e).unwrap();
                 partition.is_allocated().then(|| (index as u16, partition))
             })
             .collect();
         let allocations: Vec<_> = if allocation_size < std::mem::size_of::<SliceEntry>() {
             Vec::new()
         } else {
-            buffer.as_slice()[part_table_size..part_table_size + allocation_size]
+            buffer[part_table_size..part_table_size + allocation_size]
                 .chunks_exact(std::mem::size_of::<SliceEntry>())
                 .skip(1) // The first slice entry is unused.
-                .map(|e| SliceEntry::read_from(e).unwrap())
+                .map(|e| SliceEntry::read_from_bytes(e).unwrap())
                 .collect()
         };
 
@@ -233,19 +245,22 @@ impl Metadata {
     }
 
     async fn write(&self, device: &RemoteBlockClient, offset: u64) -> Result<(), Error> {
-        let mut buffer = vec![
-            0;
+        // We align the memory to that required by `Header`, but the memory needs to be aligned for
+        // `PartitionEntry` and `SliceEntry` too.
+        const_assert!(std::mem::align_of::<Header>() >= std::mem::align_of::<PartitionEntry>());
+        const_assert!(std::mem::align_of::<Header>() >= std::mem::align_of::<SliceEntry>());
+
+        let mut buffer = AlignedMem::<Header>::new(
             (BLOCK_SIZE + self.header.vpartition_table_size) as usize
-                + self.header.allocation_size()?
-        ];
-        let header = Header::mut_from_prefix(&mut buffer).unwrap();
+                + self.header.allocation_size()?,
+        );
+        let (header, _) = Header::mut_from_prefix(&mut buffer).unwrap();
         *header = self.header;
-        header.generation += 1;
         header.hash.fill(0);
 
         // Write out the partitions:
         for (&index, partition) in &self.partitions {
-            let entry = PartitionEntry::mut_from_prefix(
+            let (entry, _) = PartitionEntry::mut_from_prefix(
                 &mut buffer[BLOCK_SIZE as usize
                     + std::mem::size_of::<PartitionEntry>() * index as usize..],
             )
@@ -254,7 +269,7 @@ impl Metadata {
         }
 
         // Write out the allocation table.  The first slice entry is unused.
-        SliceEntry::mut_slice_from(
+        <[SliceEntry]>::mut_from_bytes(
             &mut buffer[(BLOCK_SIZE + self.header.vpartition_table_size) as usize..],
         )
         .unwrap()[1..1 + self.allocations.len()]
@@ -262,8 +277,8 @@ impl Metadata {
 
         // Compute the hash.
         let mut hasher = Sha256::new();
-        hasher.update(&buffer);
-        let header = Header::mut_from_prefix(buffer.as_mut_slice()).unwrap();
+        hasher.update(&*buffer);
+        let (header, _) = Header::mut_from_prefix(&mut buffer).unwrap();
         header.hash.copy_from_slice(hasher.finalize().as_slice());
 
         device.write_at(BufferSlice::Memory(&buffer), offset).await?;
@@ -327,18 +342,18 @@ impl Fvm {
 
         let mut metadata = Vec::new();
         {
-            let mut header_block = vec![0; BLOCK_SIZE as usize];
+            let mut header_block = AlignedMem::<Header>::new(BLOCK_SIZE as usize);
             client.read_at(MutableBufferSlice::Memory(&mut header_block), 0).await?;
 
-            metadata.push(Metadata::read(header_block.as_slice(), &client, 0).await);
+            metadata.push(Metadata::read(&header_block, &client, 0).await);
 
-            let header = Header::ref_from_prefix(header_block.as_slice())
-                .ok_or(anyhow!("Block size too small"))?;
+            let (header, _) = Header::ref_from_prefix(&header_block)
+                .map_err(|_| anyhow!("Block size too small"))?;
             // TODO(https://fxbug.dev/357467643): Check offset is sensible.
             let secondary_offset = header.offset_for_slot(1);
             client.read_at(MutableBufferSlice::Memory(&mut header_block), secondary_offset).await?;
 
-            metadata.push(Metadata::read(header_block.as_slice(), &client, secondary_offset).await);
+            metadata.push(Metadata::read(&header_block, &client, secondary_offset).await);
         }
 
         let (slot, metadata) = Self::pick_metadata(metadata).ok_or_else(|| {
@@ -397,8 +412,15 @@ impl Fvm {
             }
         }
 
+        info!(
+            "Mounted fvm, partitions: {:?}",
+            metadata.partitions.iter().map(|(_, e)| e.name()).collect::<Vec<_>>()
+        );
+
+        let slice_blocks = metadata.header.slice_size / client.block_size() as u64;
         Ok(Self {
-            device: Arc::new(Device::new(client)),
+            device: Arc::new(Device::new(client).await?),
+            slice_blocks,
             inner: async_lock::RwLock::new(Inner {
                 slot: slot as u8,
                 metadata,
@@ -434,8 +456,6 @@ impl Fvm {
         partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
-        vmo: Arc<VmoIdWrapper>,
-        mut vmo_offset: u64,
     ) -> Result<(), Error> {
         let inner = self.inner.read().await;
         let Some(PartitionState { mappings, .. }) = inner.partition_state.get(&partition_index)
@@ -457,7 +477,6 @@ impl Fvm {
         let slice_size = metadata.header.slice_size;
         let data_start = metadata.header.data_start();
 
-        let mut ops = Vec::new();
         while total_len > 0 {
             let slice = offset / slice_size;
             let index = match mappings.binary_search_by(|m| m.from.start.cmp(&slice)) {
@@ -480,12 +499,11 @@ impl Fvm {
             let physical_offset =
                 data_start + mapping.to * slice_size + (offset - mapping.from.start * slice_size);
 
-            ops.push(io.get_op(&self.device, physical_offset, len, &vmo, vmo_offset));
+            io.add_op(physical_offset, len).await?;
             offset += len;
             total_len -= len;
-            vmo_offset += len;
         }
-        try_join_all(ops).await?;
+        io.flush().await?;
         Ok(())
     }
 
@@ -571,52 +589,188 @@ impl Fvm {
 
         Ok(inner)
     }
+
+    /// Ensures the first `slices` slices are allocated.
+    async fn ensure_allocated(&self, partition_index: u16, slices: u64) -> Result<(), zx::Status> {
+        let inner = self.inner.upgradable_read().await;
+
+        let partition_state = &inner.partition_state[&partition_index];
+        let mappings = &partition_state.mappings;
+
+        let mut new_metadata = inner.metadata.clone();
+        let max_slice = self.max_slice(&new_metadata);
+        let mut new_mappings = Vec::new();
+        let mut next_slice = 0;
+        let mut allocated = 0;
+        for mapping in mappings {
+            if mapping.from.start >= slices {
+                break;
+            }
+            let count = mapping.from.start - next_slice;
+            if count > 0 {
+                new_mappings.push(new_metadata.allocate_slices(
+                    partition_index,
+                    next_slice,
+                    count,
+                    max_slice,
+                )?);
+                allocated += count;
+            }
+            next_slice = mapping.from.end;
+        }
+        if next_slice < slices {
+            let count = slices - next_slice;
+            new_mappings.push(new_metadata.allocate_slices(
+                partition_index,
+                next_slice,
+                count,
+                max_slice,
+            )?);
+            allocated += count;
+        }
+
+        if partition_state.slice_limit > 0
+            && (inner.metadata.partitions[&partition_index].slices as u64)
+                .checked_add(allocated)
+                .map_or(true, |s| s > partition_state.slice_limit)
+        {
+            return Err(zx::Status::NO_SPACE);
+        }
+
+        let mut inner =
+            self.write_new_metadata(inner, new_metadata).await.map_err(map_to_status)?;
+
+        inner.assigned_slice_count = inner.assigned_slice_count.checked_add(allocated).unwrap();
+
+        for m in new_mappings {
+            inner
+                .partition_state
+                .get_mut(&partition_index)
+                .unwrap()
+                .mappings
+                .insert_contiguous_mappings(m);
+        }
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    async fn find_partition_with_name(&self, name: &str) -> Option<u16> {
+        self.inner
+            .read()
+            .await
+            .metadata
+            .partitions
+            .iter()
+            .find_map(|(&index, p)| (p.name() == name).then_some(index))
+    }
 }
 
 // Trait to abstract over the difference between reads and writes.
 trait IoTrait {
     // Called to get the future that performs the read or write.
-    fn get_op<'a>(
-        &mut self,
-        device: &'a RemoteBlockClient,
-        offset: u64,
-        len: u64,
-        vmo: &'a VmoId,
-        vmo_offset: u64,
-    ) -> impl Future<Output = Result<(), zx::Status>> + 'a;
+    fn add_op(&mut self, offset: u64, len: u64) -> impl Future<Output = Result<(), zx::Status>>;
+
+    fn flush(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
 }
 
-struct Read;
+struct Read<'a> {
+    device: &'a Device,
+    vmo_id: &'a VmoId,
+    ops: FuturesUnordered<BoxFuture<'a, Result<(), zx::Status>>>,
+    vmo_offset: u64,
+}
 
-impl IoTrait for Read {
-    fn get_op<'a>(
-        &mut self,
-        device: &'a RemoteBlockClient,
-        offset: u64,
-        len: u64,
-        vmo: &'a VmoId,
-        vmo_offset: u64,
-    ) -> impl Future<Output = Result<(), zx::Status>> + 'a {
-        device.read_at(MutableBufferSlice::new_with_vmo_id(vmo, vmo_offset, len), offset)
+impl IoTrait for Read<'_> {
+    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.read_at(
+            MutableBufferSlice::new_with_vmo_id(self.vmo_id, self.vmo_offset, len),
+            offset,
+        )));
+        self.vmo_offset += len;
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<(), zx::Status> {
+        while self.ops.try_next().await?.is_some() {}
+        Ok(())
     }
 }
 
-struct Write(WriteOptions);
+// Reads to memory.
+struct ReadToMem<'a> {
+    device: &'a Device,
+    buffer: &'a mut [u8],
+}
 
-impl IoTrait for Write {
-    fn get_op<'a>(
-        &mut self,
-        device: &'a RemoteBlockClient,
-        offset: u64,
-        len: u64,
-        vmo: &'a VmoId,
-        vmo_offset: u64,
-    ) -> impl Future<Output = Result<(), zx::Status>> + 'a {
-        device.write_at_with_opts(
-            BufferSlice::new_with_vmo_id(vmo, vmo_offset, len),
+impl<'a> ReadToMem<'a> {
+    fn new(device: &'a Device, buffer: &'a mut [u8]) -> Self {
+        Self { device, buffer }
+    }
+}
+
+impl IoTrait for ReadToMem<'_> {
+    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+        // We don't care about performance, so we issue the operation immediately.
+        let (head, tail) = std::mem::take(&mut self.buffer).split_at_mut(len as usize);
+        self.buffer = tail;
+        self.device.read_at(MutableBufferSlice::Memory(head), offset).await?;
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<(), zx::Status> {
+        Ok(())
+    }
+}
+
+struct Write<'a> {
+    device: &'a Device,
+    vmo_id: &'a VmoId,
+    ops: FuturesUnordered<BoxFuture<'a, Result<(), zx::Status>>>,
+    vmo_offset: u64,
+    options: WriteOptions,
+}
+
+impl IoTrait for Write<'_> {
+    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.write_at_with_opts(
+            BufferSlice::new_with_vmo_id(self.vmo_id, self.vmo_offset, len),
             offset,
-            self.0,
-        )
+            self.options,
+        )));
+        self.vmo_offset += len;
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<(), zx::Status> {
+        while self.ops.try_next().await?.is_some() {}
+        Ok(())
+    }
+}
+
+// Writes from memory.
+struct WriteFromMem<'a> {
+    device: &'a Device,
+    buffer: &'a [u8],
+}
+
+impl<'a> WriteFromMem<'a> {
+    fn new(device: &'a Device, buffer: &'a [u8]) -> Self {
+        Self { device, buffer }
+    }
+}
+
+impl IoTrait for WriteFromMem<'_> {
+    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+        // We don't care about performance, so we issue the operation immediately.
+        let (head, tail) = self.buffer.split_at(len as usize);
+        self.buffer = tail;
+        self.device.write_at(BufferSlice::Memory(head), offset).await?;
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<(), zx::Status> {
+        Ok(())
     }
 }
 
@@ -791,12 +945,12 @@ impl Component {
                     responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
                 }
                 VolumeRequest::Mount { responder, outgoing_directory, options } => responder.send(
-                    self.handle_mount(partition_index, outgoing_directory, options).await.map_err(
-                        |error| {
+                    self.handle_mount(partition_index, outgoing_directory, options, false)
+                        .await
+                        .map_err(|error| {
                             error!(?error, partition_index, "Failed to mount volume");
                             map_to_raw_status(error)
-                        },
-                    ),
+                        }),
                 )?,
                 VolumeRequest::SetLimit { responder, bytes } => {
                     let fvm = self.fvm();
@@ -821,23 +975,9 @@ impl Component {
         self: &Arc<Self>,
         partition_index: u16,
         server_end: ServerEnd<fio::DirectoryMarker>,
-        _options: MountOptions,
+        options: MountOptions,
+        format: bool,
     ) -> Result<(), Error> {
-        let outgoing_dir = vfs::directory::immutable::simple();
-        let svc_dir = vfs::directory::immutable::simple();
-        outgoing_dir.add_entry("svc", svc_dir.clone())?;
-        let weak = Arc::downgrade(self);
-        svc_dir.add_entry(
-            fvolume::VolumeMarker::PROTOCOL_NAME,
-            vfs::service::host(move |requests| {
-                let weak = weak.clone();
-                async move {
-                    if let Some(me) = weak.upgrade() {
-                        let _ = me.handle_volume(partition_index, requests).await;
-                    }
-                }
-            }),
-        )?;
         let fvm = self.fvm();
         let partition_info = {
             let inner = fvm.inner.read().await;
@@ -851,22 +991,118 @@ impl Component {
                 name: partition.name().to_string(),
             }
         };
-        self.mounted.lock().unwrap().insert(
-            partition_index,
-            Arc::new(BlockServer::new(
-                partition_info,
-                Arc::new(PartitionInterface { partition_index, fvm }),
-            )),
-        );
-        outgoing_dir.open(
-            self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            Path::dot(),
-            server_end.into_channel().into(),
-        );
+
+        let key = if let Some(crypt) = options.crypt {
+            let crypt_proxy = crypt.into_proxy().unwrap();
+            Some(if format {
+                zxcrypt::Key::format(&fvm, partition_index, &crypt_proxy).await.unwrap()
+            } else {
+                zxcrypt::Key::unseal(&fvm, partition_index, &crypt_proxy).await?
+            })
+        } else {
+            None
+        };
+
+        let block_server = Arc::new(BlockServer::new(
+            partition_info,
+            Arc::new(PartitionInterface { partition_index, key, fvm: fvm.clone() }),
+        ));
+
+        let server_end = server_end.into_channel().into();
+
+        if let Some(uri) = options.uri {
+            // For now we only support URIs of the form: "#meta/<component_name>.cm".
+            let re = Regex::new(r"^#meta/(.*)\.cm$").unwrap();
+            let Some(caps) = re.captures(&uri) else { bail!(zx::Status::INVALID_ARGS) };
+
+            struct ComponentName(String);
+            impl FSConfig for ComponentName {
+                fn options(&self) -> Options<'_> {
+                    Options {
+                        component_name: &self.0,
+                        reuse_component_after_serving: false,
+                        format_options: FormatOptions::default(),
+                        start_options: StartOptions {
+                            read_only: false,
+                            verbose: false,
+                            fsck_after_every_transaction: false,
+                            write_compression_level: -1,
+                            write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                            cache_eviction_policy_override: EvictionPolicyOverride::None,
+                            startup_profiling_seconds: 0,
+                        },
+                        component_type: ComponentType::default(),
+                    }
+                }
+            }
+
+            struct Server(ExecutionScope, Arc<BlockServer<SessionManager<PartitionInterface>>>);
+
+            impl BlockConnector for Server {
+                fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
+                    let (client, stream) = fidl::endpoints::create_request_stream()?;
+                    let block_server = self.1.clone();
+                    self.0.spawn(async move {
+                        let _ = block_server.handle_requests(stream).await;
+                    });
+                    Ok(client)
+                }
+            }
+
+            let mut fs = Filesystem::new(
+                Server(self.scope.clone(), block_server.clone()),
+                ComponentName(caps[1].to_string()),
+            );
+
+            if format {
+                fs.format().await?;
+            }
+
+            // TODO(https://fxbug.dev/357467643): Support properly shutting down the filesystem.
+            // For now, just leak the mounted filesystem.
+            let exposed_dir = fs.serve().await?.take_exposed_dir();
+
+            self.mounted.lock().unwrap().insert(partition_index, block_server);
+
+            let _ = exposed_dir.open(
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::POSIX_EXECUTABLE
+                    | fio::OpenFlags::POSIX_WRITABLE,
+                fio::ModeType::empty(),
+                ".",
+                server_end,
+            );
+        } else {
+            // Expose the volume as a block device.
+            let outgoing_dir = vfs::directory::immutable::simple();
+            let svc_dir = vfs::directory::immutable::simple();
+            outgoing_dir.add_entry("svc", svc_dir.clone())?;
+            let weak = Arc::downgrade(self);
+            svc_dir.add_entry(
+                fvolume::VolumeMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak = weak.clone();
+                    async move {
+                        if let Some(me) = weak.upgrade() {
+                            let _ = me.handle_volume(partition_index, requests).await;
+                        }
+                    }
+                }),
+            )?;
+
+            self.mounted.lock().unwrap().insert(partition_index, block_server.clone());
+
+            outgoing_dir.open(
+                self.scope.clone(),
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::RIGHT_EXECUTABLE,
+                Path::dot(),
+                server_end,
+            );
+        }
+
         Ok(())
     }
 
@@ -889,6 +1125,7 @@ impl Component {
         let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
         let inner = fvm.inner.upgradable_read().await;
         let Some(type_guid) = create_options.type_guid else {
+            warn!("Unable to create volume; missing type GUID");
             bail!(zx::Status::INVALID_ARGS);
         };
         let guid = create_options.guid.unwrap_or_else(|| Uuid::new_v4().to_bytes_le());
@@ -906,7 +1143,7 @@ impl Component {
         async move {
             self.add_volume_to_volumes_directory(partition_index, name)?;
 
-            self.handle_mount(partition_index, outgoing_directory, mount_options).await
+            self.handle_mount(partition_index, outgoing_directory, mount_options, true).await
         }
         .await
         .map_err(|error| {
@@ -953,6 +1190,7 @@ impl Component {
 
 struct PartitionInterface {
     partition_index: u16,
+    key: Option<zxcrypt::Key>,
     fvm: Arc<Fvm>,
 }
 
@@ -976,20 +1214,45 @@ impl Interface for PartitionInterface {
             "read {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
             self.partition_index
         );
-        self.fvm
-            .do_io(
-                Read,
-                self.partition_index,
-                device_block_offset,
-                block_count,
-                self.fvm.device.get_vmo_id(vmo),
-                vmo_offset,
-            )
-            .await
-            .map_err(|error| {
-                warn!(?error, "Read failed");
-                map_to_status(error)
-            })
+        let device = &self.fvm.device;
+        if let Some(key) = &self.key {
+            let device_block_offset = device_block_offset
+                .checked_add(self.fvm.slice_blocks)
+                .ok_or(zx::Status::OUT_OF_RANGE)?;
+            self.fvm
+                .do_io(
+                    zxcrypt::EncryptedRead::new(
+                        &device,
+                        &key,
+                        device_block_offset,
+                        vmo,
+                        vmo_offset,
+                    )
+                    .await,
+                    self.partition_index,
+                    device_block_offset,
+                    block_count,
+                )
+                .await
+        } else {
+            self.fvm
+                .do_io(
+                    Read {
+                        device: &device,
+                        vmo_id: &device.get_vmo_id(&vmo),
+                        ops: FuturesUnordered::new(),
+                        vmo_offset,
+                    },
+                    self.partition_index,
+                    device_block_offset,
+                    block_count,
+                )
+                .await
+        }
+        .map_err(|error| {
+            warn!(?error, "Read failed");
+            map_to_status(error)
+        })
     }
 
     async fn write(
@@ -998,26 +1261,54 @@ impl Interface for PartitionInterface {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
-        opts: WriteOptions,
+        options: WriteOptions,
     ) -> Result<(), zx::Status> {
         debug!(
             "write {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
             self.partition_index
         );
-        self.fvm
-            .do_io(
-                Write(opts),
-                self.partition_index,
-                device_block_offset,
-                block_count,
-                self.fvm.device.get_vmo_id(vmo),
-                vmo_offset,
-            )
-            .await
-            .map_err(|error| {
-                warn!(?error, "Write failed");
-                map_to_status(error)
-            })
+        let device = &self.fvm.device;
+        if let Some(key) = &self.key {
+            let device_block_offset = device_block_offset
+                .checked_add(self.fvm.slice_blocks)
+                .ok_or(zx::Status::OUT_OF_RANGE)?;
+            self.fvm
+                .do_io(
+                    zxcrypt::EncryptedWrite::new(
+                        &device,
+                        &key,
+                        device_block_offset,
+                        vmo,
+                        vmo_offset,
+                        options,
+                    )
+                    .await,
+                    self.partition_index,
+                    device_block_offset,
+                    block_count,
+                )
+                .await
+        } else {
+            let vmo_id = device.get_vmo_id(&vmo);
+            self.fvm
+                .do_io(
+                    Write {
+                        device,
+                        vmo_id: &vmo_id,
+                        ops: FuturesUnordered::new(),
+                        options,
+                        vmo_offset,
+                    },
+                    self.partition_index,
+                    device_block_offset,
+                    block_count,
+                )
+                .await
+        }
+        .map_err(|error| {
+            warn!(?error, "Write failed");
+            map_to_status(error)
+        })
     }
 
     async fn flush(&self) -> Result<(), zx::Status> {
@@ -1033,22 +1324,26 @@ impl Interface for PartitionInterface {
     ) -> Result<(fvolume::VolumeManagerInfo, fvolume::VolumeInfo), zx::Status> {
         let inner = self.fvm.inner.read().await;
         let slice_count = self.fvm.max_slice(&inner.metadata);
+        let reserved = if self.key.is_some() { 1 } else { 0 };
         Ok((
             fvolume::VolumeManagerInfo {
                 slice_size: inner.metadata.header.slice_size,
-                slice_count,
-                assigned_slice_count: inner.assigned_slice_count,
+                slice_count: slice_count.saturating_sub(reserved),
+                assigned_slice_count: inner.assigned_slice_count.saturating_sub(reserved),
                 maximum_slice_count: slice_count,
-                max_virtual_slice: MAX_SLICE_COUNT,
+                max_virtual_slice: MAX_SLICE_COUNT.saturating_sub(reserved),
             },
             fvolume::VolumeInfo {
-                partition_slice_count: inner
+                partition_slice_count: (inner
                     .metadata
                     .partitions
                     .get(&self.partition_index)
                     .unwrap()
-                    .slices as u64,
-                slice_limit: inner.partition_state[&self.partition_index].slice_limit,
+                    .slices as u64)
+                    .saturating_sub(reserved),
+                slice_limit: inner.partition_state[&self.partition_index]
+                    .slice_limit
+                    .saturating_sub(reserved),
             },
         ))
     }
@@ -1060,7 +1355,10 @@ impl Interface for PartitionInterface {
         let inner = self.fvm.inner.read().await;
         let mappings = &inner.partition_state[&self.partition_index].mappings;
         let mut results = Vec::new();
-        for &slice in start_slices {
+        for &(mut slice) in start_slices {
+            if self.key.is_some() {
+                slice = slice.checked_add(1).ok_or(zx::Status::OUT_OF_RANGE)?;
+            }
             if slice >= MAX_SLICE_COUNT {
                 return Err(zx::Status::OUT_OF_RANGE);
             }
@@ -1107,6 +1405,11 @@ impl Interface for PartitionInterface {
         if slice_count == 0 {
             return Ok(());
         }
+        let start_slice = if self.key.is_some() {
+            start_slice.checked_add(1).ok_or(zx::Status::OUT_OF_RANGE)?
+        } else {
+            start_slice
+        };
         let inner = self.fvm.inner.upgradable_read().await;
 
         let partition_state = &inner.partition_state[&self.partition_index];
@@ -1159,12 +1462,17 @@ impl Interface for PartitionInterface {
             .get_mut(&self.partition_index)
             .unwrap()
             .mappings
-            .insert_mappings(new_mappings);
+            .insert_contiguous_mappings(new_mappings);
 
         Ok(())
     }
 
     async fn shrink(&self, start_slice: u64, slice_count: u64) -> Result<(), zx::Status> {
+        let start_slice = if self.key.is_some() {
+            start_slice.checked_add(1).ok_or(zx::Status::OUT_OF_RANGE)?
+        } else {
+            start_slice
+        };
         let inner = self.fvm.inner.upgradable_read().await;
         let mappings = &inner.partition_state[&self.partition_index].mappings;
 
@@ -1286,6 +1594,51 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
+/// Holds memory that has the same alignment as T, but with an arbitrary size.
+struct AlignedMem<T>(&'static mut [u8], PhantomData<T>);
+
+impl<T> AlignedMem<T> {
+    fn new(size: usize) -> Self {
+        Self(
+            // SAFETY: Safe by inspection.
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    alloc::alloc_zeroed(
+                        alloc::Layout::from_size_align(size, std::mem::align_of::<T>()).unwrap(),
+                    ),
+                    size,
+                )
+            },
+            PhantomData,
+        )
+    }
+}
+
+impl<T> Drop for AlignedMem<T> {
+    fn drop(&mut self) {
+        // SAFETY: Pairs with the allocation in `new`.
+        unsafe {
+            alloc::dealloc(
+                self.0.as_mut_ptr(),
+                alloc::Layout::from_size_align(self.0.len(), std::mem::align_of::<T>()).unwrap(),
+            );
+        }
+    }
+}
+
+impl<T> Deref for AlignedMem<T> {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl<T> DerefMut for AlignedMem<T> {
+    fn deref_mut(&mut self) -> &mut [u8] {
+        self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Component, MAX_SLICE_COUNT};
@@ -1390,6 +1743,13 @@ mod tests {
         fn take_fake_server(self) -> Arc<FakeServer> {
             self.fake_server
         }
+    }
+
+    /// Returns the number of assigned slices for the individual volume and the whole FVM volume.
+    async fn get_counts(proxy: &fvolume::VolumeProxy) -> (u64, u64) {
+        let (status, manager_info, volume_info) = proxy.get_volume_info().await.unwrap();
+        assert_eq!(status, zx::sys::ZX_OK);
+        (manager_info.unwrap().assigned_slice_count, volume_info.unwrap().partition_slice_count)
     }
 
     #[fuchsia::test]
@@ -1904,14 +2264,6 @@ mod tests {
     async fn test_shrink() {
         let final_checks;
 
-        /// Returns the number of assigned slices for the individual volume and the whole FVM
-        /// volume.
-        async fn get_counts(proxy: &fvolume::VolumeProxy) -> (u64, u64) {
-            let (status, manager_info, volume_info) = proxy.get_volume_info().await.unwrap();
-            assert_eq!(status, zx::sys::ZX_OK);
-            (manager_info.unwrap().assigned_slice_count, volume_info.unwrap().partition_slice_count)
-        }
-
         let initial_counts;
 
         let fake_server = {
@@ -2298,5 +2650,65 @@ mod tests {
             .expect("create failed");
 
         assert!(flush_called.load(Ordering::Relaxed));
+    }
+
+    #[fuchsia::test]
+    async fn ensure_allocated() {
+        let fixture = Fixture::new(10 * SLICE_SIZE).await;
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+
+        volumes_proxy
+            .create(
+                "foo",
+                dir_server_end,
+                CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                MountOptions::default(),
+            )
+            .await
+            .expect("create failed (FIDL)")
+            .expect("create failed");
+
+        let volume_proxy =
+            connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+        let (original_manager_slice_count, _) = get_counts(&volume_proxy).await;
+
+        assert_eq!(volume_proxy.extend(3, 1).await.expect("extend failed (FIDL)"), zx::sys::ZX_OK);
+
+        let fvm = fixture.component.fvm();
+        let partition_index = fvm.find_partition_with_name("foo").await.unwrap();
+        fvm.ensure_allocated(partition_index, 5).await.unwrap();
+
+        let (status, ranges, range_count) = volume_proxy.query_slices(&[0, 5]).await.unwrap();
+        assert_eq!(status, zx::sys::ZX_OK);
+        assert_eq!(range_count, 2);
+        assert_eq!(
+            &ranges[..2],
+            &[
+                fvolume::VsliceRange { allocated: true, count: 5 },
+                fvolume::VsliceRange { allocated: false, count: MAX_SLICE_COUNT - 5 }
+            ]
+        );
+
+        let (manager_slice_count, partition_slice_count) = get_counts(&volume_proxy).await;
+        // When the volume was created, it uses 1 slice.
+        assert_eq!(manager_slice_count, original_manager_slice_count + 4);
+        assert_eq!(partition_slice_count, 5);
+
+        // Write to the assigned slices and then read back.
+        let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
+        let mut data = vec![0; SLICE_SIZE as usize * 5];
+        for (i, chunk) in data.chunks_exact_mut(BLOCK_SIZE as usize).enumerate() {
+            chunk.fill(i as u8);
+        }
+
+        client.write_at(BufferSlice::Memory(&data), 0).await.unwrap();
+
+        let mut read = vec![0; SLICE_SIZE as usize * 5];
+        client.read_at(MutableBufferSlice::Memory(&mut read), 0).await.unwrap();
+
+        assert_eq!(&read, &data);
     }
 }

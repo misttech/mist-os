@@ -159,7 +159,8 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
                  std::optional<const std::vector<uint8_t>> channels =
                      std::optional<const std::vector<uint8_t>>{});
   std::optional<wlan_fullmac_wire::WlanScanResult> ScanResultCode(uint64_t txn_id);
-  const std::list<wlan_fullmac_wire::WlanFullmacScanResult>* ScanResultList(uint64_t txn_id);
+  const std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest>* ScanResultList(
+      uint64_t txn_id);
 
   // SoftAP operation
   void StartSoftAp(const wlan_ieee80211::CSsid& ssid = kDefaultSoftApSsid,
@@ -205,7 +206,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   struct ScanStatus {
     // If not present, indicates that the scan has not completed yet
     std::optional<wlan_fullmac_wire::WlanScanResult> result_code = std::nullopt;
-    std::list<wlan_fullmac_wire::WlanFullmacScanResult> result_list;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcOnScanResultRequest> result_list;
   };
   // One entry per scan started
   std::map<uint64_t, ScanStatus> scan_results_;

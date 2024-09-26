@@ -8,6 +8,7 @@ use crate::walk_state::WalkStateUnit;
 use async_trait::async_trait;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
+use router_error::RouterError;
 use sandbox::{Capability, Request, Router};
 
 struct RightsRouter {
@@ -18,7 +19,12 @@ struct RightsRouter {
 
 #[async_trait]
 impl sandbox::Routable for RightsRouter {
-    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let RightsRouter { router, rights, moniker } = self;
         let request_rights =
             request.metadata.get_rights().ok_or(fsandbox::RouterError::InvalidArgs)?;
@@ -27,7 +33,7 @@ impl sandbox::Routable for RightsRouter {
         // The rights of the request must be compatible with the
         // rights of this step of the route.
         match request_rights.validate_next(&router_rights) {
-            Ok(()) => router.route(request).await,
+            Ok(()) => router.route(Some(request), debug).await,
             Err(e) => Err(RoutingError::from(e).into()),
         }
     }
@@ -77,7 +83,7 @@ mod tests {
         let metadata = Dict::new();
         metadata.set_rights(fio::R_STAR_DIR.into());
         let capability = proxy
-            .route(Request { target: FakeComponentToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeComponentToken::new(), metadata }), false)
             .await
             .unwrap();
         let capability = match capability {
@@ -95,7 +101,7 @@ mod tests {
         let metadata = Dict::new();
         metadata.set_rights(fio::RW_STAR_DIR.into());
         let error = proxy
-            .route(Request { target: FakeComponentToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeComponentToken::new(), metadata }), false)
             .await
             .unwrap_err();
         assert_matches!(

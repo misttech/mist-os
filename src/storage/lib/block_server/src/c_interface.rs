@@ -134,7 +134,7 @@ unsafe impl Sync for Callbacks {}
 pub struct Session {
     manager: Arc<SessionManager>,
     helper: SessionHelper<SessionManager>,
-    fifo: zx::Fifo,
+    fifo: zx::Fifo<BlockFifoRequest, BlockFifoResponse>,
     queue: Mutex<SessionQueue>,
     vmos: Mutex<HashMap<RequestId, Arc<zx::Vmo>>>,
     abort_handle: AbortHandle,
@@ -162,13 +162,7 @@ impl Session {
                 let mut queue = self.queue.lock().unwrap();
                 while !queue.responses.is_empty() {
                     let (front, _) = queue.responses.as_slices();
-                    match unsafe {
-                        self.fifo.write_ptr(
-                            std::mem::size_of::<BlockFifoResponse>(),
-                            front.as_ptr() as *mut u8,
-                            front.len(),
-                        )
-                    } {
+                    match self.fifo.write(front) {
                         Ok(count) => {
                             let full = count < front.len();
                             queue.responses.drain(..count);
@@ -184,16 +178,8 @@ impl Session {
             };
 
             // Process pending reads.
-            match unsafe {
-                self.fifo.read_ptr(
-                    std::mem::size_of::<BlockFifoRequest>(),
-                    requests[0].as_mut_ptr() as *mut u8,
-                    MAX_REQUESTS,
-                )
-            } {
-                Ok(count) => self.handle_requests(
-                    requests[..count].iter().map(|r| unsafe { r.assume_init_ref() }),
-                ),
+            match self.fifo.read_uninit(&mut requests) {
+                Ok(valid_requests) => self.handle_requests(valid_requests.iter()),
                 Err(zx::Status::SHOULD_WAIT) => {
                     let mut signals =
                         zx::Signals::OBJECT_READABLE | zx::Signals::USER_0 | zx::Signals::USER_1;
@@ -273,15 +259,8 @@ impl Session {
         };
         let mut queue = self.queue.lock().unwrap();
         if queue.responses.is_empty() {
-            match unsafe {
-                self.fifo.write_ptr(
-                    std::mem::size_of::<BlockFifoResponse>(),
-                    &response as *const _ as *const u8,
-                    1,
-                )
-            } {
-                Ok(count) => {
-                    assert_eq!(count, 1);
+            match self.fifo.write_one(&response) {
+                Ok(()) => {
                     return;
                 }
                 Err(_) => {

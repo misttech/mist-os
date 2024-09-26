@@ -4,7 +4,7 @@
 
 use crate::fuse_attr::{create_dir_attr, create_file_attr, create_symlink_attr};
 use crate::fuse_errors::FxfsResult;
-use event_listener::Event;
+use event_listener::{Event, Listener as _};
 use fuse3::raw::prelude::*;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::{FxFilesystem, OpenFxFilesystem};
@@ -397,10 +397,8 @@ mod tests {
             )
             .await
             .expect("new_transaction failed");
-        let file = dir
-            .create_child_file(&mut transaction, "foo", None)
-            .await
-            .expect("create_child_file failed");
+        let file =
+            dir.create_child_file(&mut transaction, "foo").await.expect("create_child_file failed");
         transaction.commit().await.expect("transaction commit failed");
         let object_id = file.object_id();
 

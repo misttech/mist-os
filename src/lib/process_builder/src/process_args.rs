@@ -9,7 +9,7 @@ use fuchsia_zircon as zx;
 use std::ffi::CString;
 use std::{fmt, mem, num};
 use thiserror::Error;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Possible errors that can occur during processargs startup message construction
 #[derive(Error, Debug)]
@@ -57,7 +57,7 @@ const ZX_PROCARGS_PROTOCOL: u32 = 0x4150585d;
 const ZX_PROCARGS_VERSION: u32 = 0x00001000;
 
 /// Header for bootstrap message following the processargs protocol.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Default)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Default)]
 #[repr(C)]
 pub(crate) struct MessageHeader {
     // Protocol and version identifiers to allow for different process start message protocols and

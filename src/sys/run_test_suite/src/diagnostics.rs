@@ -124,7 +124,7 @@ pub fn get_type() -> LogsIteratorOption {
 #[cfg(test)]
 mod test {
     use super::*;
-    use diagnostics_data::{BuilderArgs, LogsDataBuilder};
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Timestamp};
     use moniker::Moniker;
 
     #[fuchsia::test]
@@ -132,7 +132,7 @@ mod test {
         let input_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: Moniker::root().into(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -140,7 +140,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
@@ -149,7 +149,7 @@ mod test {
         ];
         let displayed_logs = vec![LogsDataBuilder::new(BuilderArgs {
             moniker: "child".try_into().unwrap(),
-            timestamp_nanos: 1000i64.into(),
+            timestamp: Timestamp::from_nanos(1000),
             component_url: Some("test-child-url".into()),
             severity: Severity::Warn,
         })
@@ -188,7 +188,7 @@ mod test {
     async fn filter_log_severity_by_component() {
         let a_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
@@ -196,7 +196,7 @@ mod test {
         .build();
         let a_warn_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
         })
@@ -204,7 +204,7 @@ mod test {
         .build();
         let b_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
@@ -212,7 +212,7 @@ mod test {
         .build();
         let b_warn_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
         })
@@ -220,7 +220,7 @@ mod test {
         .build();
         let c_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "c".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
@@ -269,7 +269,7 @@ mod test {
     async fn filter_log_severity_by_component_multiple_matches() {
         let a_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
@@ -277,7 +277,7 @@ mod test {
         .build();
         let a_warn_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
         })
@@ -285,7 +285,7 @@ mod test {
         .build();
         let b_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
@@ -293,7 +293,7 @@ mod test {
         .build();
         let b_fatal_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".try_into().unwrap(),
-            timestamp_nanos: 0i64.into(),
+            timestamp: Timestamp::from_nanos(0),
             component_url: Some("test-root-url".into()),
             severity: Severity::Fatal,
         })
@@ -337,7 +337,7 @@ mod test {
         let unaltered_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: Moniker::root().into(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -345,7 +345,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child/a".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
@@ -355,7 +355,7 @@ mod test {
         let altered_moniker_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: Moniker::root().into(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -363,7 +363,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "a".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
@@ -406,7 +406,7 @@ mod test {
         let unaltered_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: ".".try_into().unwrap(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -414,7 +414,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child/a".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
@@ -424,7 +424,7 @@ mod test {
         let altered_moniker_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: ".".try_into().unwrap(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -432,7 +432,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child/a".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
@@ -475,7 +475,7 @@ mod test {
         let input_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: Moniker::root().into(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -483,7 +483,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Error,
             })
@@ -493,7 +493,7 @@ mod test {
         let displayed_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
                 moniker: Moniker::root().into(),
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
@@ -501,7 +501,7 @@ mod test {
             .build(),
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child".try_into().unwrap(),
-                timestamp_nanos: 1000i64.into(),
+                timestamp: Timestamp::from_nanos(1000),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Error,
             })

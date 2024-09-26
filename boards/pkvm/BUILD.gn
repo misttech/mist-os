@@ -7,6 +7,7 @@ import("//build/assembly/board_input_bundle.gni")
 
 common_arguments = {
   provided_features = [
+    "fuchsia::bus_pci",
     "fuchsia::driver_framework_v2_support",
     "fuchsia::paravirtualization",
     "fuchsia::pmm_checker_auto",
@@ -48,11 +49,6 @@ board_input_bundle("main_bundle") {
   }
 
   drivers = [
-    {
-      package_target = "//src/devices/bus/drivers/pci:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/bus-pci.cm" ]
-    },
     {
       package_target = "//src/devices/misc/drivers/virtio-socket:package"
       package_set = "bootfs"

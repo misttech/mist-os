@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -107,7 +103,10 @@ impl EmptyProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<EmptyProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<EmptyProtocolEvent, fidl::Error> {
         EmptyProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -262,13 +261,11 @@ impl EmptyProtocolEvent {
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
             0x1ff0ccf9b710e23f => {
-                let mut out = fidl::new_empty!(EmptyProtocolReceiveRequest);
-                fidl::encoding::Decoder::decode_into::<EmptyProtocolReceiveRequest>(
-                    &tx_header,
-                    _body_bytes,
-                    _handles,
-                    &mut out,
-                )?;
+                let mut out = fidl::new_empty!(
+                    EmptyProtocolReceiveRequest,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                );
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolReceiveRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((EmptyProtocolEvent::Receive { e: out.e }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
@@ -348,25 +345,21 @@ impl futures::Stream for EmptyProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x132262fd8b200708 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(EmptyProtocolSendRequest);
-                    fidl::encoding::Decoder::decode_into::<EmptyProtocolSendRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        EmptyProtocolSendRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolSendRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
                     Ok(EmptyProtocolRequest::Send_ { e: req.e, control_handle })
                 }
                 0x76a931254962cea => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(EmptyProtocolSendAndReceiveRequest);
-                    fidl::encoding::Decoder::decode_into::<EmptyProtocolSendAndReceiveRequest>(
-                        &header,
-                        _body_bytes,
-                        handles,
-                        &mut req,
-                    )?;
+                    let mut req = fidl::new_empty!(
+                        EmptyProtocolSendAndReceiveRequest,
+                        fidl::encoding::DefaultFuchsiaResourceDialect
+                    );
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolSendAndReceiveRequest>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
                     Ok(EmptyProtocolRequest::SendAndReceive {
                         e: req.e,
@@ -441,6 +434,16 @@ impl fidl::endpoints::ControlHandle for EmptyProtocolControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -521,6 +524,13 @@ impl EmptyProtocolSendAndReceiveResponder {
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for Empty {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Empty {
         type Owned = Self;
 
@@ -534,20 +544,12 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Empty {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Empty> for &Empty {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Empty, D> for &Empty {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -557,7 +559,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Empty {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Empty {
         #[inline(always)]
         fn new_empty() -> Self {
             Self
@@ -566,7 +568,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -575,6 +577,13 @@ mod internal {
                 0 => Ok(()),
                 _ => Err(fidl::Error::Invalid),
             }
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EmptyProtocolReceiveRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -591,26 +600,20 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for EmptyProtocolReceiveRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<EmptyProtocolReceiveRequest> for &EmptyProtocolReceiveRequest {
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<EmptyProtocolReceiveRequest, D> for &EmptyProtocolReceiveRequest
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<EmptyProtocolReceiveRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<EmptyProtocolReceiveRequest>::encode(
+            fidl::encoding::Encode::<EmptyProtocolReceiveRequest, D>::encode(
                 (<Empty as fidl::encoding::ValueTypeMarker>::borrow(&self.e),),
                 encoder,
                 offset,
@@ -618,13 +621,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<Empty>>
-        fidl::encoding::Encode<EmptyProtocolReceiveRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<Empty, D>>
+        fidl::encoding::Encode<EmptyProtocolReceiveRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -637,23 +640,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for EmptyProtocolReceiveRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for EmptyProtocolReceiveRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { e: fidl::new_empty!(Empty) }
+            Self { e: fidl::new_empty!(Empty, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(Empty, &mut self.e, decoder, offset + 0, _depth)?;
+            fidl::decode!(Empty, D, &mut self.e, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EmptyProtocolSendAndReceiveRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -670,28 +682,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for EmptyProtocolSendAndReceiveRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<EmptyProtocolSendAndReceiveRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<EmptyProtocolSendAndReceiveRequest, D>
         for &EmptyProtocolSendAndReceiveRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<EmptyProtocolSendAndReceiveRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<EmptyProtocolSendAndReceiveRequest>::encode(
+            fidl::encoding::Encode::<EmptyProtocolSendAndReceiveRequest, D>::encode(
                 (<Empty as fidl::encoding::ValueTypeMarker>::borrow(&self.e),),
                 encoder,
                 offset,
@@ -699,13 +704,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<Empty>>
-        fidl::encoding::Encode<EmptyProtocolSendAndReceiveRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<Empty, D>>
+        fidl::encoding::Encode<EmptyProtocolSendAndReceiveRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -718,23 +723,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for EmptyProtocolSendAndReceiveRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for EmptyProtocolSendAndReceiveRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { e: fidl::new_empty!(Empty) }
+            Self { e: fidl::new_empty!(Empty, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(Empty, &mut self.e, decoder, offset + 0, _depth)?;
+            fidl::decode!(Empty, D, &mut self.e, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EmptyProtocolSendAndReceiveResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -751,28 +765,21 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for EmptyProtocolSendAndReceiveResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<EmptyProtocolSendAndReceiveResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<EmptyProtocolSendAndReceiveResponse, D>
         for &EmptyProtocolSendAndReceiveResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<EmptyProtocolSendAndReceiveResponse>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<EmptyProtocolSendAndReceiveResponse>::encode(
+            fidl::encoding::Encode::<EmptyProtocolSendAndReceiveResponse, D>::encode(
                 (<Empty as fidl::encoding::ValueTypeMarker>::borrow(&self.e),),
                 encoder,
                 offset,
@@ -780,13 +787,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<Empty>>
-        fidl::encoding::Encode<EmptyProtocolSendAndReceiveResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<Empty, D>>
+        fidl::encoding::Encode<EmptyProtocolSendAndReceiveResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -799,23 +806,32 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for EmptyProtocolSendAndReceiveResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for EmptyProtocolSendAndReceiveResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { e: fidl::new_empty!(Empty) }
+            Self { e: fidl::new_empty!(Empty, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(Empty, &mut self.e, decoder, offset + 0, _depth)?;
+            fidl::decode!(Empty, D, &mut self.e, decoder, offset + 0, _depth)?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for EmptyProtocolSendRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -832,26 +848,20 @@ mod internal {
             1
         }
     }
-    impl fidl::encoding::ValueTypeMarker for EmptyProtocolSendRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<EmptyProtocolSendRequest> for &EmptyProtocolSendRequest {
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<EmptyProtocolSendRequest, D> for &EmptyProtocolSendRequest
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<EmptyProtocolSendRequest>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<EmptyProtocolSendRequest>::encode(
+            fidl::encoding::Encode::<EmptyProtocolSendRequest, D>::encode(
                 (<Empty as fidl::encoding::ValueTypeMarker>::borrow(&self.e),),
                 encoder,
                 offset,
@@ -859,13 +869,13 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<Empty>> fidl::encoding::Encode<EmptyProtocolSendRequest>
-        for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<Empty, D>>
+        fidl::encoding::Encode<EmptyProtocolSendRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -878,22 +888,24 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for EmptyProtocolSendRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for EmptyProtocolSendRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { e: fidl::new_empty!(Empty) }
+            Self { e: fidl::new_empty!(Empty, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(Empty, &mut self.e, decoder, offset + 0, _depth)?;
+            fidl::decode!(Empty, D, &mut self.e, decoder, offset + 0, _depth)?;
             Ok(())
         }
     }

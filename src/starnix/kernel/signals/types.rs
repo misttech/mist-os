@@ -17,7 +17,7 @@ use starnix_uapi::{
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// `SignalActions` contains a `sigaction` for each valid signal.
 #[derive(Debug)]
@@ -341,7 +341,7 @@ impl SignalState {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct SignalInfoHeader {
     pub signo: u32,
@@ -439,7 +439,7 @@ impl SignalInfo {
                     _pad: 0,
                 };
                 let mut array: [u8; SI_MAX_SIZE as usize] = [0; SI_MAX_SIZE as usize];
-                header.write_to(&mut array[..SI_HEADER_SIZE]);
+                let _ = header.write_to(&mut array[..SI_HEADER_SIZE]);
                 array[SI_HEADER_SIZE..SI_MAX_SIZE as usize].copy_from_slice(&data);
                 array
             }

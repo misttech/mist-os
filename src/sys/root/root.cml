@@ -30,8 +30,6 @@
     ],
     offer: [
         {
-            from: "#config",
-            to: "#bootstrap",
             config: [
                 "fuchsia.diagnostics.AllowSerialLogs",
                 "fuchsia.diagnostics.BindServices",
@@ -81,13 +79,15 @@
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
+                "fuchsia.platform.bus.SoftwareDeviceIds",
+                "fuchsia.platform.bus.SoftwareDeviceNames",
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.usb.PeripheralConfig.Functions",
             ],
-        },
-        {
             from: "#config",
             to: "#bootstrap",
+        },
+        {
             config: [
                 "fuchsia.blobfs.CacheEvictionPolicy",
                 "fuchsia.blobfs.WriteCompressionAlgorithm",
@@ -112,6 +112,8 @@
                 "fuchsia.virtcon.RoundedCorners",
                 "fuchsia.virtcon.ScrollbackRows",
             ],
+            from: "#config",
+            to: "#bootstrap",
             availability: "optional",
         },
         {
@@ -278,7 +280,7 @@
         // product and non-eng builds of any product.
         {
             protocol: [
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "#core",

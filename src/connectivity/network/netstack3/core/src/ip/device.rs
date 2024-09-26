@@ -50,7 +50,7 @@ use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::socket::SasCandidate;
 use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
-    IpRouteTablesContext, IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
+    IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
@@ -362,7 +362,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
-    ip::IpDeviceContext<Ipv4, BC> for CoreCtx<'_, BC, L>
+    ip::IpDeviceContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_device_enabled::<Ipv4, _, _>(self, device_id)
@@ -397,21 +397,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 
     fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_unicast_forwarding_enabled::<Ipv4, _, _>(self, device_id)
-    }
-
-    fn confirm_reachable(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &Self::DeviceId,
-        neighbor: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
-    ) {
-        match device {
-            DeviceId::Ethernet(id) => {
-                nud::confirm_reachable::<Ipv4, _, _, _>(self, bindings_ctx, id, neighbor)
-            }
-            // NUD is not supported on Loopback or pure IP devices.
-            DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
-        }
     }
 }
 
@@ -465,7 +450,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    ip::IpDeviceContext<Ipv6, BC> for CoreCtx<'_, BC, L>
+    ip::IpDeviceContext<Ipv6> for CoreCtx<'_, BC, L>
 {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_device_enabled::<Ipv6, _, _>(self, device_id)
@@ -501,16 +486,24 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_unicast_forwarding_enabled::<Ipv6, _, _>(self, device_id)
     }
+}
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        I: IpExt,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<I>>,
+    > ip::IpDeviceConfirmReachableContext<I, BC> for CoreCtx<'_, BC, L>
+{
     fn confirm_reachable(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        neighbor: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+        neighbor: SpecifiedAddr<<I as Ip>::Addr>,
     ) {
         match device {
             DeviceId::Ethernet(id) => {
-                nud::confirm_reachable::<Ipv6, _, _, _>(self, bindings_ctx, id, neighbor)
+                nud::confirm_reachable::<I, _, _, _>(self, bindings_ctx, id, neighbor)
             }
             // NUD is not supported on Loopback or pure IP devices.
             DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
@@ -935,7 +928,7 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
-    ) -> Result<(), crate::error::ExistsError> {
+    ) {
         let device_id = device_id.clone();
         let entry = ip::AddableEntry {
             subnet,
@@ -944,24 +937,7 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
             metric: AddableMetric::MetricTracksInterface,
         };
 
-        // TODO(https://fxbug.dev/42079625): Rather than perform a synchronous
-        // check for whether the route already exists, use a routes-admin
-        // RouteSet to track the NDP-added route.
-        // TODO(https://fxbug.dev/358254288): Should check the route table where
-        // the route lives instead of the main table.
-        let already_exists =
-            self.with_main_ip_routing_table(|_core_ctx, table: &ip::RoutingTable<Ipv6, _>| {
-                table.iter_table().any(|table_entry: &ip::Entry<Ipv6Addr, _>| {
-                    &ip::AddableEntry::from(table_entry.clone()) == &entry
-                })
-            });
-
-        if already_exists {
-            return Err(crate::error::ExistsError);
-        }
-
         ip::request_context_add_route::<Ipv6, _, _>(bindings_ctx, entry);
-        Ok(())
     }
 
     fn del_discovered_ipv6_route(

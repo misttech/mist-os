@@ -22,8 +22,8 @@ use std::mem::{self, ManuallyDrop};
     PartialOrd,
     Hash,
     zerocopy::FromBytes,
-    zerocopy::FromZeros,
-    zerocopy::NoCell,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 #[repr(transparent)]
 pub struct Koid(sys::zx_koid_t);
@@ -386,6 +386,21 @@ pub trait Peered: HandleBased {
             unsafe { sys::zx_object_signal_peer(handle, clear_mask.bits(), set_mask.bits()) };
         ok(status)
     }
+
+    /// Returns true if the handle has received the `PEER_CLOSED` signal.
+    ///
+    /// # Errors
+    ///
+    /// See https://fuchsia.dev/reference/syscalls/object_wait_one?hl=en#errors for a full list of
+    /// errors. Note that `Status::TIMED_OUT` errors are converted to `Ok(false)` and all other
+    /// errors are propagated.
+    fn is_closed(&self) -> Result<bool, Status> {
+        match self.wait_handle(Signals::OBJECT_PEER_CLOSED, MonotonicTime::INFINITE_PAST) {
+            Ok(signals) => Ok(signals.contains(Signals::OBJECT_PEER_CLOSED)),
+            Err(Status::TIMED_OUT) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /// Zircon object types.
@@ -503,19 +518,98 @@ pub enum HandleOp<'a> {
     Duplicate(HandleRef<'a>),
 }
 
-/// Operation to perform on handles during write.
-/// Based on zx_handle_disposition_t, but does not match the same layout.
+/// Operation to perform on handles during write. ABI-compatible with `zx_handle_disposition_t`.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(C)]
 pub struct HandleDisposition<'a> {
-    pub handle_op: HandleOp<'a>,
+    // Must be either ZX_HANDLE_OP_MOVE or ZX_HANDLE_OP_DUPLICATE.
+    operation: sys::zx_handle_op_t,
+    // ZX_HANDLE_OP_MOVE==owned, ZX_HANDLE_OP_DUPLICATE==borrowed.
+    handle: sys::zx_handle_t,
+    // Preserve a borrowed handle's lifetime. Does not occupy any layout.
+    _handle_lifetime: std::marker::PhantomData<&'a ()>,
+
     pub object_type: ObjectType,
     pub rights: Rights,
     pub result: Status,
 }
 
-impl HandleDisposition<'_> {
-    pub fn into_raw<'a>(self) -> sys::zx_handle_disposition_t {
-        match self.handle_op {
+static_assertions::assert_eq_size!(HandleDisposition<'_>, sys::zx_handle_disposition_t);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, operation),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, operation)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, handle),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, handle)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, object_type),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, type_)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, rights),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, rights)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, result),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, result)
+);
+
+impl<'a> HandleDisposition<'a> {
+    pub fn new(
+        handle_op: HandleOp<'a>,
+        object_type: ObjectType,
+        rights: Rights,
+        status: Status,
+    ) -> Self {
+        let (operation, handle) = match handle_op {
+            HandleOp::Move(h) => (sys::ZX_HANDLE_OP_MOVE, h.into_raw()),
+            HandleOp::Duplicate(h) => (sys::ZX_HANDLE_OP_DUPLICATE, h.raw_handle()),
+        };
+
+        Self {
+            operation,
+            handle,
+            _handle_lifetime: std::marker::PhantomData,
+            object_type,
+            rights: rights,
+            result: status,
+        }
+    }
+
+    pub fn raw_handle(&self) -> sys::zx_handle_t {
+        self.handle
+    }
+
+    pub fn is_move(&self) -> bool {
+        self.operation == sys::ZX_HANDLE_OP_MOVE
+    }
+
+    pub fn is_duplicate(&self) -> bool {
+        self.operation == sys::ZX_HANDLE_OP_DUPLICATE
+    }
+
+    pub fn take_op(&mut self) -> HandleOp<'a> {
+        match self.operation {
+            sys::ZX_HANDLE_OP_MOVE => {
+                // SAFETY: this is guaranteed to be a valid handle number by a combination of this
+                // type's public API and the kernel's guarantees.
+                HandleOp::Move(unsafe {
+                    Handle::from_raw(std::mem::replace(&mut self.handle, sys::ZX_HANDLE_INVALID))
+                })
+            }
+            sys::ZX_HANDLE_OP_DUPLICATE => {
+                // SAFETY: this is guaranteed to be a valid handle number by a combination of this
+                // type's public API and the kernel's guarantees.
+                HandleOp::Duplicate(unsafe { Unowned::from_raw_handle(self.handle) })
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn into_raw(mut self) -> sys::zx_handle_disposition_t {
+        match self.take_op() {
             HandleOp::Move(mut handle) => sys::zx_handle_disposition_t {
                 operation: sys::ZX_HANDLE_OP_MOVE,
                 handle: std::mem::replace(&mut handle, Handle::invalid()).into_raw(),
@@ -530,6 +624,15 @@ impl HandleDisposition<'_> {
                 rights: self.rights.bits(),
                 result: self.result.into_raw(),
             },
+        }
+    }
+}
+
+impl<'a> Drop for HandleDisposition<'a> {
+    fn drop(&mut self) {
+        // Ensure we clean up owned handle variants.
+        if self.operation == sys::ZX_HANDLE_OP_MOVE {
+            unsafe { drop(Handle::from_raw(self.handle)) };
         }
     }
 }
@@ -549,6 +652,22 @@ pub struct HandleInfo {
 }
 
 static_assertions::assert_eq_size!(HandleInfo, sys::zx_handle_info_t);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, handle),
+    std::mem::offset_of!(sys::zx_handle_info_t, handle)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, object_type),
+    std::mem::offset_of!(sys::zx_handle_info_t, ty)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, rights),
+    std::mem::offset_of!(sys::zx_handle_info_t, rights)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, _unused),
+    std::mem::offset_of!(sys::zx_handle_info_t, unused)
+);
 
 impl HandleInfo {
     /// Make a new `HandleInfo`.
@@ -694,12 +813,12 @@ mod tests {
     #[test]
     fn raw_handle_disposition() {
         const RAW_HANDLE: sys::zx_handle_t = 1;
-        let hd = HandleDisposition {
-            handle_op: HandleOp::Move(unsafe { Handle::from_raw(RAW_HANDLE) }),
-            rights: Rights::EXECUTE,
-            object_type: ObjectType::VMO,
-            result: Status::OK,
-        };
+        let hd = HandleDisposition::new(
+            HandleOp::Move(unsafe { Handle::from_raw(RAW_HANDLE) }),
+            ObjectType::VMO,
+            Rights::EXECUTE,
+            Status::OK,
+        );
         let raw_hd = hd.into_raw();
         assert_eq!(raw_hd.operation, sys::ZX_HANDLE_OP_MOVE);
         assert_eq!(raw_hd.handle, RAW_HANDLE);
@@ -721,5 +840,14 @@ mod tests {
         assert_eq!(hi.handle.into_raw(), RAW_HANDLE);
         assert_eq!(hi.object_type, ObjectType::VMO);
         assert_eq!(hi.rights, Rights::EXECUTE);
+    }
+
+    #[test]
+    fn basic_peer_closed() {
+        let (lhs, rhs) = crate::EventPair::create();
+        assert!(!lhs.is_closed().unwrap());
+        assert!(!rhs.is_closed().unwrap());
+        drop(rhs);
+        assert!(lhs.is_closed().unwrap());
     }
 }

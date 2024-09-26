@@ -8,10 +8,9 @@ use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::client;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use fuchsia_zircon::DurationNum;
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_crashdriver_test as fcdt,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_test as fdt, fuchsia_zircon as zx,
 };
 
 fn send_get_device_info_request(
@@ -62,7 +61,7 @@ async fn wait_for_instance(realm: &fuchsia_component_test::RealmInstance) -> Res
             instance = entry.name.clone();
             break;
         }
-        Timer::new(100.millis().after_now()).await;
+        Timer::new(zx::Duration::from_millis(100).after_now()).await;
     }
 
     return Ok(instance);
@@ -119,7 +118,7 @@ async fn test_restart_on_crash() -> Result<()> {
         if driver_host_koid_2.is_some() && driver_host_koid_2 != driver_host_koid_1 {
             break;
         }
-        Timer::new(100.millis().after_now()).await;
+        Timer::new(zx::Duration::from_millis(100).after_now()).await;
     }
 
     assert_ne!(driver_host_koid_1, driver_host_koid_2);

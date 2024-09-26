@@ -16,6 +16,7 @@ use crate::model::environment::Environment;
 use crate::model::routing::{self, RoutingError};
 use crate::model::start::Start;
 use ::namespace::Entry as NamespaceEntry;
+use ::routing::bedrock::request_metadata::resolver_metadata;
 use ::routing::bedrock::sandbox_construction::ComponentSandbox;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::component_instance::{
@@ -24,7 +25,9 @@ use ::routing::component_instance::{
 };
 use ::routing::error::ComponentInstanceError;
 use ::routing::policy::GlobalPolicyChecker;
-use ::routing::resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage};
+use ::routing::resolving::{
+    ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage, ResolverError,
+};
 use async_trait::async_trait;
 use cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl};
 use cm_types::{Name, Url};
@@ -36,6 +39,7 @@ use errors::{
     OpenOutgoingDirError, ResolveActionError, StartActionError, StopActionError,
     StructuredConfigError,
 };
+use fidl::endpoints::create_proxy;
 use futures::future::{join_all, BoxFuture};
 use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
@@ -46,7 +50,7 @@ use instance::{
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Capability, Dict, DirEntry, Request, Routable, Router};
+use sandbox::{Capability, Connectable, Dict, DirEntry, Message, Request, Routable, Router};
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -61,8 +65,9 @@ use vfs::directory::entry::{
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -989,9 +994,13 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ProgramOutput {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_program_output_dict().await?.route(request).await
+                component.get_program_output_dict().await?.route(request, debug).await
             }
         }
 
@@ -1012,9 +1021,13 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ComponentOutput {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_component_output_dict().await?.route(request).await
+                component.get_component_output_dict().await?.route(request, debug).await
             }
         }
 
@@ -1280,6 +1293,106 @@ impl ComponentInstance {
             timestamp,
             payload,
         }
+    }
+
+    /// Routes this component's resolver capability from `component_input`, establishes a
+    /// connection to the capability provider, asks it to resolve `component_address`, and returns
+    /// the results.
+    ///
+    /// If `component_input` is `None` then the component input dictionary from this component will
+    /// be used.
+    pub async fn perform_resolve(
+        self: &Arc<Self>,
+        component_input: Option<ComponentInput>,
+        component_address: &ComponentAddress,
+    ) -> Result<ResolvedComponent, ResolverError> {
+        let component_input = match component_input {
+            Some(input) => input,
+            None => match &*self.lock_state().await {
+                InstanceState::Unresolved(state) => state.component_input.clone(),
+                InstanceState::Resolved(state) | InstanceState::Started(state, _) => {
+                    state.sandbox.component_input.clone()
+                }
+                InstanceState::Shutdown(_, _) | InstanceState::Destroyed => {
+                    return Err(ResolverError::routing_error(RoutingError::RouteSourceShutdown {
+                        moniker: self.moniker.clone(),
+                    }));
+                }
+            },
+        };
+        let resolvers_dict = component_input.environment().resolvers();
+        let resolver_capability_res =
+            resolvers_dict.get(&Name::new(component_address.scheme()).unwrap());
+        let resolver_router = match resolver_capability_res {
+            Ok(Some(Capability::Router(resolver_router))) => resolver_router,
+            _ => {
+                return Err(ResolverError::SchemeNotRegistered);
+            }
+        };
+        let resolver_capability = resolver_router
+            .route(
+                Some(Request {
+                    target: self.as_weak().into(),
+                    metadata: resolver_metadata(cm_rust::Availability::Required),
+                }),
+                false,
+            )
+            .await
+            .map_err(|err| ResolverError::routing_error(err))?;
+        // TODO(361308923): only support the Connector type here.
+        let resolver_proxy = match &resolver_capability {
+            // Built-in resolver are hosted by a LaunchTaskOnReceive, which returns a Connector
+            // capability for new routes.
+            Capability::Connector(resolver_connector) => {
+                let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>().unwrap();
+                resolver_connector.send(Message { channel: server_end.into_channel() }).map_err(
+                    |_| {
+                        ResolverError::routing_error(RoutingError::BedrockFailedToSend {
+                            moniker: self.moniker.clone().into(),
+                            capability_id: component_address.scheme().to_string(),
+                        })
+                    },
+                )?;
+                proxy
+            }
+            // Component provided resolvers are handled by a program router, which returns a DirEntry
+            // capability for new routes.
+            Capability::DirEntry(resolver_dir_entry) => {
+                let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>().unwrap();
+                resolver_dir_entry.send(Message { channel: server_end.into_channel() }).map_err(
+                    |_| {
+                        ResolverError::routing_error(RoutingError::BedrockFailedToSend {
+                            moniker: self.moniker.clone().into(),
+                            capability_id: component_address.scheme().to_string(),
+                        })
+                    },
+                )?;
+                proxy
+            }
+            cap => {
+                return Err(ResolverError::routing_error(
+                    RoutingError::BedrockWrongCapabilityType {
+                        actual: cap.debug_typename().to_string(),
+                        expected: "Connector or DirEntry".to_string(),
+                        moniker: self.moniker.clone().into(),
+                    },
+                ));
+            }
+        };
+        let (component_url, some_context) = component_address.to_url_and_context();
+        let component = if component_address.is_relative_path() {
+            let context = some_context.ok_or_else(|| {
+                error!(url=%component_url, "calling resolve_with_context() with absolute");
+                ResolverError::RelativeUrlMissingContext(component_url.to_string())
+            })?;
+            resolver_proxy
+                .resolve_with_context(component_url, &context.into())
+                .await
+                .map_err(ResolverError::fidl_error)??
+        } else {
+            resolver_proxy.resolve(component_url).await.map_err(ResolverError::fidl_error)??
+        };
+        component.try_into()
     }
 }
 
@@ -2138,7 +2251,7 @@ pub mod tests {
         let ris = ResolvedInstanceState::new(
             &comp,
             resolved_component,
-            ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
+            ComponentAddress::from_url(&comp.component_url, &comp).await.unwrap(),
             Default::default(),
             Default::default(),
         )

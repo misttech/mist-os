@@ -4,7 +4,6 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints::{create_proxy, create_request_stream, Responder};
-use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
 use fidl_fuchsia_media_sessions2::{
     DiscoveryMarker, DiscoveryProxy, SessionControlProxy, SessionInfoDelta, SessionsWatcherRequest,
     SessionsWatcherRequestStream, WatchOptions,
@@ -12,11 +11,11 @@ use fidl_fuchsia_media_sessions2::{
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::DurationNum;
 use futures::{future, Future, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{trace, warn};
+use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fuchsia_zircon as zx};
 
 use crate::media::media_state::{
     MediaState, MEDIA_SESSION_ADDRESSED_PLAYER_ID, MEDIA_SESSION_DISPLAYABLE_NAME,
@@ -363,10 +362,10 @@ impl MediaSessionsInner {
             }
             (fidl_avrcp::NotificationEvent::TrackPosChanged, interval) => {
                 let current_values = active_session.session_info().into();
-                let response_timeout = active_session
-                    .session_info()
-                    .get_playback_rate()
-                    .map_or(None, |r| r.reference_deadline((interval as i64).seconds()));
+                let response_timeout =
+                    active_session.session_info().get_playback_rate().map_or(None, |r| {
+                        r.reference_deadline(zx::Duration::from_seconds(interval as i64))
+                    });
                 (current_values, response_timeout)
             }
             (fidl_avrcp::NotificationEvent::TrackChanged, _) => {

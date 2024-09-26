@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("ppp-tests-bin") {
+cc_test_executable("ppp-tests-bin") {
   testonly = true
 
   output_name = "ppp-tests"

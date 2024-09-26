@@ -15,6 +15,9 @@ use std::sync::Arc;
 use tracing::error;
 use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
+#[cfg(target_os = "fuchsia")]
+use fuchsia_zircon as zx;
+
 /// A marker for a particular FIDL protocol.
 ///
 /// Implementations of this trait can be used to manufacture instances of a FIDL
@@ -123,6 +126,18 @@ pub trait SynchronousProxy: Sized + Send + Sync {
     /// writing to the channel is unsafe because the proxy assumes it has
     /// exclusive control over these operations.
     fn as_channel(&self) -> &Channel;
+
+    /// Returns true if the proxy has received the `PEER_CLOSED` signal.
+    ///
+    /// # Errors
+    ///
+    /// See https://fuchsia.dev/reference/syscalls/object_wait_one?hl=en#errors for a full list of
+    /// errors. Note that `Status::TIMED_OUT` errors are converted to `Ok(false)` and all other
+    /// errors are propagated.
+    fn is_closed(&self) -> Result<bool, zx::Status> {
+        use zx::Peered;
+        self.as_channel().is_closed()
+    }
 }
 
 /// A stream of requests coming into a FIDL server over a channel.
@@ -175,6 +190,14 @@ pub trait ControlHandle {
     /// Returns a future that completes when the server receives the
     /// `PEER_CLOSED` signal.
     fn on_closed(&self) -> OnSignalsRef<'_>;
+
+    /// Sets and clears the signals provided on peer handle.
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status>;
 }
 
 /// A type associated with a particular two-way FIDL method, used by servers to

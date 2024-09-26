@@ -4,6 +4,7 @@
 
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/fuzz.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("test") {
   testonly = true
@@ -26,7 +27,7 @@ source_set("vaapi_stubs") {
   deps = [ "//third_party/googletest:gtest" ]
 }
 
-executable("vaapi_tests") {
+cc_test_executable("vaapi_tests") {
   testonly = true
 
   sources = [

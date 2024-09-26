@@ -50,13 +50,11 @@ class FakeStorageHost {
     }
 
     // Bind to the local namespace at Path()
-    zx::channel client, server;
-    ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
-    ASSERT_EQ(vfs_.Serve(root_dir_, std::move(server), fs::VnodeConnectionOptions::ReadOnly()),
-              ZX_OK);
+    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(vfs_.ServeDirectory(root_dir_, std::move(server)), ZX_OK);
     fdio_ns_t* ns;
     EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
-    EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, Path().c_str(), client.release()));
+    EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, Path().c_str(), client.TakeChannel().release()));
   }
 
   fbl::unique_fd OpenPartitionsDir() {

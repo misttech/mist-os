@@ -11,16 +11,13 @@
 #include <fbl/intrusive_wavl_tree.h>
 #include <ffl/fixed.h>
 
+#include "time.h"
+
 namespace sched {
 
 // Forward-declared; defined in <lib/sched/run-queue.h>
 template <typename Thread>
 class RunQueue;
-
-// Fixed-point wrappers for cleaner time arithmetic when dealing with other
-// fixed-point quantities.
-using Duration = ffl::Fixed<zx_duration_t, 0>;
-using Time = ffl::Fixed<zx_time_t, 0>;
 
 // Flexible work weight.
 //

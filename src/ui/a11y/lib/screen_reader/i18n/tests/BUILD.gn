@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
 import("//src/lib/icu/third_party_icu_headers.gni")
 
 group("tests") {
@@ -16,7 +17,7 @@ third_party_icu_headers("icu_headers") {
   ]
 }
 
-executable("i18n_tests") {
+cc_test_executable("i18n_tests") {
   testonly = true
 
   sources = [

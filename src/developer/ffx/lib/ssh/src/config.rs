@@ -117,6 +117,13 @@ impl SshConfig {
         args
     }
 
+    // Sets the ServerAliveCountMax value, based on the compiled-in ServerAliveInterval being
+    // hardcoded to "1".
+    pub fn set_server_alive_count_max(&mut self, keepalive_timeout: u16) -> Result<()> {
+        let _ = self.set("ServerAliveCountMax", keepalive_timeout.to_string())?;
+        Ok(())
+    }
+
     fn read_default_config(&mut self, config_contents: &str) -> Result<()> {
         for mut l in config_contents.lines() {
             l = l.trim();
@@ -220,5 +227,13 @@ RemoteForward = "quoted two words"
                 "VerifyHostKeyDNS=no",
             ]
         )
+    }
+
+    #[fuchsia::test]
+    async fn test_keepalive_timeout() {
+        let mut cfg = SshConfig::empty();
+        cfg.set_server_alive_count_max(30).expect("couldn't set keepalive timeout");
+        let args = cfg.to_args();
+        assert_eq!(args, vec!["-o", "ServerAliveCountMax=30"]);
     }
 }

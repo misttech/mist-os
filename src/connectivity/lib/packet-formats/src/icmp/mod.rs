@@ -42,14 +42,16 @@ use packet::{
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
 use crate::ipv4::{self, Ipv4PacketRaw};
 use crate::ipv6::Ipv6PacketRaw;
 
-#[derive(Copy, Clone, Default, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Default, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct HeaderPrefix {
     msg_type: u8,
@@ -80,8 +82,9 @@ impl HeaderPrefix {
 /// and so `peek_message_type` succeeding does not guarantee that a subsequent
 /// call to `parse` will also succeed.
 pub fn peek_message_type<MessageType: TryFrom<u8>>(bytes: &[u8]) -> ParseResult<MessageType> {
-    let (hdr_pfx, _) = Ref::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes)
-        .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
+    let (hdr_pfx, _) = Ref::<_, HeaderPrefix>::from_prefix(bytes).map_err(Into::into).map_err(
+        |_: zerocopy::SizeError<_, _>| debug_err!(ParseError::Format, "too few bytes for header"),
+    )?;
     MessageType::try_from(hdr_pfx.msg_type).map_err(|_| {
         debug_err!(ParseError::NotSupported, "unrecognized message type: {:x}", hdr_pfx.msg_type,)
     })
@@ -90,7 +93,7 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(bytes: &[u8]) -> ParseResult<
 /// An extension trait adding ICMP-related functionality to `Ipv4` and `Ipv6`.
 pub trait IcmpIpExt: IpProtoExt {
     /// The ICMP packet type for this IP version.
-    type IcmpPacketTypeRaw<B: ByteSliceMut>: IcmpPacketTypeRaw<B, Self>
+    type IcmpPacketTypeRaw<B: SplitByteSliceMut>: IcmpPacketTypeRaw<B, Self>
         + GenericOverIp<Self, Type = Self::IcmpPacketTypeRaw<B>>
         + GenericOverIp<Ipv4, Type = Icmpv4PacketRaw<B>>
         + GenericOverIp<Ipv6, Type = Icmpv6PacketRaw<B>>;
@@ -143,7 +146,7 @@ pub trait IcmpIpExt: IpProtoExt {
 }
 
 impl IcmpIpExt for Ipv4 {
-    type IcmpPacketTypeRaw<B: ByteSliceMut> = Icmpv4PacketRaw<B>;
+    type IcmpPacketTypeRaw<B: SplitByteSliceMut> = Icmpv4PacketRaw<B>;
     type IcmpMessageType = Icmpv4MessageType;
     type ParameterProblemCode = Icmpv4ParameterProblemCode;
     type ParameterProblemPointer = u8;
@@ -155,8 +158,7 @@ impl IcmpIpExt for Ipv4 {
         if bytes.len() < ipv4::IPV4_MIN_HDR_LEN {
             return bytes.len();
         }
-        let (header_prefix, _) =
-            Ref::<_, ipv4::HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap();
+        let (header_prefix, _) = Ref::<_, ipv4::HeaderPrefix>::from_prefix(bytes).unwrap();
         cmp::min(header_prefix.ihl() as usize * 4, bytes.len())
     }
 
@@ -165,7 +167,7 @@ impl IcmpIpExt for Ipv4 {
 }
 
 impl IcmpIpExt for Ipv6 {
-    type IcmpPacketTypeRaw<B: ByteSliceMut> = Icmpv6PacketRaw<B>;
+    type IcmpPacketTypeRaw<B: SplitByteSliceMut> = Icmpv6PacketRaw<B>;
     type IcmpMessageType = Icmpv6MessageType;
     type ParameterProblemCode = Icmpv6ParameterProblemCode;
     type ParameterProblemPointer = u32;
@@ -190,25 +192,25 @@ impl IcmpIpExt for Ipv6 {
 /// An ICMP or ICMPv6 packet
 ///
 /// 'IcmpPacketType' is implemented by `Icmpv4Packet` and `Icmpv6Packet`
-pub trait IcmpPacketTypeRaw<B: ByteSliceMut, I: Ip>:
+pub trait IcmpPacketTypeRaw<B: SplitByteSliceMut, I: Ip>:
     Sized + ParsablePacket<B, (), Error = ParseError>
 {
     /// Update the checksum to reflect an updated address in the pseudo header.
     fn update_checksum_pseudo_header_address(&mut self, old: I::Addr, new: I::Addr);
 }
 
-impl<B: ByteSliceMut> IcmpPacketTypeRaw<B, Ipv4> for Icmpv4PacketRaw<B> {
+impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv4> for Icmpv4PacketRaw<B> {
     /// Update the checksum to reflect an updated address in the pseudo header.
     fn update_checksum_pseudo_header_address(&mut self, _: Ipv4Addr, _: Ipv4Addr) {
         // ICMPv4 does not have a pseudo header.
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSliceMut> GenericOverIp<I> for Icmpv4PacketRaw<B> {
+impl<I: IcmpIpExt, B: SplitByteSliceMut> GenericOverIp<I> for Icmpv4PacketRaw<B> {
     type Type = I::IcmpPacketTypeRaw<B>;
 }
 
-impl<B: ByteSliceMut> IcmpPacketTypeRaw<B, Ipv6> for Icmpv6PacketRaw<B> {
+impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv6> for Icmpv6PacketRaw<B> {
     /// Update the checksum to reflect an updated address in the pseudo header.
     fn update_checksum_pseudo_header_address(&mut self, old: Ipv6Addr, new: Ipv6Addr) {
         let checksum = &mut self.header_prefix_mut().checksum;
@@ -216,7 +218,7 @@ impl<B: ByteSliceMut> IcmpPacketTypeRaw<B, Ipv6> for Icmpv6PacketRaw<B> {
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSliceMut> GenericOverIp<I> for Icmpv6PacketRaw<B> {
+impl<I: IcmpIpExt, B: SplitByteSliceMut> GenericOverIp<I> for Icmpv6PacketRaw<B> {
     type Type = I::IcmpPacketTypeRaw<B>;
 }
 
@@ -233,7 +235,7 @@ pub struct EmptyMessage<B>(core::marker::PhantomData<B>);
 ///   `OriginalPacket`, which is a thin wrapper around `B`.
 pub trait MessageBody: Sized {
     /// The underlying byteslice.
-    type B: ByteSlice;
+    type B: SplitByteSlice;
 
     /// Parse the MessageBody from the provided bytes.
     fn parse(bytes: Self::B) -> ParseResult<Self>;
@@ -263,7 +265,7 @@ pub trait MessageBody: Sized {
     fn bytes(&self) -> (&[u8], Option<&[u8]>);
 }
 
-impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
+impl<B: SplitByteSlice> MessageBody for EmptyMessage<B> {
     type B = B;
 
     fn parse(bytes: B) -> ParseResult<Self> {
@@ -287,7 +289,7 @@ impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
 #[derive(Debug)]
 pub struct OriginalPacket<B>(B);
 
-impl<B: ByteSlice> OriginalPacket<B> {
+impl<B: SplitByteSlice> OriginalPacket<B> {
     /// Returns the the body of the original packet.
     pub fn body<I: IcmpIpExt>(&self) -> &[u8] {
         // TODO(joshlf): Can these debug_asserts be triggered by external input?
@@ -298,7 +300,7 @@ impl<B: ByteSlice> OriginalPacket<B> {
     }
 }
 
-impl<B: ByteSlice> MessageBody for OriginalPacket<B> {
+impl<B: SplitByteSlice> MessageBody for OriginalPacket<B> {
     type B = B;
 
     fn parse(bytes: B) -> ParseResult<OriginalPacket<B>> {
@@ -314,7 +316,7 @@ impl<B: ByteSlice> MessageBody for OriginalPacket<B> {
     }
 }
 
-impl<B: ByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
+impl<B: SplitByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
     type B = B;
     fn parse(bytes: B) -> ParseResult<Options<B, O>> {
         Self::parse(bytes).map_err(|_e| debug_err!(ParseError::Format, "unable to parse options"))
@@ -331,7 +333,7 @@ impl<B: ByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
 
 /// An ICMP message.
 pub trait IcmpMessage<I: IcmpIpExt>:
-    Sized + Copy + FromBytes + AsBytes + NoCell + Unaligned
+    Sized + Copy + FromBytes + IntoBytes + KnownLayout + Immutable + Unaligned
 {
     /// Whether or not a message body is expected in an ICMP packet.
     const EXPECTS_BODY: bool = true;
@@ -345,7 +347,7 @@ pub trait IcmpMessage<I: IcmpIpExt>:
     type Code: Into<u8> + Copy + Debug;
 
     /// The type of the body used with this message.
-    type Body<B: ByteSlice>: MessageBody<B = B>;
+    type Body<B: SplitByteSlice>: MessageBody<B = B>;
 
     /// The type corresponding to this message type.
     ///
@@ -375,7 +377,7 @@ pub trait IcmpMessageType: TryFrom<u8> + Into<u8> + Copy + Debug {
     fn is_err(self) -> bool;
 }
 
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct Header<M> {
     prefix: HeaderPrefix,
@@ -394,20 +396,20 @@ struct Header<M> {
 /// [`IcmpPacket`] provides a [`FromRaw`] implementation that can be used to
 /// validate an [`IcmpPacketRaw`].
 #[derive(Debug)]
-pub struct IcmpPacketRaw<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> {
+pub struct IcmpPacketRaw<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> {
     header: Ref<B, Header<M>>,
     message_body: B,
     _marker: PhantomData<I>,
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
+impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     /// Get the ICMP message.
     pub fn message(&self) -> &M {
         &self.header.message
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
+impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     /// Attempts to calculate and write a Checksum for this [`IcmpPacketRaw`].
     ///
     /// Returns whether the checksum was successfully calculated & written. In
@@ -432,7 +434,7 @@ impl<I: IcmpIpExt, B: ByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
+impl<I: IcmpIpExt, B: SplitByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
     /// Set the ID of the ICMP echo message.
     pub fn set_id(&mut self, new: u16) {
         let old = self.header.message.id_seq.id;
@@ -443,7 +445,7 @@ impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoReply> {
+impl<I: IcmpIpExt, B: SplitByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoReply> {
     /// Set the ID of the ICMP echo message.
     pub fn set_id(&mut self, new: u16) {
         let old = self.header.message.id_seq.id;
@@ -459,7 +461,7 @@ impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoReply> {
 /// An `IcmpPacket` shares its underlying memory with the byte slice it was
 /// parsed from, meaning that no copying or extra allocation is necessary.
 #[derive(Debug)]
-pub struct IcmpPacket<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> {
+pub struct IcmpPacket<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> {
     header: Ref<B, Header<M>>,
     message_body: M::Body<B>,
     _marker: PhantomData<I>,
@@ -478,13 +480,13 @@ impl<A: IpAddress> IcmpParseArgs<A> {
     }
 }
 
-impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, ()>
+impl<B: SplitByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, ()>
     for IcmpPacketRaw<I, B, M>
 {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.message_body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.message_body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> ParseResult<Self> {
@@ -497,7 +499,7 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, ()>
     }
 }
 
-impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>>
+impl<B: SplitByteSlice, I: IcmpIpExt, M: IcmpMessage<I>>
     FromRaw<IcmpPacketRaw<I, B, M>, IcmpParseArgs<I::Addr>> for IcmpPacket<I, B, M>
 {
     type Error = ParseError;
@@ -521,13 +523,13 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>>
     }
 }
 
-impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, IcmpParseArgs<I::Addr>>
+impl<B: SplitByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, IcmpParseArgs<I::Addr>>
     for IcmpPacket<I, B, M>
 {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.message_body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.message_body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(buffer: BV, args: IcmpParseArgs<I::Addr>) -> ParseResult<Self> {
@@ -535,7 +537,7 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, IcmpParseA
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
+impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
     /// Get the ICMP message.
     pub fn message(&self) -> &M {
         &self.header.message
@@ -587,7 +589,7 @@ fn compute_checksum_fragmented<I: IcmpIpExt, BB: packet::Fragment, M: IcmpMessag
     Some(c.checksum())
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
+impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
     /// Compute the checksum, including the checksum field itself.
     ///
     /// `compute_checksum` returns `None` if the version is IPv6 and the total
@@ -603,7 +605,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacket<I, B, M> {
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, Body<B> = OriginalPacket<B>>>
+impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I, Body<B> = OriginalPacket<B>>>
     IcmpPacket<I, B, M>
 {
     /// Get the body of the packet that caused this ICMP message.
@@ -629,7 +631,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, Body<B> = OriginalPacket<B>>>
     }
 }
 
-impl<B: ByteSlice, M: IcmpMessage<Ipv4, Body<B> = OriginalPacket<B>>> IcmpPacket<Ipv4, B, M> {
+impl<B: SplitByteSlice, M: IcmpMessage<Ipv4, Body<B> = OriginalPacket<B>>> IcmpPacket<Ipv4, B, M> {
     /// Attempt to partially parse the original packet as an IPv4 packet.
     ///
     /// `f` will be invoked on the result of calling `Ipv4PacketRaw::parse` on
@@ -643,7 +645,7 @@ impl<B: ByteSlice, M: IcmpMessage<Ipv4, Body<B> = OriginalPacket<B>>> IcmpPacket
     }
 }
 
-impl<B: ByteSlice, M: IcmpMessage<Ipv6, Body<B> = OriginalPacket<B>>> IcmpPacket<Ipv6, B, M> {
+impl<B: SplitByteSlice, M: IcmpMessage<Ipv6, Body<B> = OriginalPacket<B>>> IcmpPacket<Ipv6, B, M> {
     /// Attempt to partially parse the original packet as an IPv6 packet.
     ///
     /// `f` will be invoked on the result of calling `Ipv6PacketRaw::parse` on
@@ -657,7 +659,9 @@ impl<B: ByteSlice, M: IcmpMessage<Ipv6, Body<B> = OriginalPacket<B>>> IcmpPacket
     }
 }
 
-impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, Body<B> = ndp::Options<B>>> IcmpPacket<I, B, M> {
+impl<I: IcmpIpExt, B: SplitByteSlice, M: IcmpMessage<I, Body<B> = ndp::Options<B>>>
+    IcmpPacket<I, B, M>
+{
     /// Get the pared list of NDP options from the ICMP message.
     pub fn ndp_options(&self) -> &ndp::Options<B> {
         &self.message_body
@@ -751,7 +755,7 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> PacketBuilder for IcmpPacketBuilder<I, M> 
                 .unwrap_or_else(|| {
                     panic!(
                     "total ICMP packet length of {} overflows 32-bit length field of pseudo-header",
-                    header.bytes().len() + message_body.len(),
+                    Ref::bytes(&header).len() + message_body.len(),
                 )
                 });
         header.prefix.checksum = checksum;
@@ -772,9 +776,16 @@ impl From<IcmpUnusedCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+// TODO(https://github.com/google/zerocopy/issues/1292),
+// TODO(https://github.com/rust-lang/rust/issues/45713): This needs to be public
+// in order to work around a Rust compiler bug. Once that bug is resolved, this
+// can be made private again.
+#[doc(hidden)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
+)]
 #[repr(C)]
-struct IdAndSeq {
+pub struct IdAndSeq {
     id: U16,
     seq: U16,
 }

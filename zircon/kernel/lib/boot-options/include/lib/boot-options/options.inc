@@ -795,7 +795,7 @@ The option allows a notice to be printed when the root job is either terminated,
 )""")
 
 DEFINE_OPTION("kernel.shell", bool, shell, {false}, R"""(
-Tells the kernel to start its own shell on the kernel console instead of a userspace sh.
+Tells the kernel to start its own shell on the kernel console instead of starting userspace.
 )""")
 
 DEFINE_OPTION("kernel.shell.script", SmallString, shell_script, {}, R"""(

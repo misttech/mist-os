@@ -11,11 +11,17 @@ use fuchsia_component_test::{
 };
 use tracing::*;
 use {
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_topology_test as fpt,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
+    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
-const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
+// Report prolonged match delay after this many loops.
+const DELAY_NOTIFICATION: usize = 10;
+
+// Spend no more than this many loop turns before giving up for the inspect to match.
+const MAX_LOOPS_COUNT: usize = 20;
+
+const RESTART_DELAY: zx::Duration = zx::Duration::from_seconds(1);
 
 macro_rules! block_until_inspect_matches {
     ($moniker:expr, $($tree:tt)+) => {{
@@ -25,7 +31,7 @@ macro_rules! block_until_inspect_matches {
             .select_all_for_moniker($moniker)
             .with_minimum_schema_count(1);
 
-        for i in 0.. {
+        for i in 1.. {
             let Ok(data) = reader
                 .snapshot::<Inspect>()
                 .await?
@@ -40,17 +46,21 @@ macro_rules! block_until_inspect_matches {
             match tree_assertion.run(&data) {
                 Ok(_) => break,
                 Err(error) => {
-                    if i == 10 {
-                        tracing::warn!(?error, "Still awaiting inspect match after 10 tries");
+                    if i == DELAY_NOTIFICATION {
+                        tracing::warn!(?error, "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
                     }
-                    if MACRO_LOOP_EXIT && i == 50 {
-                        return Err(error.into())
+                    if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
+                        // Print the actual, so we know why the match failed if it does.
+                        return Err(anyhow::anyhow!("err: {}: last observed {:?}", error, &data));
                     }
                 }
             }
+            fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
         }
     }};
 }
+
+const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
 
 macro_rules! block_until_power_elements_match {
     ($moniker:expr, [ $(($id1:ident = $value1:expr, $id2:ident = $value2:expr)),* ]) => {{
@@ -254,11 +264,11 @@ async fn test_system_activity_control() -> Result<()> {
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
             },
             suspend_events: {
             },
@@ -289,18 +299,18 @@ async fn test_system_activity_control() -> Result<()> {
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 1u64,
-                last_failed_error: zx::sys::ZX_ERR_NOT_SUPPORTED as i64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+               ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+               ref fobs::SUSPEND_FAIL_COUNT: 1u64,
+               ref fobs::SUSPEND_LAST_FAILED_ERROR: zx::sys::ZX_ERR_NOT_SUPPORTED as i64,
+               ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+               ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    suspend_failed: AnyProperty,
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
             },
             "fuchsia.inspect.Health": contains {

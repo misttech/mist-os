@@ -1,0 +1,24 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "tee",
+            url: "fuchsia-boot:///tee#meta/tee.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "#archivist",
+            to: "#tee",
+        },
+        {
+            protocol: [ "fuchsia.vsock.Connector" ],
+            from: "#vsock",
+            to: "#tee",
+        },
+    ],
+}

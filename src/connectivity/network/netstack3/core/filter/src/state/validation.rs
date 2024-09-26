@@ -39,6 +39,10 @@ pub enum ValidationError<RuleInfo> {
     /// action specifies a destination port range, the rule must match on transport
     /// protocol to ensure that the packet has either a TCP or UDP header.
     RedirectWithInvalidMatcher(RuleInfo),
+    /// A rule has a Masquerade action without a corresponding valid matcher: if the
+    /// action specifies a source port range, the rule must match on transport
+    /// protocol to ensure that the packet has either a TCP or UDP header.
+    MasqueradeWithInvalidMatcher(RuleInfo),
 }
 
 /// Witness type ensuring that the contained filtering state has been validated.
@@ -78,35 +82,59 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
         validate_hook(
             &ingress,
             &[UnavailableMatcher::OutInterface],
-            &[UnavailableAction::Redirect],
+            &[UnavailableAction::Redirect, UnavailableAction::Masquerade],
         )?;
         validate_hook(
             &local_ingress,
             &[UnavailableMatcher::OutInterface],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Redirect],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Redirect,
+                UnavailableAction::Masquerade,
+            ],
         )?;
         validate_hook(
             &forwarding,
             &[],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Redirect],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Redirect,
+                UnavailableAction::Masquerade,
+            ],
         )?;
         validate_hook(
             &egress,
             &[UnavailableMatcher::InInterface],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Redirect],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Redirect,
+                UnavailableAction::Masquerade,
+            ],
         )?;
         validate_hook(
             &local_egress,
             &[UnavailableMatcher::InInterface],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Redirect],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Redirect,
+                UnavailableAction::Masquerade,
+            ],
         )?;
 
         let NatRoutines { ingress, local_ingress, egress, local_egress } = nat_routines;
-        validate_hook(&ingress, &[UnavailableMatcher::OutInterface], &[])?;
+        validate_hook(
+            &ingress,
+            &[UnavailableMatcher::OutInterface],
+            &[UnavailableAction::Masquerade],
+        )?;
         validate_hook(
             &local_ingress,
             &[UnavailableMatcher::OutInterface],
-            &[UnavailableAction::TransparentProxy, UnavailableAction::Redirect],
+            &[
+                UnavailableAction::TransparentProxy,
+                UnavailableAction::Redirect,
+                UnavailableAction::Masquerade,
+            ],
         )?;
         validate_hook(
             &egress,
@@ -116,7 +144,7 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
         validate_hook(
             &local_egress,
             &[UnavailableMatcher::InInterface],
-            &[UnavailableAction::TransparentProxy],
+            &[UnavailableAction::TransparentProxy, UnavailableAction::Masquerade],
         )?;
 
         // TODO(https://fxbug.dev/318717702): ensure that no rule has an action
@@ -158,6 +186,7 @@ impl UnavailableMatcher {
 enum UnavailableAction {
     TransparentProxy,
     Redirect,
+    Masquerade,
 }
 
 impl UnavailableAction {
@@ -168,7 +197,8 @@ impl UnavailableAction {
     ) -> Result<(), ValidationError<RuleInfo>> {
         match (self, action) {
             (UnavailableAction::TransparentProxy, Action::TransparentProxy(_))
-            | (UnavailableAction::Redirect, Action::Redirect { .. }) => {
+            | (UnavailableAction::Redirect, Action::Redirect { .. })
+            | (UnavailableAction::Masquerade, Action::Masquerade { .. }) => {
                 Err(ValidationError::RuleWithInvalidAction(rule.clone()))
             }
             _ => Ok(()),
@@ -190,8 +220,14 @@ fn validate_hook<I: IpExt, DeviceClass, RuleInfo: Clone>(
     Ok(())
 }
 
-/// Ensures that no rules reachable from this routine match on
-/// `unavailable_matcher`.
+/// Ensures that:
+///  * no rules reachable from this routine match on any of the
+///    `unavailable_matchers`.
+///  * no rules reachable from this routine include one of the
+///    `unavailable_actions`.
+///  * all rules reachable from this routine have matchers that are compatible
+///    with their actions (for example, specifying a port rewrite requires that
+///    a transport protocol matcher be present).
 fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
     Routine { rules }: &Routine<I, DeviceClass, RuleInfo>,
     unavailable_matchers: &[UnavailableMatcher],
@@ -205,59 +241,55 @@ fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
             unavailable.validate(action, validation_info)?;
         }
 
+        let has_tcp_or_udp_matcher = |matcher: &PacketMatcher<_, _>| {
+            let Some(TransportProtocolMatcher { proto, .. }) = matcher.transport_protocol else {
+                return false;
+            };
+            I::map_ip(
+                proto,
+                |proto| match proto {
+                    Ipv4Proto::Proto(IpProto::Tcp | IpProto::Udp) => true,
+                    _ => false,
+                },
+                |proto| match proto {
+                    Ipv6Proto::Proto(IpProto::Tcp | IpProto::Udp) => true,
+                    _ => false,
+                },
+            )
+        };
+
         match action {
             Action::Accept | Action::Drop | Action::Return => {}
+            Action::TransparentProxy(_) => {
+                // TransparentProxy is only valid in a rule that matches on
+                // either TCP or UDP.
+                if !has_tcp_or_udp_matcher(matcher) {
+                    return Err(ValidationError::TransparentProxyWithInvalidMatcher(
+                        validation_info.clone(),
+                    ));
+                }
+            }
             Action::Redirect { dst_port } => {
                 if dst_port.is_some() {
                     // Redirect can only specify a destination port in a rule
                     // that matches on either TCP or UDP.
-                    let Some(TransportProtocolMatcher { proto, .. }) = matcher.transport_protocol
-                    else {
+                    if !has_tcp_or_udp_matcher(matcher) {
                         return Err(ValidationError::RedirectWithInvalidMatcher(
                             validation_info.clone(),
                         ));
                     };
-                    I::map_ip::<_, Result<(), _>>(
-                        proto,
-                        |proto| match proto {
-                            Ipv4Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
-                            _ => Err(ValidationError::RedirectWithInvalidMatcher(
-                                validation_info.clone(),
-                            )),
-                        },
-                        |proto| match proto {
-                            Ipv6Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
-                            _ => Err(ValidationError::RedirectWithInvalidMatcher(
-                                validation_info.clone(),
-                            )),
-                        },
-                    )?;
                 }
             }
-            Action::TransparentProxy(_) => {
-                // TransparentProxy is only valid in a rule that matches on
-                // either TCP or UDP.
-                let Some(TransportProtocolMatcher { proto, .. }) = matcher.transport_protocol
-                else {
-                    return Err(ValidationError::TransparentProxyWithInvalidMatcher(
-                        validation_info.clone(),
-                    ));
-                };
-                I::map_ip::<_, Result<(), _>>(
-                    proto,
-                    |proto| match proto {
-                        Ipv4Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
-                        _ => Err(ValidationError::TransparentProxyWithInvalidMatcher(
+            Action::Masquerade { src_port } => {
+                if src_port.is_some() {
+                    // Masquerde can only specify a source port in a rule that
+                    // matches on either TCP or UDP.
+                    if !has_tcp_or_udp_matcher(matcher) {
+                        return Err(ValidationError::MasqueradeWithInvalidMatcher(
                             validation_info.clone(),
-                        )),
-                    },
-                    |proto| match proto {
-                        Ipv6Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
-                        _ => Err(ValidationError::TransparentProxyWithInvalidMatcher(
-                            validation_info.clone(),
-                        )),
-                    },
-                )?;
+                        ));
+                    };
+                }
             }
             Action::Jump(target) => {
                 let UninstalledRoutine { routine, id: _ } = target;
@@ -403,6 +435,7 @@ impl<I: IpExt, DeviceClass: Clone + Debug, RuleInfo: Clone> Action<I, DeviceClas
             Self::Return => Action::Return,
             Self::TransparentProxy(proxy) => Action::TransparentProxy(proxy),
             Self::Redirect { dst_port } => Action::Redirect { dst_port },
+            Self::Masquerade { src_port } => Action::Masquerade { src_port },
             Self::Jump(target) => {
                 let converted = index.get_or_insert_with(target.clone(), |index| {
                     // Recursively strip debug info from the target routine.
@@ -739,6 +772,51 @@ mod tests {
         Err(ValidationError::RuleWithInvalidAction(RuleId::Invalid));
         "redirect unavailable in IP routines"
     )]
+    #[test_case(
+        Routines {
+            nat: NatRoutines {
+                egress: hook_with_rule(Rule {
+                    matcher: PacketMatcher::default(),
+                    action: Action::Masquerade { src_port: None },
+                    validation_info: RuleId::Valid,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        } =>
+        Ok(());
+        "masquerade available in NAT EGRESS"
+    )]
+    #[test_case(
+        Routines {
+            nat: NatRoutines {
+                local_ingress: hook_with_rule(Rule {
+                    matcher: PacketMatcher::default(),
+                    action: Action::Masquerade { src_port: None },
+                    validation_info: RuleId::Invalid,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        } =>
+        Err(ValidationError::RuleWithInvalidAction(RuleId::Invalid));
+        "masquerade unavailable in NAT LOCAL_INGRESS"
+    )]
+    #[test_case(
+        Routines {
+            ip: IpRoutines {
+                egress: hook_with_rule(Rule {
+                    matcher: PacketMatcher::default(),
+                    action: Action::Masquerade { src_port: None },
+                    validation_info: RuleId::Invalid,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        } =>
+        Err(ValidationError::RuleWithInvalidAction(RuleId::Invalid));
+        "masquerade unavailable in IP routines"
+    )]
     fn validate_action_available<I: IpExt>(
         routines: Routines<I, FakeDeviceClass, RuleId>,
     ) -> Result<(), ValidationError<RuleId>> {
@@ -853,6 +931,68 @@ mod tests {
         "redirect invalid with no transport protocol matcher when dst port specified"
     )]
     fn validate_redirect_matcher<I: IpExt>(
+        routine: Routine<I, FakeDeviceClass, RuleId>,
+    ) -> Result<(), ValidationError<RuleId>> {
+        validate_routine(&routine, &[], &[])
+    }
+
+    #[ip_test(I)]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: PacketMatcher::default(),
+                action: Action::Masquerade { src_port: None },
+                validation_info: RuleId::Valid,
+            }],
+        } =>
+        Ok(());
+        "masquerade valid with no matcher if src port unspecified"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: tcp_matcher(),
+                action: Action::Masquerade { src_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                validation_info: RuleId::Valid,
+            }],
+        } =>
+        Ok(());
+        "masquerade valid with TCP matcher when src port specified"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: udp_matcher(),
+                action: Action::Masquerade { src_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                validation_info: RuleId::Valid,
+            }],
+        } =>
+        Ok(());
+        "masquerade valid with UDP matcher when src port specified"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: icmp_matcher(),
+                action: Action::Masquerade { src_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                validation_info: RuleId::Invalid,
+            }],
+        } =>
+        Err(ValidationError::MasqueradeWithInvalidMatcher(RuleId::Invalid));
+        "masquerade invalid with ICMP matcher when src port specified"
+    )]
+    #[test_case(
+        Routine {
+            rules: vec![Rule {
+                matcher: PacketMatcher::default(),
+                action: Action::Masquerade { src_port: Some(LOCAL_PORT..=LOCAL_PORT) },
+                validation_info: RuleId::Invalid,
+            }],
+        } =>
+        Err(ValidationError::MasqueradeWithInvalidMatcher(RuleId::Invalid));
+        "masquerade invalid with no transport protocol matcher when src port specified"
+    )]
+    fn validate_masquerade_matcher<I: IpExt>(
         routine: Routine<I, FakeDeviceClass, RuleId>,
     ) -> Result<(), ValidationError<RuleId>> {
         validate_routine(&routine, &[], &[])

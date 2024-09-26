@@ -5,12 +5,12 @@
 //! These are structures for creating the binary data for ZBI Items.
 
 use anyhow::{bail, Result};
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 
 // LINT.IfChange
 
 /// This is the structure for the payload for ZBI_TYPE_PLATFORM_ID items.
-#[derive(AsBytes, NoCell, Debug, PartialEq)]
+#[derive(IntoBytes, Immutable, Debug, PartialEq)]
 #[repr(C, packed)]
 pub(crate) struct ZbiPlatformId {
     pub vid: u32,
@@ -19,7 +19,7 @@ pub(crate) struct ZbiPlatformId {
 }
 
 /// This is the structure for the payload for ZBI_TYPE_DRV_BOARD_INFO items.
-#[derive(AsBytes, NoCell, Debug, PartialEq)]
+#[derive(IntoBytes, Immutable, Debug, PartialEq)]
 #[repr(C, packed)]
 pub(crate) struct ZbiBoardInfo {
     /// This is a value chosen by hardware/factory developers and is provided to
@@ -36,7 +36,7 @@ impl ZbiPlatformId {
             bail!("board_name is too long (max 32 bytes): {}", board_name.as_bytes().len());
         }
         let mut platform_id = Self { vid, pid, board_name: [0u8; 32] };
-        board_name.as_bytes().write_to_prefix(&mut platform_id.board_name);
+        let _ = board_name.as_bytes().write_to_prefix(&mut platform_id.board_name);
         Ok(platform_id)
     }
 }

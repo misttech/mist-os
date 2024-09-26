@@ -6,7 +6,6 @@ use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabil
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
 use crate::model::namespace::create_namespace;
-use crate::model::resolver::Resolver;
 use crate::model::storage::admin_protocol::StorageAdmin;
 use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
@@ -298,7 +297,7 @@ async fn resolve_declaration(
         .await
         .ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
-    let (address, environment) = {
+    let (address, collection_input) = {
         // this lock needs to be dropped before we try to call resolve, since routing the resolver
         // may also need to take this lock
         let state = instance.lock_state().await;
@@ -314,16 +313,19 @@ async fn resolve_declaration(
                 .and_then(|url| ComponentAddress::from_absolute_url(&url).ok())
                 .ok_or(fsys::GetDeclarationError::BadUrl)?
         };
-        let collections = resolved_state.collections();
-        let collection_decl = collections
-            .iter()
-            .find(|c| c.name == collection)
-            .ok_or(fsys::GetDeclarationError::BadChildLocation)?;
-        (address, resolved_state.environment_for_collection(&instance, &collection_decl))
+        let collection_input = resolved_state
+            .sandbox
+            .collection_inputs
+            .get(
+                &Name::new(collection)
+                    .map_err(|_| fsys::GetDeclarationError::InstanceNotResolved)?,
+            )
+            .ok_or(fsys::GetDeclarationError::InstanceNotResolved)?;
+        (address, collection_input)
     };
 
-    let resolved = environment
-        .resolve(&address)
+    let resolved = instance
+        .perform_resolve(Some(collection_input), &address)
         .await
         .map_err(|_| fsys::GetDeclarationError::InstanceNotResolved)?;
 
@@ -780,8 +782,9 @@ mod tests {
                 .build();
             let expose_decl =
                 ExposeBuilder::protocol().source(ExposeSource::Self_).name(&expose_name).build();
+            let capability_decl = CapabilityBuilder::protocol().name(&expose_name).build();
 
-            manifest = manifest.use_(use_decl).expose(expose_decl);
+            manifest = manifest.use_(use_decl).expose(expose_decl).capability(capability_decl);
         }
 
         let components = vec![("root", manifest.build())];

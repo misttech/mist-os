@@ -32,6 +32,8 @@ use default_drop::{DefaultDrop, WithDefaultDrop};
 use ifaces::{ClientIface, ConnectResult, IfaceManager, ScanEnd};
 use nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr};
 
+// TODO(https://fxbug.dev/368005870): Need to reconsider the consequences of using
+// the same iface name, even when an iface is recreated.
 const IFACE_NAME: &str = "wlan";
 
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
@@ -147,6 +149,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                 }
             }
         }
+        // TODO(https://fxbug.dev/366027488): GetAvailableModes is hardcoded.
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetAvailableModes");
             let response = fidl_wlanix::WifiChipGetAvailableModesResponse {
@@ -174,12 +177,14 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             };
             responder.send(&response).context("send GetId response")?;
         }
+        // TODO(https://fxbug.dev/366028666): GetMode is hardcoded.
         fidl_wlanix::WifiChipRequest::GetMode { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetMode");
             let response =
                 fidl_wlanix::WifiChipGetModeResponse { mode: Some(0), ..Default::default() };
             responder.send(&response).context("send GetMode response")?;
         }
+        // TODO(https://fxbug.dev/366027491): GetCapabilities is hardcoded.
         fidl_wlanix::WifiChipRequest::GetCapabilities { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetCapabilities");
             let response = fidl_wlanix::WifiChipGetCapabilitiesResponse {
@@ -770,6 +775,8 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
             info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
             if let Some(callback) = payload.callback {
                 sta_iface_state.lock().callbacks.push(callback.into_proxy()?);
+            } else {
+                warn!("Empty callback field in received RegisterCallback request.")
             }
         }
         fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork { payload, .. } => {
@@ -778,7 +785,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                 let supplicant_sta_network_stream = supplicant_sta_network
                     .into_stream()
                     .context("create SupplicantStaNetwork stream")?;
-                // TODO(b/316035436): Should we return NetworkAdded event?
+                // TODO(https://fxbug.dev/316035436): Should we return NetworkAdded event?
                 serve_supplicant_sta_network(
                     telemetry_sender,
                     supplicant_sta_network_stream,
@@ -929,6 +936,7 @@ fn build_nl80211_ack() -> fidl_wlanix::Nl80211Message {
 }
 
 fn build_nl80211_err() -> fidl_wlanix::Nl80211Message {
+    // TODO(https://fxbug.dev/369154198): This should probably contain an error value.
     fidl_wlanix::Nl80211Message {
         message_type: Some(fidl_wlanix::Nl80211MessageType::Error),
         payload: None,

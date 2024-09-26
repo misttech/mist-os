@@ -39,6 +39,7 @@ fuchsia_product_bundle(
 fuchsia_product_bundle(
     name = "product_bundle_eng.arm64",
     board_name = "arm64",
+    default_virtual_device = ":workbench_emu.arm64",
     main = ":assembly_eng.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
     product_bundle_name = "workbench_eng",
@@ -46,6 +47,9 @@ fuchsia_product_bundle(
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
     update_version_file = "//build/info:version",
+    virtual_devices = [
+        ":workbench_emu.arm64",
+    ],
 )
 
 fuchsia_product_bundle(
@@ -103,6 +107,14 @@ fuchsia_virtual_device(
     name = "workbench_emu",
     arch = ARCH.X64,
     device_name = "workbench_emu",
+    window_height_px = 1200,
+    window_width_px = 720,
+)
+
+fuchsia_virtual_device(
+    name = "workbench_emu.arm64",
+    arch = ARCH.ARM64,
+    device_name = "workbench_emu.arm64",
     window_height_px = 1200,
     window_width_px = 720,
 )

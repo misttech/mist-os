@@ -1167,7 +1167,7 @@ async fn recovery_to_write(
     {
         return Ok(None);
     }
-    return Ok(Some(image_metadata.url().to_owned()));
+    Ok(Some(image_metadata.url().to_owned()))
 }
 
 #[derive(Debug, Clone, Copy)]

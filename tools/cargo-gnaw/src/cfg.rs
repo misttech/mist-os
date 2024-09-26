@@ -135,7 +135,7 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
         Ok(String::from("current_cpu == \"arm64\""))
     } else if cfg == "target_arch = \"x86_64\"" {
         Ok(String::from("current_cpu == \"x64\""))
-    } else if cfg == "target_arch = \"wasm32\"" {
+    } else if cfg == "target_arch = \"wasm32\"" || cfg == "target_family = \"wasm\"" {
         Ok(String::from("current_cpu == \"wasm32\""))
     } else if cfg == "target_arch = \"riscv32i\"" {
         Ok(String::from("current_cpu == \"riscv32\""))

@@ -181,6 +181,7 @@ source_set("binder") {
     # IPCThreadState.cpp contains unused variables.
     "-Wno-unused-variable",
   ]
+  include_dirs = [ binder_source_base ]
   if (is_host) {
     cflags_cc += [
       # Parcel.cpp contains unused functions in the host build

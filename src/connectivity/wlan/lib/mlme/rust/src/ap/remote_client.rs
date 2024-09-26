@@ -16,7 +16,7 @@ use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, FrameClass, ReasonCode};
 use wlan_common::timer::EventId;
 use wlan_common::{ie, TimeUnit};
 use wlan_statemachine::StateMachine;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
@@ -897,7 +897,7 @@ impl RemoteClient {
     // Public handler functions.
 
     /// Handles management frames (IEEE Std 802.11-2016, 9.3.3) from the PHY.
-    pub async fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
+    pub async fn handle_mgmt_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         capabilities: mac::CapabilityInfo,
@@ -982,7 +982,7 @@ impl RemoteClient {
     /// These data frames may be in A-MSDU format (IEEE Std 802.11-2016, 9.3.2.2). However, the
     /// individual frames will be passed to |handle_msdu| and we don't need to care what format
     /// they're in.
-    pub fn handle_data_frame<B: ByteSlice, D: DeviceOps>(
+    pub fn handle_data_frame<B: SplitByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
         data_frame: mac::DataFrame<B>,
@@ -1098,7 +1098,7 @@ mod tests {
     use lazy_static::lazy_static;
     use test_case::test_case;
     use wlan_common::assert_variant;
-    use wlan_common::mac::{AsBytesExt as _, CapabilityInfo};
+    use wlan_common::mac::{CapabilityInfo, IntoBytesExt as _};
     use wlan_common::test_utils::fake_frames::*;
     use wlan_common::timer::{self, create_timer};
     use zerocopy::Unalign;

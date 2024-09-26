@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
+import("//build/testing/cc_test_executable.gni")
 
 sdk_source_set("process") {
   category = "internal"
@@ -26,7 +27,7 @@ sdk_source_set("process") {
   ]
 }
 
-executable("unittests") {
+cc_test_executable("unittests") {
   testonly = true
   output_name = "process_unittests"
 

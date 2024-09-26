@@ -38,7 +38,7 @@ impl DispatcherBuilder {
     /// See `FDF_DISPATCHER_OPTION_UNSYNCHRONIZED` in the C API
     const UNSYNCHRONIZED: u32 = 0b01;
     /// See `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS` in the C API
-    const ALLOW_THREAD_BLOCKING: u32 = 0x10;
+    const ALLOW_THREAD_BLOCKING: u32 = 0b10;
 
     /// Creates a new [`DispatcherBuilder`] that can be used to configure a new dispatcher.
     /// For more information on the threading-related flags for the dispatcher, see
@@ -117,10 +117,8 @@ impl DispatcherBuilder {
         let name_len = self.name.len();
         let scheduler_role = self.scheduler_role.as_ptr() as *mut ffi::c_char;
         let scheduler_role_len = self.scheduler_role.len();
-        let observer = match self.shutdown_observer {
-            Some(observer) => observer.into_ptr(),
-            None => null_mut(),
-        };
+        let observer =
+            self.shutdown_observer.unwrap_or_else(|| ShutdownObserver::new(|_| {})).into_ptr();
         // SAFETY: all arguments point to memory that will be available for the duration
         // of the call, except `observer`, which will be available until it is unallocated
         // by the dispatcher exit handler.
@@ -149,7 +147,7 @@ impl DispatcherBuilder {
 }
 
 #[derive(Debug)]
-pub struct Dispatcher(NonNull<fdf_dispatcher_t>);
+pub struct Dispatcher(pub(crate) NonNull<fdf_dispatcher_t>);
 
 // SAFETY: The api of fdf_dispatcher_t is thread safe.
 unsafe impl Send for Dispatcher {}
@@ -167,7 +165,22 @@ impl Dispatcher {
         Self(handle)
     }
 
-    pub fn post_task_sync(&self, p: impl TaskCallback) -> Result<(), Status> {
+    fn get_raw_flags(&self) -> u32 {
+        // SAFETY: the inner fdf_dispatcher_t is valid by construction
+        unsafe { fdf_dispatcher_get_options(self.0.as_ptr()) }
+    }
+
+    /// Whether this dispatcher's tasks and futures can run on multiple threads at the same time.
+    pub fn is_unsynchronized(&self) -> bool {
+        (self.get_raw_flags() & DispatcherBuilder::UNSYNCHRONIZED) != 0
+    }
+
+    /// Whether this dispatcher is allowed to call blocking functions or not
+    pub fn allows_thread_blocking(&self) -> bool {
+        (self.get_raw_flags() & DispatcherBuilder::ALLOW_THREAD_BLOCKING) != 0
+    }
+
+    pub fn post_task_sync<'a>(&self, p: impl TaskCallback<'a>) -> Result<(), Status> {
         // SAFETY: the fdf dispatcher is valid by construction and can provide an async dispatcher.
         let async_dispatcher = unsafe { fdf_dispatcher_get_async_dispatcher(self.0.as_ptr()) };
         let task_arc = Arc::new(UnsafeCell::new(TaskFunc {
@@ -197,11 +210,11 @@ impl Dispatcher {
         }
     }
 
-    pub fn spawn_task(
-        &self,
-        future: impl Future<Output = ()> + 'static + Send,
+    pub fn spawn_task<'a>(
+        &'a self,
+        future: impl Future<Output = ()> + 'a + Send,
     ) -> Result<(), Status> {
-        let task = Arc::new(TaskFuture {
+        let task = Arc::new(Task {
             future: Mutex::new(Some(future.boxed())),
             dispatcher: ManuallyDrop::new(Dispatcher(self.0)),
         });
@@ -269,15 +282,15 @@ impl<'a> core::ops::DerefMut for DispatcherRef<'a> {
     }
 }
 
-pub trait TaskCallback: FnOnce(Status) + 'static + Send + Sync {}
-impl<T> TaskCallback for T where T: FnOnce(Status) + 'static + Send + Sync {}
+pub trait TaskCallback<'a>: FnOnce(Status) + 'a + Send + Sync {}
+impl<'a, T> TaskCallback<'a> for T where T: FnOnce(Status) + 'a + Send + Sync {}
 
-struct TaskFuture {
-    future: Mutex<Option<BoxFuture<'static, ()>>>,
+struct Task<'a> {
+    future: Mutex<Option<BoxFuture<'a, ()>>>,
     dispatcher: ManuallyDrop<Dispatcher>,
 }
 
-impl ArcWake for TaskFuture {
+impl<'a> ArcWake for Task<'a> {
     fn wake_by_ref(arc_self: &Arc<Self>) {
         match arc_self.queue() {
             Err(e) if e == Status::from_raw(ZX_ERR_BAD_STATE) => {
@@ -291,7 +304,7 @@ impl ArcWake for TaskFuture {
     }
 }
 
-impl TaskFuture {
+impl<'a> Task<'a> {
     /// Posts a task to progress the currently stored future. The task will
     /// consume the future if the future is ready after the next poll.
     /// Otherwise, the future is kept to be polled again after being woken.
@@ -320,17 +333,17 @@ impl TaskFuture {
 }
 
 #[repr(C)]
-struct TaskFunc {
+struct TaskFunc<'a> {
     task: async_task,
     dispatcher: *mut async_dispatcher,
-    func: Box<dyn TaskCallback>,
+    func: Box<dyn TaskCallback<'a>>,
 }
 
-impl TaskFunc {
+impl<'a> TaskFunc<'a> {
     extern "C" fn call(_dispatcher: *mut async_dispatcher, task: *mut async_task, status: i32) {
         // SAFETY: the async api promises that this function will only be called
         // up to once, so we can reconstitute the `Arc` and let it get dropped.
-        let task = unsafe { Arc::from_raw(task as *const UnsafeCell<TaskFunc>) };
+        let task = unsafe { Arc::from_raw(task as *const UnsafeCell<Self>) };
         // SAFETY: if we can't get a mut ref from the arc, then the task is already
         // being cancelled, so we don't want to call it.
         if let Some(task) = Arc::try_unwrap(task).ok() {
@@ -424,7 +437,7 @@ pub(crate) mod test {
         });
     }
 
-    pub fn with_raw_dispatcher<T>(name: &str, p: impl FnOnce(&Dispatcher) -> T) -> T {
+    pub fn with_raw_dispatcher<T>(name: &str, p: impl for<'a> FnOnce(&'a Dispatcher) -> T) -> T {
         ensure_driver_env();
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();

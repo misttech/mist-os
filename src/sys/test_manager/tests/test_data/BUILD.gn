@@ -4,68 +4,69 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("passing-test-example-bin") {
+cc_test_executable("passing-test-example-bin") {
   output_name = "passing-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "passing_test_example.cc" ]
 }
 
-executable("test-with-stderr-bin") {
+cc_test_executable("test-with-stderr-bin") {
   output_name = "test-with-stderr"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "test_with_stderr.cc" ]
 }
 
-executable("no-onfinished-after-test-example-bin") {
+cc_test_executable("no-onfinished-after-test-example-bin") {
   output_name = "no-onfinished-after-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "no_onfinished_after_test_example.cc" ]
 }
 
-executable("disabled-test-example-bin") {
+cc_test_executable("disabled-test-example-bin") {
   output_name = "disabled-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "disabled_test_example.cc" ]
 }
 
-executable("failing-test-example-bin") {
+cc_test_executable("failing-test-example-bin") {
   output_name = "failing-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "failing_test_example.cc" ]
 }
 
-executable("incomplete-test-example-bin") {
+cc_test_executable("incomplete-test-example-bin") {
   output_name = "incomplete-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "incomplete_test_example.cc" ]
 }
 
-executable("invalid-test-example-bin") {
+cc_test_executable("invalid-test-example-bin") {
   output_name = "invalid-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "invalid_test_example.cc" ]
 }
 
-executable("no-test-example-bin") {
+cc_test_executable("no-test-example-bin") {
   output_name = "no-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "no_test_example.cc" ]
 }
 
-executable("huge-test-example-bin") {
+cc_test_executable("huge-test-example-bin") {
   output_name = "huge-test-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "huge_test_example.cc" ]
 }
 
-executable("get-tests-hangs-example-bin") {
+cc_test_executable("get-tests-hangs-example-bin") {
   output_name = "get-tests-hangs-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "get_tests_hangs_example.cc" ]
 }
 
-executable("get-tests-closes-channel-example-bin") {
+cc_test_executable("get-tests-closes-channel-example-bin") {
   output_name = "get-tests-closes-channel-example"
   deps = [ "//src/lib/test-suite:test_suite_lib" ]
   sources = [ "get_tests_closes_channel_example.cc" ]

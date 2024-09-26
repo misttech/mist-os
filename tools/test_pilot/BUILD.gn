@@ -41,7 +41,7 @@ if (is_host) {
   }
 
   sdk_host_tool("test_pilot_sdk") {
-    category = "private"
+    category = "internal"
     output_name = "test_pilot"
     deps = [ ":test_pilot" ]
   }

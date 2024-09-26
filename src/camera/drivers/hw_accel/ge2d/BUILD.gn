@@ -39,7 +39,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/camera/drivers/hw_accel/task:camera-task",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -47,6 +46,7 @@ source_set("lib") {
     "//zircon/system/ulib/hwreg",
   ]
   deps = [
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/driver",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/image-format",

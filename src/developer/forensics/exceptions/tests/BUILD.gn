@@ -3,6 +3,7 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 visibility = [ ":*" ]
 
@@ -40,7 +41,7 @@ executable("crasher") {
   exclude_toolchain_tags = [ "hwasan" ]
 }
 
-executable("exception_broker_config_test_exe") {
+cc_test_executable("exception_broker_config_test_exe") {
   testonly = true
 
   sources = [ "exception_broker_config_test.cc" ]
@@ -57,7 +58,7 @@ executable("exception_broker_config_test_exe") {
   ]
 }
 
-executable("exception_broker_integration_test_exe") {
+cc_test_executable("exception_broker_integration_test_exe") {
   testonly = true
 
   sources = [ "exception_broker_integration_test.cc" ]
@@ -76,7 +77,7 @@ executable("exception_broker_integration_test_exe") {
   exclude_toolchain_tags = [ "hwasan" ]
 }
 
-executable("exception_broker_unittest_exe") {
+cc_test_executable("exception_broker_unittest_exe") {
   testonly = true
 
   sources = [
@@ -111,7 +112,7 @@ executable("exception_broker_unittest_exe") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("process_launch_failure_unittest_exe") {
+cc_test_executable("process_launch_failure_unittest_exe") {
   testonly = true
 
   sources = [ "process_launch_failure_unittest.cc" ]
@@ -129,7 +130,7 @@ executable("process_launch_failure_unittest_exe") {
   ]
 }
 
-executable("wake_lease_integration_test_exe") {
+cc_test_executable("wake_lease_integration_test_exe") {
   testonly = true
 
   sources = [ "wake_lease_integration_test.cc" ]
@@ -144,7 +145,7 @@ executable("wake_lease_integration_test_exe") {
   ]
 }
 
-executable("wake_lease_unittest_exe") {
+cc_test_executable("wake_lease_unittest_exe") {
   testonly = true
 
   sources = [ "wake_lease_unittest.cc" ]

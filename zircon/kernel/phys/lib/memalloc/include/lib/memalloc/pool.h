@@ -235,19 +235,12 @@ class Pool {
   fit::result<fit::failed, uint64_t> Resize(const Range& original, uint64_t new_size,
                                             uint64_t min_alignment);
 
-  // Removes all accounting for RAM (free or allocated) past the provided
-  // capacity. This is used to simulate physical memory constraints of smaller
-  // devices. It is a destructive routine; removed memory can not be recovered
-  // or reallocated.
-  //
-  // It is always the tail of RAM that is removed. If allocations are removed,
-  // then that memory is simply forgotten about by the pool. This applies to
-  // bookkeeping to an extent as well: the tracking of bookkeeping allocation
-  // may be removed, but the pool might still have access to bookkeeping in
-  // forgotten ranges, possibly continuing to draw from it rather than allocate
-  // new tracked bookkeeping ranges. This is okay, as it is assumed that memory
-  // that the pool does not track will not be used by any program.
-  void RestrictTotalRam(uint64_t new_capacity_bytes);
+  // Effectively truncates all of RAM (free or allocated) by allocating all of
+  // it past the provided capacity as type kTruncatedRam. This is used to
+  // simulate physical memory constraints of smaller devices. Any allocations
+  // (including pool bookkeeping) past the cut-off are destructively
+  // reallocated (via UpdateRamSubranges()).
+  fit::result<fit::failed> TruncateTotalRam(uint64_t new_capacity_bytes);
 
   // Returns `fit::success` if the provided range was succesully marked as peripheral. This requires
   // that `range.type` is `memalloc::Type::kPeripheral` and that there are no ranges of type

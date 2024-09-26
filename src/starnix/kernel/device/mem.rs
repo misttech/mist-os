@@ -386,9 +386,8 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let mem_class =
-        registry.objects.get_or_create_class("mem".into(), registry.objects.virtual_bus());
-    registry.add_and_register_device(
+    let mem_class = registry.objects.mem_class();
+    registry.register_device(
         locked,
         system_task,
         "null".into(),
@@ -397,7 +396,7 @@ where
         DeviceDirectory::new,
         simple_device_ops::<DevNull>,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "zero".into(),
@@ -406,7 +405,7 @@ where
         DeviceDirectory::new,
         simple_device_ops::<DevZero>,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "full".into(),
@@ -415,7 +414,7 @@ where
         DeviceDirectory::new,
         simple_device_ops::<DevFull>,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "random".into(),
@@ -424,7 +423,7 @@ where
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "urandom".into(),
@@ -433,7 +432,7 @@ where
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
-    registry.add_and_register_device(
+    registry.register_device(
         locked,
         system_task,
         "kmsg".into(),

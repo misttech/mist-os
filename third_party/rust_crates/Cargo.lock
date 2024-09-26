@@ -182,7 +182,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf46fee83e5ccffc220104713af3292ff9bc7c64c7de289f66dae8e38d826833"
 dependencies = [
  "concurrent-queue",
- "event-listener",
+ "event-listener 2.5.1",
  "futures-core",
 ]
 
@@ -236,7 +236,7 @@ version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8101efe8695a6c17e02911402145357e718ac92d3ff88ae8419e84b1707b685"
 dependencies = [
- "event-listener",
+ "event-listener 2.5.1",
  "futures-lite",
 ]
 
@@ -1105,6 +1105,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
+name = "event-listener"
+version = "5.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6032be9bd27023a771701cc49f9f053c751055f71efb2e0ae5c15809093675ba"
+dependencies = [
+ "concurrent-queue",
+ "parking",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "fancy-regex"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1288,7 +1299,7 @@ dependencies = [
  "elliptic-curve",
  "euclid",
  "eui48",
- "event-listener",
+ "event-listener 5.3.1",
  "fancy-regex",
  "fatfs",
  "flate2",
@@ -1479,7 +1490,7 @@ dependencies = [
  "walkdir",
  "which",
  "xml-rs",
- "zerocopy 0.8.0-alpha.5",
+ "zerocopy 0.8.0-alpha.25",
  "zip",
  "zstd",
 ]
@@ -5087,11 +5098,11 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.0-alpha.5"
+version = "0.8.0-alpha.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dd4a4b5a6b38e736bca19abe211abf0ba2552462555fc960d763fbbaff2b191"
+checksum = "ade16fe7106200b0c121a3251c106c40ffcdecdab68122de5909643d22db075e"
 dependencies = [
- "zerocopy-derive 0.8.0-alpha.5",
+ "zerocopy-derive 0.8.0-alpha.25",
 ]
 
 [[package]]
@@ -5107,9 +5118,9 @@ dependencies = [
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.0-alpha.5"
+version = "0.8.0-alpha.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "157bd6b2f5a6f8e2b1b1e5b427aec8d2c085f9ab99c92eaa0ca79b9b84c11254"
+checksum = "7873cce5410d6ff897beb4b4847366c1013fcda5ec96387a74fa4e0d2580025b"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.35",

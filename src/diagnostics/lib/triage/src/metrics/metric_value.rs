@@ -115,13 +115,13 @@ impl From<DiagnosticProperty> for MetricValue {
             DiagnosticProperty::Bool(_name, value) => Self::Bool(value),
             // TODO(cphoenix): Figure out what to do about histograms.
             DiagnosticProperty::DoubleArray(_name, ArrayContent::Values(values)) => {
-                Self::Vector(super::map_vec(&values, |value| Self::Float(*value)))
+                Self::Vector(values.iter().map(|value| Self::Float(*value)).collect())
             }
             DiagnosticProperty::IntArray(_name, ArrayContent::Values(values)) => {
-                Self::Vector(super::map_vec(&values, |value| Self::Int(*value)))
+                Self::Vector(values.iter().map(|value| Self::Int(*value)).collect())
             }
             DiagnosticProperty::UintArray(_name, ArrayContent::Values(values)) => {
-                Self::Vector(super::map_vec(&values, |value| Self::Int(*value as i64)))
+                Self::Vector(values.iter().map(|value| Self::Int(*value as i64)).collect())
             }
             DiagnosticProperty::DoubleArray(_name, ArrayContent::LinearHistogram(_))
             | DiagnosticProperty::IntArray(_name, ArrayContent::LinearHistogram(_))

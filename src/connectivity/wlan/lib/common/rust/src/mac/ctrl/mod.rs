@@ -3,23 +3,23 @@
 // found in the LICENSE file.
 
 use super::{CtrlFrame, CtrlSubtype};
-use zerocopy::{ByteSlice, Ref};
+use zerocopy::{Ref, SplitByteSlice};
 
 mod fields;
 
 pub use fields::*;
 
 #[derive(Debug)]
-pub enum CtrlBody<B: ByteSlice> {
+pub enum CtrlBody<B: SplitByteSlice> {
     PsPoll { ps_poll: Ref<B, PsPoll> },
     Unsupported { subtype: CtrlSubtype },
 }
 
-impl<B: ByteSlice> CtrlBody<B> {
+impl<B: SplitByteSlice> CtrlBody<B> {
     pub fn parse(subtype: CtrlSubtype, bytes: B) -> Option<Self> {
         match subtype {
             CtrlSubtype::PS_POLL => {
-                let (ps_poll, _) = Ref::new_unaligned_from_prefix(bytes)?;
+                let (ps_poll, _) = Ref::from_prefix(bytes).ok()?;
                 Some(CtrlBody::PsPoll { ps_poll })
             }
             subtype => Some(CtrlBody::Unsupported { subtype }),
@@ -29,7 +29,7 @@ impl<B: ByteSlice> CtrlBody<B> {
 
 impl<B> TryFrom<CtrlFrame<B>> for CtrlBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type Error = ();
 

@@ -274,10 +274,6 @@ class VnodeF2fs : public fs::PagedVnode,
   bool SetDirty();
   bool ClearDirty();
   bool IsDirty();
-  void UpdateVersion(const uint64_t version) __TA_EXCLUDES(mutex_) {
-    std::lock_guard lock(mutex_);
-    data_version_ = version;
-  }
 
   void SetInlineXattrAddrs(const uint16_t addrs) { inline_xattr_size_ = addrs; }
 
@@ -305,27 +301,29 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->FindPage(index, out);
   }
 
-  zx::result<std::vector<LockedPage>> FindPages(pgoff_t start, pgoff_t end) {
-    return file_cache_->FindPages(start, end);
+  std::vector<LockedPage> FindLockedPages(pgoff_t start, pgoff_t end) {
+    return file_cache_->FindLockedPages(start, end);
   }
 
-  zx_status_t GrabCachePage(pgoff_t index, LockedPage *out) {
-    return file_cache_->GetPage(index, out);
+  zx_status_t GrabLockedPage(pgoff_t index, LockedPage *out) {
+    return file_cache_->GetLockedPage(index, out);
   }
 
-  zx::result<std::vector<LockedPage>> GrabCachePages(pgoff_t start, pgoff_t end) {
+  zx::result<std::vector<fbl::RefPtr<Page>>> GrabPages(pgoff_t start, pgoff_t end) {
     return file_cache_->GetPages(start, end);
   }
 
-  zx::result<std::vector<LockedPage>> GrabCachePages(const std::vector<pgoff_t> &page_offsets) {
-    return file_cache_->GetPages(page_offsets);
+  zx::result<std::vector<LockedPage>> GrabLockedPages(pgoff_t start, pgoff_t end) {
+    return file_cache_->GetLockedPages(start, end);
   }
 
-  pgoff_t Writeback(WritebackOperation &operation);
-  pgoff_t Writeback() {
-    WritebackOperation op;
-    return Writeback(op);
+  zx::result<std::vector<LockedPage>> GrabLockedPages(const std::vector<pgoff_t> &page_offsets) {
+    return file_cache_->GetLockedPages(page_offsets);
   }
+
+  size_t GetPageCount() { return file_cache_->GetSize(); }
+
+  pgoff_t Writeback(WritebackOperation &operation) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
                                           bool zero = true) {
@@ -338,7 +336,7 @@ class VnodeF2fs : public fs::PagedVnode,
   const VmoManager &GetVmoManager() const { return vmo_manager(); }
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
   zx_status_t InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
-  void CleanupPages();
+  void CleanupCache();
 
   zx_status_t SetExtendedAttribute(XattrIndex index, std::string_view name,
                                    cpp20::span<const uint8_t> value, XattrOption option);
@@ -360,6 +358,12 @@ class VnodeF2fs : public fs::PagedVnode,
   const timespec &GetTime() const TA_NO_THREAD_SAFETY_ANALYSIS {
     return time_->Get<T>();
   }
+  pgoff_t Writeback(bool is_sync = false, bool is_reclaim = false)
+      __TA_EXCLUDES(f2fs::GetGlobalLock()) {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
+    WritebackOperation op = {.bSync = is_sync, .bReclaim = is_reclaim};
+    return Writeback(op);
+  }
 
  protected:
   block_t GetBlockAddrOnDataSegment(LockedPage &page);
@@ -375,6 +379,7 @@ class VnodeF2fs : public fs::PagedVnode,
 
   bool NeedToSyncDir() const;
   bool NeedToCheckpoint();
+  bool NeedInodeWrite() const __TA_EXCLUDES(mutex_);
 
   zx::result<size_t> CreatePagedVmo(uint64_t size) __TA_REQUIRES(mutex_);
   zx_status_t ClonePagedVmo(fuchsia_io::wire::VmoFlags flags, size_t size, zx::vmo *out_vmo)
@@ -398,7 +403,7 @@ class VnodeF2fs : public fs::PagedVnode,
 
   uint64_t checkpointed_size_ __TA_GUARDED(mutex_) = 0;  // use only in directory structure
   uint64_t current_depth_ __TA_GUARDED(mutex_) = 1;      // use only in directory structure
-  uint64_t data_version_ __TA_GUARDED(mutex_) = 0;       // lastest version of data for fsync
+  std::atomic<uint64_t> data_version_ = 0;               // lastest version of data for fsync
   uint32_t inode_flags_ __TA_GUARDED(mutex_) = 0;        // keep an inode flags for ioctl
   uint16_t extra_isize_ = 0;                             // extra inode attribute size in bytes
   uint16_t inline_xattr_size_ = 0;                       // inline xattr size

@@ -110,6 +110,10 @@ impl FxFile {
         self.handle.uncached_handle().verified_file()
     }
 
+    pub fn handle(&self) -> &PagedObjectHandle {
+        &self.handle
+    }
+
     /// If this instance has not been marked to be purged, returns an OpenedNode instance.
     /// If marked for purging, returns None.
     pub fn clone_as_opened_node(self: &Arc<Self>) -> Option<OpenedNode<FxFile>> {
@@ -443,6 +447,16 @@ impl File for FxFile {
 
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         self.handle.store_handle().remove_extended_attribute(name).await.map_err(map_to_status)
+    }
+
+    #[cfg(test)]
+    async fn allocate(
+        &self,
+        offset: u64,
+        length: u64,
+        _mode: fio::AllocateMode,
+    ) -> Result<(), Status> {
+        self.handle.allocate(offset..(offset + length)).await.map_err(map_to_status)
     }
 
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {

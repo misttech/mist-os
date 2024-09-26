@@ -23,7 +23,7 @@
 /// ```
 ///
 /// Each named field is initialized with a value whose type must implement
-/// `zerocopy::AsBytes`. Any fields which are not explicitly initialized will be left as
+/// `zerocopy::IntoBytes`. Any fields which are not explicitly initialized will be left as
 /// all zeroes.
 #[macro_export]
 macro_rules! struct_with_union_into_bytes {
@@ -45,7 +45,7 @@ macro_rules! struct_with_union_into_bytes {
             // the field.
             let value = $value;
             if false {
-                fn type_check_as_bytes<T: zerocopy::AsBytes>(_: T) {
+                fn type_check_as_bytes<T: zerocopy::IntoBytes>(_: T) {
                     unreachable!()
                 }
                 type_check_as_bytes(value);
@@ -59,7 +59,7 @@ macro_rules! struct_with_union_into_bytes {
                 // the field's type (in order to drop it), which would be unsound.
                 //
                 // Since we know from the preceding `if` branch that the type of `value` is
-                // `AsBytes`, we know that no uninitialized bytes will be written to the
+                // `IntoBytes`, we know that no uninitialized bytes will be written to the
                 // field. That, combined with the fact that the entire `bytes.bytes` is
                 // initialized to zero, ensures that all bytes of `bytes.bytes` are
                 // initialized, so we can safely return `bytes.bytes` as a byte array.

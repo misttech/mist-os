@@ -10,9 +10,11 @@ pub fn create_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::C
     match clock_type {
         fac::ClockType::Flexible(_) => Ok(None),
         fac::ClockType::SystemMonotonic(_) => {
-            let clock =
-                zx::Clock::create(zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START, None)
-                    .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
+            let clock = zx::SyntheticClock::create(
+                zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START,
+                None,
+            )
+            .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
             let rights_clock = clock
                 .replace_handle(zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER)
                 .map_err(|e| anyhow!("Replace handle for reference clock failed: {}", e))?;
@@ -32,7 +34,7 @@ pub fn create_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::C
             let auto_start =
                 if offset.is_some() { zx::ClockOpts::empty() } else { zx::ClockOpts::AUTO_START };
 
-            let clock = zx::Clock::create(zx::ClockOpts::CONTINUOUS | auto_start, None)
+            let clock = zx::SyntheticClock::create(zx::ClockOpts::CONTINUOUS | auto_start, None)
                 .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
 
             clock

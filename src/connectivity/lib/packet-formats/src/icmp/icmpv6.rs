@@ -9,7 +9,9 @@ use core::fmt;
 use net_types::ip::{GenericOverIp, Ipv6, Ipv6Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::byteorder::network_endian::U32;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{ParseError, ParseResult};
 
@@ -27,7 +29,7 @@ use super::{
 /// knowing the message type ahead of time while still getting the benefits of a
 /// statically-typed packet struct after parsing is complete.
 #[allow(missing_docs)]
-pub enum Icmpv6Packet<B: ByteSlice> {
+pub enum Icmpv6Packet<B: SplitByteSlice> {
     DestUnreachable(IcmpPacket<Ipv6, B, IcmpDestUnreachable>),
     PacketTooBig(IcmpPacket<Ipv6, B, Icmpv6PacketTooBig>),
     TimeExceeded(IcmpPacket<Ipv6, B, IcmpTimeExceeded>),
@@ -38,7 +40,7 @@ pub enum Icmpv6Packet<B: ByteSlice> {
     Mld(mld::MldPacket<B>),
 }
 
-impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {
+impl<B: SplitByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Icmpv6Packet::*;
         use mld::MldPacket::*;
@@ -80,7 +82,7 @@ impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -155,7 +157,7 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
 /// knowing the message type ahead of time while still getting the benefits of a
 /// statically-typed packet struct after parsing is complete.
 #[allow(missing_docs)]
-pub enum Icmpv6PacketRaw<B: ByteSlice> {
+pub enum Icmpv6PacketRaw<B: SplitByteSlice> {
     DestUnreachable(IcmpPacketRaw<Ipv6, B, IcmpDestUnreachable>),
     PacketTooBig(IcmpPacketRaw<Ipv6, B, Icmpv6PacketTooBig>),
     TimeExceeded(IcmpPacketRaw<Ipv6, B, IcmpTimeExceeded>),
@@ -166,7 +168,7 @@ pub enum Icmpv6PacketRaw<B: ByteSlice> {
     Mld(mld::MldPacketRaw<B>),
 }
 
-impl<B: ByteSliceMut> Icmpv6PacketRaw<B> {
+impl<B: SplitByteSliceMut> Icmpv6PacketRaw<B> {
     pub(super) fn header_prefix_mut(&mut self) -> &mut HeaderPrefix {
         use Icmpv6PacketRaw::*;
         match self {
@@ -241,7 +243,7 @@ impl<B: ByteSliceMut> Icmpv6PacketRaw<B> {
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -370,7 +372,9 @@ impl_icmp_message!(
 );
 
 /// An ICMPv6 Packet Too Big message.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq,
+)]
 #[repr(C)]
 pub struct Icmpv6PacketTooBig {
     mtu: U32,
@@ -412,7 +416,9 @@ create_protocol_enum!(
 );
 
 /// An ICMPv6 Parameter Problem message.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
+)]
 #[repr(C)]
 pub struct Icmpv6ParameterProblem {
     pointer: U32,
@@ -447,7 +453,7 @@ mod tests {
     use crate::icmp::{IcmpMessage, MessageBody};
     use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 
-    fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv6> + Debug>(
+    fn serialize_to_bytes<B: SplitByteSlice + Debug, M: IcmpMessage<Ipv6> + Debug>(
         src_ip: Ipv6Addr,
         dst_ip: Ipv6Addr,
         icmp: &IcmpPacket<Ipv6, B, M>,

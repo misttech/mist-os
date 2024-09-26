@@ -7,8 +7,8 @@ use fidl_fuchsia_wlan_device_service::{
 };
 use fidl_test_wlan_realm::WlanConfig;
 use fuchsia_component::client::connect_to_protocol_at;
+use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::ZX_OK;
-use fuchsia_zircon::DurationNum;
 use futures::channel::oneshot;
 use std::pin::pin;
 use wlan_hw_sim::event::Handler;
@@ -52,7 +52,7 @@ async fn set_country() {
 
     helper
         .run_until_complete_or_timeout(
-            i64::MAX.nanos(), // Unlimited timeout. Await `set_country` in the event handler.
+            zx::Duration::INFINITE, // Unlimited timeout. Await `set_country` in the event handler.
             "wlanstack_dev_svc set_country",
             event::on_set_country(
                 event::extract(|alpha2: [u8; 2]| assert_eq!(alpha2, *ALPHA2))

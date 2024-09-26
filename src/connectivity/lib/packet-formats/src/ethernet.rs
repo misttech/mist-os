@@ -11,7 +11,7 @@ use packet::{
     ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::byteorder::network_endian::{U16, U32};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 
@@ -54,7 +54,7 @@ impl EthernetIpExt for Ipv6 {
     const ETHER_TYPE: EtherType = EtherType::Ipv6;
 }
 
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct HeaderPrefix {
     dst_mac: Mac,
@@ -93,13 +93,13 @@ pub enum EthernetFrameLengthCheck {
     NoCheck,
 }
 
-impl<B: ByteSlice> ParsablePacket<B, EthernetFrameLengthCheck> for EthernetFrame<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, EthernetFrameLengthCheck> for EthernetFrame<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.hdr_prefix.bytes().len()
-            + self.tag.as_ref().map(|tag| tag.bytes().len()).unwrap_or(0)
-            + self.ethertype.bytes().len();
+        let header_len = Ref::bytes(&self.hdr_prefix).len()
+            + self.tag.as_ref().map(|tag| Ref::bytes(tag).len()).unwrap_or(0)
+            + Ref::bytes(&self.ethertype).len();
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
 
@@ -165,7 +165,7 @@ impl<B: ByteSlice> ParsablePacket<B, EthernetFrameLengthCheck> for EthernetFrame
     }
 }
 
-impl<B: ByteSlice> EthernetFrame<B> {
+impl<B: SplitByteSlice> EthernetFrame<B> {
     /// The frame body.
     pub fn body(&self) -> &[u8] {
         &self.body
@@ -207,9 +207,9 @@ impl<B: ByteSlice> EthernetFrame<B> {
 
     // The size of the frame header.
     fn header_len(&self) -> usize {
-        self.hdr_prefix.bytes().len()
-            + self.tag.as_ref().map(|t| t.bytes().len()).unwrap_or(0)
-            + self.ethertype.bytes().len()
+        Ref::bytes(&self.hdr_prefix).len()
+            + self.tag.as_ref().map(|t| Ref::bytes(t).len()).unwrap_or(0)
+            + Ref::bytes(&self.ethertype).len()
     }
 
     // Total frame length including header prefix, tag, EtherType, and body.

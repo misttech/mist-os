@@ -23,7 +23,7 @@ import("//tools/cmc/build/expect_includes.gni")
 # sdk_fuchsia_package("my-sdk-package") {
 #   distribution_name = "my-package"
 #   package_label = ":my-package"
-#   category = "public"
+#   category = "partner"
 #   expected_files_exact = [
 #     "relative/path/to/file_a",
 #   ]
@@ -85,11 +85,33 @@ import("//tools/cmc/build/expect_includes.gni")
 #     Type: list of relative package paths.
 #
 template("sdk_fuchsia_package") {
-  assert(defined(invoker.api_level_added),
-         "Must specify the API level at which the package was added")
+  assert(!defined(invoker.stable), "Packages are always stable.")
   assert(
       current_toolchain == default_toolchain,
       "Unexpected use of `sdk_fuchsia_package` template with non-default toolchain `${current_toolchain}`.")
+  assert(defined(invoker.api_level_added),
+         "Must specify the API level at which the package was added")
+  assert(defined(invoker.package_label), "Must define a package to distribute.")
+  assert(defined(invoker.distribution_name),
+         "Must define a distribution name for this package.")
+
+  assert(defined(invoker.category),
+         "Must define an SDK category for this package.")
+
+  # Only categories that are included in an IDK makes sense.
+  valid_categories = [
+    # "excluded" is deprecated.
+    # "experimental" is deprecated.
+    # "internal" does not apply to packages.
+    # "cts" is only for ABI compatibility and thus not applicable.
+    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    "partner",
+    # "public" is not yet implemented.
+  ]
+  assert(
+      valid_categories + [ invoker.category ] - [ invoker.category ] !=
+          valid_categories,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
 
   if (current_build_target_api_level == "PLATFORM") {
     # While we do not ship packages targeting "PLATFORM" in the SDK, they can be
@@ -120,26 +142,6 @@ template("sdk_fuchsia_package") {
   }
 
   if (package_in_target_api_level) {
-    assert(defined(invoker.package_label),
-           "Must define a package to distribute.")
-    assert(defined(invoker.distribution_name),
-           "Must define a distribution name for this package.")
-    assert(defined(invoker.category),
-           "Must define an SDK category for this package.")
-    valid_categories = [
-      "excluded",
-      "experimental",
-      "internal",
-      "cts",
-      "partner_internal",
-      "partner",
-      "public",
-    ]
-    assert(
-        valid_categories + [ invoker.category ] - [ invoker.category ] !=
-            valid_categories,
-        "Invalid SDK category ${invoker.category}, must be one of ${valid_categories}")
-
     if (defined(invoker.expected_files_exact)) {
       expected_files_exact = invoker.expected_files_exact
     } else {
@@ -333,7 +335,13 @@ template("sdk_fuchsia_package") {
     }
 
     # Suppress unused variable warnings.
-    not_needed(invoker, "*")
+    not_needed(invoker,
+               [
+                 "distribution_name",
+                 "expected_files_exact",
+                 "expected_files_present",
+                 "package_label",
+               ])
     not_needed([ "_api_level_arg_for_manifest_script" ])
   }  # end if (package_in_target_api_level)
 }

@@ -50,8 +50,7 @@ void FaultInjectToDnodeAndTruncate(NodeManager &node_manager, fbl::RefPtr<VnodeF
   block_t temp_block_address;
 
   // Write out dirty nodes to allocate lba
-  WritebackOperation op = {.bSync = true};
-  vnode->fs()->GetNodeVnode().Writeback(op);
+  vnode->fs()->GetNodeVnode().Writeback(true, true);
   MapTester::GetCachedNatEntryBlockAddress(node_manager, node_id, temp_block_address);
   vnode->fs()->GetNodeVnode().InvalidatePages();
 
@@ -701,7 +700,7 @@ TEST_F(NodeManagerTest, NodeFooter) {
     MapTester::CheckDnodePage(*dnode_page, inode_nid);
 
     LockedPage locked_page;
-    fs_->GetNodeVnode().GrabCachePage(direct_index, &locked_page);
+    fs_->GetNodeVnode().GrabLockedPage(direct_index, &locked_page);
     NodePage *page = &locked_page.GetPage<NodePage>();
 
     // Check CopyNodeFooterFrom()

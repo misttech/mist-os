@@ -3,16 +3,13 @@
 // found in the LICENSE file.
 
 use crate::model::component::manager::ComponentManagerInstance;
-use crate::model::component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance};
+use crate::model::component::{ComponentInstance, WeakExtendedInstance};
 use crate::model::resolver::{Resolver, ResolverRegistry};
 use ::routing::environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry};
-use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
-use async_trait::async_trait;
 use cm_rust::EnvironmentDecl;
 use fidl_fuchsia_component_decl as fdecl;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::error;
 
 #[cfg(test)]
 use std::sync::Weak;
@@ -80,7 +77,7 @@ impl Environment {
                 RunnerRegistry::from_decl(&env_decl.runners),
                 env_decl.debug_capabilities.clone().into(),
             ),
-            resolver_registry: ResolverRegistry::from_decl(&env_decl.resolvers, parent),
+            resolver_registry: ResolverRegistry::new(),
             stop_timeout: match env_decl.stop_timeout_ms {
                 Some(timeout) => Duration::from_millis(timeout.into()),
                 None => match env_decl.extends {
@@ -115,39 +112,19 @@ impl Environment {
     pub fn environment(&self) -> &routing::environment::Environment<ComponentInstance> {
         &self.env
     }
-}
 
-#[async_trait]
-impl Resolver for Environment {
-    async fn resolve(
-        &self,
-        component_address: &ComponentAddress,
-    ) -> Result<ResolvedComponent, ResolverError> {
-        let parent = self.env.parent().upgrade().map_err(|_| {
-            error!("error getting the component that created the environment");
-            ResolverError::SchemeNotRegistered
-        })?;
-        match self.resolver_registry.resolve(component_address).await {
-            Err(ResolverError::SchemeNotRegistered) => match self.env.extends() {
-                EnvironmentExtends::Realm => match parent {
-                    ExtendedInstance::Component(parent) => {
-                        parent.environment.resolve(component_address).await
-                    }
-                    ExtendedInstance::AboveRoot(_) => {
-                        unreachable!("root env can't extend")
-                    }
-                },
-                EnvironmentExtends::None => Err(ResolverError::SchemeNotRegistered),
-            },
-            result => result,
-        }
+    pub fn drain_resolvers<'a>(
+        &'a mut self,
+    ) -> impl Iterator<Item = (String, Arc<dyn Resolver + Send + Sync + 'static>)> + 'a {
+        self.resolver_registry.drain()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::component::StartReason;
+    use crate::builtin_environment::RootComponentInputBuilder;
+    use crate::model::component::{ExtendedInstance, StartReason};
     use crate::model::context::ModelContext;
     use crate::model::model::{Model, ModelParams};
     use crate::model::testing::mocks::MockResolver;
@@ -165,6 +142,7 @@ mod tests {
         ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
     };
     use cm_types::Name;
+    use cm_util::TaskGroup;
     use errors::{ActionError, ModelError, ResolveActionError};
     use fidl_fuchsia_component as fcomponent;
     use maplit::hashmap;
@@ -230,7 +208,7 @@ mod tests {
             make_debug_allowlisting_config("target_name", "env_b", Moniker::root()),
             make_debug_allowlisting_config("target_name", "env_a", "a".try_into().unwrap()),
         ] {
-            let mut resolver = MockResolver::new();
+            let resolver = MockResolver::new();
             resolver.add_component(
                 "root",
                 ComponentDeclBuilder::new_empty_component()
@@ -250,11 +228,11 @@ mod tests {
                     .environment(EnvironmentBuilder::new().name("env_b"))
                     .build(),
             );
-            let resolvers = {
-                let mut registry = ResolverRegistry::new();
-                registry.register("test".to_string(), Box::new(resolver));
-                registry
-            };
+
+            let task_group = TaskGroup::new();
+            let mut root_input_builder =
+                RootComponentInputBuilder::new(task_group.as_weak(), &runtime_config);
+            root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
             let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
             let model = Model::new(
@@ -264,13 +242,13 @@ mod tests {
                     root_environment: Environment::new_root(
                         &top_instance,
                         RunnerRegistry::new(HashMap::new()),
-                        resolvers,
+                        ResolverRegistry::new(),
                         DebugRegistry::default(),
                     ),
                     top_instance,
                     instance_registry: InstanceRegistry::new(),
                 },
-                ComponentInput::default(),
+                root_input_builder.build(),
             )
             .await
             .unwrap();
@@ -291,7 +269,7 @@ mod tests {
     async fn test_inherit_root() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".parse().unwrap(),
+            source_name: "test".parse().unwrap(),
             target_name: "test".parse().unwrap(),
         };
         let runners: HashMap<Name, RunnerRegistration> = hashmap! {
@@ -308,7 +286,7 @@ mod tests {
         };
         let debug_registry = DebugRegistry { debug_capabilities };
 
-        let mut resolver = MockResolver::new();
+        let resolver = MockResolver::new();
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
@@ -332,27 +310,27 @@ mod tests {
                 .build(),
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
-        let resolvers = {
-            let mut registry = ResolverRegistry::new();
-            registry.register("test".to_string(), Box::new(resolver));
-            registry
-        };
+
+        let task_group = TaskGroup::new();
+        let config = Arc::new(RuntimeConfig::default());
+        let mut root_input_builder = RootComponentInputBuilder::new(task_group.as_weak(), &config);
+        root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let model = Model::new(
             ModelParams {
-                runtime_config: Arc::new(RuntimeConfig::default()),
+                runtime_config: config,
                 root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
-                    resolvers,
+                    ResolverRegistry::new(),
                     debug_registry,
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
             },
-            ComponentInput::default(),
+            root_input_builder.build(),
         )
         .await
         .unwrap();
@@ -390,7 +368,7 @@ mod tests {
     async fn test_inherit_parent() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".parse().unwrap(),
+            source_name: "test".parse().unwrap(),
             target_name: "test".parse().unwrap(),
         };
         let runners: HashMap<Name, RunnerRegistration> = hashmap! {
@@ -402,7 +380,7 @@ mod tests {
             source: RegistrationSource::Parent,
         };
 
-        let mut resolver = MockResolver::new();
+        let resolver = MockResolver::new();
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
@@ -411,11 +389,7 @@ mod tests {
                     EnvironmentBuilder::new()
                         .name("env_a")
                         .extends(fdecl::EnvironmentExtends::Realm)
-                        .runner(RunnerRegistration {
-                            source: RegistrationSource::Parent,
-                            source_name: "test-src".parse().unwrap(),
-                            target_name: "test".parse().unwrap(),
-                        })
+                        .runner(runner_reg.clone())
                         .debug(cm_rust::DebugRegistration::Protocol(
                             cm_rust::DebugProtocolRegistration {
                                 source_name: "source_name".parse().unwrap(),
@@ -438,15 +412,15 @@ mod tests {
                 .build(),
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
-        let resolvers = {
-            let mut registry = ResolverRegistry::new();
-            registry.register("test".to_string(), Box::new(resolver));
-            registry
-        };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let runtime_config =
             make_debug_allowlisting_config("target_name", "env_a", Moniker::root());
+        let task_group = TaskGroup::new();
+        let mut root_input_builder =
+            RootComponentInputBuilder::new(task_group.as_weak(), &runtime_config);
+        root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
+
         let model = Model::new(
             ModelParams {
                 runtime_config,
@@ -454,13 +428,13 @@ mod tests {
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
-                    resolvers,
+                    ResolverRegistry::new(),
                     DebugRegistry::default(),
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
             },
-            ComponentInput::default(),
+            root_input_builder.build(),
         )
         .await?;
         let component = model
@@ -523,7 +497,7 @@ mod tests {
     async fn test_inherit_in_collection() -> Result<(), ModelError> {
         let runner_reg = RunnerRegistration {
             source: RegistrationSource::Parent,
-            source_name: "test-src".parse().unwrap(),
+            source_name: "test".parse().unwrap(),
             target_name: "test".parse().unwrap(),
         };
         let runners: HashMap<Name, RunnerRegistration> = hashmap! {
@@ -535,7 +509,7 @@ mod tests {
             source: RegistrationSource::Parent,
         };
 
-        let mut resolver = MockResolver::new();
+        let resolver = MockResolver::new();
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
@@ -546,7 +520,7 @@ mod tests {
                         .extends(fdecl::EnvironmentExtends::Realm)
                         .runner(RunnerRegistration {
                             source: RegistrationSource::Parent,
-                            source_name: "test-src".parse().unwrap(),
+                            source_name: "test".parse().unwrap(),
                             target_name: "test".parse().unwrap(),
                         })
                         .debug(cm_rust::DebugRegistration::Protocol(
@@ -571,16 +545,17 @@ mod tests {
                 .build(),
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
-        let resolvers = {
-            let mut registry = ResolverRegistry::new();
-            registry.register("test".to_string(), Box::new(resolver));
-            registry
-        };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
 
         let runtime_config =
             make_debug_allowlisting_config("target_name", "env_a", Moniker::root());
+
+        let task_group = TaskGroup::new();
+        let mut root_input_builder =
+            RootComponentInputBuilder::new(task_group.as_weak(), &runtime_config);
+        root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
+
         let model = Model::new(
             ModelParams {
                 runtime_config,
@@ -588,13 +563,13 @@ mod tests {
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
-                    resolvers,
+                    ResolverRegistry::new(),
                     DebugRegistry::default(),
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
             },
-            ComponentInput::default(),
+            root_input_builder.build(),
         )
         .await?;
         // Add instance to collection.
@@ -667,7 +642,7 @@ mod tests {
         };
         let debug_registry = DebugRegistry { debug_capabilities };
 
-        let mut resolver = MockResolver::new();
+        let resolver = MockResolver::new();
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
@@ -686,27 +661,27 @@ mod tests {
                 .build(),
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
-        let resolvers = {
-            let mut registry = ResolverRegistry::new();
-            registry.register("test".to_string(), Box::new(resolver));
-            registry
-        };
+
+        let task_group = TaskGroup::new();
+        let config = Arc::new(RuntimeConfig::default());
+        let mut root_input_builder = RootComponentInputBuilder::new(task_group.as_weak(), &config);
+        root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let model = Model::new(
             ModelParams {
-                runtime_config: Arc::new(RuntimeConfig::default()),
+                runtime_config: config,
                 root_component_url: "test:///root".parse().unwrap(),
                 root_environment: Environment::new_root(
                     &top_instance,
                     RunnerRegistry::new(runners),
-                    resolvers,
+                    ResolverRegistry::new(),
                     debug_registry,
                 ),
                 top_instance,
                 instance_registry: InstanceRegistry::new(),
             },
-            ComponentInput::default(),
+            root_input_builder.build(),
         )
         .await
         .unwrap();
@@ -743,7 +718,7 @@ mod tests {
     // means that any child components of this component cannot be resolved.
     #[fuchsia::test]
     async fn test_resolver_no_inheritance() -> Result<(), ModelError> {
-        let mut resolver = MockResolver::new();
+        let resolver = MockResolver::new();
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
@@ -770,7 +745,7 @@ mod tests {
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
         let registry = {
             let mut registry = ResolverRegistry::new();
-            registry.register("test".to_string(), Box::new(resolver));
+            registry.register("test".to_string(), Arc::new(resolver));
             registry
         };
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));

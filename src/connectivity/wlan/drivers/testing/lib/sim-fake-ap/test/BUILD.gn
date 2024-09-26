@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("assoc_unittests") {
+cc_test_executable("assoc_unittests") {
   output_name = "assoc_unittests"
 
   testonly = true
@@ -21,7 +22,7 @@ executable("assoc_unittests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("auth_unittests") {
+cc_test_executable("auth_unittests") {
   output_name = "auth_unittests"
 
   testonly = true
@@ -38,7 +39,7 @@ executable("auth_unittests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("beacon_unittests") {
+cc_test_executable("beacon_unittests") {
   output_name = "beacon_unittests"
 
   testonly = true
@@ -57,7 +58,7 @@ executable("beacon_unittests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("data_unittests") {
+cc_test_executable("data_unittests") {
   output_name = "data_unittests"
 
   testonly = true
@@ -74,7 +75,7 @@ executable("data_unittests") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("probe_unittests") {
+cc_test_executable("probe_unittests") {
   output_name = "probe_unittests"
 
   testonly = true

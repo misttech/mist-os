@@ -13,7 +13,7 @@ use std::io::Write;
 use virtio_device::chain::WritableChain;
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::{DescChain, DriverNotify};
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 #[async_trait(?Send)]
 pub trait InputHandler {

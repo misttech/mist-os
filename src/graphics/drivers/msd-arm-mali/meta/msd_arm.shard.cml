@@ -12,6 +12,9 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.gpu.magma.Service" },
+    ],
     use: [
         {
             protocol: [
@@ -31,6 +34,12 @@
             config: "fuchsia.power.SuspendEnabled",
             key: "enable_suspend",
             type: "bool",
+        },
+    ],
+    expose: [
+        {
+            service: "fuchsia.gpu.magma.Service",
+            from: "self",
         },
     ],
 }

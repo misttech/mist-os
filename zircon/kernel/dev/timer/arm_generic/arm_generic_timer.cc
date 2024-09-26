@@ -256,41 +256,82 @@ static void platform_tick(void* arg) {
 
 template <GetTicksSyncFlag Flags>
 inline zx_ticks_t platform_current_raw_ticks_synchronized() {
-  // Refer to Section D12.1.3 "Synchronization requirements for AArch64 System
-  // registers" of "ARM Architecture Reference Manual® ARMv8, for ARMv8-A
-  // architecture profile" for details about how to synchronize reads of the
-  // system timer relative to the instruction pipeline.
+  // Make certain that any reads of the raw system timer are guaranteed to take
+  // place in a region defined by the template |Flags|.  Note that the
+  // methodology used here was defined in
   //
-  // Of particular relevance is the following note from the section referenced
-  // above.
+  // 'Arm Architecture Reference Manual for A-profile architecture'
+  // revision 'ARM DDI 0487K.a'
   //
-  // ```
-  // In particular, the values read from System registers that hold
-  // self-incrementing counts, such as the Performance Monitors counters or the
-  // Generic Timer counter or timers, could be accessed from any time after the
-  // previous Context synchronization event. For example, where a memory access
-  // is used to communicate a read of such a counter, an ISB must be inserted
-  // between the read of the memory location that is known to have returned its
-  // data, either as a result of a condition on that data or of the read having
-  // completed, and the read of the counter, if it is necessary that the counter
-  // returns a count value after the memory communication.
-  // ```
+  // In particular, please refer to examples D12-3 and D12-4.  Note that we
+  // chose to use the "DMB and Branch Dependency" approach (instead of a DSB) to
+  // ensure that timer reads take place after all previous memory accesses, and
+  // we use a load dependent on the value of the timer load to ensure that the
+  // timer load takes place before subsequent memory accesses.  Additionally, we
+  // do not make any attempt to use self-synchronizing timer register accesses.
+  // Refer to the cited examples for the potentially valid sequences.
+  uint64_t temp;
+
+  // Do we need to guarantee that this clock read occurs after previous loads,
+  // stores, or both?
   //
-  // TODO(johngro): Look into ways other than an explicit ISB we can use to make
-  // sure that loads of the system timer register are not allowed to leak past
-  // subsequent loads/stores.  I have heard rumors that it is possible to do
-  // this by cleverly synthesizing a fake data read dependency in the pipeline,
-  // but I have not (yet) found any official documentation describing this.
+  // If so, we need to implement one of two sequences.  One ensures our timer
+  // read takes place after all previous loads, and the other which ensures our
+  // timer read takes place after all previous memory accesses (loads and
+  // stores).
   if constexpr ((Flags & (GetTicksSyncFlag::kAfterPreviousLoads |
                           GetTicksSyncFlag::kAfterPreviousStores)) != GetTicksSyncFlag::kNone) {
-    __isb(ARM_MB_SY);
+    if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousStores) != GetTicksSyncFlag::kNone) {
+      // We need our timer read to happen after all previous memory accesses.
+      // This is implemented as a DMB followed by read from any valid memory
+      // location with a "branch" which depends on that read.  Note that
+      // "branch" is in air quotes because its target is the next instruction,
+      // so whether or not the branch gets taken, the result is the same (to
+      // execute the next instruction).  Finally, the sequence ends with an ISB.
+      //
+      // Refer to Example D12-4 in the ARM ARM referenced above.
+      //
+      __asm__ volatile(
+          "dmb sy;"
+          "ldr %[temp], [sp];"
+          "cbz %[temp], 1f;"
+          "1: isb;"
+          : [temp] "=r"(temp)  // outputs  : we overwrite the register selected for "temp"
+          :                    // inputs   : we have no inputs
+          : "memory");         // clobbers : nothing, however we specify "memory" in order to
+                               // prevent re-ordering, as a signal fence would do.
+    } else {
+      // We need our timer read to happen after all previous reads from memory.
+      // An ISB should be all that we need.
+      //
+      // Refer to Example D12-3 in the ARM ARM referenced above.
+      __isb(ARM_MB_SY);
+    }
   }
 
+  // Now actually read from the system timer.
+  //
+  // TODO(johngro): Replace this with inline assembly to explicitly read the
+  // virtual EL0 count register using inline assembly rather than going through
+  // a function pointer thunk.
   const zx_ticks_t ret = read_ct();
 
+  // Do we need to guarantee that this clock read occurs before subsequent loads,
+  // stores, or both?  If so, the recipe is the same in all cases.  We introduce
+  // a load operation which has data dependency on ret, forcing the timer read
+  // to finish before the dependent load can occur.
+  //
+  // Refer to Example D12-4 in the ARM ARM referenced above.
+  //
   if constexpr ((Flags & (GetTicksSyncFlag::kBeforeSubsequentLoads |
                           GetTicksSyncFlag::kBeforeSubsequentStores)) != GetTicksSyncFlag::kNone) {
-    __isb(ARM_MB_SY);
+    __asm__ volatile(
+        "eor %[temp], %[ret], %[ret];"
+        "ldr %[temp], [sp, %[temp]];"
+        : [temp] "=&r"(temp)  // outputs  : we overwrite the register selected for "temp"
+        : [ret] "r"(ret)      // inputs   : we consume the register holding |ret|
+        : "cc", "memory");    // clobbers : EOR will clobber our flags, "memory" to prevent
+                              // re-ordering.
   }
 
   return ret;

@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/assembly/bootfs_files_for_assembly.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("blktest") {
+cc_test_executable("blktest") {
   visibility = [
     ":*",
     "//src/devices/block/drivers/ftl/tests:ftl-integration",

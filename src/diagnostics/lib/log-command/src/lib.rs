@@ -415,7 +415,6 @@ impl InstanceGetter for RealmQueryProxy {
 
 impl LogCommand {
     async fn map_interest_selectors<'a>(
-        &self,
         realm_query: &impl InstanceGetter,
         interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
     ) -> Result<Vec<Cow<'a, LogInterestSelector>>, LogError> {
@@ -498,7 +497,7 @@ impl LogCommand {
             .collect::<Vec<_>>();
         let mut selectors: Cow<'_, Vec<_>> = Cow::Borrowed(&all_selectors);
         if !selectors.is_empty() && !(self.force_select || self.force_set_severity) {
-            let new_selectors = self.map_interest_selectors(realm_query, selectors.iter()).await?;
+            let new_selectors = Self::map_interest_selectors(realm_query, selectors.iter()).await?;
             if !new_selectors.is_empty() {
                 selectors = Cow::Owned(
                     new_selectors.into_iter().map(|selector| selector.into_owned()).collect(),

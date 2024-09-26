@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import asyncio
 import os
 import re
 import tempfile
@@ -271,6 +272,7 @@ class TestExecution:
         flags: args.Flags,
         parent: event.Id,
         timeout: float | None = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> command.CommandOutput:
         """Asynchronously execute this test.
 
@@ -279,6 +281,7 @@ class TestExecution:
             flags (args.Flags): Command flags to control output.
             parent (event.Id): Parent event to nest the execution under.
             timeout (float, optional): If set, timeout after this number of seconds.
+            abort_event (asyncio.Event, optional): If set and signaled, abort this test.
 
         Raises:
             TestFailed: If the test reported failure.
@@ -320,6 +323,7 @@ class TestExecution:
             symbolize=symbolize,
             env=env,
             timeout=timeout,
+            abort_signal=abort_signal,
         )
 
         if maybe_temp_dir is not None:
@@ -504,6 +508,7 @@ async def run_command(
     symbolize: bool = False,
     env: dict[str, str] | None = None,
     timeout: float | None = None,
+    abort_signal: asyncio.Event | None = None,
 ) -> command.CommandOutput | None:
     """Utility method to run a test command asynchronously.
 
@@ -521,14 +526,20 @@ async def run_command(
         env (dict[str, str], optional):
             Environment to pass to the command. Defaults to None.
         timeout (float, optional): The number of seconds to wait before timing out.
+        abort_signal (asyncio.Event, optional): If set, when the
+            event is signaled this command will attempt a graceful
+            termination.
 
     Returns:
         command.CommandOutput | None: The command output if it could
             be executed, None otherwise.
     """
-    id: event.Id
+    event_id: event.Id | None = None
+    abort_task: asyncio.Task[None] | None = None
     if recorder is not None:
-        id = recorder.emit_program_start(name, list(args), env, parent=parent)
+        event_id = recorder.emit_program_start(
+            name, list(args), env, parent=parent
+        )
     try:
         symbolizer_args = (
             None if not symbolize else ["fx", "ffx", "debug", "symbolize"]
@@ -541,29 +552,50 @@ async def run_command(
             timeout=timeout,
         )
 
+        async def handle_abort() -> None:
+            if abort_signal is not None:
+                await abort_signal.wait()
+                if recorder is not None:
+                    recorder.emit_info_message(f"Aborting {name}...")
+                started.terminate()
+                await asyncio.sleep(5)
+                if recorder is not None:
+                    recorder.emit_warning_message(
+                        f"{name} did not terminate in time, killing it"
+                    )
+                started.kill()
+
+        abort_task = asyncio.Task(handle_abort())
+
         def handle_event(current_event: command.CommandEvent) -> None:
             if recorder is not None:
+                assert event_id is not None
                 if isinstance(current_event, command.StdoutEvent):
                     recorder.emit_program_output(
-                        id,
+                        event_id,
                         current_event.text.decode(errors="replace"),
                         stream=event.ProgramOutputStream.STDOUT,
                         print_verbatim=print_verbatim,
                     )
                 if isinstance(current_event, command.StderrEvent):
                     recorder.emit_program_output(
-                        id,
+                        event_id,
                         current_event.text.decode(errors="replace"),
                         stream=event.ProgramOutputStream.STDERR,
                         print_verbatim=print_verbatim,
                     )
                 if isinstance(current_event, command.TerminationEvent):
                     recorder.emit_program_termination(
-                        id, current_event.return_code
+                        event_id, current_event.return_code
                     )
 
-        return await started.run_to_completion(callback=handle_event)
+        ret = await started.run_to_completion(callback=handle_event)
+        return ret
     except command.AsyncCommandError as e:
         if recorder is not None:
-            recorder.emit_program_termination(id, -1, error=str(e))
+            assert event_id is not None
+            recorder.emit_program_termination(event_id, -1, error=str(e))
         return None
+    finally:
+        if abort_task is not None:
+            abort_task.cancel()

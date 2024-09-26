@@ -5,7 +5,7 @@ use crate::util::is_set;
 use bitfield::bitfield;
 use fidl_fuchsia_hardware_pci::Capability as FidlCapability;
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref};
 
 // Capability types are documented in PCI Local Bus Specification v3.0 Appendix H
 enum CapabilityType {
@@ -127,7 +127,7 @@ impl<'a> Capability<'a> {
         )?;
 
         if control.can_be_64bit() {
-            let (msi, _) = Ref::<_, Msi64Capability>::new_from_prefix(
+            let (msi, _) = Ref::<_, Msi64Capability>::from_prefix(
                 &self.config[self.offset..self.config.len()],
             )
             .unwrap();
@@ -139,7 +139,7 @@ impl<'a> Capability<'a> {
                 { msi.data }
             )
         } else {
-            let (msi, _) = Ref::<_, Msi32Capability>::new_from_prefix(
+            let (msi, _) = Ref::<_, Msi32Capability>::from_prefix(
                 &self.config[self.offset..self.config.len()],
             )
             .unwrap();
@@ -149,7 +149,7 @@ impl<'a> Capability<'a> {
 
     fn msi_x(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (msix, _) =
-            Ref::<_, MsixCapability>::new_from_prefix(&self.config[self.offset..self.config.len()])
+            Ref::<_, MsixCapability>::from_prefix(&self.config[self.offset..self.config.len()])
                 .unwrap();
         let control = MsixControl(msix.control);
         let table = MsixBarField(msix.table);
@@ -168,7 +168,7 @@ impl<'a> Capability<'a> {
     }
 
     fn pci_express(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (pcie, _) = Ref::<_, PciExpressCapability>::new_from_prefix(
+        let (pcie, _) = Ref::<_, PciExpressCapability>::from_prefix(
             &self.config[self.offset..self.config.len()],
         )
         .unwrap();
@@ -219,7 +219,7 @@ bitfield! {
     _reserved, _: 15, 9;
 }
 
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C, packed)]
 struct Msi32Capability {
     id: u8,
@@ -229,7 +229,7 @@ struct Msi32Capability {
     data: u16,
 }
 
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C, packed)]
 struct Msi64Capability {
     id: u8,
@@ -240,7 +240,7 @@ struct Msi64Capability {
     data: u16,
 }
 
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C, packed)]
 struct MsixCapability {
     id: u8,
@@ -325,7 +325,7 @@ impl fmt::Display for PcieDevicePortType {
     }
 }
 
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C, packed)]
 struct PciExpressCapability {
     id: u8,

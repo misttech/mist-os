@@ -30,27 +30,64 @@ def _atom(name: str, category: str, area: str | None = None) -> Atom:
 
 class SdkCommonTests(unittest.TestCase):
     def test_categories(self) -> None:
-        atoms = [_atom("hello", "internal"), _atom("world", "public")]
+        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual([*detect_category_violations("internal", atoms)], [])
-        atoms = [_atom("hello", "internal"), _atom("world", "cts")]
-        self.assertEqual([*detect_category_violations("internal", atoms)], [])
+        atoms = [_atom("hello", "partner"), _atom("world", "partner_internal")]
+        self.assertEqual(
+            [*detect_category_violations("partner_internal", atoms)], []
+        )
 
     def test_categories_failure(self) -> None:
-        atoms = [_atom("hello", "internal"), _atom("world", "public")]
+        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
+        self.assertEqual(
+            [*detect_category_violations("partner_internal", atoms)],
+            [
+                '"hello" has publication level "internal", which is incompatible with "partner_internal".'
+            ],
+        )
+        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual(
             [*detect_category_violations("partner", atoms)],
-            ["hello has publication level internal, incompatible with partner"],
+            [
+                '"hello" has publication level "internal", which is incompatible with "partner".'
+            ],
         )
+
+    def test_unsupported_categories(self) -> None:
+        # Documented categories that are temporarily disabled.
         atoms = [_atom("hello", "internal"), _atom("world", "public")]
-        self.assertEqual(
-            [*detect_category_violations("cts", atoms)],
-            ["hello has publication level internal, incompatible with cts"],
+        self.assertRaisesRegex(
+            Exception,
+            '"world" has SDK category "public", which is not yet supported.',
+            lambda: [*detect_category_violations("internal", atoms)],
+        )
+        atoms = [_atom("hello", "partner"), _atom("world", "cts")]
+        self.assertRaisesRegex(
+            Exception,
+            '"world" has SDK category "cts", which is not yet supported.',
+            lambda: [*detect_category_violations("internal", atoms)],
+        )
+
+        # Documented categories that are no longer supported.
+        atoms = [_atom("hello", "partner"), _atom("world", "experimental")]
+        self.assertRaisesRegex(
+            Exception,
+            'Unknown SDK category "experimental"',
+            lambda: [*detect_category_violations("internal", atoms)],
+        )
+        atoms = [_atom("hello", "partner"), _atom("world", "excluded")]
+        self.assertRaisesRegex(
+            Exception,
+            'Unknown SDK category "excluded"',
+            lambda: [*detect_category_violations("internal", atoms)],
         )
 
     def test_category_name_bogus(self) -> None:
         atoms = [_atom("hello", "foobarnotgood"), _atom("world", "public")]
-        self.assertRaises(
-            Exception, lambda: [*detect_category_violations("partner", atoms)]
+        self.assertRaisesRegex(
+            Exception,
+            'Unknown SDK category "foobarnotgood"',
+            lambda: [*detect_category_violations("partner", atoms)],
         )
 
     def test_area_name(self) -> None:
@@ -96,7 +133,7 @@ class SdkCommonTests(unittest.TestCase):
         # Category violation
         atoms = [
             _atom("hello", "internal", "So Not A Real Area"),
-            _atom("hello", "public"),
+            _atom("hello", "partner"),
         ]
         self.assertEqual(
             [*v.detect_violations("partner", atoms)],
@@ -105,7 +142,7 @@ class SdkCommonTests(unittest.TestCase):
  - //hello
  - //hello
 """,
-                "hello has publication level internal, incompatible with partner",
+                '"hello" has publication level "internal", which is incompatible with "partner".',
                 "hello specifies invalid API area 'So Not A Real Area'. Valid areas: ['Unknown']",
                 "hello must specify an API area. Valid areas: ['Unknown']",
             ],

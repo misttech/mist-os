@@ -23,7 +23,7 @@ use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Request, Router};
+use sandbox::Router;
 use std::cmp::Ordering;
 use std::sync::{Arc, Weak};
 use tracing::warn;
@@ -372,18 +372,18 @@ impl RouteRequest {
         (fsys::RouteOutcome, ExtendedMoniker, Option<Vec<fsys::ServiceInstance>>),
         RouterError,
     > {
-        let res: Result<(Router, Request), ActionError> = async move {
+        let res: Result<Router, ActionError> = async move {
             let resolved_state = instance.lock_resolved_state().await.map_err(|err| {
                 ActionError::from(StartActionError::ResolveActionError {
                     moniker: instance.moniker.clone(),
                     err: Box::new(err),
                 })
             })?;
-            Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox, true))
+            Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox))
         }
         .await;
-        let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
-        router.route(request).await.map(|capability| {
+        let router = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
+        router.route(None, true).await.map(|capability| {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             let source_moniker = capability_source.source_moniker();
@@ -588,32 +588,33 @@ mod tests {
     /// Validate API reports that routing succeeded normally.
     #[fuchsia::test]
     async fn validate() {
-        let use_from_framework_decl = UseBuilder::protocol()
-            .source(UseSource::Framework)
-            .name("fuchsia.component.Realm")
-            .build();
-        let use_from_child_decl =
-            UseBuilder::protocol().source_static_child("my_child").name("foo.bar").build();
-        let expose_from_child_decl =
-            ExposeBuilder::protocol().name("foo.bar").source_static_child("my_child").build();
-        let expose_from_self_decl =
-            ExposeBuilder::protocol().name("foo.bar").source(ExposeSource::Self_).build();
-
+        // Test several capability types.
         let components = vec![
             (
                 "root",
-                ComponentDeclBuilder::new()
-                    .use_(use_from_framework_decl)
-                    .use_(use_from_child_decl)
-                    .expose(expose_from_child_decl)
+                ComponentDeclBuilder::new_empty_component()
+                    .use_(UseBuilder::runner().name("elf").source_static_child("my_child"))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Framework)
+                            .name("fuchsia.component.Realm"),
+                    )
+                    .use_(UseBuilder::protocol().name("foo.bar").source_static_child("my_child"))
+                    .expose(
+                        ExposeBuilder::protocol().name("foo.bar").source_static_child("my_child"),
+                    )
                     .child_default("my_child")
                     .build(),
             ),
             (
                 "my_child",
                 ComponentDeclBuilder::new()
+                    .dictionary_default("dict")
                     .protocol_default("foo.bar")
-                    .expose(expose_from_self_decl)
+                    .runner_default("elf")
+                    .expose(ExposeBuilder::runner().name("elf").source(ExposeSource::Self_))
+                    .expose(ExposeBuilder::dictionary().name("dict").source(ExposeSource::Self_))
+                    .expose(ExposeBuilder::protocol().name("foo.bar").source(ExposeSource::Self_))
                     .build(),
             ),
         ];
@@ -623,10 +624,6 @@ mod tests {
 
         test.model.start().await;
 
-        // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
-        assert!(instance.is_none());
-
         // Validate the root
         let mut results = validator.validate(".").await.unwrap().unwrap();
 
@@ -635,7 +632,18 @@ mod tests {
             decl_type: r.decl_type.clone().unwrap(),
         });
 
-        assert_eq!(results.len(), 3);
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "elf" && m == "my_child"
+        );
 
         let report = results.remove(0);
         assert_matches!(
@@ -676,13 +684,36 @@ mod tests {
             } if s == "fuchsia.component.Realm" && m == "."
         );
 
-        // This validation should have caused `my_child` to be resolved
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
-        assert!(instance.is_some());
+        assert!(results.is_empty());
 
         // Validate `my_child`
         let mut results = validator.validate("my_child").await.unwrap().unwrap();
-        assert_eq!(results.len(), 1);
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "dict" && m == "my_child"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "elf" && m == "my_child"
+        );
 
         let report = results.remove(0);
         assert_matches!(
@@ -696,6 +727,8 @@ mod tests {
                 ..
             } if s == "foo.bar" && m == "my_child"
         );
+
+        assert!(results.is_empty());
     }
 
     /// Validate API reports that routing succeeded with a `void` source.
@@ -1112,34 +1145,41 @@ mod tests {
     /// all capabilities).
     #[fuchsia::test]
     async fn route_all() {
-        let use_from_framework_decl = UseBuilder::protocol()
-            .source(UseSource::Framework)
-            .name("fuchsia.component.Realm")
-            .build();
-        let expose_from_child_decl = ExposeBuilder::resolver()
-            .name("qax.qux")
-            .target_name("foo.buz")
-            .source_static_child("my_child")
-            .build();
-        let expose_from_self_decl =
-            ExposeBuilder::resolver().name("qax.qux").source(ExposeSource::Self_).build();
-        let capability_decl =
-            CapabilityBuilder::resolver().name("qax.qux").path("/svc/qax.qux").build();
-
+        // Test several capability types.
         let components = vec![
             (
                 "root",
-                ComponentDeclBuilder::new()
-                    .use_(use_from_framework_decl)
-                    .expose(expose_from_child_decl)
+                ComponentDeclBuilder::new_empty_component()
+                    .use_(UseBuilder::runner().name("elf").source_static_child("my_child"))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Framework)
+                            .name("fuchsia.component.Realm"),
+                    )
+                    .expose(
+                        ExposeBuilder::runner()
+                            .name("elf")
+                            .target_name("exposed_elf")
+                            .source_static_child("my_child"),
+                    )
+                    .expose(
+                        ExposeBuilder::resolver()
+                            .name("qax.qux")
+                            .target_name("foo.buz")
+                            .source_static_child("my_child"),
+                    )
+                    .expose(ExposeBuilder::dictionary().name("dict").source(ExposeSource::Self_))
+                    .dictionary_default("dict")
                     .child_default("my_child")
                     .build(),
             ),
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .capability(capability_decl)
-                    .expose(expose_from_self_decl)
+                    .capability(CapabilityBuilder::resolver().name("qax.qux").path("/svc/qax.qux"))
+                    .runner_default("elf")
+                    .expose(ExposeBuilder::runner().name("elf").source(ExposeSource::Self_))
+                    .expose(ExposeBuilder::resolver().name("qax.qux").source(ExposeSource::Self_))
                     .build(),
             ),
         ];
@@ -1149,10 +1189,21 @@ mod tests {
 
         test.model.start().await;
 
-        // Validate the root, passing an empty vector. This should match both capabilities
+        // Validate the root, passing an empty vector. This should match all capabilities
         let mut results = validator.route(".", &[]).await.unwrap().unwrap();
 
-        assert_eq!(results.len(), 2);
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "elf" && m == "my_child"
+        );
 
         let report = results.remove(0);
         assert_matches!(
@@ -1177,8 +1228,36 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
+            } if s == "dict" && m == "."
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "exposed_elf" && m == "my_child"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: Some(m),
+                error: None,
+                ..
             } if s == "foo.buz" && m == "my_child"
         );
+
+        assert!(results.is_empty());
     }
 
     /// Route API reports that routing succeeded normally, with a partial capability name (fuzzy

@@ -7,6 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/image-format/image_format.h>
 #include <stdint.h>
 #include <zircon/assert.h>
@@ -938,44 +939,47 @@ zx_status_t Ge2dDevice::WaitForInterrupt(zx_port_packet_t* packet) {
 
 // static
 zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* out) {
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
-    return ZX_ERR_NO_RESOURCES;
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                          "pdev");
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      return result.status_value();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
-  std::optional<fdf::MmioBuffer> ge2d_mmio;
-  zx_status_t status = pdev.MapMmio(kGe2d, &ge2d_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio failed");
-    return status;
+  zx::result ge2d_mmio = pdev.MapMmio(kGe2d);
+  if (ge2d_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", ge2d_mmio.status_string());
+    return ge2d_mmio.status_value();
   }
 
-  zx::interrupt ge2d_irq;
-  status = pdev.GetInterrupt(0, &ge2d_irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.GetInterrupt failed");
-    return status;
+  zx::result ge2d_irq = pdev.GetInterrupt(0);
+  if (ge2d_irq.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", ge2d_irq.status_string());
+    return ge2d_irq.status_value();
   }
 
   zx::port port;
-  status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
+  zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
   if (status != ZX_OK) {
     zxlogf(ERROR, "port create failed");
     return status;
   }
 
-  status = ge2d_irq.bind(port, kPortKeyIrqMsg, 0 /*options*/);
+  status = ge2d_irq->bind(port, kPortKeyIrqMsg, 0 /*options*/);
   if (status != ZX_OK) {
     zxlogf(ERROR, "interrupt bind failed");
     return status;
   }
 
-  zx::bti bti;
-  status = pdev.GetBti(0, &bti);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not obtain bti");
-    return status;
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
 
   zx::result canvas_result =
@@ -994,7 +998,7 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
   std::vector<zx::vmo> watermark_input_contiguous_vmos;
   for (uint32_t i = 0; i < kWatermarkInputBufferCount; i++) {
     zx::vmo vmo;
-    status = zx::vmo::create_contiguous(bti, kWatermarkMaxSize, 0, &vmo);
+    status = zx::vmo::create_contiguous(bti.value(), kWatermarkMaxSize, 0, &vmo);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Unable to create contiguous memory for input watermark VMO");
       return ZX_ERR_NO_MEMORY;
@@ -1003,16 +1007,17 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
   }
 
   zx::vmo watermark_blended_contiguous_vmo;
-  status = zx::vmo::create_contiguous(bti, kWatermarkMaxSize, 0, &watermark_blended_contiguous_vmo);
+  status = zx::vmo::create_contiguous(bti.value(), kWatermarkMaxSize, 0,
+                                      &watermark_blended_contiguous_vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Unable to create contiguous memory for blended watermark VMO");
     return ZX_ERR_NO_MEMORY;
   }
 
   auto ge2d_device = std::make_unique<Ge2dDevice>(
-      parent, std::move(*ge2d_mmio), std::move(ge2d_irq), std::move(bti), std::move(port),
-      std::move(watermark_input_contiguous_vmos), std::move(watermark_blended_contiguous_vmo),
-      std::move(canvas_result.value()));
+      parent, std::move(ge2d_mmio.value()), std::move(ge2d_irq.value()), std::move(bti.value()),
+      std::move(port), std::move(watermark_input_contiguous_vmos),
+      std::move(watermark_blended_contiguous_vmo), std::move(canvas_result.value()));
 
   status = ge2d_device->StartThread();
   *out = std::move(ge2d_device);

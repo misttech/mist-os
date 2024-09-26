@@ -8,7 +8,6 @@ use fidl::endpoints::{create_endpoints, create_proxy};
 use fidl_fuchsia_wlan_common::WlanMacRole;
 use fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy};
 use fuchsia_component::client::connect_to_protocol_at;
-use fuchsia_zircon::prelude::*;
 use ieee80211::{Bssid, MacAddr, Ssid};
 use lazy_static::lazy_static;
 use std::future::Future;
@@ -52,12 +51,12 @@ lazy_static! {
     // TODO(https://fxbug.dev/42060050): This sleep was introduced to preserve the old timing behavior
     // of scanning when hw-sim depending on the SoftMAC driver iterating through all of the
     // channels.
-    pub static ref ARTIFICIAL_SCAN_SLEEP: fuchsia_zircon::Duration = 2.seconds();
+    pub static ref ARTIFICIAL_SCAN_SLEEP: fuchsia_zircon::Duration = zx::Duration::from_seconds(2);
 
     // Once a client interface is available for scanning, it takes up to around 30s for a scan
     // to complete (see https://fxbug.dev/42061276). Allow at least double that amount of time to reduce
     // flakiness and longer than the timeout WLAN policy should have.
-    pub static ref SCAN_RESPONSE_TEST_TIMEOUT: fuchsia_zircon::Duration = 70.seconds();
+    pub static ref SCAN_RESPONSE_TEST_TIMEOUT: fuchsia_zircon::Duration = zx::Duration::from_seconds(70);
 }
 
 /// A client supplicant.
@@ -704,7 +703,8 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
     // client interface is available.  A successful response to a scan request indicates that the
     // client policy layer is ready to use.
     // TODO(https://fxbug.dev/42135259): Figure out a new way to signal that the client policy layer is ready to go.
-    let mut retry = test_utils::RetryWithBackoff::infinite_with_max_interval(10.seconds());
+    let mut retry =
+        test_utils::RetryWithBackoff::infinite_with_max_interval(zx::Duration::from_seconds(10));
     loop {
         let (scan_proxy, server_end) = create_proxy().unwrap();
         client_controller.scan_for_networks(server_end).expect("requesting scan");

@@ -55,7 +55,7 @@ class RuntimeDynamicLinker {
 
   // Lookup a symbol from the given module, returning a pointer to it in memory,
   // or an error if not found (ie undefined symbol).
-  fit::result<Error, void*> LookupSymbol(RuntimeModule* module, const char* ref);
+  fit::result<Error, void*> LookupSymbol(const RuntimeModule& root, const char* ref);
 
   // - TODO(https://fxbug.dev/339037138): Add a test exercising the system error
   // case and include it as an example for the fit::error{Error} description.
@@ -87,8 +87,13 @@ class RuntimeDynamicLinker {
     }
 
     Soname name{file};
+    // If a module for this file is already loaded, return a reference to it.
     if (RuntimeModule* found = FindModule(name)) {
-      // A module for this file is already loaded, return a reference to it.
+      // If this module was loaded as a dependency of another module, then it
+      // would not have its module tree set.
+      if (found->module_tree().is_empty()) {
+        // TODO(https://fxbug.dev/354786114): set this module's module_tree.
+      }
       return fit::ok(found);
     }
 

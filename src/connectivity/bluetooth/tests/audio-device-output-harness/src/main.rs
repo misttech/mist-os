@@ -5,7 +5,7 @@
 use anyhow::Context;
 use fidl_fuchsia_media::{AudioChannelId, AudioDeviceEnumeratorMarker, AudioPcmMode, PcmFormat};
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
-use fuchsia_zircon::DurationNum;
+use fuchsia_zircon as zx;
 use futures::StreamExt;
 use tracing::info;
 
@@ -26,8 +26,8 @@ async fn main() -> Result<(), anyhow::Error> {
         "AudioOutHarness",
         LOCAL_MONOTONIC_CLOCK_DOMAIN,
         pcm_format,
-        10.millis(),
-        0.millis(),
+        zx::Duration::from_millis(10),
+        zx::Duration::from_millis(0),
     )?;
 
     // Spawn a task to read all the frames from the audio.

@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from honeydew.interfaces.affordances import (
     inspect,
+    netstack,
     rtc,
     session,
     system_power_state_controller,
@@ -279,6 +280,15 @@ class FuchsiaDevice(abc.ABC):
             wlan.Wlan object
         """
 
+    @properties.Affordance
+    @abc.abstractmethod
+    def netstack(self) -> netstack.Netstack:
+        """Returns a Wlan affordance object.
+
+        Returns:
+            wlan.Wlan object
+        """
+
     # List all the public methods
     @abc.abstractmethod
     def close(self) -> None:
@@ -323,7 +333,19 @@ class FuchsiaDevice(abc.ABC):
 
     @abc.abstractmethod
     def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
-        """Register a function that will be called in on_device_boot."""
+        """Register a function that will be called in `on_device_boot()`.
+
+        Args:
+            fn: Function that need to be called after FuchsiaDevice boot up.
+        """
+
+    @abc.abstractmethod
+    def register_for_on_device_close(self, fn: Callable[[], None]) -> None:
+        """Register a function that will be called during device clean up in `close()`.
+
+        Args:
+            fn: Function that need to be called during FuchsiaDevice cleanup.
+        """
 
     @abc.abstractmethod
     def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:

@@ -130,22 +130,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
 #     image as the kernel zbi.
 #
-#   must_exist_deps (optional; default: {})
-#     [scope of type:labels] A list of deps that we would like to validate are
-#     included (with their transitive deps) in the Image Assembly Config created
-#     by assembly
-#
-#     must_exist = {
-#       base_packages = [...]
-#       cache_packages = [...]
-#       bootfs_labels = [...]
-#       bootfs_package_labels = [...]
-#       extra_base_deps = [...]
-#       boot_args = [...]
-#       cmdline = [...]
-#       cmdline_deps = [...]
-#     }
-#
 #   core_realm_definition [optional]
 #     [label] The GN label of a `core_realm_definition()` template
 #
@@ -438,29 +422,6 @@ template("assembled_system") {
       }
     }
 
-    if (defined(invoker.must_exist_deps)) {
-      _must_exist = invoker.must_exist_deps
-      assert(invoker.must_exist_deps != {
-                 },
-             "must_exist should provide a scope of deps")
-      assert(defined(_must_exist.base_packages),
-             "must_exist scope has required field base_packages")
-      assert(defined(_must_exist.cache_packages),
-             "must_exist scope has required field cache_packages")
-      assert(defined(_must_exist.bootfs_labels),
-             "must_exist scope has required field bootfs_labels")
-      assert(defined(_must_exist.bootfs_package_labels),
-             "must_exist scope has required field bootfs_package_labels")
-      assert(defined(_must_exist.extra_base_deps),
-             "must_exist scope has required field extra_base_deps")
-      assert(defined(_must_exist.boot_args),
-             "must_exist scope has required field boot_args")
-      assert(defined(_must_exist.cmdline),
-             "must_exist scope has required field cmdline")
-      assert(defined(_must_exist.cmdline_deps),
-             "must_exist scope has required field cmdline_deps")
-    }
-
     fvm_tool_target = "//src/storage/bin/fvm($host_toolchain)"
     fvm_tool_path = get_label_info(fvm_tool_target, "root_out_dir")
     fvm_tool_path += "/fvm"
@@ -508,9 +469,6 @@ template("assembled_system") {
       } else {
         platform_common_aibs = eng_platform_aib_labels
       }
-
-      validation_legacy_aib =
-          "${_namespace}.validation_legacy_assembly_input_bundle"
 
       # This is defined here to save against needing to check against
       # invoker.board_config_label being false elsewhere in this template.  It can
@@ -651,34 +609,6 @@ template("assembled_system") {
     # Build the images using the Image Assembler.
     #
 
-    if (defined(_must_exist)) {
-      legacy_assembly_input_bundle(labels.validation_legacy_aib) {
-        forward_variables_from(invoker,
-                               [
-                                 "testonly",
-                                 "visibility",
-                                 "kernel_zbi",
-                                 "kernel_image_name",
-                                 "bootfs_package_labels",
-                                 "bootfs_labels",
-                                 "cmdline_deps",
-                                 "cmdline",
-                               ])
-        include_config_data = true
-        supports_blobs = _supports_blobs
-        base_packages = _must_exist.base_packages
-        cache_packages = _must_exist.cache_packages
-
-        additional_boot_args = []
-
-        bundle_name = "must_exist"
-
-        bundles_dir = files.outdir
-        create_package = false
-        create_package_archive = false
-      }
-    }
-
     check_production_tag = false
     if (defined(invoker.check_production_tag)) {
       check_production_tag = invoker.check_production_tag
@@ -724,18 +654,6 @@ template("assembled_system") {
         "--product",
         rebase_path(files.product_assembly_config, root_build_dir),
       ]
-
-      if (ramdisk_in_zbi) {
-        args += [
-          "--mode",
-          "embed-in-zbi",
-        ]
-      } else if (!_supports_blobs) {
-        args += [
-          "--mode",
-          "bootfs",
-        ]
-      }
 
       args += [
         "--input-bundles-dir",
@@ -863,18 +781,6 @@ template("assembled_system") {
       if (defined(invoker.assembly_include_account_in_fvm) &&
           invoker.assembly_include_account_in_fvm) {
         args += [ "--include-account" ]
-      }
-
-      if (ramdisk_in_zbi) {
-        args += [
-          "--mode",
-          "embed-in-zbi",
-        ]
-      } else if (!_supports_blobs) {
-        args += [
-          "--mode",
-          "bootfs",
-        ]
       }
 
       deps = []
@@ -1258,9 +1164,6 @@ template("assembled_system") {
       public_deps = [ ":${labels.image_assembler}" ]
       if (defined(invoker.output_dir)) {
         public_deps += [ ":${labels.copy_images}" ]
-      }
-      if (defined(_must_exist)) {
-        public_deps += [ ":${labels.validation_legacy_aib}" ]
       }
 
       metadata = {

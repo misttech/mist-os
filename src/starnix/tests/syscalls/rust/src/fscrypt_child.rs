@@ -10,7 +10,7 @@ use linux_uapi::{
 };
 use rand::Rng;
 use std::os::fd::AsRawFd;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 mod fscrypt_shared;
 
@@ -125,7 +125,7 @@ fn main() {
             );
             let (arg_struct_bytes, _) =
                 arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-            let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+            let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
             let identifier = unsafe { arg_struct.key_spec.u.identifier.value };
             let output = FscryptOutput { identifier };
             println!("{}", serde_json::to_string_pretty(&output).unwrap());

@@ -8,6 +8,8 @@
 #include <sys/timerfd.h>
 #include <sys/uio.h>
 
+#include <cstdint>
+#include <format>
 #include <regex>
 #include <string>
 
@@ -81,7 +83,8 @@ class SysfsPowerTest : public ::testing::Test {
 TEST_F(SysfsPowerTest, PowerDirectoryContainsExpectedContents) {
   std::vector<std::string> files;
   EXPECT_TRUE(files::ReadDirContents("/sys/power", &files));
-  EXPECT_THAT(files, IsSupersetOf({"suspend_stats", "wakeup_count", "state", "sync_on_suspend"}));
+  EXPECT_THAT(files, IsSupersetOf({"suspend_stats", "wakeup_count", "state", "sync_on_suspend",
+                                   "wake_lock", "wake_unlock"}));
 }
 
 TEST_F(SysfsPowerTest, WakeupReasonsDirectoryContainsExpectedContents) {
@@ -435,4 +438,76 @@ TEST_F(SysfsPowerTest, LastResumeReasonFileContainsExpectedContents) {
   EXPECT_TRUE(files::ReadFileToString("/sys/kernel/wakeup_reasons/last_resume_reason",
                                       &last_suspend_time_str));
   EXPECT_TRUE(std::regex_match(last_suspend_time_str, std::regex("^.*\n$")));
+}
+
+TEST_F(SysfsPowerTest, AddAndRemoveWakeLock) {
+  std::string wake_locks_str;
+  std::string test_wake_lock_str = "test_wake_lock";
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", test_wake_lock_str));
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+  EXPECT_TRUE(std::regex_match(wake_locks_str, std::regex("^.*\n$")));
+  EXPECT_NE(wake_locks_str.find(test_wake_lock_str), std::string::npos);
+
+  std::string wake_unlocks_str;
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", test_wake_lock_str));
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_unlock", &wake_unlocks_str));
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+  EXPECT_TRUE(std::regex_match(wake_unlocks_str, std::regex("^.*\n$")));
+  EXPECT_NE(wake_unlocks_str.find(test_wake_lock_str), std::string::npos);
+  EXPECT_EQ(wake_locks_str.find(test_wake_lock_str), std::string::npos);
+}
+
+TEST_F(SysfsPowerTest, WakeLockBlocksSuspend) {
+  std::string wake_locks_str;
+  std::string test_wake_lock_str = "test_wake_lock";
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", test_wake_lock_str));
+
+  // This should fail due to the implicit wake lock.
+  ASSERT_FALSE(attempt_suspend("mem"));
+
+  std::string wake_unlocks_str;
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", test_wake_lock_str));
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_unlock", &wake_unlocks_str));
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+  EXPECT_NE(wake_unlocks_str.find(test_wake_lock_str), std::string::npos);
+  EXPECT_EQ(wake_locks_str.find(test_wake_lock_str), std::string::npos);
+}
+
+TEST_F(SysfsPowerTest, WakeLockWithTimeout) {
+  std::string wake_locks_str;
+  std::string wake_unlocks_str;
+  std::string test_wake_lock_str = "test_wake_lock";
+  int wake_lock_timeout_s = 1;
+
+  EXPECT_TRUE(files::WriteFile(
+      "/sys/power/wake_lock",
+      std::format("{} {}", test_wake_lock_str, wake_lock_timeout_s * 1000 * 1000 * 1000)));
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+  EXPECT_NE(wake_locks_str.find(test_wake_lock_str), std::string::npos);
+
+  // Wait until the wake lock timeout is expired
+  sleep(wake_lock_timeout_s * 2);
+
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+  EXPECT_EQ(wake_locks_str.find(test_wake_lock_str), std::string::npos);
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_unlock", &wake_unlocks_str));
+  EXPECT_NE(wake_unlocks_str.find(test_wake_lock_str), std::string::npos);
+}
+
+TEST_F(SysfsPowerTest, WakeLockFileWrite) {
+  std::string wake_locks_str;
+
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test1"));
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test2\n"));
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test3 10000000000"));
+  EXPECT_FALSE(files::WriteFile("/sys/power/wake_lock", "test4 "));
+  EXPECT_FALSE(files::WriteFile("/sys/power/wake_lock", "test5 e"));
+
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+
+  EXPECT_NE(wake_locks_str.find("test1"), std::string::npos);
+  EXPECT_NE(wake_locks_str.find("test2"), std::string::npos);
+  EXPECT_NE(wake_locks_str.find("test3"), std::string::npos);
+  EXPECT_EQ(wake_locks_str.find("test4"), std::string::npos);
+  EXPECT_EQ(wake_locks_str.find("test5"), std::string::npos);
 }

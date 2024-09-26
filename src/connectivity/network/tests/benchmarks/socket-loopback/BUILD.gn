@@ -35,7 +35,7 @@ fuchsia_unittest_component("loopback-socket-benchmarks-with-netstack3") {
   manifest = "meta/loopback-socket-benchmarks-with-netstack3.cml"
   deps = [
     ":loopback_socket_benchmarks",
-    "//src/connectivity/network/netstack3:component",
+    "//src/connectivity/network/netstack3:component-for-tests",
   ]
 }
 
@@ -52,7 +52,6 @@ fuchsia_test_package("loopback-socket-benchmarks-tests") {
     ":loopback-socket-benchmarks-with-netstack3",
     ":loopback-socket-benchmarks-with-fake-netstack",
   ]
-  deps = [ "//src/connectivity/network/netstack3:config_for_tests" ]
 }
 
 fuchsia_unittest_component(
@@ -60,14 +59,13 @@ fuchsia_unittest_component(
   manifest = "meta/loopback-socket-benchmarks-with-netstack3-tracing.cml"
   deps = [
     ":loopback_socket_benchmarks",
-    "//src/connectivity/network/netstack3:component",
+    "//src/connectivity/network/netstack3:component-for-tests",
   ]
   test_type = "system"
 }
 
 fuchsia_test_package("loopback-socket-benchmarks-with-tracing-pkg-netstack3") {
   test_components = [ ":loopback-socket-benchmarks-with-netstack3-tracing" ]
-  deps = [ "//src/connectivity/network/netstack3:config_for_tests" ]
 
   # Prevent this test from being run as a target-side test, since it's kicked
   # off by the dart wrapper.

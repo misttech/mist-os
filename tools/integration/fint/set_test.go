@@ -154,6 +154,23 @@ func TestSet(t *testing.T) {
 		}
 	})
 
+	t.Run("populates set_artifacts fields (build_event_service)", func(t *testing.T) {
+		buildEventService := "resultstore_infra"
+		canonicalized := "resultstore"
+		staticSpec := proto.Clone(staticSpec).(*fintpb.Static)
+		staticSpec.BuildEventService = buildEventService
+		runner := &fakeSubprocessRunner{
+			mockStdout: []byte("some stdout"),
+		}
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
+		if err != nil {
+			t.Fatalf("Unexpected error from setImpl: %s", err)
+		}
+		if artifacts.BuildEventService != canonicalized {
+			t.Errorf("Wrong build_event_service.  want: %v, got: %v", canonicalized, artifacts.BuildEventService)
+		}
+	})
+
 	t.Run("leaves failure summary empty in case of success", func(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
@@ -557,6 +574,16 @@ func TestGenArgs(t *testing.T) {
 				`foo="bar"`,
 			},
 			orderMatters: true,
+		},
+		{
+			name: "build event service",
+			staticSpec: &fintpb.Static{
+				BuildEventService: "resultstore_infra",
+			},
+			contextSpec: &fintpb.Context{},
+			expectedArgs: []string{
+				`bazel_upload_build_events="resultstore_infra"`,
+			},
 		},
 		{
 			name: "go cache and rust cache",

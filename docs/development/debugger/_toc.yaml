@@ -20,7 +20,7 @@ toc:
   path: /docs/development/debugger/expressions.md
 - title: "Inspect memory"
   path: /docs/development/debugger/memory.md
-- title: "List handles and kernerl objects"
+- title: "List handles and kernel objects"
   path: /docs/development/debugger/kernel_objects.md
 - title: "Understand how symbols are loaded"
   path: /docs/development/debugger/symbols.md
@@ -34,3 +34,5 @@ toc:
   path: /docs/development/debugger/troubleshooting.md
 - title: "Tutorial: Debug tests using zxdb"
   path: /docs/development/debugger/tutorial-tests.md
+- title: "Tutorial: Debug with minidumps using zxdb"
+  path: /docs/development/debugger/tutorial-minidumps.md

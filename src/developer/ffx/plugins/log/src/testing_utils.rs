@@ -35,12 +35,12 @@ pub struct TestEnvironmentConfig {
     pub send_connected_event: bool,
 }
 
-pub fn test_log_with_severity(timestamp: impl Into<Timestamp>, severity: Severity) -> LogsData {
+pub fn test_log_with_severity(timestamp: i64, severity: Severity) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity,
-        timestamp_nanos: timestamp.into(),
+        timestamp: Timestamp::from_nanos(timestamp),
     })
     .set_pid(1)
     .set_tid(2)
@@ -48,12 +48,12 @@ pub fn test_log_with_severity(timestamp: impl Into<Timestamp>, severity: Severit
     .build()
 }
 
-pub fn test_log(timestamp: impl Into<Timestamp>) -> LogsData {
+pub fn test_log(timestamp: i64) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity: Severity::Info,
-        timestamp_nanos: timestamp.into(),
+        timestamp: Timestamp::from_nanos(timestamp),
     })
     .set_pid(1)
     .set_tid(2)
@@ -61,12 +61,12 @@ pub fn test_log(timestamp: impl Into<Timestamp>) -> LogsData {
     .build()
 }
 
-pub fn test_log_with_file(timestamp: impl Into<Timestamp>) -> LogsData {
+pub fn test_log_with_file(timestamp: i64) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity: Severity::Info,
-        timestamp_nanos: timestamp.into(),
+        timestamp: Timestamp::from_nanos(timestamp),
     })
     .set_file("test_filename.cc")
     .set_line(42)
@@ -77,12 +77,12 @@ pub fn test_log_with_file(timestamp: impl Into<Timestamp>) -> LogsData {
     .build()
 }
 
-pub fn test_log_with_tag(timestamp: impl Into<Timestamp>) -> LogsData {
+pub fn test_log_with_tag(timestamp: i64) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity: Severity::Info,
-        timestamp_nanos: timestamp.into(),
+        timestamp: Timestamp::from_nanos(timestamp),
     })
     .add_tag("test tag")
     .set_pid(1)
@@ -91,14 +91,14 @@ pub fn test_log_with_tag(timestamp: impl Into<Timestamp>) -> LogsData {
     .build()
 }
 
-pub fn naive_utc_nanos(utc_time: &str) -> Timestamp {
-    Timestamp::from(parse_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap())
+pub fn naive_utc_nanos(utc_time: &str) -> i64 {
+    parse_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap()
 }
 
 impl Default for TestEnvironmentConfig {
     fn default() -> Self {
         Self {
-            messages: vec![test_log(Timestamp::from(0))],
+            messages: vec![test_log(0)],
             boot_timestamp: 1,
             instances: Vec::new(),
             send_connected_event: false,

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum;
 use futures::channel::oneshot;
 use std::panic;
 use wlan_hw_sim::event::buffered::{ActionFrame, AssocRespFrame, AuthFrame, Buffered, MgmtFrame};
 use wlan_hw_sim::event::{branch, Handler};
 use wlan_hw_sim::*;
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
 
 /// Test WLAN AP implementation by simulating a client that sends out authentication and
 /// association *request* frames. Verify AP responds correctly with authentication and
@@ -56,7 +55,7 @@ async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
     helper
         .run_until_complete_or_timeout(
-            5.seconds(),
+            zx::Duration::from_seconds(5),
             "waiting for authentication response",
             event::on_transmit(event::extract(|frame: Buffered<AuthFrame>| {
                 let frame = frame.get();
@@ -76,7 +75,7 @@ async fn verify_assoc_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
     helper
         .run_until_complete_or_timeout(
-            5.seconds(),
+            zx::Duration::from_seconds(5),
             "waiting for association response",
             event::on_transmit(branch::or((
                 event::extract(|_: Buffered<ActionFrame<false>>| {}),
