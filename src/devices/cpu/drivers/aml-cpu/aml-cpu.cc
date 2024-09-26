@@ -265,8 +265,8 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
   reset_voltage.cancel();
   reset_frequency.cancel();
 
-  TRACE_COUNTER("dvfs", "cpu_freq", GetDomainId(), "domain", TA_INT32(GetDomainId()), "frequency",
-                TA_INT64(target_opp.freq_hz), "voltage", TA_INT64(target_opp.volt_uv));
+  TRACE_COUNTER("dvfs", "cpu_freq", GetDomainId(), "frequency", TA_INT64(target_opp.freq_hz),
+                "voltage", TA_INT64(target_opp.volt_uv));
 
   return ZX_OK;
 }
