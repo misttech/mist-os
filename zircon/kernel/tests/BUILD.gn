@@ -138,6 +138,9 @@ if (toolchain_environment == "kernel") {
       deps += [ "//zircon/kernel/lib/userabi" ]
       if (is_mistos) {
         deps += [ "//vendor/misttech/zircon/kernel/lib/starnix:tests" ]
+        deps += [
+          "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:tests",
+        ]
         deps += [ "//vendor/misttech/zircon/kernel/lib/mistos/util/tests" ]
       }
     }
