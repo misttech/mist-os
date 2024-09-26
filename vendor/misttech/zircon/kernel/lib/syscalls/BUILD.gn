@@ -14,6 +14,8 @@ assert(is_kernel, current_toolchain)
 source_set("linux_impl") {
   visibility = [ "//zircon/kernel/lib/syscalls:*" ]
   sources = [
+    "arch/${current_cpu}/kernel/process_64.cc",
+    "arch/${current_cpu}/kernel/sys_x86_64.cc",
     "drivers/char/random.cc",
     "kernel/exit.cc",
     "kernel/sys.cc",
