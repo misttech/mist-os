@@ -5,16 +5,9 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ZX_CPRNG_DRAW_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ZX_CPRNG_DRAW_H_
 
+#include <lib/user_copy/user_ptr.h>
 #include <zircon/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void zx_cprng_draw(void* buffer, size_t len);
-
-#ifdef __cplusplus
-}
-#endif
+void _zx_cprng_draw(user_out_ptr<void> buffer, size_t len);
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ZX_CPRNG_DRAW_H_
