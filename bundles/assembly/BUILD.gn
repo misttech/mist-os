@@ -527,6 +527,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/sys/tools/package:bootfs",
     "//src/ui/backlight/bin/backlight:bootfs",
     "//src/ui/input/bin/hid:bootfs",
+    "//src/ui/tools/print-input-report:bootfs",
 
     # tests
     "//src/devices/block/bin/blktest:bootfs",
