@@ -572,7 +572,7 @@ where
     pub fn cast_left<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&A::Target) -> &X>(
         &'a mut self,
         f: F,
-    ) -> Locked<OwnedTupleWrapper<&X, &B::Target>, L>
+    ) -> Locked<OwnedTupleWrapper<&'a X, &'a B::Target>, L>
     where
         T: Deref<Target = TupleWrapper<A, B>>,
     {
@@ -584,7 +584,7 @@ where
     pub fn cast_right<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&B::Target) -> &X>(
         &'a mut self,
         f: F,
-    ) -> Locked<OwnedTupleWrapper<&A::Target, &X>, L>
+    ) -> Locked<OwnedTupleWrapper<&'a A::Target, &'a X>, L>
     where
         T: Deref<Target = TupleWrapper<A, B>>,
     {
@@ -743,7 +743,10 @@ mod test {
 
     impl UnlockedAccess<UnlockedUsize> for Data {
         type Data = usize;
-        type Guard<'l> = &'l usize where Self: 'l;
+        type Guard<'l>
+            = &'l usize
+        where
+            Self: 'l;
 
         fn access(&self) -> Self::Guard<'_> {
             &self.u

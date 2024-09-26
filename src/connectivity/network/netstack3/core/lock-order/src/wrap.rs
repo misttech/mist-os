@@ -55,12 +55,14 @@ where
     T: Deref,
     T::Target: Sized,
 {
-    type AtLockLevel<'l, M> = Locked<&'l  T::Target, M>
+    type AtLockLevel<'l, M>
+        = Locked<&'l T::Target, M>
     where
         M: 'l,
         T: 'l;
 
-    type CastWrapper<X> = Locked<X, L>
+    type CastWrapper<X>
+        = Locked<X, L>
     where
         X: Deref,
         X::Target: Sized;
@@ -137,7 +139,7 @@ where
     /// Like [`Locked::lock_and`].
     fn lock_and<'a, M>(
         &'a mut self,
-    ) -> (<T::Target as LockFor<M>>::Guard<'_>, Self::AtLockLevel<'_, M>)
+    ) -> (<T::Target as LockFor<M>>::Guard<'a>, Self::AtLockLevel<'a, M>)
     where
         T::Target: LockFor<M>,
         L: LockBefore<M> + 'a,
@@ -160,7 +162,7 @@ where
     fn lock_with_and<'a, M, X>(
         &'a mut self,
         f: impl FnOnce(&T::Target) -> &X,
-    ) -> (X::Guard<'_>, Self::AtLockLevel<'_, M>)
+    ) -> (X::Guard<'a>, Self::AtLockLevel<'a, M>)
     where
         X: LockFor<M>,
         L: LockBefore<M> + 'a,
@@ -182,7 +184,7 @@ where
     /// Like [`Locked::read_lock_and`].
     fn read_lock_and<'a, M>(
         &'a mut self,
-    ) -> (<T::Target as RwLockFor<M>>::ReadGuard<'_>, Self::AtLockLevel<'_, M>)
+    ) -> (<T::Target as RwLockFor<M>>::ReadGuard<'a>, Self::AtLockLevel<'a, M>)
     where
         T::Target: RwLockFor<M>,
         L: LockBefore<M> + 'a,
@@ -205,7 +207,7 @@ where
     fn read_lock_with_and<'a, M, X>(
         &'a mut self,
         f: impl FnOnce(&T::Target) -> &X,
-    ) -> (X::ReadGuard<'_>, Self::AtLockLevel<'_, M>)
+    ) -> (X::ReadGuard<'a>, Self::AtLockLevel<'a, M>)
     where
         X: RwLockFor<M>,
         L: LockBefore<M> + 'a,
@@ -227,7 +229,7 @@ where
     /// Like [`Locked::write_lock_and`].
     fn write_lock_and<'a, M>(
         &'a mut self,
-    ) -> (<T::Target as RwLockFor<M>>::WriteGuard<'_>, Self::AtLockLevel<'_, M>)
+    ) -> (<T::Target as RwLockFor<M>>::WriteGuard<'a>, Self::AtLockLevel<'a, M>)
     where
         T::Target: RwLockFor<M>,
         L: LockBefore<M> + 'a,
@@ -253,7 +255,7 @@ where
     fn write_lock_with_and<'a, M, X>(
         &'a mut self,
         f: impl FnOnce(&T::Target) -> &X,
-    ) -> (X::WriteGuard<'_>, Self::AtLockLevel<'_, M>)
+    ) -> (X::WriteGuard<'a>, Self::AtLockLevel<'a, M>)
     where
         X: RwLockFor<M>,
         L: LockBefore<M> + 'a,
@@ -278,7 +280,7 @@ where
     }
 
     /// Like [`Locked::cast_with`]
-    fn cast_with<'a, R>(&'a mut self, f: impl FnOnce(&T::Target) -> &R) -> Self::CastWrapper<&R>
+    fn cast_with<'a, R>(&'a mut self, f: impl FnOnce(&T::Target) -> &R) -> Self::CastWrapper<&'a R>
     where
         T: 'a,
         L: 'a,
@@ -287,7 +289,7 @@ where
     }
 
     /// Like [`Locked::cast_locked`].
-    fn cast_locked<'a, M>(&'a mut self) -> Self::AtLockLevel<'_, M>
+    fn cast_locked<'a, M>(&'a mut self) -> Self::AtLockLevel<'a, M>
     where
         L: LockBefore<M> + 'a,
     {
@@ -318,7 +320,7 @@ where
     fn cast_left<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&A::Target) -> &X>(
         &'a mut self,
         f: F,
-    ) -> Self::CastWrapper<OwnedTupleWrapper<&X, &B::Target>>
+    ) -> Self::CastWrapper<OwnedTupleWrapper<&'a X, &'a B::Target>>
     where
         L: 'a,
         T: Deref<Target = TupleWrapper<A, B>> + 'a,
@@ -330,7 +332,7 @@ where
     fn cast_right<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&B::Target) -> &X>(
         &'a mut self,
         f: F,
-    ) -> Self::CastWrapper<OwnedTupleWrapper<&A::Target, &X>>
+    ) -> Self::CastWrapper<OwnedTupleWrapper<&'a A::Target, &'a X>>
     where
         L: 'a,
         T: Deref<Target = TupleWrapper<A, B>> + 'a,
@@ -407,7 +409,7 @@ pub mod disable {
         /// Like [`Locked::lock_and`].
         fn lock_and<'a, M>(
             &'a mut self,
-        ) -> (<T::Target as LockFor<M>>::Guard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        ) -> (<T::Target as LockFor<M>>::Guard<'a>, Self::AtLockLevel<'a, Unlocked>)
         where
             T::Target: LockFor<M>,
             L: LockBefore<M> + 'a,
@@ -430,7 +432,7 @@ pub mod disable {
         fn lock_with_and<'a, M, X>(
             &'a mut self,
             f: impl FnOnce(&T::Target) -> &X,
-        ) -> (X::Guard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        ) -> (X::Guard<'a>, Self::AtLockLevel<'a, Unlocked>)
         where
             X: LockFor<M>,
             L: LockBefore<M> + 'a,
@@ -452,7 +454,7 @@ pub mod disable {
         /// Like [`Locked::read_lock_and`].
         fn read_lock_and<'a, M>(
             &'a mut self,
-        ) -> (<T::Target as RwLockFor<M>>::ReadGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        ) -> (<T::Target as RwLockFor<M>>::ReadGuard<'a>, Self::AtLockLevel<'a, Unlocked>)
         where
             T::Target: RwLockFor<M>,
             L: LockBefore<M> + 'a,
@@ -478,7 +480,7 @@ pub mod disable {
         fn read_lock_with_and<'a, M, X>(
             &'a mut self,
             f: impl FnOnce(&T::Target) -> &X,
-        ) -> (X::ReadGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        ) -> (X::ReadGuard<'a>, Self::AtLockLevel<'a, Unlocked>)
         where
             X: RwLockFor<M>,
             L: LockBefore<M> + 'a,
@@ -500,7 +502,7 @@ pub mod disable {
         /// Like [`Locked::write_lock_and`].
         fn write_lock_and<'a, M>(
             &'a mut self,
-        ) -> (<T::Target as RwLockFor<M>>::WriteGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        ) -> (<T::Target as RwLockFor<M>>::WriteGuard<'a>, Self::AtLockLevel<'a, Unlocked>)
         where
             T::Target: RwLockFor<M>,
             L: LockBefore<M> + 'a,
@@ -526,7 +528,7 @@ pub mod disable {
         fn write_lock_with_and<'a, M, X>(
             &'a mut self,
             f: impl FnOnce(&T::Target) -> &X,
-        ) -> (X::WriteGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        ) -> (X::WriteGuard<'a>, Self::AtLockLevel<'a, Unlocked>)
         where
             X: RwLockFor<M>,
             L: LockBefore<M> + 'a,
@@ -551,7 +553,10 @@ pub mod disable {
         }
 
         /// Like [`Locked::cast_with`]
-        fn cast_with<'a, R>(&'a mut self, f: impl FnOnce(&T::Target) -> &R) -> Self::CastWrapper<&R>
+        fn cast_with<'a, R>(
+            &'a mut self,
+            f: impl FnOnce(&T::Target) -> &R,
+        ) -> Self::CastWrapper<&'a R>
         where
             T: 'a,
             L: 'a,
@@ -560,7 +565,7 @@ pub mod disable {
         }
 
         /// Like [`Locked::cast_locked`].
-        fn cast_locked<'a, M>(&'a mut self) -> Self::AtLockLevel<'_, Unlocked>
+        fn cast_locked<'a, M>(&'a mut self) -> Self::AtLockLevel<'a, Unlocked>
         where
             L: LockBefore<M> + 'a,
         {
@@ -591,7 +596,7 @@ pub mod disable {
         fn cast_left<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&A::Target) -> &X>(
             &'a mut self,
             f: F,
-        ) -> Self::CastWrapper<OwnedTupleWrapper<&X, &B::Target>>
+        ) -> Self::CastWrapper<OwnedTupleWrapper<&'a X, &'a B::Target>>
         where
             L: 'a,
             T: Deref<Target = TupleWrapper<A, B>> + 'a,
@@ -603,7 +608,7 @@ pub mod disable {
         fn cast_right<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&B::Target) -> &X>(
             &'a mut self,
             f: F,
-        ) -> Self::CastWrapper<OwnedTupleWrapper<&A::Target, &X>>
+        ) -> Self::CastWrapper<OwnedTupleWrapper<&'a A::Target, &'a X>>
         where
             L: 'a,
             T: Deref<Target = TupleWrapper<A, B>> + 'a,
