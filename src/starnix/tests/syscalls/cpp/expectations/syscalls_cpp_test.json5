@@ -72,10 +72,8 @@
                 // TODO(https://fxbug.dev/368658840)
                 "OverlayFs/FsMountTest.ChownMinusOneSucceeds/0",
                 "OverlayFs/FsMountTest.ChownMinusOneNoPathAccessFails/0",
-                "OverlayFs/FsMountTest.ChownMinusOneOnSUIDFileFails/0",
                 "TmpFs/FsMountTest.ChownMinusOneSucceeds/0",
                 "TmpFs/FsMountTest.ChownMinusOneNoPathAccessFails/0",
-                "TmpFs/FsMountTest.ChownMinusOneOnSUIDFileFails/0",
 
                 // TODO(https://fxbug.dev/335701084)
                 "VmspliceTest.FileInPipe",

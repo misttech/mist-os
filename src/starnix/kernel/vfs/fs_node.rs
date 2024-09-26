@@ -243,9 +243,7 @@ impl FsNodeInfo {
         }
         // Clear the setuid and setgid bits if the file is executable and a regular file.
         if self.mode.is_reg() {
-            if self.mode.intersects(FileMode::IXUSR | FileMode::IXGRP | FileMode::IXOTH) {
-                self.mode &= !FileMode::ISUID;
-            }
+            self.mode &= !FileMode::ISUID;
             self.clear_sgid_bit();
         }
         self.time_status_change = utc::utc_now();

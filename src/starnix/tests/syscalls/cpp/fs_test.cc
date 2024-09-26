@@ -708,6 +708,31 @@ TEST_P(FsMountTest, ChownSameOwnerAndGroupFails) {
   SAFE_SYSCALL(unlink(user1_file.c_str()));
 }
 
+TEST_P(FsMountTest, ChownOnSUIDFileDropsSUIDBit) {
+  std::string user1_file = files::JoinPath(mount_path_, "user1_file");
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), 0)));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    test_helper::DropAllCapabilities();
+
+    for (mode_t mode = 0000; mode <= 0777; mode++) {
+      SCOPED_TRACE(fxl::StringPrintf("Mode: %o", mode));
+      SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISUID | mode));
+      SAFE_SYSCALL(chown(user1_file.c_str(), -1, -1));
+
+      struct stat file_stat{};
+      SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
+      EXPECT_EQ(file_stat.st_mode & S_ISUID, 0U);
+    }
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
 TEST_P(FsMountTest, OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS) {
   std::string lock_file = mount_path_ + "/lock";
   int fd = SAFE_SYSCALL(open(lock_file.c_str(), O_CREAT | O_RDWR, 0600));
