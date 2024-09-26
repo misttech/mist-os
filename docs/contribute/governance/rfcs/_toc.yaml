@@ -534,3 +534,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0258_update_from_c++17_to_c++20.md
   - title: "RFC-0259: Monotonic Clock Suspension and the Boot Timeline"
     path: /docs/contribute/governance/rfcs/0259_monotonic_clock_suspension_and_the_boot_timeline.md
+  - title: "RFC-0260: Kernel Boot Time Support"
+    path: /docs/contribute/governance/rfcs/0260_kernel_boot_time_support.md
