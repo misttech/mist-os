@@ -705,7 +705,7 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
     return vec.take_error();
   }
 
-  for (auto [mapping, len] : vec.value()) {
+  for (auto& [mapping, len] : vec.value()) {
     auto next_offset = bytes_read + len;
     ktl::span<uint8_t> span{bytes.data() + bytes_read, bytes.data() + next_offset};
     auto result = read_mapping_memory(addr + bytes_read, mapping, span);
@@ -729,13 +729,16 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_mapping_memory(
     return fit::error(errno(EFAULT));
   }
 
-  return ktl::visit(MappingBacking::overloaded{
-                        [](const PrivateAnonymous&) {
-                          return fit::result<Errno, ktl::span<uint8_t>>(fit::error(errno(EFAULT)));
-                        },
-                        [&](const MappingBackingMemory& m) { return m.read_memory(addr, bytes); },
-                    },
-                    mapping.backing_.variant);
+  return ktl::visit(
+      MappingBacking::overloaded{
+          [](const PrivateAnonymous&) -> fit::result<Errno, ktl::span<uint8_t>> {
+            return fit::error(errno(EFAULT));
+          },
+          [&](const MappingBackingMemory& m) -> fit::result<Errno, ktl::span<uint8_t>> {
+            return m.read_memory(addr, bytes);
+          },
+      },
+      mapping.backing_.variant);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory_partial(
@@ -791,7 +794,7 @@ fit::result<Errno, size_t> MemoryManagerState::write_memory(
     return vec.take_error();
   }
 
-  for (auto [mapping, len] : vec.value()) {
+  for (auto& [mapping, len] : vec.value()) {
     LTRACEF_LEVEL(2, "len %zu\n", len);
     auto next_offset = bytes_written + len;
     auto result = write_mapping_memory(addr + bytes_written, mapping,
@@ -818,8 +821,10 @@ fit::result<Errno> MemoryManagerState::write_mapping_memory(
 
   return ktl::visit(
       MappingBacking::overloaded{
-          [](const PrivateAnonymous&) { return fit::result<Errno>(fit::error(errno(EFAULT))); },
-          [&](const MappingBackingMemory& m) { return m.write_memory(addr, bytes); },
+          [](const PrivateAnonymous&) -> fit::result<Errno> { return fit::error(errno(EFAULT)); },
+          [&](const MappingBackingMemory& m) -> fit::result<Errno> {
+            return m.write_memory(addr, bytes);
+          },
       },
       mapping.backing_.variant);
 }
