@@ -340,6 +340,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -396,6 +399,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -443,6 +449,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
                 wake_handling: {
                     power_level: 0u64,
+                },
+                cpu: {
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -505,6 +514,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: contains {
@@ -602,6 +614,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 wake_handling: {
                     power_level: 1u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -657,6 +672,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: contains {
@@ -754,6 +772,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -809,6 +830,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: contains {
@@ -890,6 +914,9 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                     wake_handling: {
                         power_level: 0u64,
                     },
+                    cpu: {
+                        power_level: 1u64,
+                    },
                     execution_resume_latency: {
                         power_level: i as u64,
                         resume_latency: expected_latencies[i] as u64,
@@ -960,6 +987,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1013,6 +1043,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: {
@@ -1091,6 +1124,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1136,6 +1172,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: {
@@ -1213,6 +1252,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1258,6 +1300,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: {
@@ -1321,6 +1366,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: {
@@ -1458,6 +1506,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: contains {
@@ -1641,6 +1692,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -1703,6 +1757,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
                 wake_handling: {
                     power_level: 0u64,
+                },
+                cpu: {
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -1825,6 +1882,9 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 },
                 wake_handling: {
                     power_level: 0u64,
+                },
+                cpu: {
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -2014,6 +2074,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -2055,6 +2118,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: contains {
@@ -2121,6 +2187,22 @@ async fn test_element_info_provider() -> Result<()> {
 
     assert_eq!(
         [
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("cpu".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
             fbroker::ElementPowerLevelNames {
                 identifier: Some("execution_state".into()),
                 levels: Some(vec![
@@ -2228,7 +2310,7 @@ async fn test_element_info_provider() -> Result<()> {
                 ..Default::default()
             },
         ],
-        TryInto::<[fbroker::ElementPowerLevelNames; 6]>::try_into(
+        TryInto::<[fbroker::ElementPowerLevelNames; 7]>::try_into(
             element_info_provider.get_element_power_level_names().await?.unwrap()
         )
         .unwrap()

@@ -175,6 +175,22 @@ type WakeHandlingLevel = flexible enum : uint8 {
     ACTIVE = 1;
 };
 
+/// Holds tokens to the CPU power element.
+///
+/// [`fuchsia.power.system/CpuLevel`] defines the power levels supported by this power element.
+type Cpu = resource table {
+    1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
+};
+
+/// CPU power levels
+///
+/// Elements should take an assertive dependency on `CpuLevel::ACTIVE`
+/// to ensure that the element will be suspended before the CPU suspends.
+type CpuLevel = flexible enum : uint8 {
+    INACTIVE = 0;
+    ACTIVE = 1;
+};
+
 /// Holds tokens to the application activity power element.
 ///
 /// [`fuchsia.power.system/ApplicationActivityLevel`] defines the power levels supported by this power element.

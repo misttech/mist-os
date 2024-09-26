@@ -262,6 +262,9 @@ async fn test_system_activity_control() -> Result<()> {
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
             },
             suspend_stats: {
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
@@ -295,6 +298,9 @@ async fn test_system_activity_control() -> Result<()> {
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
             },
