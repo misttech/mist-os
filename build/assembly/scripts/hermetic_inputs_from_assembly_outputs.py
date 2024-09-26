@@ -81,7 +81,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--output",
-        type=argparse.FileType("w"),
         required=True,
         help="The location to write the hermetic inputs file",
     )
@@ -99,7 +98,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--depfile",
-        type=argparse.FileType("w"),
         help="A depfile listing all the files opened by this script",
     )
     args = parser.parse_args()
@@ -151,13 +149,13 @@ def main() -> int:
     )
 
     # Write the hermetic inputs file.
-    args.output.writelines(f"{input}\n" for input in sorted(inputs))
+    with open(args.output, "w") as f:
+        f.writelines(f"{input}\n" for input in sorted(inputs))
 
     # Write the depfile.
     if args.depfile:
-        DepFile.from_deps(args.output.name, all_manifest_paths).write_to(
-            args.depfile
-        )
+        with open(args.depfile, "w") as f:
+            DepFile.from_deps(args.output, all_manifest_paths).write_to(f)
 
     return 0
 
