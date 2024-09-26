@@ -1597,7 +1597,7 @@ async fn use_from_dictionary_availability_invalid() {
                         .name("foo")
                         .target_name("A")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .target(OfferTarget::Capability("required_dict".parse().unwrap()))
                         .availability(Availability::Optional),
                 )
                 .offer(
@@ -1780,7 +1780,7 @@ async fn offer_from_dictionary_availability_invalid() {
                         .name("foo")
                         .target_name("A")
                         .source(OfferSource::Self_)
-                        .target(OfferTarget::Capability("dict".parse().unwrap()))
+                        .target(OfferTarget::Capability("required_dict".parse().unwrap()))
                         .availability(Availability::Optional),
                 )
                 .offer(

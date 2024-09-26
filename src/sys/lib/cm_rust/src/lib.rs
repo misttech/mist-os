@@ -2181,10 +2181,10 @@ impl From<CapabilityTypeName> for fio::DirentType {
             CapabilityTypeName::Service => fio::DirentType::Directory,
             CapabilityTypeName::Storage => fio::DirentType::Directory,
             CapabilityTypeName::Dictionary => fio::DirentType::Directory,
-            // The below don't appear in exposed or used dir
-            CapabilityTypeName::Resolver
-            | CapabilityTypeName::Runner
-            | CapabilityTypeName::Config => fio::DirentType::Unknown,
+            CapabilityTypeName::Resolver => fio::DirentType::Service,
+            CapabilityTypeName::Runner => fio::DirentType::Service,
+            // Config capabilities don't appear in exposed or used dir
+            CapabilityTypeName::Config => fio::DirentType::Unknown,
         }
     }
 }

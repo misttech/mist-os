@@ -235,7 +235,7 @@ pub struct TestModelResult {
     pub builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
     pub realm_proxy: Option<fcomponent::RealmProxy>,
     pub mock_runner: Arc<MockRunner>,
-    pub mock_resolver: Box<MockResolver>,
+    pub mock_resolver: Arc<MockResolver>,
 }
 
 pub struct TestEnvironmentBuilder {
@@ -310,7 +310,7 @@ impl TestEnvironmentBuilder {
     pub async fn build(mut self) -> TestModelResult {
         let mock_runner = Arc::new(MockRunner::new());
 
-        let mut mock_resolver = MockResolver::new();
+        let mock_resolver = MockResolver::new();
         for (name, decl) in &self.components {
             mock_resolver.add_component(name, decl.clone());
         }
@@ -331,7 +331,7 @@ impl TestEnvironmentBuilder {
         self.runtime_config.component_id_index_path = self.component_id_index_path;
         self.runtime_config.enable_introspection = true;
 
-        let mock_resolver = Box::new(mock_resolver);
+        let mock_resolver = Arc::new(mock_resolver);
         let builtin_environment = Arc::new(Mutex::new(
             BuiltinEnvironmentBuilder::new()
                 .add_resolver("test".to_string(), mock_resolver.clone())
@@ -373,7 +373,7 @@ pub struct ActionsTest {
     pub test_hook: Arc<TestHook>,
     pub realm_proxy: Option<fcomponent::RealmProxy>,
     pub runner: Arc<MockRunner>,
-    pub resolver: Box<MockResolver>,
+    pub resolver: Arc<MockResolver>,
 }
 
 impl ActionsTest {

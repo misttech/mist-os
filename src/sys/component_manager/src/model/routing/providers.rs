@@ -59,7 +59,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .decl()
             .capabilities
             .iter()
-            .filter(|e| matches!(e, cm_rust::CapabilityDecl::Protocol(_)))
             .map(|e| (e.name().clone(), CapabilityTypeName::from(e)))
             .collect();
         let metadata = Dict::new();

@@ -726,14 +726,6 @@ impl ResolvedInstanceState {
         }
     }
 
-    pub fn environment_for_collection(
-        &self,
-        component: &Arc<ComponentInstance>,
-        collection: &CollectionDecl,
-    ) -> Arc<Environment> {
-        self.get_environment(component, collection.environment.as_ref())
-    }
-
     /// Adds a new child component instance.
     pub async fn add_child(
         &mut self,
@@ -1180,6 +1172,7 @@ impl Routable for CapabilityRequestedHook {
         debug: bool,
     ) -> Result<Capability, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
+
         fn cm_unexpected() -> RouterError {
             RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
         }

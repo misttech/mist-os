@@ -242,30 +242,25 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
         .await;
     }
 
-    ///    a
-    ///    |
-    ///    b
+    ///   a
+    ///  / \
+    ///  b c
     ///
-    /// a: has storage decl with name "data" with a source of self at path /data
+    /// a: has storage decl with name "data" with a source of c's exposed "tmpfs" directory
     /// a: offers data storage to b
     /// a: uses a storage admin protocol from #data
     /// b: uses data storage as /storage.
+    /// c: exposes directory "tmpfs" from self at path /data
     pub async fn test_admin_protocol_used_in_the_same_place_storage_is_declared(&self) {
         let components = vec![
             (
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        CapabilityBuilder::directory()
-                            .name("tmpfs")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR),
-                    )
-                    .capability(
                         CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_),
+                            .source(StorageDirectorySource::Child("c".to_string())),
                     )
                     .offer(
                         OfferBuilder::storage()
@@ -279,12 +274,25 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .name("fuchsia.sys2.StorageAdmin"),
                     )
                     .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .use_(UseBuilder::storage().name("data").path("/storage"))
+                    .build(),
+            ),
+            (
+                "c",
+                ComponentDeclBuilder::new()
+                    .capability(
+                        CapabilityBuilder::directory()
+                            .name("tmpfs")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
+                    )
+                    .expose(ExposeBuilder::directory().name("tmpfs").source(ExposeSource::Self_))
                     .build(),
             ),
         ];

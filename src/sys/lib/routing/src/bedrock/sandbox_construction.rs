@@ -99,6 +99,14 @@ impl ComponentSandbox {
         for (copy_from, copy_to) in &[
             (&component_input.capabilities(), &self.component_input.capabilities()),
             (&component_input.environment().debug(), &self.component_input.environment().debug()),
+            (
+                &component_input.environment().runners(),
+                &self.component_input.environment().runners(),
+            ),
+            (
+                &component_input.environment().resolvers(),
+                &self.component_input.environment().resolvers(),
+            ),
             (&component_output_dict, &self.component_output_dict),
             (&program_input.namespace, &self.program_input.namespace),
             (&program_input.config, &self.program_input.config),
@@ -323,15 +331,27 @@ fn build_environment(
             warn!("failed to copy component_input.environment");
         }
     }
-    let debug_registrations =
-        environment_decl.debug_capabilities.iter().map(|debug_registration| {
-            let cm_rust::DebugRegistration::Protocol(debug) = debug_registration;
-            (&debug.source_name, &debug.target_name, &debug.source, CapabilityTypeName::Protocol)
-        });
-    let runners = environment_decl.runners.iter().map(|runner| {
-        (&runner.source_name, &runner.target_name, &runner.source, CapabilityTypeName::Runner)
+    let debug = environment_decl.debug_capabilities.iter().map(|debug_registration| {
+        let cm_rust::DebugRegistration::Protocol(debug) = debug_registration;
+        (&debug.source_name, debug.target_name.clone(), &debug.source, CapabilityTypeName::Protocol)
     });
-    for (source_name, target_name, source, cap_type) in debug_registrations.chain(runners) {
+    let runners = environment_decl.runners.iter().map(|runner| {
+        (
+            &runner.source_name,
+            runner.target_name.clone(),
+            &runner.source,
+            CapabilityTypeName::Runner,
+        )
+    });
+    let resolvers = environment_decl.resolvers.iter().map(|resolver| {
+        (
+            &resolver.resolver,
+            Name::new(&resolver.scheme).unwrap(),
+            &resolver.source,
+            CapabilityTypeName::Resolver,
+        )
+    });
+    for (source_name, target_name, source, cap_type) in debug.chain(runners).chain(resolvers) {
         let source_path =
             SeparatedPath { dirname: Default::default(), basename: source_name.clone() };
         let router = match &source {
@@ -375,9 +395,10 @@ fn build_environment(
         let dict_to_insert_to = match cap_type {
             CapabilityTypeName::Protocol => environment.debug(),
             CapabilityTypeName::Runner => environment.runners(),
+            CapabilityTypeName::Resolver => environment.resolvers(),
             c => panic!("unexpected capability type {}", c),
         };
-        match dict_to_insert_to.insert_capability(target_name, router.into()) {
+        match dict_to_insert_to.insert_capability(&target_name, router.into()) {
             Ok(()) => (),
             Err(e) => warn!("failed to add {} {} to environment: {e:?}", cap_type, target_name),
         }
@@ -699,6 +720,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
             | cm_rust::OfferDecl::Protocol(_)
             | cm_rust::OfferDecl::Dictionary(_)
             | cm_rust::OfferDecl::Runner(_)
+            | cm_rust::OfferDecl::Resolver(_)
     )
 }
 
@@ -846,6 +868,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
             | cm_rust::ExposeDecl::Protocol(_)
             | cm_rust::ExposeDecl::Dictionary(_)
             | cm_rust::ExposeDecl::Runner(_)
+            | cm_rust::ExposeDecl::Resolver(_)
     )
 }
 

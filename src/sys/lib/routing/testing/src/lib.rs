@@ -302,7 +302,6 @@ macro_rules! instantiate_common_routing_tests {
             test_use_from_expose_to_framework,
             test_offer_from_non_executable,
             test_route_filtered_aggregate_service,
-            test_route_filtered_aggregate_service_with_conflicting_filter_fails,
             test_route_anonymized_aggregate_service,
             test_use_directory_with_subdir_from_grandparent,
             test_use_directory_with_subdir_from_sibling,
@@ -1871,78 +1870,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     }
 
     ///   a
-    /// / | \
-    /// b c d
-    ///
-    /// a: offers "foo" from both b and c to d
-    /// b: exposes "foo" to parent from self
-    /// c: exposes "foo" to parent from self
-    /// d: uses "foo" from parent
-    /// routing an aggregate service with conflicting source_instance_filters should fail.
-    pub async fn test_route_filtered_aggregate_service_with_conflicting_filter_fails(&self) {
-        let expected_service_decl = CapabilityBuilder::service().name("foo").build();
-        let components = vec![
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .offer(
-                        OfferBuilder::service()
-                            .name("foo")
-                            .source_static_child("b")
-                            .target_static_child("d")
-                            .source_instance_filter(["default", "other_a"]),
-                    )
-                    .offer(
-                        OfferBuilder::service()
-                            .name("foo")
-                            .source_static_child("c")
-                            .target_static_child("d")
-                            .source_instance_filter(["default", "other_b"]),
-                    )
-                    .child_default("b")
-                    .child_default("c")
-                    .child_default("d")
-                    .build(),
-            ),
-            (
-                "b",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
-                    .capability(expected_service_decl.clone())
-                    .build(),
-            ),
-            (
-                "c",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
-                    .capability(expected_service_decl.clone())
-                    .build(),
-            ),
-            ("d", ComponentDeclBuilder::new().use_(UseBuilder::service().name("foo")).build()),
-        ];
-        let model = T::new("a", components).build().await;
-
-        let d_component =
-            model.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
-        assert_matches!(
-            route_capability(
-                RouteRequest::UseService(UseServiceDecl {
-                    source: UseSource::Parent,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: Default::default(),
-                    target_path: "/svc/foo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                &d_component,
-                &mut NoopRouteMapper
-            )
-            .await,
-            Err(RoutingError::UnsupportedRouteSource { source_type: _, moniker: _ })
-        );
-    }
-
-    ///   a
     ///    \
     ///     b
     ///      \
@@ -3375,7 +3302,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             .name("foo")
                             .source_static_child("c")
                             .target_static_child("b")
-                            .source_instance_filter([])
                             .renamed_instances([("instance_0", "renamed_instance_0")]),
                     )
                     .child_default("b")
@@ -4306,13 +4232,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// a: routes "fuchsia.MyConfig" from void
     /// b: uses "fuchsia.MyConfig" from parent
     pub async fn test_use_config_from_void(&self) {
-        let use_config = UseBuilder::config()
+        let mut use_config = UseBuilder::config()
             .source(cm_rust::UseSource::Parent)
             .name("fuchsia.MyConfig")
             .target_name("my_config")
             .availability(cm_rust::Availability::Optional)
             .config_type(cm_rust::ConfigValueType::Int8)
             .build();
+        match &mut use_config {
+            cm_rust::UseDecl::Config(use_config_decl) => {
+                use_config_decl.default =
+                    Some(cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Int8(0)))
+            }
+            _ => panic!("unexpected use declaration variant"),
+        }
         let components = vec![
             (
                 "a",
@@ -4353,7 +4286,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let cm_rust::UseDecl::Config(use_config) = use_config else { panic!() };
         let value =
             routing::config::route_config_value(&use_config, &child_component).await.unwrap();
-        assert_eq!(value, None);
+        assert_eq!(value, Some(cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Int8(0))));
     }
 
     pub async fn test_use_dictionary_protocol_from_self(&self) {

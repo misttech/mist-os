@@ -171,6 +171,13 @@ fn validate_capabilities(
     as_builtin: bool,
 ) -> Result<(), ErrorList> {
     let mut ctx = ValidationContext::default();
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    ctx.load_dictionary_names(capabilities.iter().filter_map(|capability| match capability {
+        fdecl::Capability::Dictionary(dictionary_decl) => Some(dictionary_decl),
+        _ => None,
+    }));
+
     ctx.validate_capability_decls(capabilities, as_builtin);
     if ctx.errors.is_empty() {
         Ok(())
@@ -366,6 +373,13 @@ impl<'a> ValidationContext<'a> {
 
         // Validate "capabilities" and build the set of all capabilities.
         if let Some(capabilities) = decl.capabilities.as_ref() {
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            self.load_dictionary_names(capabilities.iter().filter_map(
+                |capability| match capability {
+                    fdecl::Capability::Dictionary(dictionary_decl) => Some(dictionary_decl),
+                    _ => None,
+                },
+            ));
             self.validate_capability_decls(capabilities, false);
         }
 
@@ -640,23 +654,6 @@ impl<'a> ValidationContext<'a> {
         capabilities: &'a [fdecl::Capability],
         as_builtin: bool,
     ) {
-        for capability in capabilities {
-            match capability {
-                // Dictionaries can reference other dictionaries in the same manifest, so
-                // do a first pass to pre-populate the dictionary map.
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
-                fdecl::Capability::Dictionary(dictionary) => {
-                    if let Some(name) = dictionary.name.as_ref() {
-                        let decl = DeclType::Dictionary;
-                        if !self.all_capability_ids.insert(name) {
-                            self.errors.push(Error::duplicate_field(decl, "name", name.as_str()));
-                        }
-                        self.all_dictionaries.insert(name, &dictionary);
-                    }
-                }
-                _ => {}
-            }
-        }
         for capability in capabilities {
             self.validate_capability_decl(capability, as_builtin);
         }
@@ -1500,10 +1497,26 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
+    // Dictionaries can reference other dictionaries in the same manifest, so before processing any
+    // dictionary declarations this function should be called to do a first pass to pre-populate
+    // the dictionary map.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn load_dictionary_names(&mut self, dictionaries: impl Iterator<Item = &'a fdecl::Dictionary>) {
+        for dictionary in dictionaries {
+            let decl = DeclType::Dictionary;
+            if check_name(dictionary.name.as_ref(), decl, "name", &mut self.errors) {
+                let name = dictionary.name.as_ref().unwrap();
+                if !self.all_capability_ids.insert(name) {
+                    self.errors.push(Error::duplicate_field(decl, "name", name.as_str()));
+                }
+                self.all_dictionaries.insert(name, &dictionary);
+            }
+        }
+    }
+
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn validate_dictionary_decl(&mut self, dictionary: &'a fdecl::Dictionary) {
         let decl = DeclType::Dictionary;
-        check_name(dictionary.name.as_ref(), decl, "name", &mut self.errors);
         match dictionary.source.as_ref() {
             Some(fdecl::Ref::Self_(_)) | Some(fdecl::Ref::Parent(_)) => {
                 check_relative_path(
@@ -2092,9 +2105,13 @@ impl<'a> ValidationContext<'a> {
                     (Some(source_instance_filter), _) => {
                         for instance_name in source_instance_filter {
                             if !source_instance_filter_entries.insert(instance_name.clone()) {
-                                // If the source instance in the filter has been seen before this means there is a conflicting
-                                // aggregate service offer.
-                                self.errors.push(Error::invalid_aggregate_offer(format!("Conflicting source_instance_filter in aggregate service offer, instance_name '{}' seen in filter lists multiple times", instance_name)));
+                                // If the source instance in the filter has been seen before this
+                                // means there is a conflicting aggregate service offer.
+                                self.errors.push(Error::invalid_aggregate_offer(format!(
+                                    "Conflicting source_instance_filter in aggregate service \
+                                    offer, instance_name '{}' seen in filter lists multiple times",
+                                    instance_name,
+                                )));
                             }
                         }
                     }
@@ -2115,7 +2132,8 @@ impl<'a> ValidationContext<'a> {
 
             if service_source_names.len() > 1 {
                 self.errors.push(Error::invalid_aggregate_offer(format!(
-                    "All aggregate service offers must have the same source_name, saw {}. Use renamed_instances to rename instance names to avoid conflict.",
+                    "All aggregate service offers must have the same source_name, saw {}. Use \
+                    renamed_instances to rename instance names to avoid conflict.",
                     service_source_names.into_iter().sorted().collect::<Vec<String>>().join(", ")
                 )));
             }
@@ -9095,6 +9113,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
+                Error::missing_field(DeclType::Dictionary, "name"),
                 Error::missing_field(DeclType::Service, "name"),
                 Error::missing_field(DeclType::Service, "source_path"),
                 Error::missing_field(DeclType::Protocol, "name"),
@@ -9110,7 +9129,6 @@ mod tests {
                 Error::missing_field(DeclType::Runner, "source_path"),
                 Error::missing_field(DeclType::Resolver, "name"),
                 Error::missing_field(DeclType::Resolver, "source_path"),
-                Error::missing_field(DeclType::Dictionary, "name"),
             ])),
         },
         test_validate_capabilities_invalid_identifiers => {
@@ -9161,6 +9179,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
+                Error::invalid_field(DeclType::Dictionary, "name"),
                 Error::invalid_field(DeclType::Service, "name"),
                 Error::invalid_field(DeclType::Service, "source_path"),
                 Error::invalid_field(DeclType::Protocol, "name"),
@@ -9174,7 +9193,6 @@ mod tests {
                 Error::invalid_field(DeclType::Runner, "source_path"),
                 Error::invalid_field(DeclType::Resolver, "name"),
                 Error::invalid_field(DeclType::Resolver, "source_path"),
-                Error::invalid_field(DeclType::Dictionary, "name"),
             ])),
         },
         test_validate_capabilities_invalid_child => {
@@ -9255,6 +9273,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
+                Error::field_too_long(DeclType::Dictionary, "name"),
                 Error::field_too_long(DeclType::Service, "name"),
                 Error::field_too_long(DeclType::Service, "source_path"),
                 Error::field_too_long(DeclType::Protocol, "name"),
@@ -9268,7 +9287,6 @@ mod tests {
                 Error::field_too_long(DeclType::Runner, "source_path"),
                 Error::field_too_long(DeclType::Resolver, "name"),
                 Error::field_too_long(DeclType::Resolver, "source_path"),
-                Error::field_too_long(DeclType::Dictionary, "name"),
             ])),
         },
         test_validate_capabilities_duplicate_name => {
@@ -9450,7 +9468,8 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_aggregate_offer("Conflicting source_instance_filter in aggregate service offer, instance_name 'default' seen in filter lists multiple times"),
+                Error::invalid_aggregate_offer("Conflicting source_instance_filter in aggregate \
+                   service offer, instance_name 'default' seen in filter lists multiple times"),
             ])),
         },
 

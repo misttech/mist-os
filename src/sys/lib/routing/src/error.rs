@@ -298,6 +298,9 @@ pub enum RoutingError {
     #[error("failed to send message for capability `{capability_id}` from component `{moniker}`")]
     BedrockFailedToSend { moniker: ExtendedMoniker, capability_id: String },
 
+    #[error("failed to route capability because the route source has been shutdown and possibly destroyed")]
+    RouteSourceShutdown { moniker: Moniker },
+
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -365,6 +368,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockFailedToSend { .. }
+            | RoutingError::RouteSourceShutdown { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
@@ -410,6 +414,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::UseFromEnvironmentNotFound { moniker, .. }
             | RoutingError::UseFromParentNotFound { moniker, .. }
             | RoutingError::UseFromRootEnvironmentNotAllowed { moniker, .. }
+            | RoutingError::RouteSourceShutdown { moniker }
             | RoutingError::UseFromSelfNotFound { moniker, .. } => moniker.into(),
 
             RoutingError::BedrockMemberAccessUnsupported { moniker }

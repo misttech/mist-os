@@ -894,7 +894,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn restart_does_not_refresh_resolved_state() {
-        let (mut test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
+        let (test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
             let timestamp = zx::MonotonicTime::get();
@@ -917,12 +917,13 @@ mod tests {
             assert!(state.get_started_state().is_none());
         }
 
-        let resolver = test_harness.resolver.as_mut();
-        let original_decl =
-            resolver.get_component_decl(TEST_CHILD_NAME).expect("child decl not stored");
+        let original_decl = test_harness
+            .resolver
+            .get_component_decl(TEST_CHILD_NAME)
+            .expect("child decl not stored");
         let mut modified_decl = original_decl.clone();
         modified_decl.children.push(ChildBuilder::new().name("foo").build());
-        resolver.add_component(TEST_CHILD_NAME, modified_decl.clone());
+        test_harness.resolver.add_component(TEST_CHILD_NAME, modified_decl.clone());
 
         ActionsManager::register(
             child.clone(),

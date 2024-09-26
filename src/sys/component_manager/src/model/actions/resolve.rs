@@ -5,7 +5,6 @@
 use crate::model::actions::{Action, ActionKey};
 use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
 use crate::model::component::{Component, ComponentInstance, WeakComponentInstance};
-use crate::model::resolver::Resolver;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::resolving::ComponentAddress;
 use async_trait::async_trait;
@@ -65,7 +64,7 @@ async fn do_resolve(
     }
     let component_url = &component.component_url;
     let component_address =
-        ComponentAddress::from(component_url, component).await.map_err(|err| {
+        ComponentAddress::from_url(component_url, component).await.map_err(|err| {
             ResolveActionError::ComponentAddressParseError {
                 url: component.component_url.clone(),
                 moniker: component.moniker.clone(),
@@ -75,7 +74,7 @@ async fn do_resolve(
     let component_info = abortable_scope
         .run(async {
             let component_info =
-                component.environment.resolve(&component_address).await.map_err(|err| {
+                component.perform_resolve(None, &component_address).await.map_err(|err| {
                     ResolveActionError::ResolverError { url: component.component_url.clone(), err }
                 })?;
             Component::resolve_with_config(component_info, component.config_parent_overrides())
