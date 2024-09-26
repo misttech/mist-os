@@ -7,6 +7,8 @@ import("//build/test.gni")
 import("//build/testing/perf/test.gni")
 
 test("udp_serde_benchmarks") {
+  # Don't pessimize the benchmark by opting out of LTO if it's enabled.
+  disable_lto = false
   sources = [ "main.cc" ]
 
   deps = [
