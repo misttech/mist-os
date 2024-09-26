@@ -85,10 +85,14 @@ class Bindgen:
         self.no_default_types = []
         # Use types from Rust core instead of std.
         self.use_core = False
+        # Additional flags to pass directly to bindgen.
+        self.additional_bindgen_flags = []
         # Clang: Enable standard #include directories for the C++ standard library
         self.enable_stdlib_include_dirs = True
         # Clang: Define `__Fuchsia_API_level__`.
         self.fuchsia_api_level = ""
+        # Clang: Additional command line flags to pass to clang.
+        self.additional_clang_flags = []
 
     def set_auto_derive_traits(self, traits_map):
         self.auto_derive_traits = [(re.compile(x[0]), x[1]) for x in traits_map]
@@ -131,6 +135,8 @@ class Bindgen:
         args += ["--no-copy=" + x for x in self.no_copy_types]
         args += ["--no-default=" + x for x in self.no_default_types]
 
+        args += self.additional_bindgen_flags
+
         args += [input_file]
 
         # Clang arguments (after the "--").
@@ -150,6 +156,8 @@ class Bindgen:
         for i in self.include_dirs:
             args += ["-I", i]
         args += ["-I", "."]
+
+        args += self.additional_clang_flags
 
         subprocess.check_call(
             args, env={"RUSTFMT": os.path.abspath(RUSTFMT_PATH)}
