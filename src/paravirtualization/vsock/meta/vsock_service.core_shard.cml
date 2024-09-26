@@ -26,9 +26,15 @@
             source_availability: "unknown",
         },
         {
+            config: "fuchsia.vsock.GuestToHostSupported",
             from: "void",
             to: "#vsock",
-            config: "fuchsia.vsock.GuestToHostSupported",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.vsock.LoopbackSupported",
+            from: "void",
+            to: "#vsock",
             availability: "optional",
         },
     ],
