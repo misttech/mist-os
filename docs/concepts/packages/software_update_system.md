@@ -2,7 +2,7 @@
 
 Fuchsia is a project that constantly gets updates for new features, enhancements,
 and security fixes. Fuchsia's software update system makes use of
-[The Update Framework (TUF) version 1.0](https://github.com/theupdateframework/specification/blob/HEAD/tuf-spec.md).
+[The Update Framework (TUF) version 1.0][tuf]{:.external}.
 However, Fuchsia does have some differences from TUF:
 
 * [Specification version](#specification-version)
@@ -66,7 +66,7 @@ Definition of values:
 ## Merkle root {#merkle-root}
 
 In the Fuchsia repository, each package target includes the
-[merkle root](/docs/concepts/packages/merkleroot.md) of the package's meta FAR as a custom attribute.
+[merkle root][merkleroot] of the package's meta FAR as a custom attribute.
 This example shows the format for the merkle root:
 
 ```
@@ -94,3 +94,7 @@ Definition of values:
   meta FAR.
 * `BLOB_SIZE`. `INT`. The size, in bytes, of the unencrypted BLOB identified by the `MERKLE_ROOT`.
 
+<!-- Reference links -->
+
+[tuf]: https://github.com/theupdateframework/specification/blob/HEAD/tuf-spec.md
+[merkleroot]: /docs/concepts/security/merkleroot.md

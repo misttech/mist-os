@@ -931,7 +931,7 @@ generalization of a build system to operate asynchronously and distributed.
 [fuchsia-swd]: /docs/concepts/packages/software_update_system.md
 [fuchsia-package]: /docs/concepts/packages/package.md
 [fuchsia-package-hermetic]: /docs/concepts/software_model.md#distributing-components-through-packages
-[fuchsia-merkleroot]: /docs/concepts/packages/merkleroot.md
+[fuchsia-merkleroot]: /docs/concepts/security/merkleroot.md
 [cipd]: https://chromium.googlesource.com/infra/luci/luci-go/+/HEAD/cipd/README.md
 [glossary.product]: /docs/glossary/README.md#product
 [glossary.product-owner]: /docs/glossary/README.md#product-owner

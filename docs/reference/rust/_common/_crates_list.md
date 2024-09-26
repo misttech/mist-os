@@ -83,7 +83,7 @@
 
 * [fuchsia-merkle](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_merkle/index.html)
 
-    Protect and verify data blobs using [Merkle Trees](/docs/concepts/packages/merkleroot.md)
+    Protect and verify data blobs using [Merkle Trees](/docs/concepts/security/merkleroot.md)
 
 ## Testing
 

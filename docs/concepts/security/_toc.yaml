@@ -8,3 +8,5 @@
 toc:
 - title: "Verified Execution"
   path: /docs/concepts/security/verified_execution.md
+- title: "Fuchsia merkle roots"
+  path: /docs/concepts/security/merkleroot.md

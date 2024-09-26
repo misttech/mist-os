@@ -12,7 +12,7 @@ Some packages are present on a Fuchsia system at startup, and
 additional packages can be downloaded from a Fuchsia package server in `BLOB`s.
 The Fuchsia package server is an HTTP(S) server. These `BLOB`s are uniquely defined by a Merkle
 root. A `BLOB` is named after its content, using the
-[Fuchsia Merkle Root](merkleroot.md) algorithm. If two `BLOB`s have the same content,
+[Fuchsia Merkle Root][merkleroot] algorithm. If two `BLOB`s have the same content,
 they have the same name. As a result, each `BLOB` has a unique identifier and is
 written to persistent storage using this Merkle
 root as a key. This process is done to eliminate duplication of `BLOB`s that
@@ -113,7 +113,7 @@ Note: For more information on the Fuchsia archive format (FAR), see
 
 The package metadata archive, `meta.far`, contains metadata about
 a package, presented as the `meta/` directory. `meta.far` has a
-[merkleroot](merkleroot.md) which in practical terms is also known as the
+[merkleroot][merkleroot] which in practical terms is also known as the
 merkleroot of a package.
 
 The `meta/` directory of a package contains at minimum two files:
@@ -202,5 +202,8 @@ cannot be overridden). A relative package URL looks like the following:
 
 As with absolute package URLs, the resource path may or may not be included.
 
+<!-- Reference links -->
+
 [Subpackaging components]: /docs/concepts/components/v2/subpackaging.md
 [glossary.subpackage]: /docs/glossary/README.md#subpackage
+[merkleroot]: /docs/concepts/security/merkleroot.md
