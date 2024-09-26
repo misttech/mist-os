@@ -3,124 +3,96 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix/kernel/arch/x64/syscalls.h>
+#include <lib/mistos/starnix/kernel/execution/executor.h>
+#include <lib/mistos/starnix/kernel/syscalls/misc.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
+#include <lib/starnix_zircon/task_wrapper.h>
 #include <lib/syscalls/forward.h>
 #include <trace.h>
 
 #include "../priv.h"
 
-#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
+#include <linux/utsname.h>
 
-using namespace starnix_uapi;
-using namespace starnix;
-using namespace starnix_syscalls;
+#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(2)
 
-long sys_getpid() {
+long sys_a0039_getpid() {
   LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getpid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getpid, current_task);
 }
 
-long sys_gettid() {
-  LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_gettid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
+long sys_a0063_uname(user_out_ptr<void> name) {
+#if 1
+  struct new_utsname result;
+  strncpy(result.sysname, "Linux", sizeof(result.sysname) / sizeof(result.sysname[0]));
+
+  if (auto status = name.reinterpret<struct new_utsname>().copy_to_user(result); status != ZX_OK) {
+    return -EFAULT;
   }
-  return SyscallResult::From(*syscall_ret).value();
+
+  return 0;
+#else
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_uname, current_task, name.reinterpret<struct new_utsname>());
+#endif
 }
 
-long sys_getppid() {
+long sys_a0102_getuid() {
   LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getppid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getuid, current_task);
 }
 
-long sys_getpgid(pid_t pid) {
+long sys_a0104_getgid() {
+  LTRACE;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getgid, current_task);
+}
+
+long sys_a0107_geteuid() {
+  LTRACE;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_geteuid, current_task);
+}
+
+long sys_a0108_getegid() {
+  LTRACE;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getegid, current_task);
+}
+
+long sys_a0110_getppid() {
+  LTRACE;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getppid, current_task);
+}
+
+long sys_a0111_getpgrp() {
+  LTRACE;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getpgrp, current_task);
+}
+
+long sys_a0186_gettid() {
+  LTRACE;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_gettid, current_task);
+}
+
+long sys_a0121_getpgid(pid_t pid) {
   LTRACEF_LEVEL(2, "pid %d\n", pid);
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getpgid(CurrentTask::From(TaskBuilder(ut->task()->task())), pid);
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_getpgid, current_task, pid);
 }
 
-long sys_getpgrp() {
-  LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getpgrp(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
-}
-
-long sys_getuid() {
-  LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getuid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
-}
-
-long sys_getgid() {
-  LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getgid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
-}
-
-long sys_geteuid() {
-  LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_geteuid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
-}
-
-long sys_getegid() {
-  LTRACE;
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret = sys_getegid(CurrentTask::From(TaskBuilder(ut->task()->task())));
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return SyscallResult::From(*syscall_ret).value();
-}
-
-long sys_prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4,
-               unsigned long arg5) {
+long sys_a0157_prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4,
+                     unsigned long arg5) {
   LTRACEF_LEVEL(2, "option %d arg2 0x%lx arg3 0x%lx arg4 0x%lx arg5 0x%lx\n", option, arg2, arg3,
                 arg4, arg5);
-
-  auto ut = ThreadDispatcher::GetCurrent();
-  auto syscall_ret =
-      sys_prctl(CurrentTask::From(TaskBuilder(ut->task()->task())), option, arg2, arg3, arg4, arg5);
-  if (syscall_ret.is_error()) {
-    return syscall_ret.error_value().return_value();
-  }
-  return syscall_ret->value();
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_prctl, current_task, option, arg2, arg3, arg4, arg5);
 }
