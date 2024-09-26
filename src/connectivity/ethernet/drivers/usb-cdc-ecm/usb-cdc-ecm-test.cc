@@ -6,12 +6,10 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
-#include <fuchsia/driver/test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
@@ -37,8 +35,6 @@
 namespace usb_virtual_bus {
 namespace {
 
-using driver_integration_test::IsolatedDevmgr;
-using fuchsia::driver::test::DriverLog;
 using usb_virtual::BusLauncher;
 
 constexpr const char kManufacturer[] = "Google";

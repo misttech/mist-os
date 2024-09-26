@@ -18,28 +18,19 @@ zx_library("usb-virtual-bus-launcher") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
-    "//src/devices/testing/driver-integration-test-shim",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//zircon/system/ulib/ddk-platform-defs",
+    "//zircon/system/ulib/fbl",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
     "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/usb-peripheral-utils",
     "//zircon/system/ulib/zx",
-  ]
-
-  # STOP: Do not add any new entries to this allow list. Use //sdk/lib/driver_test_realm instead.
-  visibility = [
-    "//src/connectivity/ethernet/drivers/asix-88179/*",
-    "//src/connectivity/ethernet/drivers/usb-cdc-ecm/*",
-    "//src/devices/block/drivers/usb-mass-storage/*",
-    "//src/devices/serial/drivers/ftdi/test/*",
-    "//src/devices/serial/drivers/usb-cdc-acm/*",
-    "//src/devices/usb/drivers/usb-virtual-bus/*",
-    "//src/ui/input/drivers/usb-hid/*",
   ]
 }

@@ -117,6 +117,7 @@ test("asix-88179-integration") {
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
     "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//src/connectivity/lib/network-device/cpp",
     "//src/devices/usb/lib/usb",

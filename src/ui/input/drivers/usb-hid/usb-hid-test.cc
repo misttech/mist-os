@@ -54,8 +54,10 @@ class UsbHidTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    ASSERT_OK(bus_->ClearPeripheralDeviceFunctions());
-    ASSERT_OK(bus_->Disable());
+    if (bus_.has_value()) {
+      ASSERT_OK(bus_->ClearPeripheralDeviceFunctions());
+      ASSERT_OK(bus_->Disable());
+    }
   }
 
  protected:
