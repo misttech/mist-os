@@ -77,6 +77,7 @@ _INPUT_ARGS: dict[str, Any] = {
         mdns_enabled=False,
         subtools_search_path=None,
         proxy_timeout_secs=None,
+        ssh_keepalive_timeout=None,
     ),
 }
 

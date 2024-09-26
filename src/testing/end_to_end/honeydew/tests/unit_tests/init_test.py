@@ -35,6 +35,7 @@ _INPUT_ARGS: dict[str, Any] = {
         mdns_enabled=False,
         subtools_search_path=None,
         proxy_timeout_secs=None,
+        ssh_keepalive_timeout=None,
     ),
     "target_name": _TARGET_NAME,
     "target_ip_port": _REMOTE_TARGET_IP_PORT_OBJ,

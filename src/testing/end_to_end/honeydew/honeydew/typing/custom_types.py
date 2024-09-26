@@ -174,6 +174,7 @@ class FFXConfig:
         subtools_search_path: A path of where ffx should
             look for plugins.
         proxy_timeout_secs: Proxy timeout in secs.
+        ssh_keepalive_timeout: SSH keep-alive timeout in secs.
     """
 
     binary_path: str
@@ -183,6 +184,7 @@ class FFXConfig:
     mdns_enabled: bool
     subtools_search_path: str | None
     proxy_timeout_secs: int | None
+    ssh_keepalive_timeout: int | None
 
     def __str__(self) -> str:
         return (
@@ -193,6 +195,7 @@ class FFXConfig:
             f"mdns_enabled={self.mdns_enabled}, "
             f"subtools_search_path={self.subtools_search_path}, "
             f"proxy_timeout_secs={self.proxy_timeout_secs}, "
+            f"ssh_keepalive_timeout={self.ssh_keepalive_timeout}, "
         )
 
 

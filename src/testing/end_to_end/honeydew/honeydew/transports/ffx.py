@@ -46,6 +46,11 @@ _FFX_CONFIG_CMDS: dict[str, list[str]] = {
         "set",
         "proxy.timeout_secs",
     ],
+    "SSH_KEEPALIVE_TIMEOUT": [
+        "config",
+        "set",
+        "daemon.ssh_keepalive_timeout",
+    ],
     "DAEMON_START": [
         "daemon",
         "start",
@@ -84,8 +89,9 @@ class FfxConfig:
         logs_dir: str,
         logs_level: str | None,
         enable_mdns: bool,
-        subtools_search_path: str | None,
-        proxy_timeout_secs: int | None,
+        subtools_search_path: str | None = None,
+        proxy_timeout_secs: int | None = None,
+        ssh_keepalive_timeout: int | None = None,
     ) -> None:
         """Sets up configuration need to be used while running FFX command.
 
@@ -99,9 +105,14 @@ class FfxConfig:
                 arg of FFX
             enable_mdns: Whether or not mdns need to be enabled. This will be
                 passed to `--config discovery.mdns.enabled` arg of FFX
-            subtools_search_path: A path of where ffx should
-                look for plugins.
-            proxy_timeout_secs: Proxy timeout in secs.
+            subtools_search_path: A path of where ffx should look for plugins.
+                Default value is None which means, it will not update
+                proxy_timeout_secs
+            proxy_timeout_secs: Proxy timeout in secs. Default value is None
+                which means, it will not update proxy_timeout_secs
+            ssh_keepalive_timeout: SSH keep-alive timeout in secs.
+                Default value is None which means, it will not update
+                ssh_keepalive_timeout
 
         Raises:
             errors.FfxConfigError: If setup has already been called once.
@@ -132,10 +143,11 @@ class FfxConfig:
         self._mdns_enabled: bool = enable_mdns
         self._subtools_search_path: str | None = subtools_search_path
         self._proxy_timeout_secs: int | None = proxy_timeout_secs
+        self._ssh_keepalive_timeout: int | None = ssh_keepalive_timeout
 
         self._run(_FFX_CONFIG_CMDS["LOG_DIR"] + [self._logs_dir])
 
-        if self._logs_level:
+        if self._logs_level is not None:
             self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
 
         self._run(_FFX_CONFIG_CMDS["MDNS"] + [str(self._mdns_enabled).lower()])
@@ -143,13 +155,19 @@ class FfxConfig:
         # Setting this based on the recommendation from awdavies@ for below
         # FuchsiaController error:
         #   FFX Library Error: Timeout attempting to reach target
-        if self._proxy_timeout_secs:
+        if self._proxy_timeout_secs is not None:
             self._run(
                 _FFX_CONFIG_CMDS["PROXY_TIMEOUT"]
                 + [str(self._proxy_timeout_secs)]
             )
 
-        if self._subtools_search_path:
+        if self._ssh_keepalive_timeout is not None:
+            self._run(
+                _FFX_CONFIG_CMDS["SSH_KEEPALIVE_TIMEOUT"]
+                + [str(self._ssh_keepalive_timeout)]
+            )
+
+        if self._subtools_search_path is not None:
             self._run(
                 _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"]
                 + [self._subtools_search_path]
@@ -200,6 +218,7 @@ class FfxConfig:
             mdns_enabled=self._mdns_enabled,
             subtools_search_path=self._subtools_search_path,
             proxy_timeout_secs=self._proxy_timeout_secs,
+            ssh_keepalive_timeout=self._ssh_keepalive_timeout,
         )
 
     def _atexit_callback(self) -> None:

@@ -38,6 +38,7 @@ _LOGS_LEVEL: str = "debug"
 _MDNS_ENABLED: bool = False
 _SUBTOOLS_SEARCH_PATH: str = "/subtools"
 _PROXY_TIMEOUT_SECS: int = 30
+_SSH_KEEPALIVE_TIMEOUT: int = 60
 
 _FFX_TARGET_SHOW_JSON: dict[str, Any] = {
     "target": {
@@ -108,10 +109,13 @@ _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
     }
 ]
 
-_FFX_CONFIG_SET: list[str] = [
+_FFX_CMD_OPTIONS: list[str] = [
     "ffx",
     "--isolate-dir",
     _ISOLATE_DIR,
+]
+
+_FFX_CONFIG_SET: list[str] = _FFX_CMD_OPTIONS + [
     "config",
     "set",
 ]
@@ -127,6 +131,7 @@ _INPUT_ARGS: dict[str, Any] = {
         mdns_enabled=_MDNS_ENABLED,
         subtools_search_path=_SUBTOOLS_SEARCH_PATH,
         proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
+        ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
     ),
     "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
 }
@@ -181,6 +186,7 @@ class FfxConfigTests(unittest.TestCase):
             enable_mdns=_MDNS_ENABLED,
             subtools_search_path=_SUBTOOLS_SEARCH_PATH,
             proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
+            ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
         )
 
         ffx_configs_calls = [
@@ -196,8 +202,13 @@ class FfxConfigTests(unittest.TestCase):
             ),
             mock.call(
                 _FFX_CONFIG_SET
+                + ["daemon.ssh_keepalive_timeout", str(_SSH_KEEPALIVE_TIMEOUT)]
+            ),
+            mock.call(
+                _FFX_CONFIG_SET
                 + ["ffx.subtool-search-paths", _SUBTOOLS_SEARCH_PATH]
             ),
+            mock.call(_FFX_CMD_OPTIONS + ["daemon", "start", "--background"]),
         ]
         mock_host_shell_run.assert_has_calls(ffx_configs_calls, any_order=True)
 
@@ -211,6 +222,7 @@ class FfxConfigTests(unittest.TestCase):
                 enable_mdns=_MDNS_ENABLED,
                 subtools_search_path=_SUBTOOLS_SEARCH_PATH,
                 proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
+                ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
             )
 
     @mock.patch.object(
@@ -237,6 +249,7 @@ class FfxConfigTests(unittest.TestCase):
                 enable_mdns=_MDNS_ENABLED,
                 subtools_search_path=_SUBTOOLS_SEARCH_PATH,
                 proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
+                ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
             )
 
         mock_host_shell_run.assert_called()
@@ -260,6 +273,7 @@ class FfxConfigTests(unittest.TestCase):
             enable_mdns=_MDNS_ENABLED,
             subtools_search_path=_SUBTOOLS_SEARCH_PATH,
             proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
+            ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
         )
         mock_ffx_config_run.assert_called()
 
@@ -294,6 +308,7 @@ class FfxConfigTests(unittest.TestCase):
             enable_mdns=_MDNS_ENABLED,
             subtools_search_path=_SUBTOOLS_SEARCH_PATH,
             proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
+            ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
         )
         mock_ffx_config_run.assert_called()
 
