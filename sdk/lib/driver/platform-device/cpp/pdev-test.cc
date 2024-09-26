@@ -272,3 +272,26 @@ TEST(PDevTest, GetBoardInfo) {
   ASSERT_EQ(kPid, board_info->pid);
   ASSERT_EQ(kVid, board_info->vid);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+TEST(PDevTest, GetPowerConfiguration) {
+  fuchsia_hardware_power::PowerElement fidl_element{{.name = "test power element", .levels = {{}}}};
+  fuchsia_hardware_power::PowerElementConfiguration fidl_config{
+      {.element = std::move(fidl_element), .dependencies = {{}}}};
+  std::vector<fuchsia_hardware_power::PowerElementConfiguration> fidl_configs{
+      std::move(fidl_config)};
+
+  FakePDevWithThread infra;
+  zx::result client_channel = infra.Start({.power_elements = std::move(fidl_configs)});
+  ASSERT_OK(client_channel);
+
+  fdf::PDev pdev{std::move(client_channel.value())};
+  zx::result configs = pdev.GetPowerConfiguration();
+  ASSERT_OK(configs.status_value());
+  ASSERT_EQ(configs->size(), 1);
+  const auto& config = configs.value()[0];
+  ASSERT_EQ(config.element.name, "test power element");
+  ASSERT_TRUE(config.element.levels.empty());
+  ASSERT_TRUE(config.dependencies.empty());
+}
+#endif
