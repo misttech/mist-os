@@ -11,7 +11,7 @@
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
-#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/auth.h>
