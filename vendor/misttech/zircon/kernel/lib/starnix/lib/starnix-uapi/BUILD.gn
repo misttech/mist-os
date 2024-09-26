@@ -12,6 +12,7 @@ zx_library("starnix-uapi") {
     "math.cc",
     "signals.cc",
     "user_address.cc",
+    "user_buffer.cc",
     "vfs.cc",
   ]
   public_deps = [

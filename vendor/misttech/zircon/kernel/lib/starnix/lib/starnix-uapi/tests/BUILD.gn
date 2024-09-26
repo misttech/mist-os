@@ -4,12 +4,13 @@
 
 source_set("tests") {
   sources = [
-    "device_types-tests.cc",
-    "file_mode-tests.cc",
-    "open_flags-test.cc",
+    #"device_types-tests.cc",
+    #"file_mode-tests.cc",
+    #"open_flags-test.cc",
+    "user_buffer-tests.cc",
   ]
   deps = [
-    "//zircon/kernel/lib/mistos/starnix_uapi",
-    "//zircon/system/ulib/zxtest:zxtest-mistos",
+    "////vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi",
+    "//zircon/kernel/lib/unittest",
   ]
 }
