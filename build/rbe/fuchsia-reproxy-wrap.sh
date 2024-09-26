@@ -237,9 +237,8 @@ rewrapper_env=(
 auth_option=()
 if [[ -n "${USER+x}" ]]
 then
-  gcert_status=0
-  gcert="$(which gcert}" || gcert_status="$?"
-  if [[ "$gcert_status" == 0 ]]
+  gcert="$(which gcert)"
+  if [[ "$?" = 0 ]]
   then
     # In a Corp environment.
     # Use the credentials helper named in the cfg.
@@ -272,6 +271,7 @@ EOF
     }
   fi
 fi
+
 
 # If configured, collect reproxy logs.
 BUILD_METRICS_ENABLED=0
