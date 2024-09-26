@@ -21,6 +21,10 @@ class SyscallResult {
     return SyscallResult(static_cast<uint64_t>(value.ptr()));
   }
 
+  static SyscallResult From(const SyscallResult& other) {
+    return SyscallResult(static_cast<uint64_t>(other.value_));
+  }
+
   static SyscallResult From(pid_t value) { return SyscallResult(static_cast<uint64_t>(value)); }
   static SyscallResult From(uid_t value) { return SyscallResult(static_cast<uint64_t>(value)); }
   static SyscallResult From(size_t value) { return SyscallResult(static_cast<uint64_t>(value)); }
