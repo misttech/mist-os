@@ -40,9 +40,9 @@ fn logs_data_matches(
     severity: &Severity,
     message: &str,
 ) -> bool {
-    return data.moniker == *component_moniker
+    data.moniker == *component_moniker
         && data.msg().unwrap() == message
-        && data.metadata.severity == *severity;
+        && data.metadata.severity == *severity
 }
 
 // Panics with an error message indicating that only `m` items of `expected_sequence`
