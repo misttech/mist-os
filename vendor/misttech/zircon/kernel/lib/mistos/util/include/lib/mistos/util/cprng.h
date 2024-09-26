@@ -3,17 +3,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_CPRNG_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_CPRNG_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_CPRNG_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_CPRNG_H_
 
-#include <lib/fit/result.h>
 #include <zircon/types.h>
 
-#include <ktl/byte.h>
 #include <ktl/span.h>
 
-void cprng_draw(uint8_t* buffer, size_t size);
-void cprng_draw_uninit(ktl::span<uint8_t> buffer);
-fit::result<zx_status_t> cprng_add_entropy(const ktl::span<uint8_t> buffer);
+void cprng_draw(void* buffer, size_t len);
+zx_status_t cprng_draw_once(void* buffer, size_t len);
+ktl::span<uint8_t> cprng_draw_uninit(ktl::span<uint8_t> buffer);
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_CPRNG_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_CPRNG_H_

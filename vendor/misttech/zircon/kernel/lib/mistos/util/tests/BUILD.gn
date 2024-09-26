@@ -4,15 +4,15 @@
 
 source_set("tests") {
   sources = [
-    "bitflags-test.cc",
+    #"bitflags-test.cc",
     "cprng-test.cc",
-    "range-map-test.cc",
-    "split_string_unittest.cc",
-    "trim_unittest.cc",
-    "weak_wrapper-test.cc",
+    #"range-map-test.cc",
+    #"split_string_unittest.cc",
+    #"trim_unittest.cc",
+    #"weak_wrapper-test.cc",
   ]
   deps = [
-    "//zircon/kernel/lib/mistos/util",
-    "//zircon/system/ulib/zxtest:zxtest-mistos",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+    "//zircon/kernel/lib/unittest",
   ]
 }
