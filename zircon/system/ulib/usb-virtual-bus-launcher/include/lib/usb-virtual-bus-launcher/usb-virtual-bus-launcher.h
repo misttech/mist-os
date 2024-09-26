@@ -15,8 +15,6 @@
 
 namespace usb_virtual {
 
-using driver_integration_test::IsolatedDevmgr;
-
 using ConfigurationDescriptor =
     ::fidl::VectorView<fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor>;
 using fuchsia_hardware_usb_peripheral::wire::DeviceDescriptor;
@@ -31,20 +29,7 @@ class BusLauncher {
   BusLauncher& operator=(const BusLauncher&) = delete;
 
   // Create the isolated device manager, wait for it to start, then enable the virtual USB bus.
-  // Optionally takes |args| to passed to IsolatedDevmgr. This can be used to enable logging for
-  // your driver under test. for example:
-  //
-  //   IsolatedDevmgr::Args args = {
-  //     .log_level =
-  //       {
-  //          DriverLog{
-  //            .name = "driver_name",
-  //            .log_level = Severity::DEBUG,
-  //          },
-  //       }
-  //   };
-  //   usb_virtual::Bus::Create(std::move(args));
-  static zx::result<BusLauncher> Create(IsolatedDevmgr::Args args = {});
+  static zx::result<BusLauncher> Create();
 
   // Set up a USB peripheral device with the given descriptors. See fuchsia.hardware.usb.peripheral
   // for more information. Waits for the functions to be registered and triggers a connect event on
@@ -67,7 +52,7 @@ class BusLauncher {
  private:
   BusLauncher() = default;
 
-  IsolatedDevmgr devmgr_;
+  driver_integration_test::IsolatedDevmgr devmgr_;
   fidl::WireSyncClient<fuchsia_hardware_usb_peripheral::Device> peripheral_;
   fidl::WireSyncClient<fuchsia_hardware_usb_virtual_bus::Bus> virtual_bus_;
 };

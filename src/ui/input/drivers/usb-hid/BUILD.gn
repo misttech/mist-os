@@ -156,6 +156,7 @@ test("usb-hid-test") {
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
     "//src/lib/ddk",
