@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -37,6 +33,13 @@ impl fidl::Persistable for Simple {}
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for BasicStruct {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for BasicStruct {
         type Owned = Self;
 
@@ -50,26 +53,20 @@ mod internal {
             24
         }
     }
-    impl fidl::encoding::ValueTypeMarker for BasicStruct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<BasicStruct> for &BasicStruct {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<BasicStruct, D>
+        for &BasicStruct
+    {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<BasicStruct>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<BasicStruct>::encode(
+            fidl::encoding::Encode::<BasicStruct, D>::encode(
                 (
                     <u32 as fidl::encoding::ValueTypeMarker>::borrow(&self.x),
                     <fidl::encoding::UnboundedString as fidl::encoding::ValueTypeMarker>::borrow(
@@ -83,14 +80,15 @@ mod internal {
         }
     }
     unsafe impl<
-            T0: fidl::encoding::Encode<u32>,
-            T1: fidl::encoding::Encode<fidl::encoding::UnboundedString>,
-        > fidl::encoding::Encode<BasicStruct> for (T0, T1)
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u32, D>,
+            T1: fidl::encoding::Encode<fidl::encoding::UnboundedString, D>,
+        > fidl::encoding::Encode<BasicStruct, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -108,16 +106,19 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for BasicStruct {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for BasicStruct {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { x: fidl::new_empty!(u32), y: fidl::new_empty!(fidl::encoding::UnboundedString) }
+            Self {
+                x: fidl::new_empty!(u32, D),
+                y: fidl::new_empty!(fidl::encoding::UnboundedString, D),
+            }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -132,15 +133,23 @@ mod internal {
                     padding_start: offset + 0 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
-            fidl::decode!(u32, &mut self.x, decoder, offset + 0, _depth)?;
+            fidl::decode!(u32, D, &mut self.x, decoder, offset + 0, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedString,
+                D,
                 &mut self.y,
                 decoder,
                 offset + 8,
                 _depth
             )?;
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for Simple {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -157,26 +166,18 @@ mod internal {
             2
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Simple {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Simple> for &Simple {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Simple, D> for &Simple {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Simple>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Simple>::encode(
+            fidl::encoding::Encode::<Simple, D>::encode(
                 (
                     <u8 as fidl::encoding::ValueTypeMarker>::borrow(&self.f1),
                     <bool as fidl::encoding::ValueTypeMarker>::borrow(&self.f2),
@@ -187,13 +188,16 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<u8>, T1: fidl::encoding::Encode<bool>>
-        fidl::encoding::Encode<Simple> for (T0, T1)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<u8, D>,
+            T1: fidl::encoding::Encode<bool, D>,
+        > fidl::encoding::Encode<Simple, D> for (T0, T1)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -207,23 +211,23 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Simple {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Simple {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { f1: fidl::new_empty!(u8), f2: fidl::new_empty!(bool) }
+            Self { f1: fidl::new_empty!(u8, D), f2: fidl::new_empty!(bool, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            fidl::decode!(u8, &mut self.f1, decoder, offset + 0, _depth)?;
-            fidl::decode!(bool, &mut self.f2, decoder, offset + 1, _depth)?;
+            fidl::decode!(u8, D, &mut self.f1, decoder, offset + 0, _depth)?;
+            fidl::decode!(bool, D, &mut self.f2, decoder, offset + 1, _depth)?;
             Ok(())
         }
     }

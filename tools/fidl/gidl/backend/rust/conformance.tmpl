@@ -10,7 +10,7 @@
 use {
     assert_matches::assert_matches,
     fidl::{AsHandleRef, Error, Handle, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights},
-    fidl::encoding::{Context, Decode, Decoder, Encoder, WireFormatVersion},
+    fidl::encoding::{Context, Decode, Decoder, DefaultFuchsiaResourceDialect, Encoder, WireFormatVersion},
     fidl_test_conformance as test_conformance,
     fuchsia_zircon_status::Status,
     fuchsia_zircon_types as zx_types,
@@ -33,7 +33,7 @@ fn test_{{ .Name }}_encode() {
     let mut bytes = Vec::new();
     let mut handle_dispositions = Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
-    Encoder::encode_with_context::<{{ .ValueType }}>(
+    Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<{{ .ValueType }}>(
         {{ .Context }}, &mut bytes, &mut handle_dispositions, &{{ if .IsResource }}mut {{ end }} value).unwrap();
     assert_eq!(bytes, &{{ .Bytes }});
     {{- if .HandleDispositions }}
@@ -63,8 +63,8 @@ fn test_{{ .Name }}_decode() {
     {{- else }}
     let mut handle_infos = Vec::new();
     {{- end }}
-    let mut value = fidl::new_empty!({{ .ValueType }});
-    Decoder::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, &mut handle_infos, &mut value).unwrap();
+    let mut value = fidl::new_empty!({{ .ValueType }}, DefaultFuchsiaResourceDialect);
+    Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, &mut handle_infos, &mut value).unwrap();
     {{ .EqualityCheck }}
     {{- if .UnusedHandles }}
     let unused_handles = select_raw_handle_infos(&handle_defs, &{{ .UnusedHandles }});
@@ -86,7 +86,7 @@ fn test_{{ .Name }}_encode_failure() {
     let mut bytes = Vec::new();
     let mut handles = Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
-    match Encoder::encode_with_context::<{{ .ValueType }}>(
+    match Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<{{ .ValueType }}>(
         {{ .Context }}, &mut bytes, &mut handles, &{{ if .IsResource }}mut {{ end }}value
     ) {
         Err(err) => assert_matches!(err, {{ .ErrorCode }} { .. }),
@@ -113,8 +113,8 @@ fn test_{{ .Name }}_decode_failure() {
     {{- else }}
     let mut handle_infos = Vec::new();
     {{- end }}
-    let mut value = fidl::new_empty!({{ .ValueType }});
-    match Decoder::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, &mut handle_infos, &mut value) {
+    let mut value = fidl::new_empty!({{ .ValueType }}, DefaultFuchsiaResourceDialect);
+    match Decoder::<DefaultFuchsiaResourceDialect>::decode_with_context::<{{ .ValueType }}>({{ .Context }}, bytes, &mut handle_infos, &mut value) {
         Err(err) => assert_matches!(err, {{ .ErrorCode }} { .. }),
         Ok(_) => panic!("unexpected successful decoding"),
     }

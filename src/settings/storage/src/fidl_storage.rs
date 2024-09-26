@@ -29,10 +29,9 @@ const MAX_FLUSH_INTERVAL_MS: i64 = 1_800_000; // 30 minutes
 const MIN_FLUSH_DURATION: Duration = Duration::from_millis(MIN_FLUSH_INTERVAL_MS);
 
 pub trait FidlStorageConvertible {
-    type Storable: Persistable + Any;
-    type Loader: DefaultDispatcher<Self>
-    where
-        Self: Sized;
+    type Storable;
+    type Loader;
+
     const KEY: &'static str;
 
     fn to_storable(self) -> Self::Storable;
@@ -353,6 +352,7 @@ impl FidlStorage {
     pub async fn write<T>(&self, new_value: T) -> Result<UpdateState, Error>
     where
         T: FidlStorageConvertible,
+        <T as FidlStorageConvertible>::Storable: Persistable,
     {
         let new_value = persist(&new_value.to_storable())?;
         self.inner_write(T::KEY, new_value).await
@@ -397,9 +397,11 @@ impl FidlStorage {
     pub async fn get<T>(&self) -> T
     where
         T: FidlStorageConvertible,
+        T::Storable: Persistable,
+        T::Loader: DefaultDispatcher<T>,
     {
         match self.get_inner(T::KEY).await.current_data.as_ref().map(|data| {
-            <T as FidlStorageConvertible>::from_storable(
+            T::from_storable(
                 unpersist(data).expect("Should not be able to save mismatching types in file"),
             )
         }) {
@@ -409,16 +411,12 @@ impl FidlStorage {
     }
 }
 
-pub trait DefaultDispatcher<T>: Sealed
-where
-    T: FidlStorageConvertible,
-{
+pub trait DefaultDispatcher<T>: Sealed {
     fn get_default(_: &FidlStorage) -> T;
 }
 
 impl<T> DefaultDispatcher<T> for NoneT
 where
-    T: FidlStorageConvertible<Loader = Self>,
     T: Default,
 {
     fn get_default(_: &FidlStorage) -> T {

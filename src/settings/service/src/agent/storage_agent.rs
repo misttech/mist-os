@@ -8,6 +8,7 @@
 use std::borrow::Borrow;
 use std::sync::Arc;
 
+use fidl::Persistable;
 use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::StreamExt;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
@@ -34,7 +35,7 @@ use crate::setup::types::SetupInfo;
 use crate::storage::{Error, Payload, StorageInfo, StorageRequest, StorageResponse, StorageType};
 use crate::{payload_convert, trace, trace_guard};
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageConvertible};
-use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
+use settings_storage::fidl_storage::{DefaultDispatcher, FidlStorage, FidlStorageConvertible};
 use settings_storage::storage_factory::StorageFactory;
 use settings_storage::UpdateState;
 
@@ -234,6 +235,8 @@ where
     async fn fidl_read<S>(&self, id: ftrace::Id, responder: service::message::MessageClient)
     where
         S: FidlStorageConvertible + Into<StorageInfo>,
+        S::Storable: Persistable,
+        S::Loader: DefaultDispatcher<S>,
     {
         let guard = trace_guard!(id, c"get fidl store");
         let store = self.fidl_storage_factory.get_store().await;
@@ -252,6 +255,7 @@ where
     async fn fidl_write<S>(&self, data: S, responder: service::message::MessageClient)
     where
         S: FidlStorageConvertible,
+        S::Storable: Persistable,
     {
         let update_result = {
             let store = self.fidl_storage_factory.get_store().await;

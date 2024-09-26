@@ -5,9 +5,9 @@
 //! Provides standalone FIDL encoding and decoding.
 
 use crate::encoding::{
-    AtRestFlags, Context, Decode, Decoder, Depth, Encode, Encoder, GenericMessage,
-    GenericMessageType, ResourceTypeMarker, TypeMarker, ValueTypeMarker, WireFormatVersion,
-    MAGIC_NUMBER_INITIAL,
+    AtRestFlags, Context, Decode, Decoder, DefaultFuchsiaResourceDialect, Depth, Encode, Encoder,
+    GenericMessage, GenericMessageType, NoHandleResourceDialect, ResourceDialect,
+    ResourceTypeMarker, TypeMarker, ValueTypeMarker, WireFormatVersion, MAGIC_NUMBER_INITIAL,
 };
 use crate::handle::{HandleDisposition, HandleInfo};
 use crate::{Error, Result};
@@ -15,14 +15,19 @@ use crate::{Error, Result};
 /// Marker trait implemented for FIDL non-resource structs, tables, and unions.
 /// These can be used with the persistence API and standalone encoding/decoding API.
 pub trait Persistable:
-    TypeMarker<Owned = Self> + Decode<Self> + for<'a> ValueTypeMarker<Borrowed<'a> = &'a Self>
+    TypeMarker<Owned = Self>
+    + Decode<Self, NoHandleResourceDialect>
+    + for<'a> ValueTypeMarker<Borrowed<'a> = &'a Self>
+    + for<'a> ValueTypeMarker<Borrowed<'a>: Encode<Self, NoHandleResourceDialect>>
 {
 }
 
 /// Marker trait implemented for FIDL resource structs, tables, and unions.
 /// These can be used with the standalone encoding/decoding API, but not the persistence API.
 pub trait Standalone:
-    TypeMarker<Owned = Self> + Decode<Self> + for<'a> ResourceTypeMarker<Borrowed<'a> = &'a mut Self>
+    TypeMarker<Owned = Self>
+    + Decode<Self, DefaultFuchsiaResourceDialect>
+    + for<'a> ResourceTypeMarker<Borrowed<'a> = &'a mut Self>
 {
 }
 
@@ -89,23 +94,19 @@ fn default_persistent_encode_context() -> Context {
 /// Encodes a FIDL object to bytes following RFC-0120. This only works on
 /// non-resource structs, tables, and unions. See `unpersist` for the reverse.
 pub fn persist<T: Persistable>(body: &T) -> Result<Vec<u8>> {
-    // This helper is needed to convince rustc that &T implements Encode<T>.
-    fn helper<T: ValueTypeMarker>(body: T::Borrowed<'_>) -> Result<Vec<u8>> {
-        let context = default_persistent_encode_context();
-        let header = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
-        let msg = GenericMessage { header, body };
-        let mut bytes = Vec::<u8>::new();
-        let mut handles = Vec::<HandleDisposition<'static>>::new();
-        Encoder::encode_with_context::<GenericMessageType<WireMetadata, T>>(
-            context,
-            &mut bytes,
-            &mut handles,
-            msg,
-        )?;
-        debug_assert!(handles.is_empty(), "value type contains handles");
-        Ok(bytes)
-    }
-    helper::<T>(body)
+    let context = default_persistent_encode_context();
+    let header = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
+    let msg = GenericMessage { header, body };
+    let mut bytes = Vec::<u8>::new();
+    let mut handles = Vec::new();
+    Encoder::encode_with_context::<GenericMessageType<WireMetadata, T>>(
+        context,
+        &mut bytes,
+        &mut handles,
+        msg,
+    )?;
+    debug_assert!(handles.is_empty(), "value type contains handles");
+    Ok(bytes)
 }
 
 /// Decodes a FIDL object from bytes following RFC-0120. Must be a non-resource
@@ -119,14 +120,25 @@ pub fn unpersist<T: Persistable>(bytes: &[u8]) -> Result<T> {
 
 /// Encodes a FIDL object to bytes and wire metadata following RFC-0120. Must be
 /// a non-resource struct, table, or union.
-pub fn standalone_encode_value<T: Persistable>(body: &T) -> Result<(Vec<u8>, WireMetadata)> {
+pub fn standalone_encode_value<T: Persistable>(body: &T) -> Result<(Vec<u8>, WireMetadata)>
+where
+    for<'a> T::Borrowed<'a>: Encode<T, NoHandleResourceDialect>,
+{
     // This helper is needed to convince rustc that &T implements Encode<T>.
-    fn helper<T: ValueTypeMarker>(body: T::Borrowed<'_>) -> Result<(Vec<u8>, WireMetadata)> {
+    fn helper<T: ValueTypeMarker>(body: T::Borrowed<'_>) -> Result<(Vec<u8>, WireMetadata)>
+    where
+        for<'a> T::Borrowed<'a>: Encode<T, NoHandleResourceDialect>,
+    {
         let context = default_persistent_encode_context();
         let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
         let mut bytes = Vec::<u8>::new();
-        let mut handles = Vec::<HandleDisposition<'static>>::new();
-        Encoder::encode_with_context::<T>(context, &mut bytes, &mut handles, body)?;
+        let mut handles = Vec::new();
+        Encoder::<NoHandleResourceDialect>::encode_with_context::<T>(
+            context,
+            &mut bytes,
+            &mut handles,
+            body,
+        )?;
         debug_assert!(handles.is_empty(), "value type contains handles");
         Ok((bytes, metadata))
     }
@@ -137,16 +149,28 @@ pub fn standalone_encode_value<T: Persistable>(body: &T) -> Result<(Vec<u8>, Wir
 /// RFC-0120. Must be a resource struct, table, or union.
 pub fn standalone_encode_resource<T: Standalone>(
     mut body: T,
-) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)> {
+) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)>
+where
+    for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
+{
     // This helper is needed to convince rustc that &mut T implements Encode<T>.
+    #[allow(clippy::type_complexity)]
     fn helper<T: ResourceTypeMarker>(
         body: T::Borrowed<'_>,
-    ) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)> {
+    ) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)>
+    where
+        for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
+    {
         let context = default_persistent_encode_context();
         let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
         let mut bytes = Vec::<u8>::new();
-        let mut handles = Vec::<HandleDisposition<'static>>::new();
-        Encoder::encode_with_context::<T>(context, &mut bytes, &mut handles, body)?;
+        let mut handles = Vec::<_>::new();
+        Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<T>(
+            context,
+            &mut bytes,
+            &mut handles,
+            body,
+        )?;
         Ok((bytes, handles, metadata))
     }
     helper::<T>(&mut body)
@@ -167,7 +191,7 @@ pub fn standalone_decode_resource<T: Standalone>(
     handles: &mut [HandleInfo],
     metadata: &WireMetadata,
 ) -> Result<T> {
-    let mut output = T::Owned::new_empty();
+    let mut output = <T as TypeMarker>::Owned::new_empty();
     Decoder::decode_with_context::<T>(metadata.decoding_context(), bytes, handles, &mut output)?;
     Ok(output)
 }
@@ -175,15 +199,20 @@ pub fn standalone_decode_resource<T: Standalone>(
 /// Decodes the persistently stored header from a message.
 /// Returns the header and a reference to the tail of the message.
 fn decode_wire_metadata(bytes: &[u8]) -> Result<(WireMetadata, &[u8])> {
-    let mut header = new_empty!(WireMetadata);
+    let mut header = new_empty!(WireMetadata, NoHandleResourceDialect);
     let context = Context { wire_format_version: WireFormatVersion::V2 };
     let header_len = <WireMetadata as TypeMarker>::inline_size(context);
     if bytes.len() < header_len {
         return Err(Error::OutOfRange);
     }
     let (header_bytes, body_bytes) = bytes.split_at(header_len);
-    Decoder::decode_with_context::<WireMetadata>(context, header_bytes, &mut [], &mut header)
-        .map_err(|_| Error::InvalidHeader)?;
+    Decoder::<NoHandleResourceDialect>::decode_with_context::<WireMetadata>(
+        context,
+        header_bytes,
+        &mut [],
+        &mut header,
+    )
+    .map_err(|_| Error::InvalidHeader)?;
     header.validate_wire_format()?;
     Ok((header, body_bytes))
 }
@@ -209,9 +238,14 @@ impl ValueTypeMarker for WireMetadata {
     }
 }
 
-unsafe impl Encode<WireMetadata> for &WireMetadata {
+unsafe impl<D: ResourceDialect> Encode<WireMetadata, D> for &WireMetadata {
     #[inline]
-    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
+    unsafe fn encode(
+        self,
+        encoder: &mut Encoder<'_, D>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
         encoder.debug_check_bounds::<WireMetadata>(offset);
         unsafe {
             let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
@@ -221,7 +255,7 @@ unsafe impl Encode<WireMetadata> for &WireMetadata {
     }
 }
 
-impl Decode<Self> for WireMetadata {
+impl<D: ResourceDialect> Decode<Self, D> for WireMetadata {
     #[inline(always)]
     fn new_empty() -> Self {
         Self { disambiguator: 0, magic_number: 0, at_rest_flags: [0; 2], reserved: [0; 4] }
@@ -230,7 +264,7 @@ impl Decode<Self> for WireMetadata {
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_>,
+        decoder: &mut Decoder<'_, D>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {

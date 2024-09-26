@@ -1592,16 +1592,16 @@ impl UnknownInteractionsAjarProtocolEvent {
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
             0x6022ae999e9dc2b0 => {
-                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEvent {
                     }
                 ))
             }
             0x510586752445c769 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolStrictEventFieldsRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolStrictEventFieldsRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventFields {some_field: out.some_field,
 
@@ -1609,32 +1609,32 @@ impl UnknownInteractionsAjarProtocolEvent {
                 ))
             }
             0x57794b4cc91f816f => {
-                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolStrictEventUnionRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsAjarProtocolStrictEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolStrictEventUnionRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsAjarProtocolStrictEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventUnion {payload: out,
                     }
                 ))
             }
             0x92639249201f89d => {
-                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolStrictEventTableRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsAjarProtocolStrictEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolStrictEventTableRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsAjarProtocolStrictEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::StrictEventTable {payload: out,
                     }
                 ))
             }
             0x11c9ba570ce71df3 => {
-                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEvent {
                     }
                 ))
             }
             0x3ba8fd32bf87d862 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventFields {some_field: out.some_field,
 
@@ -1642,16 +1642,16 @@ impl UnknownInteractionsAjarProtocolEvent {
                 ))
             }
             0x7c3823f47ce0fcad => {
-                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventUnion {payload: out,
                     }
                 ))
             }
             0x9ca944d1d6436b0 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolFlexibleEventTableRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsAjarProtocolFlexibleEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsAjarProtocolFlexibleEventTableRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsAjarProtocolFlexibleEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsAjarProtocolEvent::FlexibleEventTable {payload: out,
                     }
@@ -1739,8 +1739,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0xd4663d6b2b5048b => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1750,8 +1750,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x2275b8171ae4834f => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1761,8 +1761,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x50e66d328336038 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1775,8 +1775,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x1947e36d61e4493a => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1789,8 +1789,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x5177371967e0e6d1 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1803,8 +1803,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x6f8f9343b34e2ed4 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1817,8 +1817,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x5b47637577c69006 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1831,8 +1831,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x844ff7bb3f186d9 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1845,8 +1845,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x2cbfd5a859d4ac95 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -1859,8 +1859,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                 }
                 0x30c9e1b3da57dc37 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsAjarProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3353,16 +3353,16 @@ impl UnknownInteractionsClosedProtocolEvent {
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
             0xa8ee6ee302f693b => {
-                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEvent {
                     }
                 ))
             }
             0x5d7c57b62e9c3a74 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsClosedProtocolStrictEventFieldsRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsClosedProtocolStrictEventFieldsRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventFields {some_field: out.some_field,
 
@@ -3370,16 +3370,16 @@ impl UnknownInteractionsClosedProtocolEvent {
                 ))
             }
             0x3b8475deeb4a9d64 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsClosedProtocolStrictEventUnionRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsClosedProtocolStrictEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsClosedProtocolStrictEventUnionRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsClosedProtocolStrictEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventUnion {payload: out,
                     }
                 ))
             }
             0x27da43fc85a7f5be => {
-                let mut out = fidl::new_empty!(UnknownInteractionsClosedProtocolStrictEventTableRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsClosedProtocolStrictEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsClosedProtocolStrictEventTableRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsClosedProtocolStrictEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsClosedProtocolEvent::StrictEventTable {payload: out,
                     }
@@ -3462,8 +3462,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x59282385962da24 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3473,8 +3473,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0x5eda305d6b22f1f7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3487,8 +3487,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0x1323afa3e0541253 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3501,8 +3501,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0x68b32554eb0f6fa7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3515,8 +3515,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0x6e4a94d44b69e785 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3529,8 +3529,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0x4fa35d5433db4d3a => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3543,8 +3543,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0xb22aebf23bb58fd => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3557,8 +3557,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0xcd65d4d29a43c80 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -3571,8 +3571,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                 }
                 0x117dde20b92f7b90 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsClosedProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5460,16 +5460,16 @@ impl UnknownInteractionsProtocolEvent {
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
             0x9842669255c4fc1 => {
-                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEvent {
                     }
                 ))
             }
             0x7b75ae46520ee732 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsProtocolStrictEventFieldsRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsProtocolStrictEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsProtocolStrictEventFieldsRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsProtocolStrictEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventFields {some_field: out.some_field,
 
@@ -5477,32 +5477,32 @@ impl UnknownInteractionsProtocolEvent {
                 ))
             }
             0x3663b5197598cbda => {
-                let mut out = fidl::new_empty!(UnknownInteractionsProtocolStrictEventUnionRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsProtocolStrictEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsProtocolStrictEventUnionRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsProtocolStrictEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventUnion {payload: out,
                     }
                 ))
             }
             0x25a10039a9f96910 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsProtocolStrictEventTableRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsProtocolStrictEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsProtocolStrictEventTableRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsProtocolStrictEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::StrictEventTable {payload: out,
                     }
                 ))
             }
             0x61bb1fab7d767866 => {
-                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEvent {
                     }
                 ))
             }
             0x3226dff9b0c1d801 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsProtocolFlexibleEventFieldsRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsProtocolFlexibleEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsProtocolFlexibleEventFieldsRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsProtocolFlexibleEventFieldsRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventFields {some_field: out.some_field,
 
@@ -5510,16 +5510,16 @@ impl UnknownInteractionsProtocolEvent {
                 ))
             }
             0x22afd161ca71e467 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsProtocolFlexibleEventUnionRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsProtocolFlexibleEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsProtocolFlexibleEventUnionRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsProtocolFlexibleEventUnionRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventUnion {payload: out,
                     }
                 ))
             }
             0x4f72dd46888b89e0 => {
-                let mut out = fidl::new_empty!(UnknownInteractionsProtocolFlexibleEventTableRequest);
-                fidl::encoding::Decoder::decode_into::<UnknownInteractionsProtocolFlexibleEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!(UnknownInteractionsProtocolFlexibleEventTableRequest, fidl::encoding::DefaultFuchsiaResourceDialect);
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<UnknownInteractionsProtocolFlexibleEventTableRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     UnknownInteractionsProtocolEvent::FlexibleEventTable {payload: out,
                     }
@@ -5607,8 +5607,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
             std::task::Poll::Ready(Some(match header.ordinal {
                 0x4e7273b964d117a6 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5618,8 +5618,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x818bb3a7a910446 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5629,8 +5629,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x734c996b0f37b942 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5643,8 +5643,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x334f4e7fff460ae3 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5657,8 +5657,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x2212805eca592cad => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5671,8 +5671,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x746ebf8659ff23b7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5685,8 +5685,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x6d1c6002c51bb967 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5699,8 +5699,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x2182a49480e5bd2b => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5713,8 +5713,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x453af745d38b20ca => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5727,8 +5727,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x4c26c7ab89cb68d8 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5741,8 +5741,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x4a5bb3397008b7c => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5755,8 +5755,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x3b13f82f44813a32 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5769,8 +5769,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x44301e4e8d514fb6 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5783,8 +5783,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x7f492934b6c76187 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5797,8 +5797,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x61240f878cc37c07 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5811,8 +5811,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0xf2b9611a9089b05 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5825,8 +5825,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x2172940a75f107d7 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -5839,8 +5839,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                 }
                 0x6d8aab48e1693bf2 => {
                     header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
-                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
+                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = UnknownInteractionsProtocolControlHandle {
                         inner: this.inner.clone(),
                     };
@@ -7424,6 +7424,13 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableErrResponder {
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
     {
@@ -7448,22 +7455,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, D>
         for &UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7485,13 +7485,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, D>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7507,16 +7508,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7528,6 +7531,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -7553,22 +7563,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventFieldsRequest, D>
         for &UnknownInteractionsAjarProtocolStrictEventFieldsRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7589,13 +7592,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventFieldsRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventFieldsRequest, D>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7610,16 +7614,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictEventFieldsRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7631,6 +7637,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -7658,22 +7671,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse, D>
         for &UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7695,13 +7701,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse, D>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7717,16 +7724,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7738,6 +7747,15 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -7765,24 +7783,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse, D>
         for &UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7805,14 +7814,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse, D>
         for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7828,16 +7837,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7849,6 +7860,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -7876,22 +7894,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventFieldsRequest, D>
         for &UnknownInteractionsClosedProtocolStrictEventFieldsRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7913,13 +7924,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventFieldsRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventFieldsRequest, D>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7935,16 +7947,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsClosedProtocolStrictEventFieldsRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -7956,6 +7970,15 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -7983,24 +8006,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse, D>
         for &UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8023,14 +8037,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse, D>
         for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8046,16 +8060,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8067,6 +8083,15 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8094,25 +8119,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl
-        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse, D>
         for &UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8131,14 +8146,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse, D>
         for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8151,18 +8166,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self>
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
     {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8174,6 +8189,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleEventFieldsRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8199,22 +8221,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleEventFieldsRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventFieldsRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventFieldsRequest, D>
         for &UnknownInteractionsProtocolFlexibleEventFieldsRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8235,13 +8250,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventFieldsRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventFieldsRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8256,16 +8271,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleEventFieldsRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleEventFieldsRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8277,6 +8294,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictEventFieldsRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8302,22 +8326,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictEventFieldsRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventFieldsRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventFieldsRequest, D>
         for &UnknownInteractionsProtocolStrictEventFieldsRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8336,13 +8353,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventFieldsRequest> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventFieldsRequest, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8356,16 +8373,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictEventFieldsRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictEventFieldsRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8377,6 +8396,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8402,22 +8428,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsResponse, D>
         for &UnknownInteractionsProtocolStrictTwoWayFieldsResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8438,13 +8457,13 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsResponse, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8459,16 +8478,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictTwoWayFieldsResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8480,6 +8501,15 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8507,24 +8537,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse, D>
         for &UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8546,14 +8567,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse, D>
         for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8569,16 +8590,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8590,6 +8613,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8615,22 +8645,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse, D>
         for &UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8651,13 +8674,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse, D>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8672,16 +8696,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8693,6 +8719,13 @@ mod internal {
                 std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
             }
             Ok(())
+        }
+    }
+
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
         }
     }
 
@@ -8720,22 +8753,15 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse, D>
         for &UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8756,13 +8782,14 @@ mod internal {
             Ok(())
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<i32>>
-        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> for (T0,)
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse, D>
+        for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8777,16 +8804,18 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { some_field: fidl::new_empty!(i32) }
+            Self { some_field: fidl::new_empty!(i32, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8811,6 +8840,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolFlexibleEventTableRequest
     {
@@ -8826,21 +8862,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventTableRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventTableRequest, D>
         for &UnknownInteractionsAjarProtocolFlexibleEventTableRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8876,7 +8905,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -8889,7 +8918,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolFlexibleEventTableRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -8897,7 +8928,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -8949,8 +8980,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -8983,6 +9014,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictEventTableRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsAjarProtocolStrictEventTableRequest {
         type Owned = Self;
 
@@ -8996,21 +9034,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictEventTableRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventTableRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventTableRequest, D>
         for &UnknownInteractionsAjarProtocolStrictEventTableRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9046,7 +9077,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -9059,7 +9090,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictEventTableRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictEventTableRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -9067,7 +9100,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9119,8 +9152,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -9153,6 +9186,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
     {
@@ -9168,21 +9208,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, D>
         for &UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9218,7 +9251,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -9231,7 +9264,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -9239,7 +9274,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9291,8 +9326,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -9325,6 +9360,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
     {
@@ -9340,23 +9384,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse, D>
         for &UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9393,7 +9428,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -9406,7 +9441,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -9414,7 +9451,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9466,8 +9503,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -9500,6 +9537,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsClosedProtocolStrictEventTableRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsClosedProtocolStrictEventTableRequest
     {
@@ -9515,21 +9559,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsClosedProtocolStrictEventTableRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventTableRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventTableRequest, D>
         for &UnknownInteractionsClosedProtocolStrictEventTableRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9565,7 +9602,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -9578,7 +9615,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictEventTableRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsClosedProtocolStrictEventTableRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -9586,7 +9625,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9638,8 +9677,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -9672,6 +9711,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
     {
@@ -9687,23 +9735,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, D>
         for &UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9740,7 +9779,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -9753,7 +9792,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -9761,7 +9802,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9813,8 +9854,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -9847,6 +9888,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
     {
@@ -9862,24 +9912,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl
-        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse, D>
         for &UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9913,7 +9953,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -9926,7 +9966,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self>
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
     {
         #[inline(always)]
@@ -9936,7 +9976,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -9988,8 +10028,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -10022,6 +10062,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleEventTableRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolFlexibleEventTableRequest {
         type Owned = Self;
 
@@ -10035,21 +10082,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleEventTableRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventTableRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventTableRequest, D>
         for &UnknownInteractionsProtocolFlexibleEventTableRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10084,7 +10124,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -10097,7 +10137,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleEventTableRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleEventTableRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -10105,7 +10147,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10157,8 +10199,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -10191,6 +10233,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictEventTableRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolStrictEventTableRequest {
         type Owned = Self;
 
@@ -10204,21 +10253,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictEventTableRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventTableRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventTableRequest, D>
         for &UnknownInteractionsProtocolStrictEventTableRequest
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10253,7 +10295,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -10266,7 +10308,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictEventTableRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictEventTableRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -10274,7 +10318,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10326,8 +10370,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -10360,6 +10404,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayTableResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolStrictTwoWayTableResponse {
         type Owned = Self;
 
@@ -10373,21 +10424,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayTableResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayTableResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayTableResponse, D>
         for &UnknownInteractionsProtocolStrictTwoWayTableResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10422,7 +10466,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -10435,7 +10479,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayTableResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictTwoWayTableResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -10443,7 +10489,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10495,8 +10541,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -10529,6 +10575,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
     {
@@ -10544,21 +10597,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse, D>
         for &UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10595,7 +10641,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -10608,7 +10654,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -10616,7 +10664,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10668,8 +10716,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -10702,6 +10750,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
         type Owned = Self;
 
@@ -10715,21 +10770,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayTableResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayTableResponse, D>
         for &UnknownInteractionsProtocolFlexibleTwoWayTableResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10765,7 +10813,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -10778,7 +10826,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleTwoWayTableResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -10786,7 +10836,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10838,8 +10888,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -10872,6 +10922,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
         type Owned = Self;
 
@@ -10885,21 +10942,14 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayTableErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayTableErrResponse, D>
         for &UnknownInteractionsProtocolStrictTwoWayTableErrResponse
     {
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -10935,7 +10985,7 @@ mod internal {
             // - bytes_len is calculated to fit envelope_size*max(member.ordinal).
             // - Since cur_offset is envelope_size*(member.ordinal - 1) and the envelope takes
             //   envelope_size bytes, there is always sufficient room.
-            fidl::encoding::encode_in_envelope_optional::<i32>(
+            fidl::encoding::encode_in_envelope_optional::<i32, D>(
                 self.some_field.as_ref().map(<i32 as fidl::encoding::ValueTypeMarker>::borrow),
                 encoder,
                 offset + cur_offset,
@@ -10948,7 +10998,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictTwoWayTableErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::default()
@@ -10956,7 +11008,7 @@ mod internal {
 
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11008,8 +11060,8 @@ mod internal {
                     inner_offset = decoder.out_of_line_offset(member_inline_size)?;
                     inner_depth.increment()?;
                 }
-                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32));
-                fidl::decode!(i32, val_ref, decoder, inner_offset, inner_depth)?;
+                let val_ref = self.some_field.get_or_insert_with(|| fidl::new_empty!(i32, D));
+                fidl::decode!(i32, D, val_ref, decoder, inner_offset, inner_depth)?;
                 if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize)
                 {
                     return Err(fidl::Error::InvalidNumBytesInEnvelope);
@@ -11032,6 +11084,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
     {
@@ -11047,22 +11106,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, D>
         for &UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11072,7 +11124,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -11086,7 +11138,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11095,7 +11149,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11133,7 +11187,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -11141,7 +11195,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -11164,6 +11218,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
         type Owned = Self;
 
@@ -11177,22 +11238,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventUnionRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictEventUnionRequest, D>
         for &UnknownInteractionsAjarProtocolStrictEventUnionRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11202,7 +11256,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsAjarProtocolStrictEventUnionRequest::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -11216,7 +11270,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictEventUnionRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11225,7 +11281,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11263,7 +11319,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsAjarProtocolStrictEventUnionRequest::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -11271,7 +11327,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -11297,6 +11353,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
     {
@@ -11312,22 +11375,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, D>
         for &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11337,7 +11393,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -11351,7 +11407,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11360,7 +11418,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11398,7 +11456,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -11406,7 +11464,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -11429,6 +11487,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
     {
@@ -11444,24 +11511,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, D>
         for &UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11472,7 +11530,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -11486,7 +11544,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11495,7 +11555,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11535,7 +11595,7 @@ mod internal {
                         // Initialize `self` to the right variant
                         *self =
                             UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::SomeField(
-                                fidl::new_empty!(i32),
+                                fidl::new_empty!(i32, D),
                             );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -11543,7 +11603,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -11566,6 +11626,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsClosedProtocolStrictEventUnionRequest
     {
@@ -11581,22 +11648,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventUnionRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictEventUnionRequest, D>
         for &UnknownInteractionsClosedProtocolStrictEventUnionRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11606,7 +11666,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsClosedProtocolStrictEventUnionRequest::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -11620,7 +11680,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsClosedProtocolStrictEventUnionRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11629,7 +11691,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11667,7 +11729,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsClosedProtocolStrictEventUnionRequest::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -11675,7 +11737,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -11698,6 +11760,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
     {
@@ -11713,24 +11784,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, D>
         for &UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11741,7 +11803,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -11755,7 +11817,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -11764,7 +11828,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11804,7 +11868,7 @@ mod internal {
                         // Initialize `self` to the right variant
                         *self =
                             UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::SomeField(
-                                fidl::new_empty!(i32),
+                                fidl::new_empty!(i32, D),
                             );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -11812,7 +11876,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -11835,6 +11899,15 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker
+        for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
+    {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
     {
@@ -11850,25 +11923,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker
-        for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
-    {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl
-        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, D>
         for &UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11876,7 +11939,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
             UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(ref val) => {
-                fidl::encoding::encode_in_envelope::<i32>(
+                fidl::encoding::encode_in_envelope::<i32, D>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                     encoder, offset + 8, _depth
                 )
@@ -11886,7 +11949,7 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self>
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
     {
         #[inline(always)]
@@ -11897,7 +11960,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11932,11 +11995,11 @@ mod internal {
                     // Do nothing, read the value into the object
                 } else {
                     // Initialize `self` to the right variant
-                    *self =UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(fidl::new_empty!(i32));
+                    *self =UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(fidl::new_empty!(i32, D));
                 }
                     #[allow(irrefutable_let_patterns)]
                 if let UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(ref mut val) = self {
-                    fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                    fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                 } else {
                     unreachable!()
                 }
@@ -11959,6 +12022,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleEventUnionRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolFlexibleEventUnionRequest {
         type Owned = Self;
 
@@ -11972,22 +12042,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleEventUnionRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventUnionRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleEventUnionRequest, D>
         for &UnknownInteractionsProtocolFlexibleEventUnionRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -11996,7 +12059,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsProtocolFlexibleEventUnionRequest::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -12010,7 +12073,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleEventUnionRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleEventUnionRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -12019,7 +12084,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12056,7 +12121,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsProtocolFlexibleEventUnionRequest::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -12064,7 +12129,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -12090,6 +12155,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictEventUnionRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolStrictEventUnionRequest {
         type Owned = Self;
 
@@ -12103,22 +12175,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictEventUnionRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventUnionRequest>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictEventUnionRequest, D>
         for &UnknownInteractionsProtocolStrictEventUnionRequest
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12127,7 +12192,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsProtocolStrictEventUnionRequest::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -12141,7 +12206,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictEventUnionRequest {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictEventUnionRequest
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -12150,7 +12217,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12186,7 +12253,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsProtocolStrictEventUnionRequest::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -12194,7 +12261,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -12219,6 +12286,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
         type Owned = Self;
 
@@ -12232,22 +12306,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayUnionResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayUnionResponse, D>
         for &UnknownInteractionsProtocolStrictTwoWayUnionResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12256,7 +12323,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsProtocolStrictTwoWayUnionResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -12270,7 +12337,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictTwoWayUnionResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -12279,7 +12348,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12316,7 +12385,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsProtocolStrictTwoWayUnionResponse::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -12324,7 +12393,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -12350,6 +12419,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker
         for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
     {
@@ -12365,22 +12441,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, D>
         for &UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12391,7 +12460,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -12405,7 +12474,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -12414,7 +12485,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12453,7 +12524,7 @@ mod internal {
                         // Initialize `self` to the right variant
                         *self =
                             UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::SomeField(
-                                fidl::new_empty!(i32),
+                                fidl::new_empty!(i32, D),
                             );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -12461,7 +12532,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -12484,6 +12555,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         type Owned = Self;
 
@@ -12497,22 +12575,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, D>
         for &UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12522,7 +12593,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -12536,7 +12607,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -12545,7 +12618,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12583,7 +12656,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -12591,7 +12664,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }
@@ -12617,6 +12690,13 @@ mod internal {
         }
     }
 
+    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         type Owned = Self;
 
@@ -12630,22 +12710,15 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
+    unsafe impl<D: fidl::encoding::ResourceDialect>
+        fidl::encoding::Encode<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, D>
         for &UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12655,7 +12728,7 @@ mod internal {
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
                 UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::SomeField(ref val) => {
-                    fidl::encoding::encode_in_envelope::<i32>(
+                    fidl::encoding::encode_in_envelope::<i32, D>(
                         <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
                         encoder,
                         offset + 8,
@@ -12669,7 +12742,9 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
+        for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+    {
         #[inline(always)]
         fn new_empty() -> Self {
             Self::__SourceBreaking { unknown_ordinal: 0 }
@@ -12678,7 +12753,7 @@ mod internal {
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             mut depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -12716,7 +12791,7 @@ mod internal {
                     } else {
                         // Initialize `self` to the right variant
                         *self = UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::SomeField(
-                            fidl::new_empty!(i32),
+                            fidl::new_empty!(i32, D),
                         );
                     }
                     #[allow(irrefutable_let_patterns)]
@@ -12724,7 +12799,7 @@ mod internal {
                         ref mut val,
                     ) = self
                     {
-                        fidl::decode!(i32, val, decoder, _inner_offset, depth)?;
+                        fidl::decode!(i32, D, val, decoder, _inner_offset, depth)?;
                     } else {
                         unreachable!()
                     }

@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -28,6 +24,13 @@ impl fidl::Persistable for Foo {}
 mod internal {
     use super::*;
 
+    impl fidl::encoding::ValueTypeMarker for Foo {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
     unsafe impl fidl::encoding::TypeMarker for Foo {
         type Owned = Self;
 
@@ -41,26 +44,18 @@ mod internal {
             4
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Foo {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
-        ) -> Self::Borrowed<'a> {
-            value
-        }
-    }
 
-    unsafe impl fidl::encoding::Encode<Foo> for &Foo {
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Foo, D> for &Foo {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Foo>(offset);
             // Delegate to tuple encoding.
-            fidl::encoding::Encode::<Foo>::encode(
+            fidl::encoding::Encode::<Foo, D>::encode(
                 (<fidl_test_dependent::MyEnum as fidl::encoding::ValueTypeMarker>::borrow(
                     &self.field,
                 ),),
@@ -70,13 +65,15 @@ mod internal {
             )
         }
     }
-    unsafe impl<T0: fidl::encoding::Encode<fidl_test_dependent::MyEnum>> fidl::encoding::Encode<Foo>
-        for (T0,)
+    unsafe impl<
+            D: fidl::encoding::ResourceDialect,
+            T0: fidl::encoding::Encode<fidl_test_dependent::MyEnum, D>,
+        > fidl::encoding::Encode<Foo, D> for (T0,)
     {
         #[inline]
         unsafe fn encode(
             self,
-            encoder: &mut fidl::encoding::Encoder<'_>,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
             offset: usize,
             depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -89,16 +86,16 @@ mod internal {
         }
     }
 
-    impl fidl::encoding::Decode<Self> for Foo {
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Foo {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { field: fidl::new_empty!(fidl_test_dependent::MyEnum) }
+            Self { field: fidl::new_empty!(fidl_test_dependent::MyEnum, D) }
         }
 
         #[inline]
         unsafe fn decode(
             &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_>,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
             offset: usize,
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
@@ -106,6 +103,7 @@ mod internal {
             // Verify that padding bytes are zero.
             fidl::decode!(
                 fidl_test_dependent::MyEnum,
+                D,
                 &mut self.field,
                 decoder,
                 offset + 0,

@@ -5,8 +5,9 @@
 //! An implementation of a server for a fidl interface.
 
 use crate::encoding::{
-    DynamicFlags, EmptyStruct, Encode, Encoder, Flexible, FlexibleType, FrameworkErr,
-    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
+    DefaultFuchsiaResourceDialect, DynamicFlags, EmptyStruct, Encode, Encoder, Flexible,
+    FlexibleType, FrameworkErr, TransactionHeader, TransactionMessage, TransactionMessageType,
+    TypeMarker,
 };
 use crate::handle::HandleDisposition;
 use crate::{epitaph, AsyncChannel, Error, HandleInfo};
@@ -80,7 +81,7 @@ impl ServeInner {
     #[inline]
     pub fn send<T: TypeMarker>(
         &self,
-        body: impl Encode<T>,
+        body: impl Encode<T, DefaultFuchsiaResourceDialect>,
         tx_id: u32,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
@@ -89,9 +90,10 @@ impl ServeInner {
             header: TransactionHeader::new(tx_id, ordinal, dynamic_flags),
             body,
         };
-        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, ()>(msg, |bytes, handles| {
-            self.send_raw_msg(bytes, handles)
-        })
+        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, _, ()>(
+            msg,
+            |bytes, handles| self.send_raw_msg(bytes, handles),
+        )
     }
 
     /// Sends a framework error to the client.
@@ -119,7 +121,11 @@ impl ServeInner {
         // Reuse the request decoding byte buffer for encoding (we can't call
         // `with_tls_encoded` as we're already inside `with_tls_decode_buf`).
         let mut handle_dispositions = Vec::new();
-        Encoder::encode::<Msg>(bytes, &mut handle_dispositions, msg)?;
+        Encoder::<DefaultFuchsiaResourceDialect>::encode::<Msg>(
+            bytes,
+            &mut handle_dispositions,
+            msg,
+        )?;
         debug_assert!(handle_dispositions.is_empty());
         self.send_raw_msg(&*bytes, &mut [])
     }

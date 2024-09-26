@@ -23,7 +23,9 @@ func NewGenerator(rustfmtPath, rustfmtConfigPath string) *Generator {
 	}
 	formatter := fidlgen.NewFormatter(rustfmtPath, args...)
 
-	return &Generator{fidlgen.NewGenerator("RustTemplates", templates, formatter, template.FuncMap{})}
+	return &Generator{fidlgen.NewGenerator("RustTemplates", templates, formatter, template.FuncMap{
+		"ResourceDialect": func() string { return "fidl::encoding::DefaultFuchsiaResourceDialect" },
+	})}
 }
 
 func (gen *Generator) GenerateFidl(ir fidlgen.Root, outputFilename string) error {

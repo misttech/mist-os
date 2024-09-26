@@ -442,8 +442,8 @@ mod tests {
     fn verify_fidl_vec_response_overhead() {
         let vec_response_overhead = {
             use fidl::encoding::{
-                DynamicFlags, TransactionHeader, TransactionMessage, TransactionMessageType,
-                UnboundedVector,
+                DefaultFuchsiaResourceDialect, DynamicFlags, TransactionHeader, TransactionMessage,
+                TransactionMessageType, UnboundedVector,
             };
 
             type Msg = TransactionMessageType<UnboundedVector<u8>>;
@@ -451,8 +451,11 @@ mod tests {
                 header: TransactionHeader::new(0, 0, DynamicFlags::empty()),
                 body: &[] as &[u8],
             };
-            fidl::encoding::with_tls_encoded::<Msg, _>(msg, |bytes, _handles| Ok(bytes.len()))
-                .unwrap()
+            fidl::encoding::with_tls_encoded::<Msg, DefaultFuchsiaResourceDialect, _>(
+                msg,
+                |bytes, _handles| Ok(bytes.len()),
+            )
+            .unwrap()
         };
         assert_eq!(vec_response_overhead, FIDL_VEC_RESPONSE_OVERHEAD_BYTES);
     }

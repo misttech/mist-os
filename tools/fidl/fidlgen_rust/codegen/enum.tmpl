@@ -123,21 +123,21 @@ unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
 impl fidl::encoding::ValueTypeMarker for {{ .Name }} {
     type Borrowed<'a> = Self;
     #[inline(always)]
-    fn borrow<'a>(value: &'a <Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'a> {
+    fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl fidl::encoding::Encode<Self> for {{ .Name }} {
+unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<Self, D> for {{ .Name }} {
     #[inline]
-    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_, D>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
         encoder.write_num(self.into_primitive(), offset);
         Ok(())
     }
 }
 
-impl fidl::encoding::Decode<Self> for {{ .Name }} {
+impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for {{ .Name }} {
     #[inline(always)]
     fn new_empty() -> Self {
         {{- if .IsStrict }}
@@ -148,7 +148,7 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
     }
 
     #[inline]
-    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
+    unsafe fn decode(&mut self, decoder: &mut fidl::encoding::Decoder<'_, D>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
         let prim = decoder.read_num::<{{ .UnderlyingType }}>(offset);
         {{ if .IsStrict }}
