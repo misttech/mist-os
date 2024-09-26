@@ -1944,23 +1944,47 @@ impl FsNode {
     {
         mount.check_readonly_filesystem()?;
         self.update_attributes(locked, current_task, |info| {
-            if !current_task.creds().has_capability(CAP_CHOWN) {
-                let creds = current_task.creds();
-                if info.uid != creds.euid {
+            if current_task.creds().has_capability(CAP_CHOWN) {
+                info.chown(owner, group);
+                return Ok(());
+            }
+
+            // Nobody can change the owner.
+            if let Some(uid) = owner {
+                if info.uid != uid {
                     return error!(EPERM);
                 }
-                if let Some(uid) = owner {
-                    if info.uid != uid {
-                        return error!(EPERM);
-                    }
-                }
+            }
+
+            let creds = current_task.creds();
+
+            // The owner can change the group.
+            if info.uid == creds.euid {
+                // To a group that it belongs.
                 if let Some(gid) = group {
                     if !creds.is_in_group(gid) {
                         return error!(EPERM);
                     }
                 }
+                info.chown(None, group);
+                return Ok(());
             }
-            info.chown(owner, group);
+
+            // Any other user can call chown(file, -1, -1)
+            if owner.is_some() || group.is_some() {
+                return error!(EPERM);
+            }
+
+            // But not on set-user-ID or set-group-ID files.
+            // If we were to chown them, they would drop the set-ID bit.
+            if info.mode.is_reg()
+                && (info.mode.contains(FileMode::ISUID)
+                    || info.mode.contains(FileMode::ISGID | FileMode::IXGRP))
+            {
+                return error!(EPERM);
+            }
+
+            info.chown(None, None);
             Ok(())
         })
     }
