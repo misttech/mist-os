@@ -88,7 +88,7 @@ const affine::Ratio& timer_get_ticks_to_time_ratio(void) { return gTicksToTime; 
 
 zx_time_t current_time(void) { return gTicksToTime.Scale(current_ticks()); }
 
-zx_boot_time_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
+zx_instant_boot_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
 
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 
@@ -102,7 +102,7 @@ ktl::optional<zx_ticks_t> TimerQueue::ConvertMonotonicTimeToRawTicks(zx_time_t m
   return timer_convert_mono_to_raw_ticks(deadline_mono_ticks);
 }
 
-zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_boot_time_t boot) {
+zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_instant_boot_t boot) {
   // Do not attempt to convert the sentinel value of ZX_TIME_INFINITE.
   if (boot == ZX_TIME_INFINITE) {
     return ZX_TIME_INFINITE;
@@ -148,7 +148,7 @@ void TimerQueue::UpdatePlatformTimerLocked() {
   next_timer_deadline_ = timer_deadline;
 }
 
-void TimerQueue::UpdatePlatformTimerBoot(zx_boot_time_t new_deadline) {
+void TimerQueue::UpdatePlatformTimerBoot(zx_instant_boot_t new_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   // Do not set the platform timer if we were passed an infinite deadline.
@@ -470,7 +470,7 @@ void timer_tick() {
 
 void TimerQueue::Tick(cpu_num_t cpu) {
   zx_time_t now = current_time();
-  zx_boot_time_t boot_now = current_boot_time();
+  zx_instant_boot_t boot_now = current_boot_time();
   LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
 
   // The platform timer has fired, so no deadline is set.

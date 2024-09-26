@@ -224,11 +224,11 @@ IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expect
   return {ZX_OK, expected_state};
 }
 
-zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_at) {
+zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resume_at) {
   // Prevent re-entrant calls to suspend.
   Guard<Mutex> guard{TransitionLock::Get()};
 
-  const zx_boot_time_t suspend_request_boot_time = current_boot_time();
+  const zx_instant_boot_t suspend_request_boot_time = current_boot_time();
   if (resume_at < suspend_request_boot_time) {
     return ZX_ERR_TIMED_OUT;
   }
@@ -305,7 +305,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_
       dprintf(INFO, "Setting boot CPU to resume at time %" PRId64 "\n", resume_at);
       resume_timer_.SetOneshot(
           resume_at,
-          +[](Timer* timer, zx_boot_time_t now, void* resume_at_ptr) {
+          +[](Timer* timer, zx_instant_boot_t now, void* resume_at_ptr) {
             // Verify this handler is running in the correct context.
             DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
 
