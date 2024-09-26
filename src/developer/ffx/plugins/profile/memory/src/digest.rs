@@ -346,28 +346,6 @@ pub mod processed {
         pub total_undigested: Option<u64>,
     }
 
-    /// Returns the name of a VMO category when the name match on of the rules.
-    /// This is used for presentation and aggregation.
-    pub fn rename(name: &str) -> &str {
-        lazy_static::lazy_static! {
-        /// Default, global regex match.
-        static ref RULES: [(regex::Regex, &'static str); 11] = [
-            (regex::Regex::new("ld\\.so\\.1-internal-heap|(^stack: msg of.*)").unwrap(), "[process-bootstrap]"),
-            (regex::Regex::new("^blob-[0-9a-f]+$").unwrap(), "[blobs]"),
-            (regex::Regex::new("^inactive-blob-[0-9a-f]+$").unwrap(), "[inactive blobs]"),
-            (regex::Regex::new("^thrd_t:0x.*|initial-thread|pthread_t:0x.*$").unwrap(), "[stacks]"),
-            (regex::Regex::new("^data[0-9]*:.*$").unwrap(), "[data]"),
-            (regex::Regex::new("^bss[0-9]*:.*$").unwrap(), "[bss]"),
-            (regex::Regex::new("^relro:.*$").unwrap(), "[relro]"),
-            (regex::Regex::new("^$").unwrap(), "[unnamed]"),
-            (regex::Regex::new("^scudo:.*$").unwrap(), "[scudo]"),
-            (regex::Regex::new("^.*\\.so.*$").unwrap(), "[bootfs-libraries]"),
-            (regex::Regex::new("^stack_and_tls:.*$").unwrap(), "[bionic-stack]"),
-        ];
-        }
-        RULES.iter().find(|(regex, _)| regex.is_match(name)).map_or(name, |rule| rule.1)
-    }
-
     /// Conversion trait from a raw digest to a human-friendly
     /// processed digest. Data is aggregated, normalized, sorted.
     /// Arguments:
@@ -516,7 +494,8 @@ pub mod processed {
                             Some(v) => v.len() as u64,
                             None => unreachable!(),
                         };
-                        let name = rename(&vmo.name).to_string();
+                        let name = ffx_profile_memory_common::vmo_name_to_digest_name(&vmo.name)
+                            .to_string();
                         let name_sizes = process.name_to_vmo_memory.entry(name).or_default();
                         name_sizes.vmos.push(*vmo_koid);
                         name_sizes.add_vmo(vmo, share_count);
@@ -553,7 +532,6 @@ pub mod processed {
 mod tests {
     use super::*;
     use crate::bucket::Bucket;
-    use crate::processed::rename;
     use crate::raw::BucketDefinition;
     use std::collections::{HashMap, HashSet};
 
@@ -1136,24 +1114,5 @@ mod tests {
             sorted_vmos_by_koid(&expected_vmos),
             sorted_vmos_by_koid(&processed.vmos)
         );
-    }
-
-    #[test]
-    fn rename_test() {
-        pretty_assertions::assert_eq!(rename("ld.so.1-internal-heap"), "[process-bootstrap]");
-        pretty_assertions::assert_eq!(rename("stack: msg of 123"), "[process-bootstrap]");
-        pretty_assertions::assert_eq!(rename("blob-123"), "[blobs]");
-        pretty_assertions::assert_eq!(rename("inactive-blob-123"), "[inactive blobs]");
-        pretty_assertions::assert_eq!(rename("thrd_t:0x123"), "[stacks]");
-        pretty_assertions::assert_eq!(rename("initial-thread"), "[stacks]");
-        pretty_assertions::assert_eq!(rename("pthread_t:0x123"), "[stacks]");
-        pretty_assertions::assert_eq!(rename("data456:"), "[data]");
-        pretty_assertions::assert_eq!(rename("bss456:"), "[bss]");
-        pretty_assertions::assert_eq!(rename("relro:foobar"), "[relro]");
-        pretty_assertions::assert_eq!(rename(""), "[unnamed]");
-        pretty_assertions::assert_eq!(rename("scudo:primary"), "[scudo]");
-        pretty_assertions::assert_eq!(rename("libfoo.so.1"), "[bootfs-libraries]");
-        pretty_assertions::assert_eq!(rename("foobar"), "foobar");
-        pretty_assertions::assert_eq!(rename("stack_and_tls:2331"), "[bionic-stack]");
     }
 }
