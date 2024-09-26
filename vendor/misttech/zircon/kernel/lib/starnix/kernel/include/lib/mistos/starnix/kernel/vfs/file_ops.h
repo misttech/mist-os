@@ -15,6 +15,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
 #include <asm/stat.h>
@@ -211,7 +212,7 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
       case SeekTargetType::Set:
         return fit::ok(target.offset);
       case SeekTargetType::Cur:
-        return fit::ok(checked_add(current_offset, target.offset));
+        return fit::ok(mtl::checked_add(current_offset, target.offset));
       case SeekTargetType::End: {
         auto result = compute_end(target.offset);
         if (result.is_error())
@@ -279,7 +280,7 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
         return result.take_error();                                                              \
                                                                                                  \
       auto eof_offset = result.value();                                                          \
-      auto offset_opt = checked_add(offset, eof_offset);                                         \
+      auto offset_opt = mtl::checked_add(offset, eof_offset);                                    \
       if (!offset_opt.has_value())                                                               \
         return fit::error(errno(EINVAL));                                                        \
       return fit::ok(offset_opt.value());                                                        \

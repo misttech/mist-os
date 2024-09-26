@@ -13,6 +13,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
 #include <utility>
@@ -26,7 +27,7 @@
 namespace starnix {
 
 fit::result<Errno, size_t> checked_add_offset_and_length(size_t offset, size_t length) {
-  auto end = checked_add(offset, length);
+  auto end = mtl::checked_add(offset, length);
   if (!end.has_value())
     return fit::error(errno(EINVAL));
 
