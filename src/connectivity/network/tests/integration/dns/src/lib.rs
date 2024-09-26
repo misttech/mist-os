@@ -23,11 +23,11 @@ use futures::{AsyncReadExt as _, AsyncWriteExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_ip_v6, fidl_subnet, std_ip_v6, std_socket_addr};
 use net_types::ip as net_types_ip;
-use netemul::{InStack, RealmTcpListener as _, RealmUdpSocket as _};
+use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::ndp::send_ra_with_router_lifetime;
 use netstack_testing_common::realms::{
-    KnownServiceProvider, Manager, ManagerConfig, Netstack, TestSandboxExt as _,
+    KnownServiceProvider, Manager, ManagerConfig, Netstack, NetstackExt, TestSandboxExt as _,
 };
 use netstack_testing_common::{
     interfaces, pause_fake_clock, wait_for_component_stopped, Result,
@@ -45,6 +45,7 @@ use packet_formats::ip::{IpPacket as _, IpProto, Ipv6Proto};
 use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketBuilder};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6;
+use policy_testing_common::with_netcfg_owned_device;
 
 #[netstack_test]
 #[variant(N, Netstack)]
@@ -140,18 +141,14 @@ async fn poll_lookup_admin<
     )
 }
 
-/// Tests that Netstack exposes DNS servers discovered dynamically and NetworkManager
+/// Tests that Netstack exposes DNS servers discovered through NDP and NetworkManager
 /// configures the Lookup service.
 #[netstack_test]
 #[variant(M, Manager)]
 #[variant(N, Netstack)]
-async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
-    const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
-    /// DNS server served by DHCP.
-    const DHCP_DNS_SERVER: fnet::Ipv4Address = fidl_ip_v4!("123.12.34.56");
+async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str) {
     /// DNS server served by NDP.
     const NDP_DNS_SERVER: fnet::Ipv6Address = fidl_ip_v6!("20a::1234:5678");
-
     /// Maximum number of times we'll poll `LookupAdmin` to check DNS configuration
     /// succeeded.
     const RETRY_COUNT: u64 = 60;
@@ -160,29 +157,18 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
 
     const DEFAULT_DNS_PORT: u16 = 53;
 
+    let name = name.to_string();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let network = sandbox.create_network("net").await.expect("failed to create network");
-    let server_realm = sandbox
-        .create_netstack_realm_with::<N, _, _>(
-            format!("{}_server", name),
-            &[
-                KnownServiceProvider::DnsResolver,
-                KnownServiceProvider::DhcpServer { persistent: false },
-                KnownServiceProvider::FakeClock,
-                KnownServiceProvider::SecureStash,
-            ],
-        )
-        .expect("failed to create server realm");
-
     let client_realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             format!("{}_client", name),
             &[
                 // Start the network manager on the client.
                 //
-                // The network manager should listen for DNS server events from the netstack and
-                // configure the DNS resolver accordingly.
+                // The network manager should listen for NDP DNS server events
+                // and configure the DNS resolver accordingly.
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Empty,
@@ -194,71 +180,11 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
             ],
         )
         .expect("failed to create client realm");
-
-    let server_iface = server_realm
-        .join_network(&network, "server-ep")
-        .await
-        .expect("failed to configure server networking");
-    server_iface.add_address_and_subnet_route(SERVER_ADDR).await.expect("configure address");
-
-    let dhcp_server = server_realm
-        .connect_to_protocol::<net_dhcp::Server_Marker>()
-        .expect("failed to connect to DHCP server");
-
-    let dhcp_server_ref = &dhcp_server;
-
-    let server_addr_v4 =
-        assert_matches::assert_matches!(SERVER_ADDR.addr, fnet::IpAddress::Ipv4(v4) => v4);
-    let (range_start, range_stop) = {
-        let [a, b, c, d] = server_addr_v4.addr;
-        // A small pool of addresses derived from the server's.
-        (fnet::Ipv4Address { addr: [a, b, c, d + 1] }, fnet::Ipv4Address { addr: [a, b, c, d + 4] })
-    };
-    let () = stream::iter(
-        [
-            fidl_fuchsia_net_dhcp::Parameter::IpAddrs(vec![server_addr_v4]),
-            fidl_fuchsia_net_dhcp::Parameter::AddressPool(fidl_fuchsia_net_dhcp::AddressPool {
-                prefix_length: Some(25),
-                range_start: Some(range_start),
-                range_stop: Some(range_stop),
-                ..Default::default()
-            }),
-            fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(vec!["eth2".to_string()]),
-        ]
-        .iter_mut(),
-    )
-    .for_each_concurrent(None, |parameter| async move {
-        dhcp_server_ref
-            .set_parameter(parameter)
-            .await
-            .expect("failed to call dhcp/Server.SetParameter")
-            .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|e| {
-                panic!("dhcp/Server.SetParameter({:?}) returned error: {:?}", parameter, e)
-            })
-    })
-    .await;
-
-    let () = dhcp_server
-        .set_option(&net_dhcp::Option_::DomainNameServer(vec![DHCP_DNS_SERVER]))
-        .await
-        .expect("Failed to set DNS option")
-        .map_err(zx::Status::from_raw)
-        .expect("dhcp/Server.SetOption returned error");
-
-    let () = dhcp_server
-        .start_serving()
-        .await
-        .expect("failed to call dhcp/Server.StartServing")
-        .map_err(zx::Status::from_raw)
-        .expect("dhcp/Server.StartServing returned error");
-
     // Start networking on client realm.
-    let client_iface = client_realm
+    let _client_iface = client_realm
         .join_network(&network, "client-ep")
         .await
         .expect("failed to configure client networking");
-    client_iface.start_dhcp::<InStack>().await.expect("failed to start DHCP");
 
     // Send a Router Advertisement with DNS server configurations.
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
@@ -270,17 +196,11 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
         .expect("failed to send router advertisement");
 
     // The list of servers we expect to retrieve from `fuchsia.net.name/LookupAdmin`.
-    let expect = [
-        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: DHCP_DNS_SERVER,
-            port: DEFAULT_DNS_PORT,
-        }),
-        fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
-            address: NDP_DNS_SERVER,
-            port: DEFAULT_DNS_PORT,
-            zone_index: 0,
-        }),
-    ];
+    let expect = [fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+        address: NDP_DNS_SERVER,
+        port: DEFAULT_DNS_PORT,
+        zone_index: 0,
+    })];
 
     // Poll LookupAdmin until we get the servers we want or after too many tries.
     let lookup_admin = client_realm
@@ -291,6 +211,152 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
             .fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
     poll_lookup_admin(&lookup_admin, &expect, &mut wait_for_netmgr, POLL_WAIT, RETRY_COUNT).await
+}
+
+/// Tests that Netstack exposes DNS servers discovered through DHCPv4 and NetworkManager
+/// configures the Lookup service.
+#[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
+async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str) {
+    const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
+    /// DNS server served by DHCP.
+    const DHCP_DNS_SERVER: fnet::Ipv4Address = fidl_ip_v4!("123.12.34.56");
+    /// Maximum number of times we'll poll `LookupAdmin` to check DNS configuration
+    /// succeeded.
+    const RETRY_COUNT: u64 = 60;
+    /// Duration to sleep between polls.
+    const POLL_WAIT: zx::Duration = zx::Duration::from_seconds(1);
+
+    const DEFAULT_DNS_PORT: u16 = 53;
+
+    let name = name.to_string();
+    // The device must be installed by netcfg in order to start the DHCPv4 client
+    // on the interface, as the DHCPv4 DNS servers are found through the DHCPv4
+    // client configuration and not the DnsServerWatcher.
+    let _if_name = with_netcfg_owned_device::<M, N, _>(
+        &name.clone(),
+        ManagerConfig::Empty,
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
+        [],
+        |_, network, _, client_realm, sandbox| {
+            async move {
+                let server_realm = sandbox
+                    .create_netstack_realm_with::<N, _, _>(
+                        format!("{}_server", name),
+                        &[
+                            KnownServiceProvider::DnsResolver,
+                            KnownServiceProvider::DhcpServer { persistent: false },
+                            KnownServiceProvider::FakeClock,
+                            KnownServiceProvider::SecureStash,
+                        ],
+                    )
+                    .expect("failed to create server realm");
+
+                // Start networking on server realm.
+                let server_iface = server_realm
+                    .join_network(&network, "server-ep")
+                    .await
+                    .expect("failed to configure server networking");
+                server_iface
+                    .add_address_and_subnet_route(SERVER_ADDR)
+                    .await
+                    .expect("configure address");
+
+                let dhcp_server = server_realm
+                    .connect_to_protocol::<net_dhcp::Server_Marker>()
+                    .expect("failed to connect to DHCP server");
+
+                let dhcp_server_ref = &dhcp_server;
+
+                let server_addr_v4 = assert_matches::assert_matches!(
+                    SERVER_ADDR.addr,
+                    fnet::IpAddress::Ipv4(v4) => v4
+                );
+                let (range_start, range_stop) = {
+                    let [a, b, c, d] = server_addr_v4.addr;
+                    // A small pool of addresses derived from the server's.
+                    (
+                        fnet::Ipv4Address { addr: [a, b, c, d + 1] },
+                        fnet::Ipv4Address { addr: [a, b, c, d + 4] },
+                    )
+                };
+                let () = stream::iter(
+                    [
+                        fidl_fuchsia_net_dhcp::Parameter::IpAddrs(vec![server_addr_v4]),
+                        fidl_fuchsia_net_dhcp::Parameter::AddressPool(
+                            fidl_fuchsia_net_dhcp::AddressPool {
+                                prefix_length: Some(25),
+                                range_start: Some(range_start),
+                                range_stop: Some(range_stop),
+                                ..Default::default()
+                            },
+                        ),
+                        fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(
+                            vec!["eth2".to_string()],
+                        ),
+                    ]
+                    .iter_mut(),
+                )
+                .for_each_concurrent(None, |parameter| async move {
+                    dhcp_server_ref
+                        .set_parameter(parameter)
+                        .await
+                        .expect("failed to call dhcp/Server.SetParameter")
+                        .map_err(zx::Status::from_raw)
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "dhcp/Server.SetParameter({:?}) returned error: {:?}",
+                                parameter, e
+                            )
+                        })
+                })
+                .await;
+
+                let () = dhcp_server
+                    .set_option(&net_dhcp::Option_::DomainNameServer(vec![DHCP_DNS_SERVER]))
+                    .await
+                    .expect("Failed to set DNS option")
+                    .map_err(zx::Status::from_raw)
+                    .expect("dhcp/Server.SetOption returned error");
+
+                let () = dhcp_server
+                    .start_serving()
+                    .await
+                    .expect("failed to call dhcp/Server.StartServing")
+                    .map_err(zx::Status::from_raw)
+                    .expect("dhcp/Server.StartServing returned error");
+
+                // The list of servers we expect to retrieve from `fuchsia.net.name/LookupAdmin`.
+                let expect = [fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                    address: DHCP_DNS_SERVER,
+                    port: DEFAULT_DNS_PORT,
+                })];
+
+                // Poll LookupAdmin until we get the servers we want or after too many tries.
+                let lookup_admin = client_realm
+                    .connect_to_protocol::<net_name::LookupAdminMarker>()
+                    .expect("failed to connect to LookupAdmin");
+                let wait_for_netmgr = wait_for_component_stopped(
+                    &client_realm,
+                    M::MANAGEMENT_AGENT.get_component_name(),
+                    None,
+                )
+                .fuse();
+                let mut wait_for_netmgr = pin!(wait_for_netmgr);
+                poll_lookup_admin(
+                    &lookup_admin,
+                    &expect,
+                    &mut wait_for_netmgr,
+                    POLL_WAIT,
+                    RETRY_COUNT,
+                )
+                .await
+            }
+            .boxed_local()
+        },
+    )
+    .await;
 }
 
 /// Tests that DHCPv6 exposes DNS servers discovered dynamically and the network manager

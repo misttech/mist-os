@@ -19,8 +19,11 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "discovered_dns_netcfg_basic_ns3",
-                "discovered_dns_netcfg_advanced_ns3",
+                // TODO(https://fxbug.dev/341759423): Once
+                // Netstack3 exposes NDP RAs, listen for
+                // these servers in netcfg.
+                "discovered_ndp_dns_netcfg_basic_ns3",
+                "discovered_ndp_dns_netcfg_advanced_ns3",
             ],
         },
     ],

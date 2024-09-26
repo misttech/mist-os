@@ -43,6 +43,7 @@ tests = [
     label = "dns"
     err_logs = true
     package_deps = [
+      "//src/connectivity/network/dhcpv4/client/bindings:component",
       "//src/connectivity/network/dhcpv4/server:component",
       "//src/connectivity/network/dhcpv6/client:component",
       "//src/connectivity/network/dns:component_with_fake_time",
