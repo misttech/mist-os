@@ -123,12 +123,23 @@ async fn deregister_standalone(
     match repo_proxy.remove(&repo_url).await {
         Ok(Ok(())) => (),
         Ok(Err(err)) => {
-            tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
-            return_bug!("failed to add config: {err:?}");
+            let status = Status::from_raw(err);
+            if status != Status::NOT_FOUND {
+                let message = format!(
+                    "failed to remove registration for {repo_url}: {:#?}",
+                    Status::from_raw(err)
+                );
+                tracing::error!("{message}");
+                return_bug!("{message}");
+            } else {
+                tracing::info!("registration for {repo_url} was not found. Ignoring.")
+            }
         }
         Err(err) => {
-            tracing::error!("failed to add config due to communication error: {:#?}", err);
-            return_bug!("failed to add config due to communication error: {err:?}");
+            let message =
+                format!("failed to remove registrtation  due to communication error: {:#?}", err);
+            tracing::error!("{message}");
+            return_bug!("{message}");
         }
     };
     // Remove any alias rules.
@@ -410,7 +421,7 @@ mod test {
             .await
             .expect("Setting default target");
 
-        let (repos, _) = setup_fake_server().await;
+        let repos = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let (repo_mgr, _) = setup_fake_repo_manager_server().await;
 
         make_server_instance(ServerMode::Foreground, default_repo_name.to_string(), &env.context)
@@ -492,5 +503,45 @@ mod test {
         assert!(deregister_daemon(REPO_NAME, Some(TARGET_NAME.to_string()), repos, engine)
             .await
             .is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_deregister_standalone_not_found() {
+        // command should still succeed if the repo_proxy returns NOT_FOUND.
+        let env = ffx_config::test_init().await.unwrap();
+
+        let default_repo_name = "default-repo";
+        pkg::config::set_default_repository(default_repo_name).await.unwrap();
+        env.context
+            .query("target.default")
+            .level(Some(ConfigLevel::User))
+            .set("some-target".into())
+            .await
+            .expect("Setting default target");
+
+        let repos = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let repo_mgr = fho::testing::fake_proxy(move |req| match req {
+            fidl_fuchsia_pkg::RepositoryManagerRequest::Remove { responder, .. } => {
+                responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
+            }
+            other => panic!("Unexpected request: {:?}", other),
+        });
+
+        make_server_instance(ServerMode::Foreground, default_repo_name.to_string(), &env.context)
+            .expect("creating test server");
+
+        let tool = DeregisterTool {
+            cmd: DeregisterCommand { repository: None },
+            repos,
+            context: env.context.clone(),
+            repo_proxy: repo_mgr,
+            engine_proxy: setup_fake_engine_server(),
+        };
+
+        let buffers = TestBuffers::default();
+        let writer = SimpleWriter::new_test(&buffers);
+
+        let res = tool.main(writer).await;
+        assert!(res.is_ok(), "Expected result to be OK. Got: {res:?}");
     }
 }
