@@ -1364,6 +1364,23 @@ group("tool_paths.llvm-tools") {
         },
       ]
     }
+
+    # Add the arm64 version of llvm-profdata to tool_paths for use by the arm64
+    # coverage builder.
+    if (target_cpu == "arm64" && host_platform == "linux-x64" && is_coverage) {
+      tool_paths += [
+        {
+          cpu = target_cpu
+          label = get_label_info(":$target_name", "label_no_toolchain") +
+                  "($host_arm64_toolchain)"
+          name = "llvm-profdata"
+          os = host_os
+          path = rebase_path(
+                  "//prebuilt/third_party/clang/linux-arm64/bin/llvm-profdata",
+                  root_build_dir)
+        },
+      ]
+    }
   }
 }
 

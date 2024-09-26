@@ -78,6 +78,9 @@ type Options struct {
 	// Whether to upload to upload test results to ResultDB from testrunner
 	// Bool enables soft transition from tefmocheck running in the recipe vs the processing happening in botanist.
 	UploadToResultDB bool
+
+	// The path to the llvm-profdata binary to use to merge profiles on the host.
+	LLVMProfdataPath string
 }
 
 func SetupAndExecute(ctx context.Context, opts Options, testsPath string) error {
@@ -212,7 +215,7 @@ func execute(
 			if err != nil {
 				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 			}
-			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.FFXExperimentLevel)
+			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.FFXExperimentLevel, opts.LLVMProfdataPath)
 			if err != nil {
 				return fmt.Errorf("failed to initialize ffx tester: %w", err)
 			}

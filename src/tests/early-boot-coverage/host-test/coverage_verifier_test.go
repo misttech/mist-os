@@ -181,9 +181,11 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	// experiment level does not enable using `ffx test`. When updating the ffx
 	// experiment level on the coverage builders, the level should be updated
 	// here as well.
+	// TODO(https://fxbug.dev/42075455): Pass in the llvm-profdata tool when this
+	// gets changed to enable ffx test.
 	ffxExperimentLevel := 1
 
-	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperimentLevel)
+	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperimentLevel, "")
 	if err != nil {
 		t.Fatalf("Cannot create Ffx Tester. Reason: %s", err)
 	}
