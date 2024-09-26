@@ -15,6 +15,8 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/vector.h>
 
+#include "diagnostics.h"
+
 namespace dl {
 
 using Elf = elfldltl::Elf<>;
@@ -120,6 +122,8 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // This list is set when dlopen() is called on this module.
   constexpr const ModuleRefList& module_tree() const { return module_tree_; }
   void set_module_tree(ModuleRefList module_tree) { module_tree_ = std::move(module_tree); }
+
+  ModuleRefList TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module);
 
  private:
   // A RuntimeModule can only be created with Module::Create...).

@@ -18,6 +18,7 @@ source_set("runtime") {
   sources = [
     "linking-session.h",
     "runtime-dynamic-linker.cc",
+    "runtime-module.cc",
     "runtime-module.h",
   ]
   if (is_fuchsia) {

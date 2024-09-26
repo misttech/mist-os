@@ -45,7 +45,8 @@ class LinkingSession {
     // Traverse the root module's tree to construct the list of modules whose
     // symbols are used for relocations. On success, persist the list to the
     // root module for future lookups by dlsym(), etc.
-    if (auto resolution_list = TraverseDeps(diag, root_module); !resolution_list.is_empty()) {
+    if (auto resolution_list = root_module.TraverseDeps(diag, root_module);
+        !resolution_list.is_empty()) {
       if (Relocate(diag, resolution_list)) {
         root_module.set_module_tree(std::move(resolution_list));
         return true;
@@ -174,40 +175,6 @@ class LinkingSession {
 
     // Return a pointer to the RuntimeModule that was just created and enqueued.
     return &runtime_modules_.back();
-  }
-
-  // Traverse the root module's dependencies in a breadth-first order, and
-  // return an ordered list of traversed modules to the caller. A reference to
-  // the root module is the first element in the returned list.
-  ModuleRefList TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module) {
-    ModuleRefList ordered_queue;
-
-    auto enqueue = [&diag, &ordered_queue](const RuntimeModule& module) -> bool {
-      // Skip if the module has already been enqueued, preventing circular
-      // dependencies.
-      if (std::ranges::find(ordered_queue, module.name(), &RuntimeModule::name) !=
-          ordered_queue.end()) {
-        return true;
-      }
-      return ordered_queue.push_back(diag, "module dependencies list", &module);
-    };
-
-    if (!enqueue(root_module)) {
-      return {};
-    }
-
-    // Build the BFS-ordered queue: an indexed-for-loop iterates over the list
-    // since it can be invalidated as modules are enqueued.
-    for (size_t i = 0; i < ordered_queue.size(); ++i) {
-      const RuntimeModule& module = *ordered_queue[i];
-      // Enqueue the first-level dependencies of the current module.
-      if (!std::ranges::all_of(module.direct_deps(), enqueue,
-                               [](const RuntimeModule* m) -> const RuntimeModule& { return *m; })) {
-        return {};
-      }
-    }
-
-    return ordered_queue;
   }
 
   // Perform relocations on all pending modules to be loaded. Return a boolean
