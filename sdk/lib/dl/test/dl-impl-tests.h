@@ -32,9 +32,6 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsGlobalMode = false;
   // TODO(https://fxbug.dev/342480690): Support TLS
   static constexpr bool kSupportsTls = false;
-  // TODO(https://fxbug.dev/354786114): Update the dependency tree for a module
-  // that was loaded as a dependency of another module.
-  static constexpr bool kDepModuleHasDepTree = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were

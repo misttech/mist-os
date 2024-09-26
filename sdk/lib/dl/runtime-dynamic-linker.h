@@ -86,25 +86,24 @@ class RuntimeDynamicLinker {
           Error{"TODO(https://fxbug.dev/361674544): nullptr for file is unsupported."}};
     }
 
+    // Use a non-scoped diagnostics object for the root module. Because errors
+    // are generated on this module directly, its name does not need to be
+    // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
+    dl::Diagnostics diag;
+
     Soname name{file};
     // If a module for this file is already loaded, return a reference to it.
     if (RuntimeModule* found = FindModule(name)) {
-      // If this module was loaded as a dependency of another module, then it
-      // would not have its module tree set.
-      if (found->module_tree().is_empty()) {
-        // TODO(https://fxbug.dev/354786114): set this module's module_tree.
+      if (!found->ReifyModuleTree(diag)) {
+        return diag.take_error();
       }
-      return fit::ok(found);
+      return diag.ok(found);
     }
 
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
     LinkingSession<Loader> linking_session{modules_};
 
-    // Use a non-scoped diagnostics object for the root module. Because errors
-    // are generated on this module directly, its name does not need to be
-    // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
-    dl::Diagnostics diag;
     if (!linking_session.Link(diag, name, std::forward<RetrieveFile>(retrieve_file))) {
       return diag.take_error();
     }

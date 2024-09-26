@@ -44,11 +44,6 @@ class DlTestsBase : public ::testing::Test {
   // resolution, regardless of whether it is a global module.
   static constexpr bool kStrictLoadOrderPriority = false;
 
-  // TODO(https://fxbug.dev/354786114): Remove this flag when DlImplTests can
-  // call dlsym() to lookup a symbol in a module that was first loaded as a
-  // dependency of another module.
-  static constexpr bool kDepModuleHasDepTree = true;
-
   // Whether the test fixture supports TLS.
   static constexpr bool kSupportsTls = true;
 

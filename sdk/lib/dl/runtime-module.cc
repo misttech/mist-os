@@ -6,35 +6,42 @@
 
 namespace dl {
 
-ModuleRefList RuntimeModule::TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module) {
-  ModuleRefList ordered_queue;
+bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
+  if (!module_tree_.is_empty()) {
+    return true;
+  }
 
-  auto enqueue = [&diag, &ordered_queue](const RuntimeModule& module) -> bool {
-    // Skip if the module has already been enqueued, preventing circular
-    // dependencies.
-    if (std::ranges::find(ordered_queue, module.name(), &RuntimeModule::name) !=
-        ordered_queue.end()) {
-      return true;
-    }
-    return ordered_queue.push_back(diag, "module dependencies list", &module);
+  auto enqueue = [this, &diag](const RuntimeModule& module) -> bool {
+    return module_tree_.push_back(diag, "module dependencies list", &module);
   };
 
-  if (!enqueue(root_module)) {
-    return {};
+  // This module is the root and always the first entry in the module tree.
+  if (!enqueue(*this)) {
+    return false;
   }
+
+  auto enqueue_unique = [&](const RuntimeModule& module) -> bool {
+    // Skip if the module has already been enqueued, preventing circular
+    // dependencies.
+    if (std::ranges::find(module_tree_, module.name(), &RuntimeModule::name) !=
+        module_tree_.end()) {
+      return true;
+    }
+    return enqueue(module);
+  };
 
   // Build the BFS-ordered queue: an indexed-for-loop iterates over the list
   // since it can be invalidated as modules are enqueued.
-  for (size_t i = 0; i < ordered_queue.size(); ++i) {
-    const RuntimeModule& module = *ordered_queue[i];
+  for (size_t i = 0; i < module_tree_.size(); ++i) {
+    const RuntimeModule& module = *module_tree_[i];
     // Enqueue the first-level dependencies of the current module.
-    if (!std::ranges::all_of(module.direct_deps(), enqueue,
+    if (!std::ranges::all_of(module.direct_deps(), enqueue_unique,
                              [](const RuntimeModule* m) -> const RuntimeModule& { return *m; })) {
-      return {};
+      return false;
     }
   }
 
-  return ordered_queue;
+  return true;
 }
 
 }  // namespace dl

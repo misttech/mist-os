@@ -472,19 +472,17 @@ TYPED_TEST(DlTests, OpenDepDirectly) {
 
   // Test that dlsym will resolve the same symbol pointer from the shared
   // dependency between kFile (res1) and kDepFile (res2).
-  if constexpr (TestFixture::kDepModuleHasDepTree) {
-    auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-    ASSERT_TRUE(sym1.value());
+  auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
 
-    auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-    ASSERT_TRUE(sym2.value());
+  auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
 
-    EXPECT_EQ(sym1.value(), sym2.value());
+  EXPECT_EQ(sym1.value(), sym2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
-  }
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
@@ -858,43 +856,40 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
   // Test that when we dlopen the dep directly, foo is resolved to the
   // transitive dependency, while bar_v1/bar_v2 continue to use the root
   // module's foo symbol.
-  if constexpr (TestFixture::kDepModuleHasDepTree) {
-    auto dep1 = this->DlOpen(kDepFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(dep1.is_ok()) << dep1.error_value();
-    EXPECT_TRUE(dep1.value());
+  auto dep1 = this->DlOpen(kDepFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(dep1.is_ok()) << dep1.error_value();
+  EXPECT_TRUE(dep1.value());
 
-    auto foo1 = this->DlSym(dep1.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(foo1.is_ok()) << foo1.error_value();
-    ASSERT_TRUE(foo1.value());
+  auto foo1 = this->DlSym(dep1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(foo1.is_ok()) << foo1.error_value();
+  ASSERT_TRUE(foo1.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(foo1.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(foo1.value()), kReturnValueFromFooV1);
 
-    auto dep_bar1 = this->DlSym(dep1.value(), TestSym("bar_v1").c_str());
-    ASSERT_TRUE(dep_bar1.is_ok()) << dep_bar1.error_value();
-    ASSERT_TRUE(dep_bar1.value());
+  auto dep_bar1 = this->DlSym(dep1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(dep_bar1.is_ok()) << dep_bar1.error_value();
+  ASSERT_TRUE(dep_bar1.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(dep_bar1.value()), kReturnValueFromRootModule);
+  EXPECT_EQ(RunFunction<int64_t>(dep_bar1.value()), kReturnValueFromRootModule);
 
-    auto dep2 = this->DlOpen(kDepFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(dep2.is_ok()) << dep2.error_value();
-    EXPECT_TRUE(dep2.value());
+  auto dep2 = this->DlOpen(kDepFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(dep2.is_ok()) << dep2.error_value();
+  EXPECT_TRUE(dep2.value());
 
-    auto foo2 = this->DlSym(dep2.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(foo2.is_ok()) << foo2.error_value();
-    ASSERT_TRUE(foo2.value());
+  auto foo2 = this->DlSym(dep2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(foo2.is_ok()) << foo2.error_value();
+  ASSERT_TRUE(foo2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(foo2.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(foo2.value()), kReturnValueFromFooV2);
 
-    auto dep_bar2 = this->DlSym(dep2.value(), TestSym("bar_v2").c_str());
-    ASSERT_TRUE(dep_bar2.is_ok()) << dep_bar2.error_value();
-    ASSERT_TRUE(dep_bar2.value());
+  auto dep_bar2 = this->DlSym(dep2.value(), TestSym("bar_v2").c_str());
+  ASSERT_TRUE(dep_bar2.is_ok()) << dep_bar2.error_value();
+  ASSERT_TRUE(dep_bar2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(dep_bar2.value()), kReturnValueFromRootModule);
+  EXPECT_EQ(RunFunction<int64_t>(dep_bar2.value()), kReturnValueFromRootModule);
 
-    ASSERT_TRUE(this->DlClose(dep1.value()).is_ok());
-    ASSERT_TRUE(this->DlClose(dep2.value()).is_ok());
-  }
-
+  ASSERT_TRUE(this->DlClose(dep1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(dep2.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
 }
 
