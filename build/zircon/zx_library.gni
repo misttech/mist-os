@@ -69,34 +69,42 @@ import("//build/toolchain/toolchain_environment.gni")
 #   sdk_publishable
 #     Optional: Indicates that this library can be added to the Fuchsia SDK
 #     and in which SDK category.
+#     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #     Type: string indicating an SDK category.
 #
 #   sdk_area (optional)
 #     [string] The API area responsible for maintaining this library.
 #     See //build/sdk/sdk_atom.gni.
+#     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #
 #   stable (optional)
 #     Note: this option only currently used if sdk == "source"'
 #     Whether this sdk_atom is stabilized. If false, there will not be
 #     .api file generated, and the atom will be marked as unstable in the final
 #     IDK.
+#     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #     Defaults to false.
 #
 #   sdk_headers
 #     Optional: Required, except if the global `is_kernel` is true.
 #     This must list all the public header files in the library's `include/`
-#     directory; names should be relative to `include/`.
+#     directory; names should be relative to `include/`. Despite the name,
+#     this parameter is not specific to SDK targets (those specifying
+#     `sdk_publishable`).
+#     TODO(https://fxbug.dev/333125197): Rename this parameter.
 #     Type: list(string)
 #
 #   sdk_name
 #     Optional: Name under which the library is published. This can be used
 #     when $target_name is already used by another target in the Fuchsia build.
+#     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #     Type: string
 #     Default: target_name
 #
 #   sdk_headers_for_internal_use
 #     Optional: This is always forwarded to the corresponding `sdk_*` template.
 #     See `sdk_source_set` for example about its significance.
+#     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #
 #   See source_set() for other parameters.
 #
@@ -108,18 +116,9 @@ template("zx_library") {
     "stable",
   ]
 
-  # TODO(https://fxbug.dev/333125197): Move this such that it is only applied
-  # when needed and does not silently ignore parameters that will never be used
-  # (i.e., for non-sdkable targets). Update the documentation above to indicate
-  # when it is supported.
-  not_needed(invoker,
-             [
-               "sdk_name",
-
-               # Not all template expansion paths use this variable, don't
-               # error out in those paths.
-               "sdk_headers_for_internal_use",
-             ])
+  assert(defined(sdk_publishable) ||
+         (!defined(sdk_area) && !defined(stable) && !defined(sdk_name) &&
+          !defined(sdk_headers_for_internal_use)))
 
   if (zircon_toolchain != false) {
     _library_name = target_name
