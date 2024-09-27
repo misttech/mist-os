@@ -11,6 +11,7 @@ zx_library("util") {
     "split_string.cc",
     "third_party/icu/icu_utf.cc",
     "trim.cc",
+    "try_from.cc",
     "utf_codecs.cc",
     "zx_cprng_draw.cc",
     "zx_status_get_string.cc",
