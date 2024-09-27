@@ -74,9 +74,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     still access them)
 #
 # Legacy Bundle parameters:
-#   include_legacy_bundle (optional; default=false)
-#     [bool] When true, a legacy bundle will be generated and included in product
-#     assembly. This will automatically be set to 'true' if legacy_bundle_only = true
 #
 #   legacy_bundle_only (optional)
 #     [bool] When true, this template is reduced to provide the legacy bundle
@@ -198,16 +195,6 @@ template("assembled_system") {
     _namespace = invoker.namespace
   }
 
-  _legacy_bundle_only = false
-  if (defined(invoker.legacy_bundle_only)) {
-    _legacy_bundle_only = invoker.legacy_bundle_only
-  }
-
-  _include_legacy_bundle = _legacy_bundle_only
-  if (defined(invoker.include_legacy_bundle)) {
-    _include_legacy_bundle = invoker.include_legacy_bundle
-  }
-
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
     _generate_fvm = invoker.generate_fvm
@@ -260,14 +247,6 @@ template("assembled_system") {
     not_needed([ "_universe_packages" ])
   }
 
-  if (!_include_legacy_bundle) {
-    not_needed([
-                 "_universe_packages",
-                 "_additional_boot_args",
-                 "_include_assembly_inputs",
-               ])
-  }
-
   labels = {
     legacy_assembly_input_bundle = "${_namespace}.legacy_input_bundle"
     bazel_legacy_aib = "${_namespace}.bazel_legacy_aib"
@@ -279,52 +258,55 @@ template("assembled_system") {
   }
 
   # Create the legacy assembly input bundle.
-  if (_include_legacy_bundle) {
-    legacy_assembly_input_bundle(labels.legacy_assembly_input_bundle) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                               "include_config_data",
-                               "bootfs_package_labels",
-                               "bootfs_labels",
-                               "cmdline_deps",
-                               "cmdline",
-                               "fshost_config",
-                             ])
-      bundles_dir = files.outdir
-      include_config_data = _supports_blobs
-      create_package = defined(invoker.create_legacy_aib_package) &&
-                       invoker.create_legacy_aib_package
-      create_package_archive = defined(invoker.create_legacy_aib_archive) &&
-                               invoker.create_legacy_aib_archive
+  legacy_assembly_input_bundle(labels.legacy_assembly_input_bundle) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "include_config_data",
+                             "bootfs_package_labels",
+                             "bootfs_labels",
+                             "cmdline_deps",
+                             "cmdline",
+                             "fshost_config",
+                           ])
+    bundles_dir = files.outdir
+    include_config_data = _supports_blobs
+    create_package = defined(invoker.create_legacy_aib_package) &&
+                     invoker.create_legacy_aib_package
+    create_package_archive = defined(invoker.create_legacy_aib_archive) &&
+                             invoker.create_legacy_aib_archive
 
-      # The core realm is part of the base packages. Do not generate
-      # the core realm if we are not generating an FVM
-      if (defined(invoker.core_realm_definition) && _supports_blobs) {
-        core_realm_definition = invoker.core_realm_definition
-      } else {
-        not_needed(invoker, [ "core_realm_definition" ])
-      }
-
-      if (_include_shell_commands) {
-        shell_command_packages =
-            _base_packages + _universe_packages + _cache_packages
-      }
-
-      supports_blobs = _supports_blobs
-      base_packages = _base_packages
-      cache_packages = _cache_packages
-      additional_boot_args = _additional_boot_args
-      include_assembly_inputs = _include_assembly_inputs
+    # The core realm is part of the base packages. Do not generate
+    # the core realm if we are not generating an FVM
+    if (defined(invoker.core_realm_definition) && _supports_blobs) {
+      core_realm_definition = invoker.core_realm_definition
+    } else {
+      not_needed(invoker, [ "core_realm_definition" ])
     }
 
-    bazel_input_directory(labels.bazel_legacy_aib) {
-      forward_variables_from(invoker, [ "testonly" ])
-      generator = ":${labels.legacy_assembly_input_bundle}"
-      output_directory = "${files.legacy_assembly_input_bundle_dir}"
-      gn_targets_name = labels.bazel_legacy_aib
+    if (_include_shell_commands) {
+      shell_command_packages =
+          _base_packages + _universe_packages + _cache_packages
     }
+
+    supports_blobs = _supports_blobs
+    base_packages = _base_packages
+    cache_packages = _cache_packages
+    additional_boot_args = _additional_boot_args
+    include_assembly_inputs = _include_assembly_inputs
+  }
+
+  bazel_input_directory(labels.bazel_legacy_aib) {
+    forward_variables_from(invoker, [ "testonly" ])
+    generator = ":${labels.legacy_assembly_input_bundle}"
+    output_directory = "${files.legacy_assembly_input_bundle_dir}"
+    gn_targets_name = labels.bazel_legacy_aib
+  }
+
+  _legacy_bundle_only = false
+  if (defined(invoker.legacy_bundle_only)) {
+    _legacy_bundle_only = invoker.legacy_bundle_only
   }
 
   if (_legacy_bundle_only) {
@@ -676,23 +658,21 @@ template("assembled_system") {
       args += [
         "--input-bundles-dir",
         rebase_path(files.platform_common_aibs_dir, root_build_dir),
+        "--legacy-bundle",
+        rebase_path(files.legacy_assembly_input_bundle_dir, root_build_dir),
         "--outdir",
         rebase_path(files.outdir, root_build_dir),
       ]
 
-      deps += [ invoker.product_assembly_config_label ] +
-              labels.platform_common_aibs
+      deps += [
+                ":${labels.legacy_assembly_input_bundle}",
+                invoker.product_assembly_config_label,
+              ] + labels.platform_common_aibs
 
-      inputs = [ files.product_assembly_config ] + files.platform_common_aibs
-
-      if (_include_legacy_bundle) {
-        args += [
-          "--legacy-bundle",
-          rebase_path(files.legacy_assembly_input_bundle_dir, root_build_dir),
-        ]
-        deps += [ ":${labels.legacy_assembly_input_bundle}" ]
-        inputs += [ files.legacy_assembly_input_bundle_manifest ]
-      }
+      inputs = [
+                 files.legacy_assembly_input_bundle_manifest,
+                 files.product_assembly_config,
+               ] + files.platform_common_aibs
 
       if (defined(files.board_config)) {
         args += [

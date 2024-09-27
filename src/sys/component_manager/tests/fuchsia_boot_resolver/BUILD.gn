@@ -80,7 +80,6 @@ if (current_toolchain == default_toolchain) {
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
-    include_legacy_bundle = true
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true

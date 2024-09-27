@@ -54,7 +54,6 @@ if (is_fuchsia) {
   fuchsia_base = {
     testonly = fuchsia_zbi_testonly
     check_production_tag = check_production_eligibility
-    include_legacy_bundle = true
 
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob

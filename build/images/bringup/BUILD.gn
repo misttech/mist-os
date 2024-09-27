@@ -75,7 +75,6 @@ product_assembly_configuration("product_assembly_config") {
 
 bringup_base = {
   testonly = true
-  include_legacy_bundle = true
   output_dir = root_build_dir
   generate_vbmeta = use_vbmeta
 

@@ -89,6 +89,7 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
+    bootfs_labels = []
     base_packages = [
       ":empty-pkg",
       ":empty_config",
@@ -104,6 +105,7 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_config_recovery"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
+    bootfs_labels = []
     ramdisk_in_zbi = true
     base_packages = [
       ":empty-pkg",
