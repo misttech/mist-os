@@ -2830,7 +2830,8 @@ mod test {
         DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
     };
     use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
-    use crate::internal::buffer::{Buffer, RingBuffer};
+    use crate::internal::buffer::testutil::RingBuffer;
+    use crate::internal::buffer::Buffer;
 
     const ISS_1: SeqNum = SeqNum::new(100);
     const ISS_2: SeqNum = SeqNum::new(300);

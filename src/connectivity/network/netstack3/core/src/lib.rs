@@ -201,9 +201,9 @@ pub mod tcp {
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        OriginalDestinationError, ReceiveBuffer, RingBuffer, SendBuffer, SetDeviceError,
-        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId,
-        UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        OriginalDestinationError, ReceiveBuffer, SendBuffer, SetDeviceError, SetReuseAddrError,
+        SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId, UnboundInfo,
+        DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

@@ -63,8 +63,8 @@ use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId,
     Marks, RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
-use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
-use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
+use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
+use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
 use netstack3_udp::{UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId};
 use packet::{Buf, BufferMut};
 use zerocopy::SplitByteSlice;
