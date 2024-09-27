@@ -24,6 +24,7 @@
             protocol: "fuchsia.factory.MiscFactoryStoreProvider",
             availability: "optional",
         },
+        { protocol: "fuchsia.boot.Items" },
         {
             directory: "config-data",
             rights: [ "r*" ],

@@ -5,10 +5,14 @@
 use anyhow::Error;
 use chrono::NaiveDateTime;
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_boot::{ItemsMarker, ItemsProxy};
 use fidl_fuchsia_factory::MiscFactoryStoreProviderProxy;
 use fidl_fuchsia_intl::{LocaleId, RegulatoryDomain};
 use fidl_fuchsia_io as fio;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zbi::ZbiType;
 use serde::{Deserialize, Serialize};
+use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io;
 
@@ -50,6 +54,31 @@ async fn read_factory_file(
     return Ok(result);
 }
 
+async fn get_zbi_serial_number() -> Result<String, Error> {
+    let boot: ItemsProxy = connect_to_protocol::<ItemsMarker>()?;
+
+    let (vmo, sn_len) = boot.get(ZbiType::SerialNumber as u32, 0).await?;
+
+    if sn_len == 0 {
+        return Err(anyhow::anyhow!("Serial number has length 0"));
+    }
+
+    if let Some(vmo) = vmo {
+        let mut vec = vec![0u8; sn_len as usize];
+        vmo.read(vec.borrow_mut(), 0).expect("reading VMO");
+        return match String::from_utf8(vec) {
+            Ok(v) => Ok(v),
+            Err(err) => {
+                tracing::warn!("Could not read Serial from VMO from Boot");
+                Err(err.into())
+            }
+        };
+    } else {
+        tracing::warn!("Invalid VMO from Boot");
+        return Err(anyhow::anyhow!("Invalid VMO from Boot"));
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DeviceInfo {
     pub serial_number: Option<String>,
@@ -61,6 +90,8 @@ impl DeviceInfo {
     pub async fn load(proxy_handle: &MiscFactoryStoreProviderProxy) -> Self {
         let mut device_info =
             DeviceInfo { serial_number: None, is_retail_demo: false, retail_sku: None };
+        // First try to read the serial number from  SERIAL_TXT. This is
+        // used in smart display products.
         device_info.serial_number = match read_factory_file(SERIAL_TXT, proxy_handle).await {
             Ok(content) => Some(content),
             Err(err) => {
@@ -68,6 +99,17 @@ impl DeviceInfo {
                 None
             }
         };
+        // If the SERIAL_TXT is not present, try reading from boot. This is used
+        // in vim3
+        if device_info.serial_number.is_none() {
+            device_info.serial_number = match get_zbi_serial_number().await {
+                Ok(content) => Some(content.to_string()),
+                Err(err) => {
+                    tracing::warn!("Failed to read serial number from boot {}", err);
+                    None
+                }
+            };
+        }
         if let Ok(content) = read_factory_file(RETAIL_DEMO_FILE, proxy_handle).await {
             device_info.is_retail_demo = true;
             device_info.retail_sku = Some(content)
