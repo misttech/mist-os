@@ -1327,7 +1327,7 @@ zx_status_t UsbXhci::InitMmio() {
       FDF_LOG(WARNING, "Failed to connect to power system: %s, continuing without it",
               activity_governer.status_string());
     } else {
-      activity_governer_.Bind(std::move(activity_governer.value()));
+      activity_governer_ = std::move(activity_governer.value());
     }
   }
   return ZX_OK;

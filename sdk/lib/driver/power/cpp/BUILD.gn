@@ -25,20 +25,24 @@ sdk_source_set("cpp") {
     "power-support.h",
     "types.cc",
     "types.h",
+    "wake-lease.cc",
+    "wake-lease.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/fidl",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/logging/cpp",
   ]

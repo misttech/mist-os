@@ -13,59 +13,6 @@
 
 namespace buttons {
 
-PowerIntegration::PowerIntegration(
-    async_dispatcher_t* dispatcher,
-    fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client)
-    : dispatcher_(dispatcher) {
-  if (!sag_client) {
-    return;
-  }
-
-  auto client = fidl::WireSyncClient(std::move(sag_client));
-  if (client.is_valid()) {
-    sag_client_ = std::move(client);
-  } else {
-    FDF_LOG(
-        WARNING,
-        "Failed to create fuchsia.power.system.ActivityGovernor client; system may incorrectly enter suspend.");
-  }
-}
-
-void PowerIntegration::AcquireWakeLease() {
-  if (!sag_client_) {
-    return;
-  }
-
-  if (lease_) {
-    // If already holding a lease, cancel the current timeout.
-    lease_task_.Cancel();
-  } else {
-    // If not holding a lease, take one.
-    auto result_lease = sag_client_->TakeWakeLease({"buttons-driver-wake"});
-    if (!result_lease.ok()) {
-      FDF_LOG(
-          WARNING,
-          "Failed to take wake lease, system may incorrectly enter suspend: %s. Will not attempt again.",
-          result_lease.status_string());
-      sag_client_ = {};
-      return;
-    }
-
-    lease_ = std::move(result_lease->token);
-    FDF_LOG(INFO, "Buttons driver created a wake lease due to recent input.");
-  }
-
-  lease_task_.PostDelayed(dispatcher_, kLeaseTimeout);
-}
-
-void PowerIntegration::ClosureHandler() {
-  // Drops the lease and resets handler
-  FDF_LOG(
-      INFO,
-      "Buttons driver is dropping the wake lease due to not receiving any input in the last 100ms.");
-  lease_.reset();
-}
-
 void ButtonsDevice::ButtonsInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
     fidl::AnyArena& allocator) {
@@ -176,7 +123,7 @@ int ButtonsDevice::Thread() {
     poll_timer_.wait_async(port_, kPortKeyPollTimer, ZX_TIMER_SIGNALED, 0);
   }
 
-  while (1) {
+  while (true) {
     zx_port_packet_t packet;
     zx_status_t status = port_.wait(zx::time::infinite(), &packet);
     FDF_LOG(DEBUG, "msg received on port key %lu", packet.key);
@@ -194,7 +141,8 @@ int ButtonsDevice::Thread() {
         packet.key < (kPortKeyInterruptStart + buttons_.size())) {
       uint32_t type = static_cast<uint32_t>(packet.key - kPortKeyInterruptStart);
       if (gpios_[type].config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
-        power_integration_.AcquireWakeLease();
+        const zx::duration kLeaseTimeout = zx::msec(100);
+        wake_lease_.AcquireWakeLease(kLeaseTimeout);
 
         // We need to reconfigure the GPIO to catch the opposite polarity.
         auto reconfig_result = ReconfigurePolarity(type, packet.key);
@@ -551,7 +499,7 @@ ButtonsDevice::ButtonsDevice(async_dispatcher_t* dispatcher,
     : dispatcher_(dispatcher),
       buttons_(std::move(buttons)),
       gpios_(std::move(gpios)),
-      power_integration_(PowerIntegration(dispatcher, std::move(sag_client))) {
+      wake_lease_(dispatcher, "buttons-driver-wake", std::move(sag_client), nullptr, true) {
   ZX_ASSERT(Init() == ZX_OK);
 }
 

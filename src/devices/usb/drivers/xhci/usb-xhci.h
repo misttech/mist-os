@@ -281,7 +281,7 @@ class UsbXhci : public fdf::DriverBase,
 
   void RingDoorbell(uint8_t slot, uint8_t target);
 
-  fidl::SyncClient<fuchsia_power_system::ActivityGovernor>& activity_governer() {
+  fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>& activity_governer() {
     return activity_governer_;
   }
 
@@ -324,7 +324,7 @@ class UsbXhci : public fdf::DriverBase,
 
   zx_status_t CreateNode();
 
-  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> activity_governer_;
+  fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> activity_governer_;
 
   // PCI protocol client (if x86)
   ddk::Pci pci_;

@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/wire.h>
-#include <lib/async/cpp/task.h>
+#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -34,24 +34,6 @@ constexpr uint64_t kPortKeyTimerStart = 0x100;
 constexpr uint64_t kPortKeyPollTimer = 0x1000;
 // Debounce threshold.
 constexpr uint64_t kDebounceThresholdNs = 50'000'000;
-
-// Integration with Power Framework.
-class PowerIntegration {
- public:
-  PowerIntegration(async_dispatcher_t* dispatcher,
-                   fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client);
-  void AcquireWakeLease();
-
- private:
-  void ClosureHandler();
-
-  async_dispatcher_t* dispatcher_;
-  fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> sag_client_;
-
-  const zx::duration kLeaseTimeout = zx::msec(100);
-  async::TaskClosureMethod<PowerIntegration, &PowerIntegration::ClosureHandler> lease_task_{this};
-  zx::eventpair lease_;
-};
 
 class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
  public:
@@ -155,7 +137,7 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
   zx::duration total_latency_ = {};
   zx::duration max_latency_ = {};
 
-  PowerIntegration power_integration_;
+  fdf_power::WakeLease wake_lease_;
 };
 
 }  // namespace buttons
