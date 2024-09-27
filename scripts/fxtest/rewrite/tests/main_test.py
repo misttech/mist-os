@@ -123,10 +123,30 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             "test-list.json",
             "package-repositories.json",
             "package-targets.json",
+            "all_package_manifests.list",
         ]:
             shutil.copy(
                 os.path.join(self.test_data_path, name),
                 os.path.join(self.out_dir, name),
+            )
+
+        # Simulate the generated package metadata to test merging.
+        gen_dir = os.path.join(
+            self.out_dir, "gen", "build", "images", "updates"
+        )
+        os.makedirs(gen_dir)
+        with open(
+            os.path.join(
+                gen_dir, "package_manifests_from_metadata.list.package_metadata"
+            ),
+            "w",
+        ) as f:
+            f.writelines(
+                [
+                    "obj/foo/package_manifest.json",
+                    "obj/bar/package_manifest.json",
+                    "obj/baz/package_manifest.json",
+                ]
             )
 
         self._mock_get_device_environment(
@@ -574,6 +594,10 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     "//src/sys:foo_test_package",
                     "--toolchain=//build/toolchain/host:x64",
                     "//src/sys:bar_test",
+                    "//src/sys:baz_test",
+                    "//src/tests/end_to_end:example_e2e_test",
+                    "--default",
+                    "updates",
                 ),
                 (
                     "fx",

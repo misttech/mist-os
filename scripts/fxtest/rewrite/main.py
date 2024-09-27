@@ -364,6 +364,18 @@ async def do_replay_log(
 
 
 class AsyncMain:
+    _ALL_PACKAGE_MANIFESTS_PATH = [
+        "all_package_manifests.list",
+    ]
+
+    _PACKAGE_MANIFESTS_FROM_METADATA_PATH = [
+        "gen",
+        "build",
+        "images",
+        "updates",
+        "package_manifests_from_metadata.list.package_metadata",
+    ]
+
     def __init__(
         self,
         flags: args.Flags,
@@ -927,12 +939,11 @@ class AsyncMain:
 
         if tests.has_e2e_test() and allow_build_updates:
             build_command_line.extend(["--default", "updates"])
-
-        build_id = recorder.emit_build_start(targets=build_command_line)
-        if tests.has_e2e_test():
             recorder.emit_instruction_message(
                 "E2E test selected, building updates package"
             )
+
+        build_id = recorder.emit_build_start(targets=build_command_line)
         recorder.emit_instruction_message("Use --no-build to skip building")
 
         status_suffix = " Status output suspended." if termout.is_init() else ""
@@ -954,8 +965,94 @@ class AsyncMain:
             return False
 
         if tests.has_device_test():
-            amber_directory = os.path.join(exec_env.out_dir, "amber-files")
-            delivery_blob_type = self._read_delivery_blob_type()
+            try:
+                await self._publish_packages(build_id)
+            except self._PublishException as e:
+                error = e.reason
+
+        if not error and not await self._post_build_checklist(tests, build_id):
+            error = "Post build checklist failed"
+
+        recorder.emit_end(error, id=build_id)
+
+        return error is None
+
+    @dataclass
+    class _PublishException(Exception):
+        """Exception that is raised if we fail to publish packages."""
+
+        reason: str
+
+    async def _publish_packages(self, build_id: event.Id) -> None:
+        """Publish packages that were just built.
+
+        Args:
+            build_id (event.Id): The event of the parent build to nest events under.
+
+        Raises:
+            self._PublishException: If publishing fails for any reason.
+        """
+        recorder = self._recorder
+        exec_env = self._exec_env
+        assert exec_env is not None
+
+        amber_directory = os.path.join(exec_env.out_dir, "amber-files")
+        delivery_blob_type = self._read_delivery_blob_type()
+
+        # This manifest file is updated only following the build
+        # process, which poses a problem when we want to use `fx add-test`
+        # and then expect the test to work without a full
+        # rebuild. To solve this problem, we actually synthesize a
+        # new package manifest consisting of the original
+        # all_package_manifests.list plus any new packages listed in
+        # the generated file "package_manifests_from_metadata.list.package_metadata".
+        # The new combined file will contain tests added using `fx add-test`.
+        all_package_manifests = os.path.join(
+            exec_env.out_dir,
+            *self._ALL_PACKAGE_MANIFESTS_PATH,
+        )
+
+        # Load the original package manifest list.
+        package_manifest: dict[str, typing.Any]
+        with open(all_package_manifests) as f:
+            package_manifest = json.load(f)
+
+        manifest_list: list[str]
+        try:
+            manifest_list = package_manifest["content"]["manifests"]
+        except KeyError:
+            raise self._PublishException(
+                "BUG: Failed to load manifest list from all_package_manifests.list\nPlease file a bug."
+            )
+
+        # Load the generated list file, which just has a package manifest path per line.
+        manifests_metadata_path = os.path.abspath(
+            os.path.join(
+                exec_env.out_dir,
+                *self._PACKAGE_MANIFESTS_FROM_METADATA_PATH,
+            )
+        )
+
+        # Read all lines from the generated file, merging them back into the package manifest.
+        if os.path.isfile(manifests_metadata_path):
+            lines: list[str]
+            with open(manifests_metadata_path) as f:
+                lines = [
+                    stripped_line
+                    for l in f.readlines()
+                    if (stripped_line := l.strip()) != ""
+                ]
+            manifest_list = list(set(manifest_list).union(lines))
+
+        package_manifest["content"]["manifests"] = manifest_list
+
+        with tempfile.TemporaryDirectory() as td:
+            # Generate a merged temporary manifest.
+            temp_manifest_path = os.path.join(td, "temp_manifest.list")
+            with open(temp_manifest_path, "w") as f:
+                json.dump(package_manifest, f)
+
+            # Publish the packages listed in the merged manifest.
             publish_args = (
                 exec_env.fx_cmd_line(
                     "ffx",
@@ -975,11 +1072,7 @@ class AsyncMain:
                 )
                 + [
                     "--package-list",
-                    os.path.abspath(
-                        os.path.join(
-                            exec_env.out_dir, "all_package_manifests.list"
-                        )
-                    ),
+                    temp_manifest_path,
                     os.path.abspath(amber_directory),
                 ]
             )
@@ -992,18 +1085,11 @@ class AsyncMain:
                 env={"CWD": exec_env.out_dir},
             )
             if not output:
-                error = "Failure publishing packages."
+                raise self._PublishException("Failure publishing packages.")
             elif output.return_code != 0:
-                error = (
+                raise self._PublishException(
                     f"Publish returned non-zero exit code {output.return_code}"
                 )
-
-        if not error and not await self._post_build_checklist(tests, build_id):
-            error = "Post build checklist failed"
-
-        recorder.emit_end(error, id=build_id)
-
-        return error is None
 
     def _read_delivery_blob_type(
         self,
