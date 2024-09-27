@@ -130,6 +130,21 @@ class TestArgs(unittest.TestCase):
         flags.validate()
         self.assertEqual(flags.use_test_interface, False)
 
+    def test_expand_output_variable(self) -> None:
+        flags = args.parse_args(["--outdir", "$FUCHSIA_OUT/test_out"])
+        flags.validate()
+        flags.update_artifacts_directory_with_out_path("out/default")
+        self.assertEqual(
+            flags.artifact_output_directory, "out/default/test_out"
+        )
+
+        flags = args.parse_args(["--outdir", "${FUCHSIA_OUT}/test_out2"])
+        flags.validate()
+        flags.update_artifacts_directory_with_out_path("out/default2")
+        self.assertEqual(
+            flags.artifact_output_directory, "out/default2/test_out2"
+        )
+
     def test_default_merging(self) -> None:
         config_file = config.ConfigFile(
             "path", args.parse_args(["--parallel=10"])

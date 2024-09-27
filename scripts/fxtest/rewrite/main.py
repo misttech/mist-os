@@ -487,14 +487,22 @@ class AsyncMain:
         self._exec_env = exec_env
         recorder.emit_process_env(exec_env)
 
+        flags.update_artifacts_directory_with_out_path(
+            os.path.abspath(exec_env.out_dir)
+        )
+
         recorder.emit_artifact_directory_path(
             os.path.abspath(flags.artifact_output_directory)
             if flags.artifact_output_directory
             else None
         )
 
-        if flags.artifact_output_directory and not set(sys.argv).intersection(
-            set(["--timestamp-artifacts", "--no-timestamp-artifacts"])
+        if (
+            flags.artifact_output_directory
+            and not flags.timestamp_artifacts
+            and not set(sys.argv).intersection(
+                set(["--timestamp-artifacts", "--no-timestamp-artifacts"])
+            )
         ):
             recorder.emit_warning_message(
                 "You have not specified --[no-]timestamp-artifacts.\nArtifact output will overwrite previous runs.\nThe default will soon change to support timestamped directories."
