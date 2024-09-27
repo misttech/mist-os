@@ -358,7 +358,7 @@ impl InterfaceSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<InterfaceEvent, fidl::Error> {
         InterfaceEvent::decode(self.client.wait_for_event(deadline)?)
     }

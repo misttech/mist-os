@@ -85,14 +85,14 @@ impl ExampleSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ExampleEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicInstant) -> Result<ExampleEvent, fidl::Error> {
         ExampleEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
     pub fn r#foo(
         &self,
         mut s: &str,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ExampleFooResult, fidl::Error> {
         let _response = self
             .client

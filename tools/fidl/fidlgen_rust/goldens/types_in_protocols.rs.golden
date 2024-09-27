@@ -916,7 +916,7 @@ impl ProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -960,7 +960,7 @@ impl ProtocolSynchronousProxy {
         mut float64: f64,
         mut string: &str,
         mut opt_string: Option<&str>,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>), fidl::Error>
     {
         let _response = self.client.send_query::<Basic, Basic>(
@@ -990,7 +990,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_basic(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorBasicResult, fidl::Error> {
         let _response = self
             .client
@@ -1044,7 +1044,7 @@ impl ProtocolSynchronousProxy {
         mut union: &Union,
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
         fidl::Error,
@@ -1068,7 +1068,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_compound(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorCompoundResult, fidl::Error> {
         let _response = self
             .client
@@ -1131,7 +1131,7 @@ impl ProtocolSynchronousProxy {
         mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (
             [u8; 5],
@@ -1186,7 +1186,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_array_basic(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorArrayBasicResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1249,7 +1249,7 @@ impl ProtocolSynchronousProxy {
         mut array_union: &[Union; 5],
         mut array_opt_struct: &[Option<Box<Struct>>; 5],
         mut array_opt_union: &[Option<Box<Union>>; 5],
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (
             [Bits; 5],
@@ -1289,7 +1289,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_array_compound(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorArrayCompoundResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1362,7 +1362,7 @@ impl ProtocolSynchronousProxy {
         mut vector_float64: &[f64],
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (
             Vec<u8>,
@@ -1417,7 +1417,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_vector_basic(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorVectorBasicResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1480,7 +1480,7 @@ impl ProtocolSynchronousProxy {
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (
             Vec<Bits>,
@@ -1520,7 +1520,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_vector_compound(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorVectorCompoundResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1564,7 +1564,7 @@ impl ProtocolSynchronousProxy {
         mut opt_vector_string: Option<&[String]>,
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (
             Option<Vec<u8>>,
@@ -1590,7 +1590,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_vector_optional(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorVectorOptionalResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1626,7 +1626,7 @@ impl ProtocolSynchronousProxy {
         mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
         let _response = self.client.send_query::<ArrayVectorNested, ArrayVectorNested>(
             (array_array_uint8, array_vector_uint8, vector_array_uint8, vector_vector_uint8),
@@ -1644,7 +1644,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_array_vector_nested(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorArrayVectorNestedResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1754,7 +1754,7 @@ impl ProtocolSynchronousProxy {
         mut vector_struct: Vec<ResourceStruct>,
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         (
             fidl::Handle,
@@ -1854,7 +1854,7 @@ impl ProtocolSynchronousProxy {
 
     pub fn r#error_resource(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolErrorResourceResult, fidl::Error> {
         let _response = self
             .client

@@ -70,7 +70,7 @@ impl FirstProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<FirstProtocolEvent, fidl::Error> {
         FirstProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -384,7 +384,7 @@ impl SecondProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<SecondProtocolEvent, fidl::Error> {
         SecondProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }

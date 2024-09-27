@@ -412,7 +412,7 @@ impl SomeProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<SomeProtocolEvent, fidl::Error> {
         SomeProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -421,7 +421,7 @@ impl SomeProtocolSynchronousProxy {
         &self,
         mut union_member: &UnionMember,
         mut table_member: &TableMember,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<SomeProtocolSomeMethodResult, fidl::Error> {
         let _response =
             self.client.send_query::<SomeProtocolSomeMethodRequest, fidl::encoding::ResultType<

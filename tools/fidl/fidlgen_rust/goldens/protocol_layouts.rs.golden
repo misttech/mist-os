@@ -393,7 +393,7 @@ impl MainProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolEvent, fidl::Error> {
         MainProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -413,7 +413,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedRequest,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse,
         fidl::Error,
@@ -433,7 +433,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult,
         fidl::Error,
@@ -464,7 +464,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocollayouts_imported::ImportUnionPayload,
@@ -481,7 +481,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         fidl_test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult,
         fidl::Error,
@@ -512,7 +512,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_import(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportUnionPayload,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl_test_protocollayouts_imported::ImportTablePayload, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocollayouts_imported::ImportUnionPayload,
@@ -529,7 +529,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_import_with_error(
         &self,
         mut payload: &fidl_test_protocollayouts_imported::ImportTablePayload,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayImportWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocollayouts_imported::ImportTablePayload,
@@ -554,7 +554,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_local(
         &self,
         mut payload: &LocalUnionPayload,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<LocalTablePayload, fidl::Error> {
         let _response = self.client.send_query::<LocalUnionPayload, LocalTablePayload>(
             payload,
@@ -568,7 +568,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_local_with_error(
         &self,
         mut payload: &LocalTablePayload,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
         let _response = self
             .client
@@ -595,7 +595,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon(
         &self,
         mut payload: &MainProtocolTwoWayAnonRequest,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
         let _response = self
             .client
@@ -611,7 +611,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon_with_error(
         &self,
         mut payload: &MainProtocolTwoWayAnonWithErrorRequest,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             MainProtocolTwoWayAnonWithErrorRequest,
@@ -2677,7 +2677,7 @@ impl OpenProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<OpenProtocolEvent, fidl::Error> {
         OpenProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -2694,7 +2694,7 @@ impl OpenProtocolSynchronousProxy {
     pub fn r#flexible_two_way_no_error(
         &self,
         mut value: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest,
@@ -2712,7 +2712,7 @@ impl OpenProtocolSynchronousProxy {
     pub fn r#flexible_two_way_with_error(
         &self,
         mut value: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult,
         fidl::Error,
@@ -2742,7 +2742,7 @@ impl OpenProtocolSynchronousProxy {
     pub fn r#strict_two_way_no_error(
         &self,
         mut value: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest,
@@ -2759,7 +2759,7 @@ impl OpenProtocolSynchronousProxy {
     pub fn r#strict_two_way_with_error(
         &self,
         mut value: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
         fidl::Error,

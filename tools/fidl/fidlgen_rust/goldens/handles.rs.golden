@@ -114,7 +114,7 @@ impl SomeProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<SomeProtocolEvent, fidl::Error> {
         SomeProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }

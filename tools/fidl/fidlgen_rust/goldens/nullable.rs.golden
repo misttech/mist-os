@@ -169,7 +169,7 @@ impl SimpleProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<SimpleProtocolEvent, fidl::Error> {
         SimpleProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -178,7 +178,7 @@ impl SimpleProtocolSynchronousProxy {
         &self,
         mut a: i32,
         mut b: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<i32, fidl::Error> {
         let _response =
             self.client.send_query::<SimpleProtocolAddRequest, SimpleProtocolAddResponse>(

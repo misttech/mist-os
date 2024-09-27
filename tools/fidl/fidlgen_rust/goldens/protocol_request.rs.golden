@@ -94,7 +94,7 @@ impl ChildSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ChildEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicInstant) -> Result<ChildEvent, fidl::Error> {
         ChildEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }
@@ -371,13 +371,13 @@ impl ParentSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ParentEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicInstant) -> Result<ParentEvent, fidl::Error> {
         ParentEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
     pub fn r#get_child(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl::endpoints::ClientEnd<ChildMarker>, fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, ParentGetChildResponse>(
@@ -391,7 +391,7 @@ impl ParentSynchronousProxy {
 
     pub fn r#get_child_request(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl::endpoints::ServerEnd<ChildMarker>, fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, ParentGetChildRequestResponse>(

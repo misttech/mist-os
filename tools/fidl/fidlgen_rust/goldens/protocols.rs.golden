@@ -381,7 +381,7 @@ impl AnotherDiscoverableProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<AnotherDiscoverableProtocolEvent, fidl::Error> {
         AnotherDiscoverableProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -663,7 +663,7 @@ impl ChannelProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<ChannelProtocolEvent, fidl::Error> {
         ChannelProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -680,7 +680,7 @@ impl ChannelProtocolSynchronousProxy {
         &self,
         mut a: i64,
         mut b: i64,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<i64, fidl::Error> {
         let _response = self
             .client
@@ -696,7 +696,7 @@ impl ChannelProtocolSynchronousProxy {
     pub fn r#take_handle(
         &self,
         mut h: fidl::Handle,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<(), fidl::Error> {
         let _response = self
             .client
@@ -712,7 +712,7 @@ impl ChannelProtocolSynchronousProxy {
     pub fn r#mutate_socket(
         &self,
         mut a: fidl::Socket,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl::Socket, fidl::Error> {
         let _response = self
             .client
@@ -1401,7 +1401,7 @@ impl DiscoverableProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<DiscoverableProtocolEvent, fidl::Error> {
         DiscoverableProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -1722,7 +1722,7 @@ impl HandleRightsProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<HandleRightsProtocolEvent, fidl::Error> {
         HandleRightsProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -1738,7 +1738,7 @@ impl HandleRightsProtocolSynchronousProxy {
     pub fn r#response_method(
         &self,
         mut h: fidl::Socket,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl::Socket, fidl::Error> {
         let _response = self.client.send_query::<
             HandleRightsProtocolResponseMethodRequest,
@@ -2224,7 +2224,7 @@ impl ManyParametersSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<ManyParametersEvent, fidl::Error> {
         ManyParametersEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -2666,7 +2666,7 @@ impl MethodWithUnionSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<MethodWithUnionEvent, fidl::Error> {
         MethodWithUnionEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -2674,7 +2674,7 @@ impl MethodWithUnionSynchronousProxy {
     pub fn r#union_method(
         &self,
         mut u: &TheUnion,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
         let _response = self
             .client
@@ -3073,7 +3073,7 @@ impl PlatformServer_SynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<PlatformServer_Event, fidl::Error> {
         PlatformServer_Event::decode(self.client.wait_for_event(deadline)?)
     }
@@ -3360,7 +3360,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<WithAndWithoutRequestResponseEvent, fidl::Error> {
         WithAndWithoutRequestResponseEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -3375,7 +3375,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
 
     pub fn r#no_request_empty_response(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
@@ -3389,7 +3389,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
 
     pub fn r#no_request_with_response(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<String, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -3414,7 +3414,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
     pub fn r#with_request_empty_response(
         &self,
         mut arg: &str,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<(), fidl::Error> {
         let _response = self.client.send_query::<
             WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
@@ -3431,7 +3431,7 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
     pub fn r#with_request_with_response(
         &self,
         mut arg: &str,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<String, fidl::Error> {
         let _response = self.client.send_query::<
             WithAndWithoutRequestResponseWithRequestWithResponseRequest,
@@ -4367,14 +4367,14 @@ impl WithErrorSyntaxSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<WithErrorSyntaxEvent, fidl::Error> {
         WithErrorSyntaxEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
     pub fn r#response_as_struct(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<WithErrorSyntaxResponseAsStructResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4390,7 +4390,7 @@ impl WithErrorSyntaxSynchronousProxy {
 
     pub fn r#error_as_primitive(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4406,7 +4406,7 @@ impl WithErrorSyntaxSynchronousProxy {
 
     pub fn r#error_as_enum(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4422,7 +4422,7 @@ impl WithErrorSyntaxSynchronousProxy {
 
     pub fn r#handle_in_result(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<WithErrorSyntaxHandleInResultResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -5214,7 +5214,7 @@ impl WithProtocolEndsSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<WithProtocolEndsEvent, fidl::Error> {
         WithProtocolEndsEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -5222,7 +5222,7 @@ impl WithProtocolEndsSynchronousProxy {
     pub fn r#client_ends(
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>, fidl::Error> {
         let _response = self
             .client
@@ -5238,7 +5238,7 @@ impl WithProtocolEndsSynchronousProxy {
     pub fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>, fidl::Error> {
         let _response = self
             .client
@@ -5254,7 +5254,7 @@ impl WithProtocolEndsSynchronousProxy {
     pub fn r#struct_containing_ends(
         &self,
         mut in_: ProtocolEnds,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolEnds, fidl::Error> {
         let _response = self.client.send_query::<
             WithProtocolEndsStructContainingEndsRequest,

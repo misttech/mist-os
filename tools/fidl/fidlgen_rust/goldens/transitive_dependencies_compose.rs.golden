@@ -70,13 +70,13 @@ impl TopSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<TopEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicInstant) -> Result<TopEvent, fidl::Error> {
         TopEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
     pub fn r#get_foo(
         &self,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<fidl_test_bottom::Foo, fidl::Error> {
         let _response = self
             .client
