@@ -178,7 +178,8 @@ pub async fn resolve_target_query(
         DiscoverySources::MDNS
             | DiscoverySources::USB
             | DiscoverySources::MANUAL
-            | DiscoverySources::EMULATOR,
+            | DiscoverySources::EMULATOR
+            | DiscoverySources::FASTBOOT_FILE,
     )
     .await
 }
@@ -311,9 +312,8 @@ pub async fn resolve_target_query_with(
     usb: bool,
     mdns: bool,
 ) -> Result<Vec<TargetHandle>> {
-    // TODO(colnnelson): Add DiscoverySources::FASTBOOT_FILE once feature
-    // is announced.
-    let mut sources = DiscoverySources::MANUAL | DiscoverySources::EMULATOR;
+    let mut sources =
+        DiscoverySources::MANUAL | DiscoverySources::EMULATOR | DiscoverySources::FASTBOOT_FILE;
     if usb {
         sources = sources | DiscoverySources::USB;
     }

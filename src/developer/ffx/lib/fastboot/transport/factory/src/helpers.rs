@@ -26,9 +26,7 @@ where
         fastboot_file_path.clone(),
         true,
         false,
-        // TODO(colnnelson): add DiscoverySources::FASTSBOOT_FILE to this once
-        // feature is landed announced and stabilized.
-        DiscoverySources::MDNS | DiscoverySources::MANUAL,
+        DiscoverySources::MDNS | DiscoverySources::MANUAL | DiscoverySources::FASTBOOT_FILE,
     )
     .await?;
 
