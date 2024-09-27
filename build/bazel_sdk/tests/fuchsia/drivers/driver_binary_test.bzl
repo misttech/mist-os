@@ -41,6 +41,7 @@ driver_binary_test = rule(
     doc = """Validate the driver binary.""",
     test = True,
     implementation = _driver_binary_test_impl,
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     cfg = fuchsia_transition,
     attrs = {
         "driver": attr.label(
