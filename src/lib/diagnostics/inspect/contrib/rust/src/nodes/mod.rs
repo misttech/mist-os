@@ -8,8 +8,10 @@
 //! Utilities and wrappers providing higher level functionality for Inspect Nodes and properties.
 
 mod list;
+mod lru_cache;
 
 pub use list::BoundedListNode;
+pub use lru_cache::LruCacheNode;
 
 use fuchsia_inspect::{InspectType, IntProperty, Node, Property, StringReference};
 use fuchsia_zircon as zx;

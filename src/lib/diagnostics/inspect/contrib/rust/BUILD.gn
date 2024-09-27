@@ -13,6 +13,7 @@ rustc_library("fuchsia-inspect-contrib") {
 
   deps = [
     "//src/diagnostics/persistence/fidl:persist_rust",
+    "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
@@ -21,6 +22,7 @@ rustc_library("fuchsia-inspect-contrib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:lru-cache",
     "//third_party/rust_crates:strum",
     "//third_party/rust_crates:tracing",
   ]
@@ -52,6 +54,7 @@ rustc_library("fuchsia-inspect-contrib") {
     "src/log/mod.rs",
     "src/log/wrappers.rs",
     "src/nodes/list.rs",
+    "src/nodes/lru_cache.rs",
     "src/nodes/mod.rs",
     "src/self_profile.rs",
   ]
