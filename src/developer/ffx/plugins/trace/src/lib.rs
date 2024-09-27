@@ -388,7 +388,6 @@ pub fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> R
                     value: RawArgValue::String(StringRef::Inline(method)),
                 };
                 new_args.push(symbolized_arg);
-                continue;
             }
         }
         new_args.push(arg.clone());
