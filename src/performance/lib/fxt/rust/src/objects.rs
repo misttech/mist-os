@@ -43,7 +43,7 @@ pub(super) struct RawUserspaceObjRecord<'a> {
 }
 
 impl<'a> RawUserspaceObjRecord<'a> {
-    pub(super) fn parse(buf: &'a [u8]) -> ParseResult<'_, Self> {
+    pub(super) fn parse(buf: &'a [u8]) -> ParseResult<'a, Self> {
         let (buf, header) = UserspaceObjHeader::parse(buf)?;
         let (rem, payload) = header.take_payload(buf)?;
         let (payload, pointer) = le_u64(payload)?;
