@@ -242,7 +242,7 @@ pub use internal::routing::{
 };
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
-    Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
+    InternalForwarding, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
 };
 
 /// IP layer test utilities.

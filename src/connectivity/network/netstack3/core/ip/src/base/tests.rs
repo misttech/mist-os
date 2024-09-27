@@ -139,6 +139,26 @@ impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
     }
 }
 
+impl<I: IpLayerIpExt> IpDeviceContext<I> for FakeCoreCtx<I> {
+    fn is_ip_device_enabled(&mut self, _device_id: &Self::DeviceId) -> bool {
+        unimplemented!()
+    }
+
+    type DeviceAndAddressStatusIter<'a> = core::iter::Empty<(Self::DeviceId, I::AddressStatus)>;
+
+    fn with_address_statuses<F: FnOnce(Self::DeviceAndAddressStatusIter<'_>) -> R, R>(
+        &mut self,
+        _addr: SpecifiedAddr<I::Addr>,
+        _cb: F,
+    ) -> R {
+        unimplemented!()
+    }
+
+    fn is_device_unicast_forwarding_enabled(&mut self, _device_id: &Self::DeviceId) -> bool {
+        unimplemented!()
+    }
+}
+
 impl<I: IpLayerIpExt> IpStateContext<I> for FakeCoreCtx<I> {
     type IpRouteTablesCtx<'a> = Self;
 

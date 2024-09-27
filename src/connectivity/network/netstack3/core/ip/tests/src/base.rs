@@ -58,9 +58,9 @@ use netstack3_ip::multicast_forwarding::{
 use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
-    FragmentTimerId, IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus,
-    Ipv6PresentAddressStatus, Marks, NextHop, RawMetric, ReceivePacketAction, ResolveRouteError,
-    ResolvedRoute, RoutableIpAddr,
+    FragmentTimerId, InternalForwarding, IpDeviceStateContext, IpLayerTimerId,
+    Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, Marks, NextHop, RawMetric,
+    ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 
 // Some helper functions
@@ -1409,10 +1409,10 @@ fn receive_ip_packet_action_with_src_addr<I: IpExt + TestIpExt>(
     let Out(action) = I::map_ip(
         (&packet, IpInvariant((&mut core_ctx.context(), bindings_ctx, dev))),
         |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
-            Out(ip::receive_ipv4_packet_action(core_ctx, bindings_ctx, dev, &packet, FRAME_DST))
+            Out(ip::receive_ipv4_packet_action(core_ctx, bindings_ctx, dev, packet, FRAME_DST))
         },
         |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
-            Out(ip::receive_ipv6_packet_action(core_ctx, bindings_ctx, dev, &packet, FRAME_DST))
+            Out(ip::receive_ipv6_packet_action(core_ctx, bindings_ctx, dev, packet, FRAME_DST))
         },
     );
     action
@@ -1475,7 +1475,10 @@ fn test_receive_ip_packet_action() {
             Ipv4::UNSPECIFIED_ADDRESS,
             v4_config.local_ip.get()
         ),
-        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Unicast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv4PresentAddressStatus::Unicast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
     assert_eq!(
         receive_ip_packet_action_with_src_addr::<Ipv6>(
@@ -1484,29 +1487,44 @@ fn test_receive_ip_packet_action() {
             Ipv6::UNSPECIFIED_ADDRESS,
             v6_config.local_ip.get()
         ),
-        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::UnicastAssigned }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv6PresentAddressStatus::UnicastAssigned,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to us.
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.local_ip),
-        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Unicast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv4PresentAddressStatus::Unicast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
     assert_eq!(
         receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, *v6_config.local_ip),
-        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::UnicastAssigned }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv6PresentAddressStatus::UnicastAssigned,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to the IPv4 subnet broadcast address.
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, v4_subnet.broadcast()),
-        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::SubnetBroadcast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv4PresentAddressStatus::SubnetBroadcast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to the IPv4 limited broadcast address.
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *Ipv4::LIMITED_BROADCAST_ADDRESS),
-        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::LimitedBroadcast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv4PresentAddressStatus::LimitedBroadcast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to a multicast address we're subscribed to.
@@ -1521,7 +1539,10 @@ fn test_receive_ip_packet_action() {
     }
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS),
-        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Multicast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv4PresentAddressStatus::Multicast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to the all-nodes multicast address.
@@ -1531,7 +1552,10 @@ fn test_receive_ip_packet_action() {
             &v6_dev,
             *Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS
         ),
-        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::Multicast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv6PresentAddressStatus::Multicast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to a multicast address we're subscribed to.
@@ -1541,7 +1565,10 @@ fn test_receive_ip_packet_action() {
             &v6_dev,
             *v6_config.local_ip.to_solicited_node_address()
         ),
-        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::Multicast }
+        ReceivePacketAction::Deliver {
+            address_status: Ipv6PresentAddressStatus::Multicast,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
     );
 
     // Receive packet addressed to a tentative address.
@@ -1716,7 +1743,10 @@ fn test_multicast_forwarding_receive_ip_packet_action<I: IpExt + TestIpExt>() {
     // Verify `Delivered` in the absence of a multicast route.
     assert_matches!(
         receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr.clone()),
-        ReceivePacketAction::Deliver { address_status }
+        ReceivePacketAction::Deliver {
+            address_status,
+            internal_forwarding: InternalForwarding::NotUsed
+        }
         if is_multicast::<I>(&address_status)
     );
 
@@ -1892,13 +1922,25 @@ fn do_route_lookup<I: IpExt>(
         &Marks::default(),
     )
     // Convert device IDs in any route so it's easier to compare.
-    .map(|ResolvedRoute { src_addr, device, local_delivery_device, next_hop }| {
-        let device = Device::from_index(device_ids.iter().position(|d| d == &device).unwrap());
-        let local_delivery_device = local_delivery_device.map(|device| {
-            Device::from_index(device_ids.iter().position(|d| d == &device).unwrap())
-        });
-        ResolvedRoute { src_addr, device, local_delivery_device, next_hop }
-    })
+    .map(
+        |ResolvedRoute {
+             src_addr,
+             device,
+             local_delivery_device,
+             next_hop,
+             internal_forwarding,
+         }| {
+            let device = Device::from_index(device_ids.iter().position(|d| d == &device).unwrap());
+            let internal_forwarding = internal_forwarding.map_device(|ingress_device| {
+                Device::from_index(device_ids.iter().position(|d| d == &ingress_device).unwrap())
+            });
+            let local_delivery_device = local_delivery_device.map(|device| {
+                Device::from_index(device_ids.iter().position(|d| d == &device).unwrap())
+            });
+
+            ResolvedRoute { src_addr, device, local_delivery_device, next_hop, internal_forwarding }
+        },
+    )
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
@@ -1908,21 +1950,24 @@ fn do_route_lookup<I: IpExt>(
                 Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
-                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
+                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
                 }); "local delivery")]
 #[test_case(Some(Device::First.ip_address()),
                 None,
                 Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
-                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
+                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
                 }); "local delivery specified local addr")]
 #[test_case(Some(Device::First.ip_address()),
                 Some(Device::First),
                 Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
-                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
+                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
                 }); "local delivery specified device and addr")]
 #[test_case(None,
                 Some(Device::Loopback),
@@ -1937,6 +1982,7 @@ fn do_route_lookup<I: IpExt>(
                 Ok(ResolvedRoute { src_addr: Device::Loopback.ip_address(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Loopback),
                     next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
                 }); "local delivery to loopback addr via specified loopback device no addr")]
 #[test_case(None,
                 Some(Device::Second),
@@ -1959,14 +2005,18 @@ fn do_route_lookup<I: IpExt>(
                 remote_ip::<I>().try_into().unwrap(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "remote delivery")]
 #[test_case(Some(Device::First.ip_address()),
                 None,
                 remote_ip::<I>().try_into().unwrap(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "remote delivery specified addr")]
 #[test_case(Some(Device::Second.ip_address()),
                 None,
@@ -1981,7 +2031,9 @@ fn do_route_lookup<I: IpExt>(
                 true /* transparent */,
                 Ok(ResolvedRoute { src_addr: remote_ip::<I>().try_into().unwrap(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Loopback),
-                    next_hop: NextHop::RemoteAsNeighbor });
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "transparent local delivery from specified remote addr"
 )]
 #[test_case(Some(remote_ip::<I>().try_into().unwrap()),
@@ -1990,7 +2042,9 @@ fn do_route_lookup<I: IpExt>(
                 true /* transparent */,
                 Ok(ResolvedRoute { src_addr: remote_ip::<I>().try_into().unwrap(),
                     device: Device::Loopback, local_delivery_device: Some(Device::First),
-                    next_hop: NextHop::RemoteAsNeighbor });
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "transparent remote delivery from specified remote addr"
 )]
 #[test_case(None,
@@ -1998,7 +2052,9 @@ fn do_route_lookup<I: IpExt>(
                 remote_ip::<I>().try_into().unwrap(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "remote delivery specified device")]
 #[test_case(None, Some(Device::Second), remote_ip::<I>().try_into().unwrap(), false,
                 Err(ResolveRouteError::Unreachable); "remote delivery specified device no route")]
@@ -2008,7 +2064,9 @@ fn do_route_lookup<I: IpExt>(
                 false,
                 Ok(ResolvedRoute {src_addr: Device::Second.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::First),
-                    next_hop: NextHop::RemoteAsNeighbor });
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "local delivery cross device")]
 fn lookup_route<I: TestIpExt + IpExt>(
     local_ip: Option<IpDeviceAddr<I::Addr>>,
@@ -2040,25 +2098,35 @@ fn lookup_route<I: TestIpExt + IpExt>(
 #[test_case(None,
                 None,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "no constraints")]
 #[test_case(Some(Device::First.ip_address()),
                 None,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "constrain local addr")]
 #[test_case(Some(Device::Second.ip_address()), None,
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "constrain local addr to second device")]
 #[test_case(None,
                 Some(Device::First),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "constrain device")]
 #[test_case(None, Some(Device::Second),
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
-                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed
+                });
                 "constrain to second device")]
 fn lookup_route_multiple_devices_with_route<I: TestIpExt + IpExt>(
     local_ip: Option<IpDeviceAddr<I::Addr>>,
@@ -2095,17 +2163,20 @@ fn lookup_route_multiple_devices_with_route<I: TestIpExt + IpExt>(
 #[test_case(None, None, Device::Second.link_local_addr().into(),
                 Ok(ResolvedRoute { src_addr: Device::Second.link_local_addr(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Second),
-                    next_hop: NextHop::RemoteAsNeighbor });
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed });
                 "local delivery no local address to link-local")]
 #[test_case(Some(Device::Second.ip_address()), None, Device::Second.link_local_addr().into(),
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::Second),
-                    next_hop: NextHop::RemoteAsNeighbor });
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed });
                 "local delivery same device to link-local")]
 #[test_case(Some(Device::Second.link_local_addr()), None, Device::Second.ip_address().into(),
                 Ok(ResolvedRoute { src_addr: Device::Second.link_local_addr(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Second),
-                    next_hop: NextHop::RemoteAsNeighbor });
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    internal_forwarding: InternalForwarding::NotUsed });
                 "local delivery same device from link-local")]
 #[test_case(Some(Device::First.ip_address()), None, Device::Second.link_local_addr().into(),
                 Err(ResolveRouteError::NoSrcAddr);

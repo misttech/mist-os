@@ -112,8 +112,13 @@ where
         marks: &Marks,
     ) -> Result<Self::DeviceId, ResolveRouteError> {
         let remote_ip = SocketIpAddr::new_from_multicast(addr);
-        let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
-            ip::resolve_output_route_to_destination(self, None, None, Some(remote_ip), marks)?;
+        let ResolvedRoute {
+            src_addr: _,
+            device,
+            local_delivery_device,
+            next_hop: _,
+            internal_forwarding: _,
+        } = ip::resolve_output_route_to_destination(self, None, None, Some(remote_ip), marks)?;
         // NB: Because the original address is multicast, it cannot be assigned
         // to a local interface. Thus local delivery should never be requested.
         debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);
@@ -125,7 +130,10 @@ impl<BT: BindingsTypes, I: datagram::DualStackIpExt>
     UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>> for StackState<BT>
 {
     type Data = IcmpTxCounters<I>;
-    type Guard<'l> = &'l IcmpTxCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l IcmpTxCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.inner_icmp_state().tx_counters
@@ -144,7 +152,10 @@ impl<BT: BindingsTypes, I: datagram::DualStackIpExt>
     UnlockedAccess<crate::lock_ordering::IcmpRxCounters<I>> for StackState<BT>
 {
     type Data = IcmpRxCounters<I>;
-    type Guard<'l> = &'l IcmpRxCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l IcmpRxCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.inner_icmp_state().rx_counters
@@ -161,7 +172,10 @@ impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCou
 
 impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::NdpCounters> for StackState<BT> {
     type Data = NdpCounters;
-    type Guard<'l> = &'l NdpCounters where Self: 'l;
+    type Guard<'l>
+        = &'l NdpCounters
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv6.icmp.ndp_counters
@@ -178,7 +192,10 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampRe
     for StackState<BT>
 {
     type Data = bool;
-    type Guard<'l> = &'l bool where Self: 'l;
+    type Guard<'l>
+        = &'l bool
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv4.icmp.send_timestamp_reply
@@ -207,7 +224,10 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
     for StackState<BT>
 {
     type Data = IpCounters<I>;
-    type Guard<'l> = &'l IpCounters<I> where Self: 'l;
+    type Guard<'l>
+        = &'l IpCounters<I>
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.inner_ip_state().counters()
@@ -860,7 +880,10 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacket
     for StackState<BT>
 {
     type Data = AtomicU16;
-    type Guard<'l> = &'l AtomicU16 where Self: 'l;
+    type Guard<'l>
+        = &'l AtomicU16
+    where
+        Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv4.next_packet_id

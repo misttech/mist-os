@@ -33,7 +33,7 @@ use crate::internal::base::{
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::routing::rules::{Marks, RuleInput};
 use crate::internal::routing::PacketOrigin;
-use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
+use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
@@ -627,8 +627,13 @@ where
     // TODO(https://fxbug.dev/323389672): Cache a reference to the route to
     // avoid the route lookup on send as long as the routing table hasn't
     // changed in between these operations.
-    let ResolvedRoute { src_addr, device: route_device, local_delivery_device, next_hop: _ } =
-        route;
+    let ResolvedRoute {
+        src_addr,
+        device: route_device,
+        local_delivery_device,
+        next_hop: _,
+        internal_forwarding: _,
+    } = route;
 
     // If the source or destination address require a device, make sure to
     // set that in the socket definition. Otherwise defer to what was provided.
@@ -715,6 +720,7 @@ where
         device: mut egress_device,
         mut next_hop,
         mut local_delivery_device,
+        mut internal_forwarding,
     } = resolve(
         core_ctx,
         bindings_ctx,
@@ -732,6 +738,7 @@ where
     let previous_dst = remote_ip.addr();
     let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
     let mut packet_metadata = IpLayerPacketMetadata::default();
+
     match core_ctx.filter_handler().local_egress_hook(
         bindings_ctx,
         &mut packet,
@@ -762,6 +769,7 @@ where
             device: new_device,
             next_hop: new_next_hop,
             local_delivery_device: new_local_delivery_device,
+            internal_forwarding: new_internal_forwarding,
         } = resolve(
             core_ctx,
             bindings_ctx,
@@ -778,6 +786,26 @@ where
         egress_device = new_device;
         next_hop = new_next_hop;
         local_delivery_device = new_local_delivery_device;
+        internal_forwarding = new_internal_forwarding;
+    }
+
+    // NB: Hit the forwarding hook if the route leverages internal forwarding.
+    match internal_forwarding {
+        InternalForwarding::Used(ingress_device) => {
+            match core_ctx.filter_handler().forwarding_hook(
+                &mut packet,
+                &ingress_device,
+                &egress_device,
+                &mut packet_metadata,
+            ) {
+                filter::Verdict::Drop => {
+                    packet_metadata.acknowledge_drop();
+                    return Ok(());
+                }
+                filter::Verdict::Accept => {}
+            }
+        }
+        InternalForwarding::NotUsed => {}
     }
 
     // The packet needs to be delivered locally if it's sent to a broadcast
@@ -870,7 +898,13 @@ where
             .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
             .transpose()?;
 
-        let ResolvedRoute { src_addr: _, local_delivery_device: _, device, next_hop: _ } = self
+        let ResolvedRoute {
+            src_addr: _,
+            local_delivery_device: _,
+            device,
+            next_hop: _,
+            internal_forwarding: _,
+        } = self
             .lookup_route(
                 bindings_ctx,
                 device.as_ref(),
@@ -1750,6 +1784,9 @@ pub(crate) mod testutil {
                 device: device.clone(),
                 local_delivery_device: None,
                 next_hop,
+                // NB: Keep unit tests simple and skip internal forwarding
+                // logic. Instead, this is verified by integration tests.
+                internal_forwarding: InternalForwarding::NotUsed,
             })
         }
 
@@ -1768,8 +1805,13 @@ pub(crate) mod testutil {
                 .as_ref()
                 .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
                 .transpose()?;
-            let ResolvedRoute { src_addr, device, next_hop, local_delivery_device: _ } =
-                self.lookup_route(device.as_ref(), Some(*local_ip), *remote_ip, *transparent)?;
+            let ResolvedRoute {
+                src_addr,
+                device,
+                next_hop,
+                local_delivery_device: _,
+                internal_forwarding: _,
+            } = self.lookup_route(device.as_ref(), Some(*local_ip), *remote_ip, *transparent)?;
 
             let remote_ip: &SpecifiedAddr<_> = remote_ip.as_ref();
 

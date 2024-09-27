@@ -5,22 +5,52 @@
 
 use assert_matches::assert_matches;
 use fuchsia_async::{Duration, DurationExt, TimeoutExt};
-use futures_util::{AsyncReadExt as _, AsyncWriteExt as _, SinkExt, StreamExt};
+use futures_util::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt, SinkExt, StreamExt};
 use net_declare::{fidl_ip, fidl_subnet};
 use net_types::ip::{Ipv4, Ipv6};
-use netemul::{RealmTcpListener as _, RealmTcpStream as _};
+use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket};
 use netstack_testing_common::interfaces::TestInterfaceExt;
-use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack, Netstack3, TestSandboxExt as _};
 use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use ping::PingError;
+use std::num::NonZeroU64;
 use test_case::test_case;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
 };
+
+enum ForwardingConfig {
+    BothDisabled,
+    ClientSideEnabled,
+    ServerSideEnabled,
+    BothEnabled,
+}
+
+impl ForwardingConfig {
+    fn is_client_enabled(&self) -> bool {
+        match self {
+            ForwardingConfig::BothDisabled => false,
+            ForwardingConfig::ClientSideEnabled => true,
+            ForwardingConfig::ServerSideEnabled => false,
+            ForwardingConfig::BothEnabled => true,
+        }
+    }
+
+    fn is_server_enabled(&self) -> bool {
+        match self {
+            ForwardingConfig::BothDisabled => false,
+            ForwardingConfig::ClientSideEnabled => false,
+            ForwardingConfig::ServerSideEnabled => true,
+            ForwardingConfig::BothEnabled => true,
+        }
+    }
+}
 
 struct SetupConfig {
     client_subnet: fnet::Subnet,
@@ -29,11 +59,25 @@ struct SetupConfig {
     server_gateway: fnet::IpAddress,
     router_client_ip: fnet::Subnet,
     router_server_ip: fnet::Subnet,
-    router_if_config: fnet_interfaces_admin::Configuration,
+    router_client_if_config: fnet_interfaces_admin::Configuration,
+    router_server_if_config: fnet_interfaces_admin::Configuration,
 }
 
 impl SetupConfig {
-    fn ipv4(enable_forwarding: bool) -> SetupConfig {
+    fn ipv4(forwarding: ForwardingConfig) -> SetupConfig {
+        let disabled_config = || fnet_interfaces_admin::Configuration::default();
+        let enabled_config = || fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                forwarding: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let router_client_if_config =
+            forwarding.is_client_enabled().then_some(enabled_config()).unwrap_or(disabled_config());
+        let router_server_if_config =
+            forwarding.is_server_enabled().then_some(enabled_config()).unwrap_or(disabled_config());
+
         SetupConfig {
             client_subnet: fidl_subnet!("192.168.1.2/24"),
             client_gateway: fidl_ip!("192.168.1.1"),
@@ -41,17 +85,25 @@ impl SetupConfig {
             server_gateway: fidl_ip!("192.168.0.1"),
             router_client_ip: fidl_subnet!("192.168.1.1/24"),
             router_server_ip: fidl_subnet!("192.168.0.1/24"),
-            router_if_config: fnet_interfaces_admin::Configuration {
-                ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                    forwarding: Some(enable_forwarding),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            router_client_if_config,
+            router_server_if_config,
         }
     }
 
-    fn ipv6(enable_forwarding: bool) -> SetupConfig {
+    fn ipv6(forwarding: ForwardingConfig) -> SetupConfig {
+        let disabled_config = || fnet_interfaces_admin::Configuration::default();
+        let enabled_config = || fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                forwarding: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let router_client_if_config =
+            forwarding.is_client_enabled().then_some(enabled_config()).unwrap_or(disabled_config());
+        let router_server_if_config =
+            forwarding.is_server_enabled().then_some(enabled_config()).unwrap_or(disabled_config());
+
         SetupConfig {
             client_subnet: fidl_subnet!("fd00:0:0:1::2/64"),
             client_gateway: fidl_ip!("fd00:0:0:1::1"),
@@ -59,13 +111,8 @@ impl SetupConfig {
             server_gateway: fidl_ip!("fd00:0:0:2::1"),
             router_client_ip: fidl_subnet!("fd00:0:0:1::1/64"),
             router_server_ip: fidl_subnet!("fd00:0:0:2::1/64"),
-            router_if_config: fnet_interfaces_admin::Configuration {
-                ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                    forwarding: Some(enable_forwarding),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            router_client_if_config,
+            router_server_if_config,
         }
     }
 
@@ -82,7 +129,8 @@ impl SetupConfig {
             server_gateway,
             router_client_ip,
             router_server_ip,
-            router_if_config,
+            router_client_if_config,
+            router_server_if_config,
         } = self;
 
         let client_net = sandbox.create_network("client").await.expect("create network");
@@ -141,18 +189,18 @@ impl SetupConfig {
                 .expect("call set configuration")
                 .expect("set interface configuration");
         }
-        configure_forwarding(router_client_iface.control(), &router_if_config).await;
-        configure_forwarding(router_server_iface.control(), &router_if_config).await;
+        configure_forwarding(router_client_iface.control(), &router_client_if_config).await;
+        configure_forwarding(router_server_iface.control(), &router_server_if_config).await;
         Setup {
             _client_net: client_net,
             _server_net: server_net,
             client,
             server,
-            _router: router,
+            router,
             _client_iface: client_iface,
             _server_iface: server_iface,
-            _router_client_iface: router_client_iface,
-            _router_server_iface: router_server_iface,
+            router_client_iface,
+            router_server_iface,
         }
     }
 }
@@ -165,9 +213,9 @@ struct Setup<'a> {
     _server_net: netemul::TestNetwork<'a>,
     server: netemul::TestRealm<'a>,
     _server_iface: netemul::TestInterface<'a>,
-    _router: netemul::TestRealm<'a>,
-    _router_client_iface: netemul::TestInterface<'a>,
-    _router_server_iface: netemul::TestInterface<'a>,
+    router: netemul::TestRealm<'a>,
+    router_client_iface: netemul::TestInterface<'a>,
+    router_server_iface: netemul::TestInterface<'a>,
 }
 
 const PORT: u16 = 8080;
@@ -176,8 +224,8 @@ const RESPONSE: &str = "hello from server";
 
 #[netstack_test]
 #[variant(N, Netstack)]
-#[test_case(SetupConfig::ipv4(true); "ipv4")]
-#[test_case(SetupConfig::ipv6(true); "ipv6")]
+#[test_case(SetupConfig::ipv4(ForwardingConfig::BothEnabled); "ipv4")]
+#[test_case(SetupConfig::ipv6(ForwardingConfig::BothEnabled); "ipv6")]
 async fn forwarding<N: Netstack>(name: &str, setup_config: SetupConfig) {
     let server_ip = fidl_fuchsia_net_ext::IpAddress::from(setup_config.server_subnet.addr).0;
     let client_ip = fidl_fuchsia_net_ext::IpAddress::from(setup_config.client_subnet.addr).0;
@@ -286,10 +334,10 @@ async fn expect_failed_ping(
 
 #[netstack_test]
 #[variant(N, Netstack)]
-#[test_case(SetupConfig::ipv4(true), true; "ipv4_with_forwarding")]
-#[test_case(SetupConfig::ipv4(false), false; "ipv4_without_forwarding")]
-#[test_case(SetupConfig::ipv6(true), true; "ipv6_with_forwarding")]
-#[test_case(SetupConfig::ipv6(false), false; "ipv6_without_forwarding")]
+#[test_case(SetupConfig::ipv4(ForwardingConfig::BothEnabled), true; "ipv4_with_forwarding")]
+#[test_case(SetupConfig::ipv4(ForwardingConfig::BothDisabled), false; "ipv4_without_forwarding")]
+#[test_case(SetupConfig::ipv6(ForwardingConfig::BothEnabled), true; "ipv6_with_forwarding")]
+#[test_case(SetupConfig::ipv6(ForwardingConfig::BothDisabled), false; "ipv6_without_forwarding")]
 async fn ping_other_router_addr<N: Netstack>(
     name: &str,
     setup_config: SetupConfig,
@@ -349,4 +397,295 @@ async fn ping_other_router_addr<N: Netstack>(
         )
         .await;
     }
+}
+
+#[derive(Debug)]
+enum ProbeError {
+    SendFailed { _err: std::io::Error },
+    RecvTimedOut,
+}
+
+/// Returns Ok(() if the sender is able to send a UDP packet to the receiver
+/// within the given timeout.
+async fn probe_connectivity_with_udp(
+    sender: &netemul::TestRealm<'_>,
+    send_addr: &fnet::Subnet,
+    receiver: &netemul::TestRealm<'_>,
+    receive_addr: &fnet::Subnet,
+    timeout: Duration,
+) -> Result<(), ProbeError> {
+    const PORT: u16 = 12345;
+
+    // Create a pair of sender/receiver sockets.
+    let send_addr =
+        std::net::SocketAddr::from((fidl_fuchsia_net_ext::IpAddress::from(send_addr.addr).0, PORT));
+    let send_sock = fuchsia_async::net::UdpSocket::bind_in_realm(sender, send_addr)
+        .await
+        .expect("bind send sock");
+    let receive_addr = std::net::SocketAddr::from((
+        fidl_fuchsia_net_ext::IpAddress::from(receive_addr.addr).0,
+        PORT,
+    ));
+    let receive_sock = fuchsia_async::net::UdpSocket::bind_in_realm(receiver, receive_addr)
+        .await
+        .expect("bind receive sock");
+
+    // Send data and wait for a response.
+    const PAYLOAD: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    match send_sock.send_to(&PAYLOAD, receive_addr).await {
+        Ok(written) => assert_eq!(written, PAYLOAD.len()),
+        Err(e) => return Err(ProbeError::SendFailed { _err: e }),
+    };
+
+    let mut buf = [0u8; 10];
+    let result = receive_sock
+        .recv_from(&mut buf[..])
+        .map(Option::Some)
+        .on_timeout(timeout.after_now(), || None)
+        .await;
+    let (read, from) = match result {
+        None => return Err(ProbeError::RecvTimedOut),
+        Some(result) => result.expect("receive should succeed"),
+    };
+    assert_eq!(read, PAYLOAD.len());
+    assert_eq!(&buf[..read], &PAYLOAD);
+    assert_eq!(from, send_addr);
+    Ok(())
+}
+
+/// Install a drop filter on the forwarding hook.
+async fn install_forwarding_filter(
+    controller: &mut fnet_filter_ext::Controller,
+    ingress_if: &netemul::TestInterface<'_>,
+    egress_if: &netemul::TestInterface<'_>,
+    name: &str,
+) {
+    let namespace = fnet_filter_ext::NamespaceId(name.to_owned());
+    let routine =
+        fnet_filter_ext::RoutineId { namespace: namespace.clone(), name: name.to_owned() };
+
+    let matchers = fnet_filter_ext::Matchers {
+        in_interface: Some(fnet_filter_ext::InterfaceMatcher::Id(
+            NonZeroU64::new(ingress_if.id()).unwrap(),
+        )),
+        out_interface: Some(fnet_filter_ext::InterfaceMatcher::Id(
+            NonZeroU64::new(egress_if.id()).unwrap(),
+        )),
+        ..Default::default()
+    };
+
+    controller
+        .push_changes(vec![
+            fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Namespace(
+                fnet_filter_ext::Namespace {
+                    id: namespace.clone(),
+                    domain: fnet_filter_ext::Domain::AllIp,
+                },
+            )),
+            fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Routine(
+                fnet_filter_ext::Routine {
+                    id: routine.clone(),
+                    routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                        fnet_filter_ext::InstalledIpRoutine {
+                            hook: fnet_filter_ext::IpHook::Forwarding,
+                            priority: 0,
+                        },
+                    )),
+                },
+            )),
+            fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(
+                fnet_filter_ext::Rule {
+                    id: fnet_filter_ext::RuleId { routine: routine.clone(), index: 0 },
+                    matchers,
+                    action: fnet_filter_ext::Action::Drop,
+                },
+            )),
+        ])
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit changes");
+}
+
+/// Verify the Weak Host "internal forwarding" behavior for traffic ingressing
+/// the netstack.
+#[test_case(SetupConfig::ipv4(ForwardingConfig::ClientSideEnabled); "ipv4")]
+#[test_case(SetupConfig::ipv6(ForwardingConfig::ClientSideEnabled); "ipv6")]
+#[fuchsia_async::run_singlethreaded(test)]
+async fn internal_forwarding_ingress(setup_config: SetupConfig) {
+    let client_ip = setup_config.client_subnet;
+    let server_ip = setup_config.server_subnet;
+    let router_client_ip = setup_config.router_client_ip;
+    let router_server_ip = setup_config.router_server_ip;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // NB: This test relies on fuchsia.net.filter, which is only implemented
+    // for Netstack3.
+    let setup = setup_config.build::<Netstack3>("internal_forwarding_ingress", &sandbox).await;
+
+    // The client should be able to send traffic to the router's server side IP
+    // but the server should not be able to send traffic to the router's client
+    // side IP. This is because only the client side interface has forwarding
+    // enabled.
+    probe_connectivity_with_udp(
+        &setup.client,
+        &client_ip,
+        &setup.router,
+        &router_server_ip,
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    )
+    .await
+    .expect("probe should succeed");
+    assert_matches!(
+        probe_connectivity_with_udp(
+            &setup.server,
+            &server_ip,
+            &setup.router,
+            &router_client_ip,
+            ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
+        )
+        .await,
+        Err(ProbeError::RecvTimedOut)
+    );
+
+    // A filter dropping traffic forwarded from `router_server_if` to
+    // `router_client_if` should have no effect.
+    let control = setup
+        .router
+        .connect_to_protocol::<fnet_filter::ControlMarker>()
+        .expect("connect to protocol");
+    let mut controller = fnet_filter_ext::Controller::new(
+        &control,
+        &fnet_filter_ext::ControllerId("internal_forwarding_ingress".to_owned()),
+    )
+    .await
+    .expect("create controller");
+    install_forwarding_filter(
+        &mut controller,
+        &setup.router_server_iface,
+        &setup.router_client_iface,
+        "wrong_filter",
+    )
+    .await;
+    probe_connectivity_with_udp(
+        &setup.client,
+        &client_ip,
+        &setup.router,
+        &router_server_ip,
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    )
+    .await
+    .expect("probe should succeed");
+
+    // A filter dropping traffic forwarded from `router_client_if` to
+    // `router_server_if` should cause the router to drop the traffic.
+    install_forwarding_filter(
+        &mut controller,
+        &setup.router_client_iface,
+        &setup.router_server_iface,
+        "right_filter",
+    )
+    .await;
+    assert_matches!(
+        probe_connectivity_with_udp(
+            &setup.client,
+            &client_ip,
+            &setup.router,
+            &router_server_ip,
+            ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
+        )
+        .await,
+        Err(ProbeError::RecvTimedOut)
+    );
+}
+
+/// Verify the Weak Host "internal forwarding" behavior for traffic egressing
+/// the netstack.
+#[test_case(SetupConfig::ipv4(ForwardingConfig::ServerSideEnabled); "ipv4")]
+#[test_case(SetupConfig::ipv6(ForwardingConfig::ServerSideEnabled); "ipv6")]
+#[fuchsia_async::run_singlethreaded(test)]
+async fn internal_forwarding_egress(setup_config: SetupConfig) {
+    let client_ip = setup_config.client_subnet;
+    let server_ip = setup_config.server_subnet;
+    let router_client_ip = setup_config.router_client_ip;
+    let router_server_ip = setup_config.router_server_ip;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // NB: This test relies on fuchsia.net.filter, which is only implemented
+    // for Netstack3.
+    let setup = setup_config.build::<Netstack3>("internal_forwarding_egress", &sandbox).await;
+
+    // The router should be able to send traffic from its server side IP to the
+    // client, but the router should not be able to send traffic from its
+    // client side IP to the server. This is because only the server side
+    // interface has forwarding enabled.
+    probe_connectivity_with_udp(
+        &setup.router,
+        &router_server_ip,
+        &setup.client,
+        &client_ip,
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    )
+    .await
+    .expect("probe should succeed");
+    assert_matches!(
+        probe_connectivity_with_udp(
+            &setup.router,
+            &router_client_ip,
+            &setup.server,
+            &server_ip,
+            ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+        )
+        .await,
+        Err(ProbeError::SendFailed { _err: _ })
+    );
+
+    // A filter dropping traffic forwarded from `router_client_if` to
+    // `router_server_if` should have no effect.
+    let control = setup
+        .router
+        .connect_to_protocol::<fnet_filter::ControlMarker>()
+        .expect("connect to protocol");
+    let mut controller = fnet_filter_ext::Controller::new(
+        &control,
+        &fnet_filter_ext::ControllerId("internal_forwarding_egress".to_owned()),
+    )
+    .await
+    .expect("create controller");
+    install_forwarding_filter(
+        &mut controller,
+        &setup.router_client_iface,
+        &setup.router_server_iface,
+        "wrong_filter",
+    )
+    .await;
+    probe_connectivity_with_udp(
+        &setup.router,
+        &router_server_ip,
+        &setup.client,
+        &client_ip,
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    )
+    .await
+    .expect("probe should succeed");
+
+    // A filter dropping traffic forwarded from `router_server_if` to
+    // `router_client_if` should cause the router to drop the traffic.
+    install_forwarding_filter(
+        &mut controller,
+        &setup.router_server_iface,
+        &setup.router_client_iface,
+        "right_filter",
+    )
+    .await;
+    assert_matches!(
+        probe_connectivity_with_udp(
+            &setup.router,
+            &router_server_ip,
+            &setup.client,
+            &client_ip,
+            ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+        )
+        .await,
+        Err(ProbeError::RecvTimedOut)
+    );
 }

@@ -39,22 +39,16 @@ pub trait FilterIpExt: IpExt {
 
     /// A no-op conversion to help the compiler identify that [`Self::Packet`]
     /// actually implements [`IpPacket`].
-    fn as_filter_packet<B: SplitByteSliceMut>(packet: Self::Packet<B>) -> Self::FilterIpPacket<B>;
-
-    /// The reciprocal of [`Self::as_filter_ip_packet`].
-    fn as_ip_packet<B: SplitByteSliceMut>(packet: Self::FilterIpPacket<B>) -> Self::Packet<B>;
+    fn as_filter_packet<B: SplitByteSliceMut>(
+        packet: &mut Self::Packet<B>,
+    ) -> &mut Self::FilterIpPacket<B>;
 }
 
 impl FilterIpExt for Ipv4 {
     type FilterIpPacket<B: SplitByteSliceMut> = Ipv4Packet<B>;
 
     #[inline]
-    fn as_filter_packet<B: SplitByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
-        packet
-    }
-
-    #[inline]
-    fn as_ip_packet<B: SplitByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
+    fn as_filter_packet<B: SplitByteSliceMut>(packet: &mut Ipv4Packet<B>) -> &mut Ipv4Packet<B> {
         packet
     }
 }
@@ -63,12 +57,7 @@ impl FilterIpExt for Ipv6 {
     type FilterIpPacket<B: SplitByteSliceMut> = Ipv6Packet<B>;
 
     #[inline]
-    fn as_filter_packet<B: SplitByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
-        packet
-    }
-
-    #[inline]
-    fn as_ip_packet<B: SplitByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
+    fn as_filter_packet<B: SplitByteSliceMut>(packet: &mut Ipv6Packet<B>) -> &mut Ipv6Packet<B> {
         packet
     }
 }
@@ -193,7 +182,10 @@ impl<I: IpExt, T: ?Sized> MaybeTransportPacketMut<I> for &mut T
 where
     T: MaybeTransportPacketMut<I>,
 {
-    type TransportPacketMut<'a> = T::TransportPacketMut<'a> where Self: 'a;
+    type TransportPacketMut<'a>
+        = T::TransportPacketMut<'a>
+    where
+        Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         (**self).transport_packet_mut()
@@ -201,7 +193,10 @@ where
 }
 
 impl<I: IpExt, T: TransportPacketMut<I>> MaybeTransportPacketMut<I> for Option<T> {
-    type TransportPacketMut<'a> = &'a mut T where Self: 'a;
+    type TransportPacketMut<'a>
+        = &'a mut T
+    where
+        Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         self.as_mut()
@@ -276,8 +271,14 @@ pub trait TransportPacketMut<I: IpExt> {
 }
 
 impl<B: SplitByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
-    type TransportPacket<'a> = &'a Self where Self: 'a;
-    type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, Ipv4>> where B: 'a;
+    type TransportPacket<'a>
+        = &'a Self
+    where
+        Self: 'a;
+    type TransportPacketMut<'a>
+        = Option<ParsedTransportHeaderMut<'a, Ipv4>>
+    where
+        B: 'a;
 
     fn src_addr(&self) -> Ipv4Addr {
         self.src_ip()
@@ -350,8 +351,14 @@ impl<B: SplitByteSlice> MaybeTransportPacket for Ipv4Packet<B> {
 }
 
 impl<B: SplitByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
-    type TransportPacket<'a> = &'a Self where Self: 'a;
-    type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, Ipv6>> where B: 'a;
+    type TransportPacket<'a>
+        = &'a Self
+    where
+        Self: 'a;
+    type TransportPacketMut<'a>
+        = Option<ParsedTransportHeaderMut<'a, Ipv6>>
+    where
+        B: 'a;
 
     fn src_addr(&self) -> Ipv6Addr {
         self.src_ip()
@@ -457,8 +464,14 @@ impl<'a, I: IpExt, S> TxPacket<'a, I, S> {
 }
 
 impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, S> {
-    type TransportPacket<'a> = &'a S where Self: 'a;
-    type TransportPacketMut<'a> = &'a mut S where Self: 'a;
+    type TransportPacket<'a>
+        = &'a S
+    where
+        Self: 'a;
+    type TransportPacketMut<'a>
+        = &'a mut S
+    where
+        Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
         self.src_addr
@@ -553,8 +566,14 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
 }
 
 impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
-    type TransportPacket<'a> = &'a Self where Self: 'a;
-    type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, I>> where Self: 'a;
+    type TransportPacket<'a>
+        = &'a Self
+    where
+        Self: 'a;
+    type TransportPacketMut<'a>
+        = Option<ParsedTransportHeaderMut<'a, I>>
+    where
+        Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
         self.src_addr
@@ -668,8 +687,14 @@ impl<I: IpExt, B: BufferMut> MaybeTransportPacket for ForwardedPacket<I, B> {
 impl<I: IpExt, S: TransportPacketSerializer<I>, B: IpPacketBuilder<I>> IpPacket<I>
     for Nested<S, B>
 {
-    type TransportPacket<'a> = &'a S where Self: 'a;
-    type TransportPacketMut<'a> = &'a mut S where Self: 'a;
+    type TransportPacket<'a>
+        = &'a S
+    where
+        Self: 'a;
+    type TransportPacketMut<'a>
+        = &'a mut S
+    where
+        Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
         self.outer().src_ip()
@@ -769,8 +794,16 @@ where
 }
 
 impl<I: IpExt, Inner: IpPacket<I>, Outer> IpPacket<I> for NestedWithInnerIpPacket<Inner, Outer> {
-    type TransportPacket<'a> = Inner::TransportPacket<'a> where Inner: 'a, Outer: 'a;
-    type TransportPacketMut<'a> = Inner::TransportPacketMut<'a> where Inner: 'a, Outer: 'a;
+    type TransportPacket<'a>
+        = Inner::TransportPacket<'a>
+    where
+        Inner: 'a,
+        Outer: 'a;
+    type TransportPacketMut<'a>
+        = Inner::TransportPacketMut<'a>
+    where
+        Inner: 'a,
+        Outer: 'a;
 
     fn src_addr(&self) -> I::Addr {
         self.inner().src_addr()
@@ -829,7 +862,10 @@ impl MaybeTransportPacket for Never {
 }
 
 impl<I: IpExt> MaybeTransportPacketMut<I> for Never {
-    type TransportPacketMut<'a> = Never where Self: 'a;
+    type TransportPacketMut<'a>
+        = Never
+    where
+        Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         match *self {}
@@ -864,7 +900,10 @@ impl<A: IpAddress, Inner> MaybeTransportPacket for Nested<Inner, UdpPacketBuilde
 }
 
 impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, UdpPacketBuilder<I::Addr>> {
-    type TransportPacketMut<'a> = &'a mut Self where Self: 'a;
+    type TransportPacketMut<'a>
+        = &'a mut Self
+    where
+        Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         Some(self)
@@ -908,7 +947,10 @@ where
 impl<I: IpExt, Outer, Inner> MaybeTransportPacketMut<I>
     for Nested<Inner, TcpSegmentBuilderWithOptions<I::Addr, Outer>>
 {
-    type TransportPacketMut<'a> = &'a mut Self where Self: 'a;
+    type TransportPacketMut<'a>
+        = &'a mut Self
+    where
+        Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         Some(self)
@@ -946,7 +988,11 @@ impl<I: IpExt, Inner, M: IcmpMessage<I>> MaybeTransportPacket
 impl<I: IpExt, Inner, M: IcmpMessage<I>> MaybeTransportPacketMut<I>
     for Nested<Inner, IcmpPacketBuilder<I, M>>
 {
-    type TransportPacketMut<'a> = &'a mut IcmpPacketBuilder<I, M> where M: 'a, Inner: 'a;
+    type TransportPacketMut<'a>
+        = &'a mut IcmpPacketBuilder<I, M>
+    where
+        M: 'a,
+        Inner: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         Some(self.outer_mut())
@@ -1091,7 +1137,10 @@ impl<M: igmp::MessageType<EmptyBuf>> MaybeTransportPacket
 impl<M: igmp::MessageType<EmptyBuf>> MaybeTransportPacketMut<Ipv4>
     for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
 {
-    type TransportPacketMut<'a> = Never where M: 'a;
+    type TransportPacketMut<'a>
+        = Never
+    where
+        M: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         None
@@ -1158,7 +1207,10 @@ impl<I: IpExt, B: ParseBuffer> MaybeTransportPacket for RawIpBody<I, B> {
 }
 
 impl<I: IpExt, B: BufferMut> MaybeTransportPacketMut<I> for RawIpBody<I, B> {
-    type TransportPacketMut<'a> = ParsedTransportHeaderMut<'a, I> where Self: 'a;
+    type TransportPacketMut<'a>
+        = ParsedTransportHeaderMut<'a, I>
+    where
+        Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
         let RawIpBody { protocol, src_addr, dst_addr, body, transport_packet_data: _ } = self;
@@ -1501,7 +1553,10 @@ pub mod testutil {
     }
 
     impl<I: IpExt, B: BufferMut> MaybeTransportPacketMut<I> for Nested<B, ()> {
-        type TransportPacketMut<'a> = Never where B: 'a;
+        type TransportPacketMut<'a>
+            = Never
+        where
+            B: 'a;
 
         fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
             unimplemented!()
@@ -1515,7 +1570,10 @@ pub mod testutil {
     }
 
     impl<I: IpExt> MaybeTransportPacketMut<I> for InnerSerializer<&[u8], EmptyBuf> {
-        type TransportPacketMut<'a> = Never where Self: 'a;
+        type TransportPacketMut<'a>
+            = Never
+        where
+            Self: 'a;
 
         fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
             None
@@ -1582,8 +1640,14 @@ pub mod testutil {
             for<'a> &'a T: TransportPacketExt<I>,
             for<'a> &'a mut T: MaybeTransportPacketMut<I>,
         {
-            type TransportPacket<'a> = &'a T where T: 'a;
-            type TransportPacketMut<'a> = &'a mut T where T: 'a;
+            type TransportPacket<'a>
+                = &'a T
+            where
+                T: 'a;
+            type TransportPacketMut<'a>
+                = &'a mut T
+            where
+                T: 'a;
 
             fn src_addr(&self) -> I::Addr {
                 self.src_ip
@@ -1917,7 +1981,10 @@ mod tests {
     }
 
     impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
-        type TransportPacketMut<'a> = &'a mut Self where Self: 'a;
+        type TransportPacketMut<'a>
+            = &'a mut Self
+        where
+            Self: 'a;
 
         fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
             Some(self)
