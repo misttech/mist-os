@@ -196,7 +196,7 @@ mod tests {
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::BootTime;
+    use fuchsia_zircon::BootInstant;
     use futures::channel::mpsc;
     use moniker::ExtendedMoniker;
     use std::io::Cursor;
@@ -227,7 +227,7 @@ mod tests {
     #[fuchsia::test]
     fn write_to_serial_handles_denied_tags() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp: BootTime::from_nanos(1).into(),
+            timestamp: BootInstant::from_nanos(1).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -248,7 +248,7 @@ mod tests {
             "neque bibendum molestie. Etiam ac sapien justo. Nullam aliquet ipsum nec tincidunt."
         );
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp: BootTime::from_nanos(123456789).into(),
+            timestamp: BootInstant::from_nanos(123456789).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -275,7 +275,7 @@ mod tests {
     #[fuchsia::test]
     fn when_no_tags_are_present_the_component_name_is_used() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp: BootTime::from_nanos(123456789).into(),
+            timestamp: BootInstant::from_nanos(123456789).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -318,17 +318,17 @@ mod tests {
         bootstrap_foo_container.ingest_message(make_message(
             "a",
             None,
-            zx::BootTime::from_nanos(1),
+            zx::BootInstant::from_nanos(1),
         ));
-        core_baz_container.ingest_message(make_message("c", None, zx::BootTime::from_nanos(2)));
+        core_baz_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(2)));
         let (sink, rcv) = TestSink::new();
         let _serial_task = fasync::Task::spawn(serial_config.write_logs(Arc::clone(&repo), sink));
         bootstrap_bar_container.ingest_message(make_message(
             "b",
             Some("foo"),
-            zx::BootTime::from_nanos(3),
+            zx::BootInstant::from_nanos(3),
         ));
-        core_foo_container.ingest_message(make_message("c", None, zx::BootTime::from_nanos(4)));
+        core_foo_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(4)));
 
         let received = rcv.take(2).collect::<Vec<_>>().await;
 
@@ -344,7 +344,7 @@ mod tests {
         );
     }
 
-    fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootTime) -> StoredMessage {
+    fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {
         let mut record = Record {
             timestamp: timestamp.into_nanos(),
             severity: StreamSeverity::Debug.into_primitive(),

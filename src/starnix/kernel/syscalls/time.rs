@@ -394,9 +394,9 @@ pub fn sys_timer_create(
     let timeline = match clock_id as u32 {
         CLOCK_REALTIME => Timeline::RealTime,
         CLOCK_MONOTONIC => Timeline::Monotonic,
-        CLOCK_BOOTTIME => Timeline::BootTime,
+        CLOCK_BOOTTIME => Timeline::BootInstant,
         CLOCK_REALTIME_ALARM => Timeline::RealTime,
-        CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
+        CLOCK_BOOTTIME_ALARM => Timeline::BootInstant,
         CLOCK_TAI => {
             track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
             return error!(ENOTSUP);

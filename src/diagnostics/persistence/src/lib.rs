@@ -19,7 +19,7 @@ use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::BootTime;
+use fuchsia_zircon::BootInstant;
 use futures::future::join;
 use futures::StreamExt;
 use persist_server::PersistServer;
@@ -110,7 +110,7 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
             component::health().set_ok();
             info!("Diagnostics Persistence Service ready");
         });
-        inspector.root().record_int(PUBLISHED_TIME_KEY, BootTime::get().into_nanos());
+        inspector.root().record_int(PUBLISHED_TIME_KEY, BootInstant::get().into_nanos());
     };
 
     join(fs.collect::<()>(), publish_fut).await;

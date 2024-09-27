@@ -22,7 +22,7 @@ use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
 pub struct StoredMessage {
     bytes: Box<[u8]>,
     severity: Severity,
-    timestamp: zx::BootTime,
+    timestamp: zx::BootInstant,
     stats: Arc<LogStreamStats>,
 }
 
@@ -151,7 +151,7 @@ impl StoredMessage {
         self.severity
     }
 
-    pub fn timestamp(&self) -> zx::BootTime {
+    pub fn timestamp(&self) -> zx::BootInstant {
         self.timestamp
     }
 
@@ -178,7 +178,7 @@ impl Drop for StoredMessage {
 struct LegacyMessageRecord<'a> {
     severity: RawSeverity,
     data: &'a str,
-    timestamp: zx::BootTime,
+    timestamp: zx::BootInstant,
 }
 
 impl RecordEvent for LegacyMessageRecord<'_> {
@@ -198,7 +198,7 @@ impl RecordEvent for LegacyMessageRecord<'_> {
         ""
     }
 
-    fn timestamp(&self) -> zx::BootTime {
+    fn timestamp(&self) -> zx::BootInstant {
         self.timestamp
     }
 
@@ -217,7 +217,7 @@ impl RecordEvent for LegacyMessageRecord<'_> {
 struct DebugLogRecordEvent<'a> {
     severity: RawSeverity,
     data: &'a BStr,
-    timestamp: zx::BootTime,
+    timestamp: zx::BootInstant,
 }
 
 impl RecordEvent for DebugLogRecordEvent<'_> {
@@ -237,7 +237,7 @@ impl RecordEvent for DebugLogRecordEvent<'_> {
         ""
     }
 
-    fn timestamp(&self) -> zx::BootTime {
+    fn timestamp(&self) -> zx::BootInstant {
         self.timestamp
     }
 

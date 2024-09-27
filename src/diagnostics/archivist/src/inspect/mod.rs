@@ -30,7 +30,7 @@ pub struct NodeHierarchyData {
     // Name of the file that created this snapshot.
     name: Option<InspectHandleName>,
     // Timestamp at which this snapshot resolved or failed.
-    timestamp: zx::BootTime,
+    timestamp: zx::BootInstant,
     // Errors encountered when processing this snapshot.
     errors: Vec<schema::InspectError>,
     // Optional DiagnosticsHierarchy of the inspect hierarchy, in case reading fails

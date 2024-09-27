@@ -118,29 +118,29 @@ impl TimeSource for MonotonicInstant {
     }
 }
 
-/// BootTime instances provide a monotonic clock.
-/// On Fuchsia, BootTime uses fuchsia_zircon::BootTime::get().
+/// BootInstant instances provide a monotonic clock.
+/// On Fuchsia, BootInstant uses fuchsia_zircon::BootInstant::get().
 #[derive(Debug)]
-pub struct BootTime {
+pub struct BootInstant {
     #[cfg(not(target_os = "fuchsia"))]
     starting_time: std::time::Instant,
 }
 
-impl BootTime {
-    pub fn new() -> BootTime {
+impl BootInstant {
+    pub fn new() -> BootInstant {
         #[cfg(target_os = "fuchsia")]
-        let time = BootTime {};
+        let time = BootInstant {};
         #[cfg(not(target_os = "fuchsia"))]
-        let time = BootTime { starting_time: std::time::Instant::now() };
+        let time = BootInstant { starting_time: std::time::Instant::now() };
 
         time
     }
 }
 
-impl TimeSource for BootTime {
+impl TimeSource for BootInstant {
     fn now(&self) -> i64 {
         #[cfg(target_os = "fuchsia")]
-        let now = zx::BootTime::get().into_nanos();
+        let now = zx::BootInstant::get().into_nanos();
         #[cfg(not(target_os = "fuchsia"))]
         let now = (std::time::Instant::now() - self.starting_time).as_nanos() as i64;
 
@@ -187,7 +187,7 @@ mod test {
 
     #[test]
     fn test_boot_time() {
-        let time_source = BootTime::new();
+        let time_source = BootInstant::new();
         let time_holder = TimeHolder::new(&time_source);
         let first_time = time_holder.now();
         // Make sure the monotonic time is ticking. If not, this will hang until the test times out.

@@ -250,7 +250,7 @@ pub struct SnapshotData {
     /// Optional name of the file or InspectSink proxy that created this snapshot.
     pub name: Option<InspectHandleName>,
     /// Timestamp at which this snapshot resolved or failed.
-    pub timestamp: zx::BootTime,
+    pub timestamp: zx::BootInstant,
     /// Errors encountered when processing this snapshot.
     pub errors: Vec<schema::InspectError>,
     /// Optional snapshot of the inspect hierarchy, in case reading fails
@@ -345,7 +345,7 @@ impl SnapshotData {
     ) -> SnapshotData {
         SnapshotData {
             name,
-            timestamp: zx::BootTime::get(),
+            timestamp: zx::BootInstant::get(),
             errors: Vec::new(),
             snapshot: Some(snapshot),
             escrowed,
@@ -360,7 +360,7 @@ impl SnapshotData {
     ) -> SnapshotData {
         SnapshotData {
             name,
-            timestamp: zx::BootTime::get(),
+            timestamp: zx::BootInstant::get(),
             errors: vec![error],
             snapshot: None,
             escrowed,

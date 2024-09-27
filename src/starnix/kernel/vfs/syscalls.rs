@@ -1911,7 +1911,7 @@ pub fn sys_timerfd_create(
 ) -> Result<FdNumber, Errno> {
     let timeline = match clock_id {
         CLOCK_MONOTONIC => Timeline::Monotonic,
-        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
+        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => Timeline::BootInstant,
         CLOCK_REALTIME | CLOCK_REALTIME_ALARM => Timeline::RealTime,
         _ => return error!(EINVAL),
     };

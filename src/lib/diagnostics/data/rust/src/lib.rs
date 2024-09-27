@@ -231,15 +231,15 @@ mod zircon {
     use super::*;
     use fuchsia_zircon as zx;
 
-    impl From<zx::BootTime> for Timestamp {
-        fn from(t: zx::BootTime) -> Timestamp {
+    impl From<zx::BootInstant> for Timestamp {
+        fn from(t: zx::BootInstant) -> Timestamp {
             Timestamp(t.into_nanos())
         }
     }
 
-    impl Into<zx::BootTime> for Timestamp {
-        fn into(self) -> zx::BootTime {
-            zx::BootTime::from_nanos(self.0)
+    impl Into<zx::BootInstant> for Timestamp {
+        fn into(self) -> zx::BootInstant {
+            zx::BootInstant::from_nanos(self.0)
         }
     }
 }
