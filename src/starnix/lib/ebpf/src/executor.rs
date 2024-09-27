@@ -889,17 +889,17 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         Ok(())
     }
 
-    fn load_from_sk_buf_data<'a>(
+    fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        offset: u16,
+        offset: i16,
         register_offset: Option<Register>,
         width: DataWidth,
     ) -> Result<(), String> {
         let Some(offset) =
-            register_offset.map(|r| self.reg(r).as_u16()).unwrap_or(0).checked_add(offset)
+            register_offset.map(|r| self.reg(r).as_i32()).unwrap_or(0).checked_add(offset as i32)
         else {
             // Offset overflowed. Exit.
             self.result = Some(self.reg(0).as_u64());

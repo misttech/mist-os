@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use linux_uapi::{
-    bpf_insn, sock_filter, BPF_A, BPF_ABS, BPF_ADD, BPF_ALU, BPF_AND, BPF_B, BPF_DIV, BPF_EXIT,
-    BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
-    BPF_JMP32, BPF_JNE, BPF_JSET, BPF_K, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MISC, BPF_MOV,
-    BPF_MUL, BPF_NEG, BPF_OR, BPF_RET, BPF_RSH, BPF_ST, BPF_STX, BPF_SUB, BPF_TAX, BPF_TXA, BPF_W,
-    BPF_X, BPF_XOR,
+    bpf_insn, sock_filter, BPF_A, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_B, BPF_DIV,
+    BPF_EXIT, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT,
+    BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_K, BPF_LD, BPF_LDX, BPF_LEN, BPF_LSH, BPF_MEM,
+    BPF_MISC, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RET, BPF_RSH, BPF_ST, BPF_STX, BPF_SUB,
+    BPF_TAX, BPF_TXA, BPF_W, BPF_X, BPF_XOR,
 };
 use std::collections::HashMap;
 
@@ -91,14 +91,28 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
     // EBPF registers, numbered 0-9.  We map between the two as
     // follows:
 
-    // r[0]: Mapped to A.
-    // r[1]: ebpf makes this the memory passed in,
-    // r[2]: ebpf makes this the length of the memory passed in.
-    // r[9]: Mapped to X
-    // r[10]: Const stack pointer. cBFP scratch memory (16 words) is stored on top of the stack.
-
+    // R0: Mapped to A.
     const REG_A: u8 = 0;
+
+    // R1: Incoming argument pointing at the packet context (e.g. `sk_buff`). Moved to R6.
+    const REG_ARG1: u8 = 1;
+
+    // R2: Packet size (see BPF_LEN). Moved to R7.
+    const REG_ARG2: u8 = 2;
+
+    // R6: Pointer to the program context. Initially passed as the first argument. Implicitly
+    //     used by eBPF when executing the legacy packet access instructions (`BPF_LD | BPF_ABS`
+    //     and `BPF_LD | BPF_IND`).
+    const REG_CONTEXT: u8 = 6;
+
+    // R7: Packet size (see `BPF_LEN`). Initially passed as the second argument.
+    const REG_PACKET_LEN: u8 = 7;
+
+    // R9: Mapped to X
     const REG_X: u8 = 9;
+
+    // R10: Const stack pointer. cBFP scratch memory (16 words) is stored on top of the stack.
+    const REG_STACK: u8 = 10;
 
     // Map from jump targets in the cbpf to a list of jump instructions in the epbf that target
     // it. When you figure out what the offset of the target is in the ebpf, you need to patch the
@@ -106,7 +120,14 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
     let mut to_be_patched: HashMap<usize, Vec<usize>> = HashMap::new();
 
     let mut ebpf_code: Vec<bpf_insn> = vec![];
-    ebpf_code.reserve(bpf_code.len() * 2);
+    ebpf_code.reserve(bpf_code.len() * 2 + 2);
+
+    // Save the arguments to registers that won't get clobbered by `BPF_LD`.
+    ebpf_code.push(new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, REG_CONTEXT, REG_ARG1, 0, 0));
+    ebpf_code.push(new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, REG_PACKET_LEN, REG_ARG2, 0, 0));
+
+    // Reset A to 0. This is necessary in case one of the load operation exits prematurely.
+    ebpf_code.push(new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, REG_A, 0, 0, 0));
 
     for (i, bpf_instruction) in bpf_code.iter().enumerate() {
         // Update instructions processed previously that jump to the current one.
@@ -154,37 +175,58 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
                 let mode = bpf_addressing_mode(bpf_instruction);
                 let size = bpf_size(bpf_instruction);
 
-                // Half-word (`BPF_H`) and byte (`BPF_B`) loads are allowed only for
-                // `BPF_LD | BPD_ABS` and `BPF_LD | BPD_IND`. All other loads should be word-sized
-                // (i.e. `BPF_W`).
+                // Half-word (`BPF_H`) and byte (`BPF_B`) loads are allowed only for `BPD_ABS` and
+                // `BPD_IND`. Also `BPD_ABS` and `BPD_IND` are not allowed with `BPD_LDX`.
+                // `BPF_LEN`, `BPF_IMM` and `BPF_MEM` loads should be word-sized (i.e. `BPF_W`).
                 match (size, mode, class) {
-                    (BPF_W, _, _) => (),
-                    (BPF_H | BPF_B, BPF_ABS | BPF_IND, BPF_LD) => (),
+                    (BPF_H | BPF_B | BPF_W, BPF_ABS | BPF_IND, BPF_LD) => (),
+                    (BPF_W, BPF_LEN | BPF_IMM | BPF_MEM, BPF_LD | BPF_LDX) => (),
                     _ => return Err(InvalidCbpfInstruction(bpf_instruction.code)),
                 };
 
                 match mode {
                     BPF_ABS => {
-                        // TODO(b/42079971): This should use `BPF_LD | BPF_ABS | size`.
                         ebpf_code.push(new_bpf_insn(
-                            BPF_LDX | BPF_MEM | size,
-                            dst_reg,
-                            1,
+                            BPF_LD | BPF_ABS | size,
+                            REG_A,
+                            0,
+                            bpf_instruction.k as i16,
+                            0,
+                        ));
+                    }
+                    BPF_IND => {
+                        ebpf_code.push(new_bpf_insn(
+                            BPF_LD | BPF_IND | size,
+                            REG_A,
+                            REG_X,
                             bpf_instruction.k as i16,
                             0,
                         ));
                     }
                     BPF_IMM => {
                         let imm = bpf_instruction.k as i32;
-                        ebpf_code.push(new_bpf_insn(BPF_LDX | BPF_IMM, dst_reg, 0, 0, imm));
+                        ebpf_code.push(new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, dst_reg, 0, 0, imm));
                     }
                     BPF_MEM => {
                         // cBPF's scratch memory is stored in the stack referenced by R10.
                         let offset = cbpf_scratch_offset(bpf_instruction.k)?;
-                        ebpf_code.push(new_bpf_insn(BPF_LDX | BPF_MEM, dst_reg, 10, offset, 0));
+                        ebpf_code.push(new_bpf_insn(
+                            BPF_LDX | BPF_MEM,
+                            dst_reg,
+                            REG_STACK,
+                            offset,
+                            0,
+                        ));
                     }
-                    //  TODO(b/42079971): Add `BPF_LEN`.
-                    //  TODO(b/42079971): Add `BPF_IND`.
+                    BPF_LEN => {
+                        ebpf_code.push(new_bpf_insn(
+                            BPF_ALU64 | BPF_MOV | BPF_X,
+                            REG_A,
+                            REG_PACKET_LEN,
+                            0,
+                            0,
+                        ));
+                    }
                     _ => return Err(InvalidCbpfInstruction(bpf_instruction.code)),
                 }
             }
@@ -264,7 +306,13 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
                 // cBPF's scratch memory is stored in the stack referenced by R10.
                 let src_reg = if class == BPF_STX { REG_X } else { REG_A };
                 let offset = cbpf_scratch_offset(bpf_instruction.k)?;
-                ebpf_code.push(new_bpf_insn(BPF_STX | BPF_MEM | BPF_W, 10, src_reg, offset, 0));
+                ebpf_code.push(new_bpf_insn(
+                    BPF_STX | BPF_MEM | BPF_W,
+                    REG_STACK,
+                    src_reg,
+                    offset,
+                    0,
+                ));
             }
             BPF_RET => {
                 match bpf_rval(bpf_instruction) {
@@ -302,6 +350,9 @@ mod tests {
                 sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
             ]),
             Ok(vec![
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
+                new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_JA, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
             ]),
@@ -344,6 +395,9 @@ mod tests {
                 sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
             ]),
             Ok(vec![
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
+                new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP32 | BPF_JEQ, 0, 0, 1, 0),
                 new_bpf_insn(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
@@ -357,6 +411,9 @@ mod tests {
                 sock_filter { code: (BPF_RET | BPF_K) as u16, jt: 0, jf: 0, k: 1 },
             ]),
             Ok(vec![
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
+                new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_JA, 0, 0, 0, 0),
                 new_bpf_insn(BPF_ALU | BPF_MOV | BPF_IMM, 0, 0, 0, 1),
                 new_bpf_insn(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
@@ -372,6 +429,9 @@ mod tests {
                 sock_filter { code: BPF_STX as u16, jt: 0, jf: 0, k: 15 },
             ]),
             Ok(vec![
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
+                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
+                new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_LDX | BPF_MEM | BPF_W, 0, 10, -64, 0),
                 new_bpf_insn(BPF_LDX | BPF_MEM | BPF_W, 9, 10, -4, 0),
                 new_bpf_insn(BPF_STX | BPF_MEM | BPF_W, 10, 0, -64, 0),

@@ -487,12 +487,12 @@ pub trait BpfVisitor {
         jump_offset: i16,
     ) -> Result<(), String>;
 
-    fn load_from_sk_buf_data<'a>(
+    fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        offset: u16,
+        offset: i16,
         register_offset: Option<Register>,
         width: DataWidth,
     ) -> Result<(), String>;
@@ -971,13 +971,13 @@ pub trait BpfVisitor {
                 if instruction.off < 0 {
                     return Err(format!("negative offset for load packet"));
                 }
-                return self.load_from_sk_buf_data(
+                return self.load_from_packet(
                     context,
                     // Store the result in r0
                     0,
                     // Read the packet from r6
                     6,
-                    instruction.off as u16,
+                    instruction.off,
                     register_offset,
                     width,
                 );

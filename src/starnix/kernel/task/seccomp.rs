@@ -14,6 +14,7 @@ use crate::vfs::{
 use bstr::ByteSlice;
 use ebpf::converter::{bpf_addressing_mode, bpf_class};
 use ebpf::program::EbpfProgram;
+use ebpf::{read_raw_packet_data, EbpfRunContext, PacketAccessor};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -103,7 +104,10 @@ impl SeccompFilter {
             }
         }
 
-        match EbpfProgram::from_cbpf::<seccomp_data>(code) {
+        match EbpfProgram::<()>::from_cbpf(
+            code,
+            PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
+        ) {
             Ok(program) => Ok(SeccompFilter {
                 program,
                 unique_id: maybe_unique_id,
@@ -118,8 +122,12 @@ impl SeccompFilter {
     }
 
     pub fn run(&self, data: &mut seccomp_data) -> u32 {
-        self.program.run(&mut (), data) as u32
+        self.program.run(&mut (), data, std::mem::size_of::<seccomp_data>()) as u32
     }
+}
+
+impl EbpfRunContext for SeccompFilter {
+    type Context<'a> = seccomp_data;
 }
 
 const SECCOMP_MAX_INSNS_PER_PATH: u16 = 32768;

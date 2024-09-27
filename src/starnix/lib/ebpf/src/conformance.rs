@@ -660,11 +660,11 @@ pub mod test {
     /// at offset 8 of the packet itself.
     fn read_packet(
         _context: &mut (),
-        sk_buf_ptr: BpfValue,
-        offset: u16,
+        packet_ptr: BpfValue,
+        offset: i32,
         width: DataWidth,
     ) -> Option<BpfValue> {
-        let addr = sk_buf_ptr.add((8 + offset).into());
+        let addr = packet_ptr.add(8 + offset as u64);
         let value = match width {
             DataWidth::U8 => {
                 BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u8>()) })
@@ -850,6 +850,7 @@ pub mod test {
             // Special case that only test the test framework.
             return;
         };
+
         let mut builder = EbpfProgramBuilder::<()>::default();
         if let Some(memory) = test_case.memory.as_ref() {
             let memory_id = new_bpf_type_identifier();
@@ -860,7 +861,7 @@ pub mod test {
             });
             builder.set_args(&[
                 Type::PtrToMemory {
-                    id: new_bpf_type_identifier(),
+                    id: memory_id,
                     offset: 0,
                     buffer_size,
                     fields: Default::default(),
