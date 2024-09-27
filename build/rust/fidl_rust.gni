@@ -45,13 +45,19 @@ template("fidl_rust") {
          "fidl_rust(\"$target_name\") must define `fidl_ir_target`")
 
   generation_target = "${target_name}_generate"
+  fdomain = defined(invoker.fdomain) && invoker.fdomain
 
   forward_variables_from(invoker,
                          [
                            "fidl_gen_dir",
                            "library_name",
                          ])
-  crate_name = "fidl_" + string_replace(library_name, ".", "_")
+
+  if (fdomain) {
+    crate_name = "fdomain_" + string_replace(library_name, ".", "_")
+  } else {
+    crate_name = "fidl_" + string_replace(library_name, ".", "_")
+  }
   file_stem = "$fidl_gen_dir/$crate_name"
 
   if (is_fidl_toolchain) {
@@ -91,6 +97,10 @@ template("fidl_rust") {
         "--rustfmt-config",
         rebase_path("//rustfmt.toml", root_build_dir),
       ]
+
+      if (fdomain) {
+        args += [ "--fdomain=true" ]
+      }
 
       deps = [ fidl_ir_target ]
 
@@ -136,6 +146,9 @@ template("fidl_rust") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
+      if (fdomain) {
+        deps += [ "//src/lib/fdomain/client" ]
+      }
 
       # TODO(https://fxbug.dev/42055130): Avoid this suppression. At the time of
       # writing it is needed because this target might depend on another FIDL
@@ -154,6 +167,8 @@ template("fidl_rust") {
           label = get_label_info(dep, "label_no_toolchain")
           if (label == "//zircon/vdso/zx:zx") {
             deps += [ "//src/lib/zircon/rust/fuchsia-zircon-types" ]
+          } else if (fdomain) {
+            deps += [ "${label}_fdomain" ]
           } else {
             deps += [ "${label}_rust" ]
           }

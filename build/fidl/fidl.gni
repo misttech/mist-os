@@ -182,6 +182,14 @@ template("fidl") {
   enable_bindlib = !defined(invoker.enable_bindlib) || invoker.enable_bindlib
   enable_cpp = !defined(invoker.enable_cpp) || invoker.enable_cpp
   enable_rust = !defined(invoker.enable_rust) || invoker.enable_rust
+  enable_fdomain = enable_rust
+  if (defined(invoker.enable_fdomain)) {
+    enable_fdomain = invoker.enable_fdomain
+  }
+
+  # FDomain bindings are a subtype of rust binding. Trying to build FDomain
+  # bindings without Rust does nothing.
+  assert(!enable_fdomain || enable_rust)
 
   # These bindings are not:
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
@@ -457,6 +465,42 @@ template("fidl") {
           deps += [ "//sdk:marker-${marker_category}" ]
         }
         fidl_gen_dir += "/rust"
+      }
+
+      if (enable_fdomain) {
+        # Define the Rust bindings.
+        fidl_rust("${target_name}_fdomain") {
+          forward_variables_from(invoker,
+                                 [
+                                   "applicable_licenses",
+                                   "testonly",
+                                   "visibility",
+                                   "public_deps",
+                                   "disable_rustdoc",
+                                 ])
+
+          fdomain = true
+
+          forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+          deps = []
+
+          # Add SDK category markers as Rust is used for ffx host tools.
+          # Check for allowed marker before adding category.
+          import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
+          label_name = get_label_info(":${common_parameters.fidl_target}",
+                                      "label_no_toolchain")
+          is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
+                               [ label_name ] != ffx_subtool_fidl_allowlist
+          marker_category = "unknown"
+          if (defined(invoker.sdk_category)) {
+            marker_category = invoker.sdk_category
+          }
+          if (is_allowed_for_ffx) {
+            marker_category = "allowed-for-ffx-subtool"
+          }
+          deps += [ "//sdk:marker-${marker_category}" ]
+          fidl_gen_dir += "/rust"
+        }
       }
     }
 

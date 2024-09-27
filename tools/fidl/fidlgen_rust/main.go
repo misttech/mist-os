@@ -20,6 +20,7 @@ type flagsDef struct {
 	outputFilenamePath *string
 	rustfmtPath        *string
 	rustfmtConfigPath  *string
+	fdomain            *bool
 }
 
 var flags = flagsDef{
@@ -31,6 +32,7 @@ var flags = flagsDef{
 		"path to the rustfmt tool."),
 	rustfmtConfigPath: flag.String("rustfmt-config", "",
 		"path to rustfmt.toml."),
+	fdomain: flag.Bool("fdomain", false, "if given, generate FDomain bindings."),
 }
 
 // valid returns true if the parsed flags are valid.
