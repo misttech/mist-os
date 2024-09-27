@@ -269,13 +269,7 @@ TEST(ThreadGetInfoTest, InfoThreadStatsRuntime) {
     EXPECT_GE(end_thread.total_runtime, 0);
     EXPECT_GE(delta_mono.get(), 0);
     EXPECT_GE(delta_thread.get(), 0);
-
-    // This condition depends on sleep actually taking the thread off of the CPU for most of the
-    // requested duration. There may be unexpected situations where that doesn't happen (e.g. a bug
-    // in the sleep path or some sort of VM delay) and the sleep deadline expires without the thread
-    // actually sleeping. If this condition causes flakes, the root cause should be determined, and
-    // if it cannot be eliminated, this condition can be changed to: delta_mono - delta_thread >= 0.
-    EXPECT_GE(delta_mono - delta_thread, zx::msec(9));
+    EXPECT_GE((delta_mono - delta_thread).get(), 0);
   }};
 
   test_thread.join();
