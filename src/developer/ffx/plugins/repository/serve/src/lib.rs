@@ -525,7 +525,7 @@ pub async fn serve_impl<W: Write + 'static>(
         // The server that matches the cmd is already running.
         writeln!(
             writer,
-            "A server named {} is serving on address {} the repo path: {}",
+            "A server named {} is already serving on address {} the repo path: {}",
             running.name, running.address, running.repo_path
         )
         .map_err(|e| bug!(e))?;
@@ -557,48 +557,7 @@ pub async fn serve_impl<W: Write + 'static>(
                 let repo_client = RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
                     .await
                     .with_context(|| format!("Creating a repo client for {repo_name}"))?;
-
-                let mirror_url = format!("http://{addr}/{repo_name}", addr = cmd.address)
-                    .parse()
-                    .map_err(|e| bug!("{e}"))?;
-                let repo_url = fuchsia_url::RepositoryUrl::parse_host(repo_name.clone())
-                    .map_err(|e| bug!("{e}"))?;
-                let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> =
-                    match cmd.storage_type {
-                        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
-                            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
-                        }
-                        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
-                            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
-                        }
-                        None => None,
-                    };
-
-                let repo_config = repo_client
-                    .get_config(repo_url, mirror_url, storage_type.clone())
-                    .map_err(|e| bug!("{e}"))?;
                 repo_manager.add(&repo_name, repo_client);
-
-                if let Err(e) = write_instance_info(
-                    Some(context.clone()),
-                    mode.clone(),
-                    &repo_name,
-                    &cmd.address,
-                    product_bundle.as_std_path().into(),
-                    aliases.into_iter().collect(),
-                    storage_type.unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
-                    match cmd.alias_conflict_mode {
-                        fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
-                        fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace,
-                    },
-                    repo_config,
-                )
-                .await
-                {
-                    tracing::error!(
-                        "failed to write repo server instance information for {repo_name}: {e:?}"
-                    );
-                }
             }
 
             if cmd.refresh_metadata {
@@ -639,50 +598,10 @@ pub async fn serve_impl<W: Write + 'static>(
             repo_client.update().await.context("updating the repository metadata")?;
 
             let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
-            let repo_url =
-                fuchsia_url::RepositoryUrl::parse_host(repo_name.clone()).map_err(|e| bug!(e))?;
-            let mirror_url = format!("http://{addr}/{repo_name}", addr = cmd.address)
-                .parse()
-                .map_err(|e: http::uri::InvalidUri| bug!(e))?;
-            let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> =
-                match cmd.storage_type {
-                    Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
-                        Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
-                    }
-                    Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
-                        Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
-                    }
-                    None => None,
-                };
-
-            let repo_config = repo_client
-                .get_config(repo_url, mirror_url, storage_type.clone())
-                .map_err(|e| bug!("{e}"))?;
             repo_manager.add(&repo_name, repo_client);
 
             if cmd.refresh_metadata {
                 refresh_repository_metadata(&repo_path).await?;
-            }
-
-            if let Err(e) = write_instance_info(
-                Some(context),
-                mode.clone(),
-                &repo_name,
-                &cmd.address,
-                repo_path.as_std_path().into(),
-                cmd.alias.clone(),
-                storage_type.unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
-                match cmd.alias_conflict_mode {
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace,
-                },
-                repo_config,
-            )
-            .await
-            {
-                tracing::error!(
-                    "failed to write repo server instance information for {repo_name}: {e:?}"
-                );
             }
             repo_path
         }
@@ -703,6 +622,54 @@ pub async fn serve_impl<W: Write + 'static>(
     };
 
     let server_addr = server.local_addr().clone();
+    let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> = match cmd.storage_type {
+        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
+            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
+        }
+        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
+            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
+        }
+        None => None,
+    };
+
+    // Write out the instance data
+    for (name, repo_client) in repo_manager.repositories() {
+        let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
+        let repo_url =
+            fuchsia_url::RepositoryUrl::parse_host(repo_name.clone()).map_err(|e| bug!(e))?;
+        let mirror_url = format!("http://{server_addr}/{repo_name}")
+            .parse()
+            .map_err(|e: http::uri::InvalidUri| bug!(e))?;
+        let repo_config = repo_client
+            .read()
+            .await
+            .get_config(repo_url, mirror_url, storage_type.clone())
+            .map_err(|e| bug!("{e}"))?;
+        if let Err(e) = write_instance_info(
+            Some(context.clone()),
+            mode.clone(),
+            &name,
+            &server_addr,
+            repo_path.as_std_path().into(),
+            cmd.alias.clone(),
+            storage_type.clone().unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
+            match cmd.alias_conflict_mode {
+                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => {
+                    fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut
+                }
+                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => {
+                    fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace
+                }
+            },
+            repo_config,
+        )
+        .await
+        {
+            tracing::error!(
+                "failed to write repo server instance information for {repo_name}: {e:?}"
+            );
+        }
+    }
 
     let server_task = fasync::Task::local(server_fut);
     let (mut server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
