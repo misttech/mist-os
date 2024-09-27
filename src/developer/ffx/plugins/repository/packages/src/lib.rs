@@ -13,7 +13,7 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_packages_args::{
     ExtractArchiveSubCommand, ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
 };
-use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{bug, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fuchsia_hash::Hash;
 use fuchsia_hyper::new_https_client;
 use fuchsia_pkg::PackageArchiveBuilder;
@@ -21,6 +21,7 @@ use fuchsia_repo::repo_client::{PackageEntry, RepoClient};
 use fuchsia_repo::repository::{PmRepository, RepoProvider};
 use humansize::{file_size_opts, FileSize};
 use pkg::repo::repo_spec_to_backend;
+use pkg::{PkgServerInstanceInfo as _, PkgServerInstances};
 use prettytable::format::{FormatBuilder, TableFormat};
 use prettytable::{cell, row, Row, Table};
 use std::fs::File;
@@ -270,7 +271,14 @@ async fn connect_to_repo(
 ) -> Result<RepoClient<Box<dyn RepoProvider>>> {
     // If we specified a repository on the CLI, try to look up its repository spec.
     let repo_spec = if let Some(repo_name) = repo_name {
-        if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
+        // Read repo instances
+        let instance_root = context
+            .get("repository.process_dir")
+            .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
+        let mgr = PkgServerInstances::new(instance_root);
+        if let Some(info) = mgr.get_instance(repo_name.clone())? {
+            Some(info.get_repository_spec()?)
+        } else if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
             .await
             .with_context(|| format!("Finding repo spec for {repo_name}"))?
         {

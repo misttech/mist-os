@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
+use camino::Utf8PathBuf;
 use ffx_config::EnvironmentContext;
 use fidl_fuchsia_pkg_ext::{
     RepositoryConfig, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
 };
+use fuchsia_repo::repository::RepositorySpec;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -143,6 +146,27 @@ impl PkgServerInfo {
             }
         }
         Ok(())
+    }
+
+    pub fn get_repository_spec(&self) -> Result<RepositorySpec> {
+        Ok(match &self.repo_path {
+            PathType::File(path_buf) => RepositorySpec::FileSystem {
+                metadata_repo_path: Utf8PathBuf::from_path_buf(path_buf.join("repository"))
+                    .map_err(|e| anyhow!("could not convert {e:?} to utf-8"))?,
+                blob_repo_path: Utf8PathBuf::from_path_buf(path_buf.join("repository/blobs"))
+                    .map_err(|e| anyhow!("could not convert {e:?} to utf-8"))?,
+                aliases: BTreeSet::from_iter(
+                    self.registration_aliases.iter().map(ToString::to_string),
+                ),
+            },
+            PathType::Url(url) => RepositorySpec::Http {
+                metadata_repo_url: url.clone(),
+                blob_repo_url: url.clone(),
+                aliases: BTreeSet::from_iter(
+                    self.registration_aliases.iter().map(ToString::to_string),
+                ),
+            },
+        })
     }
 }
 
