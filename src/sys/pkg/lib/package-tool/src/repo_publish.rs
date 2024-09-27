@@ -1331,7 +1331,7 @@ mod tests {
         // Populate a repo with packages in a product bundle
         let pb_dir = wrkdir.join("pb_dir");
         let pb_metadata_dir = pb_dir.join("repository");
-        let pb_blobs_dir = pb_dir.join("repository").join("blobs");
+        let pb_blobs_dir = pb_dir.join("blobs");
         test_utils::make_repo_dir(pb_metadata_dir.as_std_path(), pb_blobs_dir.as_std_path()).await;
         let pb_client =
             test_utils::make_file_system_repository(&pb_metadata_dir, &pb_blobs_dir).await;
