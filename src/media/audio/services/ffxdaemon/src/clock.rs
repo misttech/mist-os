@@ -29,7 +29,7 @@ pub fn create_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::C
 
             let update_builder = zx::ClockUpdate::builder()
                 .rate_adjust(rate.unwrap_or(0))
-                .absolute_value(now, zx::SyntheticTime::from_nanos(delta_time));
+                .absolute_value(now, zx::SyntheticInstant::from_nanos(delta_time));
 
             let auto_start =
                 if offset.is_some() { zx::ClockOpts::empty() } else { zx::ClockOpts::AUTO_START };

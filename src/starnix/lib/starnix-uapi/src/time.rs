@@ -89,7 +89,7 @@ pub fn time_from_timeval<T: zx::Timeline>(tv: timeval) -> Result<zx::Time<T>, Er
     }
 }
 
-/// Returns a `zx::SyntheticTime` for the given `timespec`, treating the `timespec` as an absolute
+/// Returns a `zx::SyntheticInstant` for the given `timespec`, treating the `timespec` as an absolute
 /// point in time (i.e., not relative to "now").
 pub fn time_from_timespec<T: zx::Timeline>(ts: timespec) -> Result<zx::Time<T>, Errno> {
     let duration = duration_from_timespec(ts)?;

@@ -14,14 +14,14 @@ use {
 
 lazy_static! {
     // A sample backstop time.
-    static ref BACKSTOP_TIME: zx::SyntheticTime = from_rfc2822("Sun, 20 Sep 2020 01:01:01 GMT");
+    static ref BACKSTOP_TIME: zx::SyntheticInstant = from_rfc2822("Sun, 20 Sep 2020 01:01:01 GMT");
 
     // A sample valid time.  It is strictly after backstop.
-    static ref VALID_TIME: zx::SyntheticTime = from_rfc2822("Tue, 29 Sep 2020 02:19:01 GMT");
+    static ref VALID_TIME: zx::SyntheticInstant = from_rfc2822("Tue, 29 Sep 2020 02:19:01 GMT");
 }
 
-fn from_rfc2822(date: &str) -> zx::SyntheticTime {
-    zx::SyntheticTime::from_nanos(
+fn from_rfc2822(date: &str) -> zx::SyntheticInstant {
+    zx::SyntheticInstant::from_nanos(
         chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos_opt().unwrap(),
     )
 }

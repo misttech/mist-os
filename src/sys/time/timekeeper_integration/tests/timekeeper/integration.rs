@@ -40,7 +40,7 @@ use {
 /// provided with handles to manipulate the time source and observe changes to the RTC and cobalt.
 async fn timekeeper_test<F, Fut>(
     clock: zx::Clock,
-    initial_rtc_time: Option<zx::SyntheticTime>,
+    initial_rtc_time: Option<zx::SyntheticInstant>,
     test_fn: F,
 ) -> Result<()>
 where
@@ -605,11 +605,11 @@ async fn test_step_clock() {
     .unwrap();
 }
 
-fn avg(time_1: zx::SyntheticTime, time_2: zx::SyntheticTime) -> zx::SyntheticTime {
+fn avg(time_1: zx::SyntheticInstant, time_2: zx::SyntheticInstant) -> zx::SyntheticInstant {
     let time_1 = time_1.into_nanos() as i128;
     let time_2 = time_2.into_nanos() as i128;
     let avg = (time_1 + time_2) / 2;
-    zx::SyntheticTime::from_nanos(avg as i64)
+    zx::SyntheticInstant::from_nanos(avg as i64)
 }
 
 #[fuchsia::test]

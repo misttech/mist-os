@@ -120,7 +120,7 @@ mod test {
     use super::*;
     use test_util::{assert_geq, assert_leq};
 
-    const BACKSTOP: zx::SyntheticTime = zx::SyntheticTime::from_nanos(1234567890);
+    const BACKSTOP: zx::SyntheticInstant = zx::SyntheticInstant::from_nanos(1234567890);
     const TIME_DIFF: zx::Duration = zx::Duration::from_seconds(5);
     const SLEW_RATE_PPM: i32 = 750;
     const ONE_MILLION: i32 = 1_000_000;
@@ -136,7 +136,7 @@ mod test {
     fn transform_properties_zero_rate_adjust() {
         let transform = Transform {
             reference_offset: TEST_REFERENCE,
-            synthetic_offset: zx::SyntheticTime::from_nanos(
+            synthetic_offset: zx::SyntheticInstant::from_nanos(
                 (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
             ),
             rate_adjust_ppm: 0,
@@ -172,7 +172,7 @@ mod test {
     fn transform_properties_positive_rate_adjust() {
         let transform = Transform {
             reference_offset: TEST_REFERENCE,
-            synthetic_offset: zx::SyntheticTime::from_nanos(
+            synthetic_offset: zx::SyntheticInstant::from_nanos(
                 (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
             ),
             rate_adjust_ppm: 25,
@@ -215,7 +215,7 @@ mod test {
     fn transform_properties_negative_rate_adjust() {
         let transform = Transform {
             reference_offset: TEST_REFERENCE,
-            synthetic_offset: zx::SyntheticTime::from_nanos(
+            synthetic_offset: zx::SyntheticInstant::from_nanos(
                 (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
             ),
             rate_adjust_ppm: -50,
@@ -255,7 +255,7 @@ mod test {
     fn transform_difference() {
         let transform_1 = Transform {
             reference_offset: TEST_REFERENCE,
-            synthetic_offset: zx::SyntheticTime::from_nanos(
+            synthetic_offset: zx::SyntheticInstant::from_nanos(
                 (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
             ),
             rate_adjust_ppm: 25,
@@ -265,7 +265,7 @@ mod test {
 
         let transform_2 = Transform {
             reference_offset: TEST_REFERENCE,
-            synthetic_offset: zx::SyntheticTime::from_nanos(TEST_REFERENCE.into_nanos()),
+            synthetic_offset: zx::SyntheticInstant::from_nanos(TEST_REFERENCE.into_nanos()),
             rate_adjust_ppm: -50,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: 0,
@@ -294,7 +294,7 @@ mod test {
     fn transform_conversion() {
         let transform = Transform {
             reference_offset: TEST_REFERENCE,
-            synthetic_offset: zx::SyntheticTime::from_nanos(
+            synthetic_offset: zx::SyntheticInstant::from_nanos(
                 (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
             ),
             rate_adjust_ppm: -15,
