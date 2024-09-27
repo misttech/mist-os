@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
-#include <lib/usb-virtual-bus-launcher-helper/usb-virtual-bus-launcher-helper.h>
 #include <lib/zx/result.h>
 
 #include <vector>

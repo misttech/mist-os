@@ -14,8 +14,6 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/watcher.h>
 #include <lib/usb-peripheral-utils/event-watcher.h>
-#include <lib/usb-virtual-bus-launcher-helper/usb-virtual-bus-launcher-helper.h>
-#include <lib/zx/channel.h>
 #include <zircon/status.h>
 
 #include <iostream>

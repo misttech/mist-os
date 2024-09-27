@@ -6,15 +6,9 @@ import("//build/zircon/zx_library.gni")
 
 zx_library("usb-virtual-bus-launcher") {
   sdk = "static"
-  sdk_headers = [
-    "lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h",
-    "lib/usb-virtual-bus-launcher-helper/usb-virtual-bus-launcher-helper.h",
-  ]
+  sdk_headers = [ "lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h" ]
   testonly = true
-  sources = [
-    "usb-virtual-bus-launcher-helper.cc",
-    "usb-virtual-bus-launcher.cc",
-  ]
+  sources = [ "usb-virtual-bus-launcher.cc" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
