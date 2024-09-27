@@ -18,32 +18,40 @@
 /// * [`fuchsia.power.system/WakeHandling`]
 /// * [`fuchsia.power.system/FullWakeHandling`]
 /// * [`fuchsia.power.system/ApplicationActivity`]
+/// * [`fuchsia.power.system/Cpu`]
 ///
 /// # Internal Dependency Diagram
 /// ```
-/// +--------------------+                  +---------------------------------+
-/// | **ExecutionState** |                  |     **ApplicationActivity**     |
-/// +--------------------+                  +---------------------------------+
-/// |       ACTIVE       |<-----------------|             ACTIVE              |
-/// +--------------------+                  +---------------------------------+
-/// |     SUSPENDING     |<--------+        |            INACTIVE             |
-/// |                    |<------+ |        +---------------------------------+
-/// +--------------------+       | |
-/// |      INACTIVE      |       | |        +---------------------------------+
-/// +--------------------+       | |        |         **WakeHandling**        |
-///                              | |        +---------------------------------+
-///                              | +--------|             ACTIVE              |
-///                              |          +---------------------------------+
-///                              |          |            INACTIVE             |
-///                              |          +---------------------------------+
-///                              |
-///                              |          +---------------------------------+
-///                              |          |       **FullWakeHandling**      |
-///                              |          +---------------------------------+
-///                              +----------|             ACTIVE              |
-///                                         +---------------------------------+
-///                                         |            INACTIVE             |
-///                                         +---------------------------------+
+///                +--------------------+                  +---------------------------------+
+///                | **ExecutionState** |                  |     **ApplicationActivity**     |
+///                +--------------------+                  +---------------------------------+
+///                |       ACTIVE       |<-----------------|             ACTIVE              |
+///                +--------------------+                  +---------------------------------+
+/// +--------------|     SUSPENDING     |<--------+        |            INACTIVE             |
+/// |              |                    |<------+ |        +---------------------------------+
+/// |              +--------------------+       | |
+/// |              |      INACTIVE      |       | |        +---------------------------------+
+/// |              +--------------------+       | |        |         **WakeHandling**        |
+/// |                                           | |        +---------------------------------+
+/// |                                           | +--------|             ACTIVE              |
+/// |                                           |          +---------------------------------+
+/// |                                           |          |            INACTIVE             |
+/// |                                           |          +---------------------------------+
+/// |                                           |
+/// |    +---------------------------------+    |
+/// |    |             **CPU**             |    |
+/// |    +---------------------------------+    |
+/// +--->|             ACTIVE              |    |
+///      +---------------------------------+    |
+///      |            INACTIVE             |    |
+///      +---------------------------------+    |
+///                                             |          +---------------------------------+
+///                                             |          |       **FullWakeHandling**      |
+///                                             |          +---------------------------------+
+///                                             +----------|             ACTIVE              |
+///                                                        +---------------------------------+
+///                                                        |            INACTIVE             |
+///                                                        +---------------------------------+
 ///
 /// +---------------------------------+
 /// |   **ExecutionResumeLatency**    |
@@ -218,6 +226,15 @@ type PowerElements = resource table {
     5: wake_handling WakeHandling;
 };
 
+/// Error codes for responses from `AddExecutionStateDependency` in
+/// [`fuchsia.power.system/CpuElementManager`].
+type AddExecutionStateDependencyError = flexible enum {
+    /// Required arguments are either not given or are not valid.
+    INVALID_ARGS = 1;
+    /// The server is not in a state to handle the request.
+    BAD_STATE = 2;
+};
+
 /// A listener for activity governor events.
 open protocol ActivityGovernorListener {
     /// Called when the activity governor detects a system resume.
@@ -295,4 +312,30 @@ open protocol ActivityGovernor {
         1: listener client_end:ActivityGovernorListener;
         // TODO(b/315994974): Handle filtering by wakeup reason.
     }) -> ();
+};
+
+/// A service that provides access to CPU-related power elements.
+@discoverable
+open protocol CpuElementManager {
+    /// Gets the assertive dependency token for the CPU power element.
+    flexible GetCpuDependencyToken() -> (Cpu);
+
+    /// Adds a dependency from the Execution State power element to the target
+    /// power element identified by [`dependency_token`] at [`power_level`].
+    ///
+    /// Once the Execution State power element is created, future calls will
+    /// return [`fuchsia.power.system/AddExecutionStateDependencyError.BAD_STATE`]
+    /// and no changes to Execution State dependencies will be made.
+    ///
+    /// If any required entries in the request are missing, the server will
+    /// return [`fuchsia.power.system/AddExecutionStateDependencyError.INVALID_ARGS`].
+    flexible AddExecutionStateDependency(resource table {
+        /// The assertive dependency token representing the target power element
+        /// of the dependency.
+        /// Required.
+        1: dependency_token fuchsia.power.broker.DependencyToken;
+        /// The power level of the target power element.
+        /// Required.
+        2: power_level fuchsia.power.broker.PowerLevel;
+    }) -> () error AddExecutionStateDependencyError;
 };
