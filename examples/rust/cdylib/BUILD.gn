@@ -16,6 +16,7 @@ executable("unittests") {
   sources = [ "crust.cc" ]
 
   deps = [
+    "//examples/rust/cdylib/rust:crust-loadable",
     "//examples/rust/cdylib/rust:crust-shared",
     "//src/lib/fxl/test:gtest_main",
   ]

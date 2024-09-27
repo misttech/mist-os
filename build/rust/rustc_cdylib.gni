@@ -59,8 +59,14 @@ import("//build/rust/rustc_test.gni")
 #     and should only be changed when absolutely necessary
 #     (such as in the case of generated code).
 #
-#   output_name (optional)
-#     Name of the output file.
+#   is_loadable_module (optional)
+#     If set to true, this will use the `loadable_module` action instead of the `shared_library`
+#     action to build the library, and by default it will not have a `lib` prefix (see
+#     `output_prefix_override` if you want to change the default behaviour).
+#
+#   use_lib_prefix (optional)
+#     Whether or not to prefix the output filename with 'lib'. If unset, this defaults to true for
+#     shared libraries (`is_loadable_module` is false or unset) and false otherwise.
 #
 #   features (optional)
 #     A list of conditional compilation flags to enable. This can be used to set features for crates
@@ -143,7 +149,28 @@ template("rustc_cdylib") {
   }
 
   rustc_artifact(rustc_target) {
-    target_type = "shared_library"
+    if (defined(invoker.is_loadable_module) && invoker.is_loadable_module) {
+      target_type = "loadable_module"
+
+      # default to not using the lib prefix for loadable_modules
+      _use_lib_prefix = false
+    } else {
+      target_type = "shared_library"
+
+      # default to using the lib prefix for shared_library
+      _use_lib_prefix = true
+    }
+
+    # let the user override the default for whether or not to use the lib prefix
+    if (defined(invoker.use_lib_prefix)) {
+      _use_lib_prefix = invoker.use_lib_prefix
+    }
+
+    # The rust_dylib toolchain always sets the lib prefix by default regardless
+    # of target type, set `output_prefix_override` to true to remove it if either
+    # the user requested it or this is a loadable_module.
+    output_prefix_override = !_use_lib_prefix
+
     crate_root = source_root
     clippy_crate_type = "cdylib"
     crate_name = rustc_target
