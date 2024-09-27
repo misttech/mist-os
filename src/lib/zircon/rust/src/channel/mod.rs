@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon channel objects.
 
 use crate::{
-    ok, AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleRef, MonotonicTime,
-    Peered, Status,
+    ok, AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleRef,
+    MonotonicInstant, Peered, Status,
 };
 use fuchsia_zircon_sys as sys;
 use std::mem::MaybeUninit;
@@ -588,7 +588,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn call(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         bytes: &[u8],
         handles: &mut [Handle],
         buf: &mut MessageBuf,
@@ -642,7 +642,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn callv(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         buffers_in: &[ChannelIoSlice<'_>],
         handles: &mut [Handle],
         buf: &mut MessageBuf,
@@ -697,7 +697,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn call_uninit<'b, 'h>(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         bytes_in: &[u8],
         handles_in: &mut [Handle],
         bytes_out: &'b mut [MaybeUninit<u8>],
@@ -758,7 +758,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn callv_uninit<'b, 'h>(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         buffers_in: &[ChannelIoSlice<'_>],
         handles_in: &mut [Handle],
         bytes_out: &'b mut [MaybeUninit<u8>],
@@ -830,7 +830,7 @@ impl Channel {
     /// `bytes_in` and `bytes_out` may overlap. `handles_in` and `handles_out` may not overlap.
     pub unsafe fn call_raw(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         bytes_in: *const u8,
         bytes_in_len: usize,
         handles_in: *mut Handle,
@@ -922,7 +922,7 @@ impl Channel {
     /// None of the provided pointers may overlap.
     pub unsafe fn callv_raw(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         buffers_in: *const ChannelIoSlice<'_>,
         buffers_in_len: usize,
         handles_in: *mut Handle,
@@ -1004,7 +1004,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn call_etc(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         bytes: &[u8],
         handle_dispositions: &mut [HandleDisposition<'_>],
         buf: &mut MessageBufEtc,
@@ -1060,7 +1060,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn callv_etc(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         buffers_in: &[ChannelIoSlice<'_>],
         handle_dispositions: &mut [HandleDisposition<'_>],
         buf: &mut MessageBufEtc,
@@ -1117,7 +1117,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn call_etc_uninit<'b, 'h>(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         bytes_in: &[u8],
         handles_in: &mut [HandleDisposition<'_>],
         bytes_out: &'b mut [MaybeUninit<u8>],
@@ -1180,7 +1180,7 @@ impl Channel {
     /// On failure returns the both the main and read status.
     pub fn callv_etc_uninit<'b, 'h>(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         buffers_in: &[ChannelIoSlice<'_>],
         handles_in: &mut [HandleDisposition<'_>],
         bytes_out: &'b mut [MaybeUninit<u8>],
@@ -1254,7 +1254,7 @@ impl Channel {
     /// `bytes_in` and `bytes_out` may overlap.
     pub unsafe fn call_etc_raw(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         bytes_in: *const u8,
         bytes_in_len: usize,
         handles_in: *mut HandleDisposition<'_>,
@@ -1349,7 +1349,7 @@ impl Channel {
     /// None of the provided pointers may overlap.
     pub unsafe fn callv_etc_raw(
         &self,
-        timeout: MonotonicTime,
+        timeout: MonotonicInstant,
         buffers_in: *const ChannelIoSlice<'_>,
         buffers_in_len: usize,
         handles_in: *mut HandleDisposition<'_>,
@@ -1839,7 +1839,12 @@ mod tests {
     fn channel_call_too_many_bytes() {
         Channel::create()
             .0
-            .call(MonotonicTime::INFINITE, &too_many_bytes(), &mut vec![], &mut MessageBuf::new())
+            .call(
+                MonotonicInstant::INFINITE,
+                &too_many_bytes(),
+                &mut vec![],
+                &mut MessageBuf::new(),
+            )
             .unwrap_err();
     }
 
@@ -1848,7 +1853,7 @@ mod tests {
         Channel::create()
             .0
             .callv(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &too_many_bytes_vectored(),
                 &mut vec![],
                 &mut MessageBuf::new(),
@@ -1860,7 +1865,12 @@ mod tests {
     fn channel_call_vectored_too_many_slices() {
         Channel::create()
             .0
-            .callv(MonotonicTime::INFINITE, &too_many_slices(), &mut vec![], &mut MessageBuf::new())
+            .callv(
+                MonotonicInstant::INFINITE,
+                &too_many_slices(),
+                &mut vec![],
+                &mut MessageBuf::new(),
+            )
             .unwrap_err();
     }
 
@@ -1869,7 +1879,7 @@ mod tests {
         Channel::create()
             .0
             .call(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &vec![],
                 &mut too_many_handles()[..],
                 &mut MessageBuf::new(),
@@ -1882,7 +1892,7 @@ mod tests {
         Channel::create()
             .0
             .callv(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &[],
                 &mut too_many_handles()[..],
                 &mut MessageBuf::new(),
@@ -1895,7 +1905,7 @@ mod tests {
         Channel::create()
             .0
             .call_etc(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &too_many_bytes(),
                 &mut vec![],
                 &mut MessageBufEtc::new(),
@@ -1908,7 +1918,7 @@ mod tests {
         Channel::create()
             .0
             .callv_etc(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &too_many_bytes_vectored(),
                 &mut vec![],
                 &mut MessageBufEtc::new(),
@@ -1921,7 +1931,7 @@ mod tests {
         Channel::create()
             .0
             .call_etc(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &vec![],
                 &mut too_many_dispositions()[..],
                 &mut MessageBufEtc::new(),
@@ -1934,7 +1944,7 @@ mod tests {
         Channel::create()
             .0
             .callv_etc(
-                MonotonicTime::INFINITE,
+                MonotonicInstant::INFINITE,
                 &vec![],
                 &mut too_many_dispositions()[..],
                 &mut MessageBufEtc::new(),
@@ -2031,7 +2041,7 @@ mod tests {
         let mut handles_to_send: Vec<Handle> = vec![duplicate_vmo_handle];
         let mut buf = MessageBuf::new();
         assert_eq!(
-            p1.call(MonotonicTime::after(ten_ms), b"0000call", &mut handles_to_send, &mut buf),
+            p1.call(MonotonicInstant::after(ten_ms), b"0000call", &mut handles_to_send, &mut buf),
             Err(Status::TIMED_OUT)
         );
         // Despite not getting a response, the handles were sent so the handle slice
@@ -2061,7 +2071,7 @@ mod tests {
         let mut buf = MessageBuf::new();
         assert_eq!(
             p1.callv(
-                MonotonicTime::after(ten_ms),
+                MonotonicInstant::after(ten_ms),
                 &[ChannelIoSlice::new(b"00"), ChannelIoSlice::new(b"00call")],
                 &mut handles_to_send,
                 &mut buf
@@ -2092,7 +2102,7 @@ mod tests {
         let mut empty: Vec<HandleDisposition<'_>> = vec![];
         let mut buf = MessageBufEtc::new();
         assert_eq!(
-            p1.call_etc(MonotonicTime::after(ten_ms), b"0000call", &mut empty, &mut buf),
+            p1.call_etc(MonotonicInstant::after(ten_ms), b"0000call", &mut empty, &mut buf),
             Err(Status::TIMED_OUT)
         );
 
@@ -2115,7 +2125,7 @@ mod tests {
         let mut buf = MessageBufEtc::new();
         assert_eq!(
             p1.callv_etc(
-                MonotonicTime::after(ten_ms),
+                MonotonicInstant::after(ten_ms),
                 &[ChannelIoSlice::new(b"0"), ChannelIoSlice::new(b"000call")],
                 &mut empty,
                 &mut buf
@@ -2145,7 +2155,7 @@ mod tests {
             // resulting in tx being dropped, which will be noticed by the rx.
             p2.wait_handle(
                 Signals::CHANNEL_READABLE,
-                MonotonicTime::after(Duration::from_seconds(1)),
+                MonotonicInstant::after(Duration::from_seconds(1)),
             )
             .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
@@ -2171,7 +2181,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.call(
-            MonotonicTime::after(Duration::from_seconds(30)),
+            MonotonicInstant::after(Duration::from_seconds(30)),
             b"txidcall",
             &mut vec![],
             &mut buf,
@@ -2199,7 +2209,7 @@ mod tests {
             // resulting in tx being dropped, which will be noticed by the rx.
             p2.wait_handle(
                 Signals::CHANNEL_READABLE,
-                MonotonicTime::after(Duration::from_seconds(1)),
+                MonotonicInstant::after(Duration::from_seconds(1)),
             )
             .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
@@ -2225,7 +2235,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.callv(
-            MonotonicTime::after(Duration::from_seconds(30)),
+            MonotonicInstant::after(Duration::from_seconds(30)),
             &[ChannelIoSlice::new(b"txid"), ChannelIoSlice::new(b"call")],
             &mut vec![],
             &mut buf,
@@ -2253,7 +2263,7 @@ mod tests {
             // resulting in tx being dropped, which will be noticed by the rx.
             p2.wait_handle(
                 Signals::CHANNEL_READABLE,
-                MonotonicTime::after(Duration::from_seconds(1)),
+                MonotonicInstant::after(Duration::from_seconds(1)),
             )
             .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
@@ -2286,7 +2296,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.call_etc(
-            MonotonicTime::after(Duration::from_seconds(30)),
+            MonotonicInstant::after(Duration::from_seconds(30)),
             b"txidcall",
             &mut handle_dispositions,
             &mut buf,
@@ -2317,7 +2327,7 @@ mod tests {
             // resulting in tx being dropped, which will be noticed by the rx.
             p2.wait_handle(
                 Signals::CHANNEL_READABLE,
-                MonotonicTime::after(Duration::from_seconds(1)),
+                MonotonicInstant::after(Duration::from_seconds(1)),
             )
             .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
@@ -2350,7 +2360,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.callv_etc(
-            MonotonicTime::after(Duration::from_seconds(30)),
+            MonotonicInstant::after(Duration::from_seconds(30)),
             &[ChannelIoSlice::new(b"txi"), ChannelIoSlice::new(b"dcall")],
             &mut handle_dispositions,
             &mut buf,
@@ -2389,7 +2399,7 @@ mod tests {
         ];
 
         send.call_etc(
-            MonotonicTime::INFINITE,
+            MonotonicInstant::INFINITE,
             &[0, 0, 0, 0],
             &mut handles,
             &mut MessageBufEtc::default(),
@@ -2428,7 +2438,7 @@ mod tests {
         ];
 
         send.callv_etc(
-            MonotonicTime::INFINITE,
+            MonotonicInstant::INFINITE,
             &[ChannelIoSlice::new(&[0, 0]), ChannelIoSlice::new(&[0, 0])],
             &mut handles,
             &mut MessageBufEtc::default(),

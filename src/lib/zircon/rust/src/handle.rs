@@ -5,7 +5,7 @@
 //! Type-safe bindings for Zircon handles.
 //!
 use crate::{
-    object_get_info_single, object_get_property, object_set_property, ok, MonotonicTime, Name,
+    object_get_info_single, object_get_property, object_set_property, ok, MonotonicInstant, Name,
     ObjectQuery, Port, Property, PropertyQuery, Rights, Signals, Status, Topic, WaitAsyncOpts,
 };
 use fuchsia_zircon_sys as sys;
@@ -172,7 +172,7 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
         ok(status)
     }
 
-    pub fn wait(&self, signals: Signals, deadline: MonotonicTime) -> Result<Signals, Status> {
+    pub fn wait(&self, signals: Signals, deadline: MonotonicInstant) -> Result<Signals, Status> {
         let mut pending = Signals::empty().bits();
         let status = unsafe {
             sys::zx_object_wait_one(
@@ -236,7 +236,7 @@ pub trait AsHandleRef {
     /// Waits on a handle. Wraps the
     /// [zx_object_wait_one](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_wait_one.md)
     /// syscall.
-    fn wait_handle(&self, signals: Signals, deadline: MonotonicTime) -> Result<Signals, Status> {
+    fn wait_handle(&self, signals: Signals, deadline: MonotonicInstant) -> Result<Signals, Status> {
         self.as_handle_ref().wait(signals, deadline)
     }
 
@@ -395,7 +395,7 @@ pub trait Peered: HandleBased {
     /// errors. Note that `Status::TIMED_OUT` errors are converted to `Ok(false)` and all other
     /// errors are propagated.
     fn is_closed(&self) -> Result<bool, Status> {
-        match self.wait_handle(Signals::OBJECT_PEER_CLOSED, MonotonicTime::INFINITE_PAST) {
+        match self.wait_handle(Signals::OBJECT_PEER_CLOSED, MonotonicInstant::INFINITE_PAST) {
             Ok(signals) => Ok(signals.contains(Signals::OBJECT_PEER_CLOSED)),
             Err(Status::TIMED_OUT) => Ok(false),
             Err(e) => Err(e),

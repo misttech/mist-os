@@ -340,8 +340,8 @@ mod tests {
     use crate::sys::ZX_RIGHT_SAME_RIGHTS;
     use crate::INFO_VEC_SIZE_INITIAL;
     use fuchsia_zircon::{
-        sys, AsHandleRef, Duration, Job, JobAction, JobCondition, JobCriticalOptions,
-        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, Signals, Task, Time,
+        sys, AsHandleRef, Duration, Instant, Job, JobAction, JobCondition, JobCriticalOptions,
+        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, Signals, Task,
     };
     use std::collections::HashSet;
     use std::ffi::CString;
@@ -375,7 +375,7 @@ mod tests {
         );
 
         job.kill().expect("Failed to kill job");
-        job.wait_handle(Signals::TASK_TERMINATED, Time::INFINITE).unwrap();
+        job.wait_handle(Signals::TASK_TERMINATED, Instant::INFINITE).unwrap();
 
         let info = job.info().unwrap();
         assert_eq!(

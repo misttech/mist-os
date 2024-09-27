@@ -173,7 +173,7 @@ mod tests {
             }
         });
 
-        let packet = port.wait(zx::MonotonicTime::INFINITE).unwrap();
+        let packet = port.wait(zx::MonotonicInstant::INFINITE).unwrap();
         assert_eq!(packet.key(), KEY);
         match packet.contents() {
             zx::PacketContents::Pager(request) => {
@@ -207,7 +207,7 @@ mod tests {
             }
         });
 
-        let packet = port.wait(zx::MonotonicTime::INFINITE).unwrap();
+        let packet = port.wait(zx::MonotonicInstant::INFINITE).unwrap();
         assert_eq!(packet.key(), KEY);
         match packet.contents() {
             zx::PacketContents::Pager(request) => {
@@ -245,7 +245,7 @@ mod tests {
             }
         });
 
-        let packet = port.wait(zx::MonotonicTime::INFINITE).unwrap();
+        let packet = port.wait(zx::MonotonicInstant::INFINITE).unwrap();
         assert_eq!(packet.key(), KEY);
         match packet.contents() {
             zx::PacketContents::Pager(request) => {
@@ -260,7 +260,7 @@ mod tests {
             packet => panic!("Unexpected packet: {:?}", packet),
         }
 
-        let packet = port.wait(zx::MonotonicTime::INFINITE).unwrap();
+        let packet = port.wait(zx::MonotonicInstant::INFINITE).unwrap();
         assert_eq!(packet.key(), KEY);
         match packet.contents() {
             zx::PacketContents::Pager(request) => {

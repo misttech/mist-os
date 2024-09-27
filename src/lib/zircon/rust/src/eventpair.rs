@@ -41,7 +41,7 @@ impl EventPair {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Duration, MonotonicTime, Signals, Status};
+    use crate::{Duration, MonotonicInstant, Signals, Status};
 
     #[test]
     fn wait_and_signal_peer() {
@@ -50,27 +50,27 @@ mod tests {
 
         // Waiting on one without setting any signal should time out.
         assert_eq!(
-            p2.wait_handle(Signals::USER_0, MonotonicTime::after(eighty_ms)),
+            p2.wait_handle(Signals::USER_0, MonotonicInstant::after(eighty_ms)),
             Err(Status::TIMED_OUT)
         );
 
         // If we set a signal, we should be able to wait for it.
         assert!(p1.signal_peer(Signals::NONE, Signals::USER_0).is_ok());
         assert_eq!(
-            p2.wait_handle(Signals::USER_0, MonotonicTime::after(eighty_ms)).unwrap(),
+            p2.wait_handle(Signals::USER_0, MonotonicInstant::after(eighty_ms)).unwrap(),
             Signals::USER_0
         );
 
         // Should still work, signals aren't automatically cleared.
         assert_eq!(
-            p2.wait_handle(Signals::USER_0, MonotonicTime::after(eighty_ms)).unwrap(),
+            p2.wait_handle(Signals::USER_0, MonotonicInstant::after(eighty_ms)).unwrap(),
             Signals::USER_0
         );
 
         // Now clear it, and waiting should time out again.
         assert!(p1.signal_peer(Signals::USER_0, Signals::NONE).is_ok());
         assert_eq!(
-            p2.wait_handle(Signals::USER_0, MonotonicTime::after(eighty_ms)),
+            p2.wait_handle(Signals::USER_0, MonotonicInstant::after(eighty_ms)),
             Err(Status::TIMED_OUT)
         );
     }

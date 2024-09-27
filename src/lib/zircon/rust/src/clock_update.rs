@@ -12,7 +12,7 @@
 //! clock.update(update).expect("update failed");
 //! ```
 
-use crate::{Time, Timeline};
+use crate::{Instant, Timeline};
 use fuchsia_zircon_sys as sys;
 use std::fmt::Debug;
 
@@ -26,8 +26,8 @@ pub trait State {
 pub trait ValueState: State {
     type ReferenceTimeline: Timeline;
     type OutputTimeline: Timeline;
-    fn reference_value(&self) -> Option<Time<Self::ReferenceTimeline>>;
-    fn synthetic_value(&self) -> Option<Time<Self::OutputTimeline>>;
+    fn reference_value(&self) -> Option<Instant<Self::ReferenceTimeline>>;
+    fn synthetic_value(&self) -> Option<Instant<Self::OutputTimeline>>;
 }
 
 /// A trait implemented by states that describe how to set a clock rate.
@@ -50,10 +50,10 @@ impl<R: Timeline, O: Timeline> State for Null<R, O> {
 impl<R: Timeline, O: Timeline> ValueState for Null<R, O> {
     type ReferenceTimeline = R;
     type OutputTimeline = O;
-    fn reference_value(&self) -> Option<Time<R>> {
+    fn reference_value(&self) -> Option<Instant<R>> {
         None
     }
-    fn synthetic_value(&self) -> Option<Time<O>> {
+    fn synthetic_value(&self) -> Option<Instant<O>> {
         None
     }
 }
@@ -71,8 +71,8 @@ impl<R: Timeline, O: Timeline> ErrorState for Null<R, O> {
 /// A `ClockUpdateBuilder` state indicating value should be set using a
 /// (reference time, synthetic time) tuple.
 pub struct AbsoluteValue<R, O> {
-    reference_value: Time<R>,
-    synthetic_value: Time<O>,
+    reference_value: Instant<R>,
+    synthetic_value: Instant<O>,
 }
 
 impl<R: Timeline + Copy, O: Timeline + Copy> State for AbsoluteValue<R, O> {
@@ -86,16 +86,16 @@ impl<R: Timeline + Copy, O: Timeline + Copy> State for AbsoluteValue<R, O> {
 impl<R: Timeline + Copy, O: Timeline + Copy> ValueState for AbsoluteValue<R, O> {
     type ReferenceTimeline = R;
     type OutputTimeline = O;
-    fn reference_value(&self) -> Option<Time<R>> {
+    fn reference_value(&self) -> Option<Instant<R>> {
         Some(self.reference_value)
     }
-    fn synthetic_value(&self) -> Option<Time<O>> {
+    fn synthetic_value(&self) -> Option<Instant<O>> {
         Some(self.synthetic_value)
     }
 }
 
 /// A `ClockUpdateBuilder` state indicating value should be set using only a synthetic time.
-pub struct ApproximateValue<R, O>(Time<O>, std::marker::PhantomData<R>);
+pub struct ApproximateValue<R, O>(Instant<O>, std::marker::PhantomData<R>);
 
 impl<R: Timeline + Copy, O: Timeline + Copy> State for ApproximateValue<R, O> {
     #[inline]
@@ -107,10 +107,10 @@ impl<R: Timeline + Copy, O: Timeline + Copy> State for ApproximateValue<R, O> {
 impl<R: Timeline + Copy, O: Timeline + Copy> ValueState for ApproximateValue<R, O> {
     type ReferenceTimeline = R;
     type OutputTimeline = O;
-    fn reference_value(&self) -> Option<Time<R>> {
+    fn reference_value(&self) -> Option<Instant<R>> {
         None
     }
-    fn synthetic_value(&self) -> Option<Time<O>> {
+    fn synthetic_value(&self) -> Option<Instant<O>> {
         Some(self.0)
     }
 }
@@ -198,8 +198,8 @@ impl<Rate: RateState, Err: ErrorState, Ref: Timeline, Out: Timeline>
     #[inline]
     pub fn absolute_value(
         self,
-        reference_value: Time<Ref>,
-        synthetic_value: Time<Out>,
+        reference_value: Instant<Ref>,
+        synthetic_value: Instant<Out>,
     ) -> ClockUpdateBuilder<AbsoluteValue<Ref, Out>, Rate, Err, Ref, Out> {
         ClockUpdateBuilder {
             value_state: AbsoluteValue { reference_value, synthetic_value },
@@ -223,7 +223,7 @@ impl<Err: ErrorState, Ref: Timeline, Out: Timeline>
     #[inline]
     pub fn approximate_value(
         self,
-        synthetic_value: Time<Out>,
+        synthetic_value: Instant<Out>,
     ) -> ClockUpdateBuilder<ApproximateValue<Ref, Out>, Null<Ref, Out>, Err, Ref, Out> {
         ClockUpdateBuilder {
             value_state: ApproximateValue(synthetic_value, std::marker::PhantomData),
@@ -299,8 +299,8 @@ impl<Val: ValueState, Rate: RateState, Ref: Timeline, Out: Timeline>
 pub struct ClockUpdate<Reference, Output> {
     options: u64,
     rate_adjust: i32,
-    synthetic_value: Time<Output>,
-    reference_value: Time<Reference>,
+    synthetic_value: Instant<Output>,
+    reference_value: Instant<Reference>,
     error_bound: u64,
 }
 
@@ -360,7 +360,7 @@ impl<Reference: Timeline, Output: Timeline> From<ClockUpdate<Reference, Output>>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MonotonicTime, MonotonicTimeline, SyntheticTime, SyntheticTimeline};
+    use crate::{MonotonicInstant, MonotonicTimeline, SyntheticInstant, SyntheticTimeline};
 
     #[test]
     fn empty_update() {
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn approximate_value() {
         let update = ClockUpdateBuilder::<_, _, _, MonotonicTimeline, SyntheticTimeline>::new()
-            .approximate_value(SyntheticTime::from_nanos(42))
+            .approximate_value(SyntheticInstant::from_nanos(42))
             .error_bounds(62)
             .build();
         assert_eq!(
@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn absolute_value() {
         let update = ClockUpdateBuilder::<_, _, _, MonotonicTimeline, SyntheticTimeline>::new()
-            .absolute_value(MonotonicTime::from_nanos(1000), SyntheticTime::from_nanos(42))
+            .absolute_value(MonotonicInstant::from_nanos(1000), SyntheticInstant::from_nanos(42))
             .rate_adjust(52)
             .error_bounds(62)
             .build();

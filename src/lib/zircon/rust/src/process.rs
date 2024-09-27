@@ -333,8 +333,8 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_zircon::sys::ZX_RIGHT_NONE;
     use fuchsia_zircon::{
-        sys, system_get_page_size, AsHandleRef, Handle, MapDetails, ProcessInfo, ProcessInfoFlags,
-        ProcessOptions, Signals, Task, TaskStatsInfo, Time, VmarFlags, Vmo,
+        sys, system_get_page_size, AsHandleRef, Handle, Instant, MapDetails, ProcessInfo,
+        ProcessInfoFlags, ProcessOptions, Signals, Task, TaskStatsInfo, VmarFlags, Vmo,
     };
     use std::ffi::CString;
 
@@ -392,7 +392,7 @@ mod tests {
         .expect("Failed to spawn process");
 
         process
-            .wait_handle(Signals::PROCESS_TERMINATED, Time::INFINITE)
+            .wait_handle(Signals::PROCESS_TERMINATED, Instant::INFINITE)
             .expect("Wait for process termination failed");
         let info = process.info().unwrap();
         const STARTED_AND_EXITED: u32 =
@@ -433,7 +433,7 @@ mod tests {
 
         process.kill().expect("Failed to kill process");
         process
-            .wait_handle(Signals::PROCESS_TERMINATED, Time::INFINITE)
+            .wait_handle(Signals::PROCESS_TERMINATED, Instant::INFINITE)
             .expect("Wait for process termination failed");
 
         let info = process.info().unwrap();
@@ -622,7 +622,7 @@ mod tests {
         );
 
         process.kill().unwrap();
-        process.wait_handle(Signals::TASK_TERMINATED, Time::INFINITE).unwrap();
+        process.wait_handle(Signals::TASK_TERMINATED, Instant::INFINITE).unwrap();
 
         drop(thread1_suspended);
         drop(thread2_suspended);

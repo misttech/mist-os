@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{sys, HandleRef, MonotonicTime, Signals, Status};
+use crate::{sys, HandleRef, MonotonicInstant, Signals, Status};
 
 /// A "wait item" containing a handle reference and information about what signals
 /// to wait on, and, on return from `object_wait_many`, which are pending.
@@ -26,7 +26,7 @@ pub struct WaitItem<'a> {
 /// syscall.
 pub fn object_wait_many(
     items: &mut [WaitItem<'_>],
-    deadline: MonotonicTime,
+    deadline: MonotonicInstant,
 ) -> Result<bool, Status> {
     let items_ptr = items.as_mut_ptr().cast::<sys::zx_wait_item_t>();
     let status = unsafe { sys::zx_object_wait_many(items_ptr, items.len(), deadline.into_nanos()) };
@@ -48,27 +48,27 @@ mod tests {
 
         // Waiting on it without setting any signal should time out.
         assert_eq!(
-            event.wait_handle(Signals::USER_0, MonotonicTime::after(ten_ms)),
+            event.wait_handle(Signals::USER_0, MonotonicInstant::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
 
         // If we set a signal, we should be able to wait for it.
         assert!(event.signal_handle(Signals::NONE, Signals::USER_0).is_ok());
         assert_eq!(
-            event.wait_handle(Signals::USER_0, MonotonicTime::after(ten_ms)).unwrap(),
+            event.wait_handle(Signals::USER_0, MonotonicInstant::after(ten_ms)).unwrap(),
             Signals::USER_0
         );
 
         // Should still work, signals aren't automatically cleared.
         assert_eq!(
-            event.wait_handle(Signals::USER_0, MonotonicTime::after(ten_ms)).unwrap(),
+            event.wait_handle(Signals::USER_0, MonotonicInstant::after(ten_ms)).unwrap(),
             Signals::USER_0
         );
 
         // Now clear it, and waiting should time out again.
         assert!(event.signal_handle(Signals::USER_0, Signals::NONE).is_ok());
         assert_eq!(
-            event.wait_handle(Signals::USER_0, MonotonicTime::after(ten_ms)),
+            event.wait_handle(Signals::USER_0, MonotonicInstant::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
     }
@@ -93,7 +93,7 @@ mod tests {
             },
         ];
         assert_eq!(
-            object_wait_many(&mut items, MonotonicTime::after(ten_ms)),
+            object_wait_many(&mut items, MonotonicInstant::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
         assert_eq!(items[0].pending, Signals::NONE);
@@ -101,13 +101,13 @@ mod tests {
 
         // Signal one object and it should return success.
         assert!(e1.signal_handle(Signals::NONE, Signals::USER_0).is_ok());
-        assert!(object_wait_many(&mut items, MonotonicTime::after(ten_ms)).is_ok());
+        assert!(object_wait_many(&mut items, MonotonicInstant::after(ten_ms)).is_ok());
         assert_eq!(items[0].pending, Signals::USER_0);
         assert_eq!(items[1].pending, Signals::NONE);
 
         // Signal the other and it should return both.
         assert!(e2.signal_handle(Signals::NONE, Signals::USER_1).is_ok());
-        assert!(object_wait_many(&mut items, MonotonicTime::after(ten_ms)).is_ok());
+        assert!(object_wait_many(&mut items, MonotonicInstant::after(ten_ms)).is_ok());
         assert_eq!(items[0].pending, Signals::USER_0);
         assert_eq!(items[1].pending, Signals::USER_1);
 
@@ -115,7 +115,7 @@ mod tests {
         assert!(e1.signal_handle(Signals::USER_0, Signals::NONE).is_ok());
         assert!(e2.signal_handle(Signals::USER_1, Signals::NONE).is_ok());
         assert_eq!(
-            object_wait_many(&mut items, MonotonicTime::after(ten_ms)),
+            object_wait_many(&mut items, MonotonicInstant::after(ten_ms)),
             Err(Status::TIMED_OUT)
         );
         assert_eq!(items[0].pending, Signals::NONE);

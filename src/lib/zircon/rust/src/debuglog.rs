@@ -4,7 +4,7 @@
 
 //! Type-safe bindings for Zircon resources.
 
-use crate::{ok, AsHandleRef, BootTime, Handle, HandleBased, HandleRef, Koid, Resource, Status};
+use crate::{ok, AsHandleRef, BootInstant, Handle, HandleBased, HandleRef, Koid, Resource, Status};
 use bitflags::bitflags;
 use bstr::BStr;
 use fuchsia_zircon_sys as sys;
@@ -85,7 +85,7 @@ impl DebugLog {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct DebugLogRecord {
     pub sequence: u64,
-    pub timestamp: BootTime,
+    pub timestamp: BootInstant,
     pub severity: DebugLogSeverity,
     pub pid: Koid,
     pub tid: Koid,
@@ -99,7 +99,7 @@ impl DebugLogRecord {
     pub fn from_raw(raw: &sys::zx_log_record_t) -> Result<Self, Status> {
         if raw.datalen <= sys::ZX_LOG_RECORD_DATA_MAX as u16 {
             Ok(Self {
-                timestamp: BootTime::from_nanos(raw.timestamp),
+                timestamp: BootInstant::from_nanos(raw.timestamp),
                 sequence: raw.sequence,
                 severity: DebugLogSeverity::from_raw(raw.severity),
                 pid: Koid::from_raw(raw.pid),
@@ -155,7 +155,7 @@ impl DebugLogSeverity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{cprng_draw, Signals, Time};
+    use crate::{cprng_draw, Instant, Signals};
     use fidl_fuchsia_kernel as fkernel;
     use fuchsia_component::client::connect_channel_to_protocol;
 
@@ -168,7 +168,7 @@ mod tests {
         connect_channel_to_protocol::<fkernel::DebuglogResourceMarker>(server_end).unwrap();
         let service = fkernel::DebuglogResourceSynchronousProxy::new(client_end);
         let resource = service
-            .get(fuchsia_zircon::MonotonicTime::INFINITE)
+            .get(fuchsia_zircon::MonotonicInstant::INFINITE)
             .expect("couldn't get debuglog resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
@@ -185,7 +185,7 @@ mod tests {
                 }
                 Err(status) if status == Status::SHOULD_WAIT => {
                     debuglog
-                        .wait_handle(Signals::LOG_READABLE, Time::INFINITE)
+                        .wait_handle(Signals::LOG_READABLE, Instant::INFINITE)
                         .expect("Failed to wait for log readable");
                     continue;
                 }
