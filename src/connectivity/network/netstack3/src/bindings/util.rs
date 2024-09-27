@@ -300,8 +300,10 @@ pub(crate) trait IntoFidl<F> {
 
 impl<C: TryIntoFidl<F, Error = Never>, F> IntoFidl<F> for C {
     fn into_fidl(self) -> F {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self.try_into_fidl() {
             Ok(f) => f,
+            Err(never) => match never {},
         }
     }
 }
@@ -345,8 +347,10 @@ pub(crate) trait IntoCore<C> {
 
 impl<F, C: TryFromFidl<F, Error = Never>> IntoCore<C> for F {
     fn into_core(self) -> C {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self.try_into_core() {
             Ok(c) => c,
+            Err(never) => match never {},
         }
     }
 }
@@ -730,8 +734,10 @@ pub(crate) trait IntoFidlWithContext<F> {
 
 impl<C: TryIntoFidlWithContext<F, Error = Never>, F> IntoFidlWithContext<F> for C {
     fn into_fidl_with_ctx<X: ConversionContext>(self, ctx: &X) -> F {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match self.try_into_fidl_with_ctx(ctx) {
             Ok(f) => f,
+            Err(never) => match never {},
         }
     }
 }
