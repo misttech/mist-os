@@ -37,8 +37,8 @@ group("sdk_category_partner_allowlist") {
   ]
 }
 group("sdk_category_internal_allowlist") {
-  # See https://fxbug.dev/333125197 and https://fxbug.dev/331961405. This can be
-  # removed once the "internal IDK" is eliminated.
+  # See https://fxbug.dev/333125197 and https://fxbug.dev/331961405.
+  # TODO(https://fxbug.dev/333907192) Remove once @internal_sdk is eliminated.
   visibility = [
     "//src/devices/lib/mmio/*",
     "//src/devices/testing/*",

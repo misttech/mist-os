@@ -858,7 +858,7 @@ sdk_molecule("core_licenses") {
 #
 # BEGIN @internal_sdk
 # DO NOT ADD anything here! This will soon be removed.
-# See https://fxbug.dev/333907106.
+# See https://fxbug.dev/333907192.
 #
 
 # This SDK molecule is a collection of libraries only available to the in-tree

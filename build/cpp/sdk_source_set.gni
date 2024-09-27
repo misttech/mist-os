@@ -83,7 +83,7 @@ template("sdk_source_set") {
   valid_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333125197): Disable once @internal_sdk
+    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
                  # is removed.
 
     # "cts" is only for ABI compatibility and thus not applicable.

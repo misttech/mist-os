@@ -180,7 +180,8 @@ template("sdk_atom") {
   _allowed_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",
+    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
+                 # is removed.
     "cts",
     "partner_internal",
     "partner",
