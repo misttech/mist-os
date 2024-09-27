@@ -694,6 +694,12 @@ impl vfs::node::Node for FxDirectory {
                 gid: props.posix_attributes.map(|a| a.gid),
                 rdev: props.posix_attributes.map(|a| a.rdev),
                 casefold: self.directory.casefold(),
+                selinux_context: self
+                    .directory
+                    .handle()
+                    .get_inline_selinux_context()
+                    .await
+                    .map_err(map_to_status)?,
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
@@ -2385,6 +2391,181 @@ mod tests {
             .map_err(zx::ok)
             .expect("get_attributes failed");
         assert!(immutable_attributes_after_update.change_time > immutable_attributes.change_time);
+        fixture.close().await;
+    }
+
+    async fn open_to_get_selinux_context(
+        root_dir: &fio::DirectoryProxy,
+        path: &str,
+        protocol: fio::Flags,
+    ) -> Option<fio::SelinuxContext> {
+        // Reopen, querying for the value.
+        let flags =
+            protocol | fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PERM_GET_ATTRIBUTES;
+        let options = fio::Options {
+            attributes: Some(fio::NodeAttributesQuery::SELINUX_CONTEXT),
+            ..Default::default()
+        };
+        let (node, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+        root_dir.open3(path, flags, &options, server_end.into_channel()).expect("Reopening node");
+        let repr = node
+            .take_event_stream()
+            .next()
+            .await
+            .expect("Need representation")
+            .expect("Failed to read")
+            .into_on_representation()
+            .unwrap();
+        match repr {
+            fio::Representation::Directory(fio::DirectoryInfo {
+                attributes: Some(attr), ..
+            })
+            | fio::Representation::File(fio::FileInfo { attributes: Some(attr), .. })
+            | fio::Representation::Symlink(fio::SymlinkInfo { attributes: Some(attr), .. }) => {
+                attr.mutable_attributes.selinux_context
+            }
+            _ => panic!("Wrong type returned."),
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_selinux_context_via_open() {
+        const CONTEXT: &str = "valid";
+        const CONTEXT2: &str = "also_valid";
+        let node_info: Vec<(&str, fio::Flags)> =
+            vec![("dir", fio::Flags::PROTOCOL_DIRECTORY), ("file", fio::Flags::PROTOCOL_FILE)];
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.root();
+
+            for (path, protocol) in node_info {
+                // Create node with the context.
+                let flags =
+                    protocol | fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::FLAG_MAYBE_CREATE;
+                let options = fio::Options {
+                    create_attributes: Some(fio::MutableNodeAttributes {
+                        selinux_context: Some(fio::SelinuxContext::Data(CONTEXT.into())),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+                let (node, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+                root_dir
+                    .open3(path, flags, &options, server_end.into_channel())
+                    .expect("Creating node");
+                // Check event stream to allow the creation to complete.
+                assert!(node
+                    .take_event_stream()
+                    .next()
+                    .await
+                    .expect("Need representation")
+                    .expect("Failed to read")
+                    .into_on_representation()
+                    .is_some());
+
+                // Fetches the set value just fine.
+                assert_eq!(
+                    open_to_get_selinux_context(&root_dir, &path, protocol).await,
+                    Some(fio::SelinuxContext::Data(CONTEXT.into()))
+                );
+
+                // See that it is synced with the xattr.
+                node.set_extended_attribute(
+                    fio::SELINUX_CONTEXT_NAME.as_bytes(),
+                    fio::ExtendedAttributeValue::Bytes(CONTEXT2.into()),
+                    fio::SetExtendedAttributeMode::Replace,
+                )
+                .await
+                .unwrap()
+                .expect("Updating xattr");
+                assert_eq!(
+                    open_to_get_selinux_context(&root_dir, &path, protocol).await,
+                    Some(fio::SelinuxContext::Data(CONTEXT2.into()))
+                );
+
+                // Make it too long so that it must use the xattr interface.
+                let vmo = zx::Vmo::create(4000).expect("Creating VMO");
+                node.set_extended_attribute(
+                    fio::SELINUX_CONTEXT_NAME.as_bytes(),
+                    fio::ExtendedAttributeValue::Buffer(vmo),
+                    fio::SetExtendedAttributeMode::Replace,
+                )
+                .await
+                .unwrap()
+                .expect("Updating xattr");
+                assert_matches!(
+                    open_to_get_selinux_context(&root_dir, &path, protocol).await,
+                    Some(fio::SelinuxContext::UseExtendedAttributes(fio::EmptyStruct {}))
+                );
+
+                node.remove_extended_attribute(fio::SELINUX_CONTEXT_NAME.as_bytes())
+                    .await
+                    .unwrap()
+                    .expect("Deleting xattr");
+                assert_matches!(
+                    open_to_get_selinux_context(&root_dir, &path, protocol).await,
+                    None
+                );
+            }
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_selinux_context_via_open_symlink() {
+        const CONTEXT: &str = "valid";
+        let fixture = TestFixture::new().await;
+        {
+            let path = "symlink";
+            let root_dir = fixture.root();
+            // Create node with the context.
+            let (node, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+            root_dir
+                .create_symlink(path, ".".as_bytes(), Some(server_end))
+                .await
+                .expect("Fidl query")
+                .expect("Create symlink");
+
+            node.set_extended_attribute(
+                fio::SELINUX_CONTEXT_NAME.as_bytes(),
+                fio::ExtendedAttributeValue::Bytes(CONTEXT.into()),
+                fio::SetExtendedAttributeMode::Create,
+            )
+            .await
+            .unwrap()
+            .expect("Updating xattr");
+
+            // Fetches the set value just fine.
+            assert_eq!(
+                open_to_get_selinux_context(&root_dir, &path, fio::Flags::PROTOCOL_SYMLINK).await,
+                Some(fio::SelinuxContext::Data(CONTEXT.into()))
+            );
+
+            // Make it too long so that it must use the xattr interface.
+            let vmo = zx::Vmo::create(4000).expect("Creating VMO");
+            node.set_extended_attribute(
+                fio::SELINUX_CONTEXT_NAME.as_bytes(),
+                fio::ExtendedAttributeValue::Buffer(vmo),
+                fio::SetExtendedAttributeMode::Replace,
+            )
+            .await
+            .unwrap()
+            .expect("Updating xattr");
+            assert_matches!(
+                open_to_get_selinux_context(&root_dir, &path, fio::Flags::PROTOCOL_SYMLINK).await,
+                Some(fio::SelinuxContext::UseExtendedAttributes(fio::EmptyStruct {}))
+            );
+
+            // Erase it comes back with empty string.
+            node.remove_extended_attribute(fio::SELINUX_CONTEXT_NAME.as_bytes())
+                .await
+                .unwrap()
+                .expect("Deleting xattr");
+            assert_matches!(
+                open_to_get_selinux_context(&root_dir, &path, fio::Flags::PROTOCOL_SYMLINK).await,
+                None
+            );
+        }
         fixture.close().await;
     }
 

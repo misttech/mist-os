@@ -285,6 +285,12 @@ impl vfs::node::Node for FxFile {
                 uid: props.posix_attributes.map(|a| a.uid),
                 gid: props.posix_attributes.map(|a| a.gid),
                 rdev: props.posix_attributes.map(|a| a.rdev),
+                selinux_context: self
+                    .handle
+                    .uncached_handle()
+                    .get_inline_selinux_context()
+                    .await
+                    .map_err(map_to_status)?,
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,

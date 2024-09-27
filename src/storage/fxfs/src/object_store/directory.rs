@@ -69,6 +69,10 @@ impl<S: HandleOwner> Directory<S> {
         self.handle.store()
     }
 
+    pub fn handle(&self) -> &StoreObjectHandle<S> {
+        &self.handle
+    }
+
     pub fn is_deleted(&self) -> bool {
         self.is_deleted.load(Ordering::Relaxed)
     }
