@@ -44,6 +44,7 @@ use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketBuilder};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6;
 use policy_testing_common::with_netcfg_owned_device;
+use test_case::test_case;
 
 #[netstack_test]
 #[variant(N, Netstack)]
@@ -139,19 +140,123 @@ async fn poll_lookup_admin<
     )
 }
 
+/// Keep polling the DnsServerWatcher's DNS servers until it returns `expect`.
+async fn poll_dns_server_watcher<
+    F: Unpin + FusedFuture + Future<Output = Result<component_events::events::Stopped>>,
+>(
+    dns_server_watcher_proxy: &net_name::DnsServerWatcherProxy,
+    expect: &[fnet::SocketAddress],
+    mut wait_for_netmgr_fut: &mut F,
+    wait_duration: zx::Duration,
+) {
+    loop {
+        let () = futures::select! {
+            servers = dns_server_watcher_proxy.watch_servers() => {
+                match servers {
+                    Ok(servers) => {
+                        let servers: Vec<_> = servers
+                            .into_iter()
+                            .filter_map(|server| server.address)
+                            .collect();
+                        if servers == expect {
+                            return;
+                        }
+                    }
+                    Err(e) => panic!("received an error from DnsServerWatcher {e:?}"),
+                };
+            },
+            () = fuchsia_async::Timer::new(wait_duration.after_now()).fuse() => {
+                panic!("timed out waiting for DNS server list");
+            }
+            stopped_event = wait_for_netmgr_fut => {
+                panic!(
+                    "the network manager unexpectedly exited with event: {:?}",
+                    stopped_event,
+                )
+            },
+        };
+    }
+}
+
+enum DnsCheckType {
+    LookupAdmin {
+        /// Duration to sleep between polls.
+        poll_wait: zx::Duration,
+        /// Maximum number of times to poll `LookupAdmin` to check
+        // whether the DNS configuration succeeded.
+        retry_count: u64,
+    },
+    DnsServerWatcher {
+        /// The maximum Duration to wait for a response from the
+        /// `DnsServerWatcher` hanging get to determine whether the
+        /// DNS configuration succeeded.
+        wait_duration: zx::Duration,
+    },
+}
+
+impl DnsCheckType {
+    fn lookup_admin() -> Self {
+        Self::LookupAdmin { poll_wait: zx::Duration::from_seconds(1), retry_count: 60 }
+    }
+
+    fn dns_server_watcher() -> Self {
+        Self::DnsServerWatcher { wait_duration: ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT }
+    }
+
+    // Determine whether the DNS servers are present given the CheckType.
+    async fn evaluate_check<
+        'a,
+        F: Unpin + FusedFuture + Future<Output = Result<component_events::events::Stopped>>,
+    >(
+        self,
+        realm: &netemul::TestRealm<'a>,
+        mut wait_for_netmgr: &mut F,
+        expect: &[fnet::SocketAddress],
+    ) {
+        match self {
+            DnsCheckType::LookupAdmin { poll_wait, retry_count } => {
+                // Poll LookupAdmin until we get the servers
+                // we want or after too many tries.
+                let lookup_admin = realm
+                    .connect_to_protocol::<net_name::LookupAdminMarker>()
+                    .expect("failed to connect to LookupAdmin");
+                poll_lookup_admin(
+                    &lookup_admin,
+                    &expect,
+                    &mut wait_for_netmgr,
+                    poll_wait,
+                    retry_count,
+                )
+                .await
+            }
+            DnsCheckType::DnsServerWatcher { wait_duration } => {
+                // Poll DnsServerWatcher hanging get until we
+                // get the servers we want or after too long.
+                let dns_server_watcher = realm
+                    .connect_to_protocol::<net_name::DnsServerWatcherMarker>()
+                    .expect("failed to connect to DnsServerWatcher");
+                poll_dns_server_watcher(
+                    &dns_server_watcher,
+                    &expect,
+                    &mut wait_for_netmgr,
+                    wait_duration,
+                )
+                .await
+            }
+        }
+    }
+}
+
 /// Tests that Netstack exposes DNS servers discovered through NDP and NetworkManager
-/// configures the Lookup service.
+/// appropriately publishes the DNS servers.
 #[netstack_test]
 #[variant(M, Manager)]
 #[variant(N, Netstack)]
-async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str) {
+#[test_case(DnsCheckType::lookup_admin(); "lookup_admin")]
+#[test_case(DnsCheckType::dns_server_watcher(); "dns_server_watcher")]
+async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str, check_type: DnsCheckType) {
     /// DNS server served by NDP.
     const NDP_DNS_SERVER: fnet::Ipv6Address = fidl_ip_v6!("20a::1234:5678");
-    /// Maximum number of times we'll poll `LookupAdmin` to check DNS configuration
-    /// succeeded.
-    const RETRY_COUNT: u64 = 60;
-    /// Duration to sleep between polls.
-    const POLL_WAIT: zx::Duration = zx::Duration::from_seconds(1);
 
     const DEFAULT_DNS_PORT: u16 = 53;
 
@@ -200,31 +305,24 @@ async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str) {
         zone_index: 0,
     })];
 
-    // Poll LookupAdmin until we get the servers we want or after too many tries.
-    let lookup_admin = client_realm
-        .connect_to_protocol::<net_name::LookupAdminMarker>()
-        .expect("failed to connect to LookupAdmin");
     let wait_for_netmgr =
         wait_for_component_stopped(&client_realm, M::MANAGEMENT_AGENT.get_component_name(), None)
             .fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
-    poll_lookup_admin(&lookup_admin, &expect, &mut wait_for_netmgr, POLL_WAIT, RETRY_COUNT).await
+    check_type.evaluate_check(&client_realm, &mut wait_for_netmgr, &expect).await
 }
 
-/// Tests that Netstack exposes DNS servers discovered through DHCPv4 and NetworkManager
-/// configures the Lookup service.
+/// Tests that DHCPv4 exposes DNS servers discovered through DHCPv4 and NetworkManager
+/// appropriately publishes the DNS servers.
 #[netstack_test]
 #[variant(M, Manager)]
 #[variant(N, Netstack)]
-async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str) {
+#[test_case(DnsCheckType::lookup_admin(); "lookup_admin")]
+#[test_case(DnsCheckType::dns_server_watcher(); "dns_server_watcher")]
+async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str, check_type: DnsCheckType) {
     const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
     /// DNS server served by DHCP.
     const DHCP_DNS_SERVER: fnet::Ipv4Address = fidl_ip_v4!("123.12.34.56");
-    /// Maximum number of times we'll poll `LookupAdmin` to check DNS configuration
-    /// succeeded.
-    const RETRY_COUNT: u64 = 60;
-    /// Duration to sleep between polls.
-    const POLL_WAIT: zx::Duration = zx::Duration::from_seconds(1);
 
     const DEFAULT_DNS_PORT: u16 = 53;
 
@@ -331,10 +429,6 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str) {
                     port: DEFAULT_DNS_PORT,
                 })];
 
-                // Poll LookupAdmin until we get the servers we want or after too many tries.
-                let lookup_admin = client_realm
-                    .connect_to_protocol::<net_name::LookupAdminMarker>()
-                    .expect("failed to connect to LookupAdmin");
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
                     M::MANAGEMENT_AGENT.get_component_name(),
@@ -342,14 +436,7 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str) {
                 )
                 .fuse();
                 let mut wait_for_netmgr = pin!(wait_for_netmgr);
-                poll_lookup_admin(
-                    &lookup_admin,
-                    &expect,
-                    &mut wait_for_netmgr,
-                    POLL_WAIT,
-                    RETRY_COUNT,
-                )
-                .await
+                check_type.evaluate_check(client_realm, &mut wait_for_netmgr, &expect).await
             }
             .boxed_local()
         },
@@ -357,22 +444,19 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str) {
     .await;
 }
 
-/// Tests that Netstack exposes DNS servers discovered through DHCPv6 and NetworkManager
-/// configures the Lookup service.
+/// Tests that DHCPv6 exposes DNS servers discovered dynamically and NetworkManager
+/// appropriately publishes the DNS servers.
 #[netstack_test]
 #[variant(M, Manager)]
 #[variant(N, Netstack)]
-async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
+#[test_case(DnsCheckType::lookup_admin(); "lookup_admin")]
+#[test_case(DnsCheckType::dns_server_watcher(); "dns_server_watcher")]
+async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: DnsCheckType) {
     /// DHCPv6 server IP.
     const DHCPV6_SERVER: net_types_ip::Ipv6Addr =
         net_types_ip::Ipv6Addr::from_bytes(std_ip_v6!("fe80::1").octets());
     /// DNS server served by DHCPv6.
     const DHCPV6_DNS_SERVER: fnet::Ipv6Address = fidl_ip_v6!("20a::1234:5678");
-    /// Maximum number of times we'll poll `LookupAdmin` to check DNS configuration
-    /// succeeded.
-    const RETRY_COUNT: u64 = 60;
-    /// Duration to sleep between polls.
-    const POLL_WAIT: zx::Duration = zx::Duration::from_seconds(1);
 
     const DEFAULT_DNS_PORT: u16 = 53;
 
@@ -516,10 +600,6 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
                     zone_index: 0,
                 })];
 
-                // Poll LookupAdmin until we get the servers we want or after too many tries.
-                let lookup_admin = client_realm
-                    .connect_to_protocol::<net_name::LookupAdminMarker>()
-                    .expect("failed to connect to LookupAdmin");
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
                     M::MANAGEMENT_AGENT.get_component_name(),
@@ -527,14 +607,7 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
                 )
                 .fuse();
                 let mut wait_for_netmgr = pin!(wait_for_netmgr);
-                poll_lookup_admin(
-                    &lookup_admin,
-                    &expect,
-                    &mut wait_for_netmgr,
-                    POLL_WAIT,
-                    RETRY_COUNT,
-                )
-                .await
+                check_type.evaluate_check(client_realm, &mut wait_for_netmgr, &expect).await
             }
             .boxed_local()
         },
