@@ -132,8 +132,8 @@ pub mod ip {
         StableIidSecret, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::multicast_forwarding::{
-        ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastRoute,
-        MulticastRouteKey, MulticastRouteTarget,
+        ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
+        MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
     };
     pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,

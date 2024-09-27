@@ -9,7 +9,9 @@ use alloc::collections::btree_map;
 use log::warn;
 use net_types::ip::{Ip, IpVersionMarker};
 use net_types::SpecifiedAddr;
-use netstack3_base::{AnyDevice, ContextPair, CoreTimerContext, DeviceIdContext};
+use netstack3_base::{
+    AnyDevice, ContextPair, CoreTimerContext, DeviceIdContext, WeakDeviceIdentifier,
+};
 
 use crate::internal::base::IpLayerForwardingContext;
 use crate::internal::multicast_forwarding::packet_queue::{PacketQueue, QueuedPacket};
@@ -21,7 +23,7 @@ use crate::internal::multicast_forwarding::state::{
     MulticastForwardingState, MulticastForwardingStateContext, MulticastRouteTableContext as _,
 };
 use crate::internal::multicast_forwarding::{
-    MulticastForwardingDeviceContext, MulticastForwardingTimerId,
+    MulticastForwardingDeviceContext, MulticastForwardingEvent, MulticastForwardingTimerId,
 };
 use crate::{IpLayerBindingsContext, IpLayerIpExt, IpPacketDestination};
 
@@ -241,16 +243,28 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
         return;
     }
 
-    let MulticastRouteKey { src_addr, dst_addr } = key;
+    let MulticastRouteKey { src_addr, dst_addr } = key.clone();
     let dst_ip: SpecifiedAddr<I::Addr> = dst_addr.into();
     let src_ip: I::RecvSrcAddr = src_addr.into();
 
     for QueuedPacket { device, packet, frame_dst } in packet_queue.into_iter() {
+        let device = match device.upgrade() {
+            // Short circuit if the device was removed while the packet was
+            // pending.
+            None => continue,
+            Some(d) => d,
+        };
         // Short circuit if the queued packet arrived on the wrong device.
         if device != input_interface {
             // TODO(https://fxbug.dev/352570820): Increment a counter.
-            // TODO(https://fxbug.dev/353328975): Send a "Wrong Interface"
-            // multicast forwarding event.
+            bindings_ctx.on_event(
+                MulticastForwardingEvent::WrongInputInterface {
+                    key: key.clone(),
+                    actual_input_interface: device.clone(),
+                    expected_input_interface: input_interface.clone(),
+                }
+                .into(),
+            );
             continue;
         }
 
@@ -340,6 +354,7 @@ mod tests {
     use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
     use crate::internal::multicast_forwarding::testutil::{SentPacket, TestIpExt};
     use crate::multicast_forwarding::{MulticastRoute, MulticastRouteKey, MulticastRouteTarget};
+    use crate::IpLayerEvent;
 
     #[ip_test(I)]
     fn enable_disable<I: IpLayerIpExt>() {
@@ -413,25 +428,31 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(true; "forwarding_enabled_for_dev")]
-    #[test_case(false; "forwarding_disabled_for_dev")]
-    fn add_route_with_pending_packets<I: TestIpExt>(forwarding_enabled_for_dev: bool) {
+    #[test_case(false, true; "forwarding_disabled")]
+    #[test_case(true, false; "forwarding_enabled_and_wrong_dev")]
+    #[test_case(true, true; "forwarding_enabled_and_right_dev")]
+    fn add_route_with_pending_packets<I: TestIpExt>(
+        forwarding_enabled_for_dev: bool,
+        right_dev: bool,
+    ) {
         const FRAME_DST: Option<FrameDestination> = None;
-        const OUTPUT_DEV: MultipleDevicesId = MultipleDevicesId::B;
+        const OUTPUT_DEV: MultipleDevicesId = MultipleDevicesId::C;
         let right_key = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
         let wrong_key = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
+        let expected_dev = MultipleDevicesId::A;
+        let actual_dev = if right_dev { expected_dev } else { MultipleDevicesId::B };
+
         let route = MulticastRoute::new_forward(
-            MultipleDevicesId::A,
+            expected_dev,
             [MulticastRouteTarget { output_interface: OUTPUT_DEV, min_ttl: 0 }].into(),
         )
         .unwrap();
 
         let mut api = multicast_forwarding::testutil::new_api::<I>();
         assert!(api.enable());
-        api.core_ctx().state.set_multicast_forwarding_enabled_for_dev(
-            MultipleDevicesId::A,
-            forwarding_enabled_for_dev,
-        );
+        api.core_ctx()
+            .state
+            .set_multicast_forwarding_enabled_for_dev(expected_dev, forwarding_enabled_for_dev);
 
         // Setup a queued packet for `right_key`.
         let (core_ctx, bindings_ctx) = api.contexts();
@@ -444,7 +465,7 @@ mod tests {
                     bindings_ctx,
                     right_key.clone(),
                     &packet,
-                    &MultipleDevicesId::A,
+                    &actual_dev,
                     FRAME_DST
                 ),
                 QueuePacketOutcome::QueuedInNewQueue,
@@ -468,13 +489,27 @@ mod tests {
         ));
 
         let mut expected_sent_packets = vec![];
-        if forwarding_enabled_for_dev {
+        if forwarding_enabled_for_dev && right_dev {
             expected_sent_packets.push(SentPacket {
                 dst: MulticastAddr::new(right_key.dst_addr()).unwrap(),
                 device: OUTPUT_DEV,
             });
         }
         assert_eq!(api.core_ctx().state.take_sent_packets(), expected_sent_packets);
+
+        let mut expected_events = vec![];
+        if !right_dev {
+            expected_events.push(IpLayerEvent::MulticastForwarding(
+                MulticastForwardingEvent::WrongInputInterface {
+                    key: right_key,
+                    actual_input_interface: actual_dev,
+                    expected_input_interface: expected_dev,
+                },
+            ));
+        }
+
+        let (_core_ctx, bindings_ctx) = api.contexts();
+        assert_eq!(bindings_ctx.take_events(), expected_events);
     }
 
     #[ip_test(I)]

@@ -710,7 +710,7 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
     }
 }
 
-impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>>
+impl<I: IpExt> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>>
     for BindingsCtx
 {
     fn on_event(&mut self, event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>) {
@@ -733,6 +733,10 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>,
                     },
                     routes::SetMembership::CoreNdp,
                 ))
+            }
+            netstack3_core::ip::IpLayerEvent::MulticastForwarding(_) => {
+                // TODO(https://fxbug.dev/353328975): Dispatch the event to
+                // the multicast admin FIDL worker.
             }
         };
     }

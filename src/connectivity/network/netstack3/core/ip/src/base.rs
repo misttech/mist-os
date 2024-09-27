@@ -70,7 +70,8 @@ use crate::internal::multicast_forwarding::state::{
     MulticastForwardingState, MulticastForwardingStateContext,
 };
 use crate::internal::multicast_forwarding::{
-    MulticastForwardingBindingsTypes, MulticastForwardingDeviceContext, MulticastForwardingTimerId,
+    MulticastForwardingBindingsTypes, MulticastForwardingDeviceContext, MulticastForwardingEvent,
+    MulticastForwardingTimerId,
 };
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
@@ -833,7 +834,7 @@ pub trait IpDeviceMtuContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
 /// Events observed at the IP layer.
 #[derive(Debug, Eq, Hash, PartialEq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub enum IpLayerEvent<DeviceId, I: Ip> {
+pub enum IpLayerEvent<DeviceId, I: IpLayerIpExt> {
     /// A route needs to be added.
     AddRoute(types::AddableEntry<I::Addr, DeviceId>),
     /// Routes matching these specifiers need to be removed.
@@ -845,11 +846,21 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
         /// Gateway/next-hop
         gateway: Option<SpecifiedAddr<I::Addr>>,
     },
+    /// The multicast forwarding engine emitted an event.
+    MulticastForwarding(MulticastForwardingEvent<I, DeviceId>),
 }
 
-impl<DeviceId, I: Ip> IpLayerEvent<DeviceId, I> {
+impl<DeviceId, I: IpLayerIpExt> From<MulticastForwardingEvent<I, DeviceId>>
+    for IpLayerEvent<DeviceId, I>
+{
+    fn from(event: MulticastForwardingEvent<I, DeviceId>) -> IpLayerEvent<DeviceId, I> {
+        IpLayerEvent::MulticastForwarding(event)
+    }
+}
+
+impl<DeviceId, I: IpLayerIpExt> IpLayerEvent<DeviceId, I> {
     /// Changes the device id type with `map`.
-    pub fn map_device<N, F: FnOnce(DeviceId) -> N>(self, map: F) -> IpLayerEvent<N, I> {
+    pub fn map_device<N, F: Fn(DeviceId) -> N>(self, map: F) -> IpLayerEvent<N, I> {
         match self {
             IpLayerEvent::AddRoute(types::AddableEntry { subnet, device, gateway, metric }) => {
                 IpLayerEvent::AddRoute(types::AddableEntry {
@@ -862,17 +873,20 @@ impl<DeviceId, I: Ip> IpLayerEvent<DeviceId, I> {
             IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
                 IpLayerEvent::RemoveRoutes { subnet, device: map(device), gateway }
             }
+            IpLayerEvent::MulticastForwarding(e) => {
+                IpLayerEvent::MulticastForwarding(e.map_device(map))
+            }
         }
     }
 }
 
 /// The bindings execution context for the IP layer.
-pub trait IpLayerBindingsContext<I: Ip, DeviceId>:
+pub trait IpLayerBindingsContext<I: IpLayerIpExt, DeviceId>:
     InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + FilterBindingsContext
 {
 }
 impl<
-        I: Ip,
+        I: IpLayerIpExt,
         DeviceId,
         BC: InstantContext
             + EventContext<IpLayerEvent<DeviceId, I>>

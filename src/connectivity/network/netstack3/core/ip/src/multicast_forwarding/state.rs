@@ -65,7 +65,7 @@ pub struct MulticastForwardingEnabledState<
     pending_table: Mutex<MulticastForwardingPendingPackets<I, D::Weak, BT>>,
 }
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: MulticastForwardingBindingsContext>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: MulticastForwardingBindingsContext<I, D>>
     MulticastForwardingEnabledState<I, D, BC>
 {
     pub(super) fn new<CC>(bindings_ctx: &mut BC) -> Self

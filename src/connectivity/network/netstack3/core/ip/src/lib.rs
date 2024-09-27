@@ -199,7 +199,7 @@ pub mod multicast_forwarding {
     };
     pub use crate::internal::multicast_forwarding::{
         MulticastForwardingBindingsContext, MulticastForwardingBindingsTypes,
-        MulticastForwardingDeviceContext, MulticastForwardingTimerId,
+        MulticastForwardingDeviceContext, MulticastForwardingEvent, MulticastForwardingTimerId,
     };
 }
 

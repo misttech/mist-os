@@ -69,8 +69,11 @@ pub struct MulticastForwardingPendingPackets<
     gc_timer: BT::Timer,
 }
 
-impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsContext>
-    MulticastForwardingPendingPackets<I, D, BC>
+impl<
+        I: IpLayerIpExt,
+        D: WeakDeviceIdentifier,
+        BC: MulticastForwardingBindingsContext<I, D::Strong>,
+    > MulticastForwardingPendingPackets<I, D, BC>
 {
     pub(crate) fn new<CC>(bindings_ctx: &mut BC) -> Self
     where
@@ -191,8 +194,11 @@ pub struct PacketQueue<I: Ip, D: WeakDeviceIdentifier, BT: MulticastForwardingBi
     expires_at: BT::Instant,
 }
 
-impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsContext>
-    PacketQueue<I, D, BC>
+impl<
+        I: IpLayerIpExt,
+        D: WeakDeviceIdentifier,
+        BC: MulticastForwardingBindingsContext<I, D::Strong>,
+    > PacketQueue<I, D, BC>
 {
     fn new(bindings_ctx: &mut BC) -> Self {
         Self {

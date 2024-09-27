@@ -20,8 +20,8 @@ pub(crate) mod state;
 
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, FrameDestination, HandleableTimer, InstantBindingsTypes,
-    InstantContext, TimerBindingsTypes, TimerContext,
+    AnyDevice, DeviceIdContext, EventContext, FrameDestination, HandleableTimer,
+    InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
 };
 use packet_formats::ip::IpPacket;
 use zerocopy::SplitByteSlice;
@@ -33,19 +33,25 @@ use crate::multicast_forwarding::{
     MulticastForwardingStateContext, MulticastRoute, MulticastRouteKey,
     MulticastRouteTableContext as _,
 };
-use crate::IpLayerIpExt;
+use crate::{IpLayerEvent, IpLayerIpExt};
 
 /// Required types for multicast forwarding provided by Bindings.
 pub trait MulticastForwardingBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
 impl<BT: InstantBindingsTypes + TimerBindingsTypes> MulticastForwardingBindingsTypes for BT {}
 
 /// Required functionality for multicast forwarding provided by Bindings.
-pub trait MulticastForwardingBindingsContext:
-    MulticastForwardingBindingsTypes + InstantContext + TimerContext
+pub trait MulticastForwardingBindingsContext<I: IpLayerIpExt, D>:
+    MulticastForwardingBindingsTypes + InstantContext + TimerContext + EventContext<IpLayerEvent<D, I>>
 {
 }
-impl<BC: MulticastForwardingBindingsTypes + InstantContext + TimerContext>
-    MulticastForwardingBindingsContext for BC
+impl<
+        I: IpLayerIpExt,
+        D,
+        BC: MulticastForwardingBindingsTypes
+            + InstantContext
+            + TimerContext
+            + EventContext<IpLayerEvent<D, I>>,
+    > MulticastForwardingBindingsContext<I, D> for BC
 {
 }
 
@@ -65,7 +71,7 @@ pub enum MulticastForwardingTimerId<I: Ip> {
 
 impl<
         I: IpLayerIpExt,
-        BC: MulticastForwardingBindingsContext,
+        BC: MulticastForwardingBindingsContext<I, CC::DeviceId>,
         CC: MulticastForwardingStateContext<I, BC>,
     > HandleableTimer<CC, BC> for MulticastForwardingTimerId<I>
 {
@@ -83,6 +89,51 @@ impl<
                     }
                 })
             }
+        }
+    }
+}
+
+/// Events that may be published by the multicast forwarding engine.
+#[derive(Debug, Eq, Hash, PartialEq, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub enum MulticastForwardingEvent<I: IpLayerIpExt, D> {
+    /// A multicast packet was received for which there was no applicable route.
+    MissingRoute {
+        /// The key of the route that's missing.
+        key: MulticastRouteKey<I>,
+        /// The interface on which the packet was received.
+        input_interface: D,
+    },
+    /// A multicast packet was received on an unexpected input interface.
+    WrongInputInterface {
+        /// The key of the route with the unexpected input interface.
+        key: MulticastRouteKey<I>,
+        /// The interface on which the packet was received.
+        actual_input_interface: D,
+        /// The interface on which the packet was expected (as specified in the
+        /// multicast route).
+        expected_input_interface: D,
+    },
+}
+
+impl<I: IpLayerIpExt, D> MulticastForwardingEvent<I, D> {
+    pub(crate) fn map_device<O, F: Fn(D) -> O>(self, map: F) -> MulticastForwardingEvent<I, O> {
+        match self {
+            MulticastForwardingEvent::MissingRoute { key, input_interface } => {
+                MulticastForwardingEvent::MissingRoute {
+                    key,
+                    input_interface: map(input_interface),
+                }
+            }
+            MulticastForwardingEvent::WrongInputInterface {
+                key,
+                actual_input_interface,
+                expected_input_interface,
+            } => MulticastForwardingEvent::WrongInputInterface {
+                key,
+                actual_input_interface: map(actual_input_interface),
+                expected_input_interface: map(expected_input_interface),
+            },
         }
     }
 }
@@ -113,7 +164,7 @@ where
     I: IpLayerIpExt,
     B: SplitByteSlice,
     CC: MulticastForwardingStateContext<I, BC> + MulticastForwardingDeviceContext<I>,
-    BC: MulticastForwardingBindingsContext,
+    BC: MulticastForwardingBindingsContext<I, CC::DeviceId>,
 {
     // Short circuit if the packet's addresses don't constitute a valid
     // multicast route key (e.g. src is not unicast, or dst is not multicast).
@@ -135,8 +186,14 @@ where
             if let Some(MulticastRoute { input_interface, action }) = route_table.get(&key) {
                 if dev != input_interface {
                     // TODO(https://fxbug.dev/352570820): Increment a counter.
-                    // TODO(https://fxbug.dev/353328975): Send a
-                    // "Wrong Interface" multicast forwarding event.
+                    bindings_ctx.on_event(
+                        MulticastForwardingEvent::WrongInputInterface {
+                            key,
+                            actual_input_interface: dev.clone(),
+                            expected_input_interface: input_interface.clone(),
+                        }
+                        .into(),
+                    );
                     return None;
                 }
                 match action {
@@ -146,10 +203,21 @@ where
             }
             // TODO(https://fxbug.dev/352570820): Increment a counter.
             ctx.with_pending_table_mut(state, |pending_table| {
-                match pending_table.try_queue_packet(bindings_ctx, key, packet, dev, frame_dst) {
+                match pending_table.try_queue_packet(
+                    bindings_ctx,
+                    key.clone(),
+                    packet,
+                    dev,
+                    frame_dst,
+                ) {
                     QueuePacketOutcome::QueuedInNewQueue => {
-                        // TODO(https://fxbug.dev/353328975): Send a
-                        // "Missing Route" multicast forwarding event.
+                        bindings_ctx.on_event(
+                            MulticastForwardingEvent::MissingRoute {
+                                key,
+                                input_interface: dev.clone(),
+                            }
+                            .into(),
+                        );
                     }
                     QueuePacketOutcome::QueuedInExistingQueue => {}
                     QueuePacketOutcome::ExistingQueueFull => {
@@ -458,6 +526,7 @@ mod testutil {
 mod tests {
     use super::*;
 
+    use alloc::vec;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::MultipleDevicesId;
     use packet::ParseBuffer;
@@ -490,17 +559,15 @@ mod tests {
         const FRAME_DST: Option<FrameDestination> = None;
         let mut api = testutil::new_api::<I>();
 
-        let buf = testutil::new_ip_packet_buf::<I>(I::SRC1, I::DST1);
-        let mut buf_ref = buf.as_ref();
-        let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
-
-        let key = if right_key {
-            MulticastRouteKey::new(I::SRC1, I::DST1).unwrap()
+        let expected_key = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
+        let actual_key = if right_key {
+            expected_key.clone()
         } else {
             MulticastRouteKey::new(I::SRC2, I::DST2).unwrap()
         };
 
-        let dev = if right_dev { MultipleDevicesId::A } else { MultipleDevicesId::B };
+        let expected_dev = MultipleDevicesId::A;
+        let actual_dev = if right_dev { expected_dev } else { MultipleDevicesId::B };
 
         if enabled {
             assert!(api.enable());
@@ -508,9 +575,9 @@ mod tests {
             // installation fails.
             assert_eq!(
                 api.add_multicast_route(
-                    key,
+                    expected_key,
                     MulticastRoute::new_forward(
-                        dev,
+                        expected_dev,
                         [MulticastRouteTarget {
                             output_interface: MultipleDevicesId::C,
                             min_ttl: 0
@@ -523,18 +590,41 @@ mod tests {
             );
         }
 
-        api.core_ctx()
-            .state
-            .set_multicast_forwarding_enabled_for_dev(MultipleDevicesId::A, dev_enabled);
+        api.core_ctx().state.set_multicast_forwarding_enabled_for_dev(actual_dev, dev_enabled);
+
+        let buf = testutil::new_ip_packet_buf::<I>(actual_key.src_addr(), actual_key.dst_addr());
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
 
         let (core_ctx, bindings_ctx) = api.contexts();
-        lookup_multicast_route_or_stash_packet(
+        let route = lookup_multicast_route_or_stash_packet(
             core_ctx,
             bindings_ctx,
             &packet,
-            &MultipleDevicesId::A,
+            &actual_dev,
             FRAME_DST,
-        )
-        .is_some()
+        );
+
+        let mut expected_events = vec![];
+        if !right_key {
+            expected_events.push(IpLayerEvent::MulticastForwarding(
+                MulticastForwardingEvent::MissingRoute {
+                    key: actual_key.clone(),
+                    input_interface: actual_dev,
+                },
+            ));
+        }
+        if !right_dev {
+            expected_events.push(IpLayerEvent::MulticastForwarding(
+                MulticastForwardingEvent::WrongInputInterface {
+                    key: actual_key,
+                    actual_input_interface: actual_dev,
+                    expected_input_interface: expected_dev,
+                },
+            ));
+        }
+        assert_eq!(bindings_ctx.take_events(), expected_events);
+
+        route.is_some()
     }
 }
