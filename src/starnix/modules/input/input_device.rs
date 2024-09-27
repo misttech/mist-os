@@ -168,11 +168,11 @@ impl InputDevice {
                     match request {
                         fuiinput::KeyboardListenerRequest::OnKeyEvent { event, responder } => {
                             let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
+                            slf.open_files.lock().retain(|f| {
+                                let Some(file) = f.upgrade() else {
+                                    return false;
+                                };
 
-                            let mut files = slf.open_files.lock();
-                            let filtered_files: Vec<Arc<InputFile>> =
-                                files.drain(..).flat_map(|f| f.upgrade()).collect();
-                            for file in filtered_files {
                                 let mut inner = file.inner.lock();
 
                                 if !new_events.is_empty() {
@@ -180,9 +180,8 @@ impl InputDevice {
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
-                                files.push(Arc::downgrade(&file));
-                            }
-
+                                return true;
+                            });
                             responder.send(fuiinput::KeyEventStatus::Handled).expect("");
                         }
                     }
@@ -263,10 +262,11 @@ impl InputDevice {
                         }
                     };
 
-                    let mut files = self.open_files.lock();
-                    let filtered_files: Vec<Arc<InputFile>> =
-                        files.drain(..).flat_map(|f| f.upgrade()).collect();
-                    for file in filtered_files {
+                    self.open_files.lock().retain(|f| {
+                        let Some(file) = f.upgrade() else {
+                            return false;
+                        };
+
                         let mut inner = file.inner.lock();
                         match &inner.inspect_status {
                             Some(inspect_status) => {
@@ -283,8 +283,8 @@ impl InputDevice {
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
 
-                        files.push(Arc::downgrade(&file));
-                    }
+                        return true;
+                    });
 
                     responder.send().expect("media buttons responder failed to respond");
                 }
