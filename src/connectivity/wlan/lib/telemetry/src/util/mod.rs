@@ -3,5 +3,4 @@
 // found in the LICENSE file.
 
 pub mod cobalt_logger;
-pub mod inspect_bounded_set;
 pub mod sender;

@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
-use crate::util::inspect_bounded_set::InspectBoundedSetNode;
+use derivative::Derivative;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::auto_persist::{
     AutoPersist, {self},
 };
 use fuchsia_inspect_contrib::id_enum::{inspect_record_id_enum, IdEnum};
-use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, LruCacheNode};
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use fuchsia_inspect_derive::Unit;
 use fuchsia_sync::Mutex;
@@ -62,13 +62,16 @@ struct ConnectedState {}
 #[derive(Debug, Default)]
 struct DisconnectedState {}
 
-#[derive(Unit)]
+#[derive(Derivative, Unit)]
+#[derivative(PartialEq, Eq, Hash)]
 struct InspectConnectedNetwork {
     bssid: String,
     ssid: String,
     protection: String,
     ht_cap: Option<Vec<u8>>,
     vht_cap: Option<Vec<u8>>,
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     wsc: Option<InspectNetworkWsc>,
     is_wmm_assoc: bool,
     wmm_param: Option<Vec<u8>>,
@@ -89,7 +92,7 @@ impl From<&BssDescription> for InspectConnectedNetwork {
     }
 }
 
-#[derive(PartialEq, Unit)]
+#[derive(PartialEq, Unit, Hash)]
 struct InspectNetworkWsc {
     device_name: String,
     manufacturer: String,
@@ -108,7 +111,7 @@ impl From<&wlan_common::ie::wsc::ProbeRespWsc> for InspectNetworkWsc {
     }
 }
 
-#[derive(PartialEq, Unit)]
+#[derive(PartialEq, Eq, Unit, Hash)]
 struct InspectDisconnectSource {
     source: String,
     reason: String,
@@ -243,7 +246,7 @@ impl ConnectDisconnectLogger {
             let mut inspect_metadata_node = self.inspect_metadata_node.lock();
             let connected_network = InspectConnectedNetwork::from(bss);
             let connected_network_id =
-                inspect_metadata_node.connected_networks.record_item(connected_network);
+                inspect_metadata_node.connected_networks.insert(connected_network) as u64;
 
             self.time_series_stats.log_connected_networks(1 << connected_network_id);
 
@@ -267,10 +270,10 @@ impl ConnectDisconnectLogger {
         let mut inspect_metadata_node = self.inspect_metadata_node.lock();
         let connected_network = InspectConnectedNetwork::from(&*info.original_bss_desc);
         let connected_network_id =
-            inspect_metadata_node.connected_networks.record_item(connected_network);
+            inspect_metadata_node.connected_networks.insert(connected_network) as u64;
         let disconnect_source = InspectDisconnectSource::from(&info.disconnect_source);
         let disconnect_source_id =
-            inspect_metadata_node.disconnect_sources.record_item(disconnect_source);
+            inspect_metadata_node.disconnect_sources.insert(disconnect_source) as u64;
         inspect_log!(self.disconnect_events_node.lock().get_mut(), {
             connected_duration: info.connected_duration.into_nanos(),
             disconnect_source_id: disconnect_source_id,
@@ -286,8 +289,8 @@ impl ConnectDisconnectLogger {
 }
 
 struct InspectMetadataNode {
-    connected_networks: InspectBoundedSetNode<InspectConnectedNetwork>,
-    disconnect_sources: InspectBoundedSetNode<InspectDisconnectSource>,
+    connected_networks: LruCacheNode<InspectConnectedNetwork>,
+    disconnect_sources: LruCacheNode<InspectDisconnectSource>,
 }
 
 impl InspectMetadataNode {
@@ -300,12 +303,11 @@ impl InspectMetadataNode {
         let connected_networks = inspect_node.create_child("connected_networks");
         let disconnect_sources = inspect_node.create_child("disconnect_sources");
         Self {
-            connected_networks: InspectBoundedSetNode::new_with_eq_fn(
+            connected_networks: LruCacheNode::new(
                 connected_networks,
                 INSPECT_CONNECTED_NETWORKS_ID_LIMIT,
-                |left, right| left.bssid == right.bssid,
             ),
-            disconnect_sources: InspectBoundedSetNode::new(
+            disconnect_sources: LruCacheNode::new(
                 disconnect_sources,
                 INSPECT_DISCONNECT_SOURCES_ID_LIMIT,
             ),
