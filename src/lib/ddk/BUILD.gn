@@ -286,6 +286,7 @@ static_library("ddk") {
     "//src/devices/usb/drivers/xhci:*",
     "//src/devices/usb/lib/usb:*",
     "//src/devices/usb/lib/usb/tests:*",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher:*",
     "//src/devices/usb/tests/usb-hci-test:*",
     "//src/diagnostics/validator/logs/ddk/log-test-driver:*",
     "//src/firmware/drivers/usb-fastboot-function:*",
@@ -362,7 +363,6 @@ static_library("ddk") {
     "//zircon/system/ulib/acpica:*",
     "//zircon/system/ulib/driver-unit-test:*",
     "//zircon/system/ulib/hwreg/test:*",
-    "//zircon/system/ulib/usb-virtual-bus-launcher:*",
     "//zircon/vdso/zx:*",
   ]
 }

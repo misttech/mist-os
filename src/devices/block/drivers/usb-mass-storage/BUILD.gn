@@ -107,12 +107,12 @@ test("ums-integration") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher",
     "//src/lib/ddk",
     "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/usb-virtual-bus-launcher",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

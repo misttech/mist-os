@@ -122,12 +122,12 @@ test("asix-88179-integration") {
     "//src/connectivity/lib/network-device/cpp",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher",
     "//src/lib/ddk",
     "//src/ui/input/lib/hid",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/usb-virtual-bus-launcher",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

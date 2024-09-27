@@ -83,7 +83,7 @@ fuchsia.BIND_USB_PROTOCOL == {usb_protocol}
 ## Writing the usb-virtual-bus test
 
 The test should be written using the
-[usb virtual bus launcher library](/zircon/system/ulib/usb-virtual-bus-launcher).
+[usb virtual bus launcher library](/src/devices/usb/testing/usb-virtual-bus-launcher).
 
 The first thing the test launches is the usb-function driver described in
 [Write a USB-function driver](#write-usb-function-driver). You can launch this
