@@ -209,15 +209,34 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/352614791): Implement the `DeltaSimple8bRle` ring buffer.
-/// A ring buffer that encodes unsigned integer items using Delta, Simple8B, and RLE compression.
-#[derive(Clone, Debug, Default)]
-pub struct DeltaSimple8bRle;
+#[derive(Clone, Debug)]
+pub struct DeltaSimple8bRle(delta_simple8b_rle::DeltaSimple8bRleRingBuffer);
 
-impl_null_buffer!(
-    A for <A> where A: Into<u64> => DeltaSimple8bRle,
-    delta_simple8b_rle::Encoding,
-);
+impl<A> RingBuffer<A> for DeltaSimple8bRle
+where
+    A: Into<u64>,
+{
+    type Encoding = delta_simple8b_rle::Encoding;
+
+    fn with_capacity(capacity: Capacity) -> Self {
+        let ring_buffer = match capacity {
+            MinSamples(n) => {
+                delta_simple8b_rle::DeltaSimple8bRleRingBuffer::with_min_samples(n.get())
+            }
+        };
+        DeltaSimple8bRle(ring_buffer)
+    }
+
+    fn push(&mut self, item: A) {
+        if let Err(e) = self.0.push(item.into()) {
+            warn!("DeltaSimple8bRleRingBuffer::push error: {}", e);
+        }
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
+    }
+}
 
 // TODO(https://fxbug.dev/352614791): Implement the `DeltaZigzagSimple8bRle` ring buffer.
 /// A ring buffer that encodes integer items using Delta, Zigzag, Simple8B, and RLE compression.

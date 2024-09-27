@@ -18,6 +18,7 @@ impl<A> encoding::Encoding<A> for Encoding {
     const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Unsigned;
 }
 
+#[derive(Clone, Debug)]
 pub struct DeltaSimple8bRleRingBuffer {
     base: Option<u64>,
     last: Option<u64>,
@@ -66,10 +67,10 @@ impl DeltaSimple8bRleRingBuffer {
     pub fn serialize(&self, buffer: &mut impl io::Write) -> io::Result<()> {
         let metadata = self.buffer.metadata();
         // Add one count for the base value
-        let num_blocks = metadata
-            .num_blocks
-            .checked_add(1)
-            .ok_or(io::Error::new(io::ErrorKind::InvalidData, "Metadata num_blocks overflow"))?;
+        let num_blocks =
+            metadata.num_blocks.checked_add(if self.base.is_some() { 1 } else { 0 }).ok_or(
+                io::Error::new(io::ErrorKind::InvalidData, "Metadata num_blocks overflow"),
+            )?;
         buffer.write_u16::<LittleEndian>(num_blocks)?;
         buffer.write_u16::<LittleEndian>(metadata.selectors_head_index)?;
         buffer.write_u8(metadata.last_block_num_values)?;

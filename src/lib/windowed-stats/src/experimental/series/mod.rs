@@ -839,4 +839,84 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn time_matrix_with_delta_simple8b_rle_buffer() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
+            SamplingProfile::highly_granular(),
+            LastAggregation::or(0),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                2, 0, // type: delta simple8b RLE; subtype: unsigned
+                7, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(42)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                2, 0, // type: delta simple8b RLE; subtype: unsigned
+                15, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                42, 0, 0, 0, 0, 0, 0, 0, // base value
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(50)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(20_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                20, 0, 0, 0, // last timestamp
+                2, 0, // type: delta simple8b RLE; subtype: unsigned
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                2, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                1, // number of values in last block
+                42, 0, 0, 0, 0, 0, 0, 0,    // base value
+                0x0f, // RLE selector
+                8, 0, 0, 0, 0, 0, 1, 0, // value 8 (delta) appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+    }
 }
