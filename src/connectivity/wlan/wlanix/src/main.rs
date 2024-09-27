@@ -1498,6 +1498,7 @@ async fn main() {
     const CLIENT_STATS_NODE_NAME: &'static str = "client_stats";
     let (telemetry_sender, serve_telemetry_fut) = wlan_telemetry::serve_telemetry(
         cobalt_logger,
+        iface_manager.clone_device_monitor_svc(),
         fuchsia_inspect::component::inspector().root().create_child(CLIENT_STATS_NODE_NAME),
         &format!("root/{CLIENT_STATS_NODE_NAME}"),
         persistence_sender,

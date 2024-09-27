@@ -54,6 +54,10 @@ impl DeviceMonitorIfaceManager {
         .context("failed to connect to device monitor")?;
         Ok(Self { monitor_svc, ifaces: Mutex::new(HashMap::new()) })
     }
+
+    pub fn clone_device_monitor_svc(&self) -> fidl_device_service::DeviceMonitorProxy {
+        self.monitor_svc.clone()
+    }
 }
 
 #[async_trait]

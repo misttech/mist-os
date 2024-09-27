@@ -35,6 +35,10 @@ pub enum TelemetryEvent {
     Disconnect { info: DisconnectInfo },
     /// Report a client connections enabled or disabled event.
     ClientConnectionsToggle { event: ClientConnectionsToggleEvent },
+    /// Report creation of client iface.
+    ClientIfaceCreated { iface_id: u16 },
+    /// Report destruction of client iface.
+    ClientIfaceDestroyed { iface_id: u16 },
 }
 
 /// Attempts to connect to the Cobalt service.
@@ -95,6 +99,7 @@ const TELEMETRY_QUERY_INTERVAL: zx::Duration = zx::Duration::from_seconds(10);
 
 pub fn serve_telemetry(
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     inspect_node: InspectNode,
     inspect_path: &str,
     persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -124,6 +129,12 @@ pub fn serve_telemetry(
     let mut toggle_logger =
         processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy, &inspect_node);
 
+    let client_iface_counters_logger =
+        processors::client_iface_counters::ClientIfaceCountersLogger::new(
+            monitor_svc_proxy,
+            &time_matrix_client,
+        );
+
     let fut = async move {
         // Prevent the inspect nodes from being dropped while the loop is running.
         let _inspect_node = inspect_node;
@@ -148,10 +159,17 @@ pub fn serve_telemetry(
                         ClientConnectionsToggle { event } => {
                             toggle_logger.log_toggle_event(event).await;
                         }
+                        ClientIfaceCreated { iface_id } => {
+                            client_iface_counters_logger.handle_iface_created(iface_id).await;
+                        }
+                        ClientIfaceDestroyed { iface_id } => {
+                            client_iface_counters_logger.handle_iface_destroyed(iface_id).await;
+                        }
                     }
                 }
                 _ = telemetry_interval.next() => {
                     connect_disconnect.handle_periodic_telemetry();
+                    client_iface_counters_logger.handle_periodic_telemetry(connect_disconnect.is_connected()).await;
                 }
             }
         }

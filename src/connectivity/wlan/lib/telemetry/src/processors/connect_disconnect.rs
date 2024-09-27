@@ -214,6 +214,13 @@ impl ConnectDisconnectLogger {
         self.time_series_stats.log_wlan_connectivity_state(1 << wlan_connectivity_state_id);
     }
 
+    pub fn is_connected(&self) -> bool {
+        match &*self.connection_state.lock() {
+            ConnectionState::Connected(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn handle_periodic_telemetry(&self) {
         self.log_connection_state();
     }
