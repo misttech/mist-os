@@ -575,6 +575,7 @@ class AsyncMain:
                 "Use --no-updateifinbase to skip updating base packages."
             )
             build_return_code = await run_build_with_suspended_output(
+                exec_env,
                 ["build/images/updates"],
                 show_output=not exec_env.log_to_stdout(),
             )
@@ -587,9 +588,7 @@ class AsyncMain:
                 "\nRunning an OTA before executing tests"
             )
             ota_result = await execution.run_command(
-                "fx",
-                "ota",
-                "--no-build",
+                *exec_env.fx_cmd_line("ota", "--no-build"),
                 recorder=recorder,
                 print_verbatim=True,
             )
@@ -720,17 +719,18 @@ class AsyncMain:
         with tempfile.TemporaryDirectory() as td:
             out_path = os.path.join(td, "test-list.json")
             result = await execution.run_command(
-                "fx",
-                "test_list_tool",
-                "--build-dir",
-                exec_env.out_dir,
-                "--input",
-                exec_env.test_json_file,
-                "--output",
-                out_path,
-                "--test-components",
-                os.path.join(exec_env.out_dir, "test_components.json"),
-                "--ignore-device-test-errors",
+                *exec_env.fx_cmd_line(
+                    "test_list_tool",
+                    "--build-dir",
+                    exec_env.out_dir,
+                    "--input",
+                    exec_env.test_json_file,
+                    "--output",
+                    out_path,
+                    "--test-components",
+                    os.path.join(exec_env.out_dir, "test_components.json"),
+                    "--ignore-device-test-errors",
+                ),
                 recorder=recorder,
             )
             if result is None or result.return_code != 0:
@@ -784,6 +784,8 @@ class AsyncMain:
 
         recorder = self._recorder
         flags = self._flags
+        exec_env = self._exec_env
+        assert exec_env is not None
 
         missing_groups: list[selection_types.MatchGroup] = []
 
@@ -814,7 +816,6 @@ class AsyncMain:
                 def suggestion_args(
                     arg: str, threshold: float | None = None
                 ) -> list[str]:
-                    name = "fx"
                     suggestion_args = [
                         "search-tests",
                         f"--max-results={flags.suggestion_count}",
@@ -823,7 +824,7 @@ class AsyncMain:
                     ]
                     if threshold is not None:
                         suggestion_args += ["--threshold", str(threshold)]
-                    return [name] + suggestion_args
+                    return exec_env.fx_cmd_line(*suggestion_args)
 
                 arg_threshold_pairs = []
                 for group in missing_groups:
@@ -940,9 +941,9 @@ class AsyncMain:
         await asyncio.sleep(0.1)
 
         return_code = await run_build_with_suspended_output(
+            exec_env,
             build_command_line,
             show_output=not exec_env.log_to_stdout(),
-            out_dir=exec_env.out_dir,
         )
 
         error = None
@@ -956,8 +957,7 @@ class AsyncMain:
             amber_directory = os.path.join(exec_env.out_dir, "amber-files")
             delivery_blob_type = self._read_delivery_blob_type()
             publish_args = (
-                [
-                    "fx",
+                exec_env.fx_cmd_line(
                     "ffx",
                     "repository",
                     "publish",
@@ -967,7 +967,7 @@ class AsyncMain:
                     ),
                     "--ignore-missing-packages",
                     "--time-versioning",
-                ]
+                )
                 + (
                     ["--delivery-blob-type", str(delivery_blob_type)]
                     if delivery_blob_type is not None
@@ -1108,7 +1108,7 @@ class AsyncMain:
         assert exec_env is not None
 
         if tests.has_device_test() and await has_device_connected(
-            recorder, parent=build_id, out_dir=exec_env.out_dir
+            exec_env, recorder, parent=build_id
         ):
             try:
                 if self._has_tests_in_base(tests):
@@ -1116,7 +1116,9 @@ class AsyncMain:
                         "Some selected test(s) are in the base package set. Running an OTA."
                     )
                     output = await execution.run_command(
-                        "fx", "ota", recorder=recorder, print_verbatim=True
+                        *exec_env.fx_cmd_line("ota"),
+                        recorder=recorder,
+                        print_verbatim=True,
                     )
                     if not output or output.return_code != 0:
                         recorder.emit_warning_message("OTA failed")
@@ -1145,7 +1147,8 @@ class AsyncMain:
 
         max_parallel = flags.parallel
         if tests.has_device_test() and not await has_device_connected(
-            recorder, out_dir=exec_env.out_dir
+            exec_env,
+            recorder,
         ):
             recorder.emit_warning_message(
                 "\nCould not find a running package server."
@@ -1465,9 +1468,9 @@ class AsyncMain:
 
 @functools.lru_cache
 async def has_device_connected(
+    exec_env: environment.ExecutionEnvironment,
     recorder: event.EventRecorder,
     parent: event.Id | None = None,
-    out_dir: str | None = None,
 ) -> bool:
     """Check if a device is connected for running target tests.
 
@@ -1478,11 +1481,10 @@ async def has_device_connected(
     Returns:
         bool: True only if a device is available to run target tests.
     """
-    extra_args = ["--dir", out_dir] if out_dir else []
     output = await execution.run_command(
-        "fx",
-        *extra_args,
-        "is-package-server-running",
+        *exec_env.fx_cmd_line(
+            "is-package-server-running",
+        ),
         recorder=recorder,
         parent=parent,
     )
@@ -1490,9 +1492,9 @@ async def has_device_connected(
 
 
 async def run_build_with_suspended_output(
+    exec_env: environment.ExecutionEnvironment,
     build_command_line: list[str],
     show_output: bool = True,
-    out_dir: str | None = None,
 ) -> int:
     # Allow display to update.
     await asyncio.sleep(0.1)
@@ -1504,10 +1506,8 @@ async def run_build_with_suspended_output(
     stdout = None if show_output else subprocess.DEVNULL
     stderr = None if show_output else subprocess.DEVNULL
 
-    out_args = ["--dir", out_dir] if out_dir else []
-
     return_code = subprocess.call(
-        ["fx"] + out_args + ["build"] + build_command_line,
+        exec_env.fx_cmd_line("build", *build_command_line),
         stdout=stdout,
         stderr=stderr,
     )

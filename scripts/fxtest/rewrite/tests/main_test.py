@@ -478,7 +478,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsSubset(
             {
-                ("fx", "ffx", "test", "run"),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "test",
+                    "run",
+                ),
             },
             call_prefixes,
         )
@@ -523,6 +530,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 [
                     [
                         "fx",
+                        "--dir",
+                        self.out_dir,
                         "search-tests",
                         f"--max-results={expected_suggestion_count}",
                         "--no-color",
@@ -559,15 +568,29 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 (
                     "fx",
                     "--dir",
-                    os.path.join(self.fuchsia_dir.name, "out/default"),
+                    self.out_dir,
                     "build",
                     "--default",
                     "//src/sys:foo_test_package",
                     "--toolchain=//build/toolchain/host:x64",
                     "//src/sys:bar_test",
                 ),
-                ("fx", "ffx", "repository", "publish"),
-                ("fx", "ffx", "test", "run"),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "repository",
+                    "publish",
+                ),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "test",
+                    "run",
+                ),
             },
             call_prefixes,
         )
@@ -640,7 +663,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     "--default",
                     "updates",
                 ),
-                ("fx", "ffx", "repository", "publish"),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "repository",
+                    "publish",
+                ),
             },
             call_prefixes,
         )
@@ -666,14 +696,17 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             command_mock.call_args_list
         )
 
-        self.assertFalse(("fx", "build") in call_prefixes)
         self.assertFalse(
-            ("fx", "ffx", "repository", "publish") in call_prefixes
+            ("fx", "--dir", self.out_dir, "build") in call_prefixes
+        )
+        self.assertFalse(
+            ("fx", "--dir", self.out_dir, "ffx", "repository", "publish")
+            in call_prefixes
         )
 
         self.assertIsSubset(
             {
-                ("fx", "ffx", "test", "run"),
+                ("fx", "--dir", self.out_dir, "ffx", "test", "run"),
             },
             call_prefixes,
         )
@@ -853,7 +886,18 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         call_prefixes = self._make_call_args_prefix_set(
             command_mock.call_args_list
         )
-        self.assertIsSubset({("fx", "ota", "--no-build")}, call_prefixes)
+        self.assertIsSubset(
+            {
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ota",
+                    "--no-build",
+                )
+            },
+            call_prefixes,
+        )
 
     async def test_print_logs_success(self) -> None:
         """Test that print_logs searches for logs, can be given a log,

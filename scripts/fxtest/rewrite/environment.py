@@ -176,6 +176,19 @@ class ExecutionEnvironment:
     def log_to_stdout(self) -> bool:
         return self.log_file == args.LOG_TO_STDOUT_OPTION
 
+    def fx_cmd_line(self, *args: str) -> list[str]:
+        """Format the given arguments into a command line for `fx`.
+
+        Returns:
+            list[str]: The full command line to use.
+        """
+
+        return [
+            "fx",
+            "--dir",
+            self.out_dir,
+        ] + list(args)
+
     def __hash__(self) -> int:
         return hash(self.fuchsia_dir)
 

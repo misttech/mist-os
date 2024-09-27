@@ -188,7 +188,17 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
 
         command_line = test.command_line()
         self.assertContainsSublist(
-            ["fx", "ffx", "test", "run", "--realm", "foo_tests"], command_line
+            [
+                "fx",
+                "--dir",
+                "/out/fuchsia",
+                "ffx",
+                "test",
+                "run",
+                "--realm",
+                "foo_tests",
+            ],
+            command_line,
         )
         self.assertContainsSublist(
             ["fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm"], command_line
@@ -271,6 +281,8 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             test.command_line(),
             [
                 "fx",
+                "--dir",
+                "/out/fuchsia",
                 "ffx",
                 "test",
                 "run",
@@ -366,7 +378,17 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
 
         command_line = test.command_line()
         self.assertContainsSublist(
-            ["fx", "ffx", "test", "run", "--realm", "foo_tests"], command_line
+            [
+                "fx",
+                "--dir",
+                "/out/fuchsia",
+                "ffx",
+                "test",
+                "run",
+                "--realm",
+                "foo_tests",
+            ],
+            command_line,
         )
         self.assertContainsSublist(
             ["fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm"], command_line
