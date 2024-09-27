@@ -2963,6 +2963,9 @@ where
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
                         {
+                            // Ignore the result - errors are handled below after calling `close`.
+                            let _: Result<(), CloseError> = conn.state.shutdown_recv();
+
                             conn.defunct = true;
                             let already_closed = match core_ctx.with_counters(|counters| {
                                 conn.state.close(
@@ -3076,11 +3079,10 @@ where
     pub fn shutdown(
         &mut self,
         id: &TcpApiSocketId<I, C>,
-        shutdown: ShutdownType,
+        shutdown_type: ShutdownType,
     ) -> Result<bool, NoConnection> {
-        debug!("shutdown [{shutdown:?}] for {id:?}");
+        debug!("shutdown [{shutdown_type:?}] for {id:?}");
         let (core_ctx, bindings_ctx) = self.contexts();
-        let (shutdown_send, shutdown_receive) = shutdown.to_send_receive();
         let (result, pending) =
             core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
                 let TcpSocketState { socket_state, ip_options: _ } = socket_state;
@@ -3091,13 +3093,6 @@ where
                         sharing: _,
                         timer,
                     }) => {
-                        if !shutdown_send {
-                            // TODO(https://fxbug.dev/42063684): Instead of
-                            // inferring the state in Bindings, we can have Core
-                            // shutdown the read side by closing the receive
-                            // buffer.
-                            return Ok((true, None));
-                        }
                         fn do_shutdown<SockI, WireI, CC, BC>(
                             core_ctx: &mut CC,
                             bindings_ctx: &mut BC,
@@ -3109,6 +3104,7 @@ where
                                 CC::WeakDeviceId,
                             >,
                             timer: &mut BC::Timer,
+                            shutdown_type: ShutdownType,
                         ) -> Result<(), NoConnection>
                         where
                             SockI: DualStackIpExt,
@@ -3119,6 +3115,20 @@ where
                                 + CounterContext<TcpCounters<SockI>>,
                         {
                             let was_closed = matches!(conn.state, State::Closed(_));
+
+                            let (shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
+                            if shutdown_receive {
+                                match conn.state.shutdown_recv() {
+                                    Ok(()) => (),
+                                    Err(CloseError::NoConnection) => return Err(NoConnection),
+                                    Err(CloseError::Closing) => (),
+                                }
+                            }
+
+                            if !shutdown_send {
+                                return Ok(());
+                            }
+
                             match core_ctx.with_counters(|counters| {
                                 conn.state.close(
                                     counters,
@@ -3159,6 +3169,7 @@ where
                                     conn,
                                     addr,
                                     timer,
+                                    shutdown_type,
                                 )?
                             }
                             MaybeDualStack::DualStack((core_ctx, converter)) => {
@@ -3171,6 +3182,7 @@ where
                                         conn,
                                         addr,
                                         timer,
+                                        shutdown_type,
                                     )?,
                                     EitherStack::OtherStack((conn, addr)) => do_shutdown(
                                         core_ctx,
@@ -3180,6 +3192,7 @@ where
                                         conn,
                                         addr,
                                         timer,
+                                        shutdown_type,
                                     )?,
                                 }
                             }
@@ -3191,6 +3204,8 @@ where
                         sharing,
                         addr,
                     ))) => {
+                        let (_shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
+
                         if !shutdown_receive {
                             return Ok((false, None));
                         }
@@ -6851,7 +6866,7 @@ mod tests {
                     Connection {
                     accept_queue: None,
                     state: State::Closed(Closed {
-                        reason: Some(ConnectionError::ConnectionReset)
+                        reason: Some(ConnectionError::ConnectionRefused)
                     }),
                     ip_sock: _,
                     defunct: false,

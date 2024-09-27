@@ -1622,6 +1622,54 @@ async fn tcp_socket_shutdown_connection<I: TestIpExt, Client: Netstack, Server: 
     .await
 }
 
+// Shutting down one end of the socket in both directions should cause writes to fail on the
+// other end. Same applies when closing the socket, (`close()` implies `shutdown(RDWR)`).
+#[netstack_test]
+#[variant(I, Ip)]
+#[variant(Client, Netstack)]
+#[variant(Server, Netstack)]
+#[test_case(false; "shutdown")]
+#[test_case(true; "close")]
+async fn tcp_socket_send_after_shutdown<I: TestIpExt, Client: Netstack, Server: Netstack>(
+    name: &str,
+    close: bool,
+) {
+    tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(
+        name,
+        |mut client: fasync::net::TcpStream, server: fasync::net::TcpStream| async move {
+            // Either close or shutdown the server end of the socket.
+            let _server = if close {
+                std::mem::drop(server);
+                None
+            } else {
+                server.shutdown(std::net::Shutdown::Both).expect("Failed to shutdown TCP read");
+                Some(server)
+            };
+
+            async {
+                // Keep writing until we get an error.
+                loop {
+                    if let Err(e) = client.write(b"Hello").await {
+                        // NS2 returns EPIPE, which is incorrect. Check the error only with NS3.
+                        if !matches!(
+                            Client::VERSION,
+                            NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2
+                        ) {
+                            assert_eq!(e.kind(), std::io::ErrorKind::ConnectionReset);
+                        }
+                        break;
+                    }
+                }
+            }
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+                panic!("timed out waiting for error from send()")
+            })
+            .await;
+        },
+    )
+    .await
+}
+
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]

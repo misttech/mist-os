@@ -389,7 +389,8 @@ impl IntoErrno for SetReuseAddrError {
 impl IntoErrno for ConnectionError {
     fn into_errno(self) -> fposix::Errno {
         match self {
-            ConnectionError::ConnectionReset => fposix::Errno::Econnrefused,
+            ConnectionError::ConnectionRefused => fposix::Errno::Econnrefused,
+            ConnectionError::ConnectionReset => fposix::Errno::Econnreset,
             ConnectionError::NetworkUnreachable => fposix::Errno::Enetunreach,
             ConnectionError::HostUnreachable => fposix::Errno::Ehostunreach,
             ConnectionError::ProtocolUnreachable => fposix::Errno::Enoprotoopt,

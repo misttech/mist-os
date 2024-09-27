@@ -19,11 +19,5 @@
                 "SocketTest/Datagram*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                "SocketTest.CloseClonedSocketAfterTcpRst",
-            ],
-        },
     ],
 }
