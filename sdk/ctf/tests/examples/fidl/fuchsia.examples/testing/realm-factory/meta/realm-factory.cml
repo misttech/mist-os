@@ -19,7 +19,6 @@
         {
             protocol: [
                 "fuchsia.component.Binder",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

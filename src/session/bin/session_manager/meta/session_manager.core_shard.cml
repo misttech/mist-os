@@ -263,7 +263,6 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.profile.Watcher",
@@ -297,12 +296,12 @@
             to: "#session-manager",
         },
         {
-            from: "parent",
-            to: "#session-manager",
             config: [
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
             ],
+            from: "parent",
+            to: "#session-manager",
         },
         {
             protocol: "fuchsia.power.system.ActivityGovernor",
@@ -311,9 +310,9 @@
             availability: "optional",
         },
         {
+            config: "fuchsia.power.SuspendEnabled",
             from: "parent",
             to: "#session-manager",
-            config: "fuchsia.power.SuspendEnabled",
         },
 
         // TODO(https://fxbug.dev/42077029): As of 2023-04-26, `session-manager` only uses

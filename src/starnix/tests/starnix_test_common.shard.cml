@@ -62,7 +62,6 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
@@ -101,7 +100,6 @@
         },
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
@@ -153,15 +151,6 @@
             directory: "boot-kernel",
             from: "parent",
             to: [ "#kernel" ],
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#netstack",
-                "#power-broker",
-                "#system-activity-governor",
-            ],
         },
         {
             directory: "dev-hrtimer",
