@@ -140,6 +140,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_kernel_config: PlatformKernelConfig = Default::default();
         let mut builder: ConfigurationBuilderImpl = Default::default();
@@ -157,6 +158,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_kernel_config =
             PlatformKernelConfig { aslr_entropy_bits: Some(12), ..Default::default() };
@@ -175,6 +177,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let mut builder: ConfigurationBuilderImpl = Default::default();
         let result =

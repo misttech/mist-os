@@ -304,6 +304,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: Some(MemorySize::Fixed(123)),
@@ -345,6 +346,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: Some(MemorySize::Percent(5)),
@@ -386,6 +388,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: Some(MemorySize::Percent(100)),
@@ -412,6 +415,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             protected_memory_size: Some(MemorySize::Percent(100)),
@@ -448,6 +452,7 @@ mod test {
             },
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: None,
@@ -500,6 +505,7 @@ mod test {
             },
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: Some(MemorySize::Percent(12)),
@@ -552,6 +558,7 @@ mod test {
             },
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let platform_sysmem_config = PlatformSysmemConfig {
             contiguous_memory_size: None,
@@ -719,6 +726,7 @@ mod test {
             },
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
 
         let platform_sysmem_config = PlatformSysmemConfig {

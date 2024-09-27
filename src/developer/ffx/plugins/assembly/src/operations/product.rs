@@ -174,6 +174,7 @@ Resulting product is not supported and may misbehave!
         &board_info,
         &outdir,
         &resource_dir,
+        developer_overrides.as_ref().and_then(|o| Some(&o.developer_only_options)),
     )?;
 
     // Now that all the configuration has been determined, create the builder

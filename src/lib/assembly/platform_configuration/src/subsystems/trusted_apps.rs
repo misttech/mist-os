@@ -68,6 +68,7 @@ mod tests {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            _developer_only_options: Default::default(),
         };
         let mut builder: ConfigurationBuilderImpl = Default::default();
         let trusted_apps = vec![
