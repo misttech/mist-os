@@ -378,13 +378,7 @@ class Protection(enum.IntEnum):
     @staticmethod
     def from_fidl(fidl: f_wlan_sme.Protection) -> "Protection":
         """Parse from a fuchsia.wlan.sme/Protection."""
-        match fidl:
-            case p if isinstance(p, f_wlan_sme.Protection) and (
-                int(p) >= 0 and int(p) <= 11
-            ):
-                return Protection(int(p))
-            case _:
-                raise TypeError(f"Unknown Protection FIDL value: {fidl}")
+        return Protection(fidl)
 
 
 @dataclass(frozen=True)
