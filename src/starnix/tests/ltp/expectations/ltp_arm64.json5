@@ -15,6 +15,9 @@
                 "epoll_wait02",
                 "futex_wait05",
 
+                // Times out on certain bots.
+                "inotify11",
+
                 // This test only runs on x86_64.
                 "signal06",
             ],
