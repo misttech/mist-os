@@ -356,7 +356,7 @@ impl MetricConfig {
             upload_once,
             project_id,
         } = template;
-        let selectors = SelectorList(
+        let selectors = SelectorList::from(
             selectors
                 .iter_mut()
                 .map::<Result<_, anyhow::Error>, _>(|s| {
