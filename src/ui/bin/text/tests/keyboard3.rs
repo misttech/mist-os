@@ -483,7 +483,7 @@ fn test_inject_key_yields_expected_key_and_key_meaning(
 ) -> (Option<input::Key>, Option<ui_input3::KeyMeaning>) {
     let (was_handled, received_event) =
         inject_key_and_receive_keyboard_protocol_message(create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             key,
             None,

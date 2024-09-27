@@ -280,15 +280,15 @@ impl DeviceIdExt for PureIpDeviceId<BindingsCtx> {
 
 /// Extends the methods available to [`Lifetime`].
 trait LifetimeExt {
-    /// Converts `self` to `zx::MonotonicTime`.
-    fn into_zx_time(self) -> zx::MonotonicTime;
+    /// Converts `self` to `zx::MonotonicInstant`.
+    fn into_zx_time(self) -> zx::MonotonicInstant;
 }
 
 impl LifetimeExt for Lifetime<StackTime> {
-    fn into_zx_time(self) -> zx::MonotonicTime {
+    fn into_zx_time(self) -> zx::MonotonicInstant {
         match self {
             Lifetime::Finite(StackTime(time)) => time.into_zx(),
-            Lifetime::Infinite => zx::MonotonicTime::INFINITE,
+            Lifetime::Infinite => zx::MonotonicInstant::INFINITE,
         }
     }
 }

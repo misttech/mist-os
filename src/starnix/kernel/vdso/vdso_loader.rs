@@ -61,7 +61,7 @@ impl MemoryMappedVvar {
     pub fn update_utc_data_transform(&self, new_transform: &UtcClockTransform) {
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
         let old_transform = UtcClockTransform {
-            reference_offset: zx::MonotonicTime::from_nanos(
+            reference_offset: zx::MonotonicInstant::from_nanos(
                 vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
             ),
             synthetic_offset: UtcTime::from_nanos(
@@ -171,7 +171,7 @@ fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
         &dir_proxy,
         VDSO_FILENAME,
         fidl_fuchsia_io::VmoFlags::READ,
-        zx::MonotonicTime::INFINITE,
+        zx::MonotonicInstant::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 
@@ -194,7 +194,7 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
         &dir_proxy,
         FILENAME,
         fidl_fuchsia_io::VmoFlags::READ,
-        zx::MonotonicTime::INFINITE,
+        zx::MonotonicInstant::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 

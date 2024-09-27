@@ -116,7 +116,7 @@ impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         let (status, info) = self
             .root_proxy
-            .query_filesystem(zx::MonotonicTime::INFINITE)
+            .query_filesystem(zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(EIO))?;
         // Not all remote filesystems support `QueryFilesystem`, many return ZX_ERR_NOT_SUPPORTED.
         if status == 0 {
@@ -226,7 +226,7 @@ impl RemoteFs {
         // caches, so we can't use remote IDs if the remote filesystem is not guaranteed to provide
         // unique IDs, or if the remote filesystem spans multiple filesystems.
         let (status, info) =
-            root_proxy.query_filesystem(zx::MonotonicTime::INFINITE).map_err(|_| errno!(EIO))?;
+            root_proxy.query_filesystem(zx::MonotonicInstant::INFINITE).map_err(|_| errno!(EIO))?;
         // Be tolerant of errors here; many filesystems return `ZX_ERR_NOT_SUPPORTED`.
         let use_remote_ids = status == 0
             && info
@@ -1525,8 +1525,9 @@ mod test {
             .add(&mut locked, &current_task, &pipe, &epoll_object, event)
             .expect("poll_file.add");
 
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
@@ -1535,8 +1536,9 @@ mod test {
             pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
@@ -1548,8 +1550,9 @@ mod test {
             pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert!(fds.is_empty());
     }
 

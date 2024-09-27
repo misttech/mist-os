@@ -89,7 +89,7 @@ impl SyncFile {
         let mut state: Vec<FenceState> = vec![];
 
         for sync_point in &self.fence.sync_points {
-            if sync_point.handle.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::ZERO)
+            if sync_point.handle.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                 == Err(zx::Status::TIMED_OUT)
             {
                 state.push(FenceState { status: Status::Active, timestamp_ns: 0 });
@@ -195,7 +195,7 @@ impl FileOps for SyncFile {
                 while i < fence.sync_points.len() {
                     if fence.sync_points[i]
                         .handle
-                        .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::ZERO)
+                        .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                         != Err(zx::Status::TIMED_OUT)
                     {
                         let mut vmo_bytes = vec![0; 8];
@@ -332,7 +332,7 @@ impl FileOps for SyncFile {
             // query_events() after this query_async() returns; however that works only if all
             // handles are signaled.  Here we perform the counting, and cancel waits, for any
             // handles currently signaled.
-            if sync_point.handle.wait_handle(Self::SIGNAL, zx::MonotonicTime::ZERO)
+            if sync_point.handle.wait_handle(Self::SIGNAL, zx::MonotonicInstant::ZERO)
                 == Err(zx::Status::TIMED_OUT)
             {
                 canceler = WaitCanceler::merge_unbounded(

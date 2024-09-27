@@ -514,7 +514,7 @@ impl Qos {
 
 #[derive(Debug)]
 pub struct StatusCheckTimeout {
-    last_fired: zx::MonotonicTime,
+    last_fired: zx::MonotonicInstant,
     next_id: Option<EventId>,
 }
 

@@ -120,7 +120,7 @@ pub struct PulseNode {
 
 impl PulseNode {
     fn new(node: Node) -> Self {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         let started = node.create_time_at("started", now);
         let last_updated = node.create_time_at("last_updated", now);
         Self {
@@ -134,7 +134,7 @@ impl PulseNode {
     }
 
     pub fn update(&mut self, new_status: ClientSmeStatus) {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         self.last_updated.set_at(now);
 
         // This method is always called when there's a state transition, so even if the client is

@@ -59,7 +59,7 @@ where
 /// on the test component retrieve the real time. When the test component needs to read fake
 /// time, it must do so using the `FakeClockController` handle. Basically, tests should access
 /// fake time through fake_clock_controller.get_monotonic() instead of the common methods such as
-/// zx::MonotonicTime::get().
+/// zx::MonotonicInstant::get().
 ///
 /// The provided `test_fn` is provided with handles to manipulate the time source, observe events
 /// passed to cobalt, and manipulate the fake time.
@@ -134,7 +134,7 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
         let cobalt_event_stream =
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
 
-        let mono_before = zx::MonotonicTime::from_nanos(
+        let mono_before = zx::MonotonicInstant::from_nanos(
             fake_time.get_monotonic().await.expect("Failed to get time"),
         );
         push_source_controller
@@ -173,7 +173,7 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
         });
 
         // At least an hour should've passed.
-        let mono_after = zx::MonotonicTime::from_nanos(
+        let mono_after = zx::MonotonicInstant::from_nanos(
             fake_time.get_monotonic().await.expect("Failed to get time"),
         );
         assert_geq!(mono_after, mono_before + INACTIVE_SOURCE_RESTART_DURATION);
@@ -228,11 +228,11 @@ async fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() -> R
         freerun_time_fast(&fake_time).await;
 
         // Wait longer than the usual restart duration.
-        let mono_before = zx::MonotonicTime::from_nanos(
+        let mono_before = zx::MonotonicInstant::from_nanos(
             fake_time.get_monotonic().await.expect("Failed to get time"),
         );
         poll_until_async!(|| async {
-            let mono_now = zx::MonotonicTime::from_nanos(
+            let mono_now = zx::MonotonicInstant::from_nanos(
                 fake_time.get_monotonic().await.expect("Failed to get time"),
             );
             mono_now - mono_before > INACTIVE_SOURCE_RESTART_DURATION * 4

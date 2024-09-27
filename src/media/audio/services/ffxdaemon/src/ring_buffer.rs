@@ -16,7 +16,7 @@ pub trait RingBuffer {
     /// Starts the ring buffer.
     ///
     /// Returns the CLOCK_MONOTONIC time at which it started.
-    async fn start(&self) -> Result<zx::MonotonicTime, anyhow::Error>;
+    async fn start(&self) -> Result<zx::MonotonicInstant, anyhow::Error>;
 
     /// Stops the ring buffer.
     async fn stop(&self) -> Result<(), anyhow::Error>;
@@ -34,7 +34,7 @@ pub trait RingBuffer {
     async fn set_active_channels(
         &self,
         active_channels_bitmask: u64,
-    ) -> Result<zx::MonotonicTime, anyhow::Error>;
+    ) -> Result<zx::MonotonicInstant, anyhow::Error>;
 }
 
 /// A [RingBuffer] backed by the `fuchsia.hardware.audio.RingBuffer` protocol.
@@ -73,9 +73,9 @@ impl HardwareRingBuffer {
 
 #[async_trait]
 impl RingBuffer for HardwareRingBuffer {
-    async fn start(&self) -> Result<zx::MonotonicTime, anyhow::Error> {
+    async fn start(&self) -> Result<zx::MonotonicInstant, anyhow::Error> {
         let start_time = self.proxy.start().await?;
-        Ok(zx::MonotonicTime::from_nanos(start_time))
+        Ok(zx::MonotonicInstant::from_nanos(start_time))
     }
 
     async fn stop(&self) -> Result<(), anyhow::Error> {
@@ -98,14 +98,14 @@ impl RingBuffer for HardwareRingBuffer {
     async fn set_active_channels(
         &self,
         active_channels_bitmask: u64,
-    ) -> Result<zx::MonotonicTime, anyhow::Error> {
+    ) -> Result<zx::MonotonicInstant, anyhow::Error> {
         let set_time = self
             .proxy
             .set_active_channels(active_channels_bitmask)
             .await
             .context("failed to call SetActiveChannels")?
             .map_err(|err| anyhow!("failed to set active channels: {:?}", err))?;
-        Ok(zx::MonotonicTime::from_nanos(set_time))
+        Ok(zx::MonotonicInstant::from_nanos(set_time))
     }
 }
 
@@ -149,7 +149,7 @@ impl AudioDeviceRingBuffer {
 
 #[async_trait]
 impl RingBuffer for AudioDeviceRingBuffer {
-    async fn start(&self) -> Result<zx::MonotonicTime, anyhow::Error> {
+    async fn start(&self) -> Result<zx::MonotonicInstant, anyhow::Error> {
         let response = self
             .proxy
             .start(&Default::default())
@@ -157,7 +157,7 @@ impl RingBuffer for AudioDeviceRingBuffer {
             .context("failed to call Start")?
             .map_err(|err| anyhow!("failed to start ring buffer: {:?}", err))?;
         let start_time = response.start_time.ok_or_else(|| anyhow!("missing 'start_time'"))?;
-        Ok(zx::MonotonicTime::from_nanos(start_time))
+        Ok(zx::MonotonicInstant::from_nanos(start_time))
     }
 
     async fn stop(&self) -> Result<(), anyhow::Error> {
@@ -185,7 +185,7 @@ impl RingBuffer for AudioDeviceRingBuffer {
     async fn set_active_channels(
         &self,
         active_channels_bitmask: u64,
-    ) -> Result<zx::MonotonicTime, anyhow::Error> {
+    ) -> Result<zx::MonotonicInstant, anyhow::Error> {
         let response = self
             .proxy
             .set_active_channels(&fadevice::RingBufferSetActiveChannelsRequest {
@@ -196,6 +196,6 @@ impl RingBuffer for AudioDeviceRingBuffer {
             .context("failed to call SetActiveChannels")?
             .map_err(|err| anyhow!("failed to set active channels: {:?}", err))?;
         let set_time = response.set_time.unwrap_or(0);
-        Ok(zx::MonotonicTime::from_nanos(set_time))
+        Ok(zx::MonotonicInstant::from_nanos(set_time))
     }
 }

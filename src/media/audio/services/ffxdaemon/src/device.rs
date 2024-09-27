@@ -306,8 +306,8 @@ impl Device {
 
         let start_time = ring_buffer.start().await?;
 
-        let t_zero = zx::MonotonicTime::from_nanos(std::cmp::max(
-            active_channels_set_time.unwrap_or(zx::MonotonicTime::from_nanos(0)).into_nanos(),
+        let t_zero = zx::MonotonicInstant::from_nanos(std::cmp::max(
+            active_channels_set_time.unwrap_or(zx::MonotonicInstant::from_nanos(0)).into_nanos(),
             start_time.into_nanos(),
         ));
 
@@ -356,7 +356,7 @@ impl Device {
             // Check that we woke up on time. Approximate ring buffer pointer position based on
             // the current time and the expected rate of how fast it moves.
             // Ring buffer pointer should be ahead of last byte written.
-            let now = zx::MonotonicTime::get();
+            let now = zx::MonotonicInstant::get();
 
             let duration_since_last_wakeup = now - last_wakeup;
             last_wakeup = now;
@@ -503,7 +503,7 @@ impl Device {
                 // Check that we woke up on time. Determine the ring buffer pointer position based
                 // on the current time and the rate at which it moves.
                 // Ring buffer pointer should be ahead of last byte read.
-                let now = zx::MonotonicTime::get();
+                let now = zx::MonotonicInstant::get();
 
                 if stop_signal.load(Ordering::SeqCst) {
                     break;

@@ -487,17 +487,17 @@ mod tests {
             let msg = read_async(&stdout).await.context("failed to read stdout")?;
             assert_eq!(msg, "");
             assert!(stdout
-                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
                 .is_ok());
             let msg = read_async(&stderr).await.context("failed to read stderr")?;
             assert_eq!(msg, "");
             assert!(stderr
-                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
                 .is_ok());
             let msg = read_async(&syslog).await.context("failed to read syslog")?;
             assert_eq!(msg, "");
             assert!(syslog
-                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
                 .is_ok());
             Ok::<(), Error>(())
         };

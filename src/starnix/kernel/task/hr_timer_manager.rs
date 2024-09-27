@@ -67,7 +67,7 @@ fn connect_to_hrtimer_async() -> Result<fhrtimer::DeviceProxy, Errno> {
 
 fn get_hrtimer_resolution_nsecs(device_proxy: &fhrtimer::DeviceSynchronousProxy) -> Option<i64> {
     match device_proxy
-        .get_properties(zx::MonotonicTime::INFINITE)
+        .get_properties(zx::MonotonicInstant::INFINITE)
         .ok()?
         .timers_properties?
         .get(HRTIMER_DEFAULT_ID as usize)?
@@ -106,7 +106,7 @@ struct HrTimerManagerState {
     ///
     /// When the `stop` method is called, the HrTimer device is stopped and the `current_deadline`
     /// is set to `None`.
-    current_deadline: Option<zx::MonotonicTime>,
+    current_deadline: Option<zx::MonotonicInstant>,
 
     /// The event that is registered with runner to allow the hrtimer to wake the kernel.
     wake_event: Option<zx::EventPair>,
@@ -195,7 +195,7 @@ impl HrTimerManager {
 
             // If the deadline is in the past, set the `ticks` as 0 to trigger event right
             // away.
-            let ticks = std::cmp::max(0, (new_deadline - zx::MonotonicTime::get()).into_nanos())
+            let ticks = std::cmp::max(0, (new_deadline - zx::MonotonicInstant::get()).into_nanos())
                 / resolution_nsecs;
             // Note: This fidl::QueryResponseFut is scheduled when created. To prevent suspend
             // before the next hrtimer is started, it needs to be created before
@@ -268,7 +268,7 @@ impl HrTimerManager {
     }
 
     #[cfg(test)]
-    fn current_deadline(&self) -> Option<zx::MonotonicTime> {
+    fn current_deadline(&self) -> Option<zx::MonotonicInstant> {
         self.lock().current_deadline.clone()
     }
 
@@ -321,7 +321,7 @@ impl HrTimerManager {
         self: &HrTimerManagerHandle,
         wake_source: Option<Weak<dyn OnWakeOps>>,
         new_timer: &HrTimerHandle,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         let mut guard = self.lock();
         let new_timer_node = HrTimerNode::new(deadline, wake_source, new_timer.clone());
@@ -433,7 +433,7 @@ struct HrTimerNode {
     /// The deadline of the associated `HrTimer`.
     ///
     /// This is used to determine the order of the nodes in the heap.
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 
     /// The source where initiated this `HrTimer`.
     ///
@@ -447,7 +447,7 @@ struct HrTimerNode {
 
 impl HrTimerNode {
     fn new(
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
         wake_source: Option<Weak<dyn OnWakeOps>>,
         hr_timer: HrTimerHandle,
     ) -> Self {
@@ -568,14 +568,18 @@ mod tests {
     #[fuchsia::test(threads = 3)]
     async fn hr_timer_manager_add_timers() {
         let hrtimer_manager = init_hr_timer_manager();
-        let soonest_deadline = zx::MonotonicTime::from_nanos(1);
+        let soonest_deadline = zx::MonotonicInstant::from_nanos(1);
         let timer1 = HrTimer::new();
         let timer2 = HrTimer::new();
         let timer3 = HrTimer::new();
 
         // Add three timers into the heap.
-        assert!(hrtimer_manager.add_timer(None, &timer3, zx::MonotonicTime::from_nanos(3)).is_ok());
-        assert!(hrtimer_manager.add_timer(None, &timer2, zx::MonotonicTime::from_nanos(2)).is_ok());
+        assert!(hrtimer_manager
+            .add_timer(None, &timer3, zx::MonotonicInstant::from_nanos(3))
+            .is_ok());
+        assert!(hrtimer_manager
+            .add_timer(None, &timer2, zx::MonotonicInstant::from_nanos(2))
+            .is_ok());
         assert!(hrtimer_manager.add_timer(None, &timer1, soonest_deadline).is_ok());
 
         // Make sure the deadline of the current running timer is the soonest.
@@ -587,11 +591,11 @@ mod tests {
         let hrtimer_manager = init_hr_timer_manager();
 
         let timer1 = HrTimer::new();
-        let sooner_deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(1));
+        let sooner_deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(1));
         assert!(hrtimer_manager.add_timer(None, &timer1, sooner_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
 
-        let later_deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(1));
+        let later_deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(1));
         assert!(later_deadline > sooner_deadline);
         assert!(hrtimer_manager.add_timer(None, &timer1, later_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
@@ -605,14 +609,14 @@ mod tests {
 
         let timer1 = HrTimer::new();
         let timer2 = HrTimer::new();
-        let timer2_deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(2));
+        let timer2_deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(2));
         let timer3 = HrTimer::new();
-        let timer3_deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(3));
+        let timer3_deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(3));
 
         assert!(hrtimer_manager.add_timer(None, &timer3, timer3_deadline).is_ok());
         assert!(hrtimer_manager.add_timer(None, &timer2, timer2_deadline).is_ok());
         assert!(hrtimer_manager
-            .add_timer(None, &timer1, zx::MonotonicTime::after(zx::Duration::from_seconds(1)))
+            .add_timer(None, &timer1, zx::MonotonicInstant::after(zx::Duration::from_seconds(1)))
             .is_ok());
 
         assert!(hrtimer_manager.remove_timer(&timer1).is_ok());
@@ -627,7 +631,7 @@ mod tests {
         let hrtimer_manager = init_hr_timer_manager();
         let timer = HrTimer::new();
         assert!(hrtimer_manager
-            .add_timer(None, &timer, zx::MonotonicTime::after(zx::Duration::from_seconds(1)))
+            .add_timer(None, &timer, zx::MonotonicInstant::after(zx::Duration::from_seconds(1)))
             .is_ok());
         assert!(hrtimer_manager.remove_timer(&timer).is_ok());
         assert!(hrtimer_manager.current_deadline().is_none());
@@ -638,8 +642,8 @@ mod tests {
         let hrtimer_manager = init_hr_timer_manager();
 
         let timer = HrTimer::new();
-        let sooner_deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(1));
-        let later_deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(2));
+        let sooner_deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(1));
+        let later_deadline = zx::MonotonicInstant::after(zx::Duration::from_seconds(2));
 
         assert!(hrtimer_manager.add_timer(None, &timer, later_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
@@ -651,7 +655,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn hr_timer_node_cmp() {
-        let time = zx::MonotonicTime::after(zx::Duration::from_seconds(1));
+        let time = zx::MonotonicInstant::after(zx::Duration::from_seconds(1));
         let timer1 = HrTimer::new();
         let node1 = HrTimerNode::new(time, None, timer1.clone());
         let timer2 = HrTimer::new();

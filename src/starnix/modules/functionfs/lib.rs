@@ -137,13 +137,13 @@ fn connect_to_device() -> Result<(fadb::DeviceSynchronousProxy, AdbHandle), Errn
         let (adb_proxy, server_end) =
             fidl::endpoints::create_sync_proxy::<fadb::UsbAdbImpl_Marker>();
         device_proxy
-            .start(server_end, zx::MonotonicTime::INFINITE)
+            .start(server_end, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(EINVAL))?
             .map_err(|_| errno!(EINVAL))?;
 
         loop {
             let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
-                .wait_for_event(zx::MonotonicTime::INFINITE)
+                .wait_for_event(zx::MonotonicInstant::INFINITE)
                 .expect("failed to wait for event");
             if status == fadb::StatusFlags::ONLINE {
                 break;
@@ -206,7 +206,7 @@ impl FunctionFsRootDir {
                 .device_proxy
                 .as_ref()
                 .expect("Device Proxy is required")
-                .stop(zx::MonotonicTime::INFINITE)
+                .stop(zx::MonotonicInstant::INFINITE)
                 .map_err(|_| errno!(EINVAL));
         }
     }
@@ -456,7 +456,7 @@ impl FileOps for FunctionFsInputEndpoint {
             .expect("failed to downcast functionfs root dir");
         let adb = rootdir.get_adb()?;
 
-        match adb.queue_tx(&bytes, zx::MonotonicTime::INFINITE) {
+        match adb.queue_tx(&bytes, zx::MonotonicInstant::INFINITE) {
             Err(err) => {
                 log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
                 return error!(EINVAL);
@@ -509,7 +509,7 @@ impl FileOps for FunctionFsOutputFileObject {
             .expect("failed to downcast functionfs root dir");
         let adb = rootdir.get_adb()?;
 
-        match adb.receive(zx::MonotonicTime::INFINITE) {
+        match adb.receive(zx::MonotonicInstant::INFINITE) {
             Err(err) => {
                 log_warn!("Failed to call UsbAdbImpl.Receive: {err}");
                 return error!(EINVAL);

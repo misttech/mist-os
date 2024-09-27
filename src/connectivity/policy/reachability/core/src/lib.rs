@@ -569,12 +569,15 @@ struct PersistentNetworkCheckContext {
     // Map of resolved IP addresses indexed by domain name.
     resolved_addrs: HashMap<String, ResolvedIps>,
     // Dns Resolve Time
-    resolved_time: zx::MonotonicTime,
+    resolved_time: zx::MonotonicInstant,
 }
 
 impl Default for PersistentNetworkCheckContext {
     fn default() -> Self {
-        Self { resolved_addrs: Default::default(), resolved_time: zx::MonotonicTime::INFINITE_PAST }
+        Self {
+            resolved_addrs: Default::default(),
+            resolved_time: zx::MonotonicInstant::INFINITE_PAST,
+        }
     }
 }
 
@@ -758,19 +761,19 @@ pub enum NetworkCheckAction {
 }
 
 pub trait TimeProvider {
-    fn now(&mut self) -> zx::MonotonicTime;
+    fn now(&mut self) -> zx::MonotonicInstant;
 }
 
 #[derive(Debug, Default)]
-pub struct MonotonicTime;
-impl TimeProvider for MonotonicTime {
-    fn now(&mut self) -> zx::MonotonicTime {
-        zx::MonotonicTime::get()
+pub struct MonotonicInstant;
+impl TimeProvider for MonotonicInstant {
+    fn now(&mut self) -> zx::MonotonicInstant {
+        zx::MonotonicInstant::get()
     }
 }
 
 /// `Monitor` monitors the reachability state.
-pub struct Monitor<Time = MonotonicTime> {
+pub struct Monitor<Time = MonotonicInstant> {
     state: StateInfo,
     stats: Stats,
     inspector: Option<&'static Inspector>,
@@ -1448,11 +1451,11 @@ mod tests {
 
     struct FakeTime {
         increment: zx::Duration,
-        time: zx::MonotonicTime,
+        time: zx::MonotonicInstant,
     }
 
     impl TimeProvider for FakeTime {
-        fn now(&mut self) -> zx::MonotonicTime {
+        fn now(&mut self) -> zx::MonotonicInstant {
             let result = self.time;
             self.time += self.increment;
             result
@@ -1752,7 +1755,7 @@ mod tests {
             sender,
             FakeTime {
                 increment: sleep_between.unwrap_or(zx::Duration::from_nanos(10)),
-                time: zx::MonotonicTime::get(),
+                time: zx::MonotonicInstant::get(),
             },
         )
         .unwrap();
@@ -2022,7 +2025,7 @@ mod tests {
                     neighbors: [(
                         net1_gateway,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2052,7 +2055,7 @@ mod tests {
                     neighbors: [(
                         net1,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2082,7 +2085,7 @@ mod tests {
                     neighbors: [(
                         net1_gateway,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2128,7 +2131,7 @@ mod tests {
                     neighbors: [(
                         net1_gateway,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2210,7 +2213,7 @@ mod tests {
                     neighbors: [(
                         net1,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2236,7 +2239,7 @@ mod tests {
                     neighbors: [(
                         net1,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2262,7 +2265,7 @@ mod tests {
                     neighbors: [(
                         net1,
                         NeighborState::new(NeighborHealth::Healthy {
-                            last_observed: fuchsia_zircon::MonotonicTime::default(),
+                            last_observed: fuchsia_zircon::MonotonicInstant::default(),
                         })
                     )]
                     .iter()
@@ -2289,7 +2292,7 @@ mod tests {
                         (
                             net1,
                             NeighborState::new(NeighborHealth::Healthy {
-                                last_observed: fuchsia_zircon::MonotonicTime::default(),
+                                last_observed: fuchsia_zircon::MonotonicInstant::default(),
                             })
                         ),
                         (
@@ -2568,12 +2571,12 @@ mod tests {
             addresses: vec![
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("1.2.3.0/24"),
-                    valid_until: fuchsia_zircon::MonotonicTime::INFINITE.into_nanos(),
+                    valid_until: fuchsia_zircon::MonotonicInstant::INFINITE.into_nanos(),
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("123::4/64"),
-                    valid_until: fuchsia_zircon::MonotonicTime::INFINITE.into_nanos(),
+                    valid_until: fuchsia_zircon::MonotonicInstant::INFINITE.into_nanos(),
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
             ],

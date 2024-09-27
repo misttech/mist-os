@@ -196,7 +196,7 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(fuchsia_zircon::MonotonicTime::after(
+            fasync::Timer::new(fuchsia_zircon::MonotonicInstant::after(
                 fuchsia_zircon::Duration::from_millis(100),
             ))
             .await;
@@ -210,7 +210,7 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(fuchsia_zircon::MonotonicTime::after(
+            fasync::Timer::new(fuchsia_zircon::MonotonicInstant::after(
                 fuchsia_zircon::Duration::from_millis(100),
             ))
             .await;

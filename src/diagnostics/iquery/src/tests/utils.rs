@@ -184,7 +184,7 @@ impl<'a> CommandAssertion<'a> {
     }
 
     pub(crate) async fn assert(self) {
-        let started = zx::MonotonicTime::get().into_nanos();
+        let started = zx::MonotonicInstant::get().into_nanos();
         let format_str = self.format.to_string();
         let command_str = self.command.to_string();
         let mut command_line = vec!["--format", &format_str, &command_str];
@@ -193,7 +193,7 @@ impl<'a> CommandAssertion<'a> {
             match execute_command(&command_line[..]).await {
                 Ok(mut result) => {
                     result = self.cleanup_unrelated_components(result);
-                    let now = zx::MonotonicTime::get().into_nanos();
+                    let now = zx::MonotonicInstant::get().into_nanos();
                     if now
                         >= started
                             + zx::Duration::from_seconds(self.max_retry_time_seconds).into_nanos()
@@ -206,7 +206,7 @@ impl<'a> CommandAssertion<'a> {
                     }
                 }
                 Err(e) => {
-                    let now = zx::MonotonicTime::get().into_nanos();
+                    let now = zx::MonotonicInstant::get().into_nanos();
                     if now
                         >= started
                             + zx::Duration::from_seconds(self.max_retry_time_seconds).into_nanos()

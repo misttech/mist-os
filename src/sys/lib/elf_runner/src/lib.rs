@@ -456,7 +456,7 @@ impl ElfRunner {
 
         // Add UTC estimate of the process start time to the runtime dir.
         let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, zx::Signals::CLOCK_STARTED)
-            .on_timeout(zx::MonotonicTime::after(zx::Duration::default()), || {
+            .on_timeout(zx::MonotonicInstant::after(zx::Duration::default()), || {
                 Err(zx::Status::TIMED_OUT)
             })
             .await
@@ -466,7 +466,7 @@ impl ElfRunner {
             .flatten();
         if let Some(clock_transformation) = clock_transformation {
             let utc_timestamp = clock_transformation
-                .apply(zx::MonotonicTime::from_nanos(process_start_time))
+                .apply(zx::MonotonicInstant::from_nanos(process_start_time))
                 .into_nanos();
             let seconds = (utc_timestamp / 1_000_000_000) as i64;
             let nanos = (utc_timestamp % 1_000_000_000) as u32;

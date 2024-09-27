@@ -49,7 +49,7 @@ pub struct KalmanFilter {
     /// A reference utc from which the estimate is maintained.
     reference_utc: UtcTime,
     /// The monotonic time at which the estimate applies.
-    monotonic: zx::MonotonicTime,
+    monotonic: zx::MonotonicInstant,
     /// Element 0 of the state vector, i.e. estimated utc after reference_utc, in nanoseconds.
     estimate_0: f64,
     /// Element 1 of the state vector, i.e. utc nanoseconds per monotonic nanosecond.
@@ -76,7 +76,7 @@ impl KalmanFilter {
     }
 
     /// Propagate the estimate forward to the requested monotonic time.
-    fn predict(&mut self, monotonic: &zx::MonotonicTime) {
+    fn predict(&mut self, monotonic: &zx::MonotonicInstant) {
         let monotonic_step = duration_to_f64(*monotonic - self.monotonic);
         self.monotonic = monotonic.clone();
         // Estimated UTC increases by (change in monotonic time) * frequency.
@@ -148,7 +148,7 @@ impl KalmanFilter {
     }
 
     /// Returns the monotonic time of the last state update.
-    pub fn monotonic(&self) -> zx::MonotonicTime {
+    pub fn monotonic(&self) -> zx::MonotonicInstant {
         self.monotonic
     }
 
@@ -169,8 +169,8 @@ mod test {
     use crate::make_test_config;
     use test_util::assert_near;
 
-    const TIME_1: zx::MonotonicTime = zx::MonotonicTime::from_nanos(10_000_000_000);
-    const TIME_2: zx::MonotonicTime = zx::MonotonicTime::from_nanos(20_000_000_000);
+    const TIME_1: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(10_000_000_000);
+    const TIME_2: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(20_000_000_000);
     const OFFSET_1: zx::Duration = zx::Duration::from_seconds(777);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(999);
     const STD_DEV_1: zx::Duration = zx::Duration::from_millis(22);
@@ -218,7 +218,7 @@ mod test {
         let mut filter = KalmanFilter::new(
             &Sample::new(
                 UtcTime::from_nanos(10001_000000000),
-                zx::MonotonicTime::from_nanos(1_000000000),
+                zx::MonotonicInstant::from_nanos(1_000000000),
                 zx::Duration::from_millis(50),
             ),
             config,
@@ -232,7 +232,7 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcTime::from_nanos(10101_100000000),
-                    zx::MonotonicTime::from_nanos(101_000000000),
+                    zx::MonotonicInstant::from_nanos(101_000000000),
                     zx::Duration::from_millis(200),
                 ))
                 .unwrap(),
@@ -246,7 +246,7 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcTime::from_nanos(10300_900000000),
-                    zx::MonotonicTime::from_nanos(301_000000000),
+                    zx::MonotonicInstant::from_nanos(301_000000000),
                     zx::Duration::from_millis(100),
                 ))
                 .unwrap(),
@@ -263,7 +263,7 @@ mod test {
         let mut filter = KalmanFilter::new(
             &Sample::new(
                 UtcTime::from_nanos(10001_000000000),
-                zx::MonotonicTime::from_nanos(1_000000000),
+                zx::MonotonicInstant::from_nanos(1_000000000),
                 zx::Duration::from_millis(50),
             ),
             Arc::clone(&config),
@@ -272,7 +272,7 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcTime::from_nanos(10201_000000000),
-                    zx::MonotonicTime::from_nanos(201_000000000),
+                    zx::MonotonicInstant::from_nanos(201_000000000),
                     zx::Duration::from_millis(50),
                 ))
                 .unwrap(),
@@ -285,7 +285,7 @@ mod test {
         assert_eq!(
             filter.transform(),
             UtcTransform {
-                reference_offset: zx::MonotonicTime::from_nanos(201_000000000),
+                reference_offset: zx::MonotonicInstant::from_nanos(201_000000000),
                 synthetic_offset: UtcTime::from_nanos(10201_000000000),
                 rate_adjust_ppm: 0,
                 error_bound_at_offset: 70774174,
@@ -303,7 +303,7 @@ mod test {
         assert_eq!(
             filter.transform(),
             UtcTransform {
-                reference_offset: zx::MonotonicTime::from_nanos(201_000000000),
+                reference_offset: zx::MonotonicInstant::from_nanos(201_000000000),
                 synthetic_offset: UtcTime::from_nanos(10201_000000000),
                 rate_adjust_ppm: -100,
                 error_bound_at_offset: 70774174,
@@ -318,7 +318,7 @@ mod test {
             filter
                 .update(&Sample::new(
                     UtcTime::from_nanos(10301_000000000),
-                    zx::MonotonicTime::from_nanos(301_000000000),
+                    zx::MonotonicInstant::from_nanos(301_000000000),
                     zx::Duration::from_millis(50),
                 ))
                 .unwrap(),

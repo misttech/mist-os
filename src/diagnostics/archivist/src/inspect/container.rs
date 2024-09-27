@@ -401,26 +401,26 @@ impl State {
     fn into_pending(
         self,
         pending: collector::InspectHandleDeque,
-        start_time: zx::MonotonicTime,
+        start_time: zx::MonotonicInstant,
     ) -> Self {
         Self {
             unpopulated: self.unpopulated,
             status: Status::Pending(pending),
             batch_timeout: self.batch_timeout,
             global_stats: self.global_stats,
-            elapsed_time: self.elapsed_time + (zx::MonotonicTime::get() - start_time),
+            elapsed_time: self.elapsed_time + (zx::MonotonicInstant::get() - start_time),
             trace_guard: self.trace_guard,
             trace_id: self.trace_id,
         }
     }
 
-    fn add_elapsed_time(&mut self, start_time: zx::MonotonicTime) {
-        self.elapsed_time += zx::MonotonicTime::get() - start_time
+    fn add_elapsed_time(&mut self, start_time: zx::MonotonicInstant) {
+        self.elapsed_time += zx::MonotonicInstant::get() - start_time
     }
 
     async fn iterate(
         mut self,
-        start_time: zx::MonotonicTime,
+        start_time: zx::MonotonicInstant,
     ) -> Option<(PopulatedInspectDataContainer, State)> {
         loop {
             match &mut self.status {
@@ -433,7 +433,7 @@ impl State {
                     None => {
                         self.global_stats.record_component_duration(
                             self.unpopulated.identity.moniker.to_string(),
-                            self.elapsed_time + (zx::MonotonicTime::get() - start_time),
+                            self.elapsed_time + (zx::MonotonicInstant::get() - start_time),
                         );
                         return None;
                     }
@@ -510,7 +510,7 @@ impl UnpopulatedInspectDataContainer {
             let timeout = state.batch_timeout;
             let elapsed_time = state.elapsed_time;
             let global_stats = Arc::clone(&state.global_stats);
-            let start_time = zx::MonotonicTime::get();
+            let start_time = zx::MonotonicInstant::get();
             let trace_guard = Arc::clone(&state.trace_guard);
             let trace_id = state.trace_id;
 
@@ -535,7 +535,7 @@ impl UnpopulatedInspectDataContainer {
                             unpopulated: unpopulated_for_timeout,
                             batch_timeout: timeout,
                             global_stats,
-                            elapsed_time: elapsed_time + (zx::MonotonicTime::get() - start_time),
+                            elapsed_time: elapsed_time + (zx::MonotonicInstant::get() - start_time),
                             trace_guard,
                             trace_id,
                         },

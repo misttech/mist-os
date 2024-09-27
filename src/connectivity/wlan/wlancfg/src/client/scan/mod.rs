@@ -131,7 +131,7 @@ pub async fn serve_scanning_loop(
             request = scan_request_channel.next() => {
                 match request {
                     Some(ApiScanRequest::Scan(reason, ssids, channels, responder)) => {
-                        queue.add_request(reason, ssids, channels, responder, zx::MonotonicTime::get());
+                        queue.add_request(reason, ssids, channels, responder, zx::MonotonicInstant::get());
                         // Check if there's an ongoing scan, otherwise take one from the queue
                         if ongoing_scan.is_terminated() {
                             ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
@@ -156,7 +156,7 @@ pub async fn serve_scanning_loop(
                     }
                 }
                 // Send scan results to requesters
-                queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::MonotonicTime::get());
+                queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::MonotonicInstant::get());
                 // Get the next (if any) request from the queue
                 ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
             },
@@ -638,7 +638,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -652,7 +652,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa2,
                 bssid: [1, 2, 3, 4, 5, 6],
@@ -664,7 +664,7 @@ mod tests {
         };
         let sme_result_3 = fidl_sme::ScanResult {
             compatibility: None,
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 bssid: [7, 8, 9, 10, 11, 12],
@@ -686,7 +686,7 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
                         signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
-                        timestamp: zx::MonotonicTime::from_nanos(sme_result_1.timestamp_nanos),
+                        timestamp: zx::MonotonicInstant::from_nanos(sme_result_1.timestamp_nanos),
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                         observation,
                         compatibility: Compatibility::expect_some([
@@ -697,7 +697,7 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid::from([7, 8, 9, 10, 11, 12]),
                         signal: types::Signal { rssi_dbm: 13, snr_db: 3 },
-                        timestamp: zx::MonotonicTime::from_nanos(sme_result_3.timestamp_nanos),
+                        timestamp: zx::MonotonicInstant::from_nanos(sme_result_3.timestamp_nanos),
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
                         observation,
                         compatibility: None,
@@ -712,7 +712,7 @@ mod tests {
                 entries: vec![types::Bss {
                     bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
                     signal: types::Signal { rssi_dbm: 7, snr_db: 2 },
-                    timestamp: zx::MonotonicTime::from_nanos(sme_result_2.timestamp_nanos),
+                    timestamp: zx::MonotonicInstant::from_nanos(sme_result_2.timestamp_nanos),
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
                     observation,
                     compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
@@ -1108,7 +1108,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -1122,7 +1122,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
@@ -1141,7 +1141,7 @@ mod tests {
                 compatibility: Some(Box::new(fidl_sme::Compatibility {
                     mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
                 })),
-                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+                timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
                 bss_description: random_fidl_bss_description!(
                     Wpa3,
                     bssid: [0, 0, 0, 0, 0, 0],
@@ -1164,7 +1164,7 @@ mod tests {
             types::Bss {
                 bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
                 signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
-                timestamp: zx::MonotonicTime::from_nanos(first_result.timestamp_nanos),
+                timestamp: zx::MonotonicInstant::from_nanos(first_result.timestamp_nanos),
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
@@ -1173,7 +1173,7 @@ mod tests {
             types::Bss {
                 bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
                 signal: types::Signal { rssi_dbm: 101, snr_db: 101 },
-                timestamp: zx::MonotonicTime::from_nanos(second_result.timestamp_nanos),
+                timestamp: zx::MonotonicInstant::from_nanos(second_result.timestamp_nanos),
                 channel: types::WlanChan::new(101, types::Cbw::Cbw40),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),

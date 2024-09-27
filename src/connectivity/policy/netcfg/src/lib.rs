@@ -3401,7 +3401,7 @@ mod tests {
     fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
         fnet_interfaces::Address {
             addr: Some(addr),
-            valid_until: Some(fuchsia_zircon::MonotonicTime::INFINITE.into_nanos()),
+            valid_until: Some(fuchsia_zircon::MonotonicInstant::INFINITE.into_nanos()),
             assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
             ..Default::default()
         }
@@ -3669,7 +3669,7 @@ mod tests {
         fnet_interfaces_admin::AddressParameters {
             initial_properties: Some(fnet_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
-                valid_lifetime_end: Some(zx::MonotonicTime::INFINITE.into_nanos()),
+                valid_lifetime_end: Some(zx::MonotonicInstant::INFINITE.into_nanos()),
                 ..Default::default()
             }),
             temporary: Some(true),

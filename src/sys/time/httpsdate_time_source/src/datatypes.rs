@@ -12,9 +12,9 @@ use time_metrics_registry::HttpsdateBoundSizeMigratedMetricDimensionPhase as Cob
 #[derive(Clone, Debug, PartialEq)]
 pub struct HttpsSample {
     /// The utc time sample.
-    pub utc: zx::MonotonicTime,
+    pub utc: zx::MonotonicInstant,
     /// Monotonic time at which the `utc` sample was most valid.
-    pub monotonic: zx::MonotonicTime,
+    pub monotonic: zx::MonotonicInstant,
     /// Standard deviation of the error distribution of `utc`.
     pub standard_deviation: zx::Duration,
     /// The size of the final bound on utc time for the sample.
@@ -85,8 +85,8 @@ mod test {
 
     #[fuchsia::test]
     fn test_https_sample_into_update() {
-        let utc_time = zx::MonotonicTime::from_nanos(111_111_111_111);
-        let monotonic_time = zx::MonotonicTime::from_nanos(222_222_222_222);
+        let utc_time = zx::MonotonicInstant::from_nanos(111_111_111_111);
+        let monotonic_time = zx::MonotonicInstant::from_nanos(222_222_222_222);
         let standard_deviation = zx::Duration::from_nanos(333_333);
 
         let sample = HttpsSample {

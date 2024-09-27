@@ -45,7 +45,7 @@ use injectable_time::TimeSource;
 use injectable_time::UtcTime as TimeType;
 
 #[cfg(target_os = "fuchsia")]
-use injectable_time::MonotonicTime as TimeType;
+use injectable_time::MonotonicInstant as TimeType;
 
 /// A trait of a standardized health checker.
 ///

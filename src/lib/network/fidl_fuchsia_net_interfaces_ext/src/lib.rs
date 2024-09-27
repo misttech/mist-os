@@ -179,7 +179,7 @@ pub struct Address {
     ///
     /// Its value must be greater than 0. A value of zx.time.INFINITE indicates
     /// that the address will always be valid.
-    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicTime once there is support for custom
+    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicInstant once there is support for custom
     // conversion functions.
     pub valid_until: zx::zx_time_t,
     /// The address's assignment state.

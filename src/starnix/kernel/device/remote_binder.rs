@@ -612,7 +612,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let offset = payload.offset.ok_or_else(|| errno!(EINVAL))?;
                         let value = payload.value.ok_or_else(|| errno!(EINVAL))?;
                         let mask = payload.mask.unwrap_or(u32::MAX);
-                        let deadline = payload.deadline.map(zx::MonotonicTime::from_nanos);
+                        let deadline = payload.deadline.map(zx::MonotonicInstant::from_nanos);
                         kernel
                             .shared_futexes
                             .external_wait(vmo.into(), offset, value, mask)

@@ -74,7 +74,7 @@ impl Tracing {
         trace_session
             .start_tracing(
                 &fidl_fuchsia_tracing_controller::StartOptions::default(),
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .map_err(|e| format_err!("Encountered FIDL error when starting trace: {e:?}"))?
             .map_err(|e| format_err!("Failed to start tracing: {e:?}"))?;
@@ -116,7 +116,7 @@ impl Tracing {
                     write_results: Some(true),
                     ..Default::default()
                 },
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .map_err(|e| format_err!("Failed to stop tracing: {:?}", e));
 

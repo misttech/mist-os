@@ -2521,7 +2521,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
     async fn add_address(
         address: &fnet::Subnet,
-        valid_until: zx::MonotonicTime,
+        valid_until: zx::MonotonicInstant,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         id: u64,
         interface_state: &fidl_fuchsia_net_interfaces::StateProxy,
@@ -2535,7 +2535,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                 &fidl_fuchsia_net_interfaces_admin::AddressParameters {
                     initial_properties: Some(
                         fidl_fuchsia_net_interfaces_admin::AddressProperties {
-                            valid_lifetime_end: (valid_until != zx::MonotonicTime::INFINITE)
+                            valid_lifetime_end: (valid_until != zx::MonotonicInstant::INFINITE)
                                 .then(|| valid_until.into_nanos()),
                             ..Default::default()
                         },
@@ -2559,7 +2559,10 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                             fnet_interfaces::AddressAssignmentState::Assigned
                         );
                         if addr == *address {
-                            assert_eq!(zx::MonotonicTime::from_nanos(got_valid_until), valid_until);
+                            assert_eq!(
+                                zx::MonotonicInstant::from_nanos(got_valid_until),
+                                valid_until
+                            );
                             true
                         } else {
                             false
@@ -2578,7 +2581,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         // Add an address with infinite valid_until and explicitly remove it.
         let _address_state_provider = add_address(
             &address,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
             &interface.control(),
             id,
             &interface_state,
@@ -2615,7 +2618,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         // Add an address with finite valid_until and explicitly remove it.
         let _address_state_provider = add_address(
             &address,
-            zx::MonotonicTime::from_nanos(1234),
+            zx::MonotonicInstant::from_nanos(1234),
             &interface.control(),
             id,
             &interface_state,
@@ -2653,7 +2656,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         // the address was removed.
         let address_state_provider = add_address(
             &address,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
             &interface.control(),
             id,
             &interface_state,

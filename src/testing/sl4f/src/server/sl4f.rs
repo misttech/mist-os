@@ -244,7 +244,7 @@ impl Sl4f {
             Ok(_) => {
                 let facade_iter = FacadeIteratorSynchronousProxy::new(client_end.into_channel());
                 loop {
-                    match facade_iter.get_next(zx::MonotonicTime::INFINITE) {
+                    match facade_iter.get_next(zx::MonotonicInstant::INFINITE) {
                         Ok(facades) if facades.is_empty() => break, // Indicates completion.
                         Ok(facades) => proxied_facades.extend(facades.into_iter()),
                         // A PEER_CLOSED error before any facades are read indicates that there was

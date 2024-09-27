@@ -19,7 +19,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
-use injectable_time::{MonotonicTime, TimeSource};
+use injectable_time::{MonotonicInstant, TimeSource};
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker};
 use std::collections::{BTreeMap, VecDeque};
@@ -83,7 +83,7 @@ pub struct ComponentTreeStats<T: RuntimeStatsSource + Debug> {
 
 impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T> {
     pub async fn new(node: inspect::Node) -> Arc<Self> {
-        Self::new_with_timesource(node, Arc::new(MonotonicTime::new())).await
+        Self::new_with_timesource(node, Arc::new(MonotonicInstant::new())).await
     }
 
     async fn new_with_timesource(
@@ -263,7 +263,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     /// anymore it deletes it. If any component is not alive any more and no more historical
     /// measurements are available for it, deletes it too.
     pub async fn measure(self: &Arc<Self>) {
-        let start = zx::MonotonicTime::get();
+        let start = zx::MonotonicInstant::get();
 
         // Copy the stats and release the lock.
         let stats = self
@@ -311,7 +311,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         }
 
         self.totals.lock().await.insert(aggregated);
-        self.processing_times.insert((zx::MonotonicTime::get() - start).into_nanos());
+        self.processing_times.insert((zx::MonotonicInstant::get() - start).into_nanos());
     }
 
     async fn prune_dead_tasks(self: &Arc<Self>, max_dead_tasks: usize) {
@@ -386,7 +386,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         weak_self: Weak<Self>,
         moniker: ExtendedMoniker,
         receiver: oneshot::Receiver<C>,
-        start_time: zx::MonotonicTime,
+        start_time: zx::MonotonicInstant,
     ) where
         C: RuntimeStatsContainer<T> + Send + Sync + 'static,
     {

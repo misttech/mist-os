@@ -61,7 +61,7 @@ impl GrallocFile {
                     vulkan_mode: Some(vulkan_mode),
                     ..Default::default()
                 },
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .expect("gralloc feature requires working VulkanModeSetter")
             .expect("gralloc feature requires VulkanModeSetter to set mode");

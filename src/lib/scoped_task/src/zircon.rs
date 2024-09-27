@@ -176,7 +176,7 @@ impl<T: zx::Task> Deref for Scoped<T> {
 fn kill<T: zx::Task>(process: &T, what: &'static str) {
     let result: Result<(), zx::Status> = (|| {
         process.kill()?;
-        process.wait_handle(zx::Signals::TASK_TERMINATED, zx::MonotonicTime::INFINITE)?;
+        process.wait_handle(zx::Signals::TASK_TERMINATED, zx::MonotonicInstant::INFINITE)?;
         Ok(())
     })();
     match result {

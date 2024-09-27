@@ -32,7 +32,7 @@ impl InterestFilter {
         let (proxy, min_severity) = if wait_for_initial_interest {
             let sync_proxy = LogSinkSynchronousProxy::new(proxy.into_channel().unwrap().into());
             let initial_severity =
-                match sync_proxy.wait_for_interest_change(zx::MonotonicTime::INFINITE) {
+                match sync_proxy.wait_for_interest_change(zx::MonotonicInstant::INFINITE) {
                     Ok(Ok(initial_interest)) => {
                         initial_interest.min_severity.unwrap_or(default_severity)
                     }

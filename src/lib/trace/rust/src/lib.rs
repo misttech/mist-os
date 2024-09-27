@@ -89,7 +89,7 @@ impl Id {
     /// TODO(https://fxbug.dev/42054669) Delete this and migrate clients to `Id::new` once UIs stop grouping
     /// async durations with the same trace id but different process ids.
     pub fn random() -> Self {
-        let ts = zx::MonotonicTime::get().into_nanos() as u64;
+        let ts = zx::MonotonicInstant::get().into_nanos() as u64;
         let high_order = ts << 16;
         let low_order = rand::random::<u16>() as u64;
         Self(high_order | low_order)

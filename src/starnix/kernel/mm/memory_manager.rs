@@ -5152,7 +5152,7 @@ mod tests {
 
         // Create a thread to service the port where we will receive pager requests.
         let thread = std::thread::spawn(move || loop {
-            let packet = port_clone.wait(zx::MonotonicTime::INFINITE).expect("wait failed");
+            let packet = port_clone.wait(zx::MonotonicInstant::INFINITE).expect("wait failed");
             match packet.contents() {
                 zx::PacketContents::Pager(contents) => {
                     if contents.command() == ZX_PAGER_VMO_READ {

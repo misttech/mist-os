@@ -74,7 +74,7 @@ impl DeviceOps for FullmacDevice {
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status> {
         self.fullmac_impl_sync_proxy
-            .start(fullmac_ifc_client_end, zx::MonotonicTime::INFINITE)
+            .start(fullmac_ifc_client_end, zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
                 tracing::error!("FIDL error on Start: {}", e);
                 zx::Status::INTERNAL
@@ -84,21 +84,21 @@ impl DeviceOps for FullmacDevice {
 
     fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
         self.fullmac_impl_sync_proxy
-            .query(zx::MonotonicTime::INFINITE)
+            .query(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QueryDeviceInfo")?
             .map_err(|e| format_err!("Driver returned error on QueryDeviceInfo: {}", e))
     }
 
     fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport> {
         self.fullmac_impl_sync_proxy
-            .query_mac_sublayer_support(zx::MonotonicTime::INFINITE)
+            .query_mac_sublayer_support(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QueryMacSublayerSupport")?
             .map_err(|e| format_err!("Driver returned error on QueryMacSublayerSupport: {}", e))
     }
 
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport> {
         self.fullmac_impl_sync_proxy
-            .query_security_support(zx::MonotonicTime::INFINITE)
+            .query_security_support(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QuerySecuritySupport")?
             .map_err(|e| format_err!("Driver returned error on QuerySecuritySupport: {}", e))
     }
@@ -107,7 +107,7 @@ impl DeviceOps for FullmacDevice {
         &self,
     ) -> anyhow::Result<fidl_common::SpectrumManagementSupport> {
         self.fullmac_impl_sync_proxy
-            .query_spectrum_management_support(zx::MonotonicTime::INFINITE)
+            .query_spectrum_management_support(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QuerySpectrumManagementSupport")?
             .map_err(|e| {
                 format_err!("Driver returned error on QuerySpectrumManagementSupport: {}", e)
@@ -116,27 +116,27 @@ impl DeviceOps for FullmacDevice {
 
     fn start_scan(&self, req: fidl_fullmac::WlanFullmacImplStartScanRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .start_scan(&req, zx::MonotonicTime::INFINITE)
+            .start_scan(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on StartScan")
     }
     fn connect(&self, req: fidl_fullmac::WlanFullmacImplConnectRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .connect(&req, zx::MonotonicTime::INFINITE)
+            .connect(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Connect")
     }
     fn reconnect(&self, req: fidl_fullmac::WlanFullmacImplReconnectRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .reconnect(&req, zx::MonotonicTime::INFINITE)
+            .reconnect(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Reconnect")
     }
     fn auth_resp(&self, resp: fidl_fullmac::WlanFullmacImplAuthRespRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .auth_resp(&resp, zx::MonotonicTime::INFINITE)
+            .auth_resp(&resp, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on AuthResp")
     }
     fn deauth(&self, req: fidl_fullmac::WlanFullmacImplDeauthRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .deauth(&req, zx::MonotonicTime::INFINITE)
+            .deauth(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Deauth")
     }
     fn assoc_resp(
@@ -144,27 +144,27 @@ impl DeviceOps for FullmacDevice {
         resp: fidl_fullmac::WlanFullmacImplAssocRespRequest,
     ) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .assoc_resp(&resp, zx::MonotonicTime::INFINITE)
+            .assoc_resp(&resp, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on AssocResp")
     }
     fn disassoc(&self, req: fidl_fullmac::WlanFullmacImplDisassocRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .disassoc(&req, zx::MonotonicTime::INFINITE)
+            .disassoc(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Disassoc")
     }
     fn reset(&self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .reset(&req, zx::MonotonicTime::INFINITE)
+            .reset(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Reset")
     }
     fn start_bss(&self, req: fidl_fullmac::WlanFullmacImplStartBssRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .start_bss(&req, zx::MonotonicTime::INFINITE)
+            .start_bss(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on StartBss")
     }
     fn stop_bss(&self, req: fidl_fullmac::WlanFullmacImplStopBssRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .stop_bss(&req, zx::MonotonicTime::INFINITE)
+            .stop_bss(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on StopBss")
     }
     fn set_keys(
@@ -172,23 +172,23 @@ impl DeviceOps for FullmacDevice {
         req: fidl_fullmac::WlanFullmacImplSetKeysRequest,
     ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp> {
         self.fullmac_impl_sync_proxy
-            .set_keys(&req, zx::MonotonicTime::INFINITE)
+            .set_keys(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on SetKeysReq")
     }
     fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .del_keys(&req, zx::MonotonicTime::INFINITE)
+            .del_keys(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL Error on DelKeysReq")
     }
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .eapol_tx(&req, zx::MonotonicTime::INFINITE)
+            .eapol_tx(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on EapolTx")
     }
     fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
         match self
             .fullmac_impl_sync_proxy
-            .get_iface_counter_stats(zx::MonotonicTime::INFINITE)
+            .get_iface_counter_stats(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on GetIfaceCounterStats")?
         {
             Ok(stats) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::Stats(
@@ -202,7 +202,7 @@ impl DeviceOps for FullmacDevice {
     ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse> {
         match self
             .fullmac_impl_sync_proxy
-            .get_iface_histogram_stats(zx::MonotonicTime::INFINITE)
+            .get_iface_histogram_stats(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on GetIfaceHistogramStats")?
         {
             Ok(stats) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
@@ -216,22 +216,22 @@ impl DeviceOps for FullmacDevice {
         resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
     ) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .sae_handshake_resp(&resp, zx::MonotonicTime::INFINITE)
+            .sae_handshake_resp(&resp, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on SaeHandshakeResp")
     }
     fn sae_frame_tx(&self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .sae_frame_tx(&frame, zx::MonotonicTime::INFINITE)
+            .sae_frame_tx(&frame, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on SaeFrameTx")
     }
     fn wmm_status_req(&self) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .wmm_status_req(zx::MonotonicTime::INFINITE)
+            .wmm_status_req(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on WmmStatusReq")
     }
     fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .on_link_state_changed(online, zx::MonotonicTime::INFINITE)
+            .on_link_state_changed(online, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on OnLinkStateChanged")
     }
 }

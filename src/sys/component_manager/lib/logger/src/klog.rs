@@ -158,7 +158,7 @@ mod tests {
         let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol::<fboot::ReadOnlyLogMarker>(server_end).unwrap();
         let service = fboot::ReadOnlyLogSynchronousProxy::new(client_end);
-        let log = service.get(zx::MonotonicTime::INFINITE).expect("couldn't get read only log");
+        let log = service.get(zx::MonotonicInstant::INFINITE).expect("couldn't get read only log");
         log
     }
 
@@ -178,7 +178,7 @@ mod tests {
                 }
                 Err(status) if status == zx::Status::SHOULD_WAIT => {
                     debuglog
-                        .wait_handle(zx::Signals::LOG_READABLE, zx::MonotonicTime::INFINITE)
+                        .wait_handle(zx::Signals::LOG_READABLE, zx::MonotonicInstant::INFINITE)
                         .expect("Failed to wait for log readable");
                     continue;
                 }

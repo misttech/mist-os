@@ -118,7 +118,7 @@ async fn to_success_response(
                 while offset < chunk.len() {
                     let pending = match tx.wait_handle(
                         zx::Signals::SOCKET_PEER_CLOSED | zx::Signals::SOCKET_WRITABLE,
-                        zx::MonotonicTime::INFINITE,
+                        zx::MonotonicInstant::INFINITE,
                     ) {
                         Err(status) => {
                             error!("tx.wait() failed - status: {}", status);

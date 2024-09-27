@@ -58,8 +58,8 @@ pub fn start_flatland_presentation_loop(
                                 .iter()
                                 .map(
                                 |x| PresentationInfo{
-                                    latch_point: zx::MonotonicTime::from_nanos(x.latch_point.unwrap()),
-                                    presentation_time: zx::MonotonicTime::from_nanos(
+                                    latch_point: zx::MonotonicInstant::from_nanos(x.latch_point.unwrap()),
+                                    presentation_time: zx::MonotonicInstant::from_nanos(
                                                         x.presentation_time.unwrap())
                                 })
                                 .collect();
@@ -67,7 +67,7 @@ pub fn start_flatland_presentation_loop(
                         }
                         Some(Ok(ui_comp::FlatlandEvent::OnFramePresented{ frame_presented_info })) => {
                             let actual_presentation_time =
-                                zx::MonotonicTime::from_nanos(frame_presented_info.actual_presentation_time);
+                                zx::MonotonicInstant::from_nanos(frame_presented_info.actual_presentation_time);
                             let presented_infos: Vec<PresentedInfo> =
                                 frame_presented_info.presentation_infos
                                 .into_iter()

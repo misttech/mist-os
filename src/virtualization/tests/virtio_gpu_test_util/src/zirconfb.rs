@@ -58,7 +58,7 @@ async fn read_info() -> Result<DetectResult, Error> {
                 __source_breaking: fidl::marker::SourceBreaking,
             };
         provider
-            .open_coordinator_with_listener_for_primary(payload, zx::MonotonicTime::INFINITE)?
+            .open_coordinator_with_listener_for_primary(payload, zx::MonotonicInstant::INFINITE)?
             .map_err(zx::Status::from_raw)?;
         (dc_proxy, listener_requests)
     };

@@ -112,7 +112,7 @@ impl VmoImage {
         index: u32,
     ) -> Self {
         let wait_result = buffer_collection
-            .wait_for_all_buffers_allocated(zx::MonotonicTime::INFINITE)
+            .wait_for_all_buffers_allocated(zx::MonotonicInstant::INFINITE)
             .expect("failed to allocate buffer collection");
         assert!(
             wait_result.is_ok(),

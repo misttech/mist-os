@@ -18,23 +18,23 @@ use {
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct PresentationInfo {
-    pub latch_point: zx::MonotonicTime,
-    pub presentation_time: zx::MonotonicTime,
+    pub latch_point: zx::MonotonicInstant,
+    pub presentation_time: zx::MonotonicInstant,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct PresentedInfo {
-    pub present_received_time: zx::MonotonicTime,
-    pub actual_latch_point: zx::MonotonicTime,
+    pub present_received_time: zx::MonotonicInstant,
+    pub actual_latch_point: zx::MonotonicInstant,
 }
 
 impl From<frame_scheduling::PresentReceivedInfo> for PresentedInfo {
     fn from(item: frame_scheduling::PresentReceivedInfo) -> PresentedInfo {
         PresentedInfo {
-            present_received_time: zx::MonotonicTime::from_nanos(
+            present_received_time: zx::MonotonicInstant::from_nanos(
                 item.present_received_time.unwrap(),
             ),
-            actual_latch_point: zx::MonotonicTime::from_nanos(item.latched_time.unwrap()),
+            actual_latch_point: zx::MonotonicInstant::from_nanos(item.latched_time.unwrap()),
         }
     }
 }
@@ -42,11 +42,11 @@ impl From<frame_scheduling::PresentReceivedInfo> for PresentedInfo {
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct PresentParameters {
     // The latch point we're expecting to make for this update.
-    pub expected_latch_point: zx::MonotonicTime,
+    pub expected_latch_point: zx::MonotonicInstant,
     // The time we're expecting to be presented to the display.
-    pub expected_presentation_time: zx::MonotonicTime,
+    pub expected_presentation_time: zx::MonotonicInstant,
     // The requested_presentation_time to pass into Present().
-    pub requested_presentation_time: zx::MonotonicTime,
+    pub requested_presentation_time: zx::MonotonicInstant,
     // The unsquashable boolean to pass into Present().
     pub unsquashable: bool,
 }
@@ -69,7 +69,7 @@ pub trait SchedulingLib {
     // Should be called whenever the OnFramePresented event is received.
     fn on_frame_presented(
         &self,
-        _actual_presentation_time: zx::MonotonicTime,
+        _actual_presentation_time: zx::MonotonicInstant,
         _presented_infos: Vec<PresentedInfo>,
     ) {
     }

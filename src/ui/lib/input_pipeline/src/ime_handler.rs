@@ -163,7 +163,7 @@ impl ImeHandler {
 /// * `event_time`: The time in nanoseconds when the event was first recorded.
 fn create_key_event(
     event: &keyboard_binding::KeyboardEvent,
-    event_time: zx::MonotonicTime,
+    event_time: zx::MonotonicInstant,
     device_id: u32,
 ) -> fidl_ui_input3::KeyEvent {
     let modifier_state: FrozenModifierState =
@@ -273,7 +273,7 @@ mod tests {
         key: fidl_fuchsia_input::Key,
         event_type: fidl_fuchsia_ui_input3::KeyEventType,
         modifiers: Option<fidl_ui_input3::Modifiers>,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
         device_descriptor: &input_device::InputDeviceDescriptor,
         keymap: Option<String>,
     ) -> input_device::UnhandledInputEvent {
@@ -292,7 +292,7 @@ mod tests {
         key: fidl_fuchsia_input::Key,
         event_type: fidl_fuchsia_ui_input3::KeyEventType,
         modifiers: Option<fidl_ui_input3::Modifiers>,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
         device_descriptor: &input_device::InputDeviceDescriptor,
         keymap: Option<String>,
         key_meaning: Option<fidl_fuchsia_ui_input3::KeyMeaning>,
@@ -314,7 +314,7 @@ mod tests {
     fn create_unhandled_input_event(
         keyboard_event: keyboard_binding::KeyboardEvent,
         device_descriptor: &input_device::InputDeviceDescriptor,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> input_device::UnhandledInputEvent {
         input_device::UnhandledInputEvent {
             device_event: input_device::InputDeviceEvent::Keyboard(keyboard_event),
@@ -989,7 +989,7 @@ mod tests {
         keyboard_binding::KeyboardEvent::new(
             fidl_input::Key::A,
             fidl_ui_input3::KeyEventType::Pressed),
-        zx::MonotonicTime::from_nanos(42) => fidl_ui_input3::KeyEvent{
+        zx::MonotonicInstant::from_nanos(42) => fidl_ui_input3::KeyEvent{
             timestamp: Some(42),
             type_: Some(fidl_ui_input3::KeyEventType::Pressed),
             key: Some(fidl_input::Key::A),
@@ -1001,7 +1001,7 @@ mod tests {
             fidl_input::Key::A,
             fidl_ui_input3::KeyEventType::Pressed)
             .into_with_repeat_sequence(13),
-        zx::MonotonicTime::from_nanos(42) => fidl_ui_input3::KeyEvent{
+        zx::MonotonicInstant::from_nanos(42) => fidl_ui_input3::KeyEvent{
             timestamp: Some(42),
             type_: Some(fidl_ui_input3::KeyEventType::Pressed),
             key: Some(fidl_input::Key::A),
@@ -1011,7 +1011,7 @@ mod tests {
             ..Default::default()}; "repeat_sequence is honored")]
     fn test_create_key_event(
         event: keyboard_binding::KeyboardEvent,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> fidl_ui_input3::KeyEvent {
         super::create_key_event(&event, event_time, 0)
     }

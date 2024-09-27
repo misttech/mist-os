@@ -208,7 +208,7 @@ impl SuspendResumeManager {
 
         // Create the PowerMode power element depending on the Application Activity of SAG.
         let power_elements = activity_governor
-            .get_power_elements(zx::MonotonicTime::INFINITE)
+            .get_power_elements(zx::MonotonicInstant::INFINITE)
             .context("cannot get Activity Governor element from SAG")?;
         if let Some(Some(application_activity_token)) = power_elements
             .application_activity
@@ -246,13 +246,13 @@ impl SuspendResumeManager {
                         level_control_channels: Some(level_control_channels),
                         ..Default::default()
                     },
-                    zx::MonotonicTime::INFINITE,
+                    zx::MonotonicInstant::INFINITE,
                 )?
                 .map_err(|e| anyhow!("PowerBroker::AddElementError({e:?})"))?;
 
             // Power on by holding a lease.
             let power_on_control = lessor
-                .lease(STARNIX_POWER_ON_LEVEL, zx::MonotonicTime::INFINITE)?
+                .lease(STARNIX_POWER_ON_LEVEL, zx::MonotonicInstant::INFINITE)?
                 .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?
                 .into_channel();
             self.lock().lease_control_channel = Some(power_on_control);
@@ -267,14 +267,14 @@ impl SuspendResumeManager {
 
             let self_ref = self.clone();
             system_task.kernel().kthreads.spawn(move |_, _| {
-                while let Ok(Ok(level)) = required_level.watch(zx::MonotonicTime::INFINITE) {
+                while let Ok(Ok(level)) = required_level.watch(zx::MonotonicInstant::INFINITE) {
                     if let Err(e) = self_ref
                         .power_mode()
                         .expect("Starnix should have a power mode")
                         .level_proxy
                         .as_ref()
                         .expect("Starnix power mode should have a current level proxy")
-                        .update(level, zx::MonotonicTime::INFINITE)
+                        .update(level, zx::MonotonicInstant::INFINITE)
                     {
                         log_warn!("Failed to update current level: {e:?}");
                         break;
@@ -283,7 +283,7 @@ impl SuspendResumeManager {
             });
 
             // We may not have a session manager to take a lease from in tests.
-            match handoff.take(zx::MonotonicTime::INFINITE) {
+            match handoff.take(zx::MonotonicInstant::INFINITE) {
                 Ok(parent_lease) => {
                     let parent_lease = parent_lease.map_err(|e| {
                         anyhow!("Failed to take lessor and lease from parent: {e:?}")
@@ -443,14 +443,14 @@ impl SuspendResumeManager {
         // Before the old lease is dropped, a new lease must be created to transit to the
         // new level. This ensures a smooth transition without going back to the initial
         // power level.
-        match power_mode.lessor_proxy.lease(level, zx::MonotonicTime::INFINITE) {
+        match power_mode.lessor_proxy.lease(level, zx::MonotonicInstant::INFINITE) {
             Ok(Ok(lease_client)) => {
                 // Wait until the lease is satisfied.
                 let lease_control = lease_client.into_sync_proxy();
                 let mut lease_status = fbroker::LeaseStatus::Unknown;
                 while lease_status != fbroker::LeaseStatus::Satisfied {
                     lease_status = lease_control
-                        .watch_status(lease_status, zx::MonotonicTime::INFINITE)
+                        .watch_status(lease_status, zx::MonotonicInstant::INFINITE)
                         .map_err(|_| errno!(EINVAL))?;
                 }
                 self.lock().lease_control_channel = Some(lease_control.into_channel());
@@ -467,7 +467,7 @@ impl SuspendResumeManager {
             .level_proxy
             .as_ref()
             .expect("Starnix PowerMode should have power level proxy")
-            .update(level, zx::MonotonicTime::INFINITE)
+            .update(level, zx::MonotonicInstant::INFINITE)
         {
             Ok(Ok(_)) => Ok(()),
             Ok(Err(err)) => error!(EINVAL, format!("power level update error {:?}", err)),
@@ -483,7 +483,7 @@ impl SuspendResumeManager {
             .open_status_channel(element_status_server)
             .map_err(|e| errno!(EINVAL, format!("Status channel failed to open: {e}")))?;
         while element_status
-            .watch_power_level(zx::MonotonicTime::INFINITE)
+            .watch_power_level(zx::MonotonicInstant::INFINITE)
             .map_err(|err| errno!(EINVAL, format!("power element status watch error {err}")))?
             .map_err(|err| {
                 errno!(EINVAL, format!("power element status watch fidl error {:?}", err))
@@ -509,7 +509,7 @@ impl SuspendResumeManager {
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
+            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicInstant::get().into_nanos());
             node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
         });
 
@@ -532,14 +532,14 @@ impl SuspendResumeManager {
             // query of stats is guaranteed to reflect the current suspend operation.
             let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
                 .expect("connection to fuchsia.power.suspend.Stats");
-            match stats_proxy.watch(zx::MonotonicTime::INFINITE) {
+            match stats_proxy.watch(zx::MonotonicInstant::INFINITE) {
                 Ok(stats) => self.update_stats(stats),
                 Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
             }
         }
 
         // Use the same "now" for all subsequent stats.
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
 
         match suspend_result {
             SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?,
@@ -587,7 +587,7 @@ impl WakeLease {
                 .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
             *guard = Some(
                 activity_governor
-                    .take_wake_lease(&self.name, zx::MonotonicTime::INFINITE)
+                    .take_wake_lease(&self.name, zx::MonotonicInstant::INFINITE)
                     .map_err(|_| errno!(EINVAL, "Failed to take wake lease"))?,
             );
         }

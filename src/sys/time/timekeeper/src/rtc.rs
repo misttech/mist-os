@@ -206,7 +206,7 @@ impl Rtc for RtcImpl {
         self.proxy
             .get()
             .map_err(|err| anyhow!("FIDL error on Rtc::get: {}", err))
-            .on_timeout(zx::MonotonicTime::after(FIDL_TIMEOUT), || {
+            .on_timeout(zx::MonotonicInstant::after(FIDL_TIMEOUT), || {
                 Err(anyhow!("FIDL timeout on Rtc::get"))
             })
             .await?
@@ -235,7 +235,7 @@ impl Rtc for RtcImpl {
             .proxy
             .set(&fidl_time)
             .map_err(|err| anyhow!("FIDL error on Rtc::set: {}", err))
-            .on_timeout(zx::MonotonicTime::after(FIDL_TIMEOUT), || {
+            .on_timeout(zx::MonotonicInstant::after(FIDL_TIMEOUT), || {
                 Err(anyhow!("FIDL timeout on Rtc::set"))
             })
             .await?;
@@ -366,9 +366,9 @@ mod test {
                 responder.send(status.into_raw()).expect("Failed response");
             }
         });
-        let before = zx::MonotonicTime::get();
+        let before = zx::MonotonicInstant::get();
         assert!(rtc_impl.set(TEST_ZX_TIME).await.is_ok());
-        let span = zx::MonotonicTime::get() - before;
+        let span = zx::MonotonicInstant::get() - before;
         // Setting an integer second should not require any delay and therefore should complete
         // very fast - well under a millisecond typically. We did observe ~54ms very rarely.
         assert_lt!(span, RTC_SETUP_TIME);
@@ -388,9 +388,9 @@ mod test {
                 responder.send(status.into_raw()).expect("Failed response");
             }
         });
-        let before = zx::MonotonicTime::get();
+        let before = zx::MonotonicInstant::get();
         assert!(rtc_impl.set(TEST_ZX_TIME - TEST_OFFSET).await.is_ok());
-        let span = zx::MonotonicTime::get() - before;
+        let span = zx::MonotonicInstant::get() - before;
         // Setting a fractional second should cause a delay until the top of second before calling
         // the FIDL interface. We only verify half the expected time has passed to allow for some
         // slack in the timer calculation.

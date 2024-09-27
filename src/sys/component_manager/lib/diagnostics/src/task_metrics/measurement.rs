@@ -14,13 +14,13 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, Default, PartialOrd, Eq, Ord, PartialEq)]
 pub struct Measurement {
-    timestamp: zx::MonotonicTime,
+    timestamp: zx::MonotonicInstant,
     cpu_time: zx::Duration,
     queue_time: zx::Duration,
 }
 
 impl Measurement {
-    pub fn empty(timestamp: zx::MonotonicTime) -> Self {
+    pub fn empty(timestamp: zx::MonotonicInstant) -> Self {
         Self {
             timestamp,
             cpu_time: zx::Duration::from_nanos(0),
@@ -28,7 +28,7 @@ impl Measurement {
         }
     }
 
-    pub fn clone_with_time(m: &Self, timestamp: zx::MonotonicTime) -> Self {
+    pub fn clone_with_time(m: &Self, timestamp: zx::MonotonicInstant) -> Self {
         Self { timestamp, cpu_time: *m.cpu_time(), queue_time: *m.queue_time() }
     }
 
@@ -43,7 +43,7 @@ impl Measurement {
     }
 
     /// Time when the measurement was taken.
-    pub fn timestamp(&self) -> &zx::MonotonicTime {
+    pub fn timestamp(&self) -> &zx::MonotonicInstant {
         &self.timestamp
     }
 
@@ -69,14 +69,14 @@ impl SubAssign<&Measurement> for Measurement {
 
 impl From<zx::TaskRuntimeInfo> for Measurement {
     fn from(info: zx::TaskRuntimeInfo) -> Self {
-        Measurement::from_runtime_info(info, zx::MonotonicTime::get())
+        Measurement::from_runtime_info(info, zx::MonotonicInstant::get())
     }
 }
 
 impl Measurement {
     pub(crate) fn from_runtime_info(
         info: zx::TaskRuntimeInfo,
-        timestamp: zx::MonotonicTime,
+        timestamp: zx::MonotonicInstant,
     ) -> Self {
         Self {
             timestamp,
@@ -206,7 +206,7 @@ impl MeasurementsQueue {
     }
 
     fn clean_stale(&mut self) {
-        let now = zx::MonotonicTime::from_nanos(self.ts.now());
+        let now = zx::MonotonicInstant::from_nanos(self.ts.now());
         while let Some(Reverse(oldest)) = self.values.peek() {
             if (*oldest.timestamp() > now - self.max_period)
                 && self.values.len() <= self.max_measurements
@@ -272,12 +272,12 @@ impl MeasurementsQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{Duration as ZxDuration, MonotonicTime};
+    use fuchsia_zircon::{Duration as ZxDuration, MonotonicInstant};
     use injectable_time::FakeTime;
     use std::time::Duration;
 
     fn insert_default(q: &mut MeasurementsQueue, clock: &FakeTime) {
-        q.insert(Measurement::empty(MonotonicTime::from_nanos(clock.now())));
+        q.insert(Measurement::empty(MonotonicInstant::from_nanos(clock.now())));
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
     }
 
@@ -290,13 +290,13 @@ mod tests {
     fn insert_to_measurements_queue() {
         let clock = FakeTime::new();
         let mut q = MeasurementsQueue::new(COMPONENT_CPU_MAX_SAMPLES, Arc::new(clock.clone()));
-        q.insert(Measurement::empty(MonotonicTime::from_nanos(clock.now())));
+        q.insert(Measurement::empty(MonotonicInstant::from_nanos(clock.now())));
         clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
 
         assert_eq!(1, q.true_measurement_count());
 
         for _ in 0..COMPONENT_CPU_MAX_SAMPLES * 2 {
-            q.insert(Measurement::empty(MonotonicTime::from_nanos(clock.now())));
+            q.insert(Measurement::empty(MonotonicInstant::from_nanos(clock.now())));
             clock.add_ticks(CPU_SAMPLE_PERIOD.as_nanos() as i64);
         }
 
@@ -369,16 +369,16 @@ mod tests {
         let mut q1 = MeasurementsQueue::new(COMPONENT_CPU_MAX_SAMPLES, Arc::new(clock1.clone()));
         let mut q2 = MeasurementsQueue::new(COMPONENT_CPU_MAX_SAMPLES, Arc::new(clock2.clone()));
 
-        let mut m1 = Measurement::empty(MonotonicTime::from_nanos(clock1.now()));
-        let mut m2 = Measurement::empty(MonotonicTime::from_nanos(clock2.now()));
+        let mut m1 = Measurement::empty(MonotonicInstant::from_nanos(clock1.now()));
+        let mut m2 = Measurement::empty(MonotonicInstant::from_nanos(clock2.now()));
         m1.cpu_time = Duration::from_secs(1).into();
         m2.cpu_time = Duration::from_secs(3).into();
         insert_measurement(&mut q1, &clock1, m1);
         insert_measurement(&mut q2, &clock2, m2);
 
         for _ in 0..COMPONENT_CPU_MAX_SAMPLES {
-            let mut m1 = Measurement::empty(MonotonicTime::from_nanos(clock1.now()));
-            let mut m2 = Measurement::empty(MonotonicTime::from_nanos(clock2.now()));
+            let mut m1 = Measurement::empty(MonotonicInstant::from_nanos(clock1.now()));
+            let mut m2 = Measurement::empty(MonotonicInstant::from_nanos(clock2.now()));
             m1.cpu_time = Duration::from_secs(1).into();
             m2.cpu_time = Duration::from_secs(3).into();
             insert_measurement(&mut q1, &clock1, m1);
@@ -404,16 +404,16 @@ mod tests {
         let mut q1 = MeasurementsQueue::new(max_values, Arc::new(clock1.clone()));
         let mut q2 = MeasurementsQueue::new(max_values, Arc::new(clock2.clone()));
 
-        let mut m1 = Measurement::empty(MonotonicTime::from_nanos(clock1.now()));
-        let mut m2 = Measurement::empty(MonotonicTime::from_nanos(clock2.now()));
+        let mut m1 = Measurement::empty(MonotonicInstant::from_nanos(clock1.now()));
+        let mut m2 = Measurement::empty(MonotonicInstant::from_nanos(clock2.now()));
         m1.cpu_time = Duration::from_secs(1).into();
         m2.cpu_time = Duration::from_secs(3).into();
         insert_measurement(&mut q1, &clock1, m1);
         insert_measurement(&mut q2, &clock2, m2);
 
         for _ in 1..max_values {
-            let mut m1 = Measurement::empty(MonotonicTime::from_nanos(clock1.now()));
-            let mut m2 = Measurement::empty(MonotonicTime::from_nanos(clock2.now()));
+            let mut m1 = Measurement::empty(MonotonicInstant::from_nanos(clock1.now()));
+            let mut m2 = Measurement::empty(MonotonicInstant::from_nanos(clock2.now()));
             m1.cpu_time = Duration::from_secs(1).into();
             m2.cpu_time = Duration::from_secs(3).into();
             insert_measurement(&mut q1, &clock1, m1);
@@ -472,8 +472,8 @@ mod tests {
         let mut q2 = MeasurementsQueue::new(max_values, Arc::new(clock2.clone()));
 
         for _ in 0..max_values {
-            let mut m1 = Measurement::empty(MonotonicTime::from_nanos(clock1.now()));
-            let mut m2 = Measurement::empty(MonotonicTime::from_nanos(clock2.now()));
+            let mut m1 = Measurement::empty(MonotonicInstant::from_nanos(clock1.now()));
+            let mut m2 = Measurement::empty(MonotonicInstant::from_nanos(clock2.now()));
             m1.cpu_time = Duration::from_secs(1).into();
             m2.cpu_time = Duration::from_secs(3).into();
             insert_measurement(&mut q1, &clock1, m1);
@@ -533,7 +533,7 @@ mod tests {
         let mut q = MeasurementsQueue::new(max_values, Arc::new(FakeTime::new()));
 
         for _ in 0..(max_values + 100) {
-            q.insert(Measurement::empty(MonotonicTime::get()));
+            q.insert(Measurement::empty(MonotonicInstant::get()));
         }
 
         assert_eq!(max_values, q.true_measurement_count());

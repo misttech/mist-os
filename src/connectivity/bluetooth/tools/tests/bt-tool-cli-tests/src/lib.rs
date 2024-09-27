@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use fdio::{SpawnAction, SpawnOptions};
-use fuchsia_zircon::{self as zx, AsHandleRef, MonotonicTime, Signals, Socket, Status};
+use fuchsia_zircon::{self as zx, AsHandleRef, MonotonicInstant, Signals, Socket, Status};
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::{Error as IOError, Read, Write};
@@ -23,7 +23,7 @@ impl Read for BlockingSocket {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         if self.socket.outstanding_read_bytes()? == 0 {
             let wait_sigs = Signals::SOCKET_READABLE | Signals::SOCKET_PEER_CLOSED;
-            let signals = self.socket.wait_handle(wait_sigs, MonotonicTime::INFINITE)?;
+            let signals = self.socket.wait_handle(wait_sigs, MonotonicInstant::INFINITE)?;
             if signals.contains(Signals::SOCKET_PEER_CLOSED) {
                 return Err(Status::PEER_CLOSED.into());
             }

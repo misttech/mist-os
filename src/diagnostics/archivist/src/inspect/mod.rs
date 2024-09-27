@@ -577,7 +577,7 @@ mod tests {
 
         let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
         Arc::clone(&inspect_sink_server).handle(Event {
-            timestamp: zx::MonotonicTime::get(),
+            timestamp: zx::MonotonicInstant::get(),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component: Arc::clone(&identity),
                 request_stream,

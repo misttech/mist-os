@@ -51,7 +51,7 @@ pub enum Event {
         /// The `Track` of the estimate.
         track: Track,
         /// The monotonic time at which the state applies.
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         /// The estimated UTC corresponding to monotonic.
         utc: UtcTime,
         /// Square root of element [0,0] of the covariance matrix.
@@ -64,7 +64,7 @@ pub enum Event {
         /// The `Track` of the estimate.
         track: Track,
         /// The monotonic time at which the state applies.
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         /// The estimated frequency as a PPM deviation from nominal. A positive number means UTC is
         /// running faster than monotonic, i.e. the oscillator is slow.
         rate_adjust_ppm: i32,

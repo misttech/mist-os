@@ -28,10 +28,10 @@ async fn test_basic() -> Result<(), Error> {
     let optout_admin_svc = OptOutAdminSynchronousProxy::new(admin_client_end);
 
     // get a current value.
-    let value = optout_svc.get(zx::MonotonicTime::INFINITE)?;
+    let value = optout_svc.get(zx::MonotonicInstant::INFINITE)?;
 
     // set the value back to check that OptOutAdmin protocol works
-    let res = optout_admin_svc.set(value, zx::MonotonicTime::INFINITE)?;
+    let res = optout_admin_svc.set(value, zx::MonotonicInstant::INFINITE)?;
     assert_eq!(res, Ok(()));
 
     Ok(())

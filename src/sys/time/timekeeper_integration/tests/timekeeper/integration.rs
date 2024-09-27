@@ -99,7 +99,7 @@ where
 async fn test_no_rtc_start_clock_from_time_source_alternate_signal() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
-        let sample_monotonic = zx::MonotonicTime::get();
+        let sample_monotonic = zx::MonotonicInstant::get();
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
@@ -127,7 +127,7 @@ async fn test_no_rtc_start_clock_from_time_source() {
     timekeeper_test(clock, None, |clock, push_source_controller, _, cobalt| async move {
         let before_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
 
-        let sample_monotonic = zx::MonotonicTime::get();
+        let sample_monotonic = zx::MonotonicInstant::get();
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
@@ -154,7 +154,7 @@ async fn test_no_rtc_start_clock_from_time_source() {
         // UTC time reported by the clock should be at least the time in the sample and no
         // more than the UTC time in the sample + time elapsed since the sample was created.
         let reported_utc = clock.read().unwrap();
-        let monotonic_after_update = zx::MonotonicTime::get();
+        let monotonic_after_update = zx::MonotonicInstant::get();
         assert_geq!(reported_utc, *VALID_TIME);
         assert_leq!(reported_utc, *VALID_TIME + (monotonic_after_update - sample_monotonic));
 
@@ -226,7 +226,7 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
                 ]
             );
 
-            let sample_monotonic = zx::MonotonicTime::get();
+            let sample_monotonic = zx::MonotonicInstant::get();
             tracing::info!(
                 "[https://fxbug.dev/42080434]: before push_source_controller.set_sample"
             );
@@ -252,12 +252,12 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
             // source, and no more than the UTC time reported by the time source + time elapsed
             // since the time was read.
             let reported_utc = clock.read().unwrap();
-            let monotonic_after = zx::MonotonicTime::get();
+            let monotonic_after = zx::MonotonicInstant::get();
             assert_geq!(reported_utc, *VALID_TIME);
             assert_leq!(reported_utc, *VALID_TIME + (monotonic_after - sample_monotonic));
             // RTC should also be set.
             let rtc_update = poll_until_some_async!(async { rtc_updates.to_vec().await.pop() });
-            let monotonic_after_rtc_set = zx::MonotonicTime::get();
+            let monotonic_after_rtc_set = zx::MonotonicInstant::get();
             let rtc_reported_utc = rtc_time_to_zx_time(rtc_update);
             assert_geq!(rtc_reported_utc, *VALID_TIME);
             assert_leq!(
@@ -294,7 +294,7 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
 #[fuchsia::test]
 async fn test_start_clock_from_rtc() {
     let clock = new_nonshareable_clock();
-    let monotonic_before = zx::MonotonicTime::get();
+    let monotonic_before = zx::MonotonicInstant::get();
     timekeeper_test(
         clock,
         Some(*VALID_RTC_TIME),
@@ -309,7 +309,7 @@ async fn test_start_clock_from_rtc() {
             // UTC time reported by the clock should be at least the time reported by the RTC, and no
             // more than the UTC time reported by the RTC + time elapsed since Timekeeper was launched.
             let reported_utc = clock.read().unwrap();
-            let monotonic_after = zx::MonotonicTime::get();
+            let monotonic_after = zx::MonotonicInstant::get();
             assert_geq!(reported_utc, *VALID_RTC_TIME);
             assert_leq!(reported_utc, *VALID_RTC_TIME + (monotonic_after - monotonic_before));
 
@@ -331,7 +331,7 @@ async fn test_start_clock_from_rtc() {
 
             // Clock should be updated again when the push source reports another time.
             let clock_last_set_ticks = clock.get_details().unwrap().last_value_update_ticks;
-            let sample_monotonic = zx::MonotonicTime::get();
+            let sample_monotonic = zx::MonotonicInstant::get();
             tracing::info!(
                 "[https://fxbug.dev/42080434]: before push_source_controller.set_sample"
             );
@@ -354,12 +354,12 @@ async fn test_start_clock_from_rtc() {
                 "[https://fxbug.dev/42080434]: after push_source_controller.set_sample stage 2"
             );
             let clock_utc = clock.read().unwrap();
-            let monotonic_after_read = zx::MonotonicTime::get();
+            let monotonic_after_read = zx::MonotonicInstant::get();
             assert_geq!(clock_utc, *VALID_TIME);
             assert_leq!(clock_utc, *VALID_TIME + (monotonic_after_read - sample_monotonic));
             // RTC should be set too.
             let rtc_update = poll_until_some_async!(async { rtc_updates.to_vec().await.pop() });
-            let monotonic_after_rtc_set = zx::MonotonicTime::get();
+            let monotonic_after_rtc_set = zx::MonotonicInstant::get();
             let rtc_reported_utc = rtc_time_to_zx_time(rtc_update);
             assert_geq!(rtc_reported_utc, *VALID_TIME);
             assert_leq!(
@@ -446,7 +446,7 @@ async fn test_reject_before_backstop() {
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(BEFORE_BACKSTOP_TIME.into_nanos()),
-                monotonic: Some(zx::MonotonicTime::get().into_nanos()),
+                monotonic: Some(zx::MonotonicInstant::get().into_nanos()),
                 standard_deviation: Some(STD_DEV.into_nanos()),
                 ..Default::default()
             })
@@ -484,7 +484,7 @@ async fn test_slew_clock() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
-        let sample_1_monotonic = zx::MonotonicTime::get() - BETWEEN_SAMPLES;
+        let sample_1_monotonic = zx::MonotonicInstant::get() - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
@@ -542,7 +542,7 @@ async fn test_step_clock() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
-        let monotonic_before = zx::MonotonicTime::get();
+        let monotonic_before = zx::MonotonicInstant::get();
         let sample_1_monotonic = monotonic_before - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
@@ -566,7 +566,7 @@ async fn test_step_clock() {
         .await
         .unwrap();
         let utc_now = clock.read().unwrap();
-        let monotonic_after = zx::MonotonicTime::get();
+        let monotonic_after = zx::MonotonicInstant::get();
         assert_geq!(utc_now, sample_1_utc + BETWEEN_SAMPLES);
         assert_leq!(utc_now, sample_1_utc + BETWEEN_SAMPLES + (monotonic_after - monotonic_before));
 
@@ -588,7 +588,7 @@ async fn test_step_clock() {
             )
             .await;
         let utc_now_2 = clock.read().unwrap();
-        let monotonic_after_2 = zx::MonotonicTime::get();
+        let monotonic_after_2 = zx::MonotonicInstant::get();
 
         // After the second sample, the clock should have jumped to an offset approximately halfway
         // between the offsets defined in the two samples. 500 ms is added to the upper bound as
@@ -617,7 +617,7 @@ async fn test_restart_crashed_time_source() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
-        let monotonic_before = zx::MonotonicTime::get();
+        let monotonic_before = zx::MonotonicInstant::get();
         let sample_1_monotonic = monotonic_before - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
@@ -652,7 +652,7 @@ async fn test_restart_crashed_time_source() {
             .await;
         // Time from clock should incorporate the second sample.
         let result_utc = clock.read().unwrap();
-        let monotonic_after = zx::MonotonicTime::get();
+        let monotonic_after = zx::MonotonicInstant::get();
         let minimum_expected = avg(sample_1_utc + BETWEEN_SAMPLES, sample_2_utc)
             + (monotonic_after - monotonic_before);
         assert_geq!(result_utc, minimum_expected);

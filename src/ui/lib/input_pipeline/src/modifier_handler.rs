@@ -177,7 +177,7 @@ mod tests {
     fn get_unhandled_input_event(event: KeyboardEvent) -> UnhandledInputEvent {
         UnhandledInputEvent {
             device_event: InputDeviceEvent::Keyboard(event),
-            event_time: zx::MonotonicTime::from_nanos(42),
+            event_time: zx::MonotonicInstant::from_nanos(42),
             device_descriptor: InputDeviceDescriptor::Fake,
             trace_id: None,
         }

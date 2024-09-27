@@ -1284,7 +1284,7 @@ impl Task {
         let event = task_to_wait.upgrade().and_then(|t| t.vfork_event.clone());
         if let Some(event) = event {
             event
-                .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE)
+                .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE)
                 .map_err(|status| from_status_like_fdio!(status))?;
         }
         Ok(())

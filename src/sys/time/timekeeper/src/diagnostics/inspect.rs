@@ -37,7 +37,7 @@ lazy_static! {
 }
 
 fn monotonic_time() -> i64 {
-    zx::MonotonicTime::get().into_nanos()
+    zx::MonotonicInstant::get().into_nanos()
 }
 
 /// A vector of inspect nodes used to store some struct implementing `InspectWritable`, where the
@@ -327,7 +327,7 @@ impl TrackNode {
     /// Records a new Kalman filter update for the track.
     pub fn update_filter_state(
         &mut self,
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         utc: UtcTime,
         sqrt_covariance: zx::Duration,
     ) {
@@ -342,7 +342,7 @@ impl TrackNode {
     /// Records a new frequency update for the track.
     pub fn update_frequency(
         &mut self,
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         rate_adjust_ppm: i32,
         window_count: u32,
     ) {
@@ -658,7 +658,7 @@ mod tests {
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
         // Perform two updates to the clock. The inspect data should reflect the most recent.
-        let monotonic_time = zx::MonotonicTime::get();
+        let monotonic_time = zx::MonotonicInstant::get();
         clock
             .update(
                 UtcClockUpdate::builder()
@@ -670,7 +670,7 @@ mod tests {
         inspect_diagnostics
             .record(Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc });
 
-        let monotonic_time = zx::MonotonicTime::get();
+        let monotonic_time = zx::MonotonicInstant::get();
         clock
             .update(
                 UtcClockUpdate::builder()
@@ -849,13 +849,13 @@ mod tests {
         for i in 1..8 {
             test.record(Event::KalmanFilterUpdated {
                 track: Track::Primary,
-                monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
+                monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
                 utc: UtcTime::from_nanos(BACKSTOP_TIME) + OFFSET * i,
                 sqrt_covariance: zx::Duration::from_nanos(SQRT_COVARIANCE) * i,
             });
             test.record(Event::FrequencyUpdated {
                 track: Track::Primary,
-                monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
+                monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
                 rate_adjust_ppm: -i,
                 window_count: i as u32,
             });

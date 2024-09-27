@@ -154,7 +154,7 @@ async fn main() -> Result<(), Error> {
                                                     info!("sending report");
                                                     let msg = &[1]; // 1 means "power off", 0 would mean "don't power off"
                                                     responder.send(Ok(&fhidbus::Report {buf: Some(msg.to_vec()),
-                                                         timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+                                                         timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
                                                          ..Default::default()})
                                                     ).unwrap_or_else(|e| {
                                                         warn!("failed sending response to ReadReport: {:?}", e);

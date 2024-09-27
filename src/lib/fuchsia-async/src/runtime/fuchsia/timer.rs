@@ -35,7 +35,7 @@ pub trait TimeInterface:
 impl TimeInterface for Time {
     type Timeline = zx::MonotonicTimeline;
 
-    fn into_zx(self) -> zx::MonotonicTime {
+    fn into_zx(self) -> zx::MonotonicInstant {
         self.into_zx()
     }
 
@@ -58,7 +58,7 @@ impl WakeupTime for Time {
     }
 }
 
-impl WakeupTime for zx::MonotonicTime {
+impl WakeupTime for zx::MonotonicInstant {
     fn into_time(self) -> Time {
         self.into()
     }

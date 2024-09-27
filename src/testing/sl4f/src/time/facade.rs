@@ -35,7 +35,7 @@ impl TimeFacade {
     /// Returns true iff system time has been synchronized with some source.
     pub async fn is_synchronized() -> Result<bool, Error> {
         let clock = fuchsia_runtime::duplicate_utc_clock_handle(zx::Rights::WAIT)?;
-        match clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::MonotonicTime::ZERO) {
+        match clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::MonotonicInstant::ZERO) {
             Ok(_) => Ok(true),
             Err(zx::Status::TIMED_OUT) => Ok(false),
             Err(e) => Err(e.into()),

@@ -350,7 +350,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     force_start: bool,
 ) {
     info!("reading initial RTC time.");
-    let mono_before = zx::MonotonicTime::get();
+    let mono_before = zx::MonotonicInstant::get();
     let mut rtc_time = match rtc.get().await {
         Err(err) => {
             error!("failed to read RTC time: {}", err);
@@ -362,7 +362,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         }
         Ok(time) => time,
     };
-    let mono_after = zx::MonotonicTime::get();
+    let mono_after = zx::MonotonicInstant::get();
     let mono_time = mono_before + (mono_after - mono_before) / 2;
 
     let mut rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
@@ -465,7 +465,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         let backstop = &clock_details.backstop;
         // Not possible to start at backstop, so we start just a bit after.
         let b1 = *backstop + zx::Duration::from_nanos(1);
-        let mono = zx::MonotonicTime::get();
+        let mono = zx::MonotonicInstant::get();
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
         if let Err(status) =
@@ -640,7 +640,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config();
 
-        let monotonic_ref = zx::MonotonicTime::get();
+        let monotonic_ref = zx::MonotonicInstant::get();
 
         let (s, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
@@ -730,7 +730,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(delay);
 
-        let monotonic_ref = zx::MonotonicTime::get();
+        let monotonic_ref = zx::MonotonicInstant::get();
         let (s, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
 
@@ -807,7 +807,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(1);
 
-        let monotonic_ref = zx::MonotonicTime::get();
+        let monotonic_ref = zx::MonotonicInstant::get();
         let (s, r) = mpsc::channel(1);
         let b = Rc::new(Cell::new(true));
 

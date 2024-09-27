@@ -37,7 +37,7 @@ pub struct UpdatingTufClient {
 
     /// Time that this repository was last successfully checked for an update, or None if the
     /// repository has never successfully fetched target metadata.
-    last_update_successfully_checked_time: InspectableDebugString<Option<zx::MonotonicTime>>,
+    last_update_successfully_checked_time: InspectableDebugString<Option<zx::MonotonicInstant>>,
 
     /// `Some` if there is an AutoClient task, dropping it stops the task.
     _auto_client_aborter: Option<AbortHandleOnDrop>,

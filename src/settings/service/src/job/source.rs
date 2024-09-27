@@ -200,7 +200,7 @@ pub(super) struct Handler {
     jobs: HashMap<execution::Type, execution::Group>,
     /// A list of states. The element represents the most current [State]. We keep track of seen
     /// states to allow post analysis, such as source duration.
-    states: VecDeque<(State, zx::MonotonicTime)>,
+    states: VecDeque<(State, zx::MonotonicInstant)>,
     /// This [HashMap] associates a given [Job] [Signature] with a [Data](job::data::Data) mapping.
     /// [Signature] is used over [execution::Type] to allow storage to be shared across groups of
     /// different [types](execution::Type) that share the same [Signature].

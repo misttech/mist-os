@@ -968,7 +968,7 @@ impl FileOps for MagmaFile {
                     let abs_timeout_ns = if control.timeout_ns == u64::MAX {
                         0
                     } else {
-                        zx::MonotonicTime::get().into_nanos() as u64 + control.timeout_ns
+                        zx::MonotonicInstant::get().into_nanos() as u64 + control.timeout_ns
                     };
 
                     'outer: while status == MAGMA_STATUS_OK {
@@ -992,7 +992,7 @@ impl FileOps for MagmaFile {
                             }
                         }
 
-                        let current_time_ns = zx::MonotonicTime::get().into_nanos() as u64;
+                        let current_time_ns = zx::MonotonicInstant::get().into_nanos() as u64;
                         let rel_timeout_ns = if abs_timeout_ns == 0 {
                             u64::MAX
                         } else if abs_timeout_ns > current_time_ns {
@@ -1012,7 +1012,7 @@ impl FileOps for MagmaFile {
                                 capped_rel_timeout_ns,
                             )
                         };
-                        let current_time = zx::MonotonicTime::get().into_nanos();
+                        let current_time = zx::MonotonicInstant::get().into_nanos();
 
                         // Check if the wait timed out before the user-requested timeout.
                         if status == MAGMA_STATUS_TIMED_OUT

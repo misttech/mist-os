@@ -34,7 +34,7 @@ impl Condvar {
 
     pub fn wait<T: ?Sized>(&self, guard: &mut MutexGuard<'_, T>) {
         assert!(
-            !self.wait_inner(guard, zx::MonotonicTime::INFINITE).timed_out,
+            !self.wait_inner(guard, zx::MonotonicInstant::INFINITE).timed_out,
             "an infinite wait should not timeout"
         );
     }
@@ -53,7 +53,7 @@ impl Condvar {
         guard: &mut MutexGuard<'_, T>,
         timeout: Duration,
     ) -> WaitTimeoutResult {
-        self.wait_inner(guard, zx::MonotonicTime::after(timeout.into()))
+        self.wait_inner(guard, zx::MonotonicInstant::after(timeout.into()))
     }
 
     pub fn wait_while_for<'a, T: ?Sized, F>(
@@ -77,7 +77,7 @@ impl Condvar {
     fn wait_inner<T: ?Sized>(
         &self,
         guard: &mut MutexGuard<'_, T>,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> WaitTimeoutResult {
         // Relaxed because the futex and mutex operations synchronize.
         let current = self.inner.load(Ordering::Relaxed);

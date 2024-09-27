@@ -15,12 +15,12 @@ use super::Id;
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) enum NeighborHealth {
     Unknown,
-    Healthy { last_observed: zx::MonotonicTime },
-    Unhealthy { last_healthy: Option<zx::MonotonicTime> },
+    Healthy { last_observed: zx::MonotonicInstant },
+    Unhealthy { last_healthy: Option<zx::MonotonicInstant> },
 }
 
 impl NeighborHealth {
-    fn last_healthy(&self) -> Option<zx::MonotonicTime> {
+    fn last_healthy(&self) -> Option<zx::MonotonicInstant> {
         match self {
             NeighborHealth::Unknown => None,
             NeighborHealth::Healthy { last_observed } => Some(*last_observed),
@@ -50,7 +50,7 @@ impl NeighborHealth {
     ///
     /// An `Incomplete` or `Unreachable` entry will always move to an
     /// `Unhealthy` state.
-    fn transition(&self, now: zx::MonotonicTime, state: fnet_neighbor::EntryState) -> Self {
+    fn transition(&self, now: zx::MonotonicInstant, state: fnet_neighbor::EntryState) -> Self {
         match state {
             fnet_neighbor::EntryState::Incomplete | fnet_neighbor::EntryState::Unreachable => {
                 NeighborHealth::Unhealthy { last_healthy: self.last_healthy() }
@@ -130,7 +130,7 @@ impl NeighborCache {
                     return;
                 }
             };
-        let updated_at = zx::MonotonicTime::from_nanos(updated_at);
+        let updated_at = zx::MonotonicInstant::from_nanos(updated_at);
 
         let InterfaceNeighborCache { neighbors } =
             interfaces.entry(interface).or_insert_with(Default::default);
@@ -190,12 +190,12 @@ mod tests {
     const NEIGH2: fnet::IpAddress = fidl_ip!("2001:db8::1");
 
     struct EventSource {
-        now: zx::MonotonicTime,
+        now: zx::MonotonicInstant,
     }
 
     impl EventSource {
         fn new() -> Self {
-            Self { now: zx::MonotonicTime::from_nanos(0) }
+            Self { now: zx::MonotonicInstant::from_nanos(0) }
         }
 
         fn advance_secs(&mut self, secs: u64) {
@@ -240,7 +240,7 @@ mod tests {
         interface: Id,
         neighbor: fnet::IpAddress,
         state: fnet_neighbor::EntryState,
-        updated_at: zx::MonotonicTime,
+        updated_at: zx::MonotonicInstant,
     }
 
     impl NeighborEntry {

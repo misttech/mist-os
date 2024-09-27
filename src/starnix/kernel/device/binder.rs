@@ -2815,7 +2815,7 @@ impl RemoteResourceAccessor {
     ) -> Result<fbinder::FileResponse, Errno> {
         let result = self
             .process_accessor
-            .file_request(request, zx::MonotonicTime::INFINITE)
+            .file_request(request, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(ENOENT))?;
         result.map_err(|e| errno_from_code!(e.into_primitive() as i16))
     }
@@ -2896,7 +2896,7 @@ impl MemoryAccessor for RemoteResourceAccessor {
         vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
         vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
         self.process_accessor
-            .write_memory(addr.ptr() as u64, vmo, zx::MonotonicTime::INFINITE)
+            .write_memory(addr.ptr() as u64, vmo, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(ENOENT))?
             .map_err(Self::map_fidl_posix_errno)?;
         Ok(bytes.len())
@@ -3862,7 +3862,7 @@ impl BinderDriver {
             }
 
             // Put this thread to sleep.
-            current_task.block_until(guard, zx::MonotonicTime::INFINITE)?;
+            current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
         }
     }
 

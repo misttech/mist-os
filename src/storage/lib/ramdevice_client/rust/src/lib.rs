@@ -421,7 +421,7 @@ impl Drop for RamdiskClient {
                 let _: Result<Result<(), _>, _> = ControllerSynchronousProxy::new(
                     ramdisk_controller.into_channel().unwrap().into(),
                 )
-                .schedule_unbind(zx::MonotonicTime::INFINITE);
+                .schedule_unbind(zx::MonotonicInstant::INFINITE);
             }
         }
     }

@@ -135,7 +135,7 @@ impl MemoryAttributionManager {
                 _ = publisher.on_update(updates);
             }
 
-            zx::MonotonicTime::after(MINIMUM_RESCAN_INTERVAL).sleep();
+            zx::MonotonicInstant::after(MINIMUM_RESCAN_INTERVAL).sleep();
         }
     }
 }

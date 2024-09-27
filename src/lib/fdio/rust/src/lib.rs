@@ -786,7 +786,7 @@ pub struct NamespaceEntry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_zircon::{object_wait_many, MonotonicTime, Signals, Status, WaitItem};
+    use fuchsia_zircon::{object_wait_many, MonotonicInstant, Signals, Status, WaitItem};
 
     #[test]
     fn namespace_get_installed() {
@@ -912,7 +912,7 @@ mod tests {
             ];
 
             let signals_result =
-                object_wait_many(&mut items, MonotonicTime::INFINITE).expect("unable to wait");
+                object_wait_many(&mut items, MonotonicInstant::INFINITE).expect("unable to wait");
 
             if items[1].pending.contains(Signals::SOCKET_READABLE) {
                 let bytes_len = stdout_sock.outstanding_read_bytes().expect("Socket error");

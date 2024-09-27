@@ -144,9 +144,9 @@ mod test {
     use test_util::assert_near;
 
     // Note: we need to ensure the absolute times are not near the January 1st leap second.
-    const TIME_1: zx::MonotonicTime = zx::MonotonicTime::from_nanos(100_010_000_000_000);
-    const TIME_2: zx::MonotonicTime = zx::MonotonicTime::from_nanos(100_020_000_000_000);
-    const TIME_3: zx::MonotonicTime = zx::MonotonicTime::from_nanos(100_030_000_000_000);
+    const TIME_1: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(100_010_000_000_000);
+    const TIME_2: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(100_020_000_000_000);
+    const TIME_3: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(100_030_000_000_000);
     const OFFSET_1: zx::Duration = zx::Duration::from_seconds(777);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(999);
     const STD_DEV_1: zx::Duration = zx::Duration::from_millis(22);
@@ -154,7 +154,7 @@ mod test {
     const SQRT_COV_1: u64 = STD_DEV_1.into_nanos() as u64;
 
     fn create_filter_event(
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         offset: zx::Duration,
         sqrt_covariance: u64,
     ) -> Event {

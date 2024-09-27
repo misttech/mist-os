@@ -147,7 +147,7 @@ mod tests {
 
         assert_eq!(paver.take_events(), vec![]);
         assert_eq!(
-            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
@@ -182,7 +182,7 @@ mod tests {
 
         assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration]);
         assert_eq!(
-            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
@@ -214,7 +214,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
@@ -254,7 +254,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
         );
         assert_eq!(unblocker_recv.await, Ok(()));
@@ -411,7 +411,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Err(zx::Status::TIMED_OUT)
         );
         assert_eq!(unblocker_recv.await, Ok(()));

@@ -693,7 +693,7 @@ impl ComponentInstance {
                 };
             }
 
-            let stop_time = zx::MonotonicTime::get();
+            let stop_time = zx::MonotonicInstant::get();
             let event = self.new_event(EventPayload::Stopped {
                 status: disposition.stop_info().termination_status,
                 exit_code: disposition.stop_info().exit_code,
@@ -1279,13 +1279,13 @@ impl ComponentInstance {
     }
 
     pub fn new_event(&self, payload: EventPayload) -> Event {
-        self.new_event_with_timestamp(payload, zx::MonotonicTime::get())
+        self.new_event_with_timestamp(payload, zx::MonotonicInstant::get())
     }
 
     pub fn new_event_with_timestamp(
         &self,
         payload: EventPayload,
-        timestamp: zx::MonotonicTime,
+        timestamp: zx::MonotonicInstant,
     ) -> Event {
         Event {
             target_moniker: self.moniker.clone().into(),
@@ -1497,7 +1497,7 @@ pub mod testing {
     pub async fn wait_until_event_get_timestamp(
         event_stream: &mut EventStream,
         event_type: EventType,
-    ) -> zx::MonotonicTime {
+    ) -> zx::MonotonicInstant {
         event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
     }
 }

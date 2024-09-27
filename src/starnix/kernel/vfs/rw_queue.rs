@@ -45,7 +45,7 @@ impl<L> RwQueue<L> {
 
             std::mem::drop(inner);
 
-            current_task.block_until(guard, zx::MonotonicTime::INFINITE).map_err(|e| {
+            current_task.block_until(guard, zx::MonotonicInstant::INFINITE).map_err(|e| {
                 self.inner.lock().remove_waiter(&event);
                 e
             })?;
@@ -89,7 +89,7 @@ impl<L> RwQueue<L> {
 
             std::mem::drop(inner);
 
-            current_task.block_until(guard, zx::MonotonicTime::INFINITE).map_err(|e| {
+            current_task.block_until(guard, zx::MonotonicInstant::INFINITE).map_err(|e| {
                 self.inner.lock().remove_waiter(&event);
                 e
             })?;

@@ -802,7 +802,7 @@ mod tests {
                     counts_per_mm: COUNTS_PER_MM,
                 },
             ),
-            event_time: zx::MonotonicTime::get(),
+            event_time: zx::MonotonicInstant::get(),
             handled: input_device::Handled::No,
             trace_id: None,
         };

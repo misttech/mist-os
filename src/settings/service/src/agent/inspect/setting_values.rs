@@ -220,7 +220,7 @@ impl SettingValuesInspectAgent {
 #[cfg(test)]
 mod tests {
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_zircon::MonotonicTime;
+    use fuchsia_zircon::MonotonicInstant;
 
     use crate::agent::Invocation;
     use crate::base::UnknownInfo;
@@ -245,7 +245,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_write_inspect_on_service_lifespan() {
         // Set the clock so that timestamps will always be 0.
-        clock::mock::set(MonotonicTime::from_nanos(0));
+        clock::mock::set(MonotonicInstant::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child(INSPECT_NODE_NAME);
@@ -318,7 +318,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_write_inspect_on_changed() {
         // Set the clock so that timestamps will always be 0.
-        clock::mock::set(MonotonicTime::from_nanos(0));
+        clock::mock::set(MonotonicInstant::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let inspect_node = inspector.root().create_child(INSPECT_NODE_NAME);

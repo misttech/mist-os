@@ -345,7 +345,7 @@ impl EpollFileObject {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         max_events: usize,
-        mut wait_deadline: zx::MonotonicTime,
+        mut wait_deadline: zx::MonotonicInstant,
     ) -> Result<Vec<ReadyItem>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
@@ -363,7 +363,7 @@ impl EpollFileObject {
                 // We now know we have at least one event to return. We shouldn't return
                 // immediately, in case there are more events available, but the next loop should
                 // wait with a 0 timeout to prevent further blocking.
-                wait_deadline = zx::MonotonicTime::ZERO;
+                wait_deadline = zx::MonotonicInstant::ZERO;
             }
 
             // Loop back to check if there are more items in the Waiter's queue. Every wait_until()
@@ -408,7 +408,7 @@ impl EpollFileObject {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         max_events: usize,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<Vec<EpollEvent>, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
@@ -609,8 +609,9 @@ mod tests {
                 WRITE_COUNT.add(bytes_written);
             }
         });
-        let events =
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::INFINITE).unwrap();
+        let events = epoll_file
+            .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::INFINITE)
+            .unwrap();
         thread.await.expect("join");
         assert_eq!(1, events.len());
         let event = &events[0];
@@ -655,8 +656,9 @@ mod tests {
             )
             .unwrap();
 
-        let events =
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::INFINITE).unwrap();
+        let events = epoll_file
+            .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::INFINITE)
+            .unwrap();
         assert_eq!(1, events.len());
         let event = &events[0];
         assert!(event.events().contains(FdEvents::POLLIN));
@@ -718,8 +720,9 @@ mod tests {
                 std::mem::size_of::<u64>()
             );
 
-            let events =
-                epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::ZERO).unwrap();
+            let events = epoll_file
+                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
+                .unwrap();
 
             if do_cancel {
                 assert_eq!(0, events.len());
@@ -765,7 +768,7 @@ mod tests {
                     EpollEvent::new(FdEvents::POLLIN, 2),
                 )
                 .expect("epoll_file.add");
-            epoll_file.wait(locked, &current_task, 2, zx::MonotonicTime::ZERO).expect("wait")
+            epoll_file.wait(locked, &current_task, 2, zx::MonotonicInstant::ZERO).expect("wait")
         };
 
         let fds = poll(&mut locked);
@@ -829,7 +832,10 @@ mod tests {
         );
 
         assert_eq!(
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::ZERO).unwrap().len(),
+            epoll_file
+                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
+                .unwrap()
+                .len(),
             1
         );
 
@@ -838,7 +844,10 @@ mod tests {
 
         // Wait for new notifications
         assert_eq!(
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::ZERO).unwrap().len(),
+            epoll_file
+                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
+                .unwrap()
+                .len(),
             0
         );
         // That shouldn't crash
@@ -869,7 +878,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::ZERO).unwrap().len(),
+            epoll_file
+                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
+                .unwrap()
+                .len(),
             0
         );
 
@@ -883,7 +895,7 @@ mod tests {
             )
             .unwrap();
         let triggered_events =
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicTime::ZERO).unwrap();
+            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap();
         assert_eq!(1, triggered_events.len());
         let event = &triggered_events[0];
         assert_eq!(event.events(), FdEvents::POLLOUT);

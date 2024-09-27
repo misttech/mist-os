@@ -403,7 +403,7 @@ impl NetworkManager {
             }
         };
         Ok(starnix_networks
-            .set_default(&network_id, zx::MonotonicTime::after(self.proxy_timeout))??)
+            .set_default(&network_id, zx::MonotonicInstant::after(self.proxy_timeout))??)
     }
 
     // Call `add` on `StarnixNetworks`.
@@ -413,7 +413,7 @@ impl NetworkManager {
     ) -> Result<(), NetworkManagerError> {
         let binding = self.starnix_networks.lock();
         let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
-        Ok(starnix_networks.add(&network, zx::MonotonicTime::after(self.proxy_timeout))??)
+        Ok(starnix_networks.add(&network, zx::MonotonicInstant::after(self.proxy_timeout))??)
     }
 
     // Call `update` on `StarnixNetworks`.
@@ -423,14 +423,15 @@ impl NetworkManager {
     ) -> Result<(), NetworkManagerError> {
         let binding = self.starnix_networks.lock();
         let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
-        Ok(starnix_networks.update(&network, zx::MonotonicTime::after(self.proxy_timeout))??)
+        Ok(starnix_networks.update(&network, zx::MonotonicInstant::after(self.proxy_timeout))??)
     }
 
     // Call `remove` on `StarnixNetworks`.
     fn fidl_remove_network(&self, network_id: &u32) -> Result<(), NetworkManagerError> {
         let binding = self.starnix_networks.lock();
         let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
-        Ok(starnix_networks.remove(*network_id, zx::MonotonicTime::after(self.proxy_timeout))??)
+        Ok(starnix_networks
+            .remove(*network_id, zx::MonotonicInstant::after(self.proxy_timeout))??)
     }
 }
 

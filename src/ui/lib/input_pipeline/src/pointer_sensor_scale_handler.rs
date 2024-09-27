@@ -26,9 +26,9 @@ pub struct PointerSensorScaleHandler {
 
 struct MutableState {
     /// The time of the last processed mouse move event.
-    last_move_timestamp: Option<zx::MonotonicTime>,
+    last_move_timestamp: Option<zx::MonotonicInstant>,
     /// The time of the last processed mouse scroll event.
-    last_scroll_timestamp: Option<zx::MonotonicTime>,
+    last_scroll_timestamp: Option<zx::MonotonicInstant>,
 }
 
 /// For tick based scrolling, PointerSensorScaleHandler scales tick * 120 to logical
@@ -306,7 +306,7 @@ impl PointerSensorScaleHandler {
     }
 
     /// Scales `movement_mm`.
-    fn scale_motion(&self, movement_mm: Position, event_time: zx::MonotonicTime) -> Position {
+    fn scale_motion(&self, movement_mm: Position, event_time: zx::MonotonicInstant) -> Position {
         // Determine the duration of this `movement`.
         let elapsed_time_secs =
             match self.mutable_state.borrow_mut().last_move_timestamp.replace(event_time) {
@@ -370,7 +370,7 @@ impl PointerSensorScaleHandler {
     fn scale_scroll(
         &self,
         wheel_delta: Option<mouse_binding::WheelDelta>,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> Option<mouse_binding::WheelDelta> {
         match wheel_delta {
             None => None,
@@ -488,7 +488,7 @@ mod tests {
         input_device::UnhandledInputEvent {
             device_event: input_device::InputDeviceEvent::Mouse(mouse_event),
             device_descriptor: DEVICE_DESCRIPTOR.clone(),
-            event_time: zx::MonotonicTime::from_nanos(event_time),
+            event_time: zx::MonotonicInstant::from_nanos(event_time),
             trace_id: None,
         }
     }
@@ -523,7 +523,7 @@ mod tests {
         let handler =
             PointerSensorScaleHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
 
-        let event_time1 = zx::MonotonicTime::get();
+        let event_time1 = zx::MonotonicInstant::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
 
@@ -659,7 +659,7 @@ mod tests {
                     is_precision_scroll: None,
                 }),
                 device_descriptor: DEVICE_DESCRIPTOR.clone(),
-                event_time: zx::MonotonicTime::from_nanos(0),
+                event_time: zx::MonotonicInstant::from_nanos(0),
                 trace_id: None,
             };
             handler.clone().handle_unhandled_input_event(input_event).await;
@@ -678,7 +678,7 @@ mod tests {
                     is_precision_scroll: None,
                 }),
                 device_descriptor: DEVICE_DESCRIPTOR.clone(),
-                event_time: zx::MonotonicTime::from_nanos(duration.into_nanos()),
+                event_time: zx::MonotonicInstant::from_nanos(duration.into_nanos()),
                 trace_id: None,
             };
             let transformed_events =
@@ -935,7 +935,7 @@ mod tests {
                     is_precision_scroll: None,
                 }),
                 device_descriptor: DEVICE_DESCRIPTOR.clone(),
-                event_time: zx::MonotonicTime::from_nanos(0),
+                event_time: zx::MonotonicInstant::from_nanos(0),
                 trace_id: None,
             };
             handler.clone().handle_unhandled_input_event(input_event).await;
@@ -964,7 +964,7 @@ mod tests {
                     is_precision_scroll: None,
                 }),
                 device_descriptor: DEVICE_DESCRIPTOR.clone(),
-                event_time: zx::MonotonicTime::from_nanos(duration.into_nanos()),
+                event_time: zx::MonotonicInstant::from_nanos(duration.into_nanos()),
                 trace_id: None,
             };
             let transformed_events =
@@ -1267,7 +1267,7 @@ mod tests {
             let handler =
                 PointerSensorScaleHandler::new(&test_node, metrics::MetricsLogger::default());
             let mut input_event = make_unhandled_input_event(event);
-            const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
+            const EVENT_TIME: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(42);
             input_event.event_time = EVENT_TIME;
 
             let events = handler.clone().handle_unhandled_input_event(input_event).await;

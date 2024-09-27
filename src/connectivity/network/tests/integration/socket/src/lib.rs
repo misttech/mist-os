@@ -405,7 +405,7 @@ fn validate_send_msg_preflight_response(
                 pending: zx::Signals::NONE,
             })
             .collect::<Vec<_>>();
-        zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE_PAST)
+        zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE_PAST)
             == Err(zx::Status::TIMED_OUT)
     };
     if expect_all_eventpairs_valid != all_eventpairs_valid {
@@ -1255,7 +1255,8 @@ fn validate_recv_msg_postflight_response(
         if valid { Err(zx::Status::TIMED_OUT) } else { Ok(zx::Signals::EVENTPAIR_PEER_CLOSED) };
     let validity = validity.as_ref().expect("expected validity present");
     assert_eq!(
-        validity.wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST),
+        validity
+            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
         expected_validity,
     );
 }

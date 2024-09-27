@@ -29,7 +29,7 @@ pub struct Sample {
     /// The UTC time.
     pub utc: UtcTime,
     /// The monotonic time at which the UTC was most valid.
-    pub monotonic: zx::MonotonicTime,
+    pub monotonic: zx::MonotonicInstant,
     /// The standard deviation of the UTC error.
     pub std_dev: zx::Duration,
 }
@@ -45,7 +45,7 @@ impl TryFrom<TimeSample> for Sample {
             (_, _, None) => Err(anyhow!("sample missing standard deviation")),
             (Some(utc), Some(monotonic), Some(std_dev)) => Ok(Sample {
                 utc: UtcTime::from_nanos(utc),
-                monotonic: zx::MonotonicTime::from_nanos(monotonic),
+                monotonic: zx::MonotonicInstant::from_nanos(monotonic),
                 std_dev: zx::Duration::from_nanos(std_dev),
             }),
         }
@@ -55,7 +55,7 @@ impl TryFrom<TimeSample> for Sample {
 #[cfg(test)]
 impl Sample {
     /// Constructs a new `Sample`.
-    pub fn new(utc: UtcTime, monotonic: zx::MonotonicTime, std_dev: zx::Duration) -> Sample {
+    pub fn new(utc: UtcTime, monotonic: zx::MonotonicInstant, std_dev: zx::Duration) -> Sample {
         Sample { utc, monotonic, std_dev }
     }
 }
@@ -500,13 +500,13 @@ mod test {
         static ref STATUS_EVENT_1: Event = Event::StatusChange { status: STATUS_1 };
         static ref SAMPLE_1: Sample = Sample {
             utc: UtcTime::from_nanos(SAMPLE_1_UTC_NANOS),
-            monotonic: zx::MonotonicTime::from_nanos(SAMPLE_1_MONO_NANOS),
+            monotonic: zx::MonotonicInstant::from_nanos(SAMPLE_1_MONO_NANOS),
             std_dev: zx::Duration::from_nanos(SAMPLE_1_STD_DEV_NANOS),
         };
         static ref SAMPLE_EVENT_1: Event = Event::from(*SAMPLE_1);
         static ref SAMPLE_2: Sample = Sample {
             utc: UtcTime::from_nanos(12345678),
-            monotonic: zx::MonotonicTime::from_nanos(333),
+            monotonic: zx::MonotonicInstant::from_nanos(333),
             std_dev: zx::Duration::from_nanos(9999),
         };
         static ref SAMPLE_EVENT_2: Event = Event::from(*SAMPLE_2);

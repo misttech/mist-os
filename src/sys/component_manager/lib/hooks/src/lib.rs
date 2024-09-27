@@ -239,7 +239,7 @@ pub enum EventPayload {
     Stopped {
         status: zx::Status,
         exit_code: Option<i64>,
-        stop_time: zx::MonotonicTime,
+        stop_time: zx::MonotonicInstant,
         execution_duration: zx::Duration,
         requested_escrow: bool,
     },
@@ -254,12 +254,12 @@ pub enum EventPayload {
 pub struct RuntimeInfo {
     pub diagnostics_receiver:
         Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
-    pub start_time: zx::MonotonicTime,
+    pub start_time: zx::MonotonicInstant,
 }
 
 impl RuntimeInfo {
     pub fn new(
-        timestamp: zx::MonotonicTime,
+        timestamp: zx::MonotonicInstant,
         diagnostics_receiver: oneshot::Receiver<fdiagnostics::ComponentDiagnostics>,
     ) -> Self {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
@@ -303,7 +303,7 @@ pub struct Event {
     pub payload: EventPayload,
 
     /// Time when this event was created
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
 }
 
 impl Event {
@@ -312,7 +312,7 @@ impl Event {
             target_moniker: ExtendedMoniker::ComponentManager,
             component_url: "file:///bin/component_manager".parse().unwrap(),
             payload,
-            timestamp: zx::MonotonicTime::get(),
+            timestamp: zx::MonotonicInstant::get(),
         }
     }
 }
@@ -450,7 +450,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::MonotonicTime::get(),
+            timestamp: zx::MonotonicInstant::get(),
         };
 
         // Verify the transferred event carries the capability.

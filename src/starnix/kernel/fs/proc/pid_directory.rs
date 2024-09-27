@@ -1042,7 +1042,7 @@ impl DynamicFileSource for StatFile {
 
         let info = task.thread_group.process.info().map_err(|_| errno!(EIO))?;
         starttime = duration_to_scheduler_clock(
-            zx::MonotonicTime::from_nanos(info.start_time) - zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::from_nanos(info.start_time) - zx::MonotonicInstant::ZERO,
         ) as u64;
 
         let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;

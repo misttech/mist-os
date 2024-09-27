@@ -19,13 +19,13 @@ use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{make_message, Coord, Point, Size, ViewAssistantContext};
 use derivative::Derivative;
 use euclid::{size2, Size2D, UnknownUnit};
-use fuchsia_zircon::MonotonicTime;
+use fuchsia_zircon::MonotonicInstant;
 use std::ops::Add;
 
 /// enum that defines all messages sent with `App::queue_message` that
 /// the button view assistant will understand and process.
 pub enum ButtonMessages {
-    Pressed(MonotonicTime, String),
+    Pressed(MonotonicInstant, String),
 }
 
 // These values and the text and padding sizes are used to calculate the corners.
@@ -240,7 +240,7 @@ impl Button {
                                 #[cfg(feature = "debug_logging")]
                                 println!("====== Button {} pressed", self.label_text);
                                 context.queue_message(make_message(ButtonMessages::Pressed(
-                                    MonotonicTime::get(),
+                                    MonotonicInstant::get(),
                                     self.label_text.clone(),
                                 )));
                             }

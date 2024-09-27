@@ -396,7 +396,7 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         ),
         Err(zx::Status::TIMED_OUT)
     );
@@ -405,7 +405,7 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     assert_eq!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         )?,
         zx::Signals::USER_0
     );
@@ -427,7 +427,7 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         ),
         Err(zx::Status::TIMED_OUT)
     );
@@ -436,7 +436,7 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     assert_eq!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         )?,
         zx::Signals::USER_0
     );
@@ -463,7 +463,7 @@ async fn empty_blob_readable_after_resize() {
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         ),
         Ok(zx::Signals::USER_0)
     );

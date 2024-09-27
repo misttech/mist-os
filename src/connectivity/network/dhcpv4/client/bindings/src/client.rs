@@ -307,7 +307,7 @@ impl Client {
                     initial_properties: Some(fnet_interfaces_admin::AddressProperties {
                         preferred_lifetime_info: None,
                         valid_lifetime_end: Some(
-                            zx::MonotonicTime::from(start_time + lease_time.into()).into_nanos(),
+                            zx::MonotonicInstant::from(start_time + lease_time.into()).into_nanos(),
                         ),
                         ..Default::default()
                     }),
@@ -378,7 +378,7 @@ impl Client {
             .update_address_properties(&fnet_interfaces_admin::AddressProperties {
                 preferred_lifetime_info: None,
                 valid_lifetime_end: Some(
-                    zx::MonotonicTime::from(start_time + lease_time.into()).into_nanos(),
+                    zx::MonotonicInstant::from(start_time + lease_time.into()).into_nanos(),
                 ),
                 ..Default::default()
             })

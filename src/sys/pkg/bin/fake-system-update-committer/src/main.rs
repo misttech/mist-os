@@ -75,7 +75,7 @@ mod tests {
 
         let result = proxy.is_current_system_committed().await.unwrap();
         assert_eq!(
-            result.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            result.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
         );
     }

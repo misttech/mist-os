@@ -213,7 +213,7 @@ impl ActiveSetting {
 }
 
 struct FeatureEvent {
-    event_time: zx::MonotonicTime,
+    event_time: zx::MonotonicInstant,
     sampling_rate: i64,
     sensitivity: i64,
 }
@@ -224,7 +224,7 @@ impl FeatureEvent {
         Some(FeatureEvent {
             sampling_rate: sensor.sampling_rate?,
             sensitivity: *sensor.sensitivity?.get(0)?,
-            event_time: zx::MonotonicTime::get(),
+            event_time: zx::MonotonicInstant::get(),
         })
     }
 }

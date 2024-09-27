@@ -11,7 +11,7 @@ const ALPHA: f32 = 0.6;
 
 pub(crate) struct Counter {
     // Most recent frame timestamp
-    last_sample_timestamp: zx::MonotonicTime,
+    last_sample_timestamp: zx::MonotonicInstant,
 
     // Stores the exponential moving average of the time between two frames, using the above
     // `ALPHA` as the weight.
@@ -30,13 +30,13 @@ pub(crate) struct Counts {
 impl Counter {
     pub fn new() -> Counter {
         Counter {
-            last_sample_timestamp: zx::MonotonicTime::get(),
+            last_sample_timestamp: zx::MonotonicInstant::get(),
             avg_time_delta_ns: 0.0,
             num_frames: 0,
         }
     }
 
-    pub fn add(&mut self, timestamp: zx::MonotonicTime) {
+    pub fn add(&mut self, timestamp: zx::MonotonicInstant) {
         let delta = timestamp - self.last_sample_timestamp;
         self.last_sample_timestamp = timestamp;
 

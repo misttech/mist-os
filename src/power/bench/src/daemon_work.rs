@@ -25,16 +25,16 @@ fn work_func(
 ) -> Result<()> {
     // Acquire lease for C @ 5.
 
-    let _ = topology_control.acquire_lease("C", 5, zx::MonotonicTime::INFINITE).unwrap();
+    let _ = topology_control.acquire_lease("C", 5, zx::MonotonicInstant::INFINITE).unwrap();
     let level = status_channel
-        .watch_power_level(zx::MonotonicTime::INFINITE)
+        .watch_power_level(zx::MonotonicInstant::INFINITE)
         .expect("Fidl call should work")
         .expect("Result should be good");
     assert_eq!(level, 5);
 
-    let _ = topology_control.drop_lease("C", zx::MonotonicTime::INFINITE).unwrap();
+    let _ = topology_control.drop_lease("C", zx::MonotonicInstant::INFINITE).unwrap();
     let level = status_channel
-        .watch_power_level(zx::MonotonicTime::INFINITE)
+        .watch_power_level(zx::MonotonicInstant::INFINITE)
         .expect("Fidl call should work")
         .expect("Result should be good");
     assert_eq!(level, 0);
@@ -66,12 +66,13 @@ pub(crate) fn prepare_work(
             dependencies: vec![],
         },
     ];
-    let _ = topology_control.create(&elements, zx::MonotonicTime::INFINITE).unwrap();
+    let _ = topology_control.create(&elements, zx::MonotonicInstant::INFINITE).unwrap();
     let (status_channel, server_channel) = create_sync_proxy::<fbroker::StatusMarker>();
-    let _ = topology_control.open_status_channel("C", server_channel, zx::MonotonicTime::INFINITE);
+    let _ =
+        topology_control.open_status_channel("C", server_channel, zx::MonotonicInstant::INFINITE);
 
     let level = status_channel
-        .watch_power_level(zx::MonotonicTime::INFINITE)
+        .watch_power_level(zx::MonotonicInstant::INFINITE)
         .expect("Fidl call should work")
         .expect("Result should be good");
     assert_eq!(level, 0);

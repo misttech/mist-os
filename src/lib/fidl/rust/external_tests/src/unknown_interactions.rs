@@ -18,7 +18,7 @@ use fidl_test_unknown_interactions::{
     UnknownInteractionsProtocolSynchronousProxy,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MonotonicTime, Signals};
+use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MonotonicInstant, Signals};
 use futures::stream::StreamExt;
 use std::future::Future;
 
@@ -119,7 +119,7 @@ where
     server_end
         .wait_handle(
             Signals::CHANNEL_READABLE | Signals::CHANNEL_PEER_CLOSED,
-            MonotonicTime::after(zx::Duration::from_seconds(5)),
+            MonotonicInstant::after(zx::Duration::from_seconds(5)),
         )
         .expect("server end failed to wait for channel readable");
     server_end.read(&mut buf).expect("server end failed to read");
@@ -140,7 +140,7 @@ where
 #[test]
 fn two_way_strict_sync_send() {
     run_two_way_sync(
-        |client| client.strict_two_way(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| client.strict_two_way(MonotonicInstant::after(zx::Duration::from_seconds(2))),
         &[
             0x02, 0x00, 0x00, 0x01, //
             0xdc, 0xb0, 0x55, 0x70, 0x95, 0x6f, 0xba, 0x73, //
@@ -156,7 +156,7 @@ fn two_way_strict_sync_send() {
 #[test]
 fn two_way_strict_err_sync_send() {
     run_two_way_sync(
-        |client| client.strict_two_way_err(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| client.strict_two_way_err(MonotonicInstant::after(zx::Duration::from_seconds(2))),
         &[
             0x02, 0x00, 0x00, 0x01, //
             0xbb, 0x58, 0xe0, 0x08, 0x4e, 0xeb, 0x9b, 0x2e, //
@@ -178,7 +178,7 @@ fn two_way_strict_err_sync_send() {
 #[test]
 fn two_way_flexible_sync_send() {
     run_two_way_sync(
-        |client| client.flexible_two_way(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| client.flexible_two_way(MonotonicInstant::after(zx::Duration::from_seconds(2))),
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
@@ -199,7 +199,7 @@ fn two_way_flexible_sync_send() {
 #[test]
 fn two_way_flexible_sync_send_unknown_response() {
     let err = run_two_way_sync(
-        |client| client.flexible_two_way(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| client.flexible_two_way(MonotonicInstant::after(zx::Duration::from_seconds(2))),
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
@@ -227,7 +227,7 @@ fn two_way_flexible_sync_send_unknown_response() {
 #[test]
 fn two_way_flexible_sync_send_other_framework_error() {
     let err = run_two_way_sync(
-        |client| client.flexible_two_way(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| client.flexible_two_way(MonotonicInstant::after(zx::Duration::from_seconds(2))),
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
@@ -249,7 +249,7 @@ fn two_way_flexible_sync_send_other_framework_error() {
 #[test]
 fn two_way_flexible_sync_send_error_variant() {
     let err = run_two_way_sync(
-        |client| client.flexible_two_way(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| client.flexible_two_way(MonotonicInstant::after(zx::Duration::from_seconds(2))),
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
@@ -271,7 +271,9 @@ fn two_way_flexible_sync_send_error_variant() {
 #[test]
 fn two_way_flexible_err_sync_send() {
     run_two_way_sync(
-        |client| client.flexible_two_way_err(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| {
+            client.flexible_two_way_err(MonotonicInstant::after(zx::Duration::from_seconds(2)))
+        },
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
@@ -293,7 +295,9 @@ fn two_way_flexible_err_sync_send() {
 #[test]
 fn two_way_flexible_err_sync_send_unknown_response() {
     let err = run_two_way_sync(
-        |client| client.flexible_two_way_err(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| {
+            client.flexible_two_way_err(MonotonicInstant::after(zx::Duration::from_seconds(2)))
+        },
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
@@ -321,7 +325,9 @@ fn two_way_flexible_err_sync_send_unknown_response() {
 #[test]
 fn two_way_flexible_err_sync_send_other_framework_error() {
     let err = run_two_way_sync(
-        |client| client.flexible_two_way_err(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| {
+            client.flexible_two_way_err(MonotonicInstant::after(zx::Duration::from_seconds(2)))
+        },
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
@@ -343,7 +349,9 @@ fn two_way_flexible_err_sync_send_other_framework_error() {
 #[test]
 fn two_way_flexible_err_sync_send_error_variant() {
     let err = run_two_way_sync(
-        |client| client.flexible_two_way_err(MonotonicTime::after(zx::Duration::from_seconds(2))),
+        |client| {
+            client.flexible_two_way_err(MonotonicInstant::after(zx::Duration::from_seconds(2)))
+        },
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
@@ -379,7 +387,7 @@ fn recieve_unknown_event_strict_sync() {
         .expect("server end failed to write event");
 
     let err = client
-        .wait_for_event(MonotonicTime::after(zx::Duration::from_seconds(2)))
+        .wait_for_event(MonotonicInstant::after(zx::Duration::from_seconds(2)))
         .expect_err("unknown event unexpectedly succeeded");
 
     assert_matches!(
@@ -407,7 +415,7 @@ fn recieve_unknown_event_flexible_sync() {
         .expect("server end failed to write event");
 
     let event = client
-        .wait_for_event(MonotonicTime::after(zx::Duration::from_seconds(2)))
+        .wait_for_event(MonotonicInstant::after(zx::Duration::from_seconds(2)))
         .expect("unknown flexible event unexpectedly failed");
 
     assert_matches!(
@@ -432,7 +440,7 @@ fn recieve_unknown_event_strict_ajar_sync() {
         .expect("server end failed to write event");
 
     let err = client
-        .wait_for_event(MonotonicTime::after(zx::Duration::from_seconds(2)))
+        .wait_for_event(MonotonicInstant::after(zx::Duration::from_seconds(2)))
         .expect_err("unknown event unexpectedly succeeded");
 
     assert_matches!(
@@ -460,7 +468,7 @@ fn recieve_unknown_event_flexible_ajar_sync() {
         .expect("server end failed to write event");
 
     let event = client
-        .wait_for_event(MonotonicTime::after(zx::Duration::from_seconds(2)))
+        .wait_for_event(MonotonicInstant::after(zx::Duration::from_seconds(2)))
         .expect("unknown flexible event unexpectedly failed");
 
     assert_matches!(
@@ -485,7 +493,7 @@ fn recieve_unknown_event_strict_closed_sync() {
         .expect("server end failed to write event");
 
     let err = client
-        .wait_for_event(MonotonicTime::after(zx::Duration::from_seconds(2)))
+        .wait_for_event(MonotonicInstant::after(zx::Duration::from_seconds(2)))
         .expect_err("unknown event unexpectedly succeeded");
 
     assert_matches!(
@@ -513,7 +521,7 @@ fn recieve_unknown_event_flexible_closed_sync() {
         .expect("server end failed to write event");
 
     let err = client
-        .wait_for_event(MonotonicTime::after(zx::Duration::from_seconds(2)))
+        .wait_for_event(MonotonicInstant::after(zx::Duration::from_seconds(2)))
         .expect_err("unknown event unexpectedly succeeded");
 
     assert_matches!(
@@ -600,7 +608,7 @@ where
         server_end
             .wait_handle(
                 Signals::CHANNEL_READABLE | Signals::CHANNEL_PEER_CLOSED,
-                MonotonicTime::after(zx::Duration::from_seconds(5)),
+                MonotonicInstant::after(zx::Duration::from_seconds(5)),
             )
             .expect("failed to wait for channel readable");
         server_end.read(&mut buf).expect("failed to read");
@@ -1065,7 +1073,7 @@ where
     client_end
         .wait_handle(
             Signals::CHANNEL_READABLE | Signals::CHANNEL_PEER_CLOSED,
-            MonotonicTime::after(zx::Duration::from_seconds(5)),
+            MonotonicInstant::after(zx::Duration::from_seconds(5)),
         )
         .expect("failed to wait for channel readable");
     client_end.read(&mut buf).expect("failed to read");
@@ -1123,7 +1131,7 @@ async fn run_two_way_response<S, F>(
         client_end
             .wait_handle(
                 Signals::CHANNEL_READABLE | Signals::CHANNEL_PEER_CLOSED,
-                MonotonicTime::after(zx::Duration::from_seconds(5)),
+                MonotonicInstant::after(zx::Duration::from_seconds(5)),
             )
             .expect("client end failed to wait for channel readable");
         client_end.read(&mut buf).expect("client end failed to read");

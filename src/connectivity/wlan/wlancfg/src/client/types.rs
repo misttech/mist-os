@@ -115,7 +115,7 @@ pub struct Bss {
     /// Channel for this network.
     pub channel: WlanChan,
     /// Realtime timestamp for this scan result entry.
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
     /// The scanning mode used to observe the BSS.
     pub observation: ScanObservation,
     /// Compatibility with this device's network stack.

@@ -66,7 +66,7 @@ fn get_crypt_client() -> zx::Channel {
         let mut key = [0; 32];
         zx::cprng_draw(&mut key);
         match crypt_management_service
-            .add_wrapping_key(0, &key, zx::MonotonicTime::INFINITE)
+            .add_wrapping_key(0, &key, zx::MonotonicInstant::INFINITE)
             .expect("FIDL failed")
             .map_err(zx::Status::from_raw)
         {
@@ -80,17 +80,17 @@ fn get_crypt_client() -> zx::Channel {
         };
         zx::cprng_draw(&mut key);
         crypt_management_service
-            .add_wrapping_key(1, &key, zx::MonotonicTime::INFINITE)
+            .add_wrapping_key(1, &key, zx::MonotonicInstant::INFINITE)
             .expect("FIDL failed")
             .map_err(zx::Status::from_raw)
             .expect("add_wrapping_key failed");
         crypt_management_service
-            .set_active_key(KeyPurpose::Data, 0, zx::MonotonicTime::INFINITE)
+            .set_active_key(KeyPurpose::Data, 0, zx::MonotonicInstant::INFINITE)
             .expect("FIDL failed")
             .map_err(zx::Status::from_raw)
             .expect("set_active_key failed");
         crypt_management_service
-            .set_active_key(KeyPurpose::Metadata, 1, zx::MonotonicTime::INFINITE)
+            .set_active_key(KeyPurpose::Metadata, 1, zx::MonotonicInstant::INFINITE)
             .expect("FIDL failed")
             .map_err(zx::Status::from_raw)
             .expect("set_active_key failed");

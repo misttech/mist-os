@@ -1733,8 +1733,8 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                             prefix_len: dhcpv6_helper::PREFIX.prefix(),
                         },
                         lifetimes: fnet_dhcpv6::Lifetimes {
-                            valid_until: zx::MonotonicTime::INFINITE.into_nanos(),
-                            preferred_until: zx::MonotonicTime::INFINITE.into_nanos(),
+                            valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                            preferred_until: zx::MonotonicInstant::INFINITE.into_nanos(),
                         },
                     }),
                 );
@@ -1752,8 +1752,8 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                                 prefix_len: dhcpv6_helper::RENEWED_PREFIX.prefix(),
                             },
                             lifetimes: fnet_dhcpv6::Lifetimes {
-                                valid_until: zx::MonotonicTime::INFINITE.into_nanos(),
-                                preferred_until: zx::MonotonicTime::INFINITE.into_nanos(),
+                                valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                                preferred_until: zx::MonotonicInstant::INFINITE.into_nanos(),
                             },
                         }),
                     ),
@@ -1859,8 +1859,8 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
                             prefix_len: dhcpv6_helper::PREFIX.prefix(),
                         },
                         lifetimes: fnet_dhcpv6::Lifetimes {
-                            valid_until: zx::MonotonicTime::INFINITE.into_nanos(),
-                            preferred_until: zx::MonotonicTime::INFINITE.into_nanos(),
+                            valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                            preferred_until: zx::MonotonicInstant::INFINITE.into_nanos(),
                         },
                     }),
                 );

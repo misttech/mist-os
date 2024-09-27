@@ -36,7 +36,7 @@ impl Into<FidlRunEvent> for RunEvent {
 impl RunEvent {
     pub fn debug_data(client: ClientEnd<DebugDataIteratorMarker>) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: RunEventPayload::DebugData(client),
         }
     }
@@ -314,84 +314,84 @@ impl Into<FidlEvent> for SuiteEvents {
 impl SuiteEvents {
     pub fn case_found(identifier: u32, name: String) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CaseFound(name, identifier),
         }
     }
 
     pub fn case_started(identifier: u32) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CaseStarted(identifier),
         }
     }
 
     pub fn case_stopped(identifier: u32, status: CaseStatus) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CaseStopped(identifier, status),
         }
     }
 
     pub fn case_finished(identifier: u32) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CaseFinished(identifier),
         }
     }
 
     pub fn case_stdout(identifier: u32, socket: zx::Socket) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CaseStdout(identifier, socket),
         }
     }
 
     pub fn case_stderr(identifier: u32, socket: zx::Socket) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CaseStderr(identifier, socket),
         }
     }
 
     pub fn suite_syslog(syslog: ftest_manager::Syslog) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::SuiteSyslog(syslog),
         }
     }
 
     pub fn suite_stderr(socket: zx::Socket) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::SuiteStderr(socket),
         }
     }
 
     pub fn suite_custom_artifact(custom: ftest_manager::CustomArtifact) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::CustomArtifact(custom),
         }
     }
 
     pub fn suite_started() -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::SuiteStarted,
         }
     }
 
     pub fn suite_stopped(status: SuiteStatus) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::SuiteStopped(status),
         }
     }
 
     pub fn debug_data(client: ClientEnd<DebugDataIteratorMarker>) -> Self {
         Self {
-            timestamp: zx::MonotonicTime::get().into_nanos(),
+            timestamp: zx::MonotonicInstant::get().into_nanos(),
             payload: SuiteEventPayload::DebugData(client),
         }
     }

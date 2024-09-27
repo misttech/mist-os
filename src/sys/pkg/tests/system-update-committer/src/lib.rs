@@ -327,7 +327,7 @@ async fn system_pending_commit() {
     let event_pair =
         env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
     assert_eq!(
-        event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+        event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
         Err(zx::Status::TIMED_OUT)
     );
 
@@ -361,7 +361,7 @@ async fn system_already_committed() {
     let event_pair =
         env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
     assert_eq!(
-        event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+        event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
         Ok(zx::Signals::USER_0)
     );
 }
@@ -392,11 +392,11 @@ async fn multiple_commit_status_provider_requests() {
     let p1 = env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
 
     assert_eq!(
-        p0.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+        p0.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
         Ok(zx::Signals::USER_0)
     );
     assert_eq!(
-        p1.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+        p1.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
         Ok(zx::Signals::USER_0)
     );
 }

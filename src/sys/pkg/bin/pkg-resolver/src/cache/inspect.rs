@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 fn now_monotonic_nanos() -> i64 {
-    zx::MonotonicTime::get().into_nanos()
+    zx::MonotonicInstant::get().into_nanos()
 }
 
 /// Creates Inspect wrappers for individual blob fetches.

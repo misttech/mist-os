@@ -407,7 +407,7 @@ fn register_buffer_collection_with_scenic(
     };
 
     scenic_allocator
-        .register_buffer_collection(args, zx::MonotonicTime::INFINITE)
+        .register_buffer_collection(args, zx::MonotonicInstant::INFINITE)
         .map_err(|_| vk::ERROR_INITIALIZATION_FAILED)?
         .map_err(|_| vk::ERROR_INITIALIZATION_FAILED)?;
 

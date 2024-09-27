@@ -239,7 +239,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_fs::directory::DirEntry;
-    use fuchsia_zircon::{AsHandleRef, HandleBased, MonotonicTime, Peered, Signals};
+    use fuchsia_zircon::{AsHandleRef, HandleBased, MonotonicInstant, Peered, Signals};
     use futures::TryStreamExt;
     use maplit::hashmap;
     use sandbox::Handle;
@@ -374,7 +374,7 @@ mod tests {
         let ep0 = processargs.handles.pop().unwrap().handle;
         ep1.signal_peer(Signals::NONE, Signals::USER_1).unwrap();
         assert_eq!(
-            ep0.wait_handle(Signals::USER_1, MonotonicTime::INFINITE).unwrap(),
+            ep0.wait_handle(Signals::USER_1, MonotonicInstant::INFINITE).unwrap(),
             Signals::USER_1
         );
 
@@ -528,7 +528,7 @@ mod tests {
         // Make sure the server_end is received, and test connectivity.
         let server_end: zx::Channel = receiver.receive().await.unwrap().channel.into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST).unwrap();
 
         // Connect to the closed protocol. Because the receiver is discarded, anything we send
         // should get peer-closed.
@@ -576,7 +576,7 @@ mod tests {
         // Make sure the server_end is received, and test connectivity.
         let server_end: zx::Channel = receiver.receive().await.unwrap().channel.into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST).unwrap();
 
         // Shutdown the execution scope.
         scope.shutdown();

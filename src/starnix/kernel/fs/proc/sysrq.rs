@@ -142,7 +142,7 @@ impl FileOps for SysRqFile {
                     // capability or there was a problem with the shutdown request.
                     let reboot_res = connect_to_protocol_sync::<AdminMarker>().unwrap().reboot(
                         RebootReason::CriticalComponentFailure,
-                        zx::MonotonicTime::INFINITE,
+                        zx::MonotonicInstant::INFINITE,
                     );
 
                     // LINT.IfChange

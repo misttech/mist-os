@@ -88,7 +88,7 @@ pub fn generate_random_bss() -> types::Bss {
     let bssid = generate_random_bssid();
     let rssi = rng.gen_range(-100..20);
     let channel = generate_random_channel();
-    let timestamp = zx::MonotonicTime::from_nanos(rng.gen());
+    let timestamp = zx::MonotonicInstant::from_nanos(rng.gen());
     let snr_db = rng.gen_range(-20..50);
 
     types::Bss {

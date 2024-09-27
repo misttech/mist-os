@@ -66,9 +66,9 @@ enum TerminatedState {
 
 #[derive(Debug)]
 pub enum StartState {
-    Stopped(zx::MonotonicTime),
+    Stopped(zx::MonotonicInstant),
     Starting(Option<CodecStartResponder>),
-    Started(zx::MonotonicTime),
+    Started(zx::MonotonicInstant),
     Stopping(Option<CodecStopResponder>),
 }
 
@@ -101,14 +101,14 @@ pub enum CodecRequest {
         /// The time is system monotonic when configuring the codec to start completed (it does not
         /// include startup delay time)
         /// Replying Err() to this will close the codec, and it will need to be re-instantiated.
-        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>,
+        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>,
     },
     /// Stop the codec.
     Stop {
         /// Responder to be called when the codec has been configured to stop.
         /// On success, provides the time that the codec was configured, not including delays.
         /// On failuyre, this will close the codec and it will need to be re-instantiated.
-        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>,
+        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>,
     },
 }
 

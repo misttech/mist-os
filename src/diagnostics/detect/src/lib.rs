@@ -21,7 +21,7 @@ use fuchsia_inspect_derive::{Inspect, WithInspect};
 use fuchsia_triage::{inspect_logger, SnapshotTrigger};
 use futures::StreamExt;
 use glob::glob;
-use injectable_time::MonotonicTime;
+use injectable_time::MonotonicInstant;
 use serde_derive::Deserialize;
 use snapshot::SnapshotRequest;
 use std::collections::HashMap;
@@ -224,8 +224,8 @@ pub async fn main() -> Result<(), Error> {
     let selectors = triage_engine.selectors();
     let mut diagnostic_source = diagnostics::DiagnosticFetcher::create(selectors)?;
     let snapshot_service =
-        snapshot::CrashReportHandlerBuilder::new(MonotonicTime::new()).build().await?;
-    let system_time = MonotonicTime::new();
+        snapshot::CrashReportHandlerBuilder::new(MonotonicInstant::new()).build().await?;
+    let system_time = MonotonicInstant::new();
     let mut delay_tracker = DelayTracker::new(&system_time, &mode);
 
     inspect::component::health().set_ok();

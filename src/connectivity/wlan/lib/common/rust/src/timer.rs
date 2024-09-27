@@ -8,7 +8,7 @@ use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::sink::UnboundedSink;
 
-pub type ScheduledEvent<E> = (zx::MonotonicTime, Event<E>);
+pub type ScheduledEvent<E> = (zx::MonotonicInstant, Event<E>);
 pub type EventSender<E> = UnboundedSink<ScheduledEvent<E>>;
 pub type EventStream<E> = mpsc::UnboundedReceiver<ScheduledEvent<E>>;
 pub type EventId = u64;
@@ -59,12 +59,12 @@ impl<E> Timer<E> {
     /// # Panics
     ///
     /// This function will panic if it's called when no executor is set up.
-    pub fn now(&self) -> zx::MonotonicTime {
+    pub fn now(&self) -> zx::MonotonicInstant {
         // We use fasync to support time manipulation in tests.
         fasync::Time::now().into_zx()
     }
 
-    pub fn schedule_at(&mut self, deadline: zx::MonotonicTime, event: E) -> EventId {
+    pub fn schedule_at(&mut self, deadline: zx::MonotonicInstant, event: E) -> EventId {
         let id = self.next_id;
         self.sender.send((deadline, Event { id, event }));
         self.next_id += 1;
@@ -108,8 +108,8 @@ mod tests {
     fn test_timer_schedule_at() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let timeout1 = zx::MonotonicTime::after(zx::Duration::from_seconds(5));
-        let timeout2 = zx::MonotonicTime::after(zx::Duration::from_seconds(10));
+        let timeout1 = zx::MonotonicInstant::after(zx::Duration::from_seconds(5));
+        let timeout2 = zx::MonotonicInstant::after(zx::Duration::from_seconds(10));
         assert_eq!(timer.schedule_at(timeout1, 7), 0);
         assert_eq!(timer.schedule_at(timeout2, 9), 1);
 
@@ -158,7 +158,7 @@ mod tests {
     fn test_timer_schedule() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let start = zx::MonotonicTime::after(zx::Duration::from_millis(0));
+        let start = zx::MonotonicInstant::after(zx::Duration::from_millis(0));
 
         assert_eq!(timer.schedule(5u32), 0);
 
@@ -174,7 +174,7 @@ mod tests {
         let fut = async {
             let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
-            let now = zx::MonotonicTime::get();
+            let now = zx::MonotonicInstant::get();
             schedule(&timer, now + zx::Duration::from_millis(40), 0);
             schedule(&timer, now + zx::Duration::from_millis(10), 1);
             schedule(&timer, now + zx::Duration::from_millis(20), 2);
@@ -200,7 +200,7 @@ mod tests {
 
     fn schedule(
         timer: &UnboundedSender<ScheduledEvent<TestEvent>>,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
         event: TestEvent,
     ) {
         let entry = (deadline, Event { id: 0, event });

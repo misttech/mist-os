@@ -434,7 +434,7 @@ fn recvmsg_internal<L>(
     file: &FileHandle,
     user_message_header: UserRef<msghdr>,
     flags: u32,
-    deadline: Option<zx::MonotonicTime>,
+    deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -559,7 +559,7 @@ pub fn sys_recvmmsg(
         None
     } else {
         let ts = current_task.read_object(user_timeout)?;
-        Some(zx::MonotonicTime::after(duration_from_timespec(ts)?))
+        Some(zx::MonotonicInstant::after(duration_from_timespec(ts)?))
     };
 
     let mut index = 0usize;

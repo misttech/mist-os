@@ -64,7 +64,7 @@ pub(super) fn make_touchpad_event(
     input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Touchpad(touchpad_event),
         device_descriptor: make_touchpad_descriptor(),
-        event_time: zx::MonotonicTime::ZERO,
+        event_time: zx::MonotonicInstant::ZERO,
         trace_id: None,
         handled: input_device::Handled::No,
     }

@@ -205,7 +205,10 @@ impl CpuManager {
             }
 
             self._inspect_node.borrow_mut().add_entry(|node| {
-                node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
+                node.record_int(
+                    fobs::SUSPEND_ATTEMPTED_AT,
+                    zx::MonotonicInstant::get().into_nanos(),
+                );
             });
             // LINT.IfChange
             tracing::info!("Suspending");
@@ -231,7 +234,7 @@ impl CpuManager {
             tracing::info!(?response, "Resuming");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
             self._inspect_node.borrow_mut().add_entry(|node| {
-                let time = zx::MonotonicTime::get().into_nanos();
+                let time = zx::MonotonicInstant::get().into_nanos();
                 if let Some(Ok(Ok(SuspendResponse { suspend_duration: Some(duration), .. }))) =
                     response
                 {

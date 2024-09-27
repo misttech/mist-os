@@ -51,7 +51,7 @@ const LATENCY_HISTOGRAM_PROPERTIES: ExponentialHistogramParams<i64> = Exponentia
 pub struct InputDeviceStatus {
     /// Function for getting the current timestamp. Enables unit testing
     /// of the latency histogram.
-    now: Box<dyn Fn() -> zx::MonotonicTime>,
+    now: Box<dyn Fn() -> zx::MonotonicInstant>,
 
     /// A node that contains the state below.
     _node: fuchsia_inspect::Node,
@@ -85,12 +85,12 @@ pub struct InputDeviceStatus {
 
 impl InputDeviceStatus {
     pub fn new(device_node: fuchsia_inspect::Node) -> Self {
-        Self::new_internal(device_node, Box::new(zx::MonotonicTime::get))
+        Self::new_internal(device_node, Box::new(zx::MonotonicInstant::get))
     }
 
     fn new_internal(
         device_node: fuchsia_inspect::Node,
-        now: Box<dyn Fn() -> zx::MonotonicTime>,
+        now: Box<dyn Fn() -> zx::MonotonicInstant>,
     ) -> Self {
         let mut health_node = fuchsia_inspect::health::Node::new(&device_node);
         health_node.set_starting_up();
@@ -123,7 +123,7 @@ impl InputDeviceStatus {
         match report.event_time {
             Some(event_time) => {
                 self.driver_to_binding_latency_ms.insert(
-                    ((self.now)() - zx::MonotonicTime::from_nanos(event_time)).into_millis(),
+                    ((self.now)() - zx::MonotonicInstant::from_nanos(event_time)).into_millis(),
                 );
                 self.last_received_timestamp_ns.set(event_time.try_into().unwrap());
             }
@@ -152,7 +152,7 @@ pub struct InputEvent {
     pub device_descriptor: InputDeviceDescriptor,
 
     /// The time in nanoseconds when the event was first recorded.
-    pub event_time: zx::MonotonicTime,
+    pub event_time: zx::MonotonicInstant,
 
     /// The handled state of the event.
     pub handled: Handled,
@@ -175,7 +175,7 @@ pub struct UnhandledInputEvent {
     pub device_descriptor: InputDeviceDescriptor,
 
     /// The time in nanoseconds when the event was first recorded.
-    pub event_time: zx::MonotonicTime,
+    pub event_time: zx::MonotonicInstant,
 
     pub trace_id: Option<ftrace::Id>,
 }
@@ -473,10 +473,10 @@ pub fn get_device_from_dir_entry_path(
 ///
 /// # Parameters
 /// - `event_time`: The event time from an InputReport.
-pub fn event_time_or_now(event_time: Option<i64>) -> zx::MonotonicTime {
+pub fn event_time_or_now(event_time: Option<i64>) -> zx::MonotonicInstant {
     match event_time {
-        Some(time) => zx::MonotonicTime::from_nanos(time),
-        None => zx::MonotonicTime::get(),
+        Some(time) => zx::MonotonicInstant::from_nanos(time),
+        None => zx::MonotonicInstant::get(),
     }
 }
 
@@ -533,7 +533,7 @@ impl InputEvent {
     }
 
     /// Returns the same event, with modified event time.
-    pub fn into_with_event_time(self, event_time: zx::MonotonicTime) -> Self {
+    pub fn into_with_event_time(self, event_time: zx::MonotonicInstant) -> Self {
         Self { event_time, ..self }
     }
 
@@ -592,13 +592,13 @@ mod tests {
     #[test]
     fn max_event_time() {
         let event_time = event_time_or_now(Some(i64::MAX));
-        assert_eq!(event_time, zx::MonotonicTime::INFINITE);
+        assert_eq!(event_time, zx::MonotonicInstant::INFINITE);
     }
 
     #[test]
     fn min_event_time() {
         let event_time = event_time_or_now(Some(std::i64::MIN));
-        assert_eq!(event_time, zx::MonotonicTime::INFINITE_PAST);
+        assert_eq!(event_time, zx::MonotonicInstant::INFINITE_PAST);
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -645,7 +645,7 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let input_device_status = InputDeviceStatus::new_internal(
             inspector.root().clone_weak(),
-            Box::new(move || zx::MonotonicTime::from_nanos(latency_nsec)),
+            Box::new(move || zx::MonotonicInstant::from_nanos(latency_nsec)),
         );
         input_device_status
             .count_received_report(&InputReport { event_time: Some(0), ..InputReport::default() });
@@ -1009,7 +1009,7 @@ mod tests {
             InputEvent::from(UnhandledInputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
-                event_time: zx::MonotonicTime::from_nanos(1),
+                event_time: zx::MonotonicInstant::from_nanos(1),
                 trace_id: None,
             })
             .handled,
@@ -1019,7 +1019,7 @@ mod tests {
 
     #[fuchsia::test]
     fn unhandled_to_generic_conversion_preserves_fields() {
-        const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
+        const EVENT_TIME: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(42);
         let expected_trace_id: Option<ftrace::Id> = Some(1234.into());
         assert_eq!(
             InputEvent::from(UnhandledInputEvent {
@@ -1044,7 +1044,7 @@ mod tests {
             UnhandledInputEvent::try_from(InputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
-                event_time: zx::MonotonicTime::from_nanos(1),
+                event_time: zx::MonotonicInstant::from_nanos(1),
                 handled: Handled::Yes,
                 trace_id: None,
             }),
@@ -1054,7 +1054,7 @@ mod tests {
 
     #[fuchsia::test]
     fn generic_to_unhandled_conversion_preserves_fields_for_unhandled_events() {
-        const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
+        const EVENT_TIME: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(42);
         let expected_trace_id: Option<ftrace::Id> = Some(1234.into());
         assert_eq!(
             UnhandledInputEvent::try_from(InputEvent {
@@ -1080,7 +1080,7 @@ mod tests {
         let event = InputEvent {
             device_event: InputDeviceEvent::Fake,
             device_descriptor: InputDeviceDescriptor::Fake,
-            event_time: zx::MonotonicTime::from_nanos(1),
+            event_time: zx::MonotonicInstant::from_nanos(1),
             handled: initially_handled,
             trace_id: None,
         };
@@ -1093,7 +1093,7 @@ mod tests {
         let event = InputEvent {
             device_event: InputDeviceEvent::Fake,
             device_descriptor: InputDeviceDescriptor::Fake,
-            event_time: zx::MonotonicTime::from_nanos(1),
+            event_time: zx::MonotonicInstant::from_nanos(1),
             handled: initially_handled.clone(),
             trace_id: None,
         };
@@ -1106,7 +1106,7 @@ mod tests {
         let event = InputEvent {
             device_event: InputDeviceEvent::Fake,
             device_descriptor: InputDeviceDescriptor::Fake,
-            event_time: zx::MonotonicTime::from_nanos(1),
+            event_time: zx::MonotonicInstant::from_nanos(1),
             handled: initially_handled,
             trace_id: None,
         };

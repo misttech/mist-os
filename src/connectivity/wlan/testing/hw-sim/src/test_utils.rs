@@ -416,7 +416,7 @@ impl Drop for TestHelper {
         // first shutdown the phy to prevent any automated CreateIface
         // calls from wlancfg after removing the iface.
         sync_proxy
-            .shutdown(zx::MonotonicTime::INFINITE)
+            .shutdown(zx::MonotonicInstant::INFINITE)
             .expect("Failed to shutdown WlantapPhy gracefully.");
     }
 }

@@ -42,7 +42,9 @@ impl Service {
                     match msg {
                         fidl_focus::ControllerRequest::Notify { view_ref, responder, .. } => {
                             let view_ref = keyboard3::ViewRef::new(view_ref);
-                            keyboard3.handle_focus_change(view_ref, zx::MonotonicTime::get()).await;
+                            keyboard3
+                                .handle_focus_change(view_ref, zx::MonotonicInstant::get())
+                                .await;
                             responder.send()?;
                         }
                     }

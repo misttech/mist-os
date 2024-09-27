@@ -409,7 +409,7 @@ fn do_futex<Key: FutexKey>(
     let read_timespec = |current_task: &CurrentTask| {
         let utime = UserRef::<timespec>::from(timeout_or_value2);
         if utime.is_null() {
-            Ok(timespec_from_time(zx::MonotonicTime::INFINITE))
+            Ok(timespec_from_time(zx::MonotonicInstant::INFINITE))
         } else {
             current_task.read_object(utime)
         }
@@ -417,7 +417,7 @@ fn do_futex<Key: FutexKey>(
     let read_timeout = |current_task: &CurrentTask| {
         let timespec = read_timespec(current_task)?;
         let timeout = duration_from_timespec(timespec);
-        let deadline = zx::MonotonicTime::after(timeout?);
+        let deadline = zx::MonotonicInstant::after(timeout?);
         if is_realtime {
             // Since this is a timeout, waiting on the monotonic timeline before it's paused is
             // just as good as actually estimating UTC here.
@@ -508,7 +508,7 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
     addr: UserAddress,
     value: u32,
     mask: u32,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 ) -> Result<(), Errno> {
     let futexes = Key::get_table_from_task(current_task);
     let result = futexes.wait(current_task, addr, value, mask, deadline);

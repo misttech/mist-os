@@ -36,7 +36,7 @@ impl BytesFileOps for PowerWakeLockFile {
         // Check if there is a timeout.
         let target_monotonic = match clean_str_split.next() {
             Some(timeout_str) => Some(
-                zx::MonotonicTime::get() // now
+                zx::MonotonicInstant::get() // now
                     + zx::Duration::from_nanos(
                         timeout_str
                             .parse()

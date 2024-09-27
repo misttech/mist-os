@@ -21,9 +21,9 @@ impl Timeline {
     pub fn now(&self) -> TargetTime {
         match self {
             Self::RealTime => TargetTime::RealTime(utc::utc_now()),
-            Self::Monotonic => TargetTime::Monotonic(zx::MonotonicTime::get()),
+            Self::Monotonic => TargetTime::Monotonic(zx::MonotonicInstant::get()),
             // TODO(https://fxbug.dev/328306129) handle boot and monotonic time separately
-            Self::BootTime => TargetTime::BootTime(zx::MonotonicTime::get()),
+            Self::BootTime => TargetTime::BootTime(zx::MonotonicInstant::get()),
         }
     }
 
@@ -54,10 +54,10 @@ pub enum TimerWakeup {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TargetTime {
-    Monotonic(zx::MonotonicTime),
+    Monotonic(zx::MonotonicInstant),
     RealTime(UtcTime),
     // TODO(https://fxbug.dev/328306129) handle boot time with its own type
-    BootTime(zx::MonotonicTime),
+    BootTime(zx::MonotonicInstant),
 }
 
 impl TargetTime {
@@ -79,7 +79,7 @@ impl TargetTime {
     }
 
     // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly
-    pub fn estimate_monotonic(&self) -> zx::MonotonicTime {
+    pub fn estimate_monotonic(&self) -> zx::MonotonicInstant {
         match self {
             TargetTime::BootTime(t) | TargetTime::Monotonic(t) => *t,
             TargetTime::RealTime(t) => utc::estimate_monotonic_deadline_from_utc(*t),

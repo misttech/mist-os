@@ -280,7 +280,7 @@ async fn get_impl(
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
 ) -> Result<(), Status> {
-    let () = node.record_int("started-time", zx::MonotonicTime::get().into_nanos());
+    let () = node.record_int("started-time", zx::MonotonicInstant::get().into_nanos());
     let () = node.record_string("meta-far-id", meta_far_blob.blob_id.to_string());
     let () = node.record_uint("meta-far-length", meta_far_blob.length);
     let () = node.record_string("gc-protection", format!("{gc_protection:?}"));

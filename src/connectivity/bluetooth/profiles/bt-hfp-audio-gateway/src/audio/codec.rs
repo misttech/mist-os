@@ -22,9 +22,9 @@ use crate::CodecId;
 #[derive(Default)]
 struct CodecAudioControlInner {
     start_request:
-        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>>,
+        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>>,
     stop_request:
-        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>>,
+        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>>,
 }
 
 pub struct CodecAudioControl {

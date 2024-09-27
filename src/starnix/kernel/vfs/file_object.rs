@@ -1293,7 +1293,7 @@ impl FileObject {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         events: FdEvents,
-        deadline: Option<zx::MonotonicTime>,
+        deadline: Option<zx::MonotonicInstant>,
         mut op: Op,
     ) -> Result<T, Errno>
     where
@@ -1315,7 +1315,7 @@ impl FileObject {
                 result => return result,
             }
             waiter
-                .wait_until(current_task, deadline.unwrap_or(zx::MonotonicTime::INFINITE))
+                .wait_until(current_task, deadline.unwrap_or(zx::MonotonicInstant::INFINITE))
                 .map_err(|e| if e == ETIMEDOUT { errno!(EAGAIN) } else { e })?;
         }
     }

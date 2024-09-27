@@ -204,7 +204,7 @@ impl CobaltDiagnostics {
         );
         if track == Track::Monitor {
             if let Some(monitor_clock) = self.monitor_clock.as_ref() {
-                let monotonic_ref = zx::MonotonicTime::get();
+                let monotonic_ref = zx::MonotonicInstant::get();
                 let primary = time_at_monotonic(&self.primary_clock, monotonic_ref);
                 let monitor = time_at_monotonic(monitor_clock, monotonic_ref);
                 let direction =
@@ -479,7 +479,7 @@ mod test {
 
         diagnostics.record(Event::KalmanFilterUpdated {
             track: Track::Primary,
-            monotonic: zx::MonotonicTime::from_nanos(333_000_000_000),
+            monotonic: zx::MonotonicInstant::from_nanos(333_000_000_000),
             utc: UtcTime::from_nanos(4455445544_000_000_000),
             sqrt_covariance: zx::Duration::from_micros(55555),
         });
@@ -506,7 +506,7 @@ mod test {
 
         diagnostics.record(Event::FrequencyUpdated {
             track: Track::Primary,
-            monotonic: zx::MonotonicTime::from_nanos(888_000_000_000),
+            monotonic: zx::MonotonicInstant::from_nanos(888_000_000_000),
             rate_adjust_ppm: -4,
             window_count: 7,
         });

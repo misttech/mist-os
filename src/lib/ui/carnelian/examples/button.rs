@@ -24,7 +24,7 @@ use carnelian::{
     MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
-use fuchsia_zircon::MonotonicTime;
+use fuchsia_zircon::MonotonicInstant;
 use std::f32::consts::PI;
 use std::path::PathBuf;
 use std::thread;
@@ -42,7 +42,7 @@ struct Args {
 /// enum that defines all messages sent with `App::queue_message` that
 /// the button view assistant will understand and process.
 pub enum ButtonMessages {
-    Pressed(MonotonicTime),
+    Pressed(MonotonicInstant),
     Resize,
 }
 
@@ -203,7 +203,7 @@ impl Button {
                     input::pointer::Phase::Up => {
                         if self.active {
                             context.queue_message(make_message(ButtonMessages::Pressed(
-                                MonotonicTime::get(),
+                                MonotonicInstant::get(),
                             )));
                         }
                         self.tracking_pointer = None;

@@ -316,7 +316,7 @@ impl Drop for FvmVolume {
     fn drop(&mut self) {
         let status = self
             .volume
-            .destroy(zx::MonotonicTime::INFINITE)
+            .destroy(zx::MonotonicInstant::INFINITE)
             .expect("Failed to destroy the FVM volume");
         zx::ok(status).expect("Failed to destroy the FVM volume");
     }

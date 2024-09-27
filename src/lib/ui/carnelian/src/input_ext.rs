@@ -5,7 +5,7 @@
 #![allow(unused)]
 use crate::geometry::{IntPoint, IntSize};
 use crate::input::*;
-use fuchsia_zircon::MonotonicTime;
+use fuchsia_zircon::MonotonicInstant;
 use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Clone, Copy)]
@@ -43,7 +43,7 @@ impl TouchEventResampler {
 
     /// Dequeue non-moved events older than |sample_time| and sample touch
     /// contacts at |sample_time|.
-    pub fn dequeue_and_sample(&mut self, sample_time: MonotonicTime) -> Vec<Event> {
+    pub fn dequeue_and_sample(&mut self, sample_time: MonotonicInstant) -> Vec<Event> {
         let sample_time_ns = sample_time.into_nanos() as u64;
 
         // Process events until sample time.
@@ -231,26 +231,26 @@ mod touch_event_resampling_tests {
         resampler.enqueue(create_test_event(touch::Phase::Up, 4000));
 
         // No events should be dequeue at time 0.
-        assert_eq!(resampler.dequeue_and_sample(MonotonicTime::from_nanos(500)), vec![]);
+        assert_eq!(resampler.dequeue_and_sample(MonotonicInstant::from_nanos(500)), vec![]);
 
         // Down event and first resampled moved event.
-        let result = resampler.dequeue_and_sample(MonotonicTime::from_nanos(1500));
+        let result = resampler.dequeue_and_sample(MonotonicInstant::from_nanos(1500));
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], create_test_event(create_test_down_phase(0, 0), 1000));
         assert_eq!(result[1], create_test_event(create_test_moved_phase(5, 0), 1500));
 
         // One resampled moved event.
-        let result = resampler.dequeue_and_sample(MonotonicTime::from_nanos(2500));
+        let result = resampler.dequeue_and_sample(MonotonicInstant::from_nanos(2500));
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], create_test_event(create_test_moved_phase(15, 0), 2500));
 
         // Another resampled moved event.
-        let result = resampler.dequeue_and_sample(MonotonicTime::from_nanos(3500));
+        let result = resampler.dequeue_and_sample(MonotonicInstant::from_nanos(3500));
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], create_test_event(create_test_moved_phase(25, 0), 3500));
 
         // Last resampled moved event.
-        let result = resampler.dequeue_and_sample(MonotonicTime::from_nanos(4500));
+        let result = resampler.dequeue_and_sample(MonotonicInstant::from_nanos(4500));
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], create_test_event(create_test_moved_phase(30, 0), 4000));
         assert_eq!(result[1], create_test_event(touch::Phase::Up, 4000));

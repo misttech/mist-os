@@ -139,7 +139,7 @@ impl Repository {
             inspect: RepositoryInspectState {
                 last_merkle_successfully_resolved_time: node.create_string(
                     "last_merkle_successfully_resolved_time",
-                    format!("{:?}", Option::<zx::MonotonicTime>::None),
+                    format!("{:?}", Option::<zx::MonotonicInstant>::None),
                 ),
                 merkles_successfully_resolved_count: inspect_util::Counter::new(
                     &node,
@@ -567,7 +567,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn only_update_subscribed_repo_if_stale() {
-        let initial_time = zx::MonotonicTime::from_nanos(0);
+        let initial_time = zx::MonotonicInstant::from_nanos(0);
         clock::mock::set(initial_time);
         let (_env, served_repository, mut ts_metadata_fetched, mut repo) =
             make_repo_with_auto_and_watched_timestamp_metadata().await;
@@ -642,7 +642,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn resolve_caches_metadata() {
-        clock::mock::set(zx::MonotonicTime::from_nanos(0));
+        clock::mock::set(zx::MonotonicInstant::from_nanos(0));
 
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let env = TestEnv::builder().add_package(&pkg).build().await;
@@ -673,7 +673,7 @@ mod tests {
 
         // Advance time right before the timeout, and make sure we don't access the server.
         clock::mock::set(
-            zx::MonotonicTime::from_nanos(0) + METADATA_CACHE_STALE_TIMEOUT
+            zx::MonotonicInstant::from_nanos(0) + METADATA_CACHE_STALE_TIMEOUT
                 - zx::Duration::from_seconds(1),
         );
         assert_matches!(repo.get_merkle_at_path(&target_path).await, Ok(_));
@@ -683,7 +683,7 @@ mod tests {
 
         // Advance time right after the timeout, and make sure we access the server.
         clock::mock::set(
-            zx::MonotonicTime::from_nanos(0)
+            zx::MonotonicInstant::from_nanos(0)
                 + METADATA_CACHE_STALE_TIMEOUT
                 + zx::Duration::from_seconds(1),
         );
@@ -767,7 +767,7 @@ mod inspect_tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn get_merkle_at_path_updates_inspect() {
-        clock::mock::set(zx::MonotonicTime::from_nanos(0));
+        clock::mock::set(zx::MonotonicInstant::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
@@ -820,7 +820,7 @@ mod inspect_tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn subscribed_repo_after_event() {
-        clock::mock::set(zx::MonotonicTime::from_nanos(0));
+        clock::mock::set(zx::MonotonicInstant::from_nanos(0));
         let inspector = inspect::Inspector::default();
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let repo = Arc::new(

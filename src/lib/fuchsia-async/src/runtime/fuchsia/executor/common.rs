@@ -253,7 +253,7 @@ impl Executor {
 
     pub fn now(&self) -> Time {
         match &self.time {
-            ExecutorTime::RealTime => Time::from_zx(zx::MonotonicTime::get()),
+            ExecutorTime::RealTime => Time::from_zx(zx::MonotonicInstant::get()),
             ExecutorTime::FakeTime(t) => Time::from_nanos(t.load(Ordering::Relaxed)),
         }
     }

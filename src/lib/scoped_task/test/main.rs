@@ -87,7 +87,7 @@ fn run_test_with_c_args(args: &[&CStr], expect_success: bool) {
     )
     .expect("could not spawn");
     process
-        .wait_handle(zx::Signals::PROCESS_TERMINATED, zx::MonotonicTime::INFINITE)
+        .wait_handle(zx::Signals::PROCESS_TERMINATED, zx::MonotonicInstant::INFINITE)
         .expect("could not wait");
     let info = process.info().unwrap();
     if expect_success {

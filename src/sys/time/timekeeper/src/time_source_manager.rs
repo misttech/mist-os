@@ -38,15 +38,15 @@ const SOURCE_KEEPALIVE: zx::Duration = zx::Duration::from_minutes(60);
 /// A provider of monotonic times.
 pub trait MonotonicProvider: Send + Sync {
     /// Returns the current monotonic time.
-    fn now(&mut self) -> zx::MonotonicTime;
+    fn now(&mut self) -> zx::MonotonicInstant;
 }
 
 /// A provider of true monotonic times from the kernel.
 pub struct KernelMonotonicProvider();
 
 impl MonotonicProvider for KernelMonotonicProvider {
-    fn now(&mut self) -> zx::MonotonicTime {
-        zx::MonotonicTime::get()
+    fn now(&mut self) -> zx::MonotonicInstant {
+        zx::MonotonicInstant::get()
     }
 }
 
@@ -96,7 +96,7 @@ struct PushSourceManager<D: Diagnostics, M: MonotonicProvider> {
     /// The most recent status received from the time source in its current execution.
     last_status: Option<Status>,
     /// The monotonic time at which the most recently accepted Sample arrived.
-    last_accepted_sample_arrival: Option<zx::MonotonicTime>,
+    last_accepted_sample_arrival: Option<zx::MonotonicInstant>,
 }
 
 impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
@@ -155,8 +155,8 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
             // changes) within SOURCE_KEEPALIVE. This doesn't apply to sources that are not
             // OK (e.g. those waiting indefinitely for network availability).
             let timeout = match self.last_status {
-                Some(Status::Ok) => zx::MonotonicTime::after(SOURCE_KEEPALIVE),
-                _ => zx::MonotonicTime::INFINITE,
+                Some(Status::Ok) => zx::MonotonicInstant::after(SOURCE_KEEPALIVE),
+                _ => zx::MonotonicInstant::INFINITE,
             };
 
             let event = event_stream
@@ -215,11 +215,11 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
     fn validate_sample(
         &mut self,
         sample: &Sample,
-    ) -> Result<zx::MonotonicTime, SampleValidationError> {
+    ) -> Result<zx::MonotonicInstant, SampleValidationError> {
         let current_monotonic = self.monotonic.now();
         let earliest_allowed_arrival = match self.last_accepted_sample_arrival {
             Some(previous_arrival) if self.delays_enabled => previous_arrival + MIN_UPDATE_DELAY,
-            _ => zx::MonotonicTime::INFINITE_PAST,
+            _ => zx::MonotonicInstant::INFINITE_PAST,
         };
 
         if sample.utc < self.backstop {
@@ -341,7 +341,7 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
     diagnostics: Arc<D>,
 
     /// The monotonic time at which the last sample was requested.
-    last_sample_request_time: Option<zx::MonotonicTime>,
+    last_sample_request_time: Option<zx::MonotonicInstant>,
 
     /// If the manager ever received a sample.
     received_sample: bool,
@@ -480,18 +480,18 @@ mod test {
     /// A provider of artificial monotonic times that increment by a fixed duration each call.
     struct FakeMonotonicProvider {
         increment: zx::Duration,
-        last_time: zx::MonotonicTime,
+        last_time: zx::MonotonicInstant,
     }
 
     impl FakeMonotonicProvider {
         /// Constructs a new `FakeMonotonicProvider` that increments by `increment` on each call.
         pub fn new(increment: zx::Duration) -> Self {
-            FakeMonotonicProvider { increment, last_time: zx::MonotonicTime::ZERO }
+            FakeMonotonicProvider { increment, last_time: zx::MonotonicInstant::ZERO }
         }
     }
 
     impl MonotonicProvider for FakeMonotonicProvider {
-        fn now(&mut self) -> zx::MonotonicTime {
+        fn now(&mut self) -> zx::MonotonicInstant {
             self.last_time += self.increment;
             self.last_time
         }
@@ -568,7 +568,7 @@ mod test {
     fn create_sample(utc_factor: i64, monotonic_factor: i64) -> Sample {
         Sample {
             utc: UtcTime::ZERO + (MIN_UPDATE_DELAY * utc_factor),
-            monotonic: zx::MonotonicTime::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
+            monotonic: zx::MonotonicInstant::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
             std_dev: STD_DEV,
         }
     }
@@ -608,7 +608,7 @@ mod test {
 
         assert_eq!(
             push_manager.last_accepted_sample_arrival,
-            Some(zx::MonotonicTime::ZERO + MIN_UPDATE_DELAY * 3)
+            Some(zx::MonotonicInstant::ZERO + MIN_UPDATE_DELAY * 3)
         );
 
         diagnostics.assert_events(&[
@@ -741,7 +741,7 @@ mod test {
             manager
                 .next_sample()
                 .map(|_| true)
-                .on_timeout(zx::MonotonicTime::after(zx::Duration::from_millis(50)), || false)
+                .on_timeout(zx::MonotonicInstant::after(zx::Duration::from_millis(50)), || false)
                 .await,
             false
         );
@@ -766,7 +766,7 @@ mod test {
             manager
                 .next_sample()
                 .map(|_| true)
-                .on_timeout(zx::MonotonicTime::after(zx::Duration::from_millis(50)), || false)
+                .on_timeout(zx::MonotonicInstant::after(zx::Duration::from_millis(50)), || false)
                 .await,
             false
         );
@@ -790,7 +790,7 @@ mod test {
         // we try to validate a sample.
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR, 1)),
-            Ok(zx::MonotonicTime::ZERO + MIN_UPDATE_DELAY)
+            Ok(zx::MonotonicInstant::ZERO + MIN_UPDATE_DELAY)
         );
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR - 1, 2)),
@@ -807,7 +807,7 @@ mod test {
         // On the next call the monontonic should be a factor of 5, trick the manager into thinking
         // it already accepted an update at 4.5
         push_manager.last_accepted_sample_arrival =
-            Some(zx::MonotonicTime::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 9));
+            Some(zx::MonotonicInstant::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 9));
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR, 5)),
             Err(SVE::TooCloseToPrevious)
@@ -815,10 +815,10 @@ mod test {
         // But if we disable delays an accepted update of 5.5 at a monotonic of 6 is accepted.
         push_manager.delays_enabled = false;
         push_manager.last_accepted_sample_arrival =
-            Some(zx::MonotonicTime::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 11));
+            Some(zx::MonotonicInstant::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 11));
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR, 6)),
-            Ok(zx::MonotonicTime::ZERO + MIN_UPDATE_DELAY * 6)
+            Ok(zx::MonotonicInstant::ZERO + MIN_UPDATE_DELAY * 6)
         );
     }
 
@@ -829,7 +829,7 @@ mod test {
             Arc::new(FakeDiagnostics::new()),
         );
         let mut pull_manager = assert_pull_manager!(manager);
-        pull_manager.last_sample_request_time = Some(zx::MonotonicTime::ZERO);
+        pull_manager.last_sample_request_time = Some(zx::MonotonicInstant::ZERO);
 
         // The monotonic our manager sees will start at a factor of 1 and increment by 1 each time
         // we try to validate a sample.

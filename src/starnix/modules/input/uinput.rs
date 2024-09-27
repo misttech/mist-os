@@ -264,7 +264,7 @@ impl UinputDeviceFile {
                                 device: Some(key_server),
                                 ..Default::default()
                             },
-                            zx::MonotonicTime::INFINITE,
+                            zx::MonotonicInstant::INFINITE,
                         );
 
                         match register_res {
@@ -460,7 +460,7 @@ impl FileOps for UinputDeviceFile {
                                     report: Some(keyboard_report),
                                     ..Default::default()
                                 },
-                                zx::MonotonicTime::INFINITE,
+                                zx::MonotonicInstant::INFINITE,
                             );
                             if res.is_err() {
                                 return error!(EIO);
@@ -476,8 +476,10 @@ impl FileOps for UinputDeviceFile {
                 match input_report {
                     Ok(Some(report)) => {
                         if let Some(touch_report) = report.touch {
-                            let res = proxy
-                                .simulate_touch_event(&touch_report, zx::MonotonicTime::INFINITE);
+                            let res = proxy.simulate_touch_event(
+                                &touch_report,
+                                zx::MonotonicInstant::INFINITE,
+                            );
                             if res.is_err() {
                                 return error!(EIO);
                             }

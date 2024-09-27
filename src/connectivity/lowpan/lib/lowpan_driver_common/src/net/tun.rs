@@ -126,10 +126,10 @@ impl TunNetworkInterface {
         };
 
         let id =
-            control_sync.lock().get_id(zx::MonotonicTime::INFINITE).context("get_id failed")?;
+            control_sync.lock().get_id(zx::MonotonicInstant::INFINITE).context("get_id failed")?;
         let _was_disabled: bool = control_sync
             .lock()
-            .enable(zx::MonotonicTime::INFINITE)
+            .enable(zx::MonotonicInstant::INFINITE)
             .context("enable error")?
             .map_err(|e| anyhow::anyhow!("enable failed {:?}", e))?;
 
@@ -203,7 +203,7 @@ impl NetworkInterface for TunNetworkInterface {
             let _was_disabled: bool = self
                 .control_sync
                 .lock()
-                .enable(zx::MonotonicTime::INFINITE)
+                .enable(zx::MonotonicInstant::INFINITE)
                 .context("enable error")?
                 .map_err(|e| anyhow::anyhow!("enable failed {:?}", e))?;
         } else {
@@ -219,14 +219,14 @@ impl NetworkInterface for TunNetworkInterface {
             let _was_disabled: bool = self
                 .control_sync
                 .lock()
-                .enable(zx::MonotonicTime::INFINITE)
+                .enable(zx::MonotonicInstant::INFINITE)
                 .context("enable error")?
                 .map_err(|e| anyhow::anyhow!("enable failed {:?}", e))?;
         } else {
             let _was_enabled: bool = self
                 .control_sync
                 .lock()
-                .disable(zx::MonotonicTime::INFINITE)
+                .disable(zx::MonotonicInstant::INFINITE)
                 .context("disable error")?
                 .map_err(|e| anyhow::anyhow!("disable failed {:?}", e))?;
         }
@@ -274,7 +274,7 @@ impl NetworkInterface for TunNetworkInterface {
 
         self.control_sync
             .lock()
-            .remove_address(&addr, zx::MonotonicTime::INFINITE)?
+            .remove_address(&addr, zx::MonotonicInstant::INFINITE)?
             .expect("control_sync.remove_address");
 
         info!("TunNetworkInterface: Successfully removed address {:?}", addr);
@@ -295,7 +295,7 @@ impl NetworkInterface for TunNetworkInterface {
                 };
                 self.stack_sync
                     .lock()
-                    .add_forwarding_entry(&forwarding_entry, zx::MonotonicTime::INFINITE)?
+                    .add_forwarding_entry(&forwarding_entry, zx::MonotonicInstant::INFINITE)?
                     .map_err(|e| anyhow::anyhow!("IPv4 add_forwarding_entry failed :{:?}", e))?;
             }
             fidl_fuchsia_net::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
@@ -311,7 +311,7 @@ impl NetworkInterface for TunNetworkInterface {
                     };
                     self.stack_sync
                         .lock()
-                        .add_forwarding_entry(&forwarding_entry, zx::MonotonicTime::INFINITE)?
+                        .add_forwarding_entry(&forwarding_entry, zx::MonotonicInstant::INFINITE)?
                         .expect("add_forwarding_entry");
                     routes.insert(subnet, HashSet::from([addr.into()]));
                     info!(
@@ -338,7 +338,7 @@ impl NetworkInterface for TunNetworkInterface {
 
                 self.stack_sync
                     .lock()
-                    .del_forwarding_entry(&forwarding_entry, zx::MonotonicTime::INFINITE)?
+                    .del_forwarding_entry(&forwarding_entry, zx::MonotonicInstant::INFINITE)?
                     .map_err(|e| anyhow::anyhow!("IPv4 del_forwarding_entry failed :{:?}", e))?;
             }
             fidl_fuchsia_net::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
@@ -357,7 +357,7 @@ impl NetworkInterface for TunNetworkInterface {
 
                         self.stack_sync
                             .lock()
-                            .del_forwarding_entry(&forwarding_entry, zx::MonotonicTime::INFINITE)
+                            .del_forwarding_entry(&forwarding_entry, zx::MonotonicInstant::INFINITE)
                             .squash_result()?;
                         info!(
                             "TunNetworkInterface: Successfully removed forwarding entry for {:?}",
@@ -516,7 +516,7 @@ impl NetworkInterface for TunNetworkInterface {
                     }),
                     ..Default::default()
                 },
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .map_err(anyhow::Error::new)
             .and_then(|res| {
@@ -543,7 +543,7 @@ impl NetworkInterface for TunNetworkInterface {
                     }),
                     ..Default::default()
                 },
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .map_err(anyhow::Error::new)
             .and_then(|res| {

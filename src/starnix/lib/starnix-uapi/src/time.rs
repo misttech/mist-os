@@ -123,7 +123,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_itimerspec() {
-        let deadline = zx::MonotonicTime::from_nanos(2 * NANOS_PER_SECOND + 50);
+        let deadline = zx::MonotonicInstant::from_nanos(2 * NANOS_PER_SECOND + 50);
         let interval = zx::Duration::from_nanos(1000);
         let time_spec = itimerspec_from_deadline_interval(deadline, interval);
         assert_eq!(time_spec.it_value.tv_sec, 2);
@@ -134,7 +134,7 @@ mod test {
     #[::fuchsia::test]
     fn test_time_from_timespec() {
         let time_spec = timespec { tv_sec: 100, tv_nsec: 100 };
-        let time: zx::MonotonicTime =
+        let time: zx::MonotonicInstant =
             time_from_timespec(time_spec).expect("failed to create time from time spec");
         assert_eq!(time.into_nanos(), 100 * NANOS_PER_SECOND + 100);
     }
@@ -154,7 +154,7 @@ mod test {
     #[::fuchsia::test]
     fn test_time_from_timeval() {
         let tv = timeval { tv_sec: 100, tv_usec: 100 };
-        let time: zx::MonotonicTime =
+        let time: zx::MonotonicInstant =
             time_from_timeval(tv).expect("failed to create time from time spec");
         assert_eq!(time.into_nanos(), 100 * NANOS_PER_SECOND + 100 * NANOS_PER_MICRO);
     }

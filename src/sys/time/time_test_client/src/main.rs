@@ -33,8 +33,8 @@ async fn main() {
     future::join_all(futures).await;
 }
 
-/// Returns a standard format timestamp for a zx::MonotonicTime.
-fn zx_timestamp(time: &zx::MonotonicTime) -> String {
+/// Returns a standard format timestamp for a zx::MonotonicInstant.
+fn zx_timestamp(time: &zx::MonotonicInstant) -> String {
     chrono_timestamp(&Utc.timestamp_nanos(time.into_nanos()))
 }
 

@@ -45,7 +45,7 @@ async fn inner_main() -> Result<(), Error> {
             std::thread::sleep(std::time::Duration::from_millis((sleep_time * 800f64) as u64));
         }
         renderer
-            .render(Status::Active, progress, zx::MonotonicTime::INFINITE)
+            .render(Status::Active, progress, zx::MonotonicInstant::INFINITE)
             .expect("Died while sending progress update");
         if i > 100 && i < 150 {
             // Fast update section for fun and for profit
@@ -57,7 +57,7 @@ async fn inner_main() -> Result<(), Error> {
 
     // Send complete message
     renderer
-        .render(Status::Complete, 100.0f32, zx::MonotonicTime::INFINITE)
+        .render(Status::Complete, 100.0f32, zx::MonotonicInstant::INFINITE)
         .expect("Should have sent complete message");
     fx_log_info!("Sent progress complete");
     Ok(())

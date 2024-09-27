@@ -32,7 +32,7 @@ impl AlarmInstance {
             // SAFETY: Must only be called from OpenThread thread,
             PlatformBacking::as_ref().alarm.on_alarm_milli_get_now()
         }
-        (zx::MonotonicTime::get() - zx::MonotonicTime::ZERO).into_millis() as u32
+        (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_millis() as u32
     }
 
     fn on_time_get(&self) -> u64 {
@@ -41,7 +41,7 @@ impl AlarmInstance {
             // SAFETY: Must only be called from OpenThread thread,
             PlatformBacking::as_ref().alarm.on_time_get()
         }
-        (zx::MonotonicTime::get() - zx::MonotonicTime::ZERO).into_micros() as u64
+        (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_micros() as u64
     }
 
     fn on_alarm_milli_start_at(&self, instance: Option<&ot::Instance>, t0: u32, dt: u32) {
@@ -74,7 +74,7 @@ impl AlarmInstance {
 
         let future = async move {
             let now_in_millis =
-                (zx::MonotonicTime::get() - zx::MonotonicTime::ZERO).into_millis() as u32;
+                (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_millis() as u32;
             let offset = ((now_in_millis - t0) as i32).min(0) as u32;
             let duration = if offset <= dt {
                 Duration::from_millis((dt - offset) as u64)

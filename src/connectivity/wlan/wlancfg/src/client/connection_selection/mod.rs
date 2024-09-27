@@ -144,7 +144,7 @@ pub async fn serve_connection_selection_request_loop(
 pub struct ConnectionSelector {
     saved_network_manager: Arc<dyn SavedNetworksManagerApi>,
     scan_requester: Arc<dyn scan::ScanRequestApi>,
-    last_scan_result_time: Arc<Mutex<zx::MonotonicTime>>,
+    last_scan_result_time: Arc<Mutex<zx::MonotonicInstant>>,
     _inspect_node_root: Arc<Mutex<InspectNode>>,
     inspect_node_for_connection_selection: Arc<Mutex<AutoPersist<InspectBoundedListNode>>>,
     telemetry_sender: TelemetrySender,
@@ -170,7 +170,7 @@ impl ConnectionSelector {
         Self {
             saved_network_manager,
             scan_requester,
-            last_scan_result_time: Arc::new(Mutex::new(zx::MonotonicTime::ZERO)),
+            last_scan_result_time: Arc::new(Mutex::new(zx::MonotonicInstant::ZERO)),
             _inspect_node_root: Arc::new(Mutex::new(inspect_node)),
             inspect_node_for_connection_selection: Arc::new(Mutex::new(
                 inspect_node_for_connection_selection,
@@ -192,8 +192,8 @@ impl ConnectionSelector {
                     .await
             } else {
                 let last_scan_result_time = *self.last_scan_result_time.lock().await;
-                let scan_age = zx::MonotonicTime::get() - last_scan_result_time;
-                if last_scan_result_time != zx::MonotonicTime::ZERO {
+                let scan_age = zx::MonotonicInstant::get() - last_scan_result_time;
+                if last_scan_result_time != zx::MonotonicInstant::ZERO {
                     info!("Scan results are {}s old, triggering a scan", scan_age.into_seconds());
                     self.telemetry_sender.send(TelemetryEvent::NetworkSelectionScanInterval {
                         time_since_last_scan: scan_age,
@@ -253,7 +253,7 @@ impl ConnectionSelector {
                     merge_saved_networks_and_scan_data(&self.saved_network_manager, scan_results)
                         .await;
                 if network.is_none() {
-                    *self.last_scan_result_time.lock().await = zx::MonotonicTime::get();
+                    *self.last_scan_result_time.lock().await = zx::MonotonicInstant::get();
                     record_metrics_on_scan(candidates.clone(), &self.telemetry_sender);
                 }
                 candidates

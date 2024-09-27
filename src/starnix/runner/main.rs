@@ -34,7 +34,7 @@ async fn main() -> Result<(), Error> {
                 user_data_sharing_consent: Some(true),
                 ..Default::default()
             };
-            match privacy.set(&privacy_settings, zx::MonotonicTime::INFINITE) {
+            match privacy.set(&privacy_settings, zx::MonotonicInstant::INFINITE) {
                 Ok(Ok(())) => info!("Successfully set user data sharing consent."),
                 Ok(Err(err)) => warn!("Could not set user data sharing consent: {err:?}"),
                 Err(err) => warn!("Could not set user data sharing consent: {err:?}"),

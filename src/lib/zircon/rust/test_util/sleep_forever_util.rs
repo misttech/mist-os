@@ -5,5 +5,5 @@
 use fuchsia_zircon as zx;
 
 fn main() {
-    zx::MonotonicTime::INFINITE.sleep();
+    zx::MonotonicInstant::INFINITE.sleep();
 }

@@ -70,11 +70,11 @@ mod tests {
         let actual = svc
             .civil_to_absolute_time(&civil_time, &options)
             .await?
-            .map(zx::MonotonicTime::from_nanos);
+            .map(zx::MonotonicInstant::from_nanos);
         realm.destroy().await?;
 
         let expected =
-            Ok(zx::MonotonicTime::from_nanos(1629073062 * NANOS_PER_SECOND + 123_456_789));
+            Ok(zx::MonotonicInstant::from_nanos(1629073062 * NANOS_PER_SECOND + 123_456_789));
         assert_eq!(actual, expected);
         Ok(())
     }

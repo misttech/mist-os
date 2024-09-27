@@ -192,7 +192,7 @@ pub struct ThreadGroup {
     pub pending_signals: Mutex<QueuedSignals>,
 
     /// The monotonic time at which the thread group started.
-    pub start_time: zx::MonotonicTime,
+    pub start_time: zx::MonotonicInstant,
 }
 
 impl fmt::Debug for ThreadGroup {
@@ -441,7 +441,7 @@ impl ThreadGroup {
                 ptracees: Default::default(),
                 stop_state: AtomicStopState::new(StopState::Awake),
                 pending_signals: Default::default(),
-                start_time: zx::MonotonicTime::get(),
+                start_time: zx::MonotonicInstant::get(),
                 mutable_state: RwLock::new(ThreadGroupMutableState {
                     parent: parent
                         .as_ref()

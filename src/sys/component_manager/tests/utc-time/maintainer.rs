@@ -4,7 +4,7 @@
 
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::{client, server};
-use fuchsia_zircon::{ClockUpdate, Duration, MonotonicTime, Signals, Status};
+use fuchsia_zircon::{ClockUpdate, Duration, MonotonicInstant, Signals, Status};
 use futures::StreamExt;
 use test_util::assert_geq;
 use tracing::*;
@@ -30,7 +30,7 @@ async fn main() {
 
     debug!("received clock");
     match fasync::OnSignals::new(&clock, Signals::CLOCK_STARTED)
-        .on_timeout(MonotonicTime::after(Duration::from_millis(10)), || Err(Status::TIMED_OUT))
+        .on_timeout(MonotonicInstant::after(Duration::from_millis(10)), || Err(Status::TIMED_OUT))
         .await
     {
         Err(Status::TIMED_OUT) => (),

@@ -379,7 +379,7 @@ impl CurrentTask {
     pub fn block_until(
         &self,
         guard: EventWaitGuard<'_>,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         self.run_in_state(RunState::Event(guard.event().clone()), move || {
             guard.block_until(deadline).map_err(|e| match e {

@@ -48,7 +48,7 @@ impl Inner {
         Self { early, late }
     }
 
-    fn add_entry(&mut self, moniker: &Moniker, kind: &str, time: zx::MonotonicTime) {
+    fn add_entry(&mut self, moniker: &Moniker, kind: &str, time: zx::MonotonicInstant) {
         let node =
             if self.early.len() < self.early.capacity() { &mut self.early } else { &mut self.late };
         node.add_entry(|node| {
@@ -76,11 +76,11 @@ impl ComponentLifecycleTimeStats {
         )]
     }
 
-    fn on_component_started(self: &Arc<Self>, moniker: &Moniker, start_time: zx::MonotonicTime) {
+    fn on_component_started(self: &Arc<Self>, moniker: &Moniker, start_time: zx::MonotonicInstant) {
         self.inner.lock().add_entry(moniker, STARTED, start_time);
     }
 
-    fn on_component_stopped(self: &Arc<Self>, moniker: &Moniker, stop_time: zx::MonotonicTime) {
+    fn on_component_stopped(self: &Arc<Self>, moniker: &Moniker, stop_time: zx::MonotonicInstant) {
         self.inner.lock().add_entry(moniker, STOPPED, stop_time);
     }
 }
@@ -125,7 +125,7 @@ mod tests {
         for i in 0..2 * MAX_NUMBER_OF_LIFECYCLE_EVENTS {
             stats.on_component_started(
                 &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
-                zx::MonotonicTime::from_nanos(i as i64),
+                zx::MonotonicInstant::from_nanos(i as i64),
             );
         }
 
@@ -148,7 +148,7 @@ mod tests {
         for i in 0..MAX_NUMBER_OF_LIFECYCLE_EVENTS + 1 {
             stats.on_component_started(
                 &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
-                zx::MonotonicTime::from_nanos(i as i64),
+                zx::MonotonicInstant::from_nanos(i as i64),
             );
         }
 
@@ -179,7 +179,7 @@ mod tests {
         for i in 0..4 * MAX_NUMBER_OF_LIFECYCLE_EVENTS {
             stats.on_component_started(
                 &Moniker::new(vec![ChildName::parse(format!("{}", i)).unwrap()]),
-                zx::MonotonicTime::from_nanos(i as i64),
+                zx::MonotonicInstant::from_nanos(i as i64),
             );
         }
 

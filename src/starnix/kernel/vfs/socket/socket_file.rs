@@ -177,7 +177,7 @@ impl SocketFile {
         let result = if flags.contains(SocketMessageFlags::DONTWAIT) {
             op(locked)
         } else {
-            let deadline = self.socket.send_timeout().map(zx::MonotonicTime::after);
+            let deadline = self.socket.send_timeout().map(zx::MonotonicInstant::after);
             file.blocking_op(
                 locked,
                 current_task,
@@ -211,7 +211,7 @@ impl SocketFile {
         file: &FileObject,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
-        deadline: Option<zx::MonotonicTime>,
+        deadline: Option<zx::MonotonicInstant>,
     ) -> Result<MessageReadInfo, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
@@ -239,7 +239,7 @@ impl SocketFile {
             op(locked)
         } else {
             let deadline =
-                deadline.or_else(|| self.socket.receive_timeout().map(zx::MonotonicTime::after));
+                deadline.or_else(|| self.socket.receive_timeout().map(zx::MonotonicInstant::after));
             file.blocking_op(
                 locked,
                 current_task,

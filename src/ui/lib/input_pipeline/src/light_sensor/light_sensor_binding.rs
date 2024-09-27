@@ -311,7 +311,7 @@ impl LightSensorBinding {
                 },
             }),
             device_descriptor: device_descriptor.clone(),
-            event_time: zx::MonotonicTime::get(),
+            event_time: zx::MonotonicInstant::get(),
             handled: Handled::No,
             trace_id: None,
         };

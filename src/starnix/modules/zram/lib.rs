@@ -30,12 +30,13 @@ pub struct ZramDevice {
 
 impl ZramDevice {
     fn get_stats(&self) -> Result<fidl_fuchsia_kernel::MemoryStatsCompression, Errno> {
-        self.kernel_stats.get().get_memory_stats_compression(zx::MonotonicTime::INFINITE).map_err(
-            |e| {
+        self.kernel_stats
+            .get()
+            .get_memory_stats_compression(zx::MonotonicInstant::INFINITE)
+            .map_err(|e| {
                 log_error!("FIDL error getting memory compression stats: {e}");
                 errno!(EIO)
-            },
-        )
+            })
     }
 }
 

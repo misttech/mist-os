@@ -17,7 +17,7 @@ use carnelian::{
     ViewAssistantPtr, ViewKey,
 };
 use fuchsia_trace::{duration, duration_begin, duration_end};
-use fuchsia_zircon::{Event, MonotonicTime};
+use fuchsia_zircon::{Event, MonotonicInstant};
 use rive_rs::{self as rive};
 use std::path::Path;
 
@@ -114,7 +114,7 @@ struct RiveViewAssistant {
     playback_speed: f32,
     background: Color,
     artboard: Option<String>,
-    last_presentation_time: Option<MonotonicTime>,
+    last_presentation_time: Option<MonotonicInstant>,
     scene_details: Option<SceneDetails>,
 }
 

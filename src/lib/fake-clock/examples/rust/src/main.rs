@@ -30,11 +30,11 @@ async fn handle_requests_for_stream(stream: ExampleRequestStream) -> Result<(), 
         .try_for_each_concurrent(None, |req| async move {
             match req {
                 ExampleRequest::GetMonotonic { responder } => {
-                    responder.send(zx::MonotonicTime::get().into_nanos())
+                    responder.send(zx::MonotonicInstant::get().into_nanos())
                 }
                 ExampleRequest::WaitUntil { timeout, responder } => {
                     let () = fasync::Timer::new(fasync::Time::from_zx(
-                        zx::MonotonicTime::from_nanos(timeout),
+                        zx::MonotonicInstant::from_nanos(timeout),
                     ))
                     .await;
                     responder.send()

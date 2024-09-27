@@ -82,7 +82,7 @@ pub mod tests {
                     event_type: Some(fcomponent::EventType::CapabilityRequested),
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cm".to_string()),
-                    timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+                    timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
                     ..Default::default()
                 }),
                 payload: Some(fcomponent::EventPayload::CapabilityRequested(
@@ -103,7 +103,7 @@ pub mod tests {
                     event_type: Some(fcomponent::EventType::CapabilityRequested),
                     moniker: Some("./foo/bar".to_string()),
                     component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/bar.cm".to_string()),
-                    timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+                    timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
                     ..Default::default()
                 }),
                 payload: Some(fcomponent::EventPayload::CapabilityRequested(

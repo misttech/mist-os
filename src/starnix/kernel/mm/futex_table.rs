@@ -47,7 +47,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         addr: UserAddress,
         value: u32,
         mask: u32,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         let addr = FutexAddress::try_from(addr)?;
         let mut state = self.state.lock();
@@ -142,7 +142,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         &self,
         current_task: &CurrentTask,
         addr: UserAddress,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         let addr = FutexAddress::try_from(addr)?;
         let mut state = self.state.lock();

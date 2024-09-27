@@ -8,7 +8,7 @@ use fidl_fuchsia_scheduler::{
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::{HandleBased, MonotonicTime, Rights, Status, Thread};
+use fuchsia_zircon::{HandleBased, MonotonicInstant, Rights, Status, Thread};
 use std::sync::Arc;
 
 static ROLE_MANAGER: RwLock<Option<Arc<RoleManagerSynchronousProxy>>> = RwLock::new(None);
@@ -49,7 +49,7 @@ pub fn set_role_for_thread(thread: &Thread, role_name: &str) -> Result<(), Error
         ..Default::default()
     };
     let _ = role_manager
-        .set_role(request, MonotonicTime::INFINITE)
+        .set_role(request, MonotonicInstant::INFINITE)
         .context("fuchsia.scheduler.RoleManager::SetRole failed")
         .and_then(|result| {
             match result {
