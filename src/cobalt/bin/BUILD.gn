@@ -188,7 +188,7 @@ fuchsia_test_package("cobalt_tests_do_not_run_manually") {
     environments = [
       {
         dimensions = {
-          device_type = "Astro"
+          device_type = "Nelson"
         }
         tags = [ "cobalt-prober" ]
       },
