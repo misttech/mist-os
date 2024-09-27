@@ -301,6 +301,7 @@ function main {
   local -r landmines=("$PREBUILT_GN"
                       "$FUCHSIA_DIR/tools/devshell/build"
                       "$FUCHSIA_DIR/tools/devshell/lib/vars.sh"
+                      "${FUCHSIA_BUILD_DIR}/args.gn"
                      )
   local mine
   for mine in "${landmines[@]}"; do
