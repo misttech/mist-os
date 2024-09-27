@@ -72,6 +72,15 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             if config.suspend_enabled {
                 ensure!(*context.build_type != BuildType::User);
                 builder.platform_bundle("power_framework");
+
+                match context.feature_set_level {
+                    FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
+                    FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {
+                        // Include only when the base package set is available
+                        builder.platform_bundle("power_framework_development_support");
+                    }
+                }
+
                 match config.testing_sag_enabled {
                     true => {
                         builder.platform_bundle("power_framework_testing_sag");

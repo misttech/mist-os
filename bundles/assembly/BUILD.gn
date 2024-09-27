@@ -3952,9 +3952,17 @@ assembly_input_bundle("power_framework_testing_sag") {
 #
 assembly_input_bundle("power_framework") {
   bootfs_packages = [ "//src/power/broker:package" ]
+}
+
+# Power framework cli tools
+#
+# feature_set_levels: utility
+# build-types: eng, userdebug
+#
+assembly_input_bundle("power_framework_development_support") {
   base_packages = [ "//src/devices/hrtimer/bin:hrtimer-ctl" ]
 
-  # When power framework becomes available on user builds,
+  # When the power framework becomes available on user builds by default,
   # this tool should be moved to core_realm_development_access
   shell_commands = [
     {
