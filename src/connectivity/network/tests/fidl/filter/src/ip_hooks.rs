@@ -106,6 +106,14 @@ macro_rules! generate_test_cases_for_all_matchers {
     };
 }
 
+/// Use a shorter timeout than [`ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT`] (which is
+/// 5 seconds) because these tests rely heavily on negative checks to verify
+/// that packets are dropped, and with a 5 second timeout, the test runtimes
+/// become very long.
+///
+/// There is a risk of false negatives here, where a test that would have failed
+/// if given enough time passes instead, but the risk is relatively low, so we
+/// make the tradeoff for reasonable test durations.
 const NEGATIVE_CHECK_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(1);
 
 #[derive(Clone, Copy, Debug)]

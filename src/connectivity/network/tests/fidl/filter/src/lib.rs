@@ -26,12 +26,15 @@ use fidl_fuchsia_net_filter_ext::{
 };
 use fidl_fuchsia_net_interfaces_ext::PortClass;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use futures::{FutureExt as _, StreamExt as _};
+use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet};
 use net_types::ip::IpVersion;
+use netemul::{RealmTcpListener as _, RealmTcpStream as _};
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
-use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
+use netstack_testing_common::{
+    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
 use netstack_testing_macros::netstack_test;
 use test_case::{test_case, test_matrix};
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter};
@@ -447,6 +450,37 @@ async fn drop_controller_removes_resources(name: &str) {
         )])
     );
 
+    // Set up a listening socket and try to connect to it so we can verify that the
+    // filtering resources *actually* got dropped in Core, and not just in Bindings.
+    //
+    // NB: the default test values above create a configuration that drops incoming
+    // TCP traffic to port 22.
+    let listen_addr =
+        std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST), 22);
+    let listener = fuchsia_async::net::TcpListener::listen_in_realm(&realm, listen_addr)
+        .await
+        .expect("listen on port 22");
+
+    let mut server_fut = Box::pin(async {
+        let (_, _stream, _from) = listener.accept().await.expect("accept incoming connection");
+    })
+    .fuse();
+    let client_fut = async {
+        match fuchsia_async::net::TcpStream::connect_in_realm(&realm, listen_addr)
+            .map_ok(Some)
+            .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
+            .await
+            .expect("call connect")
+        {
+            Some(_stream) => panic!("unexpectedly connected successfully"),
+            None => {}
+        }
+    };
+    futures::select! {
+        () = client_fut.fuse() => {},
+        () = server_fut => panic!("listener should not get incoming connection"),
+    }
+
     // Drop the controller and ensure that the resources it owned are removed.
     drop(controller);
 
@@ -466,6 +500,18 @@ async fn drop_controller_removes_resources(name: &str) {
         Some(Ok(Event::EndOfUpdate)),
         "transactional updates should be demarcated with EndOfUpdate event"
     );
+
+    // Now that the controller has been dropped, we should be able to connect to the
+    // listening socket.
+    let client_fut = async {
+        let _stream = fuchsia_async::net::TcpStream::connect_in_realm(&realm, listen_addr)
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+                panic!("timed out waiting to connect to server after dropping filtering rules")
+            })
+            .await
+            .expect("connect to server should succeed");
+    };
+    let ((), ()) = futures::future::join(client_fut, server_fut).await;
 }
 
 #[netstack_test]
