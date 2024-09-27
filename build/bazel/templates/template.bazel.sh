@@ -96,9 +96,9 @@ build_metadata_opts=()
   )
   case "$BUILDBUCKET_ID" in
     */led/*)
-      build_metadata_opts+=( "--build_metadata=PARENT_BUILD_LINK=go/lucibuild/$BUILDBUCKET_ID/+/build.proto" ) ;;
+      build_metadata_opts+=( "--build_metadata=PARENT_BUILD_LINK=http://go/lucibuild/$BUILDBUCKET_ID/+/build.proto" ) ;;
     *)
-      build_metadata_opts+=( "--build_metadata=PARENT_BUILD_LINK=go/bbid/$BUILDBUCKET_ID" ) ;;
+      build_metadata_opts+=( "--build_metadata=PARENT_BUILD_LINK=http://go/bbid/$BUILDBUCKET_ID" ) ;;
   esac
 }}
 
