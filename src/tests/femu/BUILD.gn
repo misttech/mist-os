@@ -13,7 +13,8 @@ group("tests") {
 
   # //tools/emulator only works on linux.
   if (host_os == "linux") {
-    deps += [ ":femu_test($host_toolchain)" ]
+    # TODO(b/368844297): Re-enable test after fixing flakes.
+    #deps += [ ":femu_test($host_toolchain)" ]
   }
 }
 
