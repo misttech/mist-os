@@ -168,11 +168,12 @@ mod testutil {
 
     use alloc::collections::HashSet;
     use alloc::rc::Rc;
+    use alloc::vec::Vec;
     use core::cell::RefCell;
     use derivative::Derivative;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
-    use net_types::SpecifiedAddr;
+    use net_types::{MulticastAddr, SpecifiedAddr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
     use netstack3_base::{CoreTimerContext, CounterContext, CtxPair, FrameDestination};
     use netstack3_filter::ProofOfEgressCheck;
@@ -225,6 +226,12 @@ mod testutil {
             .unwrap()
     }
 
+    #[derive(Debug, PartialEq)]
+    pub(crate) struct SentPacket<I: IpLayerIpExt, D> {
+        pub(crate) dst: MulticastAddr<I::Addr>,
+        pub(crate) device: D,
+    }
+
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     pub(crate) struct FakeCoreCtxState<I: IpLayerIpExt, D: FakeStrongDeviceId> {
@@ -235,6 +242,8 @@ mod testutil {
             Rc<RefCell<MulticastForwardingState<I, D, FakeBindingsCtx<I, D>>>>,
         // The list of devices that have multicast forwarding enabled.
         pub(crate) forwarding_enabled_devices: HashSet<D>,
+        // The list of packets sent by the netstack.
+        pub(crate) sent_packets: Vec<SentPacket<I, D>>,
         counters: IpCounters<I>,
     }
 
@@ -245,6 +254,10 @@ mod testutil {
             } else {
                 let _: bool = self.forwarding_enabled_devices.remove(&dev);
             }
+        }
+
+        pub(crate) fn take_sent_packets(&mut self) -> Vec<SentPacket<I, D>> {
+            core::mem::take(&mut self.sent_packets)
         }
     }
 
@@ -370,8 +383,8 @@ mod testutil {
         fn send_ip_frame<S>(
             &mut self,
             _bindings_ctx: &mut FakeBindingsCtx<I, D>,
-            _device_id: &D,
-            _destination: IpPacketDestination<I, &D>,
+            device_id: &D,
+            destination: IpPacketDestination<I, &D>,
             _body: S,
             _egress_proof: ProofOfEgressCheck,
         ) -> Result<(), netstack3_base::SendFrameError<S>>
@@ -379,7 +392,12 @@ mod testutil {
             S: Serializer + netstack3_filter::IpPacket<I>,
             S::Buffer: BufferMut,
         {
-            unimplemented!()
+            let dst = match destination {
+                IpPacketDestination::Multicast(dst) => dst,
+                dst => panic!("unexpected sent packet: destination={dst:?}"),
+            };
+            self.state.sent_packets.push(SentPacket { dst, device: device_id.clone() });
+            Ok(())
         }
     }
 

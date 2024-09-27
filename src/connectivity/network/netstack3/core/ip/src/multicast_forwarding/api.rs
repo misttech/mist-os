@@ -325,10 +325,12 @@ impl<T: Clone> Iterator for RepeatN<T> {
 mod tests {
     use super::*;
 
+    use alloc::vec;
     use core::ops::Deref;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
+    use net_types::MulticastAddr;
     use netstack3_base::testutil::MultipleDevicesId;
     use netstack3_base::{FrameDestination, StrongDeviceIdentifier};
     use packet::ParseBuffer;
@@ -336,7 +338,7 @@ mod tests {
 
     use crate::internal::multicast_forwarding;
     use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
-    use crate::internal::multicast_forwarding::testutil::TestIpExt;
+    use crate::internal::multicast_forwarding::testutil::{SentPacket, TestIpExt};
     use crate::multicast_forwarding::{MulticastRoute, MulticastRouteKey, MulticastRouteTarget};
 
     #[ip_test(I)]
@@ -411,18 +413,25 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn add_route_with_pending_packets<I: TestIpExt>() {
+    #[test_case(true; "forwarding_enabled_for_dev")]
+    #[test_case(false; "forwarding_disabled_for_dev")]
+    fn add_route_with_pending_packets<I: TestIpExt>(forwarding_enabled_for_dev: bool) {
         const FRAME_DST: Option<FrameDestination> = None;
+        const OUTPUT_DEV: MultipleDevicesId = MultipleDevicesId::B;
         let right_key = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
         let wrong_key = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
         let route = MulticastRoute::new_forward(
             MultipleDevicesId::A,
-            [MulticastRouteTarget { output_interface: MultipleDevicesId::B, min_ttl: 0 }].into(),
+            [MulticastRouteTarget { output_interface: OUTPUT_DEV, min_ttl: 0 }].into(),
         )
         .unwrap();
 
         let mut api = multicast_forwarding::testutil::new_api::<I>();
         assert!(api.enable());
+        api.core_ctx().state.set_multicast_forwarding_enabled_for_dev(
+            MultipleDevicesId::A,
+            forwarding_enabled_for_dev,
+        );
 
         // Setup a queued packet for `right_key`.
         let (core_ctx, bindings_ctx) = api.contexts();
@@ -457,7 +466,15 @@ mod tests {
             api.core_ctx(),
             |pending_table| !pending_table.contains(&right_key)
         ));
-        // TODO(https://fxbug.dev/353328975) Verify the packet was sent.
+
+        let mut expected_sent_packets = vec![];
+        if forwarding_enabled_for_dev {
+            expected_sent_packets.push(SentPacket {
+                dst: MulticastAddr::new(right_key.dst_addr()).unwrap(),
+                device: OUTPUT_DEV,
+            });
+        }
+        assert_eq!(api.core_ctx().state.take_sent_packets(), expected_sent_packets);
     }
 
     #[ip_test(I)]
