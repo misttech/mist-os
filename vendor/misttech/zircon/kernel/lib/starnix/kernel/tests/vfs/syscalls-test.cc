@@ -16,6 +16,7 @@
 #include <ktl/string_view.h>
 
 using namespace starnix::testing;
+using namespace starnix_uapi;
 
 namespace unit_testing {
 

@@ -10,6 +10,8 @@
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/starnix_uapi/user_buffer.h>
+#include <lib/mistos/starnix_uapi/user_value.h>
 
 #include <fbl/vector.h>
 #include <ktl/array.h>
@@ -101,14 +103,10 @@ inline fit::result<E, T> read_to_object_as_bytes(ReadFn&& read_fn) {
   return fit::ok(ktl::move(object));
 }
 
-namespace {
-
 template <typename T>
 inline ktl::span<uint8_t> object_as_mut_bytes(T& object) {
-  return ktl::move(ktl::span<uint8_t>{reinterpret_cast<uint8_t*>(&object), sizeof(T)});
+  return ktl::span<uint8_t>{reinterpret_cast<uint8_t*>(&object), sizeof(T)};
 }
-
-}  // namespace
 
 class MemoryAccessor {
  public:
@@ -297,7 +295,7 @@ class MemoryAccessorExt : public MemoryAccessor {
   /// and returning the result as a slice that ends before that null.
   ///
   /// Consider using `read_c_string_to_vec` if you do not require control over the allocation.
-  fit::result<Errno, FsString> read_c_string(UserCString string, ktl::span<uint8_t>& bytes) const;
+  fit::result<Errno, FsString> read_c_string(UserCString string, ktl::span<uint8_t>& buffer) const;
 
   template <typename T>
   fit::result<Errno, size_t> write_object(UserRef<T> user, const T& object) const {
@@ -311,7 +309,7 @@ class MemoryAccessorExt : public MemoryAccessor {
     return this->write_memory(user.addr(), data);
   }
 
-  virtual ~MemoryAccessorExt() = default;
+  ~MemoryAccessorExt() override = default;
 };
 
 class TaskMemoryAccessor : public MemoryAccessorExt {

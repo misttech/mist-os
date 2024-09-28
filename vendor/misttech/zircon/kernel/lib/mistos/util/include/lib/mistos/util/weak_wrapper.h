@@ -131,8 +131,8 @@ static inline bool operator!=(decltype(nullptr), const WeakPtr<T>& ptr) {
 
 #include <fbl/intrusive_pointer_traits.h>
 
-namespace fbl {
-namespace internal {
+
+namespace fbl::internal {
 
 // Traits for managing util::weak_ptr pointers.
 template <typename T>
@@ -156,7 +156,7 @@ struct ContainerPtrTraits<::util::WeakPtr<T>> {
   static inline PtrType Reclaim(RawPtrType ptr) { return PtrType(ptr); }
 };
 
-}  // namespace internal
-}  // namespace fbl
+} // namespace fbl::internal
+
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_WEAK_WRAPPER_H_

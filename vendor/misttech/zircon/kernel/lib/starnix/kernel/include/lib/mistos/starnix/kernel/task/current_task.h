@@ -70,13 +70,11 @@ class TaskBuilder {
 
   ThreadState thread_state;
 
- public:
   /// impl TaskBuilder
-  TaskBuilder(fbl::RefPtr<Task> task);
+  explicit TaskBuilder(fbl::RefPtr<Task> task);
 
   Task* operator->();
 
- public:
   // C++
   ~TaskBuilder();
 };
@@ -102,14 +100,12 @@ class CurrentTask : public TaskMemoryAccessor {
   /// impl From<TaskBuilder> for CurrentTask
   static CurrentTask From(const TaskBuilder& builder);
 
- public:
   /// The underlying task object.
   fbl::RefPtr<Task> task;
 
   ThreadState thread_state;
 
   /// impl CurrentTask
- public:
   util::WeakPtr<Task> weak_task() const;
 
   void set_creds(Credentials creds) const;
@@ -292,15 +288,12 @@ class CurrentTask : public TaskMemoryAccessor {
                                              UserRef<pid_t> user_parent_tid,
                                              UserRef<pid_t> user_child_tid) const;
 
- public:
   /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
   /// exit signal as in clone().
   starnix::testing::AutoReleasableTask clone_task_for_test(uint64_t flags,
                                                            ktl::optional<Signal> exit_signal);
 
- public:
   /// impl MemoryAccessor for CurrentTask
-
   fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
                                                      ktl::span<uint8_t>& bytes) const final;
 
@@ -322,12 +315,12 @@ class CurrentTask : public TaskMemoryAccessor {
   UserAddress maximum_valid_address() const final;
 
   // C++
-  ~CurrentTask();
+  ~CurrentTask() override;
 
   Task* operator->() const;
 
  private:
-  CurrentTask(fbl::RefPtr<Task> task);
+  explicit CurrentTask(fbl::RefPtr<Task> task);
 };
 
 }  // namespace starnix
