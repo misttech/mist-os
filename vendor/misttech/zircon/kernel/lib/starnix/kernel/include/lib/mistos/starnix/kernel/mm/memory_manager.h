@@ -534,7 +534,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   // pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,
 
   /// Maximum valid user address for this vmar.
-  // pub maximum_valid_user_address: UserAddress,
+  UserAddress maximum_valid_user_address;
 
  public:
   static fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> New(Vmar root_vmar);
