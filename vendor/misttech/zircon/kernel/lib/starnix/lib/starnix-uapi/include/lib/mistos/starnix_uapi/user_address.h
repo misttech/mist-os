@@ -47,7 +47,7 @@ class UserAddress {
 
   bool is_null() const { return address_ == UserAddress::NULL_PTR; }
 
-  ktl::optional<UserAddress> checked_add(size_t rhs) {
+  ktl::optional<UserAddress> checked_add(size_t rhs) const {
     uint64_t result;
     if (add_overflow(address_, rhs, &result)) {
       return ktl::nullopt;
@@ -55,7 +55,7 @@ class UserAddress {
     return UserAddress(result);
   }
 
-  UserAddress saturating_add(size_t rhs) {
+  UserAddress saturating_add(size_t rhs) const {
     uint64_t result;
     add_overflow(address_, rhs, &result);
     return UserAddress(result);

@@ -35,7 +35,7 @@ class back_insert_iterator {
   back_insert_iterator& operator++() { return *this; }
   back_insert_iterator& operator++(int) { return *this; }
 
- protected:
+ private:
   Container* container_;
 };
 
