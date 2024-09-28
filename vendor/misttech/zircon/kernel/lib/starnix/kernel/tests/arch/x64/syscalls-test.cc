@@ -17,6 +17,7 @@
 #include <ktl/string_view.h>
 
 using namespace starnix::testing;
+using namespace starnix_uapi;
 
 namespace testing {
 
@@ -42,4 +43,3 @@ bool test_sys_creat() {
 UNITTEST_START_TESTCASE(starnix_arch_syscalls)
 UNITTEST("test sys creat", testing::test_sys_creat)
 UNITTEST_END_TESTCASE(starnix_arch_syscalls, "starnix_arch_syscalls", "Tests for Tasks Syscalls")
-

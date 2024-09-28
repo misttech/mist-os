@@ -38,12 +38,12 @@ bool NamespaceNode::operator==(const NamespaceNode& other) const {
 }
 
 NamespaceNode NamespaceNode::New(MountHandle mount, DirEntryHandle dir_entry) {
-  return NamespaceNode{MountInfo{mount}, dir_entry};
+  return NamespaceNode{.mount = MountInfo{mount}, .entry = dir_entry};
 }
 
 /// Create a namespace node that is not mounted in a namespace.
 NamespaceNode NamespaceNode::new_anonymous(DirEntryHandle dir_entry) {
-  return NamespaceNode{{}, dir_entry};
+  return NamespaceNode{.mount = {}, .entry = dir_entry};
 }
 
 /// Create a namespace node that is not mounted in a namespace and that refers to a node that
@@ -54,11 +54,8 @@ NamespaceNode NamespaceNode::new_anonymous_unrooted(FsNodeHandle node) {
 
 fit::result<Errno, FileHandle> NamespaceNode::open(const CurrentTask& current_task, OpenFlags flags,
                                                    bool check_access) const {
-  auto open_result = entry->node_->open(current_task, mount, flags, check_access);
-  if (open_result.is_error())
-    return open_result.take_error();
-
-  return FileObject::New(ktl::move(open_result.value()), *this, flags);
+  auto open = entry->node_->open(current_task, mount, flags, check_access) _EP(open);
+  return FileObject::New(ktl::move(open.value()), *this, flags);
 }
 
 fit::result<Errno, NamespaceNode> NamespaceNode::open_create_node(const CurrentTask& current_task,
@@ -245,7 +242,7 @@ ktl::optional<NamespaceNode> NamespaceNode::parent() const { return ktl::nullopt
 ktl::optional<DirEntryHandle> NamespaceNode::parent_within_mount() const { return ktl::nullopt; }
 
 NamespaceNode NamespaceNode::with_new_entry(DirEntryHandle _entry) const {
-  return {this->mount, _entry};
+  return {.mount = this->mount, .entry = _entry};
 }
 
 NamespaceNode NamespaceNode::enter_mount() const {

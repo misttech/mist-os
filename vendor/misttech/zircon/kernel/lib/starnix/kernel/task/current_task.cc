@@ -567,7 +567,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
   return fit::ok();
 }
 
-CurrentTask CurrentTask::From(const TaskBuilder& builder) { return ktl::move(builder.task); }
+CurrentTask CurrentTask::From(const TaskBuilder& builder) { return CurrentTask(builder.task); }
 
 util::WeakPtr<Task> CurrentTask::weak_task() const {
   ASSERT(task);

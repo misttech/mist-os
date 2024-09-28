@@ -33,6 +33,7 @@ long sys_a0318_getrandom(user_out_ptr<char> buffer, size_t count, unsigned int f
 #else
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(starnix::sys_getrandom, current_task,
-                         UserAddress::from_ptr((zx_vaddr_t)(buffer.get())), count, flags);
+                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buffer.get())), count,
+                         flags);
 #endif
 }

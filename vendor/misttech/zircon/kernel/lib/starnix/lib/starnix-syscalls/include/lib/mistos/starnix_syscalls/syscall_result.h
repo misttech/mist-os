@@ -13,9 +13,9 @@ namespace starnix_syscalls {
 
 class SyscallResult {
  public:
-  SyscallResult(uint64_t value) : value_(value) {}
+  explicit SyscallResult(uint64_t value) : value_(value) {}
 
-  inline uint64_t value() const { return value_; }
+  uint64_t value() const { return value_; }
 
   static SyscallResult From(const starnix_uapi::UserAddress& value) {
     return SyscallResult(static_cast<uint64_t>(value.ptr()));
