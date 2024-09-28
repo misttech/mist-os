@@ -10,6 +10,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+#include <zircon/assert.h>
 
 // #include <ktl/enforce.h>
 
@@ -19,7 +20,7 @@ FileHandle Anon::new_file_extended(const CurrentTask& current_task, ktl::unique_
                                    OpenFlags flags, std::function<FsNodeInfo(ino_t)> info) {
   fbl::AllocChecker ac;
   auto anon = new (&ac) Anon();
-  ASSERT(ac.check());
+  ZX_ASSERT(ac.check());
 
   auto fs = anon_fs(current_task->kernel());
   return FileObject::new_anonymous(
@@ -37,8 +38,8 @@ FileSystemHandle anon_fs(const fbl::RefPtr<Kernel>& kernel) {
   if (!kernel->anon_fs.is_initialized()) {
     fbl::AllocChecker ac;
     auto anonfs = new (&ac) AnonFs();
-    ASSERT(ac.check());
-    kernel->anon_fs.set(FileSystem::New(kernel, {CacheModeType::Uncached}, anonfs, {}));
+    ZX_ASSERT(ac.check());
+    kernel->anon_fs.set(FileSystem::New(kernel, {.type = CacheModeType::Uncached}, anonfs, {}));
   }
   return kernel->anon_fs.get();
 }

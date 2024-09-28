@@ -59,7 +59,11 @@ Namespace::Namespace(MountHandle root_mount, uint64_t id)
 Namespace::~Namespace() = default;
 
 LookupContext LookupContext::New(SymlinkMode _symlink_mode) {
-  return {_symlink_mode, MAX_SYMLINK_FOLLOWS, false, ResolveFlags::empty(), {}};
+  return {.symlink_mode = _symlink_mode,
+          .remaining_follows = MAX_SYMLINK_FOLLOWS,
+          .must_be_directory = false,
+          .resolve_flags = ResolveFlags::empty(),
+          .resolve_base = {}};
 }
 
 LookupContext LookupContext::with(SymlinkMode _symlink_mode) {
