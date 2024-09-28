@@ -97,7 +97,7 @@ struct NamespaceNode;
 // `CurrentTask`, which lets them manipulate this state.
 //
 // See also `Task` for more information about tasks.
-class CurrentTask : public MemoryAccessorExt {
+class CurrentTask : public TaskMemoryAccessor {
  public:
   /// impl From<TaskBuilder> for CurrentTask
   static CurrentTask From(const TaskBuilder& builder);
@@ -318,7 +318,9 @@ class CurrentTask : public MemoryAccessorExt {
 
   fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final;
 
- public:
+  // impl TaskMemoryAccessor
+  UserAddress maximum_valid_address() const final;
+
   // C++
   ~CurrentTask();
 

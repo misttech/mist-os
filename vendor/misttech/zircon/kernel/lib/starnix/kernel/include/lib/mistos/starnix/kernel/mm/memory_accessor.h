@@ -38,11 +38,12 @@ struct NumberOfElementsRead {
 ///
 /// The read function must only return `Ok(n)` if at least one element was read and `n` holds
 /// the number of elements of type `T` read starting from the beginning of the slice.
-template <typename T, typename E>
-inline fit::result<E, fbl::Vector<T>> read_to_vec(
-    size_t max_len, std::function<fit::result<E, NumberOfElementsRead>(ktl::span<T>&)> read_fn) {
+template <typename E, typename T, typename ReadFn>
+inline fit::result<E, fbl::Vector<T>> read_to_vec(size_t max_len, ReadFn&& read_fn) {
+  static_assert(std::is_invocable_r_v<fit::result<E, NumberOfElementsRead>, ReadFn, ktl::span<T>&>);
+
   fbl::AllocChecker ac;
-  auto buffer = fbl::Vector<T>();
+  fbl::Vector<T> buffer;
   buffer.reserve(max_len, &ac);
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
@@ -69,9 +70,10 @@ inline fit::result<E, fbl::Vector<T>> read_to_vec(
 /// # Safety
 ///
 /// The read function must only return `Ok(())` if all the bytes were read to.
-template <typename T, typename E, size_t N>
-inline fit::result<E, ktl::array<T, N>> read_to_array(
-    size_t max_len, std::function<fit::result<E>(ktl::span<T>&)> read_fn) {
+template <typename E, typename T, size_t N, typename ReadFn>
+inline fit::result<E, ktl::array<T, N>> read_to_array(size_t max_len, ReadFn&& read_fn) {
+  static_assert(std::is_invocable_r_v<fit::result<E>, ReadFn, ktl::span<T>&>);
+
   ktl::array<T, N> buffer;
   ktl::span<T> span{buffer.data(), N};
   auto read_fn_result = read_fn(span);
@@ -87,9 +89,10 @@ inline fit::result<E, ktl::array<T, N>> read_to_array(
 /// # Safety
 ///
 /// THe read function must only return `Ok(())` if all the bytes were read to.
-template <typename T, typename E>
-inline fit::result<E, T> read_to_object_as_bytes(
-    std::function<fit::result<E>(ktl::span<T>&)> read_fn) {
+template <typename E, typename T, typename ReadFn>
+inline fit::result<E, T> read_to_object_as_bytes(ReadFn&& read_fn) {
+  static_assert(std::is_invocable_r_v<fit::result<E>, ReadFn, ktl::span<T>&>);
+
   T object;
   ktl::span<uint8_t> span{reinterpret_cast<uint8_t*>(&object), sizeof(T)};
   auto read_fn_result = read_fn(span);
@@ -235,30 +238,56 @@ class MemoryAccessorExt : public MemoryAccessor {
 
   /// Read exactly `objects.len()` objects into `objects` from `user`.
   template <typename T>
-  fit::result<Errno, ktl::pair<T*, size_t>> read_objects(UserRef<T> user, T* objects,
-                                                         size_t count) const {
-    ktl::span<uint8_t> span{reinterpret_cast<uint8_t*>(objects), count * sizeof(T)};
-    auto read_result = read_memory(user.addr(), span);
+  fit::result<Errno, ktl::span<T>> read_objects(UserRef<T> user, ktl::span<T> objects) const {
+    auto objects_len = objects.size();
+
+    ktl::span<uint8_t> as_bytes{reinterpret_cast<uint8_t*>(objects.data()), objects.size_bytes()};
+    auto read_result = read_memory(user.addr(), as_bytes);
     if (read_result.is_error()) {
       return read_result.take_error();
     }
-    DEBUG_ASSERT(count * sizeof(T) == read_result->size());
-    return fit::ok(ktl::pair{reinterpret_cast<T*>(read_result->data()), count});
+    DEBUG_ASSERT(objects_len * sizeof(T) == read_result->size());
+
+    return fit::ok(ktl::span{reinterpret_cast<T*>(read_result->data()), objects_len});
   }
 
   // Read exactly `len` objects from `user`, returning them as a Vec.
   template <typename T>
   fit::result<Errno, fbl::Vector<T>> read_objects_to_vec(UserRef<T> user, size_t len) const {
-    return read_to_vec<T, Errno>(len,
+    return read_to_vec<Errno, T>(len,
                                  [&](ktl::span<T>& b) -> fit::result<Errno, NumberOfElementsRead> {
-                                   auto read_result = this->read_objects(user, b.data(), len);
+                                   auto read_result = this->read_objects(user, b);
                                    if (read_result.is_error()) {
                                      return read_result.take_error();
                                    }
-                                   DEBUG_ASSERT(len == read_result->second);
+                                   DEBUG_ASSERT(len == read_result->size());
                                    return fit::ok(NumberOfElementsRead{len});
                                  });
   }
+
+  /// Read exactly `len` objects from `user`, returning them as a SmallVector.
+  template <typename T, size_t N>
+  fit::result<Errno, util::SmallVector<T, N>> read_objects_to_smallvec(UserRef<T> user,
+                                                                       size_t len) const {
+    if (len > N) {
+      auto result = read_objects_to_vec<T>(user, len);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      return fit::ok(util::SmallVector<T, N>::from_vec(ktl::move(result.value())));
+    } else {
+      ktl::array<T, N> buffer;
+      auto result = read_objects(user, {buffer.data(), buffer.size()});
+      return fit::ok(util::SmallVector<T, N>::from_buf_and_len_unchecked(result->data(), len));
+    }
+    return fit::error(errno(EOPNOTSUPP));
+  }
+
+  /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
+  ///
+  /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
+  fit::result<Errno, UserBuffers> read_iovec(UserAddress iovec_addr,
+                                             UserValue<uint32_t> iovec_count) const;
 
   /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and
   /// returning the results as a Vec.
@@ -283,6 +312,12 @@ class MemoryAccessorExt : public MemoryAccessor {
   }
 
   virtual ~MemoryAccessorExt() = default;
+};
+
+class TaskMemoryAccessor : public MemoryAccessorExt {
+ public:
+  /// Returns the maximum valid address for this memory accessor.
+  virtual UserAddress maximum_valid_address() const = 0;
 };
 
 }  // namespace starnix

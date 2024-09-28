@@ -13,11 +13,13 @@
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
 
+#include <linux/uio.h>
+
 namespace starnix {
 
 fit::result<Errno, fbl::Vector<uint8_t>> MemoryAccessorExt::read_memory_to_vec(UserAddress addr,
                                                                                size_t len) const {
-  return read_to_vec<uint8_t, Errno>(
+  return read_to_vec<Errno, uint8_t>(
       len, [&](ktl::span<uint8_t> b) -> fit::result<Errno, NumberOfElementsRead> {
         auto read_result = this->read_memory(addr, b);
         if (read_result.is_error()) {
@@ -30,7 +32,7 @@ fit::result<Errno, fbl::Vector<uint8_t>> MemoryAccessorExt::read_memory_to_vec(U
 
 fit::result<Errno, fbl::Vector<uint8_t>> MemoryAccessorExt::read_memory_partial_to_vec(
     UserAddress addr, size_t max_len) const {
-  return read_to_vec<uint8_t, Errno>(
+  return read_to_vec<Errno, uint8_t>(
       max_len, [&](ktl::span<uint8_t> b) -> fit::result<Errno, NumberOfElementsRead> {
         auto read_result = this->read_memory_partial(addr, b);
         if (read_result.is_error()) {
@@ -38,6 +40,20 @@ fit::result<Errno, fbl::Vector<uint8_t>> MemoryAccessorExt::read_memory_partial_
         }
         return fit::ok(NumberOfElementsRead{read_result.value().size()});
       });
+}
+
+fit::result<Errno, UserBuffers> MemoryAccessorExt::read_iovec(
+    UserAddress iovec_addr, UserValue<uint32_t> iovec_count) const {
+  auto local_iovec_count = iovec_count.try_into<size_t>();
+  if (!local_iovec_count.has_value()) {
+    return fit::error(errno(EINVAL));
+  }
+  if (local_iovec_count > UIO_MAXIOV) {
+    return fit::error(errno(EINVAL));
+  }
+
+  return read_objects_to_smallvec<UserBuffer, 1>(UserRef<UserBuffer>::New(iovec_addr),
+                                                 *local_iovec_count);
 }
 
 fit::result<Errno, FsString> MemoryAccessorExt::read_c_string_to_vec(UserCString string,
@@ -70,13 +86,13 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string_to_vec(UserCString
     auto read_len = read_bytes.size();
 
     // Check if the last byte read is the null byte.
-    if (read_bytes.last(1).data()[0] == '\0') {
+    if (read_bytes.last(1)[0] == '\0') {
       auto null_index = index + read_len - 1;
       buf.set_size(null_index);
       if (buf.size() > max_size) {
         return fit::error(errno(ENAMETOOLONG));
       }
-      return fit::ok(FsString((char*)buf.data(), buf.size()));
+      return fit::ok(FsString(reinterpret_cast<char*>(buf.data()), buf.size()));
     }
 
     index += read_len;
@@ -104,7 +120,8 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string(UserCString string
   }
   // Make sure the last element holds the null byte.
   if (buffer_or_error->last(1)[0] == '\0') {
-    return fit::ok(FsString((char*)buffer_or_error->data(), buffer_or_error->size() - 1));
+    return fit::ok(
+        FsString(reinterpret_cast<char*>(buffer_or_error->data()), buffer_or_error->size() - 1));
   }
   return fit::error(errno(ENAMETOOLONG));
 }

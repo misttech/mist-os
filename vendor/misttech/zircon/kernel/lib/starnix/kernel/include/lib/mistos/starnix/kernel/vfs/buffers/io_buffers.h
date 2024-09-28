@@ -7,10 +7,14 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_buffer.h>
+#include <zircon/assert.h>
 
 #include <functional>
+#include <ranges>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
@@ -58,7 +62,6 @@ class Buffer {
   /// to (if this is an `OutputBuffer`) without causing undefined behaviour.
   // virtual Result < IovecsRef <'_, syncio::zxio::iovec>, Errno> peek_all_segments_as_iovecs() = 0;
 
- public:
   // C++
   virtual ~Buffer() = default;
 };
@@ -113,9 +116,8 @@ class OutputBuffer : public Buffer {
   /// Returns the number of bytes read and written.
   virtual fit::result<Errno, size_t> write_buffer(InputBuffer& input);
 
- public:
   // C++
-  virtual ~OutputBuffer() = default;
+  ~OutputBuffer() override = default;
 };
 
 /// The callback for `InputBuffer::peek_each` and `InputBuffer::read_each`. The callback is passed
@@ -153,7 +155,7 @@ class InputBuffer : public Buffer {
   /// is stopped.
   ///
   /// Returns the total number of bytes read.
-  virtual fit::result<Errno, size_t> read_each(InputBufferCallback callback) {
+  virtual fit::result<Errno, size_t> read_each(InputBufferCallback&& callback) {
     auto peak_each_result = peek_each(callback);
     if (peak_each_result.is_error())
       return peak_each_result.take_error();
@@ -186,7 +188,7 @@ class InputBuffer : public Buffer {
   ///
   /// Returns the number of bytes read from this buffer.
   virtual fit::result<Errno, size_t> peek(ktl::span<uint8_t>& buffer) {
-    auto index = 0;
+    auto index = 0u;
     return peek_each([&](const ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
       auto size = ktl::min(buffer.size() - index, data.size());
       auto dest = buffer.subspan(index, index + size);
@@ -227,17 +229,174 @@ class InputBuffer : public Buffer {
     auto size = result.value();
     if (size != buffer.size()) {
       return fit::error(errno(EINVAL));
-    } else {
-      return fit::ok(size);
     }
+    return fit::ok(size);
   }
 
- public:
   // C++
-  virtual ~InputBuffer() = default;
+  ~InputBuffer() override = default;
 };
 
 class InputBufferExt : public InputBuffer {};
+
+/// An OutputBuffer that write data to user space memory through a `TaskMemoryAccessor`.
+class UserBuffersOutputBuffer {};
+
+/// An InputBuffer that read data from user space memory through a `TaskMemoryAccessor`.
+template <typename M>
+class UserBuffersInputBuffer : public InputBuffer {
+ public:
+  static fit::result<Errno, UserBuffersInputBuffer> new_inner(const M* mm, UserBuffers buffers) {
+    auto available = UserBuffer::cap_buffers_to_max_rw_count(mm->maximum_valid_address(), buffers);
+    if (available.is_error()) {
+      return available.take_error();
+    }
+
+    //  Reverse the buffers as the element will be removed as they are handled.
+    buffers.reverse();
+    return fit::ok(
+        ktl::move(UserBuffersInputBuffer(mm, ktl::move(buffers), available.value(), 0ul)));
+  }
+
+  template <typename F>
+  fit::result<Errno, size_t> peek_each_inner(F&& callback) {
+    size_t read = 0;
+    for (auto& buffer : std::ranges::reverse_view(buffers_)) {
+      if (buffer.is_null()) {
+        continue;
+      }
+
+      auto result = callback(buffer, read);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      if (result > buffer.length_) {
+        return fit::error(errno(EINVAL));
+      }
+      read += result.value();
+      if (result != buffer.length_) {
+        break;
+      }
+    }
+    return fit::ok(read);
+  }
+
+  static fit::result<Errno, UserBuffersInputBuffer> unified_new(const CurrentTask& mm,
+                                                                UserBuffers buffers) {
+    return new_inner(&static_cast<const TaskMemoryAccessor&>(mm), ktl::move(buffers));
+  }
+
+  static fit::result<Errno, UserBuffersInputBuffer> unified_new_at(const CurrentTask& mm,
+                                                                   UserAddress address,
+                                                                   size_t length) {
+    util::SmallVector<UserBuffer, 1> input_iovec;
+    input_iovec.push_back(UserBuffer{.address_ = address, .length_ = length});
+    return unified_new(mm, ktl::move(input_iovec));
+  }
+
+  // impl Buffer
+  fit::result<Errno, size_t> segments_count() const final {
+    return fit::ok(ktl::count_if(buffers_.begin(), buffers_.end(),
+                                 [](const UserBuffer& b) { return b.is_null(); }));
+  }
+
+  fit::result<Errno> peek_each_segment(PeekBufferSegmentsCallback callback) final {
+    // This `UserBuffersInputBuffer` made sure that each segment only pointed
+    // to valid user-space address ranges on creation so each `buffer` is
+    // safe to read from.
+    for (auto& buffer : std::ranges::reverse_view(buffers_)) {
+      if (buffer.is_null()) {
+        continue;
+      }
+      callback(buffer);
+    }
+
+    return fit::ok();
+  }
+
+  // impl InputBuffer
+  fit::result<Errno, size_t> peek(ktl::span<uint8_t>& uninit_bytes) final {
+    return peek_each_inner(
+        [&](UserBuffer& buffer, size_t read_so_far) -> fit::result<Errno, size_t> {
+          auto read_to = uninit_bytes.data() + read_so_far;
+          size_t remaining_bytes = uninit_bytes.size() - read_so_far;
+          auto read_count = ktl::min(buffer.length_, remaining_bytes);
+          auto read_to_span = ktl::span<uint8_t>{read_to, read_count};
+          auto read_bytes = mm_->read_memory(buffer.address_, read_to_span);
+          if (read_bytes.is_error()) {
+            return read_bytes.take_error();
+          }
+          ZX_DEBUG_ASSERT(read_bytes->size() == read_count);
+          return fit::ok(read_count);
+        });
+  }
+
+  fit::result<Errno, size_t> peek_each(InputBufferCallback callback) final {
+    return peek_each_inner(
+        [&](UserBuffer& buffer, size_t _read_so_far) -> fit::result<Errno, size_t> {
+          auto bytes = mm_->read_memory_to_vec(buffer.address_, buffer.length_);
+          if (bytes.is_error()) {
+            return bytes.take_error();
+          }
+          return callback(bytes.value());
+        });
+  }
+
+  size_t drain() final {
+    auto result = available_;
+    bytes_read_ += available_;
+    available_ = 0;
+    buffers_.clear();
+    return result;
+  }
+
+  fit::result<Errno> advance(size_t length) final {
+    if (length > available_) {
+      return fit::error(errno(EINVAL));
+    }
+    available_ -= length;
+    bytes_read_ += length;
+    while (!buffers_.is_empty()) {
+      auto buffer = buffers_.pop();
+      if (!buffer.has_value()) {
+        break;
+      }
+
+      if (length < buffer->length_) {
+        auto result = buffer->advance(length);
+        if (result.is_error()) {
+          return result.take_error();
+        }
+        buffers_.push_back(buffer.value());
+        return fit::ok();
+      }
+      length -= buffer->length_;
+      if (length == 0) {
+        return fit::ok();
+      }
+    }
+
+    if (length != 0) {
+      return fit::error(errno(EINVAL));
+    }
+    return fit::ok();
+  }
+
+  size_t available() const final { return available_; }
+
+  size_t bytes_read() const final { return bytes_read_; }
+
+ private:
+  explicit UserBuffersInputBuffer(const M* mm, UserBuffers buffers, size_t available,
+                                  size_t bytes_read)
+      : mm_(mm), buffers_(ktl::move(buffers)), available_(available), bytes_read_(bytes_read) {}
+
+  const M* mm_;
+  UserBuffers buffers_;
+  size_t available_;
+  size_t bytes_read_;
+};
 
 /// An OutputBuffer that write data to an internal buffer.
 class VecOutputBuffer : public OutputBuffer {
@@ -322,7 +481,7 @@ class VecOutputBuffer : public OutputBuffer {
  private:
   friend bool unit_testing::test_vec_output_buffer();
 
-  VecOutputBuffer(size_t capacity) : buffer_(), capacity_(capacity) {
+  explicit VecOutputBuffer(size_t capacity) : capacity_(capacity) {
     fbl::AllocChecker ac;
     buffer_.reserve(capacity, &ac);
     ASSERT(ac.check());
@@ -339,7 +498,7 @@ class VecInputBuffer : public InputBuffer {
 
  public:
   // impl VecInputBuffer
-  static VecInputBuffer New(const ktl::span<uint8_t>& data);
+  static VecInputBuffer New(const ktl::span<const uint8_t>& data);
 
   // impl From<Vec<u8>>
   static VecInputBuffer from(fbl::Vector<uint8_t> buffer);

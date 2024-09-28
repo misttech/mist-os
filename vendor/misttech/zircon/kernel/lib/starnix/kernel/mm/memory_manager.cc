@@ -1050,7 +1050,9 @@ fbl::RefPtr<MemoryManager> MemoryManager::from_vmar(Vmar root_vmar, Vmar user_vm
 }
 
 MemoryManager::MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar_info)
-    : root_vmar(ktl::move(root)), base_addr(UserAddress::from_ptr(user_vmar_info.base)) {
+    : root_vmar(ktl::move(root)),
+      base_addr(UserAddress::from_ptr(user_vmar_info.base)),
+      maximum_valid_user_address(UserAddress::from_ptr(user_vmar_info.base + user_vmar_info.len)) {
   LTRACEF("user_vmar_info={.base=%lx,.len=%lu}\n", user_vmar_info.base, user_vmar_info.len);
 
   auto _state = state.Write();

@@ -964,4 +964,8 @@ fit::result<Errno, size_t> CurrentTask::zero(UserAddress addr, size_t length) co
   return task->mm()->unified_zero(*this, addr, length);
 }
 
+UserAddress CurrentTask::maximum_valid_address() const {
+  return task->mm()->maximum_valid_user_address;
+}
+
 }  // namespace starnix

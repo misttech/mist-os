@@ -35,9 +35,8 @@ fit::result<Errno, size_t> OutputBuffer::write_all(const ktl::span<uint8_t>& buf
   auto size = result.value();
   if (size != buffer.size()) {
     return fit::error(errno(EINVAL));
-  } else {
-    return fit::ok(size);
   }
+  return fit::ok(size);
 }
 
 fit::result<Errno, size_t> OutputBuffer::write_buffer(InputBuffer& input) {
@@ -50,7 +49,7 @@ fit::result<Errno, size_t> OutputBuffer::write_buffer(InputBuffer& input) {
 
 fit::result<Errno, fbl::Vector<uint8_t>> InputBuffer::peek_all() {
   // SAFETY: self.peek returns the number of bytes read.
-  return read_to_vec<uint8_t, Errno>(
+  return read_to_vec<Errno, uint8_t>(
       available(), [&](ktl::span<uint8_t>& buf) -> fit::result<Errno, NumberOfElementsRead> {
         auto peek_result = this->peek(buf);
         if (peek_result.is_error())
@@ -59,7 +58,7 @@ fit::result<Errno, fbl::Vector<uint8_t>> InputBuffer::peek_all() {
       });
 }
 
-VecInputBuffer VecInputBuffer::New(const ktl::span<uint8_t>& data) {
+VecInputBuffer VecInputBuffer::New(const ktl::span<const uint8_t>& data) {
   fbl::AllocChecker ac;
   fbl::Vector<uint8_t> buffer;
   buffer.resize(data.size(), &ac);
