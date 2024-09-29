@@ -21,6 +21,14 @@
                 // these servers in netcfg.
                 "discovered_ndp_dns_netcfg_basic_ns3::lookup_admin",
                 "discovered_ndp_dns_netcfg_advanced_ns3::lookup_admin",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/341759423): Once
+                // Netstack3 exposes NDP RAs, listen for
+                // these servers in netcfg.
                 "discovered_ndp_dns_netcfg_basic_ns3::dns_server_watcher",
                 "discovered_ndp_dns_netcfg_advanced_ns3::dns_server_watcher",
 
