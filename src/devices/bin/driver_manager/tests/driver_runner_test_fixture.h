@@ -127,6 +127,8 @@ class TestDirectory final : public fidl::testing::TestBase<fio::Directory> {
 
   void Open(OpenRequest& request, OpenCompleter::Sync& completer) override;
 
+  void Open3(Open3Request& request, Open3Completer::Sync& completer) override;
+
   void handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
                              fidl::UnknownMethodCompleter::Sync&) override;
 
