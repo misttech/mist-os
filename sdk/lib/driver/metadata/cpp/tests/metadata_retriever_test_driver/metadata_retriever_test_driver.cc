@@ -51,6 +51,7 @@ void MetadataRetrieverTestDriver::Serve(
 }
 
 void MetadataRetrieverTestDriver::GetMetadata(GetMetadataCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::result metadata = fdf_metadata::GetMetadata<fuchsia_hardware_test::Metadata>(incoming());
 
   if (metadata.is_error()) {
@@ -60,9 +61,14 @@ void MetadataRetrieverTestDriver::GetMetadata(GetMetadataCompleter::Sync& comple
   }
 
   completer.Reply(fit::ok(std::move(metadata.value())));
+#else
+  FDF_SLOG(ERROR, "Getting metadata not supported at current Fuchsia API level.");
+  completer.Reply(fit::error(ZX_ERR_UNSUPPORTED));
+#endif
 }
 
 void MetadataRetrieverTestDriver::GetMetadataIfExists(
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     GetMetadataIfExistsCompleter::Sync& completer) {
   zx::result result =
       fdf_metadata::GetMetadataIfExists<fuchsia_hardware_test::Metadata>(incoming());
@@ -83,6 +89,10 @@ void MetadataRetrieverTestDriver::GetMetadataIfExists(
   fuchsia_hardware_test::MetadataRetrieverGetMetadataIfExistsResponse response{
       {.metadata = std::move(metadata.value()), .retrieved_metadata = true}};
   completer.Reply(fit::ok(std::move(response)));
+#else
+  FDF_SLOG(ERROR, "Getting metadata not supported at current Fuchsia API level.");
+  completer.Reply(fit::error(ZX_ERR_UNSUPPORTED));
+#endif
 }
 
 }  // namespace fdf_metadata::test

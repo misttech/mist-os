@@ -15,6 +15,8 @@
 #include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 namespace fdf_metadata {
 
 // Serves metadata that can be retrieved using `fdf_metadata::GetMetadata<|FidlType|>()`.
@@ -187,5 +189,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
 };
 
 }  // namespace fdf_metadata
+
+#endif
 
 #endif  // LIB_DRIVER_METADATA_CPP_METADATA_SERVER_H_
