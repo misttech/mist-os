@@ -187,7 +187,7 @@ class FsNode final
     kernel_ = fs->kernel();
   }
 
-  FsNodeOps& ops() const { return *ops_.get(); }
+  FsNodeOps& ops() const { return *ops_; }
 
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const CurrentTask& current_task,
                                                                OpenFlags flags) const;
@@ -207,7 +207,10 @@ class FsNode final
   /// Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
 
-  // Whether this node is a directory.
+  /// Whether this node is a regular file.
+  bool is_reg() const { return info()->mode.is_reg(); }
+
+  /// Whether this node is a directory.
   bool is_dir() const { return info()->mode.is_dir(); }
 
   /// Whether this node is a symbolic link.

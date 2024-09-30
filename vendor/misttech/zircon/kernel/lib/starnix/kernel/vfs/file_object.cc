@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -26,6 +27,8 @@
 
 namespace starnix {
 
+using starnix_syscalls::SyscallResult;
+
 fit::result<Errno, size_t> checked_add_offset_and_length(size_t offset, size_t length) {
   auto end = mtl::checked_add(offset, length);
   if (!end.has_value())
@@ -37,13 +40,13 @@ fit::result<Errno, size_t> checked_add_offset_and_length(size_t offset, size_t l
   return fit::ok(*end);
 }
 
-fit::result<Errno, long> default_fcntl(uint32_t cmd) {
+fit::result<Errno, SyscallResult> default_fcntl(uint32_t cmd) {
   // track_stub!(TODO("https://fxbug.dev/322875704"), "default fcntl", cmd);
   return fit::error(errno(EINVAL));
 }
 
-fit::result<Errno, long> default_ioctl(const FileObject&, const CurrentTask&, uint32_t request,
-                                       long arg) {
+fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const CurrentTask&,
+                                                uint32_t request, long arg) {
   return fit::error(errno(ENOTSUP));
 }
 
