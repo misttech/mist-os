@@ -10,16 +10,23 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
-#include <lib/mistos/starnix/kernel/vfs/syscalls.h>
+#include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/util/error_propagation.h>
+#include <trace.h>
+
+#include <ktl/optional.h>
+
+#include "../kernel_priv.h"
 
 #include <ktl/enforce.h>
 
 #include <linux/fcntl.h>
 
-using namespace starnix_uapi;
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -31,54 +38,87 @@ namespace {
 fit::result<Errno, FileHandle> open_file_at(const CurrentTask& current_task, FdNumber dir_fd,
                                             UserCString user_path, uint32_t flags, FileMode mode,
                                             ResolveFlags resolve_flags) {
-  auto path_or_error = current_task.read_c_string_to_vec(user_path, PATH_MAX);
-  if (path_or_error.is_error())
-    return path_or_error.take_error();
-  return current_task.open_file_at(dir_fd, path_or_error.value(),
-                                   OpenFlags::from_bits_truncate(flags), mode, resolve_flags);
+  auto path = current_task.read_c_string_to_vec(user_path, PATH_MAX) _EP(path);
+  LTRACEF("dir_fd %d, path %s\n", dir_fd.raw(), path->c_str());
+  return current_task.open_file_at(dir_fd, path.value(), OpenFlags::from_bits_truncate(flags), mode,
+                                   resolve_flags);
 }
 
 FdFlags get_fd_flags(uint32_t flags) {
   if ((flags & O_CLOEXEC) != 0) {
     return FdFlags(FdFlagsEnum::CLOEXEC);
-  } else {
-    return FdFlags::empty();
   }
+  return FdFlags::empty();
 }
 
 fit::result<Errno, FdNumber> do_openat(const CurrentTask& current_task, FdNumber dir_fd,
                                        UserCString user_path, uint32_t flags, FileMode mode,
                                        ResolveFlags resolve_flags) {
-  auto file_or_error = open_file_at(current_task, dir_fd, user_path, flags, mode, resolve_flags);
-  if (file_or_error.is_error()) {
-    return file_or_error.take_error();
-  }
+  auto file = open_file_at(current_task, dir_fd, user_path, flags, mode, resolve_flags) _EP(file);
   auto fd_flags = get_fd_flags(flags);
-  return current_task->add_file(file_or_error.value(), fd_flags);
+  return current_task->add_file(file.value(), fd_flags);
+}
+
+fit::result<Errno, size_t> do_writev(const CurrentTask& current_task, FdNumber fd,
+                                     starnix_uapi::UserAddress iovec_addr,
+                                     starnix_uapi::UserValue<uint32_t> iovec_count,
+                                     ktl::optional<off_t> offset, uint32_t flags) {
+  if ((flags & ~RWF_SUPPORTED) != 0) {
+    return fit::error(errno(EOPNOTSUPP));
+  }
+
+  if (flags != 0) {
+    // track_stub !(TODO("https://fxbug.dev/322874523"), "pwritev2 flags", flags);
+  }
+
+  auto file = current_task->files.get(fd) _EP(file);
+  auto iovec = current_task.read_iovec(iovec_addr, iovec_count) _EP(iovec);
+  auto data = UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(
+      current_task, ktl::move(iovec.value())) _EP(data);
+
+  auto res = [&]() -> fit::result<Errno, size_t> {
+    if (offset.has_value()) {
+      return file->write_at(current_task, offset.value(), &data.value());
+    }
+    return file->write(current_task, &data.value());
+  }();
+
+  if (res.is_error()) {
+    if (res.error_value().error_code() == EFAULT) {
+      // track_stub!(TODO("https://fxbug.dev/297370529"), "allow partial writes");
+    }
+  }
+
+  return res;
 }
 
 }  // namespace
 
 fit::result<Errno, size_t> sys_read(const CurrentTask& current_task, FdNumber fd,
                                     starnix_uapi::UserAddress address, size_t length) {
-  auto file_or_error = current_task->files.get(fd);
-  if (file_or_error.is_error())
-    return file_or_error.take_error();
-  // file_or_error->read(current_task, );
+  auto file = current_task->files.get(fd) _EP(file);
+  // file->read(current_task, UserBuffersOutputBuffer::unified_new_at(current_task, address,
+  // length))
   return fit::error(errno(ENOSYS));
 }
 
 fit::result<Errno, size_t> sys_write(const CurrentTask& current_task, FdNumber fd,
                                      starnix_uapi::UserAddress address, size_t length) {
-  auto file_or_error = current_task->files.get(fd);
-  if (file_or_error.is_error())
-    return file_or_error.take_error();
-  // file_or_error->write(current_task, );
-  return fit::error(errno(ENOSYS));
+  auto file = current_task->files.get(fd) _EP(file);
+  auto buffer = UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address,
+                                                                           length) _EP(buffer);
+  return map_eintr(file->write(current_task, &*buffer), errno(ERESTARTSYS));
 }
 
 fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd) {
-  return current_task->files.close(fd);
+  auto result = current_task->files.close(fd) _EP(result);
+  return fit::ok();
+}
+
+fit::result<Errno, size_t> sys_writev(const CurrentTask& current_task, FdNumber fd,
+                                      starnix_uapi::UserAddress iovec_addr,
+                                      starnix_uapi::UserValue<uint32_t> iovec_count) {
+  return do_writev(current_task, fd, iovec_addr, iovec_count, ktl::nullopt, 0);
 }
 
 fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber dir_fd,

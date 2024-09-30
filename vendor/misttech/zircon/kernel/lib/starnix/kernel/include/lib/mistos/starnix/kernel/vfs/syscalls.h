@@ -9,9 +9,11 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/starnix_uapi/user_value.h>
 
 #include <linux/openat2.h>
 
@@ -30,12 +32,56 @@ fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd);
 fit::result<Errno> sys_close_range(const CurrentTask& current_task, uint32_t first, uint32_t last,
                                    uint32_t flags);
 
-fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber fir_fd,
-                                        starnix_uapi::UserCString, uint32_t flags,
+fit::result<Errno, off_t> sys_lseek(const CurrentTask& current_task, FdNumber fd, off_t offset,
+                                    uint32_t whence);
+
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_fcntl(const CurrentTask& current_task,
+                                                              FdNumber fd, uint32_t cmd,
+                                                              uint64_t arg);
+
+fit::result<Errno, size_t> sys_pread64(const CurrentTask& current_task, FdNumber fd,
+                                       starnix_uapi::UserAddress address, size_t length,
+                                       off_t offset);
+
+fit::result<Errno, size_t> sys_pwrite64(const CurrentTask& current_task, FdNumber fd,
+                                        starnix_uapi::UserAddress address, size_t length,
+                                        off_t offset);
+
+fit::result<Errno, size_t> sys_readv(const CurrentTask& current_task, FdNumber fd,
+                                     starnix_uapi::UserAddress iovec_addr,
+                                     starnix_uapi::UserValue<uint32_t> iovec_count);
+
+fit::result<Errno, size_t> sys_preadv(const CurrentTask& current_task, FdNumber fd,
+                                      starnix_uapi::UserAddress iovec_addr,
+                                      starnix_uapi::UserValue<uint32_t> iovec_count, off_t offset);
+
+fit::result<Errno, size_t> sys_preadv2(const CurrentTask& current_task, FdNumber fd,
+                                       starnix_uapi::UserAddress iovec_addr,
+                                       starnix_uapi::UserValue<uint32_t> iovec_count, off_t offset,
+                                       uint64_t arg, uint32_t flags);
+
+fit::result<Errno, size_t> sys_writev(const CurrentTask& current_task, FdNumber fd,
+                                      starnix_uapi::UserAddress iovec_addr,
+                                      starnix_uapi::UserValue<uint32_t> iovec_count);
+
+fit::result<Errno, size_t> sys_pwritev(const CurrentTask& current_task, FdNumber fd,
+                                       starnix_uapi::UserAddress iovec_addr,
+                                       starnix_uapi::UserValue<uint32_t> iovec_count, off_t offset);
+
+fit::result<Errno, size_t> sys_pwritev2(const CurrentTask& current_task, FdNumber fd,
+                                        starnix_uapi::UserAddress iovec_addr,
+                                        starnix_uapi::UserValue<uint32_t> iovec_count, off_t offset,
+                                        uint64_t arg, uint32_t flags);
+
+fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber dir_fd,
+                                        starnix_uapi::UserCString user_path, uint32_t flags,
                                         starnix_uapi::FileMode mode);
 
 fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber fir_fd,
                                          starnix_uapi::UserCString, struct open_how, size_t size);
+
+fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber dd,
+                                         starnix_uapi::UserRef<struct stat>);
 
 }  // namespace starnix
 
