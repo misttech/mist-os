@@ -5,41 +5,94 @@
 version: 2.1
 
 jobs:
-  build:
+  setup:
     docker:
       - image: cimg/base:current
-
     steps:
-      - checkout
       - run: sudo apt-get update && sudo apt-get install -y rsync
       - run:
           command: |
             curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
             export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri init -analytics-opt=true
             jiri import -name=integration flower https://github.com/misttech/integration
+            jiri -v -vv update -fetch-packages=false
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache jiri-packages-{{ checksum "integration/jiri.lock" }}
-            - jiri-packages
+            - &jiri-cache jiri-pkg-{{ checksum "integration/jiri.lock" }}
       - run:
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
             jiri -v -vv update
             git checkout $CIRCLE_BRANCH
+            jiri project-config --no-update=true --no-rebase=true
       - save_cache:
           name: Save Jiri Package Cache
           key: *jiri-cache
           paths:
             - .cipd
+            - .jiri_root
+            - .jiri_manifest
             - prebuilt
+      - persist_to_workspace:
+          root: .
+          paths:
+            - integration
+
+  build:
+    docker:
+      - image: cimg/base:current
+
+    steps:
+      - run: git clone --depth 1 -b "$CIRCLE_BRANCH" << pipeline.trigger_parameters.github_app.repo_url >>
+      - run: sudo apt-get update && sudo apt-get install -y rsync
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          name: Restore Jiri Cache
+          keys:
+            - &jiri-cache jiri-pkg-{{ checksum "integration/jiri.lock" }}
       - run:
           command: |
+            export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri -v -vv update -fetch-packages=false
             echo -n "submodules=false" > build/checkout.gni
             make args gen
+            make it
+      - persist_to_workspace:
+          root: .
+          paths:
+            - out
+  test:
+    docker:
+      - image: cimg/base:current
+
+    steps:
+      - run: git clone --depth 1 -b "$CIRCLE_BRANCH" << pipeline.trigger_parameters.github_app.repo_url >>
+      - run: sudo apt-get update && sudo apt-get install -y rsync
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          name: Restore Jiri Cache
+          keys:
+            - &jiri-cache jiri-pkg-{{ checksum "integration/jiri.lock" }}
+      - run:
+          command: |
+            export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri -v -vv update -fetch-packages=false
+            echo -n "submodules=false" > build/checkout.gni
             make test
 
 workflows:
-  build-workflow:
+  version: 2
+  build-and-test:
     jobs:
-      - build
+      - setup
+      - build:
+          requires:
+            - setup
+      - test:
+          requires:
+            - setup
+            - build
