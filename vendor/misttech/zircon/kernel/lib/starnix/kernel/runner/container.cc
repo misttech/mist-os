@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
+#include <lib/mistos/starnix/kernel/fs/mistos/syslog.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
@@ -18,6 +19,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/back_insert_iterator.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -41,15 +43,16 @@ fit::result<Errno, Container> create_container(const Config& config) {
   const ktl::string_view DEFAULT_INIT("/container/init");
 
   fbl::RefPtr<Kernel> kernel = Kernel::New(config.kernel_cmdline).value_or(fbl::RefPtr<Kernel>());
-  ASSERT_MSG(kernel, "creating Kernel: %s\n", config.name.data());
+  ASSERT_MSG(kernel, "creating Kernel: %.*s\n", static_cast<int>(config.name.size()),
+             config.name.data());
 
   fbl::RefPtr<FsContext> fs_context;
-  if (auto result = create_fs_context(kernel, config); result.is_error()) {
+  auto result = create_fs_context(kernel, config);
+  if (result.is_error()) {
     LTRACEF("creating FsContext: %d\n", result.error_value());
     return fit::error(errno(from_status_like_fdio(result.error_value())));
-  } else {
-    fs_context = result.value();
   }
+  fs_context = result.value();
 
   auto init_pid = kernel->pids.Write()->allocate_pid();
   // Lots of software assumes that the pid for the init process is 1.
@@ -105,14 +108,21 @@ fit::result<Errno, Container> create_container(const Config& config) {
   if (LOCAL_TRACE) {
     TRACEF("creating init task: ");
     for (auto arg : config.init) {
-      TRACEF("%s ", arg.data());
+      TRACEF("%.*s ", static_cast<int>(arg.size()), arg.data());
     }
     TRACEF("\n");
   }
 
   auto pre_run = [&](CurrentTask& init_task) -> fit::result<Errno> {
-    return init_task.exec(executable.value(), argv[0], ktl::move(argv),
-                          fbl::Vector<ktl::string_view>());
+    auto stdio = SyslogFile::new_file(init_task);
+    auto files = init_task->files;
+    for (int i : {0, 1, 2}) {
+      if (files.get(FdNumber::from_raw(i)).is_error()) {
+        auto result = files.insert(*init_task.task, FdNumber::from_raw(i), stdio) _EP(result);
+      }
+    }
+
+    return init_task.exec(executable.value(), argv[0], argv, fbl::Vector<ktl::string_view>());
   };
 
   auto task_complete = [](fit::result<zx_status_t>) -> void {
