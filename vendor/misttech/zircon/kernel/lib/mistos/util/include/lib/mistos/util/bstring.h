@@ -7,6 +7,7 @@
 
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <stdio.h>
+#include <zircon/assert.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_single_list.h>
@@ -18,12 +19,10 @@ class BString {
  public:
   // Creates an empty string.
   // Does not allocate heap memory.
-  BString() = default;
+  BString() { InitWithEmpty(); }
 
   // Creates a copy of another string.
-  BString(const BString& other) {
-    ktl::copy(other.begin(), other.end(), util::back_inserter(data_));
-  }
+  BString(const BString& other) : BString(ktl::string_view(other)) {}
 
   // Move constructs from another string.
   // The other string is set to empty.
@@ -33,24 +32,27 @@ class BString {
     other.data_.reset();
   }
 
-  BString(const ktl::string_view& str) {
-    ktl::copy(str.begin(), str.end(), util::back_inserter(data_));
-  }
+  // Creates a string from the contents of a null-terminated C string.
+  // Allocates heap memory only if |data| is non-empty.
+  // |data| must not be null.
+  BString(const char* data) { Init(data, ktl::string_view(data).size()); }
 
-  BString(const char* data, size_t size) {
-    ktl::copy(data, data + size, util::back_inserter(data_));
-  }
+  // Creates a string from the contents of a character array of given length.
+  // Allocates heap memory only if |length| is non-zero.
+  // |data| must not be null.
+  BString(const char* data, size_t length) { Init(data, length); }
 
-  BString(const char* data) {
-    const ktl::string_view tmp(data);
-    ktl::copy(tmp.begin(), tmp.end(), util::back_inserter(data_));
-  }
+  // Creates a string from the contents of a string.
+  // Allocates heap memory only if |str.length()| is non-zero.
+  BString(ktl::string_view str) : BString(str.data(), str.length()) {}
 
   // Returns a pointer to the null-terminated contents of the string.
   const char* data() const { return data_.data(); }
   const char* c_str() const { return data(); }
 
-  size_t size() const { return data_.size(); }
+  // Returns the length of the string, excluding its null terminator.
+  size_t length() const { return data_.size() - 1; }
+  size_t size() const { return length(); }
 
   // Returns true if the string's length is zero.
   bool empty() const { return size() == 0U; }
@@ -74,7 +76,7 @@ class BString {
   // Assigns this string to a copy of another string.
   BString& operator=(const BString& other) {
     data_.reset();
-    ktl::copy(other.begin(), other.end(), util::back_inserter(data_));
+    Init(other.data(), other.length());
     return *this;
   }
 
@@ -90,9 +92,12 @@ class BString {
   // Create a std::string_view backed by the string.
   // The view does not take ownership of the data so the string
   // must outlast the std::string_view.
-  operator ktl::string_view() const { return {data(), size()}; }
+  operator std::string_view() const { return {data(), length()}; }
 
  private:
+  void Init(const char* data, size_t length);
+  void InitWithEmpty();
+
   fbl::Vector<char> data_;
 };
 

@@ -6,8 +6,11 @@ source_set("tests") {
   sources = [
     #"bitflags-test.cc",
     "cprng-test.cc",
+
     #"range-map-test.cc",
     #"split_string_unittest.cc",
+    "bstring-test.cc",
+
     #"trim_unittest.cc",
     #"weak_wrapper-test.cc",
   ]

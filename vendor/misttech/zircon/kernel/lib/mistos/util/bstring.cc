@@ -6,6 +6,29 @@
 
 #include <ktl/enforce.h>
 
+void BString::InitWithEmpty() {
+  fbl::AllocChecker ac;
+  data_.reserve(1, &ac);
+  ZX_ASSERT(ac.check());
+  data_.push_back('\0', &ac);
+  ZX_ASSERT(ac.check());
+}
+
+void BString::Init(const char* data, size_t length) {
+  if (length == 0U) {
+    InitWithEmpty();
+    return;
+  }
+  fbl::AllocChecker ac;
+  data_.reserve(length + 1, &ac);
+  ZX_ASSERT(ac.check());
+  memcpy(data_.data(), data, length);
+  data_.set_size(length);
+
+  data_.push_back('\0', &ac);
+  ZX_ASSERT(ac.check());
+}
+
 int BString::compare(const BString& other) const {
   size_t len = ktl::min(size(), other.size());
   int retval = memcmp(data(), other.data(), len);
