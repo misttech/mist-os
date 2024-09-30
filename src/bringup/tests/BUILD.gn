@@ -30,7 +30,6 @@ group("bootfs-tests") {
     "//src/zircon/tests/kcounter:kcounter-bootfs-test",
     "//src/zircon/tests/thread-state:thread-state-bootfs-test",
     "//src/zircon/tests/time:time-bootfs-test",
-    "//src/zircon/tests/timers:timers-bootfs-test",
     "//src/zircon/tests/vdso:vdso-base-bootfs-test",
     "//src/zircon/tests/vdso:vdso-bootfs-test",
     "//src/zircon/tests/vdso:vdso-variant-bootfs-test",

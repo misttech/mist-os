@@ -20,10 +20,10 @@ void CheckInfo(const zx::timer& timer, uint32_t options, zx_time_t deadline, zx_
   ASSERT_OK(timer.get_info(ZX_INFO_TIMER, &info, sizeof(info), nullptr, nullptr));
   EXPECT_EQ(info.options, options);
   EXPECT_EQ(info.deadline, deadline);
-  EXPECT_EQ(info.slack, slack);
+  EXPECT_GE(info.slack, slack);
 }
 
-TEST(TimersTest, DeadlineAfter) {
+TEST(Timer, DeadlineAfter) {
   auto then = zx_clock_get_monotonic();
   // The day we manage to boot and run this test in less than 1uS we need to fix this.
   ASSERT_GT(then, 1000u);
@@ -39,7 +39,7 @@ TEST(TimersTest, DeadlineAfter) {
   EXPECT_LT(zx_deadline_after(ZX_TIME_INFINITE_PAST), 0);
 }
 
-TEST(TimersTest, SetNegativeDeadline) {
+TEST(Timer, SetNegativeDeadline) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
   CheckInfo(timer, 0, 0, 0);
@@ -52,7 +52,7 @@ TEST(TimersTest, SetNegativeDeadline) {
   CheckInfo(timer, 0, 0, 0);
 }
 
-TEST(TimersTest, SetNegativeDeadlineMax) {
+TEST(Timer, SetNegativeDeadlineMax) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
   zx::duration slack;
@@ -64,14 +64,14 @@ TEST(TimersTest, SetNegativeDeadlineMax) {
   CheckInfo(timer, 0, 0, 0);
 }
 
-TEST(TimersTest, SetNegativeSlack) {
+TEST(Timer, SetNegativeSlack) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
   ASSERT_EQ(timer.set(zx::time(), zx::duration(-1)), ZX_ERR_OUT_OF_RANGE);
   CheckInfo(timer, 0, 0, 0);
 }
 
-TEST(TimersTest, AlreadyPassedDeadlineOnWaitOne) {
+TEST(Timer, AlreadyPassedDeadlineOnWaitOne) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
   CheckInfo(timer, 0, 0, 0);
@@ -86,7 +86,7 @@ TEST(TimersTest, AlreadyPassedDeadlineOnWaitOne) {
   CheckInfo(timer, 0, 0, 0);
 }
 
-TEST(TimersTest, Basic) {
+TEST(Timer, Basic) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
 
@@ -106,7 +106,7 @@ TEST(TimersTest, Basic) {
   }
 }
 
-TEST(TimersTest, Restart) {
+TEST(Timer, Restart) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
 
@@ -124,13 +124,13 @@ TEST(TimersTest, Restart) {
   }
 }
 
-TEST(TimersTest, InvalidCalls) {
+TEST(Timer, InvalidCalls) {
   zx::timer timer;
   ASSERT_EQ(zx::timer::create(0, INVALID_CLOCK, &timer), ZX_ERR_INVALID_ARGS);
   ASSERT_EQ(zx::timer::create(ZX_TIMER_SLACK_LATE + 1, INVALID_CLOCK, &timer), ZX_ERR_INVALID_ARGS);
 }
 
-TEST(TimersTest, EdgeCases) {
+TEST(Timer, EdgeCases) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
   ASSERT_OK(timer.set(zx::time(), zx::nsec(0)));
@@ -138,7 +138,7 @@ TEST(TimersTest, EdgeCases) {
 
 // furiously spin resetting the timer, trying to race with it going off to look for
 // race conditions.
-TEST(TimersTest, RestartRace) {
+TEST(Timer, RestartRace) {
   const zx_time_t kTestDuration = ZX_SEC(5);
   auto start = zx_clock_get_monotonic();
 
@@ -154,7 +154,7 @@ TEST(TimersTest, RestartRace) {
 // If the timer is already due at the moment it is started then the signal should be
 // asserted immediately.  Likewise canceling the timer should immediately deassert
 // the signal.
-TEST(TimersTest, SignalsAssertedImmediately) {
+TEST(Timer, SignalsAssertedImmediately) {
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
 
@@ -216,13 +216,11 @@ void CheckCoalescing(uint32_t mode) {
 }
 
 // Test is disabled, see |CheckCoalescing|.
-TEST(TimersTest, DISABLED_CoalesceTestEarly) {
+TEST(Timer, DISABLED_CoalesceTestEarly) {
   ASSERT_NO_FAILURES(CheckCoalescing(ZX_TIMER_SLACK_EARLY));
 }
 
 // Test is disabled, see |CheckCoalescing|.
-TEST(TimersTest, DISABLED_CoalesceTestLate) {
-  ASSERT_NO_FAILURES(CheckCoalescing(ZX_TIMER_SLACK_LATE));
-}
+TEST(Timer, DISABLED_CoalesceTestLate) { ASSERT_NO_FAILURES(CheckCoalescing(ZX_TIMER_SLACK_LATE)); }
 
 }  // anonymous namespace

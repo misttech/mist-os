@@ -52,6 +52,7 @@ core_tests = [
   "syscall-generation",
   "thread-initial-state",
   "time",
+  "timer",
   "version",
 ]
 
