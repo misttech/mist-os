@@ -142,6 +142,11 @@ class FdTable {
     retain([](FdNumber, FdFlags& flags) -> bool { return !flags.contains(FdFlagsEnum::CLOEXEC); });
   }
 
+  fit::result<Errno> insert(const Task& task, FdNumber fd, FileHandle file) const;
+
+  fit::result<Errno> insert_with_flags(const Task& task, FdNumber fd, FileHandle file,
+                                       FdFlags flags) const;
+
   fit::result<Errno, FdNumber> add_with_flags(const Task& task, FileHandle file,
                                               FdFlags flags) const;
 
