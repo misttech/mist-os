@@ -132,3 +132,4 @@ GOBIN="${BIN_TMP}" $GO install 'github.com/bazelbuild/bazel-gazelle/cmd/gazelle@
 (cd "${GAZELLE_TMP}" && "${BIN_TMP}/gazelle" update -repo_root . -go_prefix='go.fuchsia.dev/fuchsia')
 # Copy back generated Bazel files.
 cp -Rf "${GAZELLE_TMP}/third_party/golibs" "${FUCHSIA_DIR}/third_party"
+"$FUCHSIA_DIR/scripts/fuchsia-vendored-python" prepend_autogen_header.py
