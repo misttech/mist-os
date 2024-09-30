@@ -206,13 +206,13 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn src_addr(&self) -> I::Addr {
+    /// Returns the source address, stripped of all its witnesses.
+    pub fn src_addr(&self) -> I::Addr {
         I::map_ip(self, |key| key.src_addr.addr, |key| **key.src_addr.addr)
     }
 
-    #[cfg(test)]
-    pub(crate) fn dst_addr(&self) -> I::Addr {
+    /// Returns the destination address, stripped of all its witnesses.
+    pub fn dst_addr(&self) -> I::Addr {
         I::map_ip(self, |key| *key.dst_addr.addr, |key| *key.dst_addr.addr)
     }
 }

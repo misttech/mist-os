@@ -523,10 +523,10 @@ impl FidlResponder<Result<&fnet_multicast_admin::RouteStats, GetRouteStatsError>
 /// [`fnet_multicast_admin::Ipv6RoutingTableControllerWatchRoutingEventsResponder`].
 #[derive(Debug)]
 pub struct WatchRoutingEventsResponse<'a, I: FidlMulticastAdminIpExt> {
-    dropped_events: u64,
-    addresses: &'a UnicastSourceAndMulticastDestination<I>,
-    input_interface: u64,
-    event: &'a fnet_multicast_admin::RoutingEvent,
+    pub dropped_events: u64,
+    pub addresses: &'a UnicastSourceAndMulticastDestination<I>,
+    pub input_interface: u64,
+    pub event: &'a fnet_multicast_admin::RoutingEvent,
 }
 
 impl<'a> FidlResponder<WatchRoutingEventsResponse<'a, Ipv4>>

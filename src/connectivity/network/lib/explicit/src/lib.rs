@@ -25,11 +25,22 @@ pub trait ResultExt<T, E> {
     /// This allows code to be written which will stop compiling if a result's
     /// error type changes in the future.
     fn ok_checked<EE: sealed::EqType<E>>(self) -> Option<T>;
+
+    /// Like [`Result::err`], but the caller must provide the ok type being
+    /// discarded.
+    ///
+    /// This allows code to be written which will stop compiling if a result's
+    /// ok type changes in the future.
+    fn err_checked<TT: sealed::EqType<T>>(self) -> Option<E>;
 }
 
 impl<T, E> ResultExt<T, E> for Result<T, E> {
     fn ok_checked<EE: sealed::EqType<E>>(self) -> Option<T> {
         Result::ok(self)
+    }
+
+    fn err_checked<TT: sealed::EqType<T>>(self) -> Option<E> {
+        Result::err(self)
     }
 }
 

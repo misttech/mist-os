@@ -45,6 +45,7 @@ use std::time::Duration;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
+use fidl_fuchsia_net_multicast_ext::FidlMulticastAdminIpExt;
 use fuchsia_inspect::health::Reporter as _;
 use futures::channel::mpsc;
 use futures::{select, FutureExt as _, StreamExt as _};
@@ -88,8 +89,8 @@ use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpS
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
-    Lifetime, SlaacConfiguration,
+    IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfiguration,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -710,33 +711,28 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
     }
 }
 
-impl<I: IpExt> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>>
+impl<I: IpExt + FidlMulticastAdminIpExt> EventContext<IpLayerEvent<DeviceId<BindingsCtx>, I>>
     for BindingsCtx
 {
-    fn on_event(&mut self, event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>) {
-        // Core dispatched a routes-change request but has no expectation of
-        // observing the result, so we just discard the result receiver.
+    fn on_event(&mut self, event: IpLayerEvent<DeviceId<BindingsCtx>, I>) {
+        // NB: Downgrade the device ID immediately because we're about to stash
+        // the event in a channel.
+        let event = event.map_device(|d| d.downgrade());
         match event {
-            netstack3_core::ip::IpLayerEvent::AddRoute(entry) => {
+            IpLayerEvent::AddRoute(entry) => {
                 self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
-                    routes::RouteOp::Add(entry.map_device_id(|d| d.downgrade())),
+                    routes::RouteOp::Add(entry),
                     routes::SetMembership::CoreNdp,
                 ))
             }
-            netstack3_core::ip::IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
+            IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
                 self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
-                    routes::RouteOp::RemoveMatching {
-                        subnet,
-                        device: device.downgrade(),
-                        gateway,
-                        metric: None,
-                    },
+                    routes::RouteOp::RemoveMatching { subnet, device, gateway, metric: None },
                     routes::SetMembership::CoreNdp,
                 ))
             }
-            netstack3_core::ip::IpLayerEvent::MulticastForwarding(_) => {
-                // TODO(https://fxbug.dev/353328975): Dispatch the event to
-                // the multicast admin FIDL worker.
+            IpLayerEvent::MulticastForwarding(event) => {
+                self.multicast_admin.sink::<I>().dispatch_multicast_forwarding_event(event);
             }
         };
     }

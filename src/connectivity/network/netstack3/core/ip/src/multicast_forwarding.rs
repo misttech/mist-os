@@ -21,7 +21,7 @@ pub(crate) mod state;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{
     AnyDevice, DeviceIdContext, EventContext, FrameDestination, HandleableTimer,
-    InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
+    InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::ip::IpPacket;
 use zerocopy::SplitByteSlice;
@@ -134,6 +134,29 @@ impl<I: IpLayerIpExt, D> MulticastForwardingEvent<I, D> {
                 actual_input_interface: map(actual_input_interface),
                 expected_input_interface: map(expected_input_interface),
             },
+        }
+    }
+}
+
+impl<I: IpLayerIpExt, D: WeakDeviceIdentifier> MulticastForwardingEvent<I, D> {
+    /// Upgrades the device IDs held by this event.
+    pub fn upgrade_device_id(self) -> Option<MulticastForwardingEvent<I, D::Strong>> {
+        match self {
+            MulticastForwardingEvent::MissingRoute { key, input_interface } => {
+                Some(MulticastForwardingEvent::MissingRoute {
+                    key,
+                    input_interface: input_interface.upgrade()?,
+                })
+            }
+            MulticastForwardingEvent::WrongInputInterface {
+                key,
+                actual_input_interface,
+                expected_input_interface,
+            } => Some(MulticastForwardingEvent::WrongInputInterface {
+                key,
+                actual_input_interface: actual_input_interface.upgrade()?,
+                expected_input_interface: expected_input_interface.upgrade()?,
+            }),
         }
     }
 }

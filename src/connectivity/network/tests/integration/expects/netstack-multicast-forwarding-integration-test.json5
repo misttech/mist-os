@@ -10,20 +10,6 @@
             ],
         },
         {
-            type: "skip",
-            matchers: [
-                // TODO(https://fxbug.dev/323052525): Support Multicast Routing.
-                "multicast_forwarding_v4_ns3::missing_route",
-                "multicast_forwarding_v4_ns3::unexpected_input_interface",
-                "multicast_forwarding_v6_ns3::missing_route",
-                "multicast_forwarding_v6_ns3::unexpected_input_interface",
-                "watch_routing_events_dropped_events_v4_ns3",
-                "watch_routing_events_dropped_events_v6_ns3",
-                "watch_routing_events_hanging_v4_ns3",
-                "watch_routing_events_hanging_v6_ns3",
-            ],
-        },
-        {
             type: "expect_failure_with_err_logs",
             matchers: [
                 // TODO(https://fxbug.dev/323052525): Support Multicast Routing.
