@@ -16,17 +16,27 @@ all devices (known as [nodes][nodes]) and drivers in a Fuchsia system.
 
 ## Table of contents
 
-*  [Driver framework (DFv2)][driver-framework]
-*  [Comparison between DFv1 and DFv2][dfv1-and-dfv2]
-*  [Drivers and nodes][nodes]
-*  [Driver binding][driver-binding]
-*  [Driver communication][driver-communication]
-*  [Mapping a device's memory in a driver][mapping-memory]
-*  [Driver dispatcher and threads][driver-dispatcher]
-*  [Driver dispatcher performance][driver-dispatcher-performance]
+*  [**Driver framework (DFv2)**][driver-framework]: Explains the core concepts
+   and structure of Fuchsia's new driver framework.
+*  [**Comparison between DFv1 and DFv2**][dfv1-and-dfv2]: Compares the two
+   versions of Fuchsia's driver framework.
+*  [**Drivers and nodes**][nodes]: Explains the fundamental concepts of nodes
+   and their attributes and capabilities.
+*  [**Driver binding**][driver-binding]: Explains the process of how the driver
+   manager matches and binds a driver to a node.
+*  [**Driver communication**][driver-communication]: Explains different
+   communication methods: driver-to-driver and non-driver-to-driver.
+*  [**Mapping a device's memory in a driver**][mapping-memory]: Explains
+   how a device's memory region is mapped in a driver host.
+*  [**Driver dispatcher and threads**][driver-dispatcher]: Explains how
+   dispatchers allow drivers to schedule asynchronous work on threads.
+*  [**Driver dispatcher performance**][driver-dispatcher-performance]:
+   Discusses performance aspects of a dispatcher's inlined and non-inlined
+   calls.
 
 To learn more about creating DFv2 drivers, see the
-[DFv2 driver development][dfv2-overview] section.
+[**DFv2 driver development**][dfv2-overview] section.
+
 <!-- Reference links -->
 
 [components]: /docs/concepts/components/v2/README.md
