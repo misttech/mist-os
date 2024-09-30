@@ -83,3 +83,14 @@ uint32_t from_status_like_fdio(zx_status_t status) {
       return EIO;
   }
 }
+
+/// Maps `Err(EINTR)` to the specified errno.
+fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err) {
+  if (result.is_error()) {
+    if (result.error_value().error_code() == EINTR) {
+      return fit::error(err);
+    }
+    return result.take_error();
+  }
+  return result;
+}
