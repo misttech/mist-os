@@ -8,6 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_args.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/util/strings/utf_codecs.h>
 #include <zircon/types.h>
@@ -35,6 +36,10 @@ class FdNumber {
   }
 
   bool operator==(const FdNumber& other) const { return number_ == other.number_; }
+
+  operator starnix_syscalls::SyscallResult() const {
+    return starnix_syscalls::SyscallResult(raw());
+  }
 
  private:
   explicit FdNumber(int32_t n) : number_(n) {}
