@@ -8,6 +8,7 @@
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
@@ -19,10 +20,9 @@
 #include <tuple>
 #include <utility>
 
+#include <arch/defines.h>
 #include <fbl/alloc_checker.h>
 #include <lockdep/guard.h>
-
-#include "arch/defines.h"
 
 #include <linux/prctl.h>
 
@@ -45,7 +45,7 @@ bool test_brk() {
     if (auto opt = state->mappings.get(addr); opt) {
       return opt->first;
     }
-    return util::Range<UserAddress>({.start=0, .end=0});
+    return util::Range<UserAddress>({.start = 0, .end = 0});
   };
 
   // Initialize the program break.
@@ -427,8 +427,11 @@ TEST(MemoryManager, test_read_c_string_to_vec_large) {
 
   ASSERT_EQ(fbl::String((char*)random_data.data(), max_size - 1), read_result.value());
 }
+#endif
 
-TEST(MemoryManager, test_read_c_string_to_vec) {
+bool test_read_c_string_to_vec() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
   auto ma = *current_task;
@@ -438,42 +441,45 @@ TEST(MemoryManager, test_read_c_string_to_vec) {
   auto addr = mm->base_addr + 10 * page_size;
 
   // Map a page at a fixed address and write an unterminated string at the end of it.
-  ASSERT_EQ(addr, map_memory(*current_task, addr, page_size));
+  ASSERT_TRUE(addr == map_memory(*current_task, addr, page_size));
 
-  ktl::span<uint8_t> test_str((uint8_t*)"foo!", 4);
+  ktl::span<const uint8_t> test_str((const uint8_t*)"foo!", 4);
   auto test_addr = addr + page_size - test_str.size();
   ASSERT_TRUE(ma.write_memory(test_addr, test_str).is_ok(), "failed to write test string");
 
   // Expect error if the string is not terminated.
-  ASSERT_EQ(errno(ENAMETOOLONG), ma.read_c_string_to_vec(test_addr, max_size).error_value());
+  ASSERT_EQ(errno(ENAMETOOLONG).error_code(),
+            ma.read_c_string_to_vec(test_addr, max_size).error_value().error_code());
 
   // Expect success if the string is terminated.
   ASSERT_TRUE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"\0", 1}).is_ok(),
               "failed to write test string");
 
-  auto string_of_error = ma.read_c_string_to_vec(test_addr, max_size);
-  ASSERT_TRUE(string_of_error.is_ok(), "error %d", string_of_error.error_value().error_code());
-  ASSERT_EQ(fbl::String("foo"), string_of_error.value());
+  auto string = ma.read_c_string_to_vec(test_addr, max_size);
+  ASSERT_TRUE(string.is_ok());
+  ASSERT_TRUE(FsString("foo") == string.value());
 
   // Expect success if the string spans over two mappings.
-  ASSERT_EQ(addr + page_size, map_memory(*current_task, addr + page_size, page_size));
-  // TODO: Adjacent private anonymous mappings are collapsed. To test this case this test needs to
-  // provide a backing for the second mapping.
-  // assert_eq!(mm.get_mapping_count(), 2);
-  ASSERT_TRUE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"bar\0", 4}).is_ok(),
+  ASSERT_TRUE((addr + page_size) == map_memory(*current_task, addr + page_size, page_size));
+  // TODO (Herrera): Adjacent private anonymous mappings are collapsed. To test this case this test
+  // needs to provide a backing for the second mapping. assert_eq!(mm.get_mapping_count(), 2);
+  ASSERT_TRUE(ma.write_memory(addr + (page_size - 1), {(const uint8_t*)"bar\0", 4}).is_ok(),
               "failed to write extra chars");
 
-  string_of_error = ma.read_c_string_to_vec(test_addr, max_size);
-  ASSERT_TRUE(string_of_error.is_ok(), "error %d", string_of_error.error_value().error_code());
-  ASSERT_EQ(fbl::String("foobar"), string_of_error.value());
+  auto string2 = ma.read_c_string_to_vec(test_addr, max_size);
+  ASSERT_TRUE(string2.is_ok());
+  ASSERT_TRUE(FsString("foobar") == string2.value());
 
   // Expect error if the string exceeds max limit
-  ASSERT_EQ(errno(ENAMETOOLONG), ma.read_c_string_to_vec(test_addr, 2).error_value());
+  ASSERT_EQ(errno(ENAMETOOLONG).error_code(),
+            ma.read_c_string_to_vec(test_addr, 2).error_value().error_code());
 
   // Expect error if the address is invalid.
-  ASSERT_EQ(errno(EFAULT), ma.read_c_string_to_vec(UserCString(), max_size).error_value());
+  ASSERT_EQ(errno(EFAULT).error_code(),
+            ma.read_c_string_to_vec(UserCString(), max_size).error_value().error_code());
+
+  END_TEST;
 }
-#endif
 
 bool test_read_c_string() {
   BEGIN_TEST;
@@ -509,9 +515,8 @@ bool test_read_c_string() {
 
   // Expect success if the string spans over two mappings.
   ASSERT_TRUE(addr + page_size == map_memory(*current_task, addr + page_size, page_size));
-  // TODO: To be multiple mappings we need to provide a file backing for the next page or the
-  // mappings will be collapsed.
-  // assert_eq!(mm.get_mapping_count(), 2);
+  // TODO(Herrera): To be multiple mappings we need to provide a file backing for the next page or
+  // the mappings will be collapsed. assert_eq!(mm.get_mapping_count(), 2);
 
   ASSERT_FALSE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"bar\0", 4}).is_error(),
                "failed to write extra chars");
@@ -932,6 +937,7 @@ UNITTEST_START_TESTCASE(starnix_mm)
 UNITTEST("test brk", unit_testing::test_brk)
 UNITTEST("test mm exec", unit_testing::test_mm_exec)
 UNITTEST("test get contiguous mappings at", unit_testing::test_get_contiguous_mappings_at)
+UNITTEST("test read c string to vec", unit_testing::test_read_c_string_to_vec)
 UNITTEST("test read c string", unit_testing::test_read_c_string)
 UNITTEST("test unmap returned mappings", unit_testing::test_unmap_returned_mappings)
 UNITTEST("test unmap returns multiple mappings", unit_testing::test_unmap_returns_multiple_mappings)
