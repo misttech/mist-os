@@ -20,8 +20,8 @@ all devices (known as [nodes][nodes]) and drivers in a Fuchsia system.
    and structure of Fuchsia's new driver framework.
 *  [**Comparison between DFv1 and DFv2**][dfv1-and-dfv2]: Compares the two
    versions of Fuchsia's driver framework.
-*  [**Drivers and nodes**][nodes]: Explains the fundamental concepts of nodes
-   and their attributes and capabilities.
+*  [**Drivers and nodes**][nodes]: Explains the fundamental concepts of nodes,
+   which are the building blocks in DFv2.
 *  [**Driver binding**][driver-binding]: Explains the process of how the driver
    manager matches and binds a driver to a node.
 *  [**Driver communication**][driver-communication]: Explains different
