@@ -128,16 +128,17 @@ def main() -> int:
     )
     graph = pb["payload"]["root"]["broker"]["topology"]["fuchsia.inspect.Graph"]
     events = graph["events"]
+    pb_total = len(events)
 
-    event_keys_sorted = sorted(events)
-    start_idx = int(event_keys_sorted[0])
-    end_idx = int(event_keys_sorted[-1])
+    events_sorted = sorted(events.items(), key=lambda item: int(item[0]))
+    start_idx = int(events_sorted[0][0])
+    end_idx = int(events_sorted[-1][0])
 
     # one line per event
     lines = []
     level_durations = {}
     lease_durations = {}
-    for n in sorted(events):  # list of keys in order
+    for n, _ in events_sorted:  # list of keys in order
         # each line:  sequence #, time, event name, what, entity, duration
         curr = events[n]
         line = []  # join line parts later.
@@ -235,13 +236,23 @@ def main() -> int:
 
         lines.append(line)  # list of list of strings
 
-    # splice in SAG and FSH events too
+    # splice in events from Starnix, SAG, FSH events
+
+    # extract Starnix's suspend/resume events
+    starnix = find_dict_by_moniker(
+        moniker="core/starnix_runner/kernels:", json=json_contents
+    )
+    starnix_events = starnix["payload"]["root"]["suspend_events"]
+    starnix_total = len(starnix_events)
+    starnix_count = 0
 
     # extract system activity governor's suspend/resume events
     sag = find_dict_by_moniker(
         moniker="bootstrap/system-activity-governor", json=json_contents
     )
     sag_events = sag["payload"]["root"]["suspend_events"]
+    sag_total = len(sag_events)
+    sag_count = 0
 
     # extract fuchsia suspend hal's suspend/resume events
     fsh = find_dict_by_metadata(
@@ -249,25 +260,43 @@ def main() -> int:
         json=json_contents,
     )
     fsh_events = fsh["payload"]["root"]["suspend_events"]
+    fsh_total = len(fsh_events)
+    fsh_count = 0
 
     # add sag and fsh events into 'lines' and re-sort. exclude if outside PB's event range.
     extra_lines = []
     history_start = events[str(start_idx)]["@time"]
     history_end = events[str(end_idx)]["@time"]
+
+    for e in starnix_events.values():
+        if key_within(e, "attempted_at_ns", history_start, history_end):
+            time = f'{e["attempted_at_ns"]/1_000_000_000:.{9}f}'
+            extra_lines.append(
+                ["starnix", time, "suspend->sag", "_", "starnix"]
+            )
+            starnix_count += 1
+        elif key_within(e, "resumed_at_ns", history_start, history_end):
+            time = f'{e["resumed_at_ns"]/1_000_000_000:.{9}f}'
+            extra_lines.append(["starnix", time, "resume<-sag", "_", "starnix"])
+            starnix_count += 1
     for e in sag_events.values():
         if key_within(e, "suspended", history_start, history_end):
             time = f'{e["suspended"]/1_000_000_000:.{9}f}'
             extra_lines.append(["sag", time, "suspend->fsh", "_", "sag"])
+            sag_count += 1
         elif key_within(e, "resumed", history_start, history_end):
             time = f'{e["resumed"]/1_000_000_000:.{9}f}'
             extra_lines.append(["sag", time, "resume<-fsh", "_", "sag"])
+            sag_count += 1
     for e in fsh_events.values():
         if key_within(e, "suspended", history_start, history_end):
             time = f'{e["suspended"]/1_000_000_000:.{9}f}'
             extra_lines.append(["fsh", time, "suspend->zx", "_", "fsh"])
+            fsh_count += 1
         elif key_within(e, "resumed", history_start, history_end):
             time = f'{e["resumed"]/1_000_000_000:.{9}f}'
             extra_lines.append(["fsh", time, "resume<-zx", "_", "fsh"])
+            fsh_count += 1
     lines.extend(extra_lines)
     lines = sorted(lines, key=lambda line: float(line[1]))
 
@@ -276,10 +305,14 @@ def main() -> int:
             args.output.write(",".join(line) + "\n")
         return 0
 
-    history_duration = float(lines[-1][1]) - float(lines[0][1])
+    history_len = float(lines[-1][1]) - float(lines[0][1])
+    args.output.write(f"Power events, window of {history_len:.0f} seconds.\n")
+    args.output.write(f"PB events: {pb_total} power events form the window.\n")
     args.output.write(
-        f"Event history, observation period {history_duration:.0f} seconds\n"
+        f"Starnix events: {starnix_count}/{starnix_total} within window.\n"
     )
+    args.output.write(f"SAG events: {sag_count}/{sag_total} within window.\n")
+    args.output.write(f"FSH events: {fsh_count}/{fsh_total} within window.\n")
 
     # find formatting alignment
     lines = [

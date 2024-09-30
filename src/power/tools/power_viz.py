@@ -131,13 +131,15 @@ def main() -> int:
             level_map = to_vertices[to_vtx]["meta"]
             edge_set[from_vtx][to_vtx] = level_map
 
-    inspect_events_keys_sorted = sorted(inspect_events)
-    inspect_events_start_y_idx = int(inspect_events_keys_sorted[0])
-    inspect_events_end_idx = int(inspect_events_keys_sorted[-1])
+    inspect_events_keys_sorted = sorted(
+        inspect_events.items(), key=lambda item: int(item[0])
+    )
+    inspect_events_start_y_idx = int(inspect_events_keys_sorted[0][0])
+    inspect_events_end_y_idx = int(inspect_events_keys_sorted[-1][0])
 
     # events: list of event dicts, to read in JS
     events = []
-    for inspect_n in sorted(inspect_events):  # list of keys in order
+    for inspect_n, _ in inspect_events_keys_sorted:
         # each dict:  ordinal, when, what, spec, whom, long (if applicable), level (if applicable)
         curr = inspect_events[inspect_n]
         when = curr["@time"]
@@ -241,7 +243,7 @@ def main() -> int:
         elif curr["event"] == "update_key" and curr["key"].isnumeric():
             continue  # topology change, TBD
 
-    # splice in Starnix, SAG, and FSH suspend/resume events
+    # splice in events from Starnix, SAG, FSH events
 
     # extract Starnix's suspend/resume events
     starnix = find_dict(
@@ -264,7 +266,7 @@ def main() -> int:
 
     # add sag and fsh events into 'events' and re-sort. exclude if outside PB's event range.
     history_start = inspect_events[str(inspect_events_start_y_idx)]["@time"]
-    history_end = inspect_events[str(inspect_events_end_idx)]["@time"]
+    history_end = inspect_events[str(inspect_events_end_y_idx)]["@time"]
     for e in starnix_events.values():
         if key_within(e, "attempted_at_ns", history_start, history_end):
             event = {}
@@ -378,7 +380,7 @@ HTML_TEMPLATE = """
     const g_margin_top = 50;  // fudge px down, from svg top boundary
     const g_margin_left = 350;  // fudge px right, from svg left boundary
     const g_canvas_width = 100 * Object.keys(g_elems).length;
-    const g_max_y_px = 20000;
+    const g_max_y_px = 200000;
 
     const g_diagram = document.getElementById("diagram");
     const g_svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
