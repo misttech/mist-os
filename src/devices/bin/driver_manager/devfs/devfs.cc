@@ -372,9 +372,6 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
       // TODO(https://fxbug.dev/42068339): Remove.
       "block",
 
-      // TODO(https://fxbug.dev/42065015): Remove.
-      "bt-hci",
-
       // TODO(https://fxbug.dev/42065064): Remove.
       "cpu-ctrl",
 
