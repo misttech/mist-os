@@ -12,7 +12,6 @@ use futures::prelude::*;
 use moniker::Moniker;
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use tracing::*;
 use {
@@ -28,7 +27,6 @@ pub struct RemoteControlService {
     ids: RefCell<Vec<Weak<RefCell<Vec<u64>>>>>,
     id_allocator: Box<dyn Fn() -> Result<HostIdentifier>>,
     connector: Box<dyn Fn(fidl::Socket)>,
-    moniker_map: HashMap<String, String>,
 }
 
 struct Client {
@@ -43,47 +41,17 @@ struct Client {
 
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
-        let moniker_map = Self::load_moniker_map().await;
-        Self::new_with_allocator(connector, Box::new(|| HostIdentifier::new()), moniker_map)
-    }
-
-    async fn load_moniker_map() -> HashMap<String, String> {
-        let f = match fuchsia_fs::file::open_in_namespace_deprecated(
-            "/pkg/data/moniker-map.json",
-            io::OpenFlags::RIGHT_READABLE,
-        ) {
-            Ok(f) => f,
-            Err(e) => {
-                error!(%e, "failed to open moniker maps json file");
-                return HashMap::default();
-            }
-        };
-        let bytes = match fuchsia_fs::file::read(&f).await {
-            Ok(b) => b,
-            Err(e) => {
-                error!(?e, "failed to read bytes from moniker map json");
-                return HashMap::default();
-            }
-        };
-        match serde_json::from_slice(bytes.as_slice()) {
-            Ok(m) => m,
-            Err(e) => {
-                error!(?e, "failed to parse moniker map json");
-                HashMap::default()
-            }
-        }
+        Self::new_with_allocator(connector, Box::new(|| HostIdentifier::new()))
     }
 
     pub(crate) fn new_with_allocator(
         connector: impl Fn(fidl::Socket) + 'static,
         id_allocator: impl Fn() -> Result<HostIdentifier> + 'static,
-        moniker_map: HashMap<String, String>,
     ) -> Self {
         Self {
             id_allocator: Box::new(id_allocator),
             ids: Default::default(),
             connector: Box::new(connector),
-            moniker_map,
         }
     }
 
@@ -197,10 +165,6 @@ impl RemoteControlService {
             .await;
     }
 
-    fn map_moniker(self: &Rc<Self>, moniker: String) -> String {
-        self.moniker_map.get(&moniker).cloned().unwrap_or(moniker)
-    }
-
     pub async fn identify_host(
         self: &Rc<Self>,
         responder: rcs::RemoteControlIdentifyHostResponder,
@@ -252,7 +216,6 @@ impl RemoteControlService {
         flags: io::OpenFlags,
         server_end: zx::Channel,
     ) -> Result<(), rcs::ConnectCapabilityError> {
-        let moniker = self.map_moniker(moniker);
         // Connect to the root LifecycleController protocol
         let lifecycle = connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
             "/svc/fuchsia.sys2.LifecycleController.root",
@@ -394,8 +357,6 @@ mod tests {
 
     const IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];
     const IPV6_ADDR: [u8; 16] = [127, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6];
-    const FAKE_SERVICE_MONIKER: &'static str = "my/component";
-    const MAPPED_SERVICE_MONIKER: &'static str = "my/other/component";
 
     fn setup_fake_device_service() -> hwinfo::DeviceProxy {
         let (proxy, mut stream) =
@@ -559,12 +520,11 @@ mod tests {
     #[derive(Default)]
     #[non_exhaustive]
     struct RcsEnv {
-        moniker_map: HashMap<String, String>,
         system_info_proxy: Option<sysinfo::SysInfoProxy>,
     }
 
     fn make_rcs_from_env(env: RcsEnv) -> Rc<RemoteControlService> {
-        let RcsEnv { moniker_map, system_info_proxy } = env;
+        let RcsEnv { system_info_proxy } = env;
         Rc::new(RemoteControlService::new_with_allocator(
             |_| (),
             move || {
@@ -579,12 +539,7 @@ mod tests {
                     boot_timestamp_nanos: BOOT_TIME,
                 })
             },
-            moniker_map,
         ))
-    }
-
-    fn make_rcs_with_maps(moniker_map: HashMap<String, String>) -> Rc<RemoteControlService> {
-        make_rcs_from_env(RcsEnv { moniker_map, ..Default::default() })
     }
 
     fn setup_rcs_proxy_from_env(
@@ -859,20 +814,6 @@ mod tests {
         assert_eq!(1234u64, ids[0]);
         assert_eq!(4567u64, ids[1]);
 
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_map_moniker() -> Result<()> {
-        let map = [(FAKE_SERVICE_MONIKER.to_string(), MAPPED_SERVICE_MONIKER.to_string())]
-            .into_iter()
-            .collect();
-
-        let service = make_rcs_with_maps(map);
-        assert_eq!(service.map_moniker(FAKE_SERVICE_MONIKER.to_string()), MAPPED_SERVICE_MONIKER);
-
-        let service = make_rcs_with_maps(HashMap::new());
-        assert_eq!(service.map_moniker(FAKE_SERVICE_MONIKER.to_string()), FAKE_SERVICE_MONIKER);
         Ok(())
     }
 }
