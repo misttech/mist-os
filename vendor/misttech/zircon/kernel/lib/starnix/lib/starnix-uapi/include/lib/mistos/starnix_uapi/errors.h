@@ -6,6 +6,7 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
 
+#include <lib/fit/result.h>
 #include <zircon/types.h>
 
 #include <linux/errno.h>
@@ -53,5 +54,44 @@ uint32_t from_status_like_fdio(zx_status_t);
 
 // Define macro errno!
 #define errno(err) Errno::New(ErrnoCode(err))
+
+// Special errors indicating a blocking syscall was interrupted, but it can be restarted.
+//
+// They are not defined in uapi, but can be observed by ptrace on Linux.
+//
+// If the syscall is restartable, it might not be restarted, depending on the value of SA_RESTART
+// for the signal handler and the specific restartable error code.
+// But it will always be restarted if the signal did not call a userspace signal handler.
+// If not restarted, this error code is converted into EINTR.
+//
+// More information can be found at
+// https://cs.opensource.google/gvisor/gvisor/+/master:pkg/errors/linuxerr/internal.go;l=71;drc=2bb73c7bd7dcf0b36e774d8e82e464d04bc81f4b.
+
+/// Convert to EINTR if interrupted by a signal handler without SA_RESTART enabled, otherwise
+/// restart.
+const ErrnoCode ERESTARTSYS(512);
+
+/// Always restart, regardless of the signal handler.
+const ErrnoCode ERESTARTNOINTR(513);
+
+/// Convert to EINTR if interrupted by a signal handler. SA_RESTART is ignored. Otherwise restart.
+const ErrnoCode ERESTARTNOHAND(514);
+
+/// Like `ERESTARTNOHAND`, but restart by invoking a closure instead of calling the syscall
+/// implementation again.
+const ErrnoCode ERESTART_RESTARTBLOCK(516);
+
+fit::result<Errno> map_eintr(fit::result<Errno> result, Errno _errno);
+
+template <typename T>
+fit::result<Errno, T> map_eintr(fit::result<Errno, T> result, Errno _errno) {
+  if (result.is_error()) {
+    if (result.error_value().error_code() == EINTR) {
+      return fit::error(_errno);
+    }
+    return result.take_error();
+  }
+  return result.take_value();
+}
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_ERRORS_H_
