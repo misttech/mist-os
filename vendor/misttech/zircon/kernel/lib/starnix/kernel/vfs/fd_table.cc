@@ -13,9 +13,11 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <trace.h>
 
 #include <optional>
+#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <ktl/optional.h>
@@ -148,6 +150,20 @@ FdTable FdTable::Create() {
   return FdTable(table);
 }
 
+fit::result<Errno> FdTable::insert(const Task& task, FdNumber fd, FileHandle file) const {
+  return insert_with_flags(task, fd, std::move(file), FdFlags::empty());
+}
+
+fit::result<Errno> FdTable::insert_with_flags(const Task& task, FdNumber fd, FileHandle file,
+                                              FdFlags flags) const {
+  auto rlimit = task.thread_group->get_rlimit({ResourceEnum::NOFILE});
+  auto id_ = id();
+  auto inner = inner_.Lock();
+  auto state = inner->get()->store_.Lock();
+  auto result = state->insert_entry(fd, rlimit, {ktl::move(file), id_, flags}) _EP(result);
+  return fit::ok();
+}
+
 fit::result<Errno, FdNumber> FdTable::add_with_flags(const Task& task, FileHandle file,
                                                      FdFlags flags) const {
   // profile_duration!("AddFd");
@@ -156,11 +172,7 @@ fit::result<Errno, FdNumber> FdTable::add_with_flags(const Task& task, FileHandl
   auto inner = inner_.Lock();
   auto state = inner->get()->store_.Lock();
   auto fd = state->next_fd_;
-
-  if (auto result = state->insert_entry(fd, rlimit, {file, id_, flags}); result.is_error()) {
-    return result.take_error();
-  }
-
+  auto result = state->insert_entry(fd, rlimit, {ktl::move(file), id_, flags}) _EP(result);
   return fit::ok(fd);
 }
 
