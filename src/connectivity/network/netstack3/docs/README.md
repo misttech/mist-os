@@ -10,6 +10,7 @@ This directory contains documentation of various aspects of the netstack. Briefl
 - [`DUAL_STACK_SOCKETS.md`](./DUAL_STACK_SOCKETS.md) describes how dual-stack
 sockets are implemented with type safety.
 - [`HACKING.md`](./HACKING.md) contains instructions for hacking on the netstack
+- [`HOST_MODEL.md`](./HOST_MODEL.md) explains the netstack's host model.
 - [`IMPROVEMENTS.md`](./IMPROVEMENTS.md) contains ideas for possible future improvements
 - [`IP_TYPES.md`](./IP_TYPES.md) describes our use of types and traits to represent IP versions and addresses
 - [`PARSING_SERIALIZATION.md`](./PARSING_SERIALIZATION.md) describes how we
