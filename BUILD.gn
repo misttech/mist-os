@@ -208,7 +208,6 @@ build_api_module("api") {
     ":build_info",
     ":checkout_artifacts",
     ":cipd_assembly_artifacts",
-    ":clippy_target_mapping",
     ":delivery_blob_config",
     ":detailed_size_checker_data",
     ":fuzzers",
@@ -227,7 +226,6 @@ build_api_module("api") {
     ":product_bundles",
     ":product_size_checker_output",
     ":rbe_config",
-    ":rust_searchdir",
     ":rust_target_mapping",
     ":sdk_archives",
     ":test_components",
@@ -1454,44 +1452,74 @@ group("rbe_config.metadata") {
   }
 }
 
-# Provides a mapping from rust source files to their corresponding clippy targets.
-# See `//build/rust/clippy.gni` and `//tools/devshell/contrib/lib/rust/clippy.py`
-# for more details.
+# Provides information about all available rust, clippy, and rustdoc targets.
+# Consumed by `//tools/devshell/contrib/lib/rust/clippy.py` and
+# `//tools/devshell/contrib/lib/rust/rustdoc-link.py`.
 #
 # Type: list(scope)
 #
-#   clippy
-#     - Required: The label of a clippy target.
-#     - Type: label_with_toolchain
-#
-#   output
-#     - Required: The path to the clippy output relative to $root_build_dir
-#     - Type: path
-#
-#   src
-#     - Required: The list of rust source files for that target.
-#     - Type: List[path] (all relative to $root_build_dir)
-#
-build_api_module("clippy_target_mapping") {
-  testonly = true
-  data_keys = [ "rust_source_map" ]
-  walk_keys = [ "clippy_barrier" ]
-  deps = [ "//:default" ]
-}
-
-# List of all rustdoc targets, and some info about them.
-# See //build/rust/rustdoc.gni and the rustdoc link step in
-# //tools/devshell/contrib/lib/rust/rustdoc-link
+#   actual_label
+#       - Required: Label for target that invokes rustc
+#       - Type: label_with_toolchain
+#       - Example: //src/lib/fuchsia-async:fuchsia-async.actual(//build/toolchain:host_x64)
+#   disable_clippy
+#       - Required: whether the clippy target is put into the build graph
+#       - Type: boolean
+#   disable_rustdoc
+#       - Required: whether the rustdoc target is put into the build graph
+#       - Type: boolean
+#   clippy_label(optional)
+#       - Required: Label for target that invokes clippy
+#       - Present: this field is only guaranteed for !disable_clippy
+#       - Type: label_with_toolchain
+#       - Example: //src/lib/fuchsia-async:fuchsia-async.actual.clippy(//build/toolchain:host_x64)
+#   clippy_output(optional)
+#       - Required: file that contains the clippy output
+#       - Present: this field is only guaranteed for !disable_clippy
+#       - Type: path relative to $root_build_dir
+#       - Example: host_x64/gen/src/lib/fuchsia-async/fuchsia-async.actual.clippy
+#   original_label
+#       - Required: The original target name before a possible .actual suffix is added.
+#         May refer to a group.
+#       - Type: label_with_toolchain
+#       - Example: //src/lib/fuchsia-async:fuchsia-async(//build/toolchain:host_x64)
+#   rustdoc_label(optional)
+#       - Required: The label of the rustdoc target
+#       - Present: this field is only guaranteed for !disable_rustdoc
+#       - Type: label_with_toolchain
+#       - Example: //src/lib/fuchsia-async:fuchsia-async.actual.rustdoc(//build/toolchain:host_x64)
+#   rustdoc_out_dir(optional)
+#       - Required: directory in which rustdoc output is written
+#       - Present: this field is only guaranteed for !disable_rustdoc
+#       - Type: path relative to $root_build_dir
+#       - Example: host_x64/gen/src/lib/fuchsia-async/fuchsia-async.aux.doc
+#   rustdoc_stamp_output(optional)
+#       - Required: this file's mtime is updated when rustdoc is successfully built for a target
+#       - Present: this field is only guaranteed for !disable_rustdoc
+#       - Type: path relative to $root_build_dir
+#       - Example: host_x64/gen/src/lib/fuchsia-async/fuchsia-async.aux.touch
+#   extern(optional)
+#       - Required: command line argument needed to pass to rustc to depend on this target.
+#       - Present: this field is not present on bin targets
+#       - Type: command line argument
+#       - Example: --extern=fuchsia_async=host_x64/obj/src/lib/fuchsia-async/fuchsia-async.actual/libfuchsia_async.rlib
+#   searchdir(optional)
+#       - Required: command line argument needed to pass to rustc to transitively depend on this target.
+#       - Present: this field is not present on bin targets
+#       - Type: command line argument
+#       - Example: -Ldependency=host_x64/obj/src/lib/fuchsia-async/fuchsia-async.actual
+#   src(optional)
+#       - Required: list of rust source code files, relative to $root_build_dir
+#       - Present: this field is only guaranteed for !disable_clippy
+#       - Type: list(str)
+#       - Example: [ "../../src/lib/fuchsia-async/src/lib.rs", ... ]
+#   target
+#       - Required: rust target tuple under which the actual, rustdoc, and clippy targets are built
+#       - Example: "x86_64-unknown-linux-gnu"
 build_api_module("rust_target_mapping") {
   testonly = true
   data_keys = [ "rust_target_mapping" ]
-  deps = [ "//:default" ]
-}
-
-# Used by `fx rustdoc-link` command. Includes all search directories for all rust targets.
-build_api_module("rust_searchdir") {
-  testonly = true
-  data_keys = [ "searchdir" ]
+  walk_keys = [ "rust_test_barrier" ]
   deps = [ "//:default" ]
 }
 

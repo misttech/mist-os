@@ -541,9 +541,10 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 [gn.package.generator."0.7.5"]
 visibility = [
   ":loom-v0_7_1",
+  ":loom-v0_7_1.clippy",
   ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.rustdoc.deps",
-  ":loom-v0_7_1.rustdoc.transdeps",
+  ":loom-v0_7_1.aux.deps",
+  ":loom-v0_7_1.aux.transdeps",
 ]
 testonly = true
 deps = [
@@ -754,26 +755,37 @@ visibility = [
   ":tuf-v0_3_0-beta12",
   ":webpki-v0_21_0",
 
+  ":ring.clippy",
+  ":rustls-v0_21_7.clippy",
+  ":rustls-webpki-v0_101_6.clippy",
+  ":sct-v0_6_0.clippy",
+  ":trust-dns-proto-v0_21_2.clippy",
+  ":tuf-v0_3_0-beta12.clippy",
+  ":webpki-v0_21_0.clippy",
+
   ":ring.rustdoc",
   ":rustls-v0_21_7.rustdoc",
+  ":rustls-webpki-v0_101_6.rustdoc",
   ":sct-v0_7_0.rustdoc",
   ":trust-dns-proto-v0_21_2.rustdoc",
   ":tuf-v0_3_0-beta12.rustdoc",
   ":webpki-v0_21_0.rustdoc",
 
-  ":ring.rustdoc.deps",
-  ":rustls-v0_21_7.rustdoc.deps",
-  ":sct-v0_7_0.rustdoc.deps",
-  ":trust-dns-proto-v0_21_2.rustdoc.deps",
-  ":tuf-v0_3_0-beta12.rustdoc.deps",
-  ":webpki-v0_21_0.rustdoc.deps",
+  ":ring.aux.deps",
+  ":rustls-v0_21_7.aux.deps",
+  ":rustls-webpki-v0_101_6.aux.deps",
+  ":sct-v0_7_0.aux.deps",
+  ":trust-dns-proto-v0_21_2.aux.deps",
+  ":tuf-v0_3_0-beta12.aux.deps",
+  ":webpki-v0_21_0.aux.deps",
 
-  ":ring.rustdoc.transdeps",
-  ":rustls-v0_21_7.rustdoc.transdeps",
-  ":sct-v0_7_0.rustdoc.transdeps",
-  ":trust-dns-proto-v0_21_2.rustdoc.transdeps",
-  ":tuf-v0_3_0-beta12.rustdoc.transdeps",
-  ":webpki-v0_21_0.rustdoc.transdeps",
+  ":ring.aux.transdeps",
+  ":rustls-v0_21_7.aux.transdeps",
+  ":rustls-webpki-v0_101_6.aux.transdeps",
+  ":sct-v0_7_0.aux.transdeps",
+  ":trust-dns-proto-v0_21_2.aux.transdeps",
+  ":tuf-v0_3_0-beta12.aux.transdeps",
+  ":webpki-v0_21_0.aux.transdeps",
 ]
 deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
@@ -829,9 +841,10 @@ deps = [ "//build/validate:non_production_tag" ]
 visibility = [
   ":loom-v0_7_1",
   ":loom-v0_7_1",
+  ":loom-v0_7_1.clippy",
   ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.rustdoc.deps",
-  ":loom-v0_7_1.rustdoc.transdeps",
+  ":loom-v0_7_1.aux.deps",
+  ":loom-v0_7_1.aux.transdeps",
 ]
 testonly = true
 

@@ -165,7 +165,7 @@ template("rustc_macro") {
                    "force_opt",
                  ])
       crate_root = source_root
-      clippy_crate_type = "proc-macro"
+      rust_crate_type = "proc-macro"
       pass_through = {
         forward_variables_from(invoker,
                                [
@@ -179,12 +179,19 @@ template("rustc_macro") {
       forward_variables_from(invoker,
                              [
                                "disable_clippy",
+                               "disable_rustdoc",
+                               "zip_rustdoc_to",
+                               "define_rustdoc_test_override",
+                               "rustdoc_args",
+                               "quiet_clippy",
+                               "public_deps",
+                               "rustdoc_out_dir",
+                               "testonly",
                                "edition",
                                "enforce_source_listing",
                                "inputs",
                                "rustenv",
                                "sources",
-                               "testonly",
                              ])
 
       deps = []
@@ -254,11 +261,13 @@ template("rustc_macro") {
   if (!in_host_compiler_toolchain) {
     group(target_name) {
       public_deps = [ ":${target_name}($host_toolchain)" ]
+      forward_variables_from(invoker, [ "testonly" ])
     }
     not_needed([ "proc_macro_target" ])
   } else {
     group(target_name) {
       public_deps = [ ":${proc_macro_target}" ]
+      forward_variables_from(invoker, [ "testonly" ])
     }
   }
 }

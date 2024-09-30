@@ -12,6 +12,8 @@ Options:
   --help | -h : print help and exit
   --output FILE : clippy file to output (required)
   --jq FILE : path to 'jq' (required)
+  --deps FILE : path to .deps argfile (required)
+  --transdeps FILE : path to .transdeps argfile (required)
   --fail : clippy cause failure
   --quiet : produce output without printing or failing
 
@@ -24,6 +26,8 @@ driver_options=()
 fail=0
 quiet=0
 ignore_rustc=0
+deps_rspfile=
+transdeps_rspfile=
 
 # Extract options before --
 prev_opt=
@@ -47,6 +51,10 @@ do
     --output=*) output="$optarg" ;;
     --jq) prev_opt=jq ;;
     --jq=*) jq="$optarg" ;;
+    --deps) prev_opt=deps_rspfile ;;
+    --deps=*) deps_rspfile="$optarg" ;;
+    --transdeps) prev_opt=transdeps_rspfile ;;
+    --transdeps=*) transdeps_rspfile="$optarg" ;;
     --fail) fail=1 ;;
     --quiet) quiet=1 ;;
     --clippy-only) ignore_rustc=1 ;;
@@ -61,6 +69,8 @@ test -z "$prev_out" || { echo "Option is missing argument to set $prev_opt." ; e
 
 test -n "$output" || { echo "Error: --output required, but missing." ; exit 1 ;}
 test -n "$jq" || { echo "Error: --jq required, but missing." ; exit 1 ;}
+test -n "$deps_rspfile" || { echo "Error: --deps required, but missing." ; exit 1 ;}
+test -n "$transdeps_rspfile" || { echo "Error: --transdeps required, but missing." ; exit 1 ;}
 
 # After -- the remaining args are the clippy-driver command and args set
 # in the clippy GN template.
@@ -80,8 +90,7 @@ do
 done
 
 # $deps_rspfile contains --externs for direct dependencies
-deps_rspfile="$output.deps"
-transdeps=( $(sort -u "$output.transdeps") )
+transdeps=( $(sort -u "$transdeps_rspfile") )
 
 # Rewrite --externs to use rmetas where possible.
 # Use rmetas where they exist, to avoid requiring local copies of full rlibs.

@@ -172,7 +172,7 @@ template("rustc_cdylib") {
     output_prefix_override = !_use_lib_prefix
 
     crate_root = source_root
-    clippy_crate_type = "cdylib"
+    rust_crate_type = "cdylib"
     crate_name = rustc_target
     pass_through = {
       forward_variables_from(invoker,

@@ -112,7 +112,7 @@ template("rustc_test_internal") {
     }
 
     crate_root = source_root
-    clippy_crate_type = "bin"
+    rust_crate_type = "bin"
     pass_through = {
       forward_variables_from(invoker,
                              [

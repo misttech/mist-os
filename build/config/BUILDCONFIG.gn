@@ -3320,6 +3320,36 @@ template("basic_executable") {
   }
 }
 
+import("//build/rust/rust_auxiliary.gni")
+
+# variables needed by above
+_rust_auxiliary_variables_to_forward = [
+  "actual_name",
+  "aliased_deps",
+  "configs",
+  "crate_name",
+  "crate_root",
+  "crate_type",
+  "define_rustdoc_test_override",
+  "disable_clippy",
+  "disable_rustdoc",
+  "enable_clippy_first_party",
+  "include_rustdoc_first_party",
+  "original_target_name",
+  "quiet_clippy",
+  "quiet_rustdoc",
+  "rust_crate_type",
+  "rustdoc_args",
+  "rustdoc_merge",
+  "rustdoc_out_dir",
+  "rustenv",
+  "rustflags",
+  "sources",
+  "testonly",
+  "visibility",
+  "zip_rustdoc_to",
+]
+
 # This wraps the built-in GN executable() template, adding a few more features:
 #
 # - Perform variant-based toolchain selection using variant_target(). See its
@@ -3366,6 +3396,30 @@ template("basic_executable") {
 template("executable") {
   _executable_name = target_name
   variant_shared_redirection = false
+
+  _is_rust_target = defined(invoker.crate_root)
+  if (_is_rust_target) {
+    actual_name = "$target_name"
+
+    # Reuse the name (without .actual) defined in rustc_artifact.gni
+    if (defined(invoker.rust_auxiliary_name)) {
+      _rust_auxiliary_name = invoker.rust_auxiliary_name
+    } else {
+      _rust_auxiliary_name = "$target_name.aux"
+    }
+
+    rust_auxiliary(_rust_auxiliary_name) {
+      forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
+      invoker_deps = invoker.deps
+      if (!defined(rust_crate_type)) {
+        rust_crate_type = "bin"
+      }
+
+      # search index size, mostly.
+      disable_rustdoc_binary = true
+    }
+  }
+
   variant_target("executable") {
     deps = []
     assert_no_deps = []
@@ -3399,6 +3453,18 @@ template("executable") {
                              "target_name",
                              "visibility",
                            ])
+
+    if (defined(invoker.no_rust_aux_build_config_dep)) {
+      _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
+    } else {
+      _no_rust_aux_build_config_dep = false
+    }
+    if (!defined(public_deps)) {
+      public_deps = []
+    }
+    if (_is_rust_target && !no_rust_aux_build_config_dep) {
+      public_deps += [ ":$_rust_auxiliary_name" ]
+    }
 
     if (!defined(output_dir)) {
       output_dir = root_out_dir
@@ -3743,6 +3809,25 @@ template("source_set") {
 _built_in_target_types_without_public_wrapper -= [ "source_set" ]
 
 template("static_library") {
+  _is_rust_target = defined(invoker.crate_root)
+  if (_is_rust_target) {
+    actual_name = "$target_name"
+
+    # Reuse the name (without .actual) defined in rustc_artifact.gni
+    if (defined(invoker.rust_auxiliary_name)) {
+      _rust_auxiliary_name = invoker.rust_auxiliary_name
+    } else {
+      _rust_auxiliary_name = "$target_name.aux"
+    }
+
+    rust_auxiliary(_rust_auxiliary_name) {
+      forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
+      invoker_deps = invoker.deps
+      assert(rust_crate_type == "staticlib",
+             "should only be used by rustc_staticlib")
+    }
+  }
+
   _static_library_internal_wrapper(target_name) {
     forward_variables_from(invoker,
                            "*",
@@ -3759,6 +3844,17 @@ template("static_library") {
                              "visibility",
                            ])
 
+    if (!defined(public_deps)) {
+      public_deps = []
+    }
+    if (defined(invoker.no_rust_aux_build_config_dep)) {
+      _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
+    } else {
+      _no_rust_aux_build_config_dep = false
+    }
+    if (_is_rust_target && !no_rust_aux_build_config_dep) {
+      public_deps += [ ":$_rust_auxiliary_name" ]
+    }
     if (is_fuchsia && zircon_toolchain == false) {
       if (!defined(deps)) {
         deps = []
@@ -3796,62 +3892,35 @@ _built_in_target_types_without_public_wrapper -= [ "static_library" ]
 #   direct and transitive dependencies.
 #
 template("rust_library") {
-  # use include_rustdoc from declare_args below
-  import("//build/rust/include_rustdoc.gni")
-
-  # only want to define .rustdoc targets for environments that have
-  # include_rustdoc = true and targets that don't disable_rustdoc = true
-  _disable_rustdoc = (defined(invoker.disable_rustdoc) &&
-                      invoker.disable_rustdoc) || !include_rustdoc
-  if (!_disable_rustdoc) {
-    # don't want to import //build/config/sysroot.gni (imported indirectly from
-    # rustdoc.gni) into every BUILD.gn
-    import("//build/rust/rustdoc.gni")
-  }
-
+  # rust_auxiliary has minimal imports unless we're including clippy or rustdoc
+  # should be safe to include here
+  import("//build/rust/rust_auxiliary.gni")
   actual_name = "$target_name"
 
-  # The rustdoc target needs an output file, so rustdoc_wrapper.py touches
-  # rustdoc_token_output after rustdoc exits successfully. Defined here because
-  # we put it in our metadata.
-  _rustdoc_token_output = "$target_gen_dir/$target_name.touch"
-
-  forward_variables_from(invoker,
-                         [
-                           "rustdoc_out_dir",
-                           "rustdoc_name",
-                         ])
-
-  if (!defined(rustdoc_out_dir)) {
-    rustdoc_out_dir = "$target_gen_dir/$target_name.doc"
+  # Reuse the name (without .actual) defined in rustc_artifact.gni
+  if (defined(invoker.rust_auxiliary_name)) {
+    _rust_auxiliary_name = invoker.rust_auxiliary_name
+  } else {
+    _rust_auxiliary_name = "$target_name.aux"
   }
 
-  if (!defined(rustdoc_name)) {
-    rustdoc_name = "$target_name.rustdoc"
+  if (defined(invoker.output_dir)) {
+    _searchdir_path = invoker.output_dir
+  } else {
+    _searchdir_path = get_label_info(":$target_name", "target_out_dir")
+    if (rust_one_rlib_per_dir) {
+      _searchdir_path += "/" + target_name
+    }
   }
-  if (!_disable_rustdoc) {
-    rustdoc(rustdoc_name) {
-      forward_variables_from(invoker,
-                             [
-                               "actual_name",
-                               "aliased_deps",
-                               "configs",
-                               "crate_name",
-                               "crate_root",
-                               "crate_type",
-                               "quiet_rustdoc",
-                               "rustdoc_args",
-                               "rustenv",
-                               "rustflags",
-                               "testonly",
-                               "visibility",
-                               "zip_rustdoc_to",
-                             ])
-      invoker_deps = invoker.deps
-      rustdoc_crate_type = "rlib"
-      rustdoc_token_output = _rustdoc_token_output
+  _rlib_path = "$_searchdir_path/lib${invoker.output_name}.rlib"
 
-      rustdoc_out_dir = rustdoc_out_dir
+  rust_auxiliary(_rust_auxiliary_name) {
+    forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
+    invoker_deps = invoker.deps
+    rlib_path = _rlib_path
+    searchdir_path = _searchdir_path
+    if (!defined(rust_crate_type)) {
+      rust_crate_type = "rlib"
     }
   }
 
@@ -3862,57 +3931,47 @@ template("rust_library") {
                              "applicable_licenses",
                              "metadata",
                              "visibility",
+                             "rust_crate_type",
+                             "enable_clippy_first_party",
+                             "include_rustdoc_first_party",
+                             "original_target_name",
+                             "no_rust_aux_build_config_dep",
+                             "define_rustdoc_test_override",
                            ])
-    forward_variables_from(invoker, [ "applicable_licenses" ])
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
+
     if (!defined(inputs)) {
       inputs = []
     }
     inputs += restat_rust_wrapper_inputs
-    if (!defined(output_dir)) {
-      output_dir = get_label_info(":$target_name", "target_out_dir")
-      if (rust_one_rlib_per_dir) {
-        output_dir += "/" + target_name
-      }
+
+    output_dir = _searchdir_path
+
+    _rlib_path = rebase_path(_rlib_path, root_build_dir)
+    _searchdir_path = rebase_path(_searchdir_path, root_build_dir)
+
+    if (!defined(public_deps)) {
+      public_deps = []
     }
-    if (!defined(gen_deps)) {
-      gen_deps = []
+    if (defined(invoker.no_rust_aux_build_config_dep)) {
+      _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
+    } else {
+      _no_rust_aux_build_config_dep = false
     }
-    if (!_disable_rustdoc) {
-      gen_deps += [ ":$rustdoc_name" ]
+    if (!_no_rust_aux_build_config_dep) {
+      public_deps += [ ":$_rust_auxiliary_name" ]
     }
-    _rlib = rebase_path("$output_dir/lib${output_name}.rlib", root_build_dir)
-    _searchdir = rebase_path(output_dir, root_build_dir)
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
-      rlib = [ "--extern=$crate_name=$_rlib" ]
-      searchdir = [ "-Ldependency=$_searchdir" ]
 
-      # info about a target that is going to be rustdoc'd
-      # rustdoc metadata must be here, because sometimes rustdoc
-      # targets are gen_deps'd and not deps'd
-      rust_target_mapping = [
-        {
-          disable_rustdoc = _disable_rustdoc
-          rustdoc_label =
-              get_label_info(":$rustdoc_name", "label_with_toolchain")
-          actual_label = get_label_info(":$actual_name", "label_with_toolchain")
-          rustdoc_out_dir = rebase_path(rustdoc_out_dir, root_build_dir)
-
-          if (!_disable_rustdoc) {
-            target = current_target_tuple
-            extern_html_root_url = rustdoc_extern_html_root_url
-          }
-          extern = "--extern=$crate_name=$_rlib"
-
-          # rustdoc-link.py inspects this mtime to avoid unneeded copies
-          touch = rebase_path(_rustdoc_token_output, root_build_dir)
-          searchdir = "-Ldependency=$_searchdir"
-        },
-      ]
-
+      rlib = [ "--extern=$crate_name=$_rlib_path" ]
+      searchdir = [ "-Ldependency=$_searchdir_path" ]
       rust_barrier = []
     }
   }
@@ -3940,6 +3999,39 @@ template("rust_proc_macro") {
     }
     not_needed(invoker, "*")
   } else {
+    actual_name = "$target_name"
+
+    # Reuse the name (without .actual) defined in rustc_artifact.gni
+    if (defined(invoker.rust_auxiliary_name)) {
+      _rust_auxiliary_name = invoker.rust_auxiliary_name
+    } else {
+      _rust_auxiliary_name = "$target_name.aux"
+    }
+
+    if (defined(invoker.output_dir)) {
+      _searchdir_path = invoker.output_dir
+    } else {
+      _searchdir_path = get_label_info(":$target_name", "target_out_dir")
+      if (rust_one_rlib_per_dir) {
+        _searchdir_path += "/" + target_name
+      }
+    }
+    _output_extension = "so"
+    if (host_os == "mac") {
+      _output_extension = "dylib"
+    }
+    _rlib_path = "$_searchdir_path/lib${invoker.output_name}.$_output_extension"
+
+    rust_auxiliary(_rust_auxiliary_name) {
+      forward_variables_from(invoker, _rust_auxiliary_variables_to_forward)
+      invoker_deps = invoker.deps
+      rlib_path = _rlib_path
+      searchdir_path = _searchdir_path
+      if (!defined(rust_crate_type)) {
+        rust_crate_type = "proc-macro"
+      }
+    }
+
     _rust_proc_macro_internal_wrapper(target_name) {
       forward_variables_from(invoker,
                              "*",
@@ -3947,6 +4039,7 @@ template("rust_proc_macro") {
                                "applicable_licenses",
                                "crate_name",
                                "metadata",
+                               "no_rust_aux_build_config_dep",
                              ])
       forward_variables_from(invoker,
                              [
@@ -3957,25 +4050,30 @@ template("rust_proc_macro") {
         inputs = []
       }
       inputs += restat_rust_wrapper_inputs
-      if (!defined(output_dir)) {
-        output_dir = get_label_info(":$target_name", "target_out_dir")
-        if (rust_one_rlib_per_dir) {
-          output_dir += "/" + target_name
-        }
+
+      output_extension = _output_extension
+      output_dir = _searchdir_path
+
+      _rlib_path = rebase_path(_rlib_path, root_build_dir)
+      _searchdir_path = rebase_path(_searchdir_path, root_build_dir)
+
+      if (!defined(public_deps)) {
+        public_deps = []
       }
-      output_extension = "so"
-      if (host_os == "mac") {
-        output_extension = "dylib"
+      if (defined(invoker.no_rust_aux_build_config_dep)) {
+        _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
+      } else {
+        _no_rust_aux_build_config_dep = false
       }
-      _rlib = rebase_path("$output_dir/lib$output_name.$output_extension",
-                          root_build_dir)
-      _searchdir = rebase_path(output_dir, root_build_dir)
+      if (!_no_rust_aux_build_config_dep) {
+        public_deps += [ ":$_rust_auxiliary_name" ]
+      }
       metadata = {
         if (defined(invoker.metadata)) {
           forward_variables_from(invoker.metadata, "*")
         }
-        rlib = [ "--extern=$crate_name=$_rlib" ]
-        searchdir = [ "-Ldependency=$_searchdir" ]
+        rlib = [ "--extern=$crate_name=$_rlib_path" ]
+        searchdir = [ "-Ldependency=$_searchdir_path" ]
         rust_barrier = []
       }
     }
