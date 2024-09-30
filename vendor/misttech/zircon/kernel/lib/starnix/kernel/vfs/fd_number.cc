@@ -9,7 +9,7 @@
 
 namespace starnix {
 
-const FdNumber FdNumber::_AT_FDCWD = {AT_FDCWD};
+const FdNumber FdNumber::AT_FDCWD_(AT_FDCWD);
 
 }
 

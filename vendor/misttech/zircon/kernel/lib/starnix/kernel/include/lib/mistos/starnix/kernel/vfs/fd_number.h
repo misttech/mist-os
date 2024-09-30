@@ -17,7 +17,7 @@ namespace starnix {
 class FdNumber {
  public:
   // impl FdNumber
-  static const FdNumber _AT_FDCWD;
+  static const FdNumber AT_FDCWD_;
 
   static FdNumber from_raw(int32_t n) { return FdNumber(n); }
 
@@ -37,7 +37,7 @@ class FdNumber {
   bool operator==(const FdNumber& other) const { return number_ == other.number_; }
 
  private:
-  FdNumber(int32_t n) : number_(n) {}
+  explicit FdNumber(int32_t n) : number_(n) {}
 
   int32_t number_;
 };
