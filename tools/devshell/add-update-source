@@ -4,31 +4,20 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Software delivery
-### register dev host as target's update source
-
-## usage: fx add-update-source [--addr ADDR] [--port PORT] [--name NAME]
+### register a repository package server as a device's update source
+## usage: fx add-update-source  [--repo-name NAME] [--persist]
 ##
 ## Configure target device to use a new update source.
 ##
-##   --name NAME        Name the generated update source config NAME.
-##   --addr ADDR        Specify the package server address explicitly.
-##   --port PORT        The port at ADDR on which the package server is running (default: 8083).
-##   --[no-]persist     Enable or disable persistence of repo metadata. Disabled by default.
-##   --server-mode MODE Use repository server mode MODE to register a repository onto a device.
-##                      (default: output of 'ffx config get repository.server.mode').
+##   --repo-name NAME Name of the repository package server to use as the update source.
+##   --persist        Enable persistence of repo metadata. Disabled by default.
 ##
-## ADDR:
-## Any IPv4 / IPv6 address or publicly reachable DNS name.
-## Note: ADDR must be the address as-routable by the target device.
-## If an link-local IPv6 address is provided, it must include a
-## valid scope for the target (e.g. %ethp0014).
-## If no ADDR is provided, the default address is assumed to be the
-## address of the host machine as seen by the target from an SSH
-## connection to the target device.
 ##
 ## NAME:
-## If no name is supplied, the name defaults to "devhost", otherwise
-## it contains the address given.
+## If no name is supplied, the name defaults to configured default repository.
+##
+## Note:
+## This is a wrapper for `ffx target repository register`
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/updates.sh || exit $?
@@ -42,33 +31,16 @@ function main {
   fx-standard-switches "$@"
   set -- "${FX_ARGV[@]}"
 
-  local addr=""
-  local port=""
-  local source_name=""
-  local persist=""
-  local server_mode=""
+  local repo_name=""
+  local storage_type=""
   while [[ $# -ne 0 ]]; do
     case "$1" in
-      --addr)
-        addr="$2"
+      --repo-name)
+        repo_name="$2"
         shift
-        ;;
-      --port)
-        port="$2"
-        shift
-        ;;
-      --name)
-        source_name="$2"
-        shift
-        ;;
-      --no-persist)
         ;;
       --persist)
-        persist="-p"
-        ;;
-      --server-mode)
-        server_mode="$2"
-        shift
+        storage_type="persistent"
         ;;
       *)
         fx-error "Unrecognized option: $1"
@@ -78,126 +50,26 @@ function main {
     shift
   done
 
-  if [[ -z "${server_mode}" ]]; then
-    server_mode="$(package-server-mode)"
-    local err="$?"
-    if [[ "${err}" -ne 0 ]]; then
-      exit 1
-    fi
+  register_args=( target repository register )
+  if [[ -n "${storage_type}" ]]; then
+    register_args+=( --storage-type "${storage_type}" )
   fi
-
-  if [[ "${server_mode}" = "pm" ]]; then
-    if [[ -z "${port}" ]]; then
-      port="8083"
-    fi
-
-    if [[ -z "${source_name}" ]]; then
-      if [[ -z "${addr}" ]]; then
-        source_name="devhost"
-      else
-        source_name="${addr}"
-      fi
-    fi
-
-    if [[ -z "${addr}" ]]; then
-      addr=$(fx-command-run shell 'echo $SSH_CONNECTION' | cut -d ' ' -f 1)
-      if [[ $? -ne 0 || -z "${addr}" ]]; then
-        fx-error "unable to determine host address as seen from the target.  Is the target up?"
-        exit 1
-      fi
-    fi
-
-    addr="$(echo "${addr}" | sed 's/%/%25/g')"
-
-    # A poor mans heuristic for "is an ipv6 address", URL encase escape
-    # the address.
-    if [[ "${addr}" =~ : ]]; then
-      addr="[${addr}]"
-    fi
-
-    config_url="http://${addr}:${port}/config.json"
-
-    add_repo_args=(-n "${source_name}")
-    if [[ ! -z "${persist}" ]]; then
-      add_repo_args+=( "${persist}" )
-    fi
-    add_repo_args+=( "${config_url}" )
-
-    fx-command-run shell pkgctl repo add url "${add_repo_args[@]}"
-    err=$?
-
-    if [[ $err -ne 0 ]]; then
-      fx-error "Unable to register update source."
-      if [[ $err -eq 2 ]]; then
-        # The GET request failed.
-        fx-error " - Is 'fx serve' running?"
-        fx-error " - Can the target reach ${config_url} ?"
-      fi
-      return "$err"
-    fi
-
-    rule="'{
-      \"version\": \"1\",
-      \"content\": [
-        {
-          \"host_match\": \"fuchsia.com\",
-          \"host_replacement\": \"${source_name}\",
-          \"path_prefix_match\": \"/\",
-          \"path_prefix_replacement\": \"/\"
-        },
-        {
-          \"host_match\": \"chromium.org\",
-          \"host_replacement\": \"${source_name}\",
-          \"path_prefix_match\": \"/\",
-          \"path_prefix_replacement\": \"/\"
-        }
-      ]
-    }'"
-
-    fx-command-run shell pkgctl rule replace json $rule
-    err=$?
-
-    if [[ $err -ne 0 ]]; then
-      fx-error "The repo has been set up, but there was an error setting the rewriting rule for ${source_name}: $rule"
-      fx-error "To remove the repo, run \"fx shell pkgctl repo rm fuchsia-pkg://${source_name}\"."
-      return $err
-    fi
-  else
-    if [[ ! -z "$addr" ]]; then
-      fx-error "The feature 'legacy_serve' and ffx does not support the '--addr' flag"
-      exit 1
-    fi
-
-    # Error out if we can't start a package server.
-    check-if-we-can-start-package-server "${server_mode}" "" "${port}"
-    err=$?
-    if [[ "${err}" -ne 0 ]]; then
-      exit 1
-    fi
-
-    # Use the build directory's name by default. Note that package URLs are not
-    # allowed to have underscores, so replace them with hyphens.
-    if [[ -z "${source_name}" ]]; then
-      source_name="$(ffx-default-repository-name)"
-    fi
-
-
-    register_args=()
-    if [[ ! -z "${persist}" ]]; then
-      register_args+=( --storage-type persistent )
-    fi
-    # When alias conflict detected, replace with what is being registered here.
-    register_args+=( --alias-conflict-mode replace )
-
-    ffx-register-repository "$source_name" "" "$port" "${register_args[@]}" || return $?
+  if [[ -n "${repo_name}" ]]; then
+    register_args+=( --repository "${repo_name}" )
   fi
+  # When alias conflict detected, replace with what is being registered here.
+  register_args+=( --alias-conflict-mode replace )
 
-  fx-command-run shell update channel set "${source_name}"
+  fx-command-run ffx --target "$(get-device-name)" "${register_args[@]}" || return $?
+
+ if [[ -n "${repo_name}" ]]; then
+  fx-command-run shell update channel set "${repo_name}"
   err=$?
   if [[ $err -ne 0 ]]; then
-    fx-error "Failed to change the update channel to '${source_name}'"
+    fx-error "Failed to change the update channel to '${repo_name}'"
     return "$err"
   fi
+ fi
 }
 
 main "$@"

@@ -2,50 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-function package-server-mode {
-  # Next try to determine what server mode we should actually be using.
-  local mode=$(fx-command-run ffx config get repository.server.mode 2>/dev/null)
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    fx-error "Unable to get the configured repository server mode"
-    return "${err}"
-  fi
-
-  # If unspecified, it indicates an invalid configuration.
-  if [[ "${mode}" = "" || "${mode}" = "null" ]]; then
-    fx-error "Invalid repository server mode: ${mode}"
-    return 1
-  else
-    # Regex: Remove the leading and trailing quotes from the server mode.
-    if [[ $mode =~ \"(.*)\" ]]; then
-      mode="${BASH_REMATCH[1]}"
-    else
-      fx-error "could not parse ffx server mode: '${mode}'"
-      return 1
-    fi
-  fi
-
-  # Check that the server mode is known.
-  case "${mode}" in
-    "pm") echo pm ;;
-    "ffx") echo ffx ;;
-    *)
-      fx-error "Unknown repository server mode: ${mode}"
-      return 1
-  esac
-
-  return 0
-}
-
 # Determines if a package server can be started.
-#
-# This depends on our package server mode:
-#
-# * If we are using pm, return 0 if the specified port is available.
-# * If we are using ffx, return 0 if ffx is configured to listen on the
-#   specified port.
 function check-if-we-can-start-package-server {
-  local mode=$1
+  local name="$1"
   local expected_ip=$2
   local expected_port=$3
 
@@ -54,207 +13,51 @@ function check-if-we-can-start-package-server {
     return 0
   fi
 
-  # Checks if a pm package server process appears to be running.
-  if [[ -z "$(pgrep -f 'pm serve')" ]]; then
-    local is_pm_running=1 # 1 means that pm is not running
-  else
-    local is_pm_running=0 # 0 means that pm is running
-  fi
-
-  # Check that the server mode is known, and that we have the ability to use this server mode.
-  if [[ "${mode}" = "pm" ]]; then
-    # Something is using the port. Try to determine if it's another pm server, or ffx.
-    if [[ "${is_pm_running}" -eq 0 ]]; then
-      fx-error "It looks like another \"fx serve\" process may be running."
-      fx-error "It may be the ffx repository server. Try shutting it down with:"
-      fx-error ""
-      fx-error "$ ffx repository server stop"
-      fx-error ""
-      fx-error "Otherwise, try stopping that process, and re-run \"fx serve\"."
-      return 1
-    fi
-
-    local configured_mode="$(package-server-mode)"
-    if [[ "${configured_mode}" == "ffx" ]]; then
-      fx-error "Even though we are trying to start a pm package server, it appears"
-      fx-error "we are configured to use the ffx repository server. Try shutting it"
-      fx-error "down with:"
-      fx-error ""
-      fx-error "$ ffx repository server stop"
-      fx-error "$ ffx config set repository.server.mode pm"
-      fx-error "$ fx serve"
-      return 1
-    else
-      # Check if the ffx package repository server is running. If so, shut it
-      # down if it's configured to use the port we're trying to use.
-      local ffx_port=$(ffx-repository-server-running-port)
-      local err=$?
-      if [[ "${err}" -eq 0 && "${ffx_port}" == "${expected_port}" ]]; then
-        fx-warn "The ffx repository server is running on ${expected_port}".
-        fx-warn "Trying to shut it down..."
-
-        fx-command-run ffx repository server stop
-        local err=$?
-        if [[ "${err}" -ne 0 ]]; then
-          fx-warn "Failed to stop ffx repository server. Checking if the port"
-          fx-warn "freed up anyway."
-        fi
-
-        if ! is-listening-on-port "${expected_port}"; then
-          fx-info "ffx repository server shut down"
-          return 0
-        fi
-      fi
-
-      fx-error "It looks like some process is listening on ${port}."
-      fx-error "You probably need to stop that and start a new one here with \"fx serve\""
-    fi
-
-    return 1
-  else
-    if is_feature_enabled "foreground_repo_server"; then
-      fx-error "It looks like some process is listening on ${port}."
-      fx-error "It may be the background ffx repository server. Try shutting"
-      fx-error "it down by killing any active \"fx serve\" process, or by running:"
-      fx-error ""
-      fx-error "$ ffx repository server stop"
-      fx-error ""
-      fx-error "Then restarting \"fx serve\""
-      return 1
-    else
-      local expected_addr=$(join-repository-ip-port "${expected_ip}" "${expected_port}")
-      local err=$?
-      if [[ "${err}" -ne 0 ]]; then
-        return 1
-      fi
-
-      # Check if the ffx package repository server is already running on the expected address.
-      local actual_addr=$(ffx-repository-server-running-address)
-      local err=$?
-      if [[ "${err}" -ne 0 ]]; then
-        return 1
-      fi
-
-      if [[ ! -z "${actual_addr}" ]]; then
-        if [[ "${expected_addr}" == "${actual_addr}" ]]; then
-          return 0
-        else
-          fx-error "The repository server is already running on '${actual_addr}', not '${expected_addr}'."
-          fx-error "To fix this, run:"
-          fx-error ""
-          fx-error "$ ffx repository server stop"
-          fx-error ""
-          fx-error "Then re-run this command."
-
-          return 1
-        fi
-      else
-        fx-error "Another process is using port '${expected_port}', which"
-        fx-error "will block the ffx repository server from listening on ${ffx_addr}."
-        fx-error ""
-        fx-error "Try shutting down that process, and re-running this command."
-
-        return 1
-      fi
-    fi
-  fi
-}
-
-function check-for-package-server {
-  local mode="$(package-server-mode)"
+  expected_addr=$(join-repository-ip-port "${expected_ip}" "${expected_port}")
   local err=$?
   if [[ "${err}" -ne 0 ]]; then
     return 1
   fi
 
-  if [[ "${mode}" = "pm" ]]; then
-    # Make sure it is running.
-    if [[ -z "$(pgrep -f 'pm serve .*/amber-files')" ]]; then
-      fx-error "It looks like 'fx serve' is not running."
-      fx-error "You probably need to start \"fx serve\""
+  # Check if the ffx package repository server is already running on the expected address.
+  actual_addr=$(ffx-repository-server-running-address "$name")
+  local err=$?
+  if [[ "${err}" -ne 0 ]]; then
+    return 1
+  fi
+
+  if [[ -n "${actual_addr}" ]]; then
+    if [[ "${expected_addr}" == "${actual_addr}" ]]; then
+      return 0
+    else
+      fx-error "The repository server is already running on '${actual_addr}', not '${expected_addr}'."
+      fx-error "To fix this, run:"
+      fx-error ""
+      fx-error "$ ffx repository server stop"
+      fx-error ""
+      fx-error "Then re-run this command."
+
       return 1
     fi
-
-    # Warn if it is using the wrong repository.
-    if [[ -z "$(pgrep -f "pm serve .*${FUCHSIA_BUILD_DIR}/amber-files")" ]]; then
-      fx-warn "It looks like 'fx serve' is running in a different workspace."
-      fx-warn "You probably need to stop that one and start a new one here with \"fx serve\""
-    fi
-
-    # Warn if incremental is enabled for this shell, but the server is not auto publishing packages.
-    if is_feature_enabled "incremental"; then
-      # Regex terminates with a space to avoid matching the -persist option.
-      if [[ -z "$(pgrep -f "pm serve .*${FUCHSIA_BUILD_DIR}/amber-files .*-p ")" ]]; then
-        fx-warn "Incremental build is enabled, but it looks like incremental build is disabled for 'fx serve'."
-        fx-warn "You probably need to stop 'fx serve', and restart it with incremental build enabled."
-        fx-warn "You can enable incremental build in the shell running 'fx serve' with 'export FUCHSIA_DISABLED_incremental=0'"
-      fi
-    fi
   else
-    # Check for the foreground server.
-    if [[ "$(pgrep -f 'ffx.* repository serve')" ]]; then
-      if [[ "$(pgrep -f "ffx.* repository serve .* --repo-path .*/amber-files")" ]] && [[ -z "$(pgrep -f "ffx.* repository serve .* --repo-path .*${FUCHSIA_BUILD_DIR}/amber-files")" ]]; then
-        fx-warn "It looks like 'fx serve' is running in a different workspace."
-        fx-warn "You probably need to stop that one and start a new one here with \"fx serve\""
-      fi
-    else
-      # check for the background server.
-      local server_state=$(ffx-repository-server-state)
-      local err=$?
-      if [[ "${err}" -ne 0 ]]; then
-        return "${err}"
-      fi
+    fx-error "Another process is using port '${expected_port}', which"
+    fx-error "will block the ffx repository server from listening on ${expected_addr}."
+    fx-error ""
+    fx-error "Try shutting down that process, and re-running this command."
 
-      case "${server_state}" in
-        "stopped")
-          fx-error "It looks like the package repository server is not running."
-          fx-error "You probably need to run \"fx serve\""
-          return 1
-          ;;
+    return 1
+  fi
 
-        "running")
-          local ffx_addr=$(ffx-configured-repository-server-address)
-          local err=$?
-            if [[ "${err}" -ne 0 ]]; then
-              return "${err}"
-          fi
+}
 
-          # Regex: zero or more characters, a colon, then at least one digit, matching
-          # the digits.
-          if [[ ${ffx_addr} =~ .*:([0-9]+) ]]; then
-            local ffx_port="${BASH_REMATCH[1]}"
-          else
-            fx-error "could not parse ip and port from ffx server address: '$ffx_addr'"
-            return 1
-          fi
+function check-for-package-server {
 
-          if [[ "${ffx_port}" -eq 0 ]]; then
-            fx-warn "The server is configured to listen on a random port."
-            fx-warn "We can't determine which port this is, so assuming it's running."
-          else
-            if ! is-listening-on-port "${ffx_port}"; then
-              fx-error "It looks like the ffx package server is not running."
-              fx-error "You probably need to run \"fx add-update-source\""
-              return 1
-            fi
-          fi
-
-          # FIXME(https://fxbug.dev/42160775): Check if the current `devhost` points at
-          # '${FUCHSIA_BUILD_DIR}/amber-files'.
-          #
-          ;;
-
-        "disabled")
-          fx-error "repository server is currently disabled. to re-enable, run:"
-          fx-error ""
-          fx-error "$ ffx config set repository.server.mode ffx"
-          fx-error "$ ffx config remove repository.server.listen"
-          fx-error ""
-          fx-error "Then re-run this command."
-          return 1
-          ;;
-      esac
-    fi
+  # Check for a server serving the same repo
+  running_info="$(fx-command-run ffx --machine json repository server list | grep "${FUCHSIA_BUILD_DIR}/amber-files")"
+  if [[ "${running_info}" == "" ]]; then
+        fx-error "It looks like the package repository server is not running."
+        fx-error "You probably need to run \"fx serve\""
+        return 1
   fi
 
   return 0
@@ -276,152 +79,23 @@ function is-listening-on-port {
   return 1
 }
 
-function ffx-start-server {
-  local ip="$1"
-  local port="$2"
-
-  local addr=$(join-repository-ip-port "${ip}" "${port}")
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    return "${err}"
-  fi
-
-  # Skip starting the server if it's already running on the expected address.
-  local actual_addr=$(ffx-repository-server-running-address)
-  local err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    return 1
-  fi
-
-  if [[ -z "${actual_addr}" ]]; then
-    fx-command-run ffx repository server start --address "${addr}"
-    err=$?
-    if [[ "${err}" -ne 0 ]]; then
-      fx-error "The repository server was unable to be started"
-      return "${err}"
-    fi
-  else
-    if [[ "${addr}" == "${actual_addr}" ]]; then
-      return 0
-    else
-      fx-error "The repository server is already running on '${actual_addr}', not '${expected_addr}'."
-      fx-error "To fix this, run:"
-      fx-error ""
-      fx-error "$ ffx repository server stop"
-      fx-error ""
-      fx-error "Then re-run this command."
-    fi
-  fi
-
-  return 0
-}
-
-function ffx-stop-server {
-  fx-command-run ffx repository server stop
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    fx-error "The repository server was unable to be stopped"
-    return "${err}"
-  fi
-
-  return 0
-}
-
-function ffx-add-repository {
-  local repo_name=$1
-  shift
-
-  if [[ -z "${repo_name}" ]]; then
-    fx-error "The repository name was not specified"
-    return 1
-  fi
-
-  fx-command-run ffx repository add-from-pm \
-    --repository "${repo_name}" \
-    "${FUCHSIA_BUILD_DIR}/amber-files"
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    fx-error "The repository was not able to be added to ffx"
-    return $err
-  fi
-
-  return 0
-}
-
-function ffx-register-repository {
-  local repo_name=$1
-  shift
-  local ip=$1
-  shift
-  local port=$1
-  shift
-
-  ffx-add-repository "${repo_name}" || return $?
-
-  # Start the server before registering a repository. While `register`
-  # technically also automatically starts the server in the background, running
-  # it in the foreground gives us better error messages.
-  ffx-start-server "${ip}" "${port}" || return $?
-
-  # FIXME(https://fxbug.dev/42180938): ffx cannot yet parse targets that may
-  # include the ssh port. We'll explicitly specify the target here with
-  # `get-device-name`, which strips out the port if present.
-  fx-command-run ffx \
-    --target "$(get-device-name)" \
-    target repository register \
-    --repository "${repo_name}" \
-    --alias "fuchsia.com" \
-    --alias "chromium.org" \
-    "$@"
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    fx-error "Could not register the package repository on the target device"
-    fx-error ""
-    fx-error "If you recently enabled the ffx server, you may need to start"
-    fx-error "the ffx repository server with"
-    fx-error ""
-    fx-error "$ ffx repository server start"
-
-    return $err
-  fi
-
-  return 0
-}
-
-function ffx-repository-server-state {
-  local state=$(
-    fx-command-run ffx --machine json repository server status |
-      fx-command-run jq -r '.state'
-  )
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    fx-error "Unable to get the running ffx repository server state."
-    return "${err}"
-  fi
-
-  case "${state}" in
-    "running") echo running ;;
-    "stopped") echo stopped ;;
-    "disabled") echo disabled ;;
-    *)
-      fx-error "Unknown ffx repository server state: ${state}"
-      return 1
-  esac
-
-  return 0
-}
-
 # If the server is running, this returns the address the server is running on.
 # Otherwise it returns an empty string.
 function ffx-repository-server-running-address {
-  local address=$(
-    fx-command-run ffx --machine json repository server status |
-      fx-command-run jq -r 'select(.state == "running") | .address'
+  server_name="$1"
+  if [[ "$server_name" != "" ]]; then
+    name_filter="--name $server_name"
+  else
+    name_filter=""
+  fi
+  address=$(
+    fx-command-run ffx --machine json repository server list "${name_filter}" |
+      fx-command-run jq -r '.ok.data[].address'
   )
   err=$?
   if [[ "${err}" -ne 0 ]]; then
-    fx-error "Unable to get the active ffx repository server address."
-    fx-error "Current server status: $(ffx --machine json repository server status)"
+    fx-error "Unable to get the active ffx repository server list."
+    fx-error "Current server list: $(ffx --machine json-pretty repository server list)"
     return "${err}"
   fi
 
@@ -433,7 +107,8 @@ function ffx-repository-server-running-address {
 # If the server is running, this returns the port the server is running on.
 # Otherwise it returns an empty string.
 function ffx-repository-server-running-port {
-  local addr=$(ffx-repository-server-running-address)
+  name="$1"
+  addr=$(ffx-repository-server-running-address "$name")
   err=$?
   if [[ "${err}" -ne 0 ]]; then
     fx-error "Unable to get the running ffx repository server address."
@@ -449,35 +124,15 @@ function ffx-repository-server-running-port {
     echo "${BASH_REMATCH[1]}"
   else
     fx-error "Could not parse port from ffx repository server address: '$addr'"
-    fx-error "Current server status: $(ffx --machine json repository server status)"
+    fx-error "Current serrvers: $(ffx repository server list)"
     return 1
   fi
 
   return 0
 }
 
-function ffx-repository-server-enabled {
-  local enabled=$(fx-command-run ffx config get repository.server.enabled)
-  err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    fx-error "Unable to get the configured repository server enabled."
-    return "${err}"
-  fi
-
-  case "${enabled}" in
-    "true") echo true ;;
-    "false") echo false ;;
-    "null") echo false ;;
-    *)
-      fx-error "Unknown repository.server.enabled: ${enabled}"
-      return 1
-  esac
-
-  return 0
-}
-
 function ffx-configured-repository-server-address {
-  local addr=$(fx-command-run ffx config get repository.server.listen)
+  addr=$(fx-command-run ffx config get repository.server.listen)
   err=$?
   if [[ "${err}" -ne 0 ]]; then
     fx-error "Unable to get the configured repository server address."
@@ -500,7 +155,7 @@ function ffx-configured-repository-server-address {
 }
 
 function ffx-configured-repository-server-port {
-  local addr=$(ffx-configured-repository-server-address)
+  addr=$(ffx-configured-repository-server-address)
   err=$?
   if [[ "${err}" -ne 0 ]]; then
     fx-error "Unable to get the configured repository server address."
@@ -518,19 +173,9 @@ function ffx-configured-repository-server-port {
 }
 
 function default-repository-url {
-  local mode="$(package-server-mode)"
-  local err=$?
 
-  if [[ "${err}" -ne 0 ]]; then
-    return 1
-  fi
-
-  if [[ "${mode}" = "pm" ]]; then
-    echo "fuchsia-pkg://devhost"
-  else
-    local ffx_repo="$(ffx-default-repository-name)" || return $?
+    ffx_repo="$(ffx-default-repository-name)" || return $?
     echo "fuchsia-pkg://${ffx_repo}"
-  fi
 
   return 0
 }
@@ -539,7 +184,7 @@ function join-repository-ip-port {
   local expected_ip="$1"
   local expected_port="$2"
 
-  local configured_addr=$(ffx-configured-repository-server-address)
+  configured_addr=$(ffx-configured-repository-server-address)
   local err=$?
   if [[ "${err}" -ne 0 ]]; then
     fx-error "Could not read ffx repository server from config"

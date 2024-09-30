@@ -4,7 +4,8 @@
         "server": {
             "enabled": false,
             "listen": "[::]:8083",
-            "mode": "ffx"
+            "mode": "ffx",
+            "default_port": "8083"
         }
     }
 }
