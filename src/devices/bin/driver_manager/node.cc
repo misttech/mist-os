@@ -1148,39 +1148,43 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     symbols = this->symbols();
   }
 
-  std::optional<DriverHost::DriverLoadArgs> dynamic_linker_args;
+  std::optional<DriverHost::DriverLoadArgs> dynamic_linker_load_args;
+  std::optional<DriverHost::DriverStartArgs> dynamic_linker_start_args;
   if (use_dynamic_linker) {
     auto result = DriverHost::DriverLoadArgs::Create(start_info);
     if (result.is_error()) {
       cb(result.take_error());
       return;
     }
-    dynamic_linker_args = std::move(*result);
+    dynamic_linker_load_args = std::move(*result);
+    dynamic_linker_start_args = DriverHost::DriverStartArgs(properties_, symbols, start_info);
   }
 
   // Launch a driver host if we are not colocated.
   if (!colocate) {
     if (use_dynamic_linker) {
       (*node_manager_)
-          ->CreateDriverHostDynamicLinker(
-              [weak_self = weak_from_this(), name = name_, args = std::move(*dynamic_linker_args),
-               url = std::string(url), controller = std::move(controller),
-               cb = std::move(cb)](zx::result<DriverHost*> driver_host) mutable {
-                auto node_ptr = weak_self.lock();
-                if (!node_ptr) {
-                  LOGF(WARNING, "Node '%s' freed before it is used", name.c_str());
-                  cb(zx::error(ZX_ERR_BAD_STATE));
-                  return;
-                }
+          ->CreateDriverHostDynamicLinker([weak_self = weak_from_this(), name = name_,
+                                           load_args = std::move(dynamic_linker_load_args),
+                                           start_args = std::move(dynamic_linker_start_args),
+                                           url = std::string(url),
+                                           controller = std::move(controller), cb = std::move(cb)](
+                                              zx::result<DriverHost*> driver_host) mutable {
+            auto node_ptr = weak_self.lock();
+            if (!node_ptr) {
+              LOGF(WARNING, "Node '%s' freed before it is used", name.c_str());
+              cb(zx::error(ZX_ERR_BAD_STATE));
+              return;
+            }
 
-                if (driver_host.is_error()) {
-                  cb(driver_host.take_error());
-                  return;
-                }
-                node_ptr->driver_host_ = driver_host.value();
-                node_ptr->StartDriverWithDynamicLinker(std::move(args), url, std::move(controller),
-                                                       std::move(cb));
-              });
+            if (driver_host.is_error()) {
+              cb(driver_host.take_error());
+              return;
+            }
+            node_ptr->driver_host_ = driver_host.value();
+            node_ptr->StartDriverWithDynamicLinker(std::move(*load_args), std::move(*start_args),
+                                                   url, std::move(controller), std::move(cb));
+          });
       return;
     }
     auto result = (*node_manager_)->CreateDriverHost(use_next_vdso);
@@ -1192,7 +1196,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
 
   if (use_dynamic_linker) {
-    StartDriverWithDynamicLinker(std::move(*dynamic_linker_args), url, std::move(controller),
+    StartDriverWithDynamicLinker(std::move(*dynamic_linker_load_args),
+                                 std::move(*dynamic_linker_start_args), url, std::move(controller),
                                  std::move(cb));
     return;
   }
@@ -1230,8 +1235,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 }
 
 void Node::StartDriverWithDynamicLinker(
-    DriverHost::DriverLoadArgs args, std::string_view url,
-    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+    DriverHost::DriverLoadArgs load_args, DriverHost::DriverStartArgs start_args,
+    std::string_view url, fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
     fit::callback<void(zx::result<>)> cb) {
   auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
   node_ref_.emplace(dispatcher_, std::move(server_end), this,
@@ -1240,7 +1245,8 @@ void Node::StartDriverWithDynamicLinker(
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints.client));
-  driver_host_.value()->StartWithDynamicLinker(std::move(client_end), name_, std::move(args),
+  driver_host_.value()->StartWithDynamicLinker(std::move(client_end), name_, std::move(load_args),
+                                               std::move(start_args),
                                                std::move(driver_endpoints.server), std::move(cb));
 }
 

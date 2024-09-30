@@ -257,8 +257,8 @@ DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
 
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-    DriverLoadArgs load_args, fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
-    StartCallback cb) {
+    DriverLoadArgs load_args, DriverStartArgs start_args,
+    fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
   // TODO(https://fxbug.dev/357854682): pass this to the started driver host once
   // fuchsia_driver_host.DriverHost is implemented. Store it here for now so the node doesn't think
   // the driver host has died prematurely.
@@ -273,7 +273,7 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
 
   std::string driver_name = std::string(load_args.driver_soname);
   driver_host_loader_->LoadDriver(args).ThenExactlyOnce(
-      [this, node = std::move(node), node_name, load_args = std::move(load_args), driver_name,
+      [this, node = std::move(node), node_name, start_args = std::move(start_args), driver_name,
        cb = std::move(cb)](auto& result) mutable {
         if (!result.ok()) {
           LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
@@ -299,7 +299,7 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
           return;
         }
 
-        // TODO(https://fxbug.dev/355233670): send node client and load args as part of
+        // TODO(https://fxbug.dev/355233670): send node client and start args as part of
         // |fuchsia_driver_host::DriverHost::Start|.
 
         cb(zx::ok());

@@ -36,6 +36,24 @@ class DriverHost {
     fidl::ClientEnd<fuchsia_io::Directory> lib_dir;
   };
 
+  // Components that will be sent to the driver host when requesting to start a driver.
+  struct DriverStartArgs {
+    DriverStartArgs(fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+                    fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+                    fuchsia_component_runner::wire::ComponentStartInfo start_info)
+        :  // We need to make a copy of these FIDL fields. We receive these fields
+           // as part of the |fuchsia_component_runner::ComponentRunner::Start| FIDL call
+           // and create this |DriverStartArgs| object, but we may not call
+           // |Node::StartDriverWithDynamicLinker| until later (after the FIDL call has returned).
+          node_properties_(fidl::ToNatural(node_properties)),
+          symbols_(fidl::ToNatural(symbols)),
+          start_info_(fidl::ToNatural(start_info)) {}
+
+    std::optional<fuchsia_driver_framework::NodePropertyDictionary> node_properties_;
+    std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>> symbols_;
+    fuchsia_component_runner::ComponentStartInfo start_info_;
+  };
+
   virtual void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end,
                      std::string node_name,
                      fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
@@ -46,8 +64,8 @@ class DriverHost {
   // Loads and starts a driver using dynamic linking.
   virtual void StartWithDynamicLinker(
       fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-      DriverLoadArgs load_args, fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
-      StartCallback cb) {
+      DriverLoadArgs load_args, DriverStartArgs start_args,
+      fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
@@ -113,6 +131,7 @@ class DynamicLinkerDriverHostComponent final
 
   void StartWithDynamicLinker(fidl::ClientEnd<fuchsia_driver_framework::Node> node,
                               std::string node_name, DriverLoadArgs load_args,
+                              DriverStartArgs start_args,
                               fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
                               StartCallback cb) override;
 

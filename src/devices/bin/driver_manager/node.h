@@ -428,7 +428,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void SynchronizePropertiesDict();
 
   void StartDriverWithDynamicLinker(
-      DriverHost::DriverLoadArgs args, std::string_view url,
+      DriverHost::DriverLoadArgs load_args, DriverHost::DriverStartArgs start_args,
+      std::string_view url,
       fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
       fit::callback<void(zx::result<>)> cb);
 
