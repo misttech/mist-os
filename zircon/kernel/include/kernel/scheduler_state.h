@@ -27,11 +27,6 @@ namespace unittest {
 class ThreadEffectiveProfileObserver;
 }
 
-namespace internal {
-template <typename T>
-class PiNodeAdapter;
-}  // namespace internal
-
 #ifndef SCHEDULER_EXTRA_INVARIANT_VALIDATION
 #define SCHEDULER_EXTRA_INVARIANT_VALIDATION false
 #endif
@@ -434,8 +429,6 @@ class SchedulerState {
   friend class OwnedWaitQueue;
   friend class WaitQueue;
   friend class WaitQueueCollection;
-  template <typename T>
-  friend class internal::PiNodeAdapter;
 
   // Allow tests to observe/modify our state.
   friend class LoadBalancerTest;

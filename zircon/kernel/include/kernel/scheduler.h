@@ -65,6 +65,11 @@ constexpr zx_cpu_performance_scale_t ToUserPerformanceScale(SchedPerformanceScal
 // per-CPU state.
 class Scheduler {
  public:
+  // fwd decl of a helper class used to implement various PI operations.  See
+  // //zircon/kernel/kernel/scheduler_pi.cc to see how it is used.
+  template <typename Op, typename TargetType>
+  class PiOperation;
+
   // Default minimum granularity of time slices.
   static constexpr SchedDuration kDefaultMinimumGranularity = SchedMs(1);
 
@@ -250,7 +255,7 @@ class Scheduler {
   // upstream of it in a PI graph.  Because of this, the two scenarios are
   // handled separately using two different methods.
   template <typename TargetType>
-  static void UpstreamThreadBaseProfileChanged(Thread& upstream, TargetType& target)
+  static void UpstreamThreadBaseProfileChanged(const Thread& upstream, TargetType& target)
       TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
              ChainLockable::GetLock(target), preempt_disabled_token);
 
@@ -263,7 +268,7 @@ class Scheduler {
   // parameters (start time, finish time, time slice remaining) of |target| as
   // needed because of the join operation.
   template <typename UpstreamType, typename TargetType>
-  static void JoinNodeToPiGraph(UpstreamType& upstream, TargetType& target)
+  static void JoinNodeToPiGraph(const UpstreamType& upstream, TargetType& target)
       TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
              ChainLockable::GetLock(target), preempt_disabled_token);
 
@@ -277,7 +282,7 @@ class Scheduler {
   // scheduling parameters (start time, finish time, time slice remaining) in
   // both |target| and |upstream| as needed because of the split operation.
   template <typename UpstreamType, typename TargetType>
-  static void SplitNodeFromPiGraph(UpstreamType& upstream, TargetType& target)
+  static void SplitNodeFromPiGraph(const UpstreamType& upstream, TargetType& target)
       TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
              ChainLockable::GetLock(target), preempt_disabled_token);
 
@@ -385,10 +390,6 @@ class Scheduler {
   static bool PeekIsIdle(cpu_num_t cpu) { return (PeekIdleMask() & cpu_num_to_mask(cpu)) != 0; }
 
  private:
-  // fwd decl of a helper class used for PI Join/Split operations
-  template <typename T>
-  class PiNodeAdapter;
-
   friend struct Thread;
 
   // Allow percpu to init our cpu number and performance scale.
@@ -397,9 +398,6 @@ class Scheduler {
   friend struct LoadBalancerTestAccess;
   // Allow tests to modify our state.
   friend class LoadBalancerTest;
-  // A helper used in Join/Split operations
-  template <typename T>
-  friend class PiNodeAdapter;
   // Diagnostics used by LockupDetector
   friend void DumpSchedulerActiveThreadDetails(Scheduler& scheduler);
 
@@ -551,32 +549,6 @@ class Scheduler {
   // queue_lock, ensuring that it will stay in its current state until after we
   // drop the lock.
   bool IsLockedSchedulerActive() TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
-
-  // Handle all of the common tasks associated with each of the possible PI
-  // interactions.  The outline of this is:
-  //
-  // 1) If the target is an active thread (meaning either running or runnable),
-  //    we need to:
-  // 1.1) Enter the scheduler's queue lock.
-  // 1.2) If the thread is active, but not actually running, remove the target
-  //      thread from its scheduler's run queue.
-  // 1.3) Now update the thread's effective profile.
-  // 1.4) Apply any changes in the thread's effective profile to its scheduler's
-  //      bookkeeping.
-  // 1.5) Update the dynamic parameters of the thread.
-  // 1.6) Either re-insert the thread into its scheduler's run queue (if it was
-  //      READY) or adjust its schedulers preemption time (if it was RUNNING).
-  // 1.7) Trigger a reschedule on the thread's scheduler.
-  // 2) If the target is either an OwnedWaitQueue, or a thread which is not
-  //    active:
-  // 2.1) Recompute the target's effective profile, adjust the target's position
-  //      in it's wait queue if the target is a thread which is currently
-  //      blocked in a wait queue.
-  // 2.2) Recompute the target's dynamic scheduler parameters.
-  template <typename TargetType, typename Callable>
-  static inline void HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<TargetType>& target,
-                                               Callable UpdateDynamicParams)
-      TA_REQ(chainlock_transaction_token, target.get_lock());
 
   using EndTraceCallback = fit::inline_function<void(), sizeof(void*)>;
 
