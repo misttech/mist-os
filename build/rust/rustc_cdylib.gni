@@ -181,6 +181,7 @@ template("rustc_cdylib") {
                                "exclude_toolchain_tags",
                                "output_dir",
                                "runtime_deps",
+                               "variant_selector_target_type",
                              ])
       crate_type = "cdylib"
       output_name = _lib_output_name
@@ -210,6 +211,7 @@ template("rustc_cdylib") {
                              "sources",
                              "testonly",
                              "visibility",
+                             "metadata",
                            ])
 
     if (defined(invoker.disable_rbe)) {
