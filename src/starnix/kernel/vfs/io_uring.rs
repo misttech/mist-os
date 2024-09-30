@@ -10,10 +10,11 @@ use crate::vfs::{
     FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
 use fuchsia_zircon as zx;
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_buffer::UserBuffers;
 use starnix_uapi::{
     errno, error, io_cqring_offsets, io_sqring_offsets, io_uring_cqe, io_uring_params,
     io_uring_sqe, IORING_FEAT_SINGLE_MMAP, IORING_OFF_CQ_RING, IORING_OFF_SQES, IORING_OFF_SQ_RING,
@@ -61,6 +62,8 @@ static_assertions::const_assert_eq!(std::mem::size_of::<ControlHeader>(), 64);
 pub struct IoUringFileObject {
     ring_buffer: Arc<MemoryObject>,
     sq_entries: Arc<MemoryObject>,
+
+    registered_buffers: Mutex<UserBuffers>,
 }
 
 impl IoUringFileObject {
@@ -81,6 +84,8 @@ impl IoUringFileObject {
             }
             cq_entries
         } else {
+            // This operation cannot overflow because sq_entries is capped at IORING_MAX_ENTRIES,
+            // which is only 15 bits.
             sq_entries * 2
         };
 
@@ -131,8 +136,26 @@ impl IoUringFileObject {
         let object = Box::new(IoUringFileObject {
             ring_buffer: Arc::new(ring_buffer_vmo.into()),
             sq_entries: Arc::new(sq_entries_vmo.into()),
+            registered_buffers: Default::default(),
         });
         Ok(Anon::new_file(current_task, object, OpenFlags::RDWR))
+    }
+
+    pub fn register_buffers(&self, buffers: UserBuffers) {
+        // The docs for io_uring_register imply that the kernel should actually map this memory
+        // into its own address space when these buffers are registered. That's probably observable
+        // if the client changes the mappings for these addresses between the time they are
+        // registered and they are used. For now, we just store the addresses.
+        *self.registered_buffers.lock() = buffers;
+    }
+
+    pub fn unregister_buffers(&self) {
+        self.registered_buffers.lock().clear();
+    }
+
+    pub fn enter(&self, to_submit: u32, _min_complete: u32, _flags: u32) -> Result<u32, Errno> {
+        // TODO(https://fxbug.dev/297431387): Actually process the ops in the buffer.
+        Ok(to_submit)
     }
 }
 

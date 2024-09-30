@@ -62,13 +62,13 @@ use starnix_uapi::{
     F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC,
-    MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH,
-    O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND,
-    POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
-    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
-    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
-    XATTR_REPLACE,
+    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
+    IORING_UNREGISTER_BUFFERS, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
+    MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
+    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
+    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
+    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
+    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -3100,25 +3100,50 @@ pub fn sys_io_uring_setup(
 
 pub fn sys_io_uring_enter(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _fd: FdNumber,
-    _to_submit: u32,
-    _min_complete: u32,
-    _flags: u32,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    to_submit: u32,
+    min_complete: u32,
+    flags: u32,
     _sig: UserRef<sigset_t>,
-) -> Result<FdNumber, Errno> {
-    error!(ENOSYS)
+) -> Result<u32, Errno> {
+    if !current_task.kernel().features.io_uring {
+        return error!(ENOSYS);
+    }
+    let file = current_task.files.get(fd)?;
+    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    // TODO(https://fxbug.dev/297431387): Use `_sig` to change the signal mask for `current_task`.
+    io_uring.enter(to_submit, min_complete, flags)
 }
 
 pub fn sys_io_uring_register(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _fd: FdNumber,
-    _opcode: u32,
-    _arg: UserAddress,
-    _nr_args: usize,
-) -> Result<FdNumber, Errno> {
-    error!(ENOSYS)
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    opcode: u32,
+    arg: UserAddress,
+    nr_args: UserValue<i32>,
+) -> Result<SyscallResult, Errno> {
+    if !current_task.kernel().features.io_uring {
+        return error!(ENOSYS);
+    }
+    let file = current_task.files.get(fd)?;
+    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    match opcode {
+        IORING_REGISTER_BUFFERS => {
+            let buffers = current_task.read_iovec(arg, nr_args)?;
+            io_uring.register_buffers(buffers);
+            return Ok(SUCCESS);
+        }
+        IORING_UNREGISTER_BUFFERS => {
+            if !arg.is_null() {
+                return error!(EINVAL);
+            }
+            io_uring.unregister_buffers();
+            return Ok(SUCCESS);
+        }
+        _ => return error!(EINVAL),
+    }
 }
 
 #[cfg(test)]
