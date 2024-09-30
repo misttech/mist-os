@@ -30,3 +30,10 @@ source_set("test_effects_v2") {
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
+
+group("test_effects") {
+  deps = [
+    ":test_effects_v1",
+    ":test_effects_v2",
+  ]
+}

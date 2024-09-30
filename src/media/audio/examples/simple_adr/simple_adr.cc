@@ -27,6 +27,8 @@
 
 namespace examples {
 
+namespace {
+
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia_audio_device::PlugDetectCapabilities>& plug_caps) {
@@ -119,6 +121,8 @@ inline std::ostream& operator<<(std::ostream& out,
       return (out << "unknown DeviceType enum");
   }
 }
+
+}  // namespace
 
 // fidl::AsyncEventHandler<> implementation, called when the server disconnects its channel.
 template <typename ProtocolT>
@@ -264,10 +268,12 @@ void MediaApp::WaitForFirstAudioDevice() {
               std::cout << "    dai_format_sets           NONE" << '\n';
             }
 
-            std::cout << "    is_input                  "
-                      << (device.is_input() ? (*device.is_input() ? "true" : "false")
-                                            : "UNSPECIFIED")
-                      << '\n';
+            if (device.is_input().has_value()) {
+              std::cout << "    is_input                  "
+                        << (*device.is_input() ? "true" : "false") << '\n';
+            } else {
+              std::cout << "    is_input                  UNSPECIFIED" << '\n';
+            }
 
             if (device.gain_caps().has_value()) {
               std::cout << "    gain_caps" << '\n';
@@ -286,16 +292,18 @@ void MediaApp::WaitForFirstAudioDevice() {
                                 ? std::to_string(*device.gain_caps()->gain_step_db()) + " dB"
                                 : "NONE (non-compliant)")
                         << '\n';
-              std::cout << "        can_mute              "
-                        << (device.gain_caps()->can_mute()
-                                ? (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE")
-                                : "NONE (FALSE)")
-                        << '\n';
-              std::cout << "        can_agc               "
-                        << (device.gain_caps()->can_agc()
-                                ? (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE")
-                                : "NONE (FALSE)")
-                        << '\n';
+              if (device.gain_caps()->can_mute()) {
+                std::cout << "        can_mute              "
+                          << (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE") << '\n';
+              } else {
+                std::cout << "        can_mute              NONE (FALSE)" << '\n';
+              }
+              if (device.gain_caps()->can_agc()) {
+                std::cout << "        can_agc               "
+                          << (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE") << '\n';
+              } else {
+                std::cout << "        can_agc               NONE (FALSE)" << '\n';
+              }
             } else {
               std::cout << "    gain_caps                 NONE" << '\n';
             }
@@ -430,16 +438,18 @@ void MediaApp::ObserveStreamOutput() {
                                 ? std::to_string(*result->state()->gain_db()) + " dB"
                                 : "NONE (non-compliant)")
                         << '\n';
-              std::cout << "    muted:                    "
-                        << (result->state()->muted()
-                                ? (*result->state()->muted() ? "TRUE" : "FALSE")
-                                : "NONE (FALSE)")
-                        << '\n';
-              std::cout << "    agc_enabled:              "
-                        << (result->state()->agc_enabled()
-                                ? (*result->state()->agc_enabled() ? "TRUE" : "FALSE")
-                                : "NONE (FALSE)")
-                        << '\n';
+              if (result->state()->muted().has_value()) {
+                std::cout << "    muted:                    "
+                          << (*result->state()->muted() ? "TRUE" : "FALSE") << '\n';
+              } else {
+                std::cout << "    muted:                    NONE (FALSE)" << '\n';
+              }
+              if (result->state()->agc_enabled().has_value()) {
+                std::cout << "    agc_enabled:              "
+                          << (*result->state()->agc_enabled() ? "TRUE" : "FALSE") << '\n';
+              } else {
+                std::cout << "    agc_enabled:              NONE (FALSE)" << '\n';
+              }
             });
         observer_client_->WatchPlugState().Then(
             [this](fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) {
@@ -459,6 +469,7 @@ void MediaApp::ObserveStreamOutput() {
       });
 }
 
+// static
 void MediaApp::ConnectToControlCreator() {
   if (!control_creator_client_.has_value()) {
     zx::result client_end = component::Connect<fuchsia_audio_device::ControlCreator>();
@@ -653,7 +664,7 @@ void MediaApp::WriteAudioToVmo() {
                                      cycles_per_buffer) *
                  M_PI / static_cast<double>(ring_buffer_size_)));
     for (size_t chan = 0; chan < channels_per_frame_; ++chan) {
-      rb_start_[idx * channels_per_frame_ + chan] = val;
+      rb_start_[(idx * channels_per_frame_) + chan] = val;
     }
   }
 }
@@ -675,7 +686,8 @@ void MediaApp::StartRingBuffer() {
 
 void MediaApp::ChangeGainByDbAfter(float change_db, zx::duration wait_duration,
                                    int32_t iterations) {
-  auto gain_db = std::max(min_gain_db_, max_gain_db_ - change_db * static_cast<float>(iterations));
+  auto gain_db =
+      std::max(min_gain_db_, max_gain_db_ - (change_db * static_cast<float>(iterations)));
   std::cout << "Setting device gain to " << gain_db << " dB" << '\n';
 
   control_client_

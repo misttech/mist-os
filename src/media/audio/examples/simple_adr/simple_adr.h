@@ -27,45 +27,30 @@ class FidlHandler : public fidl::AsyncEventHandler<ProtocolT> {
  public:
   FidlHandler(MediaApp* parent, std::string_view name) : parent_(parent), name_(name) {}
   void on_fidl_error(fidl::UnbindInfo error) final;
+  void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {
+    std::cout << name_ << ": unknown event ordinal " << metadata.event_ordinal;
+  }
 
  private:
   MediaApp* parent_;
   std::string_view name_;
 };
-class ControlFidlHandler : public FidlHandler<fuchsia_audio_device::Control> {
- public:
-  ControlFidlHandler(MediaApp* parent, std::string_view name) : FidlHandler(parent, name) {}
-  void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_audio_device::Control> metadata) override {
-    std::cout << "ControlFidlHandler: unknown event (Control) ordinal " << metadata.event_ordinal;
-  }
-};
-
-class ObserverFidlHandler : public FidlHandler<fuchsia_audio_device::Observer> {
- public:
-  ObserverFidlHandler(MediaApp* parent, std::string_view name) : FidlHandler(parent, name) {}
-  void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_audio_device::Observer> metadata) override {
-    std::cout << "ObserverFidlHandler: unknown event (Observer) ordinal " << metadata.event_ordinal;
-  }
-};
 
 class MediaApp {
   // Display device metadata received from AudioDeviceRegistry, for each device
-  static inline constexpr bool kLogDeviceInfo = false;
+  static constexpr bool kLogDeviceInfo = true;
 
   // Automatically connect to a StreamConfig ring buffer and play a sinusoid?
-  static inline constexpr bool kAutoplaySinusoid = true;
+  static constexpr bool kAutoplaySinusoid = true;
 
   // TODO(b/306455236): Use a format / rate supported by the detected device.
-  static inline constexpr fuchsia_audio::SampleType kSampleFormat =
-      fuchsia_audio::SampleType::kInt16;
-  static inline constexpr uint16_t kBytesPerSample = 2;
-  static inline constexpr float kToneAmplitude = 0.125f;
+  static constexpr fuchsia_audio::SampleType kSampleFormat = fuchsia_audio::SampleType::kInt16;
+  static constexpr uint16_t kBytesPerSample = 2;
+  static constexpr float kToneAmplitude = 0.125f;
 
-  static inline constexpr uint32_t kFrameRate = 48000;
-  static inline constexpr float kApproxToneFrequency = 240.0f;
-  static inline constexpr float kApproxFramesPerCycle = kFrameRate / kApproxToneFrequency;
+  static constexpr uint32_t kFrameRate = 48000;
+  static constexpr float kApproxToneFrequency = 240.0f;
+  static constexpr float kApproxFramesPerCycle = kFrameRate / kApproxToneFrequency;
 
  public:
   MediaApp(async::Loop& loop, fit::closure quit_callback);
@@ -77,7 +62,7 @@ class MediaApp {
   void ConnectToRegistry();
 
   void WaitForFirstAudioDevice();
-  void ConnectToControlCreator();
+  static void ConnectToControlCreator();
   bool ConnectToControl();
 
   void ObserveStreamOutput();
@@ -109,10 +94,10 @@ class MediaApp {
   int16_t* rb_start_;
   size_t channels_per_frame_ = 0;
 
+  FidlHandler<fuchsia_audio_device::Control> ctl_handler_{this, "Control"};
+  FidlHandler<fuchsia_audio_device::Observer> obs_handler_{this, "Observer"};
   FidlHandler<fuchsia_audio_device::Registry> reg_handler_{this, "Registry"};
   FidlHandler<fuchsia_audio_device::RingBuffer> rb_handler_{this, "RingBuffer"};
-  ControlFidlHandler ctl_handler_{this, "Control"};
-  ObserverFidlHandler obs_handler_{this, "Observer"};
 };
 
 }  // namespace examples
