@@ -110,6 +110,7 @@ source_set("binder") {
     "TextOutput.cpp",
     "Utils.cpp",
     "ndk/ibinder.cpp",
+    "ndk/libbinder.cpp",
     "ndk/parcel.cpp",
     "ndk/process.cpp",
     "ndk/service_manager.cpp",
@@ -188,4 +189,17 @@ source_set("binder") {
       "-Wno-unused-function",
     ]
   }
+}
+
+# Temporary library to support the unstable Rust API bindings.
+# TODO: Once b/184872979 is resolved, this should no longer be needed
+source_set("libbinder_rpc_unstable") {
+  source_files = [ "libbinder_rpc_unstable.cpp" ]
+  sources = rebase_path(source_files, "", binder_source_base)
+  include_dirs = [
+    binder_source_base,
+    binder_source_base + "/include_rpc_unstable",
+    "src/paravirtualization/vsock/lib",
+  ]
+  deps = [ ":binder" ]
 }

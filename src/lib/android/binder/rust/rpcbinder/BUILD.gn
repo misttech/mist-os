@@ -30,6 +30,7 @@ rustc_library("rpcbinder") {
   ]
   deps = [
     ":binder_rpc_unstable_bindgen",
+    "//src/lib/android/binder:libbinder_rpc_unstable",
     "//src/lib/android/binder/rust:binder",
     "//third_party/rust_crates:cfg-if",
     "//third_party/rust_crates:foreign-types",
