@@ -2967,14 +2967,14 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_file_with_flags(
         &self,
-        locked: &mut Locked<'_, ResourceAccessorAddFile>,
+        _locked: &mut Locked<'_, ResourceAccessorAddFile>,
         current_task: &CurrentTask,
         file: FileHandle,
         _flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(locked, current_task)?;
+        let handle = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..Default::default()

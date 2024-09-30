@@ -45,7 +45,7 @@ where
     L: LockBefore<BeforeFsNodeAppend>,
 {
     let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
-    serve_file_at(locked, server_end.into_channel().into(), system_task, &root_file)?;
+    serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
 }
 

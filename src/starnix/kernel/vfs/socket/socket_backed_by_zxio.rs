@@ -11,7 +11,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, FileOpsToHandle, Locked};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::{Errno, ENOTSUP};
 use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::vfs::FdEvents;
@@ -432,7 +432,6 @@ impl SocketOps for ZxioBackedSocket {
 
     fn to_handle(
         &self,
-        _locked: &mut Locked<'_, FileOpsToHandle>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {

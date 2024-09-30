@@ -15,7 +15,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
 };
 use fuchsia_zircon::HandleBased;
-use starnix_sync::{FileOpsCore, FileOpsToHandle, LockEqualOrBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -116,14 +116,13 @@ impl FileOps for SocketFile {
     /// If None is returned, the file will act as if it was a fd to `/dev/null`.
     fn to_handle(
         &self,
-        locked: &mut Locked<'_, FileOpsToHandle>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        if let Some(handle) = self.socket.to_handle(locked, file, current_task)? {
+        if let Some(handle) = self.socket.to_handle(file, current_task)? {
             Ok(Some(handle))
         } else {
-            serve_file(locked, current_task, file).map(|c| Some(c.0.into_handle()))
+            serve_file(current_task, file).map(|c| Some(c.0.into_handle()))
         }
     }
 }
