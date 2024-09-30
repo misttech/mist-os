@@ -31,16 +31,33 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 #[derive(Default, Debug, Clone)]
 pub struct ProgramInput {
     /// All of the capabilities that appear in a program's namespace.
-    pub namespace: Dict,
+    namespace: Dict,
 
     /// A router for the runner that a component has used (if any). This is in an `Arc<Mutex<_>>`
     /// because it needs to match the semantics of `Dict`, notably that clones grab new references
     /// to the same underlying data and the data can be mutated without a mutable reference to
     /// `ProgramInput`.
-    pub runner: Arc<Mutex<Option<Router>>>,
+    runner: Arc<Mutex<Option<Router>>>,
 
     /// All of the config capabilities that a program will use.
-    pub config: Dict,
+    config: Dict,
+}
+
+impl ProgramInput {
+    pub fn new(namespace: Dict, runner: Option<Router>, config: Dict) -> Self {
+        ProgramInput { namespace, runner: Arc::new(Mutex::new(runner)), config }
+    }
+    pub fn namespace(&self) -> Dict {
+        self.namespace.clone()
+    }
+
+    pub fn runner(&self) -> Option<Router> {
+        self.runner.lock().unwrap().clone()
+    }
+
+    pub fn config(&self) -> Dict {
+        self.config.clone()
+    }
 }
 
 /// A component's sandbox holds all the routing dictionaries that a component has once its been

@@ -148,12 +148,12 @@ async fn do_start(
                 moniker: component.moniker.clone(),
                 err: Box::new(err),
             })?;
-        let runner = resolved_state.sandbox.program_input.runner.lock().unwrap().clone();
+        let runner = resolved_state.sandbox.program_input.runner();
         (
             runner,
             resolved_state.decl().get_runner().as_ref().map(|r| r.source_name.clone()),
             resolved_state.resolved_component.clone(),
-            resolved_state.sandbox.program_input.namespace.clone(),
+            resolved_state.sandbox.program_input.namespace(),
         )
     };
     let runner = match runner_router {

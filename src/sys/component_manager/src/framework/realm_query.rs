@@ -400,7 +400,7 @@ async fn construct_namespace(
         resolved_state.package(),
         &instance,
         resolved_state.decl(),
-        &resolved_state.sandbox.program_input.namespace,
+        &resolved_state.sandbox.program_input.namespace(),
         instance.execution_scope.clone(),
     )
     .await

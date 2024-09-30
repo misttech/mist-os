@@ -61,7 +61,7 @@ where
     let component_sandbox =
         component.component_sandbox().await.map_err(|e| RoutingError::from(e))?;
     let capability =
-        match component_sandbox.program_input.config.get_capability(&use_config.target_name) {
+        match component_sandbox.program_input.config().get_capability(&use_config.target_name) {
             Some(c) => c,
             None => {
                 return Err(RoutingError::BedrockNotPresentInDictionary {

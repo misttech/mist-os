@@ -572,7 +572,7 @@ impl ResolvedInstanceState {
                 self.resolved_component.package.as_ref(),
                 &component,
                 &self.resolved_component.decl,
-                &self.sandbox.program_input.namespace,
+                &self.sandbox.program_input.namespace(),
                 component.execution_scope.clone(),
             )
             .await?;

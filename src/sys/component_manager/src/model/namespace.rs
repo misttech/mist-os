@@ -25,7 +25,7 @@ use routing::bedrock::sandbox_construction::ProgramInput;
 use sandbox::{Capability, Dict, DirEntry};
 use serve_processargs::NamespaceBuilder;
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 
@@ -99,11 +99,7 @@ async fn add_use_decls(
     // Only `program_input.namespace` (`program_input_namespace_dict`) is provided to this
     // function. However, `into_router` expects the full [ProgramInput], so synthesize our own
     // ProgramInput with the other fields empty.
-    let program_input = ProgramInput {
-        namespace: program_input_namespace_dict.clone(),
-        runner: Arc::new(Mutex::new(None)),
-        config: Dict::new(),
-    };
+    let program_input = ProgramInput::new(program_input_namespace_dict.clone(), None, Dict::new());
     for use_ in uses {
         if let cm_rust::UseDecl::Runner(_) = use_ {
             // The runner is not available in the namespace.

@@ -40,7 +40,7 @@ impl UseRouteRequest {
     ) -> Router {
         match self {
             Self::UseProtocol(decl) => {
-                let Some(capability) = program_input.namespace.get_capability(&decl.target_path)
+                let Some(capability) = program_input.namespace().get_capability(&decl.target_path)
                 else {
                     panic!(
                         "router for capability {:?} is missing from program input dictionary for \
@@ -59,12 +59,9 @@ impl UseRouteRequest {
             }
             Self::UseRunner(_) => {
                 // A component can only use one runner, it must be this one.
-                let program_input = program_input.runner.lock().unwrap();
-                let router = program_input
-                    .as_ref()
+                program_input
+                    .runner()
                     .expect("component has `use runner` but no runner in program input?")
-                    .clone();
-                router
             }
         }
     }
