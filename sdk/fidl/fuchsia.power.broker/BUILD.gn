@@ -41,7 +41,7 @@ fidl("fuchsia.power.broker") {
     "//src/power/topology-test-daemon/*:*",
     "//src/session/bin/*",
     "//src/session/tests/session_manager:*",
-    "//src/starnix/kernel/*:*",
+    "//src/starnix/*:*",
     "//src/sys/time/timekeeper/*:*",
     "//vendor/*",
   ]
