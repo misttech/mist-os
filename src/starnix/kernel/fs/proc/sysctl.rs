@@ -13,7 +13,9 @@ use crate::vfs::{
 };
 use starnix_logging::bug_ref;
 use starnix_sync::Mutex;
-use starnix_uapi::auth::{Capabilities, FsCred, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
+use starnix_uapi::auth::{
+    Capabilities, FsCred, CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
+};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
@@ -35,6 +37,14 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
     });
     dir.subdir(current_task, "kernel", 0o555, |dir| {
+        dir.node(
+            "cap_last_cap",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(|| Ok(format!("{}\n", CAP_LAST_CAP))),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
         dir.node(
             "core_pattern",
             fs.create_node(

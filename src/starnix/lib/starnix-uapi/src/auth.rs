@@ -218,6 +218,7 @@ pub const CAP_PERFMON: Capabilities = Capabilities { mask: 1u64 << uapi::CAP_PER
 pub const CAP_BPF: Capabilities = Capabilities { mask: 1u64 << uapi::CAP_BPF };
 pub const CAP_CHECKPOINT_RESTORE: Capabilities =
     Capabilities { mask: 1u64 << uapi::CAP_CHECKPOINT_RESTORE };
+pub const CAP_LAST_CAP: u32 = uapi::CAP_LAST_CAP;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -619,7 +619,6 @@
                 "ProcSysVmMmapMinAddr.HasNumericValue",
                 "ProcSysVmOvercommitMemory.HasNumericValue",
                 "ProcFilesystems.Bug65172365",
-                "ProcFilesystems.ReadCapLastCap",
                 "Proc.GetdentsEnoent",
                 "Proc.PidReuse",
                 "Proc.PidTidIOAccounting",
