@@ -26,7 +26,7 @@ impl AtomicMonotonicInstant {
     /// Loads a [`zx::MonotonicInstant`].
     pub fn load(&self, order: Ordering) -> zx::MonotonicInstant {
         let Self(atomic_time) = self;
-        zx::Time::from_nanos(atomic_time.load(order))
+        zx::Instant::from_nanos(atomic_time.load(order))
     }
 
     /// Stores a [`zx::MonotonicInstant`].

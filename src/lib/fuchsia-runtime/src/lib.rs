@@ -14,8 +14,8 @@
 
 use fuchsia_zircon::sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID};
 use fuchsia_zircon::{
-    Clock, ClockDetails, ClockTransformation, ClockUpdate, Handle, HandleBased, Job,
-    MonotonicTimeline, Process, Rights, Status, Thread, Time, Timeline, Unowned, Vmar,
+    Clock, ClockDetails, ClockTransformation, ClockUpdate, Handle, HandleBased, Instant, Job,
+    MonotonicTimeline, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
 };
 use num_derive::FromPrimitive;
 use num_traits::cast::FromPrimitive;
@@ -353,7 +353,7 @@ pub struct UtcTimeline;
 impl Timeline for UtcTimeline {}
 
 /// A UTC timestamp, measured in nanoseconds since Jan 1 1970.
-pub type UtcTime = Time<UtcTimeline>;
+pub type UtcTime = Instant<UtcTimeline>;
 
 /// A clock that will return UTC timestamps.
 // TODO(https://fxbug.dev/356911500) switch to boot timeline

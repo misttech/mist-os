@@ -37,9 +37,9 @@ impl Timeline {
 
     pub fn zero_time(&self) -> TargetTime {
         match self {
-            Timeline::Monotonic => TargetTime::Monotonic(zx::Time::from_nanos(0)),
-            Timeline::RealTime => TargetTime::RealTime(zx::Time::from_nanos(0)),
-            Timeline::BootInstant => TargetTime::BootInstant(zx::Time::from_nanos(0)),
+            Timeline::Monotonic => TargetTime::Monotonic(zx::Instant::from_nanos(0)),
+            Timeline::RealTime => TargetTime::RealTime(zx::Instant::from_nanos(0)),
+            Timeline::BootInstant => TargetTime::BootInstant(zx::Instant::from_nanos(0)),
         }
     }
 }

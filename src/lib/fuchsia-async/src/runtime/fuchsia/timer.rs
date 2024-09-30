@@ -28,7 +28,7 @@ pub trait TimeInterface:
 {
     type Timeline: zx::Timeline + Send + Sync + 'static;
 
-    fn into_zx(self) -> zx::Time<Self::Timeline>;
+    fn into_zx(self) -> zx::Instant<Self::Timeline>;
     fn now() -> Self;
 }
 

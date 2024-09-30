@@ -12,9 +12,9 @@ const MILLION: u64 = 1_000_000;
 #[derive(Clone, Default, Debug, Eq, PartialEq)]
 pub struct Transform<Reference, Output> {
     /// An offset on the monotonic timeline in nanoseconds.
-    pub reference_offset: zx::Time<Reference>,
+    pub reference_offset: zx::Instant<Reference>,
     /// An offset on the synthetic timeline in nanoseconds.
-    pub synthetic_offset: zx::Time<Output>,
+    pub synthetic_offset: zx::Instant<Output>,
     /// An adjustment to the standard 1 monotonic tick:1 synthetic tick rate in parts per million.
     /// Positive values indicate the synthetic clock is moving faster than the monotonic clock.
     pub rate_adjust_ppm: i32,
@@ -26,7 +26,7 @@ pub struct Transform<Reference, Output> {
 
 impl<Reference: zx::Timeline + Copy, Output: zx::Timeline + Copy> Transform<Reference, Output> {
     /// Returns the synthetic time at the supplied monotonic time.
-    pub fn synthetic(&self, reference: zx::Time<Reference>) -> zx::Time<Output> {
+    pub fn synthetic(&self, reference: zx::Instant<Reference>) -> zx::Instant<Output> {
         // Cast to i128 to avoid overflows in multiplication.
         let reference_difference = (reference - self.reference_offset).into_nanos() as i128;
         let synthetic_offset = self.synthetic_offset.into_nanos() as i128;
@@ -35,11 +35,11 @@ impl<Reference: zx::Timeline + Copy, Output: zx::Timeline + Copy> Transform<Refe
 
         let time_nanos =
             (reference_difference * synthetic_ticks / reference_ticks) + synthetic_offset;
-        zx::Time::from_nanos(time_nanos as i64)
+        zx::Instant::from_nanos(time_nanos as i64)
     }
 
     /// Returns the error bound at the supplied monotonic time.
-    pub fn error_bound(&self, reference: zx::Time<Reference>) -> u64 {
+    pub fn error_bound(&self, reference: zx::Instant<Reference>) -> u64 {
         // Cast to i128 to avoid overflows in multiplication.
         let reference_difference = (reference - self.reference_offset).into_nanos() as i128;
         if reference_difference <= 0 {
@@ -55,13 +55,13 @@ impl<Reference: zx::Timeline + Copy, Output: zx::Timeline + Copy> Transform<Refe
 
     /// Returns the synthetic time on this `Transform` minus the synthetic time on `other`,
     /// calculated at the supplied monotonic time.
-    pub fn difference(&self, other: &Self, reference: zx::Time<Reference>) -> zx::Duration {
+    pub fn difference(&self, other: &Self, reference: zx::Instant<Reference>) -> zx::Duration {
         self.synthetic(reference) - other.synthetic(reference)
     }
 
     /// Returns a `ClockUpdate` that will set a `Clock` onto this `Transform` using data
     /// from the supplied monotonic time.
-    pub fn jump_to(&self, reference: zx::Time<Reference>) -> zx::ClockUpdate<Reference, Output> {
+    pub fn jump_to(&self, reference: zx::Instant<Reference>) -> zx::ClockUpdate<Reference, Output> {
         zx::ClockUpdate::<Reference, Output>::builder()
             .absolute_value(reference, self.synthetic(reference))
             .rate_adjust(self.rate_adjust_ppm)
@@ -98,8 +98,8 @@ impl<Reference: zx::Timeline, Output: zx::Timeline> From<&zx::Clock<Reference, O
 /// is only useful for calculating the time for monotonic times close to the current time.
 pub fn time_at_monotonic<Reference: zx::Timeline, Output: zx::Timeline>(
     clock: &zx::Clock<Reference, Output>,
-    reference: zx::Time<Reference>,
-) -> zx::Time<Output> {
+    reference: zx::Instant<Reference>,
+) -> zx::Instant<Output> {
     let reference_nanos = reference.into_nanos() as i128;
     // Clock read failures should only be caused by an invalid clock object.
     let details = clock.get_details().expect("failed to get clock details");
@@ -112,7 +112,7 @@ pub fn time_at_monotonic<Reference: zx::Timeline, Output: zx::Timeline>(
 
     let time_nanos = ((reference_nanos - reference_offset) * synthetic_ticks / reference_ticks)
         + synthetic_offset;
-    zx::Time::from_nanos(time_nanos as i64)
+    zx::Instant::from_nanos(time_nanos as i64)
 }
 
 #[cfg(test)]

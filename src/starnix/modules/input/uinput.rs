@@ -303,7 +303,7 @@ impl UinputDeviceFile {
                                 device: Some(touch_server),
                                 ..Default::default()
                             },
-                            zx::Time::INFINITE,
+                            zx::Instant::INFINITE,
                         );
 
                         match register_res {

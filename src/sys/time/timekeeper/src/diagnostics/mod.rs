@@ -27,10 +27,10 @@ use fuchsia_zircon as zx;
 #[cfg(test)]
 pub const ANY_DURATION: zx::Duration = zx::Duration::from_nanos(i64::MIN);
 
-/// A special time that will match any value during an `eq_with_any` operation.
+/// A special instant that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
-pub const fn any_time<T: zx::Timeline>() -> zx::Time<T> {
-    zx::Time::from_nanos(i64::MIN)
+pub const fn any_time<T: zx::Timeline>() -> zx::Instant<T> {
+    zx::Instant::from_nanos(i64::MIN)
 }
 
 /// An event that is potentially worth recording in one or more diagnostics systems.

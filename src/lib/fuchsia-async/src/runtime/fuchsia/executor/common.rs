@@ -442,9 +442,9 @@ impl Executor {
                 // If we're considered awake choose INFINITE_PAST which will make the wait call
                 // return immediately.  Otherwise, wait until a packet arrives.
                 let deadline = if !sleeping || UNTIL_STALLED {
-                    zx::Time::INFINITE_PAST
+                    zx::Instant::INFINITE_PAST
                 } else {
-                    zx::Time::INFINITE
+                    zx::Instant::INFINITE
                 };
 
                 match self.port.wait(deadline) {

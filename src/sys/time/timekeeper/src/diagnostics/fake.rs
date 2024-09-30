@@ -75,7 +75,7 @@ impl EqWithAny for zx::Duration {
     }
 }
 
-impl<T: zx::Timeline> EqWithAny for zx::Time<T> {
+impl<T: zx::Timeline> EqWithAny for zx::Instant<T> {
     fn eq_with_any(&self, other: &Self) -> bool {
         self == &any_time::<T>() || self == other
     }

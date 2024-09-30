@@ -309,7 +309,7 @@ impl HrTimerManager {
     ) -> Result<(), Errno> {
         guard.current_deadline = None;
         self.check_connection()?
-            .stop(HRTIMER_DEFAULT_ID, zx::Time::INFINITE)
+            .stop(HRTIMER_DEFAULT_ID, zx::Instant::INFINITE)
             .map_err(|e| errno!(EINVAL, format!("HrTimer::Stop fidl error: {e}")))?
             .map_err(|e| errno!(EINVAL, format!("HrTimer::Stop driver error: {e:?}")))?;
 

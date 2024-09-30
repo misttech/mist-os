@@ -114,7 +114,7 @@ impl BytesFileOps for PowerStateFile {
                     ),
                     ..Default::default()
                 },
-                zx::Time::INFINITE,
+                zx::Instant::INFINITE,
             ) {
                 Ok(Ok(res)) => {
                     // TODO(https://fxbug.dev/328306129): Replace this with boot time.

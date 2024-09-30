@@ -20,7 +20,7 @@ pub const SCHEDULER_CLOCK_HZ: i64 = 100;
 const_assert_eq!(NANOS_PER_SECOND % SCHEDULER_CLOCK_HZ, 0);
 const NANOS_PER_SCHEDULER_TICK: i64 = NANOS_PER_SECOND / SCHEDULER_CLOCK_HZ;
 
-pub fn timeval_from_time<T: zx::Timeline>(time: zx::Time<T>) -> timeval {
+pub fn timeval_from_time<T: zx::Timeline>(time: zx::Instant<T>) -> timeval {
     let nanos = time.into_nanos();
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
@@ -30,7 +30,7 @@ pub fn timeval_from_duration(duration: zx::Duration) -> timeval {
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
 
-pub fn timespec_from_time<T: zx::Timeline>(time: zx::Time<T>) -> timespec {
+pub fn timespec_from_time<T: zx::Timeline>(time: zx::Instant<T>) -> timespec {
     let nanos = time.into_nanos();
     timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND }
 }
@@ -80,20 +80,20 @@ pub fn timespec_from_timeval(tv: timeval) -> timespec {
     timespec { tv_sec: tv.tv_sec, tv_nsec: tv.tv_usec * 1000 }
 }
 
-pub fn time_from_timeval<T: zx::Timeline>(tv: timeval) -> Result<zx::Time<T>, Errno> {
+pub fn time_from_timeval<T: zx::Timeline>(tv: timeval) -> Result<zx::Instant<T>, Errno> {
     let duration = duration_from_timeval(tv)?;
     if duration.into_nanos() < 0 {
         error!(EINVAL)
     } else {
-        Ok(zx::Time::ZERO + duration)
+        Ok(zx::Instant::ZERO + duration)
     }
 }
 
 /// Returns a `zx::SyntheticInstant` for the given `timespec`, treating the `timespec` as an absolute
 /// point in time (i.e., not relative to "now").
-pub fn time_from_timespec<T: zx::Timeline>(ts: timespec) -> Result<zx::Time<T>, Errno> {
+pub fn time_from_timespec<T: zx::Timeline>(ts: timespec) -> Result<zx::Instant<T>, Errno> {
     let duration = duration_from_timespec(ts)?;
-    Ok(zx::Time::ZERO + duration)
+    Ok(zx::Instant::ZERO + duration)
 }
 
 pub fn timespec_is_zero(ts: timespec) -> bool {
@@ -102,7 +102,7 @@ pub fn timespec_is_zero(ts: timespec) -> bool {
 
 /// Returns an `itimerspec` with `it_value` set to `deadline` and `it_interval` set to `interval`.
 pub fn itimerspec_from_deadline_interval<T: zx::Timeline>(
-    deadline: zx::Time<T>,
+    deadline: zx::Instant<T>,
     interval: zx::Duration,
 ) -> itimerspec {
     itimerspec {
