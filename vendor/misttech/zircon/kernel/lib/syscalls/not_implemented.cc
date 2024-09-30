@@ -14,8 +14,6 @@
 
 #include "priv.h"
 
-#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
-
 #define NO_RETURN(attrs) RETRUN_##attrs
 
 #define RETURN___NO_RETURN \
@@ -28,15 +26,14 @@
     return -88; \
   } while (0)
 
-
 // These don't have kernel entry points.
 #define VDSO_SYSCALL(...)
 
 // Make the function a weak symbol so real impl can override it.
 #define KERNEL_SYSCALL(name, type, attrs, nargs, arglist, prototype) \
-  extern "C" attrs type ni_sys_##name prototype;                                \
+  extern "C" attrs type ni_sys_##name prototype;                     \
   type ni_sys_##name prototype {                                     \
-    LTRACEF("Not implemented (%s)\n", __PRETTY_FUNCTION__);          \
+    TRACEF("Not implemented (%s)\n", __PRETTY_FUNCTION__);           \
     RETURN_##attrs;                                                  \
   }                                                                  \
   decltype(sys_##name) sys_##name __LEAF_FN __WEAK_ALIAS("ni_sys_" #name);
