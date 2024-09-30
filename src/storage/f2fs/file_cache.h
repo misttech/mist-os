@@ -336,8 +336,10 @@ class FileCache {
   void Downgrade(Page *raw_page) __TA_EXCLUDES(tree_lock_);
   bool IsOrphan() const { return is_orphan_.test(std::memory_order_relaxed); }
   bool SetOrphan() { return is_orphan_.test_and_set(std::memory_order_relaxed); }
-  // It returns a bitmap indicating which of blocks requires read I/O.
-  std::vector<bool> GetDirtyPagesInfo(pgoff_t index, size_t max_scan) __TA_EXCLUDES(tree_lock_);
+  // It returns a proper read size within the range of [size, size + max_size) according to the
+  // status of recently used pages and memory pressure level.
+  size_t GetReadHint(pgoff_t start, size_t size, size_t max_size, bool high_memory_pressure = false)
+      __TA_EXCLUDES(tree_lock_);
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
 

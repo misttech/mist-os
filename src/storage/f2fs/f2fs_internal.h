@@ -46,7 +46,7 @@ constexpr pgoff_t kInvalidPageOffset = std::numeric_limits<pgoff_t>::max();
 constexpr block_t kInvalidNodeOffset = std::numeric_limits<block_t>::max();
 
 // For readahead
-constexpr block_t kDefaultReadaheadSize = 32;
+constexpr block_t kMaxReadaheadSize = 128;
 constexpr block_t kDefaultNodeReadSize = 16;
 
 // CountType for monitoring

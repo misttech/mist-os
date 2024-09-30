@@ -151,16 +151,19 @@ TEST_F(FileCacheTest, WritebackOperation) {
   ASSERT_EQ(file.Writeback(op), 0UL);
   ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kWriteback), 0);
 
-  // The Pages should be kept but not uptodate since kernel can evict any clean pages.
+  // The Pages should not be kept on vnodes using pager after writeback.
   {
+    ASSERT_EQ(file.Writeback(op), 0UL);
     fbl::RefPtr<Page> page1, page2;
-    ASSERT_EQ(file.FindPage(0, &page1), ZX_OK);
-    ASSERT_EQ(file.FindPage(1, &page2), ZX_OK);
-    ASSERT_EQ(LockedPage(std::move(page1))->IsUptodate(), false);
-    ASSERT_EQ(LockedPage(std::move(page2))->IsUptodate(), false);
+    ASSERT_EQ(file.FindPage(0, &page1), ZX_ERR_NOT_FOUND);
+    ASSERT_EQ(file.FindPage(1, &page2), ZX_ERR_NOT_FOUND);
   }
 
   // Invalidate pages
+  {
+    LockedPage page = GetLockedPage(0);
+    page = GetLockedPage(1);
+  }
   file.InvalidatePages();
   {
     fbl::RefPtr<Page> page1, page2;
@@ -480,6 +483,36 @@ TEST_F(WritebackTest, InvalidPage) {
 
   // |page| should be notified.
   ASSERT_FALSE(page->IsWriteback());
+}
+
+TEST_F(FileCacheTest, ReadaheadSize) {
+  constexpr size_t size = 10;
+  constexpr size_t max_size = size + kMaxReadaheadSize;
+  FileCache *cache = &GetPage(0)->GetFileCache();
+  size_t num_pages = cache->GetReadHint(0, size, max_size);
+  ASSERT_EQ(num_pages, max_size);
+  cache->Reset();
+
+  GetPage(size);
+  num_pages = cache->GetReadHint(0, size, max_size);
+  ASSERT_EQ(num_pages, size);
+  cache->Reset();
+
+  size_t offset = (size + max_size) / 2;
+  GetPage(offset);
+  num_pages = cache->GetReadHint(0, size, max_size);
+  ASSERT_EQ(num_pages, offset);
+  cache->Reset();
+
+  GetPage(size / 2);
+  num_pages = cache->GetReadHint(0, size, max_size);
+  ASSERT_EQ(num_pages, max_size);
+  cache->Reset();
+
+  GetPage(size / 2);
+  num_pages = cache->GetReadHint(0, size, max_size, true);
+  ASSERT_EQ(num_pages, size);
+  cache->Reset();
 }
 
 }  // namespace

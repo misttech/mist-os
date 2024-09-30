@@ -526,24 +526,25 @@ void FileCache::Reset() {
   vmo_manager_->Reset();
 }
 
-std::vector<bool> FileCache::GetDirtyPagesInfo(pgoff_t index, size_t max_scan) {
-  std::vector<bool> read_blocks;
-  read_blocks.reserve(max_scan);
-
-  // Set bits in |read_blocks| which requires read IOs.
-  fs::SharedLock tree_lock(tree_lock_);
-  auto current = page_tree_.find(index);
-  for (size_t i = 0; i < max_scan; ++i) {
-    read_blocks.push_back(true);
-    if (current != page_tree_.end() && current->GetKey() == index + i) {
-      if (current->IsDirty() || current->IsWriteback()) {
-        // no read IOs for dirty or writeback pages which are uptodate and pinned.
-        read_blocks[i] = false;
-      }
-      ++current;
+size_t FileCache::GetReadHint(pgoff_t start, size_t size, size_t max_size,
+                              bool high_memory_pressure) {
+  // Consider using dirty or writeback pages on high memory pressure.
+  if (high_memory_pressure) {
+    return size;
+  }
+  fs::SharedLock lock(tree_lock_);
+  pgoff_t end = start + max_size;
+  auto last_page = page_tree_.lower_bound(start + size);
+  for (; last_page != page_tree_.end() && last_page->GetKey() < end; ++last_page) {
+    // Do not readahead recently used pages
+    if (last_page->GetKey() >= start + size) {
+      break;
     }
   }
-  return read_blocks;
+  if (last_page != page_tree_.end()) {
+    end = std::min(end, last_page->GetKey());
+  }
+  return end - start;
 }
 
 std::vector<fbl::RefPtr<Page>> FileCache::FindDirtyPages(const WritebackOperation &operation) {
@@ -575,8 +576,8 @@ std::vector<fbl::RefPtr<Page>> FileCache::FindDirtyPages(const WritebackOperatio
       if (raw_page->IsDirty()) {
         ZX_DEBUG_ASSERT(raw_page->IsLastReference());
         page = fbl::ImportFromRawPtr(raw_page);
-      } else if (operation.bReclaim) {
-        // Evict clean Pages if operation.bReclaim is set
+      } else if (operation.bReclaim || GetVmoManager().IsPaged()) {
+        // Evict clean Pages if it is invoked due to memory reclaim or its vnode is pager backed.
         fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
         EvictUnsafe(raw_page);
       }

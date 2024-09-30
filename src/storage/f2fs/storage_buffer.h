@@ -58,8 +58,7 @@ class OwnedStorageBuffer {
 
 class StorageBufferPool {
  public:
-  explicit StorageBufferPool(BcacheMapper *bcache_mapper,
-                             size_t default_size = kDefaultReadaheadSize,
+  explicit StorageBufferPool(BcacheMapper *bcache_mapper, size_t default_size = kMaxReadaheadSize,
                              size_t large_size = kDefaultBlocksPerSegment,
                              int num_pager_threads = 1);
   ~StorageBufferPool();

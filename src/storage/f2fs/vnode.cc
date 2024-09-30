@@ -137,73 +137,58 @@ void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
   }
 }
 
-block_t VnodeF2fs::GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block) {
-  block_t size = req_size;
-  size = std::max(kDefaultReadaheadSize, size);
-  if (start_block + size > end_block) {
-    size = end_block - start_block;
-  }
-  return size;
-}
-
 zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t offset,
                                                    const size_t length) {
-  std::vector<bool> block_bitmap;
-  size_t vmo_size = fbl::round_up(length, kBlockSize);
-  size_t file_size = GetSize();
-  const block_t num_requested_blocks = safemath::checked_cast<block_t>(vmo_size / kBlockSize);
-  block_t num_read_blocks = num_requested_blocks;
-  block_t start_block = safemath::checked_cast<block_t>(offset / kBlockSize);
+  constexpr size_t block_size = kBlockSize;
+  const size_t file_size = GetSize();
+  const size_t max_block = CheckedDivRoundUp(file_size, block_size);
 
-  // Just supply pages for appended or inline area without read I/Os.
+  const size_t start_block = offset / kBlockSize;
+  const size_t end_block = std::min(CheckedDivRoundUp(offset + length, block_size), max_block);
+  const size_t request_blocks = end_block - start_block;
+  size_t num_read_blocks = 0;
+
+  // Do not readahead if it has inline data or memory pressure is high.
   if (!TestFlag(InodeInfoFlag::kInlineData) && !TestFlag(InodeInfoFlag::kNoAlloc) &&
       offset < file_size) {
-    block_t end_block =
-        safemath::checked_cast<block_t>(fbl::round_up(file_size, kBlockSize) / kBlockSize);
-    num_read_blocks = GetReadBlockSize(start_block, num_read_blocks, end_block);
-    // Get the information about which of blocks are subject to writeback.
-    block_bitmap = file_cache_->GetDirtyPagesInfo(start_block, num_read_blocks);
-    ZX_ASSERT(num_read_blocks == block_bitmap.size());
-    vmo_size = num_read_blocks * kBlockSize;
+    size_t num_readahead_blocks = std::min(max_block, end_block + kMaxReadaheadSize) - start_block;
+    num_read_blocks = file_cache_->GetReadHint(start_block, request_blocks, num_readahead_blocks,
+                                               fs()->GetMemoryStatus(MemoryStatus::kNeedReclaim));
+  }
+
+  zx::result addrs = GetDataBlockAddresses(start_block, num_read_blocks, true);
+  if (addrs.is_error()) {
+    return addrs.take_error();
+  }
+
+  // Read blocks only for valid block addrs.
+  num_read_blocks = 0;
+  uint32_t num_checked_addrs = 0;
+  for (auto &addr : *addrs) {
+    ++num_checked_addrs;
+    if (addr != kNewAddr && addr != kNullAddr) {
+      num_read_blocks = num_checked_addrs;
+    }
+    if (num_checked_addrs == request_blocks && !num_read_blocks) {
+      // We can skip disk I/Os as well as readahead.
+      break;
+    }
   }
 
   // Create vmo to feed paged vmo.
+  size_t vmo_size = std::max(request_blocks, num_read_blocks) * block_size;
   if (auto status = zx::vmo::create(vmo_size, 0, &vmo); status != ZX_OK) {
     return zx::error(status);
   }
 
-  // Commit pages to |vmo|. Ensure that newly commited pages are set to zero.
-  if (auto ret = vmo.op_range(ZX_VMO_OP_COMMIT, 0, vmo_size, nullptr, 0); ret != ZX_OK) {
-    return zx::error(ret);
-  }
-
-  // Read blocks only for valid block addrs unless regarding pages are subject to writeback.
-  if (block_bitmap.size()) {
-    auto addrs = GetDataBlockAddresses(start_block, num_read_blocks, true);
-    if (addrs.is_error()) {
-      return addrs.take_error();
+  if (num_read_blocks) {
+    addrs->resize(num_read_blocks, kNullAddr);
+    if (auto status = fs()->MakeReadOperations(vmo, *addrs, PageType::kData); status.is_error()) {
+      return status.take_error();
     }
-    uint32_t i = 0;
-    block_t actual_read_blocks = 0;
-    for (auto &addr : *addrs) {
-      if (!block_bitmap[i++]) {
-        // no read IOs for dirty and writeback pages.
-        addr = kNullAddr;
-      } else if (addr != kNewAddr && addr != kNullAddr) {
-        // the number of blocks to be read.
-        ++actual_read_blocks;
-      }
-
-      if (i == num_requested_blocks && actual_read_blocks == 0) {
-        // All pages are already uptodate, and we can skip disk I/Os as well as readahead.
-        break;
-      }
-    }
-    if (actual_read_blocks) {
-      if (auto status = fs()->MakeReadOperations(vmo, *addrs, PageType::kData); status.is_error()) {
-        return status.take_error();
-      }
-    }
+    // Load read pages on FileCache as hints of readahead. It's okay to fail because the failure
+    // doesn't affect read operations but only readahead.
+    [[maybe_unused]] zx::result ret = GrabPages(start_block, start_block + num_read_blocks);
   }
   return zx::ok(vmo_size);
 }
