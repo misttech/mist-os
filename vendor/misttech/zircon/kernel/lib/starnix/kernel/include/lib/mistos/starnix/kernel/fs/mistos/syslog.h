@@ -8,6 +8,10 @@
 
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
+
+#include <ktl/span.h>
 
 namespace starnix {
 
@@ -15,12 +19,12 @@ class SyslogFile : public FileOps {
  public:
   static FileHandle new_file(const CurrentTask& current_task);
 
-  bool is_seekable() const final { return false; }
+  fileops_impl_nonseekable();
+  fileops_impl_noop_sync();
 
-  fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,
-                                 off_t current_offset, SeekTarget target) final {
-    return fit::error(errno(ESPIPE));
-  }
+  fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
+                                   const CurrentTask& current_task, size_t offset,
+                                   InputBuffer* data) final;
 
   fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
                                   const CurrentTask& current_task, size_t offset,
@@ -29,11 +33,10 @@ class SyslogFile : public FileOps {
     return fit::ok(0);
   }
 
-  fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
-                                   const CurrentTask& current_task, size_t offset,
-                                   InputBuffer* data) final {
-    DEBUG_ASSERT(offset == 0);
-    return fit::error(errno(ENOTSUP));
+  fit::result<Errno, starnix_syscalls::SyscallResult> ioctl(const FileObject& file,
+                                                            const CurrentTask& current_task,
+                                                            uint32_t request, long arg) final {
+    return default_ioctl(file, current_task, request, arg);
   }
 };
 
