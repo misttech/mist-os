@@ -55,10 +55,10 @@ list before submitting your contribution, to ensure code sample clarity:
           *   Importing libraries.
 *   **Link to existing documentation** where applicable.
       For example, a prerequisite for the process you are documenting
-      might be a paved Fuchsia target device.
-      Rather than restating how to pave one’s device, link to an existing
-      “Pave” topic that already exists on [fuchsia.dev](https://fuchsia.dev/),
-      such as [Build and pave quickstart](/docs/development/build/build_and_pave_quickstart.md).
+      might be a flashed Fuchsia target device.
+      Rather than restating how to flash one’s device, link to an existing
+      “Flash” topic that already exists on [fuchsia.dev](https://fuchsia.dev/),
+      such as [Build and flash Fuchsia](/docs/development/build/build_and_flash_fuchsia.md).
 *   **Avoid using `foo`, `bar`, or other vague placeholder names** if you are
     including placeholders in your code sample.
     Instead, use a name that expresses what that placeholder's function

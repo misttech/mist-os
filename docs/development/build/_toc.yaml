@@ -6,14 +6,12 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
+- title: "Build and flash Fuchsia"
+  path: /docs/development/build/build_and_flash_fuchsia.md
 - title: "Build Workbench"
   path: /docs/development/build/build_workbench.md
 - title: "fx workflows"
   path: /docs/development/build/fx.md
-- title: "Build and pave quickstart"
-  path: /docs/development/build/build_and_pave_quickstart.md
-- title: "Retrieve build information"
-  path: /docs/development/build/build_information.md
 - title: "Advanced"
   section:
   - title: "Build Clang toolchain"

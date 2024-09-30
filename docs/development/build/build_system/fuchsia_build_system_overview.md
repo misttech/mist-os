@@ -1,4 +1,4 @@
-# The Fuchsia build system
+# Fuchsia build system
 
 ## Overview
 
@@ -7,7 +7,7 @@ packages for various devices. To do so, it uses [GN][gn-main], a meta-build
 system that generates build files consumed by [Ninja][ninja-main], which
 executes the actual build.
 
-Note that Zircon uses a different build system, though still using GN and
+Note: Zircon uses a different build system, though still using GN and
 Ninja.
 
 ## Getting started
