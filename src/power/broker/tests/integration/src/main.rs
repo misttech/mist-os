@@ -148,6 +148,11 @@ mod tests {
         let parent_required_fut = parent_required.watch();
         let mut child_required_fut = child_required.watch();
 
+        // Attempt to update with invalid level, this should fail.
+        executor.run_singlethreaded(async {
+            assert!(child_lessor.lease(100).await.unwrap().is_err());
+        });
+
         // Acquire lease for C.
         // P's required level should become ON.
         // C's required level should remain OFF until P turns ON.

@@ -8,7 +8,7 @@ use fidl::endpoints::{create_request_stream, ServerEnd};
 use fidl_fuchsia_power_broker::{
     self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlRequest,
     ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
-    LeaseControlRequestStream, LeaseStatus, LessorRequest, LessorRequestStream,
+    LeaseControlRequestStream, LeaseError, LeaseStatus, LessorRequest, LessorRequestStream,
     RequiredLevelRequest, RequiredLevelRequestStream, StatusRequest, StatusRequestStream,
     TopologyRequest, TopologyRequestStream,
 };
@@ -77,8 +77,13 @@ impl BrokerSvc {
                         tracing::debug!("Lease({:?}, {:?})", &element_id, &level);
                         let resp = {
                             let mut broker = self.broker.borrow_mut();
-                            let level =
-                                broker.get_level_index(&element_id, &level).unwrap().clone();
+                            let Some(level) =
+                                broker.get_level_index(&element_id, &level).map(|l| l.clone())
+                            else {
+                                return responder
+                                    .send(Err(LeaseError::InvalidLevel))
+                                    .context("send failed");
+                            };
                             broker.acquire_lease(&element_id, level)
                         };
                         match resp {

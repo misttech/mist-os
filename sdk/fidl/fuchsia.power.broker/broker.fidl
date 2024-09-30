@@ -236,6 +236,8 @@ open protocol Lessor {
     /// `LeaseStatus::SATISFIED` this does not indicate the `PowerElement` is at
     /// the leased `PowerLevel`. Instead this indicates that the dependencies of
     /// the leased `PowerLevel` are at level required by the `PowerLevel`.
+    ///
+    /// Requesting an invalid level returns `LeaseError::INVALID_LEVEL`.
     flexible Lease(resource struct {
         /// Power level of this element to be raised to.
         level PowerLevel;
@@ -249,6 +251,7 @@ open protocol Lessor {
 type LeaseError = flexible enum {
     INTERNAL = 1;
     NOT_AUTHORIZED = 2;
+    INVALID_LEVEL = 3;
 };
 
 type LeaseStatus = flexible enum {

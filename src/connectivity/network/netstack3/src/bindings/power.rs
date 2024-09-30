@@ -122,6 +122,7 @@ impl From<fpower_broker::LeaseError> for FatalTransmitSuspensionError {
     fn from(value: fpower_broker::LeaseError) -> Self {
         match &value {
             fpower_broker::LeaseError::Internal
+            | fpower_broker::LeaseError::InvalidLevel
             | fpower_broker::LeaseError::NotAuthorized
             | fpower_broker::LeaseError::__SourceBreaking { .. } => Self::Lease(value),
         }
