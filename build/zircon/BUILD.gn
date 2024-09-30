@@ -43,7 +43,6 @@ group("sdk_category_internal_allowlist") {
     "//src/devices/lib/mmio/*",
     "//src/devices/testing/*",
     "//zircon/kernel/lib/devicetree/*",
-    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl/*",
     "//zircon/system/ulib/mmio-ptr/*",

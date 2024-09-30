@@ -2,12 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/zircon/zx_library.gni")
 
 zx_library("ddk-platform-defs") {
   sdk = "source"
-
-  # TODO(https://fxbug.dev/333125197): Update include paths and make a normal library.
-  sdk_publishable = "internal"
   sdk_headers = [ "lib/ddk/platform-defs.h" ]
 }
