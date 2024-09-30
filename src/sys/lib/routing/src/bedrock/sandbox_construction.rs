@@ -18,45 +18,79 @@ use cm_types::{IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::FutureExt;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{Capability, Data, Dict, Request, Router, Unit};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tracing::warn;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
+lazy_static! {
+    static ref NAMESPACE: Name = "namespace".parse().unwrap();
+    static ref RUNNER: Name = "runner".parse().unwrap();
+    static ref CONFIG: Name = "config".parse().unwrap();
+}
+
 /// All capabilities that are available to a component's program.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct ProgramInput {
-    /// All of the capabilities that appear in a program's namespace.
-    namespace: Dict,
+    // This will always have the following fields:
+    // - namespace: Dict
+    // - runner: Option<Router>
+    // - config: Dict
+    inner: Dict,
+}
 
-    /// A router for the runner that a component has used (if any). This is in an `Arc<Mutex<_>>`
-    /// because it needs to match the semantics of `Dict`, notably that clones grab new references
-    /// to the same underlying data and the data can be mutated without a mutable reference to
-    /// `ProgramInput`.
-    runner: Arc<Mutex<Option<Router>>>,
-
-    /// All of the config capabilities that a program will use.
-    config: Dict,
+impl Default for ProgramInput {
+    fn default() -> Self {
+        Self::new(Dict::new(), None, Dict::new())
+    }
 }
 
 impl ProgramInput {
     pub fn new(namespace: Dict, runner: Option<Router>, config: Dict) -> Self {
-        ProgramInput { namespace, runner: Arc::new(Mutex::new(runner)), config }
+        let inner = Dict::new();
+        inner.insert(NAMESPACE.clone(), namespace.into()).unwrap();
+        if let Some(runner) = runner {
+            inner.insert(RUNNER.clone(), runner.into()).unwrap();
+        }
+        inner.insert(CONFIG.clone(), config.into()).unwrap();
+        ProgramInput { inner }
     }
+
+    /// All of the capabilities that appear in a program's namespace.
     pub fn namespace(&self) -> Dict {
-        self.namespace.clone()
+        let cap = self.inner.get(&*NAMESPACE).expect("capabilities must be cloneable").unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("namespace entry must be a dict: {cap:?}");
+        };
+        dict
     }
 
+    /// A router for the runner that a component has used (if any).
     pub fn runner(&self) -> Option<Router> {
-        self.runner.lock().unwrap().clone()
+        let cap = self.inner.get(&*RUNNER).expect("capabilities must be cloneable");
+        match cap {
+            None => None,
+            Some(Capability::Router(r)) => Some(r),
+            cap => unreachable!("runner entry must be a router: {cap:?}"),
+        }
     }
 
+    fn set_runner(&self, router: Router) {
+        self.inner.insert(RUNNER.clone(), router.into()).unwrap()
+    }
+
+    /// All of the config capabilities that a program will use.
     pub fn config(&self) -> Dict {
-        self.config.clone()
+        let cap = self.inner.get(&*CONFIG).expect("capabilities must be cloneable").unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("config entry must be a dict: {cap:?}");
+        };
+        dict
     }
 }
 
@@ -125,8 +159,8 @@ impl ComponentSandbox {
                 &self.component_input.environment().resolvers(),
             ),
             (&component_output_dict, &self.component_output_dict),
-            (&program_input.namespace, &self.program_input.namespace),
-            (&program_input.config, &self.program_input.config),
+            (&program_input.namespace(), &self.program_input.namespace()),
+            (&program_input.config(), &self.program_input.config()),
             (&program_output_dict, &self.program_output_dict),
             (&framework_dict, &self.framework_dict),
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
@@ -138,8 +172,8 @@ impl ComponentSandbox {
                     .unwrap();
             }
         }
-        if let Some(runner_router) = program_input.runner.lock().unwrap().take() {
-            *self.program_input.runner.lock().unwrap() = Some(runner_router);
+        if let Some(runner_router) = program_input.runner() {
+            self.program_input.set_runner(runner_router);
         }
         for (key, component_input) in child_inputs.enumerate() {
             self.child_inputs.insert(key, component_input).unwrap();
@@ -523,7 +557,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
         .expect("failed to build default use metadata?");
     metadata.set_availability(*config_use.availability());
     let default_request = Request { metadata, target: component.as_weak().into() };
-    match program_input.config.insert_capability(
+    match program_input.config().insert_capability(
         &config_use.target_name,
         router
             .with_availability(moniker.clone(), *config_use.availability())
@@ -678,15 +712,14 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
         .with_availability(moniker.clone(), *use_.availability())
         .with_default(default_request);
     if let Some(target_path) = use_.path() {
-        if let Err(e) = program_input.namespace.insert_capability(target_path, router.into()) {
+        if let Err(e) = program_input.namespace().insert_capability(target_path, router.into()) {
             warn!("failed to insert {} in program input dict: {e:?}", target_path)
         }
     } else {
         match use_ {
             cm_rust::UseDecl::Runner(_) => {
-                let mut runner_guard = program_input.runner.lock().unwrap();
-                assert!(runner_guard.is_none(), "component can't use multiple runners");
-                *runner_guard = Some(router);
+                assert!(program_input.runner().is_none(), "component can't use multiple runners");
+                program_input.set_runner(router);
             }
             _ => panic!("unexpected capability type: {:?}", use_),
         }
