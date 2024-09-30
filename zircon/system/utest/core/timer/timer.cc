@@ -24,19 +24,19 @@ void CheckInfo(const zx::timer& timer, uint32_t options, zx_time_t deadline, zx_
 }
 
 TEST(Timer, DeadlineAfter) {
-  auto then = zx_clock_get_monotonic();
+  const zx::time then = zx::clock::get_monotonic();
   // The day we manage to boot and run this test in less than 1uS we need to fix this.
-  ASSERT_GT(then, 1000u);
+  ASSERT_GT(then, zx::time(1000u));
 
-  auto one_hour_later = zx_deadline_after(ZX_HOUR(1));
+  const zx::time one_hour_later = zx::deadline_after(zx::hour(1));
   EXPECT_LT(then, one_hour_later);
 
-  zx_duration_t too_big = INT64_MAX - 100;
-  auto clamped = zx_deadline_after(too_big);
-  EXPECT_EQ(clamped, ZX_TIME_INFINITE);
+  const zx::duration too_big = zx::duration(INT64_MAX - 100);
+  const zx::time clamped = zx::deadline_after(too_big);
+  EXPECT_EQ(clamped, zx::time::infinite());
 
-  EXPECT_LT(0, zx_deadline_after(10 * 365 * ZX_HOUR(24)));
-  EXPECT_LT(zx_deadline_after(ZX_TIME_INFINITE_PAST), 0);
+  EXPECT_LT(zx::time(), zx::deadline_after(10 * 365 * zx::hour(24)));
+  EXPECT_LT(zx::deadline_after(zx::duration::infinite_past()), zx::time());
 }
 
 TEST(Timer, SetNegativeDeadline) {
@@ -95,8 +95,8 @@ TEST(Timer, Basic) {
   EXPECT_EQ(pending, 0u);
 
   for (int ix = 0; ix != 3; ++ix) {
-    const auto deadline_timer = zx::deadline_after(zx::msec(10));
-    const auto deadline_wait = zx::deadline_after(zx::sec(1000));
+    const zx::time deadline_timer = zx::deadline_after(zx::msec(10));
+    const zx::time deadline_wait = zx::deadline_after(zx::sec(1000));
     // Timer should fire faster than the wait timeout.
     ASSERT_OK(timer.set(deadline_timer, zx::nsec(0)));
 
@@ -112,8 +112,8 @@ TEST(Timer, Restart) {
 
   zx_signals_t pending;
   for (int ix = 0; ix != 10; ++ix) {
-    const auto deadline_timer = zx::deadline_after(zx::msec(500));
-    const auto deadline_wait = zx::deadline_after(zx::msec(1));
+    const zx::time deadline_timer = zx::deadline_after(zx::msec(500));
+    const zx::time deadline_wait = zx::deadline_after(zx::msec(1));
     // Setting a timer already running is equivalent to a cancel + set.
     ASSERT_OK(timer.set(deadline_timer, zx::nsec(0)));
     CheckInfo(timer, 0, deadline_timer.get(), 0);
@@ -139,12 +139,12 @@ TEST(Timer, EdgeCases) {
 // furiously spin resetting the timer, trying to race with it going off to look for
 // race conditions.
 TEST(Timer, RestartRace) {
-  const zx_time_t kTestDuration = ZX_SEC(5);
-  auto start = zx_clock_get_monotonic();
+  const zx::duration kTestDuration = zx::msec(5);
+  const zx::time start = zx::clock::get_monotonic();
 
   zx::timer timer;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
-  while (zx_clock_get_monotonic() - start < kTestDuration) {
+  while (zx::clock::get_monotonic() - start < kTestDuration) {
     ASSERT_OK(timer.set(zx::deadline_after(zx::usec(100)), zx::nsec(0)));
   }
 
@@ -159,7 +159,7 @@ TEST(Timer, SignalsAssertedImmediately) {
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
 
   for (int i = 0; i < 100; i++) {
-    zx::time now = zx::clock::get_monotonic();
+    const zx::time now = zx::clock::get_monotonic();
 
     EXPECT_OK(timer.set(now, zx::nsec(0)));
 
@@ -190,10 +190,10 @@ void CheckCoalescing(uint32_t mode) {
   zx::timer timer_2;
   ASSERT_OK(zx::timer::create(mode, ZX_CLOCK_MONOTONIC, &timer_2));
 
-  zx_time_t start = zx_clock_get_monotonic();
+  const zx::time start = zx::clock::get_monotonic();
 
-  const auto deadline_1 = zx::time(start + ZX_MSEC(350));
-  const auto deadline_2 = zx::time(start + ZX_MSEC(250));
+  const zx::time deadline_1 = start + zx::msec(350);
+  const zx::time deadline_2 = start + zx::msec(250);
 
   ASSERT_OK(timer_1.set(deadline_1, zx::nsec(0)));
   ASSERT_OK(timer_2.set(deadline_2, zx::msec(110)));
@@ -204,12 +204,12 @@ void CheckCoalescing(uint32_t mode) {
   EXPECT_EQ(pending, ZX_TIMER_SIGNALED);
   CheckInfo(timer_2, 0, 0, 0);
 
-  auto duration = zx_clock_get_monotonic() - start;
+  const zx::duration duration = zx::clock::get_monotonic() - start;
 
   if (mode == ZX_TIMER_SLACK_LATE) {
-    EXPECT_GE(duration, ZX_MSEC(350));
+    EXPECT_GE(duration, zx::msec(350));
   } else if (mode == ZX_TIMER_SLACK_EARLY) {
-    EXPECT_LE(duration, ZX_MSEC(345));
+    EXPECT_LE(duration, zx::msec(345));
   } else {
     assert(false);
   }
