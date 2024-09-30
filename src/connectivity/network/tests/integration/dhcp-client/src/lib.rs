@@ -182,7 +182,7 @@ async fn create_test_realm<'a, N: Netstack>(
 
     let server_realm: netemul::TestRealm<'_> = sandbox
         .create_netstack_realm_with::<N, _, _>(
-            "server-realm",
+            format!("server-realm-{name}"),
             &[KnownServiceProvider::DhcpServer { persistent: false }],
         )
         .expect("create realm should succeed");
