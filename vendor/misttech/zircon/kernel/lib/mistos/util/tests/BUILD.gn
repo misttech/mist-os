@@ -8,8 +8,8 @@ source_set("tests") {
     "cprng-test.cc",
 
     #"range-map-test.cc",
-    #"split_string_unittest.cc",
     "bstring-test.cc",
+    "split_string_unittest.cc",
 
     #"trim_unittest.cc",
     #"weak_wrapper-test.cc",
