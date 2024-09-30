@@ -95,7 +95,7 @@ bool test_permissions() {
 
   FsStr path("test.bin");
   auto file = (*current_task)
-                  .open_file_at(FdNumber::_AT_FDCWD, path,
+                  .open_file_at(FdNumber::AT_FDCWD_, path,
                                 OpenFlags(OpenFlagsEnum::CREAT) | OpenFlags(OpenFlagsEnum::RDONLY),
                                 FileMode::from_bits(0777), ResolveFlags::empty());
 
@@ -127,7 +127,7 @@ bool test_persistence() {
                 .error_value()
                 .error_code());
   auto _txt = (*current_task)
-                  .open_file_at(FdNumber::_AT_FDCWD, "/usr/bin/test.txt",
+                  .open_file_at(FdNumber::AT_FDCWD_, "/usr/bin/test.txt",
                                 OpenFlags(OpenFlagsEnum::RDWR) | OpenFlags(OpenFlagsEnum::CREAT),
                                 FileMode::from_bits(0777), ResolveFlags::empty());
   auto txt = (*current_task).open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR));

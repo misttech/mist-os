@@ -75,7 +75,7 @@ fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
                                       starnix_uapi::UserCString user_path, uint32_t flags,
                                       starnix_uapi::FileMode mode) {
-  return sys_openat(current_task, FdNumber::_AT_FDCWD, user_path, flags, mode);
+  return sys_openat(current_task, FdNumber::AT_FDCWD_, user_path, flags, mode);
 }
 
 }  // namespace starnix

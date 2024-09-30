@@ -596,7 +596,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
                      &dir_fd]() -> fit::result<Errno, NamespaceNode> {
     if (path_is_absolute && !flags.contains(ResolveFlagsEnum::IN_ROOT)) {
       return fit::ok((*this)->fs()->root());
-    } else if (dir_fd == FdNumber::_AT_FDCWD) {
+    } else if (dir_fd == FdNumber::AT_FDCWD_) {
       return fit::ok((*this)->fs()->cwd());
     } else {
       // O_PATH allowed for:
@@ -640,7 +640,7 @@ fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFla
     // FileMode argument.
     return fit::error(errno(EINVAL));
   }
-  return open_file_at(FdNumber::_AT_FDCWD, path, flags, FileMode(), ResolveFlags::empty());
+  return open_file_at(FdNumber::AT_FDCWD_, path, flags, FileMode(), ResolveFlags::empty());
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_path(

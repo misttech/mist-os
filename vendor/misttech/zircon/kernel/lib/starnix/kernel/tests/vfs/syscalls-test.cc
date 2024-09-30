@@ -40,7 +40,7 @@ bool test_sys_open_cloexec() {
   auto result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
   ASSERT_TRUE(result.is_ok());
 
-  auto fd_or_error = sys_openat(*current_task, starnix::FdNumber::_AT_FDCWD, UserCString(path_addr),
+  auto fd_or_error = sys_openat(*current_task, starnix::FdNumber::AT_FDCWD_, UserCString(path_addr),
                                 O_RDONLY | O_CLOEXEC, starnix_uapi::FileMode());
   ASSERT_TRUE(fd_or_error.is_ok(), "failed to sys_openat");
 
