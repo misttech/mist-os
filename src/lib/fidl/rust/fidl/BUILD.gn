@@ -37,6 +37,7 @@ fidl_rust_sources = [
   "src/persistence.rs",
   "src/prelude.rs",
   "src/server.rs",
+  "src/time.rs",
 ]
 
 rustc_library("fidl") {

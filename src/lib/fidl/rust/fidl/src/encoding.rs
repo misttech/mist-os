@@ -12,6 +12,7 @@ use crate::endpoints::ProtocolMarker;
 use crate::handle::{
     Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights, Status,
 };
+use crate::time::{BootInstant, MonotonicInstant};
 use crate::{Error, MethodType, Result};
 use bitflags::bitflags;
 use std::cell::{RefCell, RefMut};
@@ -488,6 +489,76 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
     }
 }
 
+unsafe impl TypeMarker for BootInstant {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        mem::align_of::<Self>()
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        mem::size_of::<Self>()
+    }
+}
+
+impl ValueTypeMarker for BootInstant {
+    type Borrowed<'a> = Self;
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        *value
+    }
+}
+
+unsafe impl<D: ResourceDialect> Encode<BootInstant, D> for BootInstant {
+    #[inline]
+    unsafe fn encode(
+        self,
+        encoder: &mut Encoder<'_, D>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        encoder.debug_check_bounds::<Self>(offset);
+        encoder.write_num(self.into_nanos(), offset);
+        Ok(())
+    }
+}
+
+unsafe impl TypeMarker for MonotonicInstant {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        mem::align_of::<Self>()
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        mem::size_of::<Self>()
+    }
+}
+
+impl ValueTypeMarker for MonotonicInstant {
+    type Borrowed<'a> = Self;
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        *value
+    }
+}
+
+unsafe impl<D: ResourceDialect> Encode<MonotonicInstant, D> for MonotonicInstant {
+    #[inline]
+    unsafe fn encode(
+        self,
+        encoder: &mut Encoder<'_, D>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        encoder.debug_check_bounds::<Self>(offset);
+        encoder.write_num(self.into_nanos(), offset);
+        Ok(())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Decoder
 ////////////////////////////////////////////////////////////////////////////////
@@ -807,6 +878,44 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
             };
         }
         Ok(mem::replace(&mut handle_info.handle, Handle::invalid()))
+    }
+}
+
+impl<D: ResourceDialect> Decode<Self, D> for BootInstant {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        BootInstant::ZERO
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_, D>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        *self = Self::from_nanos(decoder.read_num(offset));
+        Ok(())
+    }
+}
+
+impl<D: ResourceDialect> Decode<Self, D> for MonotonicInstant {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        MonotonicInstant::ZERO
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_, D>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        *self = Self::from_nanos(decoder.read_num(offset));
+        Ok(())
     }
 }
 
@@ -3221,6 +3330,16 @@ mod test {
         for ctx in CONTEXTS {
             assert!(encode_decode::<f32>(ctx, f32::NAN).is_nan());
             assert!(encode_decode::<f64>(ctx, f64::NAN).is_nan());
+        }
+    }
+
+    #[test]
+    fn encode_decode_instants() {
+        let monotonic = MonotonicInstant::from_nanos(987654321);
+        let boot = BootInstant::from_nanos(987654321);
+        for ctx in CONTEXTS {
+            assert_eq!(encode_decode::<BootInstant>(ctx, boot), boot);
+            assert_eq!(encode_decode::<MonotonicInstant>(ctx, monotonic), monotonic);
         }
     }
 
