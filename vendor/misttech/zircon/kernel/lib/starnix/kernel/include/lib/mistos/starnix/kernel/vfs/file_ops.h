@@ -12,6 +12,8 @@
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
@@ -29,11 +31,12 @@ class InputBuffer;
 class DirectSink;
 
 using WeakFileHandle = util::WeakPtr<FileObject>;
-using UserAddress = starnix_uapi::UserAddress;
+using starnix_syscalls::SyscallResult;
+using starnix_uapi::UserAddress;
 
-fit::result<Errno, long> default_fcntl(uint32_t cmd);
-fit::result<Errno, long> default_ioctl(const FileObject&, const CurrentTask&, uint32_t request,
-                                       long arg);
+fit::result<Errno, SyscallResult> default_fcntl(uint32_t cmd);
+fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const CurrentTask&,
+                                                uint32_t request, long arg);
 
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 class FileOps {
@@ -52,6 +55,9 @@ class FileOps {
 
   /// Returns whether the file is seekable.
   virtual bool is_seekable() const = 0;
+
+  /// Returns true if `write()` operations on the file will update the seek offset.
+  bool writes_update_seek_offset() const { return has_persistent_offsets(); }
 
   /// Read from the file at an offset. If the file does not have persistent offsets (either
   /// directly, or because it is not seekable), offset will be 0 and can be ignored.
@@ -74,12 +80,7 @@ class FileOps {
   /// Syncs cached state associated with the file descriptor to persistent storage.
   ///
   /// The method blocks until the synchronization is complete.
-  virtual fit::result<Errno> sync(const FileObject& file, const CurrentTask& current_task) {
-    /*if (!file.node().is_reg() && !file.node().is_dir()) {
-      return fit::error(errno(EINVAL));
-    }*/
-    return fit::ok();
-  }
+  virtual fit::result<Errno> sync(const FileObject& file, const CurrentTask& current_task) = 0;
 
   /// Syncs cached data, and only enough metadata to retrieve said data, to persistent storage.
   ///
@@ -151,14 +152,15 @@ class FileOps {
   }
 #endif
 
-  virtual fit::result<Errno, long> ioctl(
+  virtual fit::result<Errno, SyscallResult> ioctl(
       /*Locked<FileOpsCore>& locked,*/ const FileObject& file, const CurrentTask& current_task,
       uint32_t request, long arg) {
     return default_ioctl(file, current_task, request, arg);
   }
 
-  virtual fit::result<Errno, long> fcntl(const FileObject& file, const CurrentTask& current_task,
-                                         uint32_t cmd, uint64_t arg) {
+  virtual fit::result<Errno, SyscallResult> fcntl(const FileObject& file,
+                                                  const CurrentTask& current_task, uint32_t cmd,
+                                                  uint64_t arg) {
     return default_fcntl(cmd);
   }
 
@@ -186,7 +188,6 @@ class FileOps {
     return fit::error(errno(EINVAL));
   }
 
- public:
   // C++
   virtual ~FileOps() = default;
 };
@@ -259,12 +260,12 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
   fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file, \
                                   const CurrentTask& current_task, size_t offset,          \
                                   OutputBuffer* data) final {                              \
-    return delegate.read(locked, file, current_task, offset, data);                        \
+    return (delegate).read(locked, file, current_task, offset, data);                      \
   }                                                                                        \
                                                                                            \
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,  \
                                  off_t current_offset, SeekTarget target) final {          \
-    return delegate.seek(file, current_task, current_offset, target);                      \
+    return (delegate).seek(file, current_task, current_offset, target);                    \
   }                                                                                        \
   using __fileops_impl_delegate_read_and_seek_force_semicolon = int
 
@@ -341,11 +342,22 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
   }                                                                                        \
   using __fileops_impl_directory_force_semicolon = int
 
+#define fileops_impl_noop_sync()                                                           \
+  fit::result<Errno> sync(const FileObject& file, const CurrentTask& current_task) final { \
+    if (!file.node()->is_reg() && !file.node()->is_dir()) {                                \
+      return fit::error(errno(EINVAL));                                                    \
+    }                                                                                      \
+    return fit::ok();                                                                      \
+  }                                                                                        \
+  using __fileops_impl_noop_sync_force_semicolon = int
+
 struct OPathOps : FileOps {
   /// impl OPathOps
   static OPathOps* New();
 
   /// impl FileOps
+  fileops_impl_noop_sync();
+
   bool has_persistent_offsets() const final { return false; }
 
   bool is_seekable() const final { return true; }
@@ -379,9 +391,9 @@ struct OPathOps : FileOps {
     return fit::error(errno(EBADF));
   }
 
-  fit::result<Errno, long> ioctl(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
-                                 const CurrentTask& current_task, uint32_t request,
-                                 long arg) final {
+  fit::result<Errno, SyscallResult> ioctl(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
+                                          const CurrentTask& current_task, uint32_t request,
+                                          long arg) final {
     return fit::error(errno(EBADF));
   }
 };

@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix/kernel/vfs/falloc.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix/kernel/vfs/xattr.h>
@@ -102,6 +103,7 @@ class MemoryFileObject : public FileOps {
 
   /// impl FileOps
   fileops_impl_memory(memory_);
+  fileops_impl_noop_sync();
 
   fit::result<Errno> readahead(const FileObject& file, const CurrentTask& current_task,
                                size_t offset, size_t length) final {
