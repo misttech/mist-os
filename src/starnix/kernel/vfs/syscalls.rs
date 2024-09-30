@@ -62,10 +62,10 @@ use starnix_uapi::{
     F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB,
-    MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE,
-    PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM,
-    POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
+    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC,
+    MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH,
+    O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND,
+    POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
     POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
     TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
     XATTR_REPLACE,
@@ -3072,11 +3072,30 @@ pub fn sys_io_uring_setup(
     if !current_task.kernel().features.io_uring {
         return error!(ENOSYS);
     }
-    let params = current_task.read_object(user_params)?;
-    let file = IoUringFileObject::new_file(current_task, entries, params)?;
-    // There doesn't seem to be a way to create an io_uring file descriptor with CLOEXEC, which is
-    // surprising.
-    current_task.add_file(file, FdFlags::empty())
+    if entries == 0 {
+        return error!(EINVAL);
+    }
+
+    let mut params = current_task.read_object(user_params)?;
+    for byte in params.resv {
+        if byte != 0 {
+            return error!(EINVAL);
+        }
+    }
+
+    const SUPPORTED_FLAGS: u32 = IORING_SETUP_CQSIZE;
+    let unsupported_flags = params.flags & !SUPPORTED_FLAGS;
+    if unsupported_flags != 0 {
+        track_stub!(TODO("https://fxbug.dev/297431387"), "io_uring flags", unsupported_flags);
+        return error!(EINVAL);
+    }
+
+    let file = IoUringFileObject::new_file(current_task, entries, &mut params)?;
+
+    // io_uring file descriptors are always created with CLOEXEC.
+    let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
+    current_task.write_object(user_params, &params)?;
+    Ok(fd)
 }
 
 pub fn sys_io_uring_enter(
