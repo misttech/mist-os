@@ -13,12 +13,12 @@
 
 namespace util {
 
-enum WhiteSpaceHandling {
+enum WhiteSpaceHandling : uint8_t {
   kKeepWhitespace,
   kTrimWhitespace,
 };
 
-enum SplitResult {
+enum SplitResult : uint8_t {
   // Strictly return all results.
   kSplitWantAll,
 
