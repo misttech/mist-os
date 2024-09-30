@@ -538,6 +538,7 @@ group("legacy_bundle_allowlist") {
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/early-boot-coverage/*",
     "//src/tests/limited_netsvc/image:*",
+    "//third_party/network-conformance/images:*",
     "//zircon/kernel/lib/userabi/userboot/tests:*",
     "//zircon/kernel/phys/test/debugdata-propagation:*",
     "//zircon/system/ulib/c/test:*",
