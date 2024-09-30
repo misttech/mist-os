@@ -96,7 +96,8 @@ impl FrameworkCapability for BinderFrameworkCapability {
 async fn report_routing_failure_to_target(target: WeakComponentInstance, err: ModelError) {
     match target.upgrade().map_err(|e| ModelError::from(e)) {
         Ok(target) => {
-            report_routing_failure(&DEBUG_REQUEST, &target, &err).await;
+            report_routing_failure(&*DEBUG_REQUEST, DEBUG_REQUEST.availability(), &target, &err)
+                .await;
         }
         Err(err) => {
             warn!(moniker=%target.moniker, error=%err, "failed to upgrade reference");

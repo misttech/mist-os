@@ -192,8 +192,16 @@ fn protocol_use(
             };
             let legacy_request = legacy_request.clone();
             Some(
-                async move { report_routing_failure(&legacy_request, &target, error).await }
-                    .boxed(),
+                async move {
+                    report_routing_failure(
+                        &legacy_request,
+                        legacy_request.availability(),
+                        &target,
+                        error,
+                    )
+                    .await
+                }
+                .boxed(),
             )
         },
     ))

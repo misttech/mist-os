@@ -24,7 +24,7 @@ use errors::ModelError;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use moniker::Moniker;
-use router_error::{Explain, RouterError};
+use router_error::RouterError;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -104,7 +104,7 @@ pub(super) async fn route_and_open_capability_with_reporting(
             Err(RoutingError::SourceCapabilityIsVoid { moniker: target.moniker.clone() }.into())
         }
         Err(e) => {
-            report_routing_failure(&route_request, &target, &e).await;
+            report_routing_failure(&route_request, route_request.availability(), &target, &e).await;
             Err(e)
         }
     }
@@ -188,22 +188,22 @@ pub(super) async fn delete_storage(routed_storage: RoutedStorage) -> Result<(), 
 }
 
 /// Sets an epitaph on `server_end` for a capability routing failure, and logs the error. Logs a
-/// failure to route a capability. Formats `err` as a `String`, but elides the type if the error is
-/// a `RoutingError`, the common case.
+/// failure to route a capability.
 pub async fn report_routing_failure(
-    request: &RouteRequest,
+    capability_requested: impl std::fmt::Display,
+    availability: Option<Availability>,
     target: &Arc<ComponentInstance>,
-    err: &impl Explain,
+    err: impl std::error::Error,
 ) {
     target
         .with_logger_as_default(|| {
-            let availability = request.availability().unwrap_or(Availability::Required);
+            let availability = availability.unwrap_or(Availability::Required);
             let moniker = &target.moniker;
             match availability {
                 Availability::Required => {
                     // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
                     warn!(
-                        "{request} was not available for target `{moniker}`:\n\t\
+                        "{capability_requested} was not available for target `{moniker}`:\n\t\
                         {err}\n\tFor more, run `ffx component doctor {moniker}`",
                     );
                 }
@@ -222,7 +222,7 @@ pub async fn report_routing_failure(
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
-                        "{availability} {request} was not available for target `{moniker}`:\n\t\
+                        "{availability} {capability_requested} was not available for target `{moniker}`:\n\t\
                         {err}\n\tFor more, run `ffx component doctor {moniker}`",
                     );
                 }

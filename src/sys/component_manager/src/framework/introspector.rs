@@ -178,7 +178,8 @@ impl CapabilityProvider for AccessDeniedCapabilityProvider {
             target_moniker: self.target.moniker.clone(),
         });
         if let Ok(target) = self.target.upgrade() {
-            report_routing_failure(&DEBUG_REQUEST, &target, &err).await;
+            report_routing_failure(&*DEBUG_REQUEST, DEBUG_REQUEST.availability(), &target, &err)
+                .await;
         }
         Err(err.into())
     }
