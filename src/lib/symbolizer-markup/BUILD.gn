@@ -2,15 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/library_headers.gni")
 import("//build/test.gni")
 
-config("includes") {
-  include_dirs = [ "include" ]
-}
-
-source_set("symbolizer-markup") {
-  public = [ "include/lib/symbolizer-markup/writer.h" ]
-  sources = []
+library_headers("headers") {
+  headers = [
+    "lib/symbolizer-markup/line-buffered-sink.h",
+    "lib/symbolizer-markup/writer.h",
+  ]
 
   public_deps = [
     "//sdk/lib/fit",
@@ -19,13 +18,12 @@ source_set("symbolizer-markup") {
   if (!is_fuchsia) {
     public_deps += [ "//zircon/system/public" ]
   }
+}
 
-  deps = [
-    "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
-  ]
+source_set("symbolizer-markup") {
+  public_deps = [ ":headers" ]
 
-  public_configs = [ ":includes" ]
+  sources = []
 }
 
 test("symbolizer-markup-unittests") {
@@ -33,6 +31,7 @@ test("symbolizer-markup-unittests") {
   deps = [
     ":symbolizer-markup",
     "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
 }

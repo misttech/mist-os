@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/symbolizer-markup/line-buffered-sink.h>
 #include <lib/symbolizer-markup/writer.h>
 
 #include <string>
 #include <string_view>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -15,6 +17,16 @@ struct Sink {
   void operator()(std::string_view s) { value.append(s); }
 
   std::string& value;
+};
+
+struct MockSink {
+  // gmock can't handle method names that aren't simple identifiers, so
+  // reflect to the Call gmock method.  This also allows that method to take
+  // std::string so we needn't assume that EXPECT_CALL arguments are all
+  // safely live-forever string_views.
+  void operator()(std::string_view str) { Call(std::string(str)); }
+
+  MOCK_METHOD(void, Call, (std::string));
 };
 
 TEST(SymbolizerMarkupTests, Literals) {
@@ -269,6 +281,50 @@ TEST(SymbolizerMarkupTests, LoadImageMmap) {
 {{{mmap:0x60000000:0x6000:load:5:wx:0x1800}}}
 {{{mmap:0x70000000:0x7000:load:6:x:0x1c00}}})""";
   EXPECT_EQ(kExpected, markup);
+}
+
+TEST(SymbolizerMarkupTests, LineBufferedSink) {
+  constexpr size_t kBufferSize = 64;
+
+  {
+    ::testing::StrictMock<MockSink> sink;
+    EXPECT_CALL(sink, Call("{{{reset}}}\n")).Times(2);
+
+    symbolizer_markup::Writer{symbolizer_markup::LineBuffered<kBufferSize>::Sink{std::ref(sink)}}
+        // This sends at least four chunks by definition, but each Reset()
+        // actually sends three.
+        .Reset()
+        .Newline()
+        .Reset()
+        .Newline();
+  }
+
+  // Test that an unfinished line gets flushed in the destructor.
+  {
+    ::testing::StrictMock<MockSink> sink;
+    EXPECT_CALL(sink, Call("first line\n"));
+    EXPECT_CALL(sink, Call("unfinished line has no newline"));
+    symbolizer_markup::Writer{symbolizer_markup::LineBuffered<kBufferSize>::Sink{std::ref(sink)}}
+        .Literal("first line")
+        .Newline()
+        .Literal("unfinished line has no newline");
+  }
+
+  // Test that a whole buffer is flushed when exactly full.
+  {
+    constexpr std::string_view kLongString =
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n";
+    constexpr std::string_view kFullChunk = kLongString.substr(0, kBufferSize);
+    constexpr std::string_view kRemainder = kLongString.substr(kBufferSize);
+    static_assert(kLongString.size() > kBufferSize);
+    static_assert(kFullChunk.size() == kBufferSize);
+    static_assert(kRemainder.size() < kBufferSize);
+
+    ::testing::StrictMock<MockSink> sink;
+    EXPECT_CALL(sink, Call(std::string(kFullChunk)));
+    EXPECT_CALL(sink, Call(std::string(kRemainder)));
+    symbolizer_markup::LineBuffered<kBufferSize>::Sink{std::ref(sink)}(kLongString);
+  }
 }
 
 }  // namespace
