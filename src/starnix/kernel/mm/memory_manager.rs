@@ -638,10 +638,8 @@ fn map_in_vmar(
             // be within the first 2 GB of the process address space.
             (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
         }
-        DesiredAddress::Any => unreachable!(),
-        DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
-            (addr - base_addr, zx::VmarFlags::SPECIFIC)
-        }
+        DesiredAddress::Hint(_) | DesiredAddress::Any => unreachable!(),
+        DesiredAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
         DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
     };
 
@@ -671,17 +669,7 @@ fn map_in_vmar(
         | vmar_maybe_map_range;
 
     profile.pivot("VmarMapSyscall");
-    let mut map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
-
-    // Retry mapping if the target address was a Hint.
-    profile.pivot("MapInVmarResults");
-    if map_result.is_err() {
-        if let DesiredAddress::Hint(_) = addr {
-            let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
-            map_result = memory.map_in_vmar(vmar, 0, memory_offset, length, vmar_flags);
-        }
-    }
-
+    let map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
     let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
 
     Ok(UserAddress::from_ptr(mapped_addr))
@@ -711,30 +699,51 @@ impl MemoryManagerState {
         }
     }
 
+    // Accept the hint if the range is unused and does not wrap around.
+    fn is_hint_acceptable(&self, hint_addr: UserAddress, length: usize) -> bool {
+        let Some(hint_end) = hint_addr.checked_add(length) else {
+            return false;
+        };
+        self.mappings.intersection(&(hint_addr..hint_end)).next().is_none()
+    }
+
     // Map the memory without updating `self.mappings`.
     fn map_internal(
         &self,
-        addr: DesiredAddress,
+        mut addr: DesiredAddress,
         memory: &MemoryObject,
         memory_offset: u64,
         length: usize,
         flags: MappingFlags,
         populate: bool,
     ) -> Result<UserAddress, Errno> {
-        let new_addr = match addr {
-            DesiredAddress::Any if !flags.contains(MappingFlags::LOWER_32BIT) => {
-                profile_duration!("FindAddressForMmap");
-                let new_addr: UserAddress = self
-                    .find_next_unused_range(round_up_to_system_page_size(length)?)
-                    .ok_or_else(|| errno!(ENOMEM))?;
-                DesiredAddress::Fixed(new_addr)
-            }
-            _ => addr,
-        };
+        let adjusted_length = round_up_to_system_page_size(length)?;
+
+        // If the hint is not acceptable, strip it.
+        if let DesiredAddress::Hint(mut hint_addr) = addr {
+            // Round down to page size
+            hint_addr =
+                UserAddress::from_ptr(hint_addr.ptr() - hint_addr.ptr() % *PAGE_SIZE as usize);
+            addr = if self.is_hint_acceptable(hint_addr, adjusted_length) {
+                DesiredAddress::Fixed(hint_addr)
+            } else {
+                DesiredAddress::Any
+            };
+        }
+
+        // If the address is not known at this point, choose an available one. If LOWER_32BIT is
+        // set, defer the decision to Zircon.
+        if addr == DesiredAddress::Any && !flags.contains(MappingFlags::LOWER_32BIT) {
+            profile_duration!("FindAddressForMmap");
+            let new_addr = self
+                .find_next_unused_range(round_up_to_system_page_size(length)?)
+                .ok_or_else(|| errno!(ENOMEM))?;
+            addr = DesiredAddress::Fixed(new_addr)
+        }
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            new_addr,
+            addr,
             memory,
             memory_offset,
             length,
@@ -3784,7 +3793,7 @@ impl MemoryManager {
 }
 
 /// The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DesiredAddress {
     /// Map at any address chosen by the kernel.
     Any,

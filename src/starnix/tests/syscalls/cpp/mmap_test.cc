@@ -1131,4 +1131,50 @@ TEST(Mmap, AddressesAreInDescendingOrder) {
   }
 }
 
+TEST(Mmap, HintIgnoredIfInUse) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* page_in_use = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(page_in_use, MAP_FAILED);
+
+  // Probe for the next available address
+  void* next_addr = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(next_addr, page_in_use);
+  ASSERT_EQ(munmap(next_addr, page_size), 0);
+
+  // Try to mmap at the address that is unavailable, without an overwrite flag.
+  void* hint_result = mmap(page_in_use, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  // mmap should have given us the next available address, ignoring the hint
+  EXPECT_EQ(hint_result, next_addr);
+  ASSERT_EQ(munmap(hint_result, page_size), 0);
+
+  ASSERT_EQ(munmap(page_in_use, page_size), 0);
+}
+
+TEST(Mmap, HintRoundedDownIfMisaligned) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  // Probe for a next available 1-page and 2-page gaps
+  void* next_onepage = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(next_onepage, MAP_FAILED);
+  void* next_twopage = mmap(nullptr, 2 * page_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(next_twopage, MAP_FAILED);
+  ASSERT_EQ(munmap(next_onepage, page_size), 0);
+  ASSERT_EQ(munmap(next_twopage, 2 * page_size), 0);
+
+  void* hint_result = mmap(static_cast<char*>(next_twopage) + 1, page_size, PROT_NONE,
+                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(hint_result, MAP_FAILED);
+  EXPECT_NE(hint_result,
+            next_onepage);  // Not ignoring the hint by allocating the next available 1-page gap
+  EXPECT_EQ(hint_result, next_twopage);  // Instead, rounding down the hinted address and using it.
+  ASSERT_EQ(munmap(hint_result, page_size), 0);
+
+  hint_result = mmap(static_cast<char*>(next_twopage) + page_size - 1, page_size, PROT_NONE,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(hint_result, MAP_FAILED);
+  EXPECT_NE(hint_result,
+            next_onepage);  // Not ignoring the hint by allocating the next available 1-page gap
+  EXPECT_EQ(hint_result, next_twopage);  // Instead, rounding down the hinted address and using it.
+  ASSERT_EQ(munmap(hint_result, page_size), 0);
+}
+
 }  // namespace
