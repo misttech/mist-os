@@ -29,7 +29,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::distributions::Uniform;
 use rand::Rng;
 
-use crate::internal::device::opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret};
+use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
 use crate::internal::device::state::{Lifetime, SlaacConfig, TemporarySlaacConfig};
 use crate::internal::device::{AddressRemovedReason, Ipv6DeviceAddr};
 
@@ -173,7 +173,7 @@ pub struct SlaacAddrsMutAndConfig<'a, BT: SlaacBindingsTypes, A: SlaacAddresses<
     /// The device's interface identifier.
     pub interface_identifier: [u8; 8],
     /// Secret key for generating temporary addresses.
-    pub temp_secret_key: StableIidSecret,
+    pub temp_secret_key: IidSecret,
     #[allow(missing_docs)]
     pub _marker: PhantomData<BT>,
 }
@@ -1368,7 +1368,7 @@ fn generate_global_temporary_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8; 8],
     seed: u64,
-    secret_key: &StableIidSecret,
+    secret_key: &IidSecret,
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     let prefix_len = usize::from(prefix.prefix() / 8);
 
@@ -1407,7 +1407,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     dad_transmits: Option<NonZeroU16>,
     retrans_timer: Duration,
     iid: [u8; 8],
-    temp_secret_key: StableIidSecret,
+    temp_secret_key: IidSecret,
 ) {
     if subnet.prefix() != REQUIRED_PREFIX_BITS {
         // If the sum of the prefix length and interface identifier length does
@@ -2299,7 +2299,7 @@ mod tests {
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
     }
 
-    const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;
+    const SECRET_KEY: IidSecret = IidSecret::ALL_ONES;
 
     const ONE_HOUR: NonZeroDuration =
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));

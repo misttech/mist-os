@@ -46,7 +46,7 @@ pub mod device {
         DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef,
         DadTimerId,
     };
-    pub use crate::internal::device::opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret};
+    pub use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
     pub use crate::internal::device::route_discovery::{
         Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryBindingsContext,
         Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,

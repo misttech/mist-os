@@ -12,29 +12,29 @@ use rand::Rng;
 
 /// The length in bytes of the `secret_key` argument to
 /// [`generate_opaque_interface_identifier`].
-const STABLE_IID_SECRET_KEY_BYTES: usize = 32;
+const IID_SECRET_KEY_BYTES: usize = 32;
 
-/// A stable secret for generating [`OpaqueIid`]s.
+/// A secret for generating [`OpaqueIid`]s.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct StableIidSecret([u8; STABLE_IID_SECRET_KEY_BYTES]);
+pub struct IidSecret([u8; IID_SECRET_KEY_BYTES]);
 
-impl StableIidSecret {
+impl IidSecret {
     /// A static secret for use in tests.
     #[cfg(any(test, feature = "testutils"))]
-    pub const ALL_ONES: Self = Self([1u8; STABLE_IID_SECRET_KEY_BYTES]);
+    pub const ALL_ONES: Self = Self([1u8; IID_SECRET_KEY_BYTES]);
 
     /// Creates a new random secret with the provided `rng`.
     pub fn new_random<R: Rng>(rng: &mut R) -> Self {
-        let mut bytes = [0u8; STABLE_IID_SECRET_KEY_BYTES];
+        let mut bytes = [0u8; IID_SECRET_KEY_BYTES];
         rng.fill(&mut bytes[..]);
         Self(bytes)
     }
 }
 
-impl Debug for StableIidSecret {
+impl Debug for IidSecret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Avoid putting the secret in logs.
-        f.write_str("StableIidSecret(..)")
+        f.write_str("IidSecret(..)")
     }
 }
 
@@ -71,7 +71,7 @@ impl OpaqueIid {
         net_iface: IF,
         net_id: ID,
         dad_counter: OpaqueIidNonce,
-        secret_key: &StableIidSecret,
+        secret_key: &IidSecret,
     ) -> Self
     where
         IF: AsRef<[u8]>,
@@ -159,7 +159,7 @@ impl OpaqueIid {
             write_u64(hmac, u.try_into().unwrap())
         }
 
-        let StableIidSecret(secret_key) = secret_key;
+        let IidSecret(secret_key) = secret_key;
         let mut hmac = HmacSha256::new_from_slice(&secret_key[..]).expect("create new HmacSha256");
 
         // Write prefix address; no need to prefix with length because this is
@@ -235,7 +235,7 @@ mod tests {
         let default_net_iface = &[0, 1, 2];
         let default_net_id = &[3, 4, 5];
         let default_dad_counter = OpaqueIidNonce::DadCounter(0);
-        let default_secret_key = &StableIidSecret::ALL_ONES;
+        let default_secret_key = &IidSecret::ALL_ONES;
 
         // Test that the same arguments produce the same output.
         let iid0 = OpaqueIid::new(
@@ -374,7 +374,7 @@ mod tests {
         const DAD_COUNTER: OpaqueIidNonce = OpaqueIidNonce::DadCounter(0);
 
         assert_eq!(
-            OpaqueIid::new(PREFIX, NET_IFACE, NET_ID, DAD_COUNTER, &StableIidSecret::ALL_ONES),
+            OpaqueIid::new(PREFIX, NET_IFACE, NET_ID, DAD_COUNTER, &IidSecret::ALL_ONES),
             OpaqueIid(255541303695013087662815070945404751656),
         );
     }

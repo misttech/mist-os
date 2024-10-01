@@ -124,12 +124,12 @@ pub mod ip {
     // Re-exported types.
     pub use netstack3_base::{SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
-        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
+        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason, IidSecret,
         IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceConfigurationUpdate,
         Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfiguration,
-        StableIidSecret, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+        TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::multicast_forwarding::{
         ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
