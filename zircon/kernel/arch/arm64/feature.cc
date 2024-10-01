@@ -215,6 +215,12 @@ enum arm64_microarch midr_to_microarch(uint32_t midr) {
         return ARM_CORTEX_A520;
       case 0xd81:
         return ARM_CORTEX_A720;
+      case 0xd82:
+        return ARM_CORTEX_X4;
+      case 0xd85:
+        return ARM_CORTEX_X925;
+      case 0xd87:
+        return ARM_CORTEX_A725;
       default:
         return UNKNOWN;
     }
@@ -320,6 +326,9 @@ static void midr_to_core_string(uint32_t midr, char* str, size_t len) {
     case ARM_CORTEX_A720:
       partnum_str = "ARM Cortex-A720";
       break;
+    case ARM_CORTEX_A725:
+      partnum_str = "ARM Cortex-A725";
+      break;
     case ARM_CORTEX_X1:
       partnum_str = "ARM Cortex-X1";
       break;
@@ -331,6 +340,12 @@ static void midr_to_core_string(uint32_t midr, char* str, size_t len) {
       break;
     case ARM_CORTEX_X3:
       partnum_str = "ARM Cortex-X3";
+      break;
+    case ARM_CORTEX_X4:
+      partnum_str = "ARM Cortex-X4";
+      break;
+    case ARM_CORTEX_X925:
+      partnum_str = "ARM Cortex-X925";
       break;
     case ARM_NEOVERSE_E1:
       partnum_str = "ARM Neoverse E1";
