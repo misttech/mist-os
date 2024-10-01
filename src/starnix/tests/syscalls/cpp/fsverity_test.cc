@@ -33,7 +33,7 @@ class FsverityTest : public ::testing::Test {
           << "This test does not generally work on Linux as it requires a kernel with fsverity.";
     }
 
-    const char *tmpdir = getenv("FSVERITY_TMPDIR");
+    const char *tmpdir = getenv("MUTABLE_STORAGE");
     test_filename_ = std::string(tmpdir) + "/fsverity";
 
     int fd = open(test_filename_.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
@@ -58,7 +58,7 @@ TEST(FsverityUnitTest, OriginalFileHandle) {
         << "This test does not generally work on Linux as it requires a kernel with fsverity.";
   }
 
-  const char *tmpdir = getenv("FSVERITY_TMPDIR");
+  const char *tmpdir = getenv("MUTABLE_STORAGE");
   std::string filename = std::string(tmpdir) + "/fsverity";
   int fd = open(filename.c_str(), O_CREAT | O_RDWR);
   ASSERT_GT(fd, 0) << fd << " errno:" << errno;

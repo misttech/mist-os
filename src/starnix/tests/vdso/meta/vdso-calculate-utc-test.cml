@@ -10,7 +10,6 @@
         binary: "data/tests/vdso-calculate-utc-test-bin",
         uid: "0",
         test_type: "gtest",
-        environ: [ "FSVERITY_TMPDIR={component_path}/data" ],
     },
     use: [
         {

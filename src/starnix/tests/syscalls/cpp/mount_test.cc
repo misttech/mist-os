@@ -274,7 +274,6 @@ TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
   std::string expected_contents;
   EXPECT_TRUE(files::ReadFileToString("data/hello_world.txt", &expected_contents));
 
-  // TODO(https://fxbug.dev/42080815) remove explicit loopback discovery and binding once unneeded
   fbl::unique_fd loop_control(open("/dev/loop-control", O_RDWR, 0777));
   ASSERT_TRUE(loop_control.is_valid());
 
@@ -296,6 +295,53 @@ TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
 
   std::string observed_contents;
   EXPECT_TRUE(files::ReadFileToString(TestPath("basic_ext4/hello_world.txt"), &observed_contents));
+
+  ASSERT_EQ(expected_contents, observed_contents);
+}
+
+// Test that we can successfully mount ext4 images backed files in an fs that returns resizable
+// VMOs.
+TEST_F(MountTest, Ext4ReadOnlyInMutableStorageSmokeTest) {
+  std::string expected_contents;
+  ASSERT_TRUE(files::ReadFileToString("data/hello_world.txt", &expected_contents));
+
+  fbl::unique_fd loop_control(open("/dev/loop-control", O_RDWR, 0777));
+  ASSERT_TRUE(loop_control.is_valid());
+
+  int free_loop_device_num(ioctl(loop_control.get(), LOOP_CTL_GET_FREE, nullptr));
+  ASSERT_TRUE(free_loop_device_num >= 0);
+
+  std::string loop_device_path = "/dev/loop" + std::to_string(free_loop_device_num);
+  fbl::unique_fd free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
+  ASSERT_TRUE(free_loop_device.is_valid());
+
+  // Copy the original ext4 image to a location in mutable storage.
+  std::ifstream orig_image("data/simple_ext4.img", std::ios_base::in | std::ios::binary);
+  std::string image_in_mut_storage_path =
+      std::string(std::getenv("MUTABLE_STORAGE")) + "/simple_ext4_in_mut_storage.img";
+  std::ofstream image_in_mut_storage(image_in_mut_storage_path,
+                                     std::ios_base::out | std::ios::binary);
+  ASSERT_TRUE(orig_image.good());
+  ASSERT_TRUE(image_in_mut_storage.good());
+  char buf[4096];
+  do {
+    orig_image.read(&buf[0], 4096);
+    image_in_mut_storage.write(&buf[0], orig_image.gcount());
+  } while (orig_image.gcount() > 0);
+  orig_image.close();
+  image_in_mut_storage.close();
+
+  fbl::unique_fd ext_image(open(image_in_mut_storage_path.c_str(), O_RDONLY, 0644));
+  ASSERT_TRUE(ext_image.is_valid());
+
+  ASSERT_SUCCESS(ioctl(free_loop_device.get(), LOOP_SET_FD, ext_image.get()));
+
+  ASSERT_SUCCESS(MakeDir("basic_ext4"));
+  ASSERT_SUCCESS(
+      mount(loop_device_path.c_str(), TestPath("basic_ext4").c_str(), "ext4", MS_RDONLY, nullptr));
+
+  std::string observed_contents;
+  ASSERT_TRUE(files::ReadFileToString(TestPath("basic_ext4/hello_world.txt"), &observed_contents));
 
   ASSERT_EQ(expected_contents, observed_contents);
 }

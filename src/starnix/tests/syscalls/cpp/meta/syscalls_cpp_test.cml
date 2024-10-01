@@ -9,7 +9,7 @@
     program: {
         uid: "0",
         test_type: "gtest",
-        environ: [ "FSVERITY_TMPDIR={component_path}/data" ],
+        environ: [ "MUTABLE_STORAGE={component_path}/data" ],
     },
     use: [
         {
@@ -19,6 +19,7 @@
         },
         {
             storage: "data",
+            rights: [ "rw*" ],
             path: "/data",
         },
     ],
