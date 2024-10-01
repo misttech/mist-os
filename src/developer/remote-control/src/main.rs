@@ -15,7 +15,6 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 use {fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync};
 
-mod args;
 mod usb;
 
 async fn exec_server() -> Result<(), Error> {
@@ -108,15 +107,8 @@ async fn exec_server() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    let args::RemoteControl { cmd } = argh::from_env();
-
-    let res = match cmd {
-        args::Command::RemoteControl(_) => exec_server().await,
-    };
-
-    if let Err(err) = res {
-        error!(%err, "Error running command");
-        std::process::exit(1);
+    if let Err(err) = exec_server().await {
+        error!(%err, "Error executing server");
     }
     Ok(())
 }
