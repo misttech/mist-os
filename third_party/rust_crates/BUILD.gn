@@ -1436,8 +1436,10 @@ rust_library("ahash-v0_8_6") {
     "--edition=2018",
     "-Cmetadata=c0866eecdfac783f",
     "-Cextra-filename=-c0866eecdfac783f",
+    "--cfg=feature=\"default\"",
     "--cfg=feature=\"getrandom\"",
     "--cfg=feature=\"runtime-rng\"",
+    "--cfg=feature=\"std\"",
   ]
   if (current_cpu == "x64" || current_cpu == "arm64" || false || false ||
       false || false) {

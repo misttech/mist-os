@@ -27,7 +27,7 @@ aead = { version = "0.4.2", features = ["std"] }
 aes = "0.8.4"
 aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
-ahash = { version = "0.8.6", default-features = false, features = [ "runtime-rng" ] }
+ahash = "0.8.6"
 ansi_term = "0.12.0"
 anyhow = "1.0.86"
 arbitrary = { version = "1.0.3", features = ["derive"] }
