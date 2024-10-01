@@ -66,7 +66,8 @@ closed protocol Misc {
 
     /// ## Summary
     ///
-    /// Read the number of high-precision timer ticks since boot.
+    /// Read the number of high-precision timer ticks since boot, not including
+    /// time spent suspended.
     ///
     /// ## Declaration
     ///
@@ -78,7 +79,8 @@ closed protocol Misc {
     ///
     /// ## Description
     ///
-    /// `zx_ticks_get()` returns the number of high-precision timer ticks since boot.
+    /// `zx_ticks_get()` returns the number of high-precision timer ticks since boot,
+    /// not including time spent suspended.
     ///
     /// These ticks may be processor cycles, high speed timer, profiling timer, etc.
     /// They are not guaranteed to continue advancing when the system is asleep.
@@ -162,7 +164,6 @@ closed protocol Misc {
     /// ## See also
     ///
     /// [ticks_per_second](ticks_per_second.md)
-    @next
     @vdsocall
     strict TicksGetBoot() -> (@wrapped_return struct {
         ticks Ticks;
