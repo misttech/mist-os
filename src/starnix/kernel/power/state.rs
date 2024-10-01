@@ -98,8 +98,7 @@ impl BytesFileOps for PowerStateFile {
 
         #[cfg(feature = "wake_locks")]
         {
-            // TODO(https://fxbug.dev/328306129): Replace this with boot time.
-            let suspend_start_time = zx::MonotonicInstant::get();
+            let suspend_start_time = zx::BootInstant::get();
             let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
                 .expect("Failed to connect to manager");
             match manager.suspend_container(
@@ -117,8 +116,7 @@ impl BytesFileOps for PowerStateFile {
                 zx::Instant::INFINITE,
             ) {
                 Ok(Ok(res)) => {
-                    // TODO(https://fxbug.dev/328306129): Replace this with boot time.
-                    let wake_time = zx::MonotonicInstant::get();
+                    let wake_time = zx::BootInstant::get();
                     power_manager.update_suspend_stats(|suspend_stats| {
                         suspend_stats.success_count += 1;
                         suspend_stats.last_time_in_suspend_operations =
