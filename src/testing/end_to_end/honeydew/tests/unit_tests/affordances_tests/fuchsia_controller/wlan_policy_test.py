@@ -161,7 +161,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         self.network_config_iterator: asyncio.Task[None] | None = None
 
     def tearDown(self) -> None:
-        self.wlan_policy_obj.close()
+        self.wlan_policy_obj._close()
         return super().tearDown()
 
     @contextmanager

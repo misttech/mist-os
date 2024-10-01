@@ -88,10 +88,6 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             self.access_point.close()
         super().teardown_test()
 
-    def teardown_class(self) -> None:
-        self.device.wlan_policy.close()
-        return super().teardown_class()
-
     def test_client_methods(self) -> None:
         """Test case for wlan_policy client methods.
 

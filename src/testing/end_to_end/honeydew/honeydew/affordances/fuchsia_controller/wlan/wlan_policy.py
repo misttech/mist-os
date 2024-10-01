@@ -140,9 +140,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
 
-        self._fuchsia_device_close.register_for_on_device_close(self.close)
+        self._fuchsia_device_close.register_for_on_device_close(self._close)
 
-    def close(self) -> None:
+    def _close(self) -> None:
         """Release handle on client controller.
 
         This needs to be called on test class teardown otherwise the device may
