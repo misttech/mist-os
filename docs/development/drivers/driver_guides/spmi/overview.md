@@ -61,8 +61,37 @@ spmi@0xffff0000 {
         reg = <$TARGET_ID SPMI_USID>;
         reg-names = "$TARGET_NAME";
 
-        /* The new node is below */
+        /* Your driver's node is below */
         $SUB_TARGET_DEVICE_TYPE@$SUB_TARGET_ADDRESS {
+            compatible = "$COMPATIBLE"
+            reg = <$SUB_TARGET_ADDRESS $SUB_TARGET_SIZE>;
+            reg-names = "$SUB_TARGET_NAME";
+        };
+    };
+};
+```
+
+If your driver node must be the child of some other bus, you can also get access
+to a sub-target with an `spmis` reference property. For example:
+
+```none {:.devsite-disable-click-to-copy}
+#include "sdk/lib/driver/devicetree/visitors/drivers/spmi-controllers/spmi/spmi.h"
+
+$BUS@0xffff1000 {
+    /* Your driver's node is below */
+    $BUS_CHILD {
+        compatible = "$COMPATIBLE"
+        spmis = <&$SUB_TARGET_LABEL>;
+    };
+};
+
+spmi@0xffff0000 {
+    $TARGET_DEVICE_TYPE@$TARGET_ID {
+        reg = <$TARGET_ID SPMI_USID>;
+        reg-names = "$TARGET_NAME";
+
+        /* This is the sub-target your driver can access */
+        $SUB_TARGET_LABEL: $SUB_TARGET_DEVICE_TYPE@$SUB_TARGET_ADDRESS {
             reg = <$SUB_TARGET_ADDRESS $SUB_TARGET_SIZE>;
             reg-names = "$SUB_TARGET_NAME";
         };
@@ -73,7 +102,7 @@ spmi@0xffff0000 {
 Your driver should connect to
 [fuchsia.hardware.spmi.SubTargetService][spmi.fidl], and have an entry for it in
 its component manifest. The SPMI controller driver will add a node for your
-sub-target with the following bind properties:
+sub-target or reference property with the following bind properties:
 
 | Property | Optional | Purpose |
 | -------- | -------- | ------- |
@@ -86,6 +115,17 @@ sub-target with the following bind properties:
 Register accesses through [fuchsia.hardware.spmi.Device][spmi.fidl] will be
 mapped to the sub-target's starting address, and limited to the range assigned
 to the sub-target.
+
+
+#### Sub-target devicetree bindings
+
+The following are prohibited by the [SPMI devicetree visitor][spmi-visitor]:
+
+- Target nodes being referenced in `spmis` properties
+- A sub-target node having a `compatible` property and also being referenced in
+  an `spmis` property
+- A sub-target node being referenced by `spmis` properties in multiple other
+  nodes
 
 ## Writing an SPMI controller driver
 

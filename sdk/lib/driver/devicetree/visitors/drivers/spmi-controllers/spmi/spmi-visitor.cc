@@ -4,7 +4,6 @@
 
 #include "spmi-visitor.h"
 
-#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/visitors/common-types.h>
 #include <lib/driver/devicetree/visitors/registration.h>
@@ -18,6 +17,8 @@
 #include "spmi.h"
 
 namespace {
+
+constexpr char kSpmisPropertyName[] = "spmis";
 
 template <typename T>
 zx::result<std::pair<uint32_t, uint32_t>> GetAddressAndSizeCells(const T& node) {
@@ -68,7 +69,77 @@ zx::result<uint64_t> GetAddressSuffix(const std::string& name) {
 
 namespace spmi_dt {
 
+SpmiVisitor::SpmiVisitor() {
+  fdf_devicetree::Properties spmi_properties = {};
+  spmi_properties.emplace_back(std::make_unique<fdf_devicetree::ReferenceProperty>(
+      kSpmisPropertyName, 0u, /*required=*/false));
+  spmi_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(spmi_properties));
+}
+
+zx::result<> SpmiVisitor::Visit(fdf_devicetree::Node& node,
+                                const devicetree::PropertyDecoder& decoder) {
+  if (zx::result<> result = ParseController(node); result.is_error()) {
+    return result.take_error();
+  }
+  return ParseReferenceProperty(node);
+}
+
 zx::result<> SpmiVisitor::FinalizeNode(fdf_devicetree::Node& node) {
+  if (sub_targets_.contains(node.id())) {
+    if (zx::result<> result = FinalizeSubTarget(sub_targets_[node.id()], node); result.is_error()) {
+      return result.take_error();
+    }
+  }
+
+  if (sub_target_references_.contains(node.id())) {
+    return FinalizeSubTargetReferences(sub_target_references_[node.id()], node);
+  }
+
+  return zx::ok();
+}
+
+zx::result<> SpmiVisitor::ParseReferenceProperty(fdf_devicetree::Node& node) {
+  zx::result<fdf_devicetree::PropertyValues> properties = spmi_parser_->Parse(node);
+  if (properties.is_error()) {
+    FDF_LOG(ERROR, "Failed to parse node \"%s\"", node.name().c_str());
+    return properties.take_error();
+  }
+  if (!properties->contains(kSpmisPropertyName)) {
+    return zx::ok();
+  }
+
+  if (sub_target_references_.contains(node.id())) {
+    FDF_LOG(ERROR, "Duplicate ID for SPMI reference node \"%s\"", node.name().c_str());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  const std::vector<fdf_devicetree::PropertyValue>& spmis = (*properties)[kSpmisPropertyName];
+  std::set<uint32_t>& sub_target_references = sub_target_references_[node.id()];
+  for (const auto& spmi : spmis) {
+    std::optional<std::pair<fdf_devicetree::ReferenceNode, fdf_devicetree::PropertyCells>>
+        reference = spmi.AsReference();
+    if (!reference || !reference->first) {
+      FDF_LOG(ERROR, "Failed to parse SPMI sub-target reference for node \"%s\"",
+              node.name().c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    SubTarget& sub_target = sub_targets_[reference->first.id()];
+    if (sub_target.has_reference_property) {
+      FDF_LOG(ERROR, "Multiple reference properties for SPMI sub-target \"%s\"",
+              reference->first.name().c_str());
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
+    }
+    sub_target.has_reference_property = true;
+
+    sub_target_references.insert(reference->first.id());
+  }
+  return zx::ok();
+}
+
+zx::result<> SpmiVisitor::ParseController(fdf_devicetree::Node& node) {
+  const uint32_t controller_id = node.id();
+
   if (!node.name().starts_with("spmi@")) {
     return zx::ok();
   }
@@ -80,7 +151,7 @@ zx::result<> SpmiVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  fuchsia_hardware_spmi::ControllerInfo controller{{.id = ++controller_id_}};
+  fuchsia_hardware_spmi::ControllerInfo controller{{.id = controller_id}};
 
   uint16_t used_target_ids = 0;
   for (const fdf_devicetree::ChildNode& child : node.children()) {
@@ -127,7 +198,8 @@ zx::result<> SpmiVisitor::FinalizeNode(fdf_devicetree::Node& node) {
 
     used_target_ids |= (1 << target_id);
 
-    zx::result<fuchsia_hardware_spmi::TargetInfo> target = ParseTarget(target_id, child);
+    zx::result<fuchsia_hardware_spmi::TargetInfo> target =
+        ParseTarget(controller_id, target_id, child);
     if (target.is_error()) {
       return target.take_error();
     }
@@ -155,7 +227,7 @@ zx::result<> SpmiVisitor::FinalizeNode(fdf_devicetree::Node& node) {
 }
 
 zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
-    uint32_t target_id, const fdf_devicetree::ChildNode& node) const {
+    uint32_t controller_id, uint32_t target_id, const fdf_devicetree::ChildNode& node) {
   std::vector<std::string_view> reg_names = GetRegNames(node);
   if (reg_names.size() > 1) {
     FDF_LOG(ERROR, "SPMI target \"%s\" has mismatched reg and reg-names properties",
@@ -175,7 +247,7 @@ zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
             {
                 fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::TARGETSERVICE,
                                         bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_id_),
+                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_id),
                 fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, target_id),
             },
         .properties =
@@ -195,29 +267,31 @@ zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
     return zx::ok(target);
   }
 
-  const auto cells = GetAddressAndSizeCells(node);
+  const zx::result<std::pair<uint32_t, uint32_t>> cells = GetAddressAndSizeCells(node);
   if (cells.is_error() || *cells != std::pair<uint32_t, uint32_t>{1, 1}) {
     FDF_LOG(ERROR, "Invalid #address-cells or #size-cells for SPMI target \"%s\"",
             node.name().c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  std::vector<fuchsia_hardware_spmi::SubTargetInfo> sub_targets;
+  std::vector<fuchsia_hardware_spmi::SubTargetInfo> sub_targets_info;
   for (const fdf_devicetree::ChildNode& child : node.GetNode()->children()) {
     zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> sub_target_regions =
-        ParseSubTarget(target, child);
+        ParseSubTarget(controller_id, target, child);
     if (sub_target_regions.is_error()) {
       return sub_target_regions.take_error();
     }
-    sub_targets.insert(sub_targets.end(), sub_target_regions->begin(), sub_target_regions->end());
+    sub_targets_info.insert(sub_targets_info.end(), sub_target_regions->begin(),
+                            sub_target_regions->end());
   }
 
-  target.sub_targets().emplace(std::move(sub_targets));
+  target.sub_targets().emplace(std::move(sub_targets_info));
   return zx::ok(target);
 }
 
 zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::ParseSubTarget(
-    const fuchsia_hardware_spmi::TargetInfo& parent, const fdf_devicetree::ChildNode& node) const {
+    uint32_t controller_id, const fuchsia_hardware_spmi::TargetInfo& parent,
+    const fdf_devicetree::ChildNode& node) {
   ZX_DEBUG_ASSERT(parent.id());
 
   zx::result<uint64_t> address_suffix = GetAddressSuffix(node.name());
@@ -251,6 +325,9 @@ zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::Parse
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
+  std::vector<fuchsia_driver_framework::ParentSpec>& parent_specs =
+      sub_targets_[node.id()].parent_specs;
+
   std::vector<fuchsia_hardware_spmi::SubTargetInfo> sub_targets;
   for (size_t i = 0; i < reg_array.size(); i += 2) {
     const uint32_t address = reg_array[i];
@@ -275,7 +352,7 @@ zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::Parse
                 fdf::MakeAcceptBindRule(
                     bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
                     bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_id_),
+                fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_id),
                 fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID,
                                         static_cast<uint32_t>(*parent.id())),
                 fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, address),
@@ -303,11 +380,58 @@ zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::Parse
     }
 
     sub_targets.push_back(std::move(sub_target));
-
-    node.GetNode()->AddNodeSpec(sub_target_spec);
+    parent_specs.push_back(std::move(sub_target_spec));
   }
 
   return zx::ok(sub_targets);
+}
+
+zx::result<> SpmiVisitor::FinalizeSubTarget(const SubTarget& sub_target,
+                                            fdf_devicetree::Node& node) {
+  if (sub_target.has_reference_property) {
+    if (node.properties().contains("compatible")) {
+      FDF_LOG(ERROR,
+              "SPMI sub-target \"%s\" has a compatible property and is referenced by other nodes",
+              node.name().c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    return zx::ok();
+  }
+
+  // Only add composite parents for the sub-target if it does not appear in a reference property.
+  if (sub_target.parent_specs.empty()) {
+    FDF_LOG(ERROR, "No parent specs found for SPMI sub-target \"%s\"", node.name().c_str());
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  for (const fuchsia_driver_framework::ParentSpec& parent_spec : sub_target.parent_specs) {
+    node.AddNodeSpec(parent_spec);
+  }
+
+  return zx::ok();
+}
+
+zx::result<> SpmiVisitor::FinalizeSubTargetReferences(
+    const std::set<uint32_t>& sub_target_references, fdf_devicetree::Node& node) {
+  for (const uint32_t sub_target_id : sub_target_references) {
+    if (!sub_targets_.contains(sub_target_id) || sub_targets_[sub_target_id].parent_specs.empty()) {
+      FDF_LOG(ERROR, "No SPMI sub-target found for reference property in node \"%s\"",
+              node.name().c_str());
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+
+    const SubTarget& sub_target = sub_targets_[sub_target_id];
+    if (!sub_target.has_reference_property) {
+      FDF_LOG(ERROR, "SPMI sub-target is not marked as having a reference proprty for node \"%s\"",
+              node.name().c_str());
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+    for (const fuchsia_driver_framework::ParentSpec& parent_spec : sub_target.parent_specs) {
+      node.AddNodeSpec(parent_spec);
+    }
+  }
+  return zx::ok();
 }
 
 }  // namespace spmi_dt
