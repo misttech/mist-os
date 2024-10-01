@@ -52,33 +52,39 @@ list, dump or extract package archives:
 ffx package archive list
 ```
 
-For example, to list the contents of a package named `meta/far`, run the
-following command:
+For example, the `ffx package archive list` command below lists the contents
+of a package named `meta.far` in the
+`~/fuchsia/out/default/obj/third_party/sbase/sed_pkg/` directory:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx package archive list meta.far
-meta/contents
-meta/fuchsia.abi/abi-revision
-meta/package
+$ ffx package archive list ~/fuchsia/out/default/obj/third_party/sbase/sed_pkg/meta.far
++-------------------------------+
+| NAME                          |
++===============================+
+| meta/contents                 |
++-------------------------------+
+| meta/fuchsia.abi/abi-revision |
++-------------------------------+
+| meta/package                  |
++-------------------------------+
 ```
 
-Notice that this `meta.far` package contains `meta/contents`. The
-`meta/contents` file maps the user-facing file names of a package to the
-Merkle root of those files, allowing to see which files belong to it:
+Notice that this `meta.far` package contains a file named `meta/contents`.
+The `meta/contents` file maps the user-facing filenames of the package to
+the merkle root of those files, for example:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx package archive cat meta.far meta/contents
-bin/sed=6a07c6a584dadc9700ad6904ad920704592f706b4b8f55ec6fc736391588a1ef
-lib/ld.so.1=2debd7e1b8542e3a9004794a4417a55d27c928030277364e597cc3e6f80f5407
-lib/libasync-default.so=55482d52d72b63a0f51d20991ea49fa939b2559d4a7002606bc9e50e42af64e4
-lib/libbackend_fuchsia_globals.so=8da42bd2ad7fc246a6ecba016753fa4e9b0b7f6c685e22da4de997888fd18b06
-lib/libc++.so.2=e4145c4b3fd40b6d5371a5f21b46fb965d7c82d4b8bb438c9e94254ea58d8cba
-lib/libc++abi.so.1=1b5b77954855602b64b877c37defc450d8741d4bb95bd60427cbf234561090e2
-lib/libfdio.so=1e47faf9e335206ca73a253dece42a5d537912fc6abceadd0a06ea1462aa8e33
-lib/libunwind.so.1=dffab54d807a4352e088529a7a2112b651042bf511e7df7d2adca40aaec77c86
+$ ffx package archive cat ~/fuchsia/out/default/obj/third_party/sbase/sed_pkg/meta.far meta/contents
+bin/sed=361c6e3a027cf38af0d53e1009ef3b3448f4aeb60270910a116396f5ec8eccba
+lib/ld.so.1=c8ec55a14590e7e6f06f311d632744012f85084968d98a335c778f29207caa14
+lib/libc++.so.2=d8a45259c74cf65c1f8470ac043c6459403fdd0bbf676092ba82f36451e4e571
+lib/libc++abi.so.1=f12b37c2b9bfb43fbe33d446794a6ffeee1452b16b7c8d08b3438f3045d1f19a
+lib/libfdio.so=9834d890adedc8e532899a673092271e394458e98e6cee049cb78f5a95372b11
+lib/libunwind.so.1=89e5dee07ff8d2a03c58d524d8d832e79c70dcb81508f8a83c6fbf07e1539e83
 ```
 
-Note: For more details on packages and their contents, see [Structure of a package][pkg-struct].
+For more details on packages and their contents, see
+[Structure of a package][pkg-struct].
 
 ## Package servers
 
@@ -182,7 +188,7 @@ that locates them in blobfs is only held in RAM. The system currently does not
 garbage collect inaccessible or no-longer-used packages (having garbage to
 collect is a recent innovation!), but will eventually.
 
-The command `fx gc` will reboot the target device and then evict all old
+The `fx gc` command will reboot the target device and then evict all old
 ephemeral software from the device, freeing up space.
 
 ### Restarting without rebooting
