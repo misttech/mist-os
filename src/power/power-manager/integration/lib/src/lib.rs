@@ -309,13 +309,6 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let cpu_manager_to_power_manager_routes = Route::new()
-            .capability(Capability::protocol_by_name("fuchsia.component.Binder").weak());
-        realm_builder
-            .add_route(cpu_manager_to_power_manager_routes.from(&cpu_manager).to(&power_manager))
-            .await
-            .unwrap();
-
         realm_builder
             .add_route(
                 Route::new()

@@ -115,7 +115,8 @@ impl CpuManager {
         Ok(match json_data["type"].as_str().unwrap() {
             "ThermalWatcher" => {
                 thermal_watcher::ThermalWatcherBuilder::new_from_json(json_data, &self.nodes)
-                    .build(node_futures)?
+                    .build(node_futures)
+                    .await?
             }
             "CpuControlHandler" => {
                 cpu_control_handler::CpuControlHandlerBuilder::new_from_json(json_data, &self.nodes)

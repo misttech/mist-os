@@ -30,6 +30,7 @@ bootstrap_user_platform_aib_names = [
 
   # Power
   "legacy_power_framework",
+  "cpu_manager",
 
   # Graphics
   "virtcon",

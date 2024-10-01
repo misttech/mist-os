@@ -3877,10 +3877,7 @@ assembly_input_bundle("brightness_manager") {
 # build-types: all
 #
 assembly_input_bundle("legacy_power_framework") {
-  bootfs_packages = [
-    "//src/power/power-manager:package",
-    "//src/power/cpu-manager:package",
-  ]
+  bootfs_packages = [ "//src/power/power-manager:package" ]
   compiled_packages = [
     {
       bootfs_package = true
@@ -3889,6 +3886,27 @@ assembly_input_bundle("legacy_power_framework") {
         {
           component_name = "bootstrap"
           shards = [ "//src/power/meta/power-framework.shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Power Framework CPU Manager.
+#
+# feature_set_levels: all
+# build-types: all
+#
+assembly_input_bundle("cpu_manager") {
+  bootfs_packages = [ "//src/power/cpu-manager:package" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/power/meta/cpu-manager.bootstrap_shard.cml" ]
         },
       ]
     },
