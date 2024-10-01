@@ -11,6 +11,7 @@ rustc_library("flyweights") {
 
   sources = [ "src/lib.rs" ]
   deps = [
+    "//third_party/rust_crates:ahash",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:serde",

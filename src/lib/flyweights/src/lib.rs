@@ -7,12 +7,12 @@
 
 #![warn(missing_docs)]
 
+use ahash::AHashSet;
 use once_cell::sync::Lazy;
 use serde::de::{Deserializer, Visitor};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::mem::{size_of, ManuallyDrop};
@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// If a live `FlyStr` contains an `Arc<Box<str>>`, the `Arc<Box<str>>` must also be in this cache
 /// and it must have a refcount of >= 2.
-static CACHE: Lazy<Mutex<HashSet<Storage>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static CACHE: Lazy<Mutex<AHashSet<Storage>>> = Lazy::new(|| Mutex::new(AHashSet::new()));
 
 /// Wrapper type for stored `Arc`s that lets us query the cache without an owned value. Implementing
 /// `Borrow<str> for Arc<Box<str>>` upstream *might* be possible with specialization but this is
@@ -450,8 +450,8 @@ mod tests {
     fn reset_global_cache() {
         // We still want subsequent tests to be able to run if one in the same process panics.
         match CACHE.lock() {
-            Ok(mut c) => *c = HashSet::new(),
-            Err(e) => *e.into_inner() = HashSet::new(),
+            Ok(mut c) => *c = AHashSet::new(),
+            Err(e) => *e.into_inner() = AHashSet::new(),
         }
     }
     fn num_strings_in_global_cache() -> usize {
@@ -603,7 +603,7 @@ mod tests {
         let first = FlyStr::new(first);
         let second = FlyStr::new(second);
 
-        let mut set = HashSet::new();
+        let mut set = AHashSet::new();
         set.insert(first.clone());
         assert!(set.contains(&first));
         assert!(!set.contains(&second));
