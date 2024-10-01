@@ -50,6 +50,7 @@ gvisor_tests = [
   "getrusage_test",
   "inotify_test",
   "ioctl_test",
+  "iouring_test",
   "itimer_test",
   "kill_test",
   "lseek_test",
