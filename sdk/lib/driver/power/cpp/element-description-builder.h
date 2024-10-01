@@ -5,7 +5,6 @@
 #ifndef LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
 #define LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
 
-#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/power/cpp/types.h>
