@@ -3,11 +3,15 @@
 # found in the LICENSE file.
 """WLAN affordance implementation using Fuchsia Controller."""
 
+import asyncio
 import logging
 
 import fidl.fuchsia_location_namedplace as f_location_namedplace
+import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
+import fidl.fuchsia_wlan_ieee80211 as f_wlan_ieee80211
 import fidl.fuchsia_wlan_sme as f_wlan_sme
+from fidl._client import FidlClient
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
@@ -18,7 +22,9 @@ from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
 from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.wlan import (
+    Authentication,
     BssDescription,
+    ClientStatusConnected,
     ClientStatusResponse,
     CountryCode,
     MacAddress,
@@ -62,6 +68,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ffx: FFX transport.
             fuchsia_controller: Fuchsia Controller transport.
             reboot_affordance: Object that implements RebootCapableDevice.
+            fuchsia_device_close: Object that implements FuchsiaDeviceClose.
         """
         super().__init__()
         self._verify_supported(device_name, ffx)
@@ -118,22 +125,25 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             self._fc_transport.connect_device_proxy(_DEVICE_MONITOR_PROXY)
         )
 
-    def connect(
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def connect(
         self,
         ssid: str,
+        # TODO(http://b/356234331): Remove the password field once
+        # authentication is used everywhere.
         password: str | None,
         bss_desc: BssDescription,
-        # TODO(http://b/324949922): Uncomment once the WLAN affordance API is
-        # changed to include the desired authentication in every call to
-        # connect().
-        # authentication: Authentication,
+        authentication: Authentication | None = None,
     ) -> bool:
         """Trigger connection to a network.
 
         Args:
             ssid: The network to connect to.
-            password: The password for the network.
+            password: The password for the network. Deprecated; use
+                authentication instead.
             bss_desc: The basic service set for target network.
+            authentication: Authentication to connect with.
 
         Returns:
             True on success otherwise false.
@@ -141,12 +151,84 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
             NetworkInterfaceNotFoundError: No client WLAN interface found.
+            TypeError: When authentication is not provided.
         """
-        # TODO(http://b/324949922): Uncomment once the WLAN affordance API is
-        # changed to include the desired authentication in every call to
-        # connect().
-        # TODO(http://b/324949815): Implement server to ConnectTransaction
-        raise NotImplementedError()
+        if authentication is None:
+            raise TypeError(
+                "authentication is required for the WLAN FC affordance"
+            )
+
+        iface_id = await self._get_first_sme(WlanMacRole.CLIENT)
+        sme = await self._get_client_sme(iface_id)
+
+        client, server = Channel.create()
+        connect_transaction_client = f_wlan_sme.ConnectTransaction.Client(
+            client.take()
+        )
+
+        req = f_wlan_sme.ConnectRequest(
+            ssid=list(ssid.encode("utf-8")),
+            bss_description=bss_desc.to_fidl(),
+            multiple_bss_candidates=False,  # only used for metrics, selected arbitrarily
+            authentication=authentication.to_fidl(),
+            deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
+        )
+
+        # Run an event handler in the background before starting the connect.
+        results: asyncio.Queue[f_wlan_sme.ConnectResult] = asyncio.Queue()
+        event_handler = ConnectTransactionEventHandler(
+            connect_transaction_client, results
+        )
+        event_handler_task = self.loop().create_task(event_handler.serve())
+
+        try:
+            # Initiate the connect.
+            sme.connect(req=req, txn=server.take())
+
+            # Wait for the driver to finish connecting.
+            response = await asyncio.wait_for(results.get(), timeout=60)
+            result = response.result
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientSme.Connect() error {status}"
+            ) from status
+        except TimeoutError as e:
+            raise errors.HoneydewWlanError(
+                f'Timed out waiting for the WLAN SME to connect to "{ssid}"'
+            ) from e
+        finally:
+            event_handler_task.cancel()
+            try:
+                await event_handler_task
+            except asyncio.exceptions.CancelledError:
+                pass  # expected
+
+        # Verify the connection.
+        if result.code != f_wlan_ieee80211.StatusCode.SUCCESS:
+            code = f_wlan_ieee80211.StatusCode(result.code)
+            raise errors.HoneydewWlanError(
+                f'Failed to connect to "{ssid}", received {code.name}'
+                f"({code.value})"
+            )
+        if result.is_credential_rejected:
+            raise errors.HoneydewWlanError(
+                f'Failed to connect to "{ssid}", credentials were rejected.'
+            )
+
+        client_status = await self._status(sme)
+        if isinstance(client_status, ClientStatusConnected):
+            got_ssid = bytes(client_status.ssid).decode("utf-8")
+            if got_ssid != ssid:
+                raise errors.HoneydewWlanError(
+                    "Connected to wrong network. "
+                    f'Expected "{ssid}", got "{got_ssid}".'
+                )
+        else:
+            raise errors.HoneydewWlanError(
+                f"Expected ClientStatusConnected, got {client_status}"
+            )
+
+        return True
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -503,3 +585,57 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ) from status
 
         return ClientStatusResponse.from_fidl(resp.resp)
+
+
+class ConnectTransactionEventHandler(
+    f_wlan_sme.ConnectTransaction.EventHandler
+):
+    """Event handler for ClientSme.Connect()."""
+
+    def __init__(
+        self,
+        client: FidlClient,
+        connect_results: asyncio.Queue[f_wlan_sme.ConnectResult],
+    ) -> None:
+        super().__init__(client)
+        self._connect_results = connect_results
+
+    async def on_connect_result(
+        self, req: f_wlan_sme.ConnectTransactionOnConnectResultRequest
+    ) -> None:
+        """Return the result of the initial connection request or later
+        SME-initiated reconnection."""
+        _LOGGER.debug(
+            "ConnectTransaction.OnConnectResult() called with %s", req
+        )
+        await self._connect_results.put(req)
+
+    def on_disconnect(
+        self, req: f_wlan_sme.ConnectTransactionOnDisconnectRequest
+    ) -> None:
+        """Notify that the client has disconnected.
+
+        If req.disconnect_info indicates that SME is attempting to reconnect by
+        itself, there's not need for caller to intervene for now.
+        """
+        _LOGGER.debug("ConnectTransaction.OnDisconnect() called with %s", req)
+
+    def on_roam_result(
+        self, req: f_wlan_sme.ConnectTransactionOnRoamResultRequest
+    ) -> None:
+        """Report the result of a roam attempt."""
+        _LOGGER.debug("ConnectTransaction.OnRoamResult() called with %s", req)
+
+    def on_signal_report(
+        self, req: f_wlan_sme.ConnectTransactionOnSignalReportRequest
+    ) -> None:
+        """Give an update of the latest signal report."""
+        _LOGGER.debug("ConnectTransaction.OnSignalReport() called with %s", req)
+
+    def on_channel_switched(
+        self, req: f_wlan_sme.ConnectTransactionOnChannelSwitchedRequest
+    ) -> None:
+        """Give an update of the channel switching."""
+        _LOGGER.debug(
+            "ConnectTransaction.OnChannelSwitched() called with %s", req
+        )

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import fidl.fuchsia_wlan_common as f_wlan_common
+import fidl.fuchsia_wlan_common_security as f_wlan_common_security
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
 import fidl.fuchsia_wlan_policy as f_wlan_policy
 import fidl.fuchsia_wlan_sme as f_wlan_sme
@@ -744,6 +745,118 @@ class BssDescription:
                     )
 
         return None
+
+
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available, replace with the
+# statically generated FIDL equivalent.
+@dataclass(frozen=True)
+class Authentication:
+    """Pairs credentials with a particular security protocol.
+
+    This type requires validation, as `protocol` and `credentials` may disagree.
+    """
+
+    protocol: SecurityProtocol
+    """Security protocol."""
+
+    credentials: Credentials | None
+    """Credentials to pair with the security protocol."""
+
+    def to_fidl(self) -> f_wlan_common_security.Authentication:
+        """Convert to a fuchsia.wlan.common.security/Authentication."""
+        return f_wlan_common_security.Authentication(
+            protocol=self.protocol,
+            credentials=self.credentials.to_fidl()
+            if self.credentials
+            else None,
+        )
+
+
+class SecurityProtocol(enum.IntEnum):
+    """WLAN security protocols."""
+
+    OPEN = 1
+    """Open network security.
+
+    This indicates that no security protocol or suite is used by a WLAN; it
+    is not to be confused with "open authentication".
+    """
+
+    WEP = 2
+    WPA1 = 3
+    WPA2_PERSONAL = 4
+    WPA2_ENTERPRISE = 5
+    WPA3_PERSONAL = 6
+    WPA3_ENTERPRISE = 7
+
+
+class Credentials(Protocol):
+    """Credentials used to authenticate with a WLAN."""
+
+    def to_fidl(self) -> f_wlan_common_security.Credentials:
+        """Convert to a fuchsia.wlan.common.security/Credentials."""
+
+
+@dataclass(frozen=True)
+class WepCredentials(Credentials):
+    """WEP credentials."""
+
+    key: str
+    """Unencoded WEP key.
+
+    This field is always a binary key; ASCII hexadecimal encoding should not be
+    used here.
+    """
+
+    def to_fidl(self) -> f_wlan_common_security.Credentials:
+        """Convert to a fuchsia.wlan.common.security/Credentials."""
+        credentials = f_wlan_common_security.Credentials()
+        credentials.wep = f_wlan_common_security.WepCredentials(
+            key=list(self.key.encode("utf-8"))
+        )
+        return credentials
+
+
+@dataclass(frozen=True)
+class WpaPskCredentials(Credentials):
+    """WPA-PSK credentials."""
+
+    psk: bytes
+    """
+    Unencoded pre-shared key (PSK).
+
+    This field is always a binary key; ASCII hexadecimal encoding should not be
+    used here.
+    """
+
+    def to_fidl(self) -> f_wlan_common_security.Credentials:
+        """Convert to a fuchsia.wlan.common.security/Credentials."""
+        credentials = f_wlan_common_security.Credentials()
+        credentials.wpa = f_wlan_common_security.WpaCredentials()
+        credentials.wpa.psk = list(self.psk)
+        return credentials
+
+
+@dataclass(frozen=True)
+class WpaPassphraseCredentials(Credentials):
+    """WPA credentials with passphrase."""
+
+    passphrase: str
+    """
+    UTF-8 encoded passphrase.
+
+    This field is expected to use UTF-8 or compatible encoding. This is more
+    permissive than the passphrase to PSK mapping specified in IEEE Std
+    802.11-2016 Appendix J.4, but UTF-8 is typically used in practice.
+    """
+
+    def to_fidl(self) -> f_wlan_common_security.Credentials:
+        """Convert to a fuchsia.wlan.common.security/Credentials."""
+        credentials = f_wlan_common_security.Credentials()
+        credentials.wpa = f_wlan_common_security.WpaCredentials()
+        credentials.wpa.passphrase = list(self.passphrase.encode("utf-8"))
+        return credentials
 
 
 # TODO(http://b/346424966): Only necessary because Python does not have static

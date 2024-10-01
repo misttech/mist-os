@@ -14,10 +14,12 @@ from mobly import asserts, signals, test_runner
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing.netstack import InterfaceProperties
 from honeydew.typing.wlan import (
+    Authentication,
     ClientStatusConnected,
     ClientStatusConnecting,
     ClientStatusIdle,
     CountryCode,
+    SecurityProtocol,
     WlanMacRole,
 )
 
@@ -170,19 +172,15 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
         bss_scan_response = self.device.wlan.scan_for_bss_info()
         bss_desc_for_ssid = bss_scan_response.get(test_ssid)
         if bss_desc_for_ssid:
-            try:
-                asserts.assert_true(
-                    self.device.wlan.connect(
-                        ssid=test_ssid,
-                        password=None,
-                        bss_desc=bss_desc_for_ssid[0],
-                    ),
-                    "Failed to connect.",
-                )
-            except NotImplementedError:
-                # TODO(http://b/324949922): Remove this try-catch statement once
-                # WLAN FC affordance implements connect.
-                pass
+            asserts.assert_true(
+                self.device.wlan.connect(
+                    ssid=test_ssid,
+                    password=None,
+                    bss_desc=bss_desc_for_ssid[0],
+                    authentication=Authentication(SecurityProtocol.OPEN, None),
+                ),
+                "Failed to connect.",
+            )
         else:
             asserts.fail("Scan did not find bss descriptions for test ssid")
 

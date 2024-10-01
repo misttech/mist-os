@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan."""
 
+import copy
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -13,8 +14,9 @@ import fidl.fuchsia_location_namedplace as f_location_namedplace
 import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_common_security as f_wlan_common_security
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
+import fidl.fuchsia_wlan_ieee80211 as f_wlan_ieee80211
 import fidl.fuchsia_wlan_sme as f_wlan_sme
-from fuchsia_controller_py import ZxStatus
+from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew.affordances.fuchsia_controller.wlan import wlan
 from honeydew.errors import HoneydewWlanError, NotSupportedError
@@ -22,6 +24,7 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing.wlan import (
+    Authentication,
     BssDescription,
     BssType,
     ChannelBandwidth,
@@ -32,15 +35,26 @@ from honeydew.typing.wlan import (
     InformationElementType,
     Protection,
     QueryIfaceResponse,
+    SecurityProtocol,
+    WepCredentials,
     WlanChannel,
     WlanMacRole,
+    WpaPassphraseCredentials,
+    WpaPskCredentials,
 )
 
 _TEST_SSID = "ThepromisedLAN"
-_TEST_SSID_BYTES = list(str.encode(_TEST_SSID))
+_TEST_SSID_BYTES = list(str.encode(_TEST_SSID, "utf-8"))
+
+_TEST_PASSWORD = "password"
+_TEST_PSK = (
+    "c9a68e83bfd123d144ec5256bc45682accfb8e8f0561f39f44dd388cba9e86f2".encode(
+        "utf-8"
+    )
+)
 
 _TEST_BSS_DESC_1_FC = f_wlan_common.BssDescription(
-    bssid=bytes([1, 2, 3]),
+    bssid=[1, 2, 3],
     bss_type=f_wlan_common.BssType.PERSONAL,
     beacon_period=2,
     capability_info=3,
@@ -67,7 +81,7 @@ _TEST_BSS_DESC_1 = BssDescription(
 # Use the same SSID such that the two scan results will be merged under the same
 # SSID key, allowing the user to choose from multiple BSSes.
 _TEST_BSS_DESC_2_FC = f_wlan_common.BssDescription(
-    bssid=bytes([3, 2, 1]),
+    bssid=[3, 2, 1],
     bss_type=f_wlan_common.BssType.PERSONAL,
     beacon_period=5,
     capability_info=4,
@@ -156,6 +170,10 @@ class WlanFCTests(unittest.TestCase):
             spec=affordances_capable.RebootCapableDevice,
             autospec=True,
         )
+        self.fuchsia_device_close_obj = mock.MagicMock(
+            spec=affordances_capable.FuchsiaDeviceClose,
+            autospec=True,
+        )
         self.fc_transport_obj = mock.MagicMock(
             spec=fc_transport.FuchsiaController,
             autospec=True,
@@ -180,6 +198,10 @@ class WlanFCTests(unittest.TestCase):
             reboot_affordance=self.reboot_affordance_obj,
             fuchsia_device_close=self.fuchsia_device_close_obj,
         )
+
+    def tearDown(self) -> None:
+        self.wlan_obj.close()
+        super().tearDown()
 
     def test_verify_supported(self) -> None:
         """Test if _verify_supported works."""
@@ -244,11 +266,320 @@ class WlanFCTests(unittest.TestCase):
         """Test if Wlan connects to WLAN proxies."""
         self.assertIsNotNone(self.wlan_obj._device_monitor_proxy)
 
-    def test_connect(self) -> None:
-        """Test if connect works."""
-        # TODO(http://b/324949922): Finish implementation of Wlan.connect
-        with self.assertRaises(NotImplementedError):
-            self.wlan_obj.connect("ssid", "password", _TEST_BSS_DESC_1)
+    def test_connect_passes(self) -> None:
+        """Verify connect works with multiple authentication modes."""
+        for msg, auth in [
+            ("open", Authentication(SecurityProtocol.OPEN, None)),
+            (
+                "wep",
+                Authentication(
+                    SecurityProtocol.WEP, WepCredentials(_TEST_PASSWORD)
+                ),
+            ),
+            (
+                "wpa1+passphrase",
+                Authentication(
+                    SecurityProtocol.WPA1,
+                    WpaPassphraseCredentials(_TEST_PASSWORD),
+                ),
+            ),
+            (
+                "wpa1+psk",
+                Authentication(
+                    SecurityProtocol.WPA1, WpaPskCredentials(_TEST_PSK)
+                ),
+            ),
+            (
+                "wpa2+passphrase",
+                Authentication(
+                    SecurityProtocol.WPA2_PERSONAL,
+                    WpaPassphraseCredentials(_TEST_PASSWORD),
+                ),
+            ),
+            (
+                "wpa2+psk",
+                Authentication(
+                    SecurityProtocol.WPA2_PERSONAL, WpaPskCredentials(_TEST_PSK)
+                ),
+            ),
+        ]:
+            with self.subTest(msg=msg, auth=auth):
+                self.wlan_obj._device_monitor_proxy = mock.MagicMock(
+                    spec=f_wlan_device_service.DeviceMonitor.Client
+                )
+                self._mock_list_ifaces()
+                self._mock_query_iface()
+
+                with self._mock_client_sme() as client_sme:
+
+                    def connect(
+                        req: f_wlan_sme.ConnectRequest, txn: int
+                    ) -> None:
+                        expect = f_wlan_sme.ConnectRequest(
+                            ssid=_TEST_SSID_BYTES,
+                            bss_description=_TEST_BSS_DESC_1_FC,
+                            multiple_bss_candidates=False,
+                            # pylint: disable-next=cell-var-from-loop
+                            authentication=auth.to_fidl(),
+                            deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
+                        )
+                        self.assertListEqual(req.ssid, expect.ssid)
+                        self.assertListEqual(
+                            req.bss_description.bssid,
+                            expect.bss_description.bssid,
+                        )
+                        self.assertEqual(
+                            req.authentication, expect.authentication
+                        )
+                        server = f_wlan_sme.ConnectTransaction.Server(
+                            Channel(txn)
+                        )
+                        server.on_connect_result(
+                            result=f_wlan_sme.ConnectResult(
+                                code=f_wlan_ieee80211.StatusCode.SUCCESS,
+                                is_credential_rejected=False,
+                                is_reconnect=False,
+                            )
+                        )
+
+                    client_sme.connect = mock.Mock(wraps=connect)
+
+                    status_resp = f_wlan_sme.ClientStatusResponse()
+                    status_resp.connected = _TEST_SERVING_AP_INFO
+                    client_sme.status.return_value = _async_response(
+                        f_wlan_sme.ClientSmeStatusResponse(resp=status_resp)
+                    )
+
+                    self.wlan_obj.connect(
+                        _TEST_SSID,
+                        None,
+                        _TEST_BSS_DESC_1,
+                        auth,
+                    )
+
+    def test_connect_fails_no_authentication(self) -> None:
+        """Verify connect fails without authentication."""
+        with self.assertRaises(TypeError):
+            self.wlan_obj.connect(
+                _TEST_SSID,
+                None,
+                _TEST_BSS_DESC_1,
+                authentication=None,
+            )
+
+    def test_connect_fails_sme_connect(self) -> None:
+        """Verify connect fails when ClientSme.Connect() errors."""
+        self.wlan_obj._device_monitor_proxy = mock.MagicMock(
+            spec=f_wlan_device_service.DeviceMonitor.Client
+        )
+        self._mock_list_ifaces()
+        self._mock_query_iface()
+
+        with self._mock_client_sme() as client_sme:
+            client_sme.connect.side_effect = [
+                ZxStatus(ZxStatus.ZX_ERR_INTERNAL)
+            ]
+            with self.assertRaises(HoneydewWlanError):
+                self.wlan_obj.connect(
+                    _TEST_SSID,
+                    None,
+                    _TEST_BSS_DESC_1,
+                    Authentication(SecurityProtocol.OPEN, None),
+                )
+
+    def test_connect_fails_connect_timeout(self) -> None:
+        """Verify connect fails when ClientSme.Connect() takes too long."""
+        self.wlan_obj._device_monitor_proxy = mock.MagicMock(
+            spec=f_wlan_device_service.DeviceMonitor.Client
+        )
+        self._mock_list_ifaces()
+        self._mock_query_iface()
+
+        with self._mock_client_sme() as client_sme:
+            client_sme.connect.side_effect = [None]
+            with mock.patch("asyncio.wait_for", side_effect=[TimeoutError()]):
+                with self.assertRaises(HoneydewWlanError):
+                    self.wlan_obj.connect(
+                        _TEST_SSID,
+                        None,
+                        _TEST_BSS_DESC_1,
+                        Authentication(SecurityProtocol.OPEN, None),
+                    )
+
+    def test_connect_fails_driver_error(self) -> None:
+        """Verify connect fails when the driver returns an error."""
+        for msg, code, is_credentials_rejected in [
+            (
+                "error code",
+                f_wlan_ieee80211.StatusCode.REFUSED_REASON_UNSPECIFIED,
+                False,
+            ),
+            (
+                "credential rejected",
+                f_wlan_ieee80211.StatusCode.SUCCESS,
+                True,
+            ),
+        ]:
+            with self.subTest(
+                msg=msg,
+                code=code,
+                is_credentials_rejected=is_credentials_rejected,
+            ):
+                self.wlan_obj._device_monitor_proxy = mock.MagicMock(
+                    spec=f_wlan_device_service.DeviceMonitor.Client
+                )
+                self._mock_list_ifaces()
+                self._mock_query_iface()
+
+                with self._mock_client_sme() as client_sme:
+
+                    def connect(
+                        # pylint: disable-next=unused-argument
+                        req: f_wlan_sme.ConnectRequest,
+                        txn: int,
+                    ) -> None:
+                        server = f_wlan_sme.ConnectTransaction.Server(
+                            Channel(txn)
+                        )
+                        server.on_connect_result(
+                            result=f_wlan_sme.ConnectResult(
+                                # pylint: disable-next=cell-var-from-loop
+                                code=code,
+                                # pylint: disable-next=cell-var-from-loop
+                                is_credential_rejected=is_credentials_rejected,
+                                is_reconnect=False,
+                            )
+                        )
+
+                    client_sme.connect = mock.Mock(wraps=connect)
+
+                    with self.assertRaises(HoneydewWlanError):
+                        self.wlan_obj.connect(
+                            _TEST_SSID,
+                            None,
+                            _TEST_BSS_DESC_1,
+                            Authentication(SecurityProtocol.OPEN, None),
+                        )
+
+    def test_connect_fails_client_status_wrong_ssid(self) -> None:
+        """Verify connect fails when status() returns the wrong ssid."""
+        self.wlan_obj._device_monitor_proxy = mock.MagicMock(
+            spec=f_wlan_device_service.DeviceMonitor.Client
+        )
+        self._mock_list_ifaces()
+        self._mock_query_iface()
+
+        with self._mock_client_sme() as client_sme:
+
+            def connect(req: f_wlan_sme.ConnectRequest, txn: int) -> None:
+                expect = f_wlan_sme.ConnectRequest(
+                    ssid=_TEST_SSID_BYTES,
+                    bss_description=_TEST_BSS_DESC_1_FC,
+                    multiple_bss_candidates=False,
+                    authentication=Authentication(
+                        SecurityProtocol.OPEN, None
+                    ).to_fidl(),
+                    deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
+                )
+                self.assertListEqual(req.ssid, expect.ssid)
+                self.assertListEqual(
+                    req.bss_description.bssid, expect.bss_description.bssid
+                )
+                self.assertEqual(req.authentication, expect.authentication)
+                server = f_wlan_sme.ConnectTransaction.Server(Channel(txn))
+                server.on_connect_result(
+                    result=f_wlan_sme.ConnectResult(
+                        code=f_wlan_ieee80211.StatusCode.SUCCESS,
+                        is_credential_rejected=False,
+                        is_reconnect=False,
+                    )
+                )
+
+            client_sme.connect = mock.Mock(wraps=connect)
+
+            status_resp = f_wlan_sme.ClientStatusResponse()
+            status_resp.connected = copy.deepcopy(_TEST_SERVING_AP_INFO)
+            status_resp.connected.ssid.append(ord("2"))
+            client_sme.status.return_value = _async_response(
+                f_wlan_sme.ClientSmeStatusResponse(resp=status_resp)
+            )
+
+            with self.assertRaises(HoneydewWlanError):
+                self.wlan_obj.connect(
+                    _TEST_SSID,
+                    None,
+                    _TEST_BSS_DESC_1,
+                    Authentication(SecurityProtocol.OPEN, None),
+                )
+
+    def test_connect_fails_client_status_error(self) -> None:
+        """Verify connect fails when status() returns an erroneous value."""
+        resp_wrong_ssid = f_wlan_sme.ClientStatusResponse()
+        resp_wrong_ssid.connected = copy.deepcopy(_TEST_SERVING_AP_INFO)
+        resp_wrong_ssid.connected.ssid.append(ord("2"))
+
+        for msg, status_resp in [
+            (
+                "wrong ssid",
+                _async_response(
+                    f_wlan_sme.ClientSmeStatusResponse(resp=resp_wrong_ssid)
+                ),
+            ),
+            (
+                "internal error",
+                _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL)),
+            ),
+        ]:
+            with self.subTest(msg=msg, status_resp=status_resp):
+                self.wlan_obj._device_monitor_proxy = mock.MagicMock(
+                    spec=f_wlan_device_service.DeviceMonitor.Client
+                )
+                self._mock_list_ifaces()
+                self._mock_query_iface()
+
+                with self._mock_client_sme() as client_sme:
+
+                    def connect(
+                        req: f_wlan_sme.ConnectRequest, txn: int
+                    ) -> None:
+                        expect = f_wlan_sme.ConnectRequest(
+                            ssid=_TEST_SSID_BYTES,
+                            bss_description=_TEST_BSS_DESC_1_FC,
+                            multiple_bss_candidates=False,
+                            authentication=Authentication(
+                                SecurityProtocol.OPEN, None
+                            ).to_fidl(),
+                            deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
+                        )
+                        self.assertListEqual(req.ssid, expect.ssid)
+                        self.assertListEqual(
+                            req.bss_description.bssid,
+                            expect.bss_description.bssid,
+                        )
+                        self.assertEqual(
+                            req.authentication, expect.authentication
+                        )
+                        server = f_wlan_sme.ConnectTransaction.Server(
+                            Channel(txn)
+                        )
+                        server.on_connect_result(
+                            result=f_wlan_sme.ConnectResult(
+                                code=f_wlan_ieee80211.StatusCode.SUCCESS,
+                                is_credential_rejected=False,
+                                is_reconnect=False,
+                            )
+                        )
+
+                    client_sme.connect = mock.Mock(wraps=connect)
+                    client_sme.status.return_value = status_resp
+
+                    with self.assertRaises(HoneydewWlanError):
+                        self.wlan_obj.connect(
+                            _TEST_SSID,
+                            None,
+                            _TEST_BSS_DESC_1,
+                            Authentication(SecurityProtocol.OPEN, None),
+                        )
 
     def test_create_iface(self) -> None:
         """Test if create_iface creates WLAN interfaces successfully."""

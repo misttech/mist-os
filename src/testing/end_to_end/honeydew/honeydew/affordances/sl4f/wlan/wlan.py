@@ -10,6 +10,7 @@ from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan
 from honeydew.transports.sl4f import SL4F
 from honeydew.typing.wlan import (
+    Authentication,
     BssDescription,
     BssType,
     ChannelBandwidth,
@@ -84,15 +85,20 @@ class Wlan(wlan.Wlan):
     def connect(
         self,
         ssid: str,
+        # TODO(http://b/356234331): Remove the password field once
+        # authentication is used everywhere.
         password: str | None,
         bss_desc: BssDescription,
+        authentication: Authentication | None = None,
     ) -> bool:
         """Trigger connection to a network.
 
         Args:
             ssid: The network to connect to.
-            password: The password for the network.
+            password: The password for the network. Deprecated; use
+                authentication instead.
             bss_desc: The basic service set for target network.
+            authentication: Authentication to connect with.
 
         Returns:
             True on success otherwise false.
