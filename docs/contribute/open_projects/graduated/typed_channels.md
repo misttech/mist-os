@@ -300,9 +300,6 @@ You may add one of ianloic@, yifeit@ if need specific review from the FIDL team.
 
 ## Known pain-points identified during migration:
 
-* When converting `fdio_get_service_handle`, the function takes an out-param of
-  `zx_handle_t`, without any protocol types. We would like a
-  `fidl::ClientEnd<T>`.
 * When converting `fdio_open(path, flags, server.release())`, there is no
   type-safe alternative of `fdio_open`.
 * Converting between HLCPP and LLCPP endpoint types is tricky. We would like

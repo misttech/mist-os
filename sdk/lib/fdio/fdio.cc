@@ -104,9 +104,6 @@ zx_status_t fdio_unbind_from_fd(int fd, fdio_t** out) {
 }
 
 __EXPORT
-zx_status_t fdio_get_service_handle(int fd, zx_handle_t* out) { return fdio_fd_transfer(fd, out); }
-
-__EXPORT
 fdio_t* fdio_zxio_create(zxio_storage_t** out_storage) {
   zx::result io = fdio_internal::zxio::create();
   if (io.is_error()) {

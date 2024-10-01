@@ -78,24 +78,6 @@ int fdio_bind_to_fd(fdio_t* io, int fd, int starting_fd) ZX_AVAILABLE_SINCE(1);
 //     entries in the file descriptor table.
 zx_status_t fdio_unbind_from_fd(int fd, fdio_t** io_out) ZX_AVAILABLE_SINCE(1);
 
-// Returns a handle to the channel backing a file descriptor.
-//
-// Upon success, a handle to the backing channel is returned in `out`, and the caller receives
-// ownership of that handle.
-//
-// Always removes the file descriptor from the file descriptor table for this process.
-//
-// # Errors
-//
-//   * `ZX_ERR_INVALID_ARGS`: `fd` is not a valid file descriptor.
-//
-//   * `ZX_ERR_NOT_SUPPORTED`: `fd` is not backed by a channel.
-//
-//   * `ZX_ERR_UNAVAILABLE`: `fd` is busy or has been dup'ed and therefore is referenced by multiple
-//     entries in the file descriptor table.
-zx_status_t fdio_get_service_handle(int fd, zx_handle_t* out)
-    ZX_DEPRECATED_SINCE(1, 12, "Use fdio_open instead of operating on file descriptors");
-
 // Storage for a ZXIO object.
 //
 // See `lib/zxio/ops.h` for more information.

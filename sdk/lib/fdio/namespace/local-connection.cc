@@ -68,7 +68,7 @@ struct local_connection : public fdio_t {
   // slash and no trailing slash
   zx::result<fdio_ptr> open(std::string_view path, fio::wire::OpenFlags flags) override {
     auto& dir = local_dir();
-    return dir.fs->Open(fbl::RefPtr(dir.vn), path, flags);
+    return dir.fs->OpenAtDeprecated(fbl::RefPtr(dir.vn), path, flags);
   }
 
   zx_status_t get_attr(zxio_node_attributes_t* out) override {

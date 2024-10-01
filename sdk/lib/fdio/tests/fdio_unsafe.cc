@@ -36,8 +36,7 @@ TEST(UnsafeTest, BorrowChannel) {
 }
 
 TEST(UnsafeTest, BorrowChannelFromUnsupportedObject) {
-  // Local namespaces do not have a backing channel, so
-  // |fdio_unsafe_borrow_channel| and |fdio_get_service_handle| should fail.
+  // Local namespaces do not have a backing channel, so |fdio_unsafe_borrow_channel| should fail.
 
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
@@ -53,13 +52,6 @@ TEST(UnsafeTest, BorrowChannelFromUnsupportedObject) {
 
   EXPECT_EQ(ZX_HANDLE_INVALID, fdio_unsafe_borrow_channel(io));
   fdio_unsafe_release(io);
-
-  zx_handle_t handle = ZX_HANDLE_INVALID;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, fdio_get_service_handle(ns_fd.release(), &handle));
-#pragma clang diagnostic pop
-  EXPECT_EQ(ZX_HANDLE_INVALID, handle);
 
   ASSERT_OK(fdio_ns_destroy(ns));
 }

@@ -90,10 +90,6 @@ extern "C" {
 extern "C" {
     pub fn fdio_unbind_from_fd(fd: ::std::os::raw::c_int, io_out: *mut *mut fdio_t) -> zx_status_t;
 }
-extern "C" {
-    pub fn fdio_get_service_handle(fd: ::std::os::raw::c_int, out: *mut zx_handle_t)
-        -> zx_status_t;
-}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct zxio_storage {
@@ -154,12 +150,6 @@ extern "C" {
         flags: u32,
         out_fd: *mut ::std::os::raw::c_int,
     ) -> zx_status_t;
-}
-extern "C" {
-    pub fn fdio_service_clone(node: zx_handle_t) -> zx_handle_t;
-}
-extern "C" {
-    pub fn fdio_service_clone_to(node: zx_handle_t, request: zx_handle_t) -> zx_status_t;
 }
 extern "C" {
     pub fn fdio_wait_fd(
@@ -290,14 +280,6 @@ extern "C" {
 }
 extern "C" {
     pub fn fdio_ns_export_root(out: *mut *mut fdio_flat_namespace_t) -> zx_status_t;
-}
-extern "C" {
-    pub fn fdio_ns_connect(
-        ns: *mut fdio_ns_t,
-        path: *const ::std::os::raw::c_char,
-        flags: u32,
-        request: zx_handle_t,
-    ) -> zx_status_t;
 }
 extern "C" {
     pub fn fdio_ns_open(

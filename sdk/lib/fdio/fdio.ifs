@@ -44,7 +44,6 @@ Symbols:
   - { Name: fdio_fd_create_null, Type: Func }
   - { Name: fdio_fd_transfer, Type: Func }
   - { Name: fdio_fd_transfer_or_clone, Type: Func }
-  - { Name: fdio_get_service_handle, Type: Func }
   - { Name: fdio_get_vmo_clone, Type: Func }
   - { Name: fdio_get_vmo_copy, Type: Func }
   - { Name: fdio_get_vmo_exact, Type: Func }
@@ -55,7 +54,6 @@ Symbols:
   - { Name: fdio_ns_bind_fd, Type: Func }
   - { Name: fdio_ns_bind_local, Type: Func }
   - { Name: fdio_ns_chdir, Type: Func }
-  - { Name: fdio_ns_connect, Type: Func }
   - { Name: fdio_ns_create, Type: Func }
   - { Name: fdio_ns_destroy, Type: Func }
   - { Name: fdio_ns_export, Type: Func }
@@ -74,8 +72,6 @@ Symbols:
   - { Name: fdio_open_fd, Type: Func }
   - { Name: fdio_open_fd_at, Type: Func }
   - { Name: fdio_pipe_half, Type: Func }
-  - { Name: fdio_service_clone, Type: Func }
-  - { Name: fdio_service_clone_to, Type: Func }
   - { Name: fdio_service_connect, Type: Func }
   - { Name: fdio_service_connect_at, Type: Func }
   - { Name: fdio_service_connect_by_name, Type: Func }

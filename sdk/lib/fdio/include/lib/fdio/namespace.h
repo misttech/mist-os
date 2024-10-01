@@ -146,14 +146,6 @@ typedef struct fdio_flat_namespace {
 zx_status_t fdio_ns_export(fdio_ns_t* ns, fdio_flat_namespace_t** out) ZX_AVAILABLE_SINCE(1);
 zx_status_t fdio_ns_export_root(fdio_flat_namespace_t** out) ZX_AVAILABLE_SINCE(1);
 
-// Attempt to connect to a service through the namespace. The handle is always consumed.  It will be
-// closed on error or passed to the remote service on success. The path must be an absolute path
-// starting with "/".
-zx_status_t
-fdio_ns_connect(fdio_ns_t* ns, const char* path, uint32_t flags, zx_handle_t request) ZX_DEPRECATED_SINCE(
-    1, 8,
-    "Incorrectly named due to accepting flags. Use fdio_ns_open or fdio_ns_service_connect instead.");
-
 // Opens an object at `path` relative to the root of `ns` with `flags` asynchronously.
 //
 // `path` is looked up in `ns`. If found, the object at `path` is opened, passing `request` to the

@@ -152,27 +152,3 @@ zx_status_t fdio_open_fd_at(int dirfd, const char* path, uint32_t flags, int* ou
   return fdio_open_fd_at_internal(dirfd, path, static_cast<fio::wire::OpenFlags>(flags), false,
                                   out_fd);
 }
-
-__EXPORT
-zx_handle_t fdio_service_clone(zx_handle_t handle) {
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  if (endpoints.is_error()) {
-    return ZX_HANDLE_INVALID;
-  }
-  zx_status_t status = fdio_service_clone_to(handle, endpoints->server.channel().release());
-  if (status != ZX_OK) {
-    return ZX_HANDLE_INVALID;
-  }
-  return endpoints->client.channel().release();
-}
-
-__EXPORT
-zx_status_t fdio_service_clone_to(zx_handle_t handle, zx_handle_t request_raw) {
-  auto request = fidl::ServerEnd<fio::Node>(zx::channel(request_raw));
-  auto node = fidl::UnownedClientEnd<fio::Node>(handle);
-  if (!node.is_valid()) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  fio::wire::OpenFlags flags = fio::wire::OpenFlags::kCloneSameRights;
-  return fidl::WireCall(node)->Clone(flags, std::move(request)).status();
-}
