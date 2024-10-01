@@ -28,17 +28,12 @@ if (is_host) {
       public_deps += [ label ]
     }
   }
-}
 
-go_binary("pm_bin") {
-  output_name = "pm"
-  library = "cmd/pm:main"
-  sdk_category = "partner"
-}
-
-fuchsia_package_with_single_component("pm") {
-  manifest = "meta/pm.cml"
-  deps = [ ":pm_bin" ]
+  go_binary("pm_bin") {
+    output_name = "pm"
+    library = "cmd/pm:main"
+    sdk_category = "partner"
+  }
 }
 
 install_host_tools("host") {
