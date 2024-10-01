@@ -63,11 +63,6 @@ class DlImplTests : public Base {
     return dynamic_linker_.LookupSymbol(*root, ref);
   }
 
-  // TODO(https://fxbug.dev/354043838): Remove these when these functions can
-  // become pure wrappers in the DlSystemTests fixture.
-  void ExpectRootModuleNotLoaded(std::string_view name) {}
-  void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {}
-
   // The `dynamic_linker_` dtor will also destroy and unmap modules remaining in
   // its modules list, so there is no need to do any extra clean up operation.
   void CleanUpOpenedFile(void* ptr) override {}
