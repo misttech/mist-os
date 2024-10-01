@@ -2930,20 +2930,6 @@ impl ResourceAccessor for RemoteResourceAccessor {
             get_requests: Some(vec![fd.raw()]),
             ..Default::default()
         })?;
-        if let Some(mut files) = response.get_responses {
-            // Validate that the server returned a single response, as a single fd was sent.
-            if files.len() == 1 {
-                let file = files.pop().unwrap();
-                if let Some(handle) = file.file {
-                    return Ok((
-                        new_remote_file(current_task, handle, file.flags.into())?,
-                        FdFlags::empty(),
-                    ));
-                } else {
-                    return Ok((new_null_file(current_task, file.flags.into()), FdFlags::empty()));
-                }
-            }
-        }
         if let Some(mut files) = response.get_responses2 {
             // Validate that the server returned a single response, as a single fd was sent.
             if files.len() == 1 {
@@ -2976,7 +2962,11 @@ impl ResourceAccessor for RemoteResourceAccessor {
         let flags: fbinder::FileFlags = file.flags().into();
         let handle = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
-            add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
+            add_requests2: Some(vec![fbinder::FileHandle2 {
+                file: handle,
+                flags: Some(flags),
+                ..fbinder::FileHandle2::default()
+            }]),
             ..Default::default()
         })?;
         if let Some(fds) = response.add_responses {
@@ -8100,14 +8090,6 @@ pub mod tests {
         let _d2 = open_binder_fd(&mut locked, &task, &driver);
     }
 
-    fn to_file_handle2(fh: fbinder::FileHandle) -> fbinder::FileHandle2 {
-        fbinder::FileHandle2 {
-            file: fh.file,
-            flags: Some(fh.flags),
-            ..fbinder::FileHandle2::default()
-        }
-    }
-
     pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle2>;
     /// Run a test implementation of the ProcessAccessor protocol.
     /// The test implementation starts with an empty fd table, and updates it depending on the
@@ -8148,12 +8130,6 @@ pub mod tests {
                             responder.send(Err(fposix::Errno::Ebadf))?;
                             continue 'event_loop;
                         }
-                    }
-                    for file in payload.add_requests.unwrap_or(vec![]) {
-                        let fd = next_fd;
-                        next_fd += 1;
-                        fds.insert(fd, to_file_handle2(file));
-                        response.add_responses.get_or_insert_with(Vec::new).push(fd);
                     }
                     for file in payload.add_requests2.unwrap_or(vec![]) {
                         let fd = next_fd;
