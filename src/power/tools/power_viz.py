@@ -287,38 +287,38 @@ def main() -> int:
             event["level"] = "1"
             events.append(event)
     for e in sag_events.values():
-        if key_within(e, "suspended", history_start, history_end):
+        if key_within(e, "attempted_at_ns", history_start, history_end):
             event = {}
             event["seq"] = "_"
-            event["when"] = f'{e["suspended"]}'
+            event["when"] = f'{e["attempted_at_ns"]}'
             event["what"] = "suspend_into_fsh"
             event["spec"] = "_"
             event["whom"] = "sag"
             event["level"] = "0"
             events.append(event)
-        elif key_within(e, "resumed", history_start, history_end):
+        elif key_within(e, "resumed_at_ns", history_start, history_end):
             event = {}
             event["seq"] = "_"
-            event["when"] = f'{e["resumed"]}'
+            event["when"] = f'{e["resumed_at_ns"]}'
             event["what"] = "resume_from_fsh"
             event["spec"] = "_"
             event["whom"] = "sag"
             event["level"] = "1"
             events.append(event)
     for e in fsh_events.values():
-        if key_within(e, "suspended", history_start, history_end):
+        if key_within(e, "attempted_at_ns", history_start, history_end):
             event = {}
             event["seq"] = "_"
-            event["when"] = f'{e["suspended"]}'
+            event["when"] = f'{e["attempted_at_ns"]}'
             event["what"] = "suspend_into_zx"
             event["spec"] = "_"
             event["whom"] = "fsh"
             event["level"] = "0"
             events.append(event)
-        elif key_within(e, "resumed", history_start, history_end):
+        elif key_within(e, "resumed_at_ns", history_start, history_end):
             event = {}
             event["seq"] = "_"
-            event["when"] = f'{e["resumed"]}'
+            event["when"] = f'{e["resumed_at_ns"]}'
             event["what"] = "resume_from_zx"
             event["spec"] = "_"
             event["whom"] = "fsh"

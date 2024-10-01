@@ -77,6 +77,139 @@ def key_within(content: dict[Any, Any], key: str, start: int, end: int) -> bool:
     return key in content and start < content[key] and content[key] < end
 
 
+def find_elem_id_for(graph: dict[Any, Any], proper_name: str) -> str:
+    for elem in graph:
+        if graph[elem]["meta"]["name"] == proper_name:
+            return elem
+    return f"no-id-for-{proper_name}"
+
+
+# For each event line in the list, return each element's current level as a map.
+# The complete data is a list of maps.
+def compute_elem_levels_per_line(lines: list[Any]) -> list[dict[str, int]]:
+    collector = []
+    levels: dict[str, int] = {}
+    for line in lines:
+        if line[2] == "current_level":
+            levels = levels.copy()  # fresh to mutate
+            new_level = int(line[3])
+            element = line[4]
+            levels[element] = new_level
+        elif line[2] == "element" and line[3] == "Drop":
+            levels = levels.copy()  # fresh to mutate
+            del levels[line[4]]
+        # nop lines ref-point to an earlier level map, but to mutate we fork the map.
+        collector.append(levels)
+    return collector
+
+
+# For each event line in the list, return a list of same length,
+# which describes the correct inbound edges for each (element, level).
+# The lifecycle intricacies here are from mapping the Inspect Graph's notion of
+# vertices and edges and metadata updates (level->level), to Power Broker concepts.
+def compute_deps_per_line(
+    lines: list[Any], topology: dict[Any, Any]
+) -> list[dict[tuple[str, int], list[tuple[str, int]]]]:
+    # for each line, a map: (elem, level) -> [(src1, src1_level), (src2, src2_level)]
+    i_maps = []
+    i_map: dict[tuple[str, int], list[tuple[str, int]]] = {}
+    e_map: dict[str, tuple[str, str]] = {}  # edge_id:n -> (from_elem, to_elem)
+    for line in lines:
+        if line[2] == "element" and line[3] == "New":
+            pass  # nop
+        elif line[2] == "element" and line[3] == "Drop":
+            elem = line[4]
+            i_map = {
+                dst: [src for src in src_list if src[0] != elem]
+                for dst, src_list in i_map.items()
+                if dst[0] != elem
+            }  # fresh list value for each key
+        elif line[2] == "dependency" and line[3] == "New":
+            tokens = line[4].split()
+            e_map[tokens[0]] = (tokens[1], tokens[3])
+        elif line[2] == "dependency" and line[3] == "Update":
+            tokens = line[4].split()
+            # e_map lookup can fail due to lossy events prior
+            src_elem, dst_elem = "", ""  # avoid None
+            if tokens[0] in e_map:
+                # usually: we see the earlier lifecycle event
+                src_elem, dst_elem = e_map[tokens[0]]
+            else:
+                # backup: check final topology
+                for src in topology:
+                    if "relationships" in topology[src]:
+                        for dst in topology[src]["relationships"]:
+                            edge_id_num = topology[src]["relationships"][dst][
+                                "edge_id"
+                            ]
+                            edge_id_str = f"edge_id:{edge_id_num}"
+                            if edge_id_str == tokens[0]:
+                                src_elem = src
+                                dst_elem = dst
+            if not src_elem or not dst_elem:
+                print(
+                    f"could not compute in-bound deps for line {line} due to missing info.",
+                    file=sys.stderr,
+                )
+                pass  # nop
+            src_level = int(tokens[1])
+            dst_level = 0
+            dst_level_draft = tokens[3]
+            is_opportunistic = False
+            is_removal = False
+            if dst_level_draft == "None":
+                is_removal = True
+            elif dst_level_draft.endswith("p"):
+                is_opportunistic = True  # TODO(jaeheon) store this bit
+                dst_level = int(dst_level_draft.rstrip("p"))
+            else:
+                dst_level = int(dst_level_draft)
+            i_map = i_map.copy()  # shallow copy: list values point to old lists
+            # remove previous (src_elem,src_level) recorded, inspect key clobber
+            for k, v in i_map.items():
+                if k[0] == dst_elem:
+                    i_map[k] = [s for s in v if s != (src_elem, src_level)]
+            if not is_removal:
+                key = (dst_elem, dst_level)
+                srcs = []
+                if key in i_map:
+                    srcs = i_map[key].copy()  # don't mutate the past
+                srcs.append((src_elem, src_level))
+                i_map[key] = srcs
+        elif line[2] == "dependency" and line[3] == "Drop":
+            print("Encountered an edge drop, unusual.", file=sys.stderr)
+            # TODO(jaeheon) e_map lookup can fail if prior events missing
+            src_elem, dst_elem = e_map[line[4]]
+            # remove all level pairs between src,dst
+            i_map = i_map.copy()  # shallow copy: list values point to old lists
+            for k, v in i_map.items():
+                if k[0] == dst_elem:
+                    # fresh list, don't mutate the past
+                    i_map[k] = [x for x in v if x[0] != src_elem]
+        i_maps.append(i_map)
+    return i_maps
+
+
+def transitive_active_elements_of_dep(
+    in_deps: dict[tuple[str, int], list[tuple[str, int]]],
+    levels: dict[str, int],
+    dep: tuple[str, int],
+) -> list[str]:
+    elems: list[str] = []
+    queue: deque[tuple[str, int]] = deque()
+    queue.append(dep)
+    while queue:
+        curr = queue.popleft()
+        elem = curr[0]
+        target_level = curr[1]
+        current_level = levels[elem]
+        if current_level >= target_level:
+            elems.append(elem)
+        if curr in in_deps:
+            queue.extend(in_deps[curr])
+    return elems
+
+
 def main() -> int:
     # arg setup
     parser = argparse.ArgumentParser(
@@ -141,16 +274,17 @@ def main() -> int:
     for n, _ in events_sorted:  # list of keys in order
         # each line:  sequence #, time, event name, what, entity, duration
         curr = events[n]
+        what = curr["event"]
         line = []  # join line parts later.
         line.append(f"#{n}")
         when = curr["@time"] / 1_000_000_000
         line.append(f"{when:.{9}f}")  # RHS of dot is milli/micro/nano seconds
-        if curr["event"] == "update_key" and curr["key"] == "required_level":
+        if what == "update_key" and curr["key"] == "required_level":
             # level demand
             line.append(f"required_level")
             line.append(f'{curr["update"]}')
             line.append(f'{curr["vertex_id"]}')
-        elif curr["event"] == "update_key" and curr["key"] == "current_level":
+        elif what == "update_key" and curr["key"] == "current_level":
             # level comply
             line.append("current_level")
             line.append(f'{curr["update"]}')
@@ -166,9 +300,7 @@ def main() -> int:
                     line.append(f"{dur}")
                     level_durations[n] = (curr["vertex_id"], dur)
                     break
-        elif curr["event"] == "update_key" and curr["key"].startswith(
-            "lease_status_"
-        ):
+        elif what == "update_key" and curr["key"].startswith("lease_status_"):
             if curr["update"] == "Pending":
                 # lease lifecycle
                 line.append(f"lease_status")
@@ -203,36 +335,50 @@ def main() -> int:
                             curr["vertex_id"],
                             dur,
                         )
-        elif curr["event"] == "update_key" and curr["key"].startswith("lease_"):
+        elif what == "update_key" and curr["key"].startswith("lease_"):
             # lease lifecycle, start
             line.append("lease")
             line.append("New")
             line.append(f'{curr["vertex_id"]}')
-        elif curr["event"] == "drop_key" and curr["key"].startswith("lease_"):
+        elif what == "drop_key" and curr["key"].startswith("lease_"):
             # lease lifecycle, end
             line.append("lease")
             line.append("Drop")
             line.append(f'{curr["vertex_id"]}')
-        elif curr["event"] == "add_vertex":
-            # topology change, new node
+        elif what == "add_vertex":
+            # element lifecycle, start
             line.append("element")
-            line.append("Add")
+            line.append("New")
             line.append(f'{curr["vertex_id"]}')
-        elif curr["event"] == "add_edge":
-            # topology change, new edge
+        elif what == "remove_vertex":
+            # element lifecycle, end
+            line.append("element")
+            line.append("Drop")
+            line.append(f'{curr["vertex_id"]}')
+        elif what == "add_edge" and "edge_id" in curr:
+            # dependency lifecycle, start
             line.append("dependency")
-            line.append(f'{curr["meta"]}')
-            line.append(f'{curr["from"]}->{curr["to"]}')
-        elif curr["event"] == "update_key" and curr["key"].isnumeric():
-            # topology change, edge update
+            line.append(f"New")
+            line.append(
+                f'edge_id:{curr["edge_id"]} {curr["from"]} -> {curr["to"]}'
+            )
+        elif what == "update_key" and "edge_id" in curr:
+            # dependency lifecycle, modify
             line.append("dependency")
-            line.append(f"update")
-            line.append(f"TBD")
-        elif curr["event"] == "remove_vertex" or curr["event"] == "remove_edge":
-            # topology change, remove edge
+            line.append(f"Update")
+            line.append(
+                f'edge_id:{curr["edge_id"]} {curr["key"]} -> {curr["update"]}'
+            )
+        elif what == "drop_key" and "edge_id" in curr:
+            # dependency lifecycle, modify
             line.append("dependency")
-            line.append(f"update")
-            line.append(f"TBD")
+            line.append(f"Update")
+            line.append(f'edge_id:{curr["edge_id"]} {curr["key"]} -> None')
+        elif what == "remove_edge" and "edge_id" in curr:
+            # dependency lifecycle, end
+            line.append("dependency")
+            line.append(f"Drop")
+            line.append(f'edge_id:{curr["edge_id"]}')
 
         lines.append(line)  # list of list of strings
 
@@ -280,26 +426,27 @@ def main() -> int:
             extra_lines.append(["starnix", time, "resume<-sag", "_", "starnix"])
             starnix_count += 1
     for e in sag_events.values():
-        if key_within(e, "suspended", history_start, history_end):
-            time = f'{e["suspended"]/1_000_000_000:.{9}f}'
+        if key_within(e, "attempted_at_ns", history_start, history_end):
+            time = f'{e["attempted_at_ns"]/1_000_000_000:.{9}f}'
             extra_lines.append(["sag", time, "suspend->fsh", "_", "sag"])
             sag_count += 1
-        elif key_within(e, "resumed", history_start, history_end):
-            time = f'{e["resumed"]/1_000_000_000:.{9}f}'
+        elif key_within(e, "resumed_at_ns", history_start, history_end):
+            time = f'{e["resumed_at_ns"]/1_000_000_000:.{9}f}'
             extra_lines.append(["sag", time, "resume<-fsh", "_", "sag"])
             sag_count += 1
     for e in fsh_events.values():
-        if key_within(e, "suspended", history_start, history_end):
-            time = f'{e["suspended"]/1_000_000_000:.{9}f}'
+        if key_within(e, "attempted_at_ns", history_start, history_end):
+            time = f'{e["attempted_at_ns"]/1_000_000_000:.{9}f}'
             extra_lines.append(["fsh", time, "suspend->zx", "_", "fsh"])
             fsh_count += 1
-        elif key_within(e, "resumed", history_start, history_end):
-            time = f'{e["resumed"]/1_000_000_000:.{9}f}'
+        elif key_within(e, "resumed_at_ns", history_start, history_end):
+            time = f'{e["resumed_at_ns"]/1_000_000_000:.{9}f}'
             extra_lines.append(["fsh", time, "resume<-zx", "_", "fsh"])
             fsh_count += 1
     lines.extend(extra_lines)
     lines = sorted(lines, key=lambda line: float(line[1]))
 
+    # OUTPUT
     if args.csv:
         for line in lines:
             args.output.write(",".join(line) + "\n")
@@ -324,15 +471,20 @@ def main() -> int:
     mx = list(map(lambda ss: max(len(s) for s in ss), zipped))
 
     # print with nice formatting
-    for line in lines:
+    for i in range(len(lines)):
+        line = lines[i]
         form = (
             f"{line[0]:>{mx[0]}} {line[1]:>{mx[1]}}  "
             f"{line[2]:>{mx[2]}} {line[3]:<{mx[3]}}  {line[4]:<{mx[4]}} "
-            f'{line[5] if len(line) > 5 else "":>{mx[5]}}'
+            f'{line[5] if len(line) > 5 else "":>{mx[5]}}\n'
         )
-        args.output.write(form + "\n")
+        args.output.write(form)
 
-    # other fun stats too
+    # AUXILIARY DATA
+    elem_levels_per_line = compute_elem_levels_per_line(lines)
+    in_deps_per_line = compute_deps_per_line(lines, graph["topology"])
+
+    # ANALYSES
     args.output.write("\nLevel change durations, Top 10\n")
     top_level_durations = dict(
         sorted(
@@ -358,6 +510,84 @@ def main() -> int:
     )
     for key, value in itertools.islice(top_lease_durations.items(), 10):
         args.output.write(f"#{key}: {value[0]:<{name_max}} {value[1]} us\n")
+
+    # This analysis reports "active" elements through each suspend-resume
+    # sequence's minimum non-zero energy level period. Specifically, we
+    # make use of contemporaneous current level and inbound-dep edges
+    # at the time of each event to compute the reason(s) execution_state is
+    # non-zero. Intuitively, we grab execution_state at level 2 or 1, and
+    # pull out the dependencies, and examine the transitive set of element/level
+    # tuples. If an element is "currently" at the level described in the dep,
+    # we print it out. The idea is that during a failed suspend sequence,
+    # where execution_state did not reach 0, there will be an irreducible set of
+    # elements involved in keeping execution_state at 2 or 1.
+    line_max = len(lines)  # one past
+    suspend_attempts = []  # want tuple list of (suspend-idx, resume-idx)
+    suspend_no_matching_resume = 0
+    i = 0
+    while i < line_max:
+        if lines[i][0] == "starnix" and lines[i][2] == "suspend->sag":
+            matching_resume = line_max
+            for j in range(i + 1, line_max):
+                if lines[j][0] == "starnix" and lines[j][2] == "resume<-sag":
+                    matching_resume = j
+                    break
+            if matching_resume == line_max:
+                suspend_no_matching_resume += 1
+            suspend_attempts.append(
+                (i, matching_resume)
+            )  # (i, line_max) if no match.
+            i = matching_resume  # match: continue search after resume.
+            # no match: exit loop
+        i += 1
+    print(f"\nSuspend attempts: {len(suspend_attempts)}")
+    print(
+        f"Suspend attempted, but missing resume data: {suspend_no_matching_resume}\n"
+    )
+
+    print("Suspends attempts:")
+    es = find_elem_id_for(graph["topology"], "execution_state")
+    # suspend/resume indices into the lines list
+    attempt_count = 0
+    for s_idx, r_idx in suspend_attempts:
+        print(
+            f"Window {attempt_count}: event idx {lines[s_idx + 1][0]}->{lines[r_idx - 1][0]}"
+        )
+        attempt_count = attempt_count + 1
+        if r_idx == line_max:
+            print(f"Suspend analysis window")
+            print(f"  Duration: {lines[s_idx][1]} -> ...")
+            print(f"  Skipping, incomplete data")
+            continue  # skip analysis for this suspend round
+        if es not in elem_levels_per_line[s_idx]:
+            print(f"Suspend analysis window")
+            print(f"  Duration: {lines[s_idx][1]} -> {lines[r_idx][1]}")
+            print(f"  Skipping, incomplete level data for {es}")
+            continue
+        # execution_state minimum energy level and its index bracket, inclusive
+        # assumes suspend->resume has a V-shaped trajectory, one contiguous duration of minimum energy
+        es_min_level, es_min_idx_a, es_min_idx_b = 255, line_max, line_max
+        for idx in range(s_idx, r_idx + 1):
+            es_level = elem_levels_per_line[idx][es]
+            in_deps = in_deps_per_line[idx]
+            if es_level < es_min_level:
+                es_min_level = es_level
+                es_min_idx_a = idx
+            elif es_level == es_min_level:
+                es_min_idx_b = idx
+        if es_min_level > 0:
+            for idx in range(es_min_idx_a, es_min_idx_b + 1):
+                levels = elem_levels_per_line[idx]
+                in_deps = in_deps_per_line[idx]
+                elems_involved = transitive_active_elements_of_dep(
+                    in_deps, levels, (es, es_min_level)
+                )
+                print(f" at event idx {lines[idx][0]}:")
+                for elem in elems_involved:
+                    print(f"  elem {elem} is at level {levels[elem]}")
+        # TODO(jaeheon): track lease lifecycle and print held leases too
+
+    print("... done")
 
     return 0
 
