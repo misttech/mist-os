@@ -89,6 +89,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -104,6 +105,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -148,6 +150,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -163,6 +166,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -201,6 +205,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -256,6 +261,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,

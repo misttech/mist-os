@@ -78,6 +78,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.driveroneway/OneWaySendRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -117,6 +118,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.driveroneway/Payload",
             "nullable": false,
             "type_shape_v2": {
@@ -171,6 +173,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,

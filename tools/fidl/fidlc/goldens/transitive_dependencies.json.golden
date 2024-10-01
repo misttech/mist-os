@@ -79,6 +79,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.middle/Bar",
             "nullable": false,
             "type_shape_v2": {

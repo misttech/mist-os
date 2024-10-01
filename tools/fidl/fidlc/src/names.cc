@@ -87,6 +87,7 @@ std::string NameRawLiteralKind(RawLiteral::Kind kind) {
   }
 }
 
+// TODO(https://fxbug.dev/42149402): Delete KindV1.
 std::string NameTypeKind(const Type* type) {
   switch (type->kind) {
     case Type::Kind::kArray:
@@ -119,6 +120,13 @@ std::string NameTypeKind(const Type* type) {
     case Type::Kind::kUntypedNumeric:
       ZX_PANIC("should not have untyped numeric here");
   }
+}
+
+std::string NameTypeKindV2(const Type* type) {
+  if (type->kind == Type::Kind::kTransportSide) {
+    return "endpoint";
+  }
+  return NameTypeKind(type);
 }
 
 std::string NameConstantKind(Constant::Kind kind) {

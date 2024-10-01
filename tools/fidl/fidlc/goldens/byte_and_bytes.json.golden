@@ -36,6 +36,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint8",
             "type_shape_v2": {
               "inline_size": 1,

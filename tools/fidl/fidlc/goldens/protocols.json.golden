@@ -248,6 +248,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolMethodARequest",
             "nullable": false,
             "type_shape_v2": {
@@ -280,6 +281,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolEventARequest",
             "nullable": false,
             "type_shape_v2": {
@@ -310,6 +312,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolMethodBRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -325,6 +328,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolMethodBResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -355,6 +359,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolTakeHandleRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -386,6 +391,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolMutateSocketRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -401,6 +407,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ChannelProtocolMutateSocketResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -488,6 +495,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/HandleRightsProtocolNoResponseMethodRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -519,6 +527,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/HandleRightsProtocolResponseMethodRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -534,6 +543,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/HandleRightsProtocolResponseMethodResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -565,6 +575,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/HandleRightsProtocolAnEventRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -609,6 +620,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ManyParametersFifteenRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -654,6 +666,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/MethodWithUnionUnionMethodRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -669,6 +682,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/MethodWithUnionUnionMethodResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -801,6 +815,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/SyscallProtocolMethodCRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -881,6 +896,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -911,6 +927,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithAndWithoutRequestResponseWithRequestNoResponseRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -942,6 +959,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithAndWithoutRequestResponseWithRequestEmptyResponseRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -973,6 +991,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -988,6 +1007,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -1036,6 +1056,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithAndWithoutRequestResponseOnWithResponseRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1081,6 +1102,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1097,6 +1119,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1111,6 +1134,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1139,6 +1163,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1155,6 +1180,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1169,6 +1195,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1197,6 +1224,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1213,6 +1241,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1227,6 +1256,7 @@
           },
           "maybe_response_err_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ErrorEnum",
             "nullable": false,
             "type_shape_v2": {
@@ -1256,6 +1286,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1272,6 +1303,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1286,6 +1318,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1327,6 +1360,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithProtocolEndsClientEndsRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1342,6 +1376,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithProtocolEndsClientEndsResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -1372,6 +1407,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithProtocolEndsServerEndsRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1387,6 +1423,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithProtocolEndsServerEndsResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -1417,6 +1454,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithProtocolEndsStructContainingEndsRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1432,6 +1470,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithProtocolEndsStructContainingEndsResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -1470,6 +1509,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1497,6 +1537,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1552,6 +1593,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1579,6 +1621,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1634,6 +1677,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1661,6 +1705,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1716,6 +1761,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -1771,6 +1817,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
             "rights": 2147483648,
@@ -1830,6 +1877,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
             "rights": 2147483648,
@@ -1889,6 +1937,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
             "rights": 2147483648,
@@ -1948,6 +1997,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
             "rights": 3,
@@ -2007,6 +2057,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
             "rights": 3,
@@ -2066,6 +2117,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
             "rights": 3,
@@ -2125,6 +2177,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 14,
             "subtype": "socket",
             "rights": 2,
@@ -2184,6 +2237,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2211,6 +2265,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2238,6 +2293,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2265,6 +2321,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2292,6 +2349,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2319,6 +2377,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2346,6 +2405,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2373,6 +2433,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2400,6 +2461,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2427,6 +2489,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2454,6 +2517,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2481,6 +2545,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2508,6 +2573,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2535,6 +2601,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2562,6 +2629,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2617,6 +2685,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/TheUnion",
             "nullable": false,
             "type_shape_v2": {
@@ -2673,6 +2742,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/TheUnion",
             "nullable": true,
             "type_shape_v2": {
@@ -2727,9 +2797,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -2756,9 +2829,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "subtype": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -2785,9 +2861,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "identifier": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -2814,9 +2893,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "subtype": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -2871,6 +2953,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -2898,6 +2981,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -2953,6 +3037,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -3008,6 +3093,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -3063,6 +3149,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -3118,6 +3205,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -3173,6 +3261,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -3228,6 +3317,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -3340,6 +3430,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
             "rights": 2147483648,
@@ -3400,6 +3491,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -3427,6 +3519,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -3454,6 +3547,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -3509,9 +3603,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3566,9 +3663,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "identifier": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3623,9 +3723,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "subtype": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3680,9 +3783,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.protocols/DiscoverableProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.protocols/DiscoverableProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "subtype": "test.protocols/DiscoverableProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3737,6 +3843,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ProtocolEnds",
             "nullable": false,
             "type_shape_v2": {
@@ -3793,6 +3900,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ProtocolEnds",
             "nullable": false,
             "type_shape_v2": {
@@ -3853,6 +3961,7 @@
           "name": "v",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3906,6 +4015,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsEnum_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3931,6 +4041,7 @@
           "name": "err",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/ErrorEnum",
             "nullable": false,
             "type_shape_v2": {
@@ -3985,6 +4096,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -4010,6 +4122,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -4063,6 +4176,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_HandleInResult_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -4088,6 +4202,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -4141,6 +4256,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocols/WithErrorSyntax_ResponseAsStruct_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -4166,6 +4282,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,

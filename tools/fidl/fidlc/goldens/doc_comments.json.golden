@@ -94,6 +94,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -263,6 +264,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -431,6 +433,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "int32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -966,9 +969,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.doccomments/Interface",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.doccomments/Interface",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.doccomments/Interface",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -1074,6 +1080,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1197,6 +1204,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1316,6 +1324,7 @@
           "name": "Field",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1433,6 +1442,7 @@
           "name": "Field",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,

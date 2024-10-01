@@ -32,6 +32,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -116,6 +117,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint16",
         "type_shape_v2": {
           "inline_size": 2,
@@ -326,6 +328,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/SomeProtocolSomeMethodRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -341,6 +344,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/SomeProtocol_SomeMethod_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -357,6 +361,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/SomeProtocol_SomeMethod_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -371,6 +376,7 @@
           },
           "maybe_response_err_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/SomeProtocol_SomeMethod_Error",
             "nullable": false,
             "type_shape_v2": {
@@ -439,6 +445,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/Op",
             "nullable": false,
             "type_shape_v2": {
@@ -467,6 +474,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/Expression",
             "nullable": true,
             "type_shape_v2": {
@@ -495,6 +503,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/Expression",
             "nullable": true,
             "type_shape_v2": {
@@ -563,6 +572,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/UnionMember",
             "nullable": false,
             "type_shape_v2": {
@@ -591,6 +601,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/TableMember",
             "nullable": false,
             "type_shape_v2": {
@@ -648,6 +659,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/BitsMember",
             "nullable": false,
             "type_shape_v2": {
@@ -706,6 +718,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint8",
             "type_shape_v2": {
               "inline_size": 1,
@@ -764,6 +777,7 @@
           "ordinal": 1,
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "maybe_element_count": 100,
             "nullable": false,
             "type_shape_v2": {
@@ -789,8 +803,10 @@
           "ordinal": 3,
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "identifier",
+              "kind_v2": "identifier",
               "identifier": "test.anonymous/Expression",
               "nullable": true,
               "type_shape_v2": {
@@ -828,6 +844,7 @@
           "ordinal": 4,
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/Flags",
             "nullable": false,
             "type_shape_v2": {
@@ -882,8 +899,10 @@
           "ordinal": 2,
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "identifier",
+              "kind_v2": "identifier",
               "identifier": "test.anonymous/TableData",
               "nullable": false,
               "type_shape_v2": {
@@ -962,6 +981,7 @@
           "name": "value",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -986,6 +1006,7 @@
           "name": "bin_op",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/OverrideTest",
             "nullable": false,
             "type_shape_v2": {
@@ -1011,6 +1032,7 @@
           "name": "function_application",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/FunctionApplication",
             "nullable": false,
             "type_shape_v2": {
@@ -1065,6 +1087,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/SomeProtocol_SomeMethod_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1090,6 +1113,7 @@
           "name": "err",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.anonymous/SomeProtocol_SomeMethod_Error",
             "nullable": false,
             "type_shape_v2": {
@@ -1145,6 +1169,7 @@
           "name": "union_data",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint8",
             "type_shape_v2": {
               "inline_size": 1,

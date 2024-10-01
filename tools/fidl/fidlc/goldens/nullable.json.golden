@@ -111,6 +111,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.nullable/SimpleProtocolAddRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -126,6 +127,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.nullable/SimpleProtocolAddResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -162,6 +164,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -217,6 +220,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -244,6 +248,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -299,6 +304,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -352,6 +358,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
             "rights": 2147483648,
@@ -409,9 +416,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.nullable/SimpleProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.nullable/SimpleProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "identifier": "test.nullable/SimpleProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -464,9 +474,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.nullable/SimpleProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.nullable/SimpleProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "subtype": "test.nullable/SimpleProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -519,6 +532,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": true,
             "type_shape_v2": {
               "inline_size": 16,
@@ -572,6 +586,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.nullable/Int32Wrapper",
             "nullable": true,
             "type_shape_v2": {
@@ -626,6 +641,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.nullable/SimpleUnion",
             "nullable": true,
             "type_shape_v2": {
@@ -680,8 +696,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "int32",
               "type_shape_v2": {
                 "inline_size": 4,
@@ -752,6 +770,7 @@
           "name": "a",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -776,6 +795,7 @@
           "name": "b",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "float32",
             "type_shape_v2": {
               "inline_size": 4,

@@ -78,6 +78,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.drivertwoway/TwoWayAddRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -93,6 +94,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.drivertwoway/TwoWayAddResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -131,6 +133,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -158,6 +161,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -213,6 +217,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,

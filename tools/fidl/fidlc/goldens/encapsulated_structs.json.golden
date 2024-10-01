@@ -102,8 +102,10 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "identifier",
+              "kind_v2": "identifier",
               "identifier": "test.encapsulatedstructs/Int16Int8",
               "nullable": false,
               "type_shape_v2": {
@@ -169,6 +171,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -196,6 +199,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int8",
             "type_shape_v2": {
               "inline_size": 1,
@@ -249,6 +253,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int8",
             "type_shape_v2": {
               "inline_size": 1,
@@ -276,6 +281,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -329,6 +335,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.encapsulatedstructs/Int16Int8",
             "nullable": true,
             "type_shape_v2": {
@@ -357,6 +364,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
             "rights": 2147483648,
@@ -414,6 +422,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.encapsulatedstructs/Int16Int8",
             "nullable": false,
             "type_shape_v2": {
@@ -442,6 +451,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.encapsulatedstructs/Int8Int32",
             "nullable": false,
             "type_shape_v2": {
@@ -470,6 +480,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.encapsulatedstructs/ArrayInt16Int8",
             "nullable": false,
             "type_shape_v2": {
@@ -524,6 +535,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.encapsulatedstructs/StructPaddingTestStruct",
             "nullable": false,
             "type_shape_v2": {
@@ -552,6 +564,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.encapsulatedstructs/NonInlineStructTestStruct",
             "nullable": false,
             "type_shape_v2": {

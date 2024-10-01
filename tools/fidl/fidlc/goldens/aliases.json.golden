@@ -96,6 +96,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -119,6 +120,7 @@
           "deprecated": false,
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.aliases/obj_type",
             "nullable": false,
             "type_shape_v2": {
@@ -154,6 +156,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -186,8 +189,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
                 "inline_size": 16,
@@ -231,8 +236,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
                 "inline_size": 16,
@@ -287,8 +294,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
                 "inline_size": 16,
@@ -333,8 +342,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "identifier",
+              "kind_v2": "identifier",
               "identifier": "test.someotherlibrary/ReferenceMe",
               "nullable": false,
               "type_shape_v2": {
@@ -380,6 +391,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 4,
             "subtype": "channel",
             "rights": 2147483648,
@@ -416,6 +428,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 4,
             "subtype": "channel",
             "rights": 2147483648,
@@ -452,6 +465,7 @@
         {
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 4,
             "subtype": "channel",
             "rights": 2147483648,
@@ -519,6 +533,7 @@
       },
       "type": {
         "kind": "identifier",
+        "kind_v2": "identifier",
         "identifier": "test.someotherlibrary/ReferenceMe",
         "nullable": false,
         "type_shape_v2": {
@@ -548,6 +563,7 @@
       },
       "type": {
         "kind": "handle",
+        "kind_v2": "handle",
         "obj_type": 4,
         "subtype": "channel",
         "rights": 2147483648,
@@ -585,6 +601,7 @@
       },
       "type": {
         "kind": "handle",
+        "kind_v2": "handle",
         "obj_type": 4,
         "subtype": "channel",
         "rights": 2147483648,
@@ -617,6 +634,7 @@
       },
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -651,8 +669,10 @@
       },
       "type": {
         "kind": "vector",
+        "kind_v2": "vector",
         "element_type": {
           "kind": "string",
+          "kind_v2": "string",
           "nullable": false,
           "type_shape_v2": {
             "inline_size": 16,
@@ -708,8 +728,10 @@
       },
       "type": {
         "kind": "vector",
+        "kind_v2": "vector",
         "element_type": {
           "kind": "string",
+          "kind_v2": "string",
           "nullable": false,
           "type_shape_v2": {
             "inline_size": 16,

@@ -221,6 +221,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.driverhandle/HandlesInProtocolSendHandlesRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -291,9 +292,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.driverhandle/DriverProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.driverhandle/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
+            "identifier": "test.driverhandle/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -348,6 +352,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.driverhandle/T",
             "nullable": false,
             "type_shape_v2": {
@@ -435,9 +440,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.driverhandle/DriverProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.driverhandle/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
+            "subtype": "test.driverhandle/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -497,6 +505,7 @@
           "ordinal": 1,
           "type": {
             "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 5,
             "subtype": "event",
             "rights": 2147483648,
@@ -525,9 +534,12 @@
           "ordinal": 2,
           "type": {
             "kind": "identifier",
-            "identifier": "test.driverhandle/DriverProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.driverhandle/DriverProtocol",
             "nullable": false,
             "protocol_transport": "Driver",
+            "identifier": "test.driverhandle/DriverProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
