@@ -4,26 +4,22 @@
 
 use crate::LibContext;
 use anyhow::Result;
-use async_lock::Mutex;
 use camino::Utf8PathBuf;
-use errors::ffx_error;
+use errors::{ffx_error, map_daemon_error};
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
-use ffx_target::connection::Connection;
-use ffx_target::ssh_connector::SshConnector;
-use fidl::endpoints::Proxy;
+use ffx_core::Injector;
+use ffx_daemon::DaemonConfig;
+use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
+use ffx_target::add_manual_target;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl::AsHandleRef;
+use fidl_fuchsia_developer_ffx::{TargetCollectionMarker, TargetCollectionProxy, TargetProxy};
 use fuchsia_zircon_types as zx_types;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-
-fn unspecified_target() -> anyhow::Error {
-    anyhow::anyhow!(concat!(
-        "no device has been specified for this `Context`. ",
-        "A device must be specified in order to connect to the remote control proxy"
-    ))
-}
 
 fn fxe<E: std::fmt::Debug>(e: E) -> anyhow::Error {
     ffx_error!("{e:?}").into()
@@ -37,19 +33,8 @@ pub struct FfxConfigEntry {
 
 pub struct EnvContext {
     lib_ctx: Weak<LibContext>,
-    target_spec: Option<String>,
-    device_connection: Mutex<Option<Connection>>,
+    injector: Box<dyn Injector + Send + Sync>,
     pub(crate) context: EnvironmentContext,
-}
-
-async fn new_device_connection(
-    ctx: &EnvironmentContext,
-    target_spec: &Option<String>,
-) -> Result<Connection> {
-    let resolution = ffx_target::resolve_target_address(target_spec, ctx).await?;
-    let addr = resolution.addr()?;
-    let connector = SshConnector::new(addr, ctx).await?;
-    Ok(Connection::new(connector).await?)
 }
 
 impl EnvContext {
@@ -104,26 +89,68 @@ impl EnvContext {
         let _ = ffx_config::init(&context).await;
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
+        let node = overnet_core::Router::new(None)?;
         let target_spec = ffx_target::get_target_specifier(&context).await?;
-        let device_connection = Mutex::new(None);
-        Ok(Self { context, device_connection, target_spec, lib_ctx })
+        let injector = Box::new(Injection::new(
+            context.clone(),
+            DaemonVersionCheck::CheckApiLevel(
+                version_history_data::HISTORY.get_misleading_version_for_ffx().api_level,
+            ),
+            node,
+            target_spec,
+        ));
+        Ok(Self { context, injector, lib_ctx })
     }
 
-    async fn invariant_check(&self) -> Result<()> {
-        if self.target_spec.is_none() {
-            return Err(unspecified_target());
-        }
-        let mut device_connection = self.device_connection.lock().await;
-        if device_connection.is_none() {
-            *device_connection =
-                Some(new_device_connection(&self.context, &self.target_spec).await?);
-        }
-        Ok(())
+    pub async fn connect_daemon_protocol(&self, protocol: String) -> Result<zx_types::zx_handle_t> {
+        let proxy = self.injector.daemon_factory().await?;
+        let (client, server) = fidl::Channel::create();
+        proxy.connect_to_protocol(protocol.as_str(), server).await?.map_err(fxe)?;
+        let res = client.raw_handle();
+        std::mem::forget(client);
+        Ok(res)
+    }
+
+    pub async fn connect_target_proxy(&self) -> Result<zx_types::zx_handle_t> {
+        let proxy = self.injector.target_factory().await?;
+        let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
+        let res = hdl.raw_handle();
+        std::mem::forget(hdl);
+        Ok(res)
+    }
+
+    pub async fn target_proxy_factory(&self) -> Result<TargetProxy> {
+        self.injector.target_factory().await
+    }
+
+    pub async fn target_collection_proxy_factory(&self) -> Result<TargetCollectionProxy> {
+        let daemon = self.injector.daemon_factory().await?;
+        let (client, server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>()?;
+        let protocol = <TargetCollectionMarker as DiscoverableProtocolMarker>::PROTOCOL_NAME;
+        daemon
+            .connect_to_protocol(protocol, server.into_channel())
+            .await?
+            .map_err(|err| map_daemon_error(protocol, err))?;
+        Ok(client)
+    }
+
+    pub async fn target_add(
+        &self,
+        addr: IpAddr,
+        scope_id: u32,
+        port: u16,
+        wait: bool,
+    ) -> Result<()> {
+        let tc_proxy = self.target_collection_proxy_factory().await?;
+        add_manual_target(&tc_proxy, addr, scope_id, port, wait).await
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
-        self.invariant_check().await?;
-        let proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
+        let target_spec = ffx_target::get_target_specifier(&self.context).await?;
+        let daemon = self.injector.daemon_factory().await?;
+        let timeout = self.context.get_proxy_timeout().await?;
+        let proxy =
+            ffx_target::get_remote_proxy(target_spec, daemon, timeout, None, &self.context).await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
@@ -135,8 +162,7 @@ impl EnvContext {
         moniker: String,
         capability_name: String,
     ) -> Result<zx_types::zx_handle_t> {
-        self.invariant_check().await?;
-        let rcs_proxy = self.device_connection.lock().await.as_ref().unwrap().rcs_proxy().await?;
+        let rcs_proxy = self.injector.remote_factory().await?;
         let (hdl, server) = fidl::Channel::create();
         rcs::connect_with_timeout_at(
             Duration::from_secs(15),
@@ -149,15 +175,5 @@ impl EnvContext {
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
         Ok(res)
-    }
-
-    pub async fn target_wait(&self, timeout: u64, offline: bool) -> Result<()> {
-        let cmd = ffx_wait_args::WaitOptions { timeout, down: offline };
-        let tool = ffx_wait::WaitOperation {
-            cmd,
-            env: self.context.clone(),
-            waiter: ffx_wait::DeviceWaiterImpl,
-        };
-        tool.wait_impl().await.map_err(Into::into)
     }
 }

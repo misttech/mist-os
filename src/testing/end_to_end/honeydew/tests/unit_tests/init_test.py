@@ -81,7 +81,9 @@ class InitTests(unittest.TestCase):
         )
 
         mock_fc_context.assert_called_once_with(
-            config={},
+            config={
+                "daemon.autostart": "false",
+            },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
             target=_INPUT_ARGS["target_name"],
         )
@@ -102,10 +104,16 @@ class InitTests(unittest.TestCase):
         "check_connection",
         autospec=True,
     )
+    @mock.patch.object(
+        fuchsia_controller_transport.FuchsiaController,
+        "add_target",
+        autospec=True,
+    )
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
     def test_create_device_using_device_ip_port(
         self,
         mock_fc_context: mock.Mock,
+        mock_fc_add_target: mock.Mock,
         mock_fc_check_connection: mock.Mock,
         mock_ffx_add_target: mock.Mock,
         mock_ffx_check_connection: mock.Mock,
@@ -126,10 +134,13 @@ class InitTests(unittest.TestCase):
         )
 
         mock_fc_context.assert_called_once_with(
-            config={},
+            config={
+                "daemon.autostart": "false",
+            },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
             target=str(_INPUT_ARGS["target_ip_port"]),
         )
+        mock_fc_add_target.assert_called()
         mock_fc_check_connection.assert_called()
 
         mock_ffx_add_target.assert_called()

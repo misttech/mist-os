@@ -45,14 +45,21 @@ rustc_staticlib("lib") {
 
   test_deps = [ "//third_party/rust_crates:futures-test" ]
   deps = [
+    "//src/connectivity/overnet/lib/core",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/daemon:lib",
+    "//src/developer/ffx/daemon/proxy:lib",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/plugins/target/wait:ffx_wait",
     "//src/developer/ffx/plugins/target/wait:ffx_wait_args",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/versioning/version-history/rust/data",
     "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//src/lib/zircon/rust/fuchsia-zircon-types",
     "//third_party/rust_crates:anyhow",

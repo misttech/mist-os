@@ -514,6 +514,43 @@ PyObject *context_create(PyObject *self, PyObject *args) {
   return MakePyObject<PythonContext>(env_context);
 }
 
+PyObject *context_connect_daemon_protocol(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  const char *protocol = nullptr;
+  if (!PyArg_ParseTuple(args, "Os", &obj, &protocol)) {
+    return nullptr;
+  }
+  auto context = DowncastPyObject<PythonContext>(obj);
+  if (!context) {
+    return nullptr;
+  }
+  zx_handle_t handle;
+  zx_status_t status = ffx_connect_daemon_protocol(context->context(), protocol, &handle);
+  if (status != ZX_OK) {
+    mod::dump_python_err();
+    return nullptr;
+  }
+  return MakePyObject<PythonChannel>(handle);
+}
+
+PyObject *context_connect_target_proxy(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  if (!PyArg_ParseTuple(args, "O", &obj)) {
+    return nullptr;
+  }
+  auto context = DowncastPyObject<PythonContext>(obj);
+  if (!context) {
+    return nullptr;
+  }
+  zx_handle_t handle;
+  zx_status_t status = ffx_connect_target_proxy(context->context(), &handle);
+  if (status != ZX_OK) {
+    mod::dump_python_err();
+    return nullptr;
+  }
+  return MakePyObject<PythonChannel>(handle);
+}
+
 PyObject *context_connect_remote_control_proxy(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
   if (!PyArg_ParseTuple(args, "O", &obj)) {
@@ -591,23 +628,47 @@ PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
   return PyLong_FromLong(descriptor);
 }
 
-PyObject *context_target_wait(PyObject *self, PyObject *args) {
+PyObject *context_target_add(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  uint64_t seconds = 0;
-  bool offline = false;
-  // The python docs state "K" converts to "unsigned long long" so static assert they're
-  // matching the expected ABI.
-  //
-  // https://docs.python.org/3/c-api/arg.html#numbers
-  static_assert(sizeof(uint64_t) == sizeof(unsigned long long));  // NOLINT
-  if (!PyArg_ParseTuple(args, "OKb", &obj, &seconds, &offline)) {
+  const char *target = nullptr;
+  bool wait = false;
+  if (!PyArg_ParseTuple(args, "Osb", &obj, &target, &wait)) {
     return nullptr;
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
     return nullptr;
   }
-  zx_status_t status = ffx_target_wait(context->context(), seconds, offline);
+  zx_status_t status = ffx_target_add(context->context(), target, wait);
+  if (status != ZX_OK) {
+    switch (status) {
+      case ZX_ERR_INVALID_ARGS:
+        PyErr_Format(PyExc_ValueError, "invalid address passed as target: '%s'", target);
+        break;
+      default:
+        mod::dump_python_err();
+    }
+    return nullptr;
+  }
+  Py_RETURN_NONE;
+}
+
+PyObject *context_target_wait(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  uint64_t seconds = 0;
+  // The python docs state "K" converts to "unsigned long long" so static assert they're
+  // matching the expected ABI.
+  //
+  // https://docs.python.org/3/c-api/arg.html#numbers
+  static_assert(sizeof(uint64_t) == sizeof(unsigned long long));  // NOLINT
+  if (!PyArg_ParseTuple(args, "OK", &obj, &seconds)) {
+    return nullptr;
+  }
+  auto context = DowncastPyObject<PythonContext>(obj);
+  if (!context) {
+    return nullptr;
+  }
+  zx_status_t status = ffx_target_wait(context->context(), seconds);
   if (status != ZX_OK) {
     mod::dump_python_err();
     return nullptr;
@@ -1005,10 +1066,16 @@ PyMethodDef FuchsiaControllerMethods[] = {
 
     // v2 methods for Context
     {"context_create", reinterpret_cast<PyCFunction>(context_create), METH_VARARGS, nullptr},
+    {"context_connect_daemon_protocol",
+     reinterpret_cast<PyCFunction>(context_connect_daemon_protocol), METH_VARARGS, nullptr},
+    {"context_connect_target_proxy", reinterpret_cast<PyCFunction>(context_connect_target_proxy),
+     METH_VARARGS, nullptr},
     {"context_connect_device_proxy", reinterpret_cast<PyCFunction>(context_connect_device_proxy),
      METH_VARARGS, nullptr},
     {"context_connect_remote_control_proxy",
      reinterpret_cast<PyCFunction>(context_connect_remote_control_proxy), METH_VARARGS, nullptr},
+    {"context_target_add", reinterpret_cast<PyCFunction>(context_target_add), METH_VARARGS,
+     nullptr},
     {"context_target_wait", reinterpret_cast<PyCFunction>(context_target_wait), METH_VARARGS,
      nullptr},
     {"context_config_get_string", reinterpret_cast<PyCFunction>(context_config_get_string),
