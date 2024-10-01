@@ -116,7 +116,7 @@ impl Kernels {
         if let Some(kernel) = self.kernels.lock().get(&job_koid) {
             let activity_governor = connect_to_protocol::<fpower::ActivityGovernorMarker>()?;
             *kernel.wake_lease.lock() =
-                Some(activity_governor.take_wake_lease(&kernel.name).await?);
+                Some(activity_governor.take_application_activity_lease(&kernel.name).await?);
             tracing::info!("Acquired wake lease for {:?}", container_job);
         }
         Ok(())
