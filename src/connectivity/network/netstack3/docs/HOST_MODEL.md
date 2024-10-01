@@ -9,7 +9,7 @@ a different interface on the host. A strong host would not accept such a packet.
 Strong hosts are generally considered to be more secure, at the cost of less
 flexible connectivity.
 
-Netstack3's default behavior is to behave as a strong host however it does use
+Netstack3's default behavior is to behave as a strong host; however, it does use
 the weak host model in a few situations. This decision is determined on a per
 interface basis:
 
@@ -28,7 +28,7 @@ enhanced connectivity.
 Netstack3 is a weak host when looping back packets. In particular, it's possible
 for a socket bound to an address on one local interface to send to a destination
 address that's assigned to a different local interface. The exception to this is
-when when strict device requirements are in effect, due to:
+when strict device requirements are in effect, due to:
 
   1. the sending socket being bound to an interface with `SO_BINDTODEVICE`, or
   2. at least one of the source or destination addresses requires a scope ID.
