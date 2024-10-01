@@ -10,14 +10,6 @@
             ],
         },
         {
-            type: "skip",
-            matchers: [
-                // TODO(https://fxbug.dev/370575547): Unskip once the test is
-                // deflaked.
-                "watch_multiple_routing_events*",
-            ],
-        },
-        {
             type: "expect_failure_with_err_logs",
             matchers: [
                 // TODO(https://fxbug.dev/323052525): Support Multicast Routing.

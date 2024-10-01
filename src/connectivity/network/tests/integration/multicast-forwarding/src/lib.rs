@@ -269,16 +269,12 @@ impl<'a> MulticastForwardingNetwork<'a> {
         }
     }
 
-    /// Sends a single multicast packet from a configured device.
+    /// Sends a single multicast packet with optional behavior overrides.
     ///
-    /// If `source_device_override` is specified, it will be used rather than
-    /// `self.options.source_device`.
-    async fn send_multicast_packet_with_overrides(
-        &self,
-        source_device_override: Option<SourceDevice>,
-    ) {
-        let source_device = source_device_override.unwrap_or(self.options.source_device);
-        let (realm, addr, id) = match source_device {
+    /// If `dst_addr_type` is specified, it will be used rather than
+    /// `IpAddrType::Multicast`.
+    async fn send_multicast_packet_with_overrides(&self, dst_addr_type: Option<IpAddrType>) {
+        let (realm, addr, id) = match self.options.source_device {
             SourceDevice::Router(server) => {
                 let server_device = self.get_server(server);
                 (
@@ -293,7 +289,8 @@ impl<'a> MulticastForwardingNetwork<'a> {
             }
         };
 
-        let dst_addr = create_socket_addr(IpAddrType::Multicast.address(self.version));
+        let dst_addr_type = dst_addr_type.unwrap_or(IpAddrType::Multicast);
+        let dst_addr = create_socket_addr(dst_addr_type.address(self.version));
         let server_sock = fasync::net::UdpSocket::bind_in_realm(realm, dst_addr)
             .await
             .expect("bind_in_realm failed for server socket");
@@ -1804,10 +1801,6 @@ async fn watch_routing_events_already_hanging<I: Ip, N: Netstack>(name: &str) {
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
 async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
-    // NB: Use two servers to ensure the two sent packets have different sources
-    // which will result in two unique events being published.
-    const SERVERS: [Server; 2] = [Server::A, Server::B];
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
     let test_network = MulticastForwardingNetwork::new::<N>(
@@ -1815,7 +1808,7 @@ async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
         I::VERSION,
         &sandbox,
         &router_realm,
-        Vec::from(SERVERS),
+        vec![Server::A],
         vec![Client::A],
         MulticastForwardingNetworkOptions::default(),
     )
@@ -1825,8 +1818,11 @@ async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
 
     test_network.wait_for_controller_to_start(&controller).await;
 
-    for server in SERVERS {
-        test_network.send_multicast_packet_with_overrides(Some(SourceDevice::Server(server))).await;
+    // NB: Send to two separate destination addresses. This ensures the Netstack
+    // will publish two unique events.
+    const DST_ADDRS: [IpAddrType; 2] = [IpAddrType::Multicast, IpAddrType::OtherMulticast];
+    for dst_addr in DST_ADDRS {
+        test_network.send_multicast_packet_with_overrides(Some(dst_addr)).await;
     }
 
     // After sending the packet, sleep for a few seconds to allow the netstack
@@ -1836,7 +1832,7 @@ async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
     netstack_testing_common::sleep(WAIT_AFTER_SEND_DURATION.into_seconds()).await;
 
     // Verify both "Missing Route" events are observed in the correct order.
-    for server in SERVERS {
+    for dst_addr in DST_ADDRS {
         let RoutingEventResult { dropped_events, addresses, input_interface, event } = controller
             .watch_routing_events()
             .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
@@ -1845,15 +1841,14 @@ async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
             .await
             .expect("watch_routing_events failed");
 
-        let src_addr = test_network.get_server(server).ep_addr.addr;
-        let dst_addr = IpAddrType::Multicast.address(test_network.version);
+        let src_addr = test_network.get_source_address();
+        let dst_addr = dst_addr.address(test_network.version);
         let expected_addr =
             test_network.create_unicast_source_and_multicast_destination(src_addr, dst_addr);
-        let expected_src_interface = test_network.get_server(server).router_interface.id();
 
         assert_eq!(dropped_events, 0);
         assert_eq!(addresses, expected_addr);
-        assert_eq!(input_interface, expected_src_interface);
+        assert_eq!(input_interface, test_network.get_source_router_interface_id());
         assert_eq!(
             event,
             fnet_multicast_admin::RoutingEvent::MissingRoute(fnet_multicast_admin::Empty {})
