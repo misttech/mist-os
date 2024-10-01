@@ -63,6 +63,9 @@ ffx_plugin("ffx_repository_serve") {
     ]
   }
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/target.rs",
+  ]
   rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
 }
