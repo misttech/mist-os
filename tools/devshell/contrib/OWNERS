@@ -1,5 +1,4 @@
 per-file bindc = file: /src/devices/OWNERS
-
 per-file ls-buildid=joshuaseaton@google.com
 per-file check-licenses=jcecil@google.com
 per-file check-goldens=adamperry@google.com,joshuaseaton@google.com,ianloic@google.com
@@ -50,8 +49,7 @@ per-file symbol-index=dangyi@google.com,frousseau@google.com
 per-file system-status.fx=crjohns@google.com,miguelfrde@google.com
 per-file test-stats=crjohns@google.com
 per-file test-stats.py=crjohns@google.com
-per-file triage=cphoenix@google.com
-per-file triage=crjohns@google.com
+per-file triage = file: /src/diagnostics/OWNERS
 per-file unarchive-package=dangyi@google.com
 per-file update-3p-owners = file: /tools/auto_owners/OWNERS
 per-file update-rustc-third-party = file: /scripts/rust/OWNERS
