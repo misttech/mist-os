@@ -698,6 +698,9 @@ config("test-executable.in-process.config") {
 test_executable("partial-page-bss") {
   can_be_in_process = true
   sources = [ "partial-page-bss.cc" ]
+
+  # Instrumentation that emits extra data/bss contents interferes.
+  exclude_toolchain_tags = [ "needs-writable-globals" ]
 }
 
 # With --strip-sections, the file will usually end at the end of the last
