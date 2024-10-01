@@ -557,6 +557,7 @@ static_assertions::const_assert_eq!(
 );
 
 impl<'a> HandleDisposition<'a> {
+    #[inline]
     pub fn new(
         handle_op: HandleOp<'a>,
         object_type: ObjectType,
