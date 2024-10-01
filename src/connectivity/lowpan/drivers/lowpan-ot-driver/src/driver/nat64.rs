@@ -98,10 +98,8 @@ impl Nat64 {
         let active_cidr = self.active_cidr_addr.get();
         if ot_instance.nat64_get_translator_state() == Nat64State::Active {
             if let Some(addr) = active_cidr {
-                let lowpan_nicid: u64 = net_if.get_index();
                 self.add_route(net_if, addr.get_address_bytes(), addr.get_length());
                 self.enable_masquerade(
-                    lowpan_nicid,
                     wlan_client_nicid,
                     addr.get_address_bytes(),
                     addr.get_length(),
@@ -123,7 +121,6 @@ impl Nat64 {
 
     fn enable_masquerade(
         &self,
-        lowpan_nicid: u64,
         wlan_client_nicid: u64,
         cidr_addr: [u8; 4],
         cidr_addr_prefix_len: u8,
@@ -131,8 +128,6 @@ impl Nat64 {
         let masquerade_proxy = connect_to_protocol::<fidl_fuchsia_net_masquerade::FactoryMarker>()
             .context("error connecting to masquerade factory")?;
         let config = fidl_fuchsia_net_masquerade::ControlConfig {
-            // The interface carrying the network to be masqueraded.[lowpan0]
-            input_interface: lowpan_nicid,
             // The network to be masqueraded.
             src_subnet: fidl_fuchsia_net::Subnet {
                 addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {

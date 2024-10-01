@@ -2077,9 +2077,8 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
 
     masq.create(
         &fnet_masquerade::ControlConfig {
-            input_interface: router_client_iface.id(),
-            output_interface: router_server_iface.id(),
             src_subnet: router_client_ip,
+            output_interface: router_server_iface.id(),
         },
         server_end,
     )

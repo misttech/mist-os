@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Library containing methods to enable address masquerading for a given interface pair.
+/// Library containing methods to enable address masquerading for a given subnet
+/// and egress interface.
 @available(added=HEAD)
 library fuchsia.net.masquerade;
 
@@ -10,9 +11,8 @@ using fuchsia.net;
 
 /// All possible error types that may be returned by calls to `Control` or `Factory`.
 type Error = enum {
-    /// An unsupported configuration was provided. It may be one of:
-    /// - A masquerade instance already exists for the current `input_interface`.
-    /// - The provided `src_subnet` was unspecified (`0/0`)
+    /// An unsupported configuration was provided. For example, the provided
+    /// `src_subnet` was unspecified (`0/0`).
     UNSUPPORTED = 0;
 
     /// One or more of the configuration fields was invalid (e.g. `src_if` can't
@@ -22,7 +22,7 @@ type Error = enum {
     /// The provided `src_if` was not found.
     NOT_FOUND = 2;
 
-    /// The provided `src_subnet`/`outgoing_nic` pair already exist in the Nat
+    /// The provided `src_subnet`/`output_interface` pair already exist in the Nat
     /// rules.
     ALREADY_EXISTS = 3;
 
@@ -37,9 +37,9 @@ type Error = enum {
 
 /// Control provides a IP masquerade instance.
 ///
-/// This protocol is associated with the lifetime of the IP masquerade
-/// between interfaces for the configured network. This configuration will
-/// be torn down whenever either end of the protocol is closed.
+/// This protocol is associated with the lifetime of the IP masquerade. This
+/// configuration will be torn down whenever either end of the protocol is
+/// closed.
 closed protocol Control {
     /// SetEnabled enables or disabled IP masquerading for the configured
     /// instance. Newly created instances are disabled and must be enabled
@@ -76,8 +76,6 @@ closed protocol Factory {
     ///   instance.
     strict Create(resource struct {
         config @generated_name("ControlConfig") struct {
-            /// The interface carrying the network to be masqueraded.
-            input_interface fuchsia.net.InterfaceId;
             /// The network to be masqueraded.
             src_subnet fuchsia.net.Subnet;
             /// The interface through which to masquerade.
