@@ -160,9 +160,9 @@ void DeviceServer::StartAndWait2(StartAndWait2Request& request,
 
         zx::eventpair local_wake_lease, remote_wake_lease;
         zx_status_t status =
-            fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease, &remote_wake_lease);
+            fuchsia_power_system::LeaseToken::create(0, &local_wake_lease, &remote_wake_lease);
         if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "WakeLeaseToken create failed: " << zx_status_get_string(status)
+          FX_LOGS(ERROR) << "LeaseToken create failed: " << zx_status_get_string(status)
                          << std::endl;
         }
 

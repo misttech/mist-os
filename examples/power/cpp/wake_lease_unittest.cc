@@ -19,7 +19,7 @@ namespace {
 using fdf_power::testing::FakeActivityGovernor;
 using fdf_power::testing::FidlBoundServer;
 using fuchsia_power_system::ActivityGovernor;
-using fuchsia_power_system::WakeLeaseToken;
+using fuchsia_power_system::LeaseToken;
 
 class WakeLeaseTest : public gtest::TestLoopFixture {};
 

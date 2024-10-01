@@ -6,7 +6,7 @@ use anyhow::Result;
 use fidl_fuchsia_power_system as fsystem;
 
 pub struct WakeLease {
-    _token: fsystem::WakeLeaseToken,
+    _token: fsystem::LeaseToken,
 }
 
 impl WakeLease {
@@ -43,7 +43,7 @@ mod tests {
                             name: _name,
                             responder,
                         } => {
-                            let (server_token, client_token) = fsystem::WakeLeaseToken::create();
+                            let (server_token, client_token) = fsystem::LeaseToken::create();
                             let wake_lease_active = self.wake_lease_active.clone();
                             assert!(wake_lease_active.unbounded_send(true).is_ok());
 

@@ -180,9 +180,9 @@ open protocol Device {
     /// may race with the expiration of the timer.
     ///
     /// This method keeps the system awake (prevents suspension) while the timer is setup using the
-    /// mandatory passed-in `setup_keep_alive` `WakeLeaseToken`.
+    /// mandatory passed-in `setup_keep_alive` `LeaseToken`.
     /// When the timer expires this method returns a second `expiration_keep_alive`
-    /// `WakeLeaseToken` to prevent suspension at the time of expiration.
+    /// `LeaseToken` to prevent suspension at the time of expiration.
     /// These keep alive wake lease tokens are provided by the Power Framework's System Activity
     /// Governor. A driver supporting this call must be able to get `expiration_keep_alive` from
     /// System Activity Governor.
@@ -205,9 +205,9 @@ open protocol Device {
         id uint64;
         resolution Resolution;
         ticks uint64;
-        setup_keep_alive fuchsia.power.system.WakeLeaseToken;
+        setup_keep_alive fuchsia.power.system.LeaseToken;
     }) -> (resource struct {
-        expiration_keep_alive fuchsia.power.system.WakeLeaseToken;
+        expiration_keep_alive fuchsia.power.system.LeaseToken;
     }) error DriverError;
 
     /// Get driver properties.

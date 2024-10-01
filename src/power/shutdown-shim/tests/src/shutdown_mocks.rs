@@ -107,7 +107,7 @@ async fn run_activity_governor(
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             fsystem::ActivityGovernorRequest::TakeWakeLease { name: _, responder } => {
-                let (client_token, server_token) = fsystem::WakeLeaseToken::create();
+                let (client_token, server_token) = fsystem::LeaseToken::create();
                 let send_signals2 = send_signals.clone();
                 fasync::Task::spawn(async move {
                     fasync::OnSignals::new(&server_token, zx::Signals::EVENTPAIR_PEER_CLOSED)

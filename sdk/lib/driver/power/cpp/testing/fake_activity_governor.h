@@ -18,7 +18,7 @@ namespace fdf_power::testing {
 
 using fuchsia_power_system::ActivityGovernor;
 using fuchsia_power_system::ActivityGovernorListener;
-using fuchsia_power_system::WakeLeaseToken;
+using fuchsia_power_system::LeaseToken;
 
 class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
  public:
@@ -29,8 +29,8 @@ class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
  private:
   void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
                      TakeWakeLeaseCompleter::Sync& completer) override {
-    WakeLeaseToken client_token, server_token;
-    WakeLeaseToken::create(/*options=*/0u, &client_token, &server_token);
+    LeaseToken client_token, server_token;
+    LeaseToken::create(/*options=*/0u, &client_token, &server_token);
 
     // Start an async task to wait for EVENTPAIR_PEER_CLOSED signal on server_token.
     zx_handle_t token_handle = server_token.get();
@@ -50,7 +50,7 @@ class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
   }
 
   async_dispatcher_t* dispatcher_;
-  std::unordered_map<zx_handle_t, WakeLeaseToken> active_wake_leases_;
+  std::unordered_map<zx_handle_t, LeaseToken> active_wake_leases_;
 };
 
 class FakeActivityGovernorListener : public FidlTestBaseDefault<ActivityGovernorListener> {

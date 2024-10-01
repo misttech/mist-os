@@ -97,7 +97,7 @@ using zx;
 
 // TODO(https://fxbug.dev/339474151): Update this when EventPair is the standard
 // token for leases in Power Broker.
-alias WakeLeaseToken = zx.Handle:EVENTPAIR;
+alias LeaseToken = zx.Handle:EVENTPAIR;
 
 /// Holds a token to the execution state power element.
 ///
@@ -283,7 +283,7 @@ open protocol ActivityGovernor {
     /// Creates a lease that blocks suspension of the hardware platform.
     ///
     /// The hardware platform will not suspend as long as a valid
-    /// [`WakeLeaseToken`] exists.
+    /// [`LeaseToken`] exists.
     ///
     /// If an error occurs while creating a token for the wake lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no
@@ -295,7 +295,27 @@ open protocol ActivityGovernor {
         name string:fuchsia.power.broker.MAX_ELEMENT_NAME_LEN;
     }) -> (resource struct {
         /// The token that blocks hardware platform suspension.
-        token WakeLeaseToken;
+        token LeaseToken;
+    });
+
+    /// Creates a lease that blocks the system from dropping below the Application
+    /// Activity 'Active' state.
+    ///
+    /// Note that when this lease is acquired for the first time, SAG will exit the
+    /// "booting" stage and begin enforcing the suspend power policy.
+    ///
+    /// If an error occurs while creating a token for the activity lease, then the
+    /// channel to `ActivityGovernor` will be closed by the server and no
+    /// response will be returned.
+    flexible TakeApplicationActivityLease(struct {
+        /// The name of the lease.
+        ///
+        /// The name is not required to be globally unique.
+        name string:fuchsia.power.broker.MAX_ELEMENT_NAME_LEN;
+    }) -> (resource struct {
+        /// The token that blocks application activity from dropping below the
+        /// 'Active' state.
+        token LeaseToken;
     });
 
     /// Registers a listener for activity governor events.

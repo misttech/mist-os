@@ -393,33 +393,86 @@ impl SuspendStatsManager {
     }
 }
 
-/// Manager of leases that block suspension.
+/// Manager of leases that block execution state.
 ///
-/// Used to facilitate the `TakeWakeLease()` functionality of
-/// `fuchsia.power.system.ActivityGovernor`.
+/// Used to facilitate the `TakeWakeLease()` and `TakeApplicationActivityLease()`
+/// functionality of `fuchsia.power.system.ActivityGovernor`.
 ///
 /// A wake lease blocks suspension by requiring the power level of the Execution
 /// State to be at least [`ExecutionStateLevel::Suspending`].
-struct WakeLeaseManager {
+///
+/// An application activity lease requires Application Activity to be at least
+/// [`ApplicationActivityLevel::Active`].
+struct LeaseManager {
     /// The inspect node for lease stats.
     inspect_node: INode,
     /// Proxy to the power topology to create power elements.
     topology: fbroker::TopologyProxy,
     /// Dependency token for Execution State.
     execution_state_assertive_dependency_token: fbroker::DependencyToken,
+    /// Dependency token for Application Activity.
+    application_activity_assertive_dependency_token: fbroker::DependencyToken,
 }
 
-impl WakeLeaseManager {
+impl LeaseManager {
     pub fn new(
         inspect_node: INode,
         topology: fbroker::TopologyProxy,
         execution_state_assertive_dependency_token: fbroker::DependencyToken,
+        application_activity_assertive_dependency_token: fbroker::DependencyToken,
     ) -> Self {
-        Self { inspect_node, topology, execution_state_assertive_dependency_token }
+        Self {
+            inspect_node,
+            topology,
+            execution_state_assertive_dependency_token,
+            application_activity_assertive_dependency_token,
+        }
     }
 
-    async fn create_wake_lease(&self, name: String) -> Result<fsystem::WakeLeaseToken> {
-        let (server_token, client_token) = fsystem::WakeLeaseToken::create();
+    async fn create_application_activity_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
+        let (server_token, client_token) = fsystem::LeaseToken::create();
+
+        let lease_helper = LeaseHelper::new(
+            &self.topology,
+            &name,
+            vec![power_broker_client::LeaseDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                requires_token: self
+                    .application_activity_assertive_dependency_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                requires_level_by_preference: vec![
+                    ApplicationActivityLevel::Active.into_primitive()
+                ],
+            }],
+        )
+        .await?;
+        tracing::debug!("Acquiring lease for '{}'", name);
+        let lease = lease_helper.lease().await?;
+
+        let token_info = server_token.basic_info()?;
+        let inspect_lease_node =
+            self.inspect_node.create_child(token_info.koid.raw_koid().to_string());
+        let related_koid = token_info.related_koid.raw_koid();
+
+        inspect_lease_node.record_string("name", name.clone());
+        inspect_lease_node.record_string("type", "application_activity");
+        inspect_lease_node.record_uint("client_token_koid", related_koid);
+        inspect_lease_node.record_time("created_at");
+
+        fasync::Task::local(async move {
+            // Keep lease alive for as long as the client keeps it alive.
+            let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
+            tracing::debug!("Dropping lease for '{}'", name);
+            drop(inspect_lease_node);
+            drop(lease);
+        })
+        .detach();
+
+        Ok(client_token)
+    }
+
+    async fn create_wake_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
+        let (server_token, client_token) = fsystem::LeaseToken::create();
 
         let lease_helper =
             LeaseHelper::new(
@@ -445,6 +498,7 @@ impl WakeLeaseManager {
         let related_koid = token_info.related_koid.raw_koid();
 
         inspect_lease_node.record_string("name", name.clone());
+        inspect_lease_node.record_string("type", "wake");
         inspect_lease_node.record_uint("client_token_koid", related_koid);
         inspect_lease_node.record_time("created_at");
 
@@ -479,8 +533,8 @@ pub struct SystemActivityGovernor {
     /// The manager used to report suspend stats to inspect and clients of
     /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
-    /// The manager used to create and report wake leases.
-    wake_lease_manager: WakeLeaseManager,
+    /// The manager used to create and report wake and activity application leases.
+    lease_manager: LeaseManager,
     /// The collection of ActivityGovernorListener that have registered through
     /// fuchsia.power.system.ActivityGovernor/RegisterListener.
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
@@ -537,12 +591,6 @@ impl SystemActivityGovernor {
         .await
         .expect("PowerElementContext encountered error while building execution_state");
 
-        let wake_lease_manager = WakeLeaseManager::new(
-            inspect_root.create_child("wake_leases"),
-            topology.clone(),
-            execution_state.assertive_dependency_token().expect("token not registered"),
-        );
-
         element_power_level_names.push(generate_element_power_level_names(
             "execution_state",
             vec![
@@ -571,6 +619,13 @@ impl SystemActivityGovernor {
         .build()
         .await
         .expect("PowerElementContext encountered error while building application_activity");
+
+        let lease_manager = LeaseManager::new(
+            inspect_root.create_child("wake_leases"),
+            topology.clone(),
+            execution_state.assertive_dependency_token().expect("token not registered"),
+            application_activity.assertive_dependency_token().expect("token not registered"),
+        );
 
         element_power_level_names.push(generate_element_power_level_names(
             "application_activity",
@@ -704,7 +759,7 @@ impl SystemActivityGovernor {
             wake_handling,
             resume_latency_ctx,
             suspend_stats,
-            wake_lease_manager,
+            lease_manager,
             listeners: RefCell::new(Vec::new()),
             cpu_manager,
             boot_control: boot_control.into(),
@@ -1084,8 +1139,31 @@ impl SystemActivityGovernor {
                         );
                     }
                 }
+                Ok(fsystem::ActivityGovernorRequest::TakeApplicationActivityLease {
+                    responder,
+                    name,
+                }) => {
+                    let client_token =
+                        match self.lease_manager.create_application_activity_lease(name).await {
+                            Ok(client_token) => client_token,
+                            Err(error) => {
+                                tracing::warn!(
+                                ?error,
+                                "Encountered error while registering application activity lease"
+                            );
+                                return;
+                            }
+                        };
+
+                    if let Err(error) = responder.send(client_token) {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to TakeApplicationActivity request"
+                        );
+                    }
+                }
                 Ok(fsystem::ActivityGovernorRequest::TakeWakeLease { responder, name }) => {
-                    let client_token = match self.wake_lease_manager.create_wake_lease(name).await {
+                    let client_token = match self.lease_manager.create_wake_lease(name).await {
                         Ok(client_token) => client_token,
                         Err(error) => {
                             tracing::warn!(

@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_assertions::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
+use diagnostics_assertions::{
+    tree_assertion, AnyProperty, AnyStringProperty, NonZeroUintProperty, TreeAssertion,
+};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
@@ -2499,6 +2501,7 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
                     created_at: NonZeroUintProperty,
                     client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
                     name: wake_lease_name,
+                    type: AnyStringProperty,
                 }
             },
         }
@@ -2506,6 +2509,81 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
 
     drop(wake_lease);
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_take_application_activity_lease() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .collect();
+
+    let aa_status = status_endpoints.get("application_activity").unwrap();
+    assert_eq!(
+        aa_status.watch_power_level().await?.unwrap(),
+        0 /* ApplicationActivityLevel::Inactive */
+    );
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let application_activity_lease_name = "application_activity_lease";
+    let application_activity_lease =
+        activity_governor.take_application_activity_lease(application_activity_lease_name).await?;
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    assert_eq!(
+        aa_status.watch_power_level().await?.unwrap(),
+        1 /* ApplicationActivityLevel::Active */
+    );
+
+    let server_token_koid =
+        &application_activity_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {
+                var server_token_koid: {
+                    created_at: NonZeroUintProperty,
+                    client_token_koid: application_activity_lease.get_koid().unwrap().raw_koid(),
+                    name: application_activity_lease_name,
+                    type: AnyStringProperty,
+                }
+            },
+        }
+    );
+
+    drop(application_activity_lease);
+    assert_eq!(aa_status.watch_power_level().await?.unwrap(), 0);
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -2540,6 +2618,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
         wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
         wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
+        wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);

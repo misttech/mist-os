@@ -828,8 +828,8 @@ TEST_F(DriverTest, StartAndWait2Triggering) {
 
   for (auto& i : kTimersSupportWait) {
     zx::eventpair local_wake_lease, remote_wake_lease;
-    ASSERT_TRUE(fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease,
-                                                             &remote_wake_lease) == ZX_OK);
+    ASSERT_TRUE(fuchsia_power_system::LeaseToken::create(0, &local_wake_lease,
+                                                         &remote_wake_lease) == ZX_OK);
     auto result_start =
         client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
                                 std::move(remote_wake_lease)});
@@ -924,8 +924,8 @@ TEST_F(DriverTest, StartAndWait2Stop) {
   for (auto& i : kTimersSupportWait) {
     std::thread thread([this, i]() {
       zx::eventpair local_wake_lease, remote_wake_lease;
-      ASSERT_TRUE(fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease,
-                                                               &remote_wake_lease) == ZX_OK);
+      ASSERT_TRUE(fuchsia_power_system::LeaseToken::create(0, &local_wake_lease,
+                                                           &remote_wake_lease) == ZX_OK);
       auto result_start =
           client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL),
                                   0, std::move(remote_wake_lease)});
@@ -1107,8 +1107,8 @@ TEST_F(DriverTestNoPower, StartAndWait2TriggeringNoPower) {
 
   for (auto& i : kTimersSupportWait) {
     zx::eventpair local_wake_lease, remote_wake_lease;
-    ASSERT_TRUE(fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease,
-                                                             &remote_wake_lease) == ZX_OK);
+    ASSERT_TRUE(fuchsia_power_system::LeaseToken::create(0, &local_wake_lease,
+                                                         &remote_wake_lease) == ZX_OK);
     auto result_start =
         client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
                                 std::move(remote_wake_lease)});
