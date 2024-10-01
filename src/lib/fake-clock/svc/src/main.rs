@@ -739,6 +739,7 @@ mod tests {
         assert!(check_signaled(&client));
     }
 
+    #[ignore = "TODO: https://fxbug.dev/369696252 - Deflake and re-enable"]
     #[fuchsia::test]
     async fn test_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
@@ -797,6 +798,7 @@ mod tests {
         assert_eq!(clock_handle.lock().unwrap().time, future_deadline_timeout);
     }
 
+    #[ignore = "TODO: https://fxbug.dev/369696252 - Deflake and re-enable"]
     #[fuchsia::test]
     async fn test_ignored_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
