@@ -5,19 +5,10 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
+use starnix_logging::log_warn;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
-
-cfg_if::cfg_if! {
-    if #[cfg(feature = "wake_locks")] {
-        use fuchsia_zircon as zx;
-        use fidl_fuchsia_starnix_runner as frunner;
-        use fuchsia_component::client::connect_to_protocol_sync;
-    } else {
-        use starnix_logging::log_warn;
-    }
-}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SuspendState {
@@ -91,49 +82,8 @@ impl BytesFileOps for PowerStateFile {
             return error!(EINVAL);
         }
         fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
-        #[cfg(not(feature = "wake_locks"))]
-        {
-            power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
-        }
+        power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
 
-        #[cfg(feature = "wake_locks")]
-        {
-            let suspend_start_time = zx::BootInstant::get();
-            let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
-                .expect("Failed to connect to manager");
-            match manager.suspend_container(
-                frunner::ManagerSuspendContainerRequest {
-                    container_job: Some(
-                        fuchsia_runtime::job_default()
-                            .duplicate(zx::Rights::SAME_RIGHTS)
-                            .expect("Failed to dup handle"),
-                    ),
-                    wake_locks: Some(
-                        current_task.kernel().suspend_resume_manager.duplicate_lock_event(),
-                    ),
-                    ..Default::default()
-                },
-                zx::Instant::INFINITE,
-            ) {
-                Ok(Ok(res)) => {
-                    let wake_time = zx::BootInstant::get();
-                    power_manager.update_suspend_stats(|suspend_stats| {
-                        suspend_stats.success_count += 1;
-                        suspend_stats.last_time_in_suspend_operations =
-                            (wake_time - suspend_start_time).into();
-                        suspend_stats.last_time_in_sleep =
-                            zx::Duration::from_nanos(res.suspend_time.unwrap_or(0));
-                    });
-                }
-                _ => {
-                    power_manager.update_suspend_stats(|suspend_stats| {
-                        suspend_stats.fail_count += 1;
-                        suspend_stats.last_failed_errno = Some(errno!(EINVAL));
-                    });
-                    return error!(EINVAL);
-                }
-            }
-        }
         Ok(())
     }
 

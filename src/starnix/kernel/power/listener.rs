@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/370526509): Remove once wake lock features has stabilized.
+#![allow(dead_code)]
+
 use crate::task::CurrentTask;
 
 use crate::power::manager::{SuspendResult, SuspendResumeManagerHandle, STARNIX_POWER_ON_LEVEL};

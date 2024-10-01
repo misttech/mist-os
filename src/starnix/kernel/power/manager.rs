@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/370526509): Remove once wake lock features has stabilized.
+#![allow(dead_code, unused_imports)]
+
 use crate::power::{listener, SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 use crate::vfs::EpollKey;
@@ -15,7 +18,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_zircon::{HandleBased, Peered};
 use once_cell::sync::OnceCell;
-use starnix_logging::{log_info, log_warn};
+use starnix_logging::log_warn;
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -31,7 +34,7 @@ cfg_if::cfg_if! {
         use fidl_fuchsia_power_suspend as fsuspend;
         use fuchsia_component::client::connect_to_protocol;
         use futures::StreamExt;
-        use starnix_logging::log_error;
+        use starnix_logging::{log_error, log_info};
     }
 }
 
@@ -186,15 +189,35 @@ impl SuspendResumeManager {
         self: &SuspendResumeManagerHandle,
         system_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
-        let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()?;
         let handoff = system_task
             .kernel()
             .connect_to_protocol_at_container_svc::<fpower::HandoffMarker>()?
             .into_sync_proxy();
-        self.init_power_element(&activity_governor, &handoff, system_task)?;
-        listener::init_listener(self, &activity_governor, system_task);
         #[cfg(not(feature = "wake_locks"))]
-        self.init_stats_watcher(system_task);
+        {
+            let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()?;
+            self.init_power_element(&activity_governor, &handoff, system_task)?;
+            listener::init_listener(self, &activity_governor, system_task);
+            self.init_stats_watcher(system_task);
+        }
+        #[cfg(feature = "wake_locks")]
+        {
+            match handoff.take(zx::MonotonicInstant::INFINITE) {
+                Ok(parent_lease) => {
+                    let parent_lease = parent_lease.map_err(|e| {
+                        anyhow!("Failed to take lessor and lease from parent: {e:?}")
+                    })?;
+                    drop(parent_lease)
+                }
+                Err(e) => {
+                    if e.is_closed() {
+                        log_warn!("Failed to send the fuchsia.session.power/Handoff.Take request. Assuming no Handoff protocol exists and moving on...");
+                    } else {
+                        return Err(e).context("Handoff::Take");
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -505,7 +528,61 @@ impl SuspendResumeManager {
         });
     }
 
+    #[cfg(feature = "wake_locks")]
+    pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
+        let suspend_start_time = zx::BootInstant::get();
+
+        self.lock().inspect_node.add_entry(|node| {
+            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, suspend_start_time.clone().into_nanos());
+            node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
+        });
+
+        let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
+            .expect("Failed to connect to manager");
+        match manager.suspend_container(
+            frunner::ManagerSuspendContainerRequest {
+                container_job: Some(
+                    fuchsia_runtime::job_default()
+                        .duplicate(zx::Rights::SAME_RIGHTS)
+                        .expect("Failed to dup handle"),
+                ),
+                wake_locks: Some(self.duplicate_lock_event()),
+                ..Default::default()
+            },
+            zx::Instant::INFINITE,
+        ) {
+            Ok(Ok(res)) => {
+                let wake_time = zx::BootInstant::get();
+                self.update_suspend_stats(|suspend_stats| {
+                    suspend_stats.success_count += 1;
+                    suspend_stats.last_time_in_suspend_operations =
+                        (wake_time - suspend_start_time).into();
+                    suspend_stats.last_time_in_sleep =
+                        zx::Duration::from_nanos(res.suspend_time.unwrap_or(0));
+                });
+                self.lock().inspect_node.add_entry(|node| {
+                    node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
+                });
+            }
+            _ => {
+                let wake_time = zx::BootInstant::get();
+                self.update_suspend_stats(|suspend_stats| {
+                    suspend_stats.fail_count += 1;
+                    suspend_stats.last_failed_errno = Some(errno!(EINVAL));
+                });
+                self.lock().inspect_node.add_entry(|node| {
+                    node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
+                    node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
+                });
+                return error!(EINVAL);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Executed on suspend.
+    #[cfg(not(feature = "wake_locks"))]
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
@@ -525,17 +602,13 @@ impl SuspendResumeManager {
 
         // Starnix will wait here on suspend.
         let suspend_result = waiter.wait();
-
-        #[cfg(not(feature = "wake_locks"))]
-        {
-            // Synchronously update the stats after performing suspend so that a later
-            // query of stats is guaranteed to reflect the current suspend operation.
-            let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
-                .expect("connection to fuchsia.power.suspend.Stats");
-            match stats_proxy.watch(zx::MonotonicInstant::INFINITE) {
-                Ok(stats) => self.update_stats(stats),
-                Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
-            }
+        // Synchronously update the stats after performing suspend so that a later
+        // query of stats is guaranteed to reflect the current suspend operation.
+        let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
+            .expect("connection to fuchsia.power.suspend.Stats");
+        match stats_proxy.watch(zx::MonotonicInstant::INFINITE) {
+            Ok(stats) => self.update_stats(stats),
+            Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
         }
 
         // Use the same "now" for all subsequent stats.
@@ -581,15 +654,19 @@ impl WakeLease {
     }
 
     pub fn activate(&self) -> Result<(), Errno> {
-        let mut guard = self.lease.lock();
-        if guard.is_none() {
-            let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
-                .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
-            *guard = Some(
-                activity_governor
-                    .take_wake_lease(&self.name, zx::MonotonicInstant::INFINITE)
-                    .map_err(|_| errno!(EINVAL, "Failed to take wake lease"))?,
-            );
+        #[cfg(not(feature = "wake_locks"))]
+        {
+            let mut guard = self.lease.lock();
+            if guard.is_none() {
+                let activity_governor =
+                    connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
+                        .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
+                *guard = Some(
+                    activity_governor
+                        .take_wake_lease(&self.name, zx::MonotonicInstant::INFINITE)
+                        .map_err(|_| errno!(EINVAL, "Failed to take wake lease"))?,
+                );
+            }
         }
         Ok(())
     }
