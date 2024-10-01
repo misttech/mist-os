@@ -206,8 +206,9 @@ class Tracing(tracing.Tracing):
                 for p in provider_stats:
                     if p.records_dropped and p.records_dropped > 0:
                         _LOGGER.warning(
-                            "%s records were dropped for %s!"
-                            % (p.records_dropped, p.name)
+                            "%s records were dropped for %s!",
+                            p.records_dropped,
+                            p.name,
                         )
         except fc.ZxStatus as status:
             raise errors.FuchsiaControllerError(
