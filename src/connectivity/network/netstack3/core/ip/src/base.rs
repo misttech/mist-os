@@ -50,6 +50,7 @@ use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
+use crate::internal::device::opaque_iid::StableIidSecret;
 use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
     IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
@@ -1586,6 +1587,7 @@ impl Ipv6StateBuilder {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
+            slaac_temp_secret_key: StableIidSecret::new_random(&mut bindings_ctx.rng()),
         }
     }
 }
@@ -1625,6 +1627,8 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     pub icmp: Icmpv6State<BT>,
     /// Stateless address autoconfiguration counters.
     pub slaac_counters: SlaacCounters,
+    /// Secret key used for generating SLAAC temporary addresses.
+    pub slaac_temp_secret_key: StableIidSecret,
 }
 
 impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>

@@ -26,7 +26,7 @@ use netstack3_core::device::{
 };
 use netstack3_core::ip::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
+    SlaacConfiguration, TemporarySlaacAddressConfiguration,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
@@ -508,10 +508,6 @@ impl DeviceHandler {
             });
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
-            // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
-            // one) to generate stable opaque interface identifiers.
-            let secret_key = StableIidSecret::new_random(&mut ctx.rng());
-
             let ip_config = IpDeviceConfigurationUpdate {
                 ip_enabled: Some(false),
                 unicast_forwarding_enabled: Some(false),
@@ -534,9 +530,7 @@ impl DeviceHandler {
                         slaac_config: Some(SlaacConfiguration {
                             enable_stable_addresses: true,
                             temporary_address_configuration: Some(
-                                TemporarySlaacAddressConfiguration::default_with_secret_key(
-                                    secret_key,
-                                ),
+                                TemporarySlaacAddressConfiguration::rfc_default(),
                             ),
                         }),
                         ip_config,

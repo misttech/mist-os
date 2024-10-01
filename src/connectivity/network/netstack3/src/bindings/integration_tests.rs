@@ -18,7 +18,7 @@ use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpInvariant, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::error::AddressResolutionFailed;
-use netstack3_core::ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret};
+use netstack3_core::ip::Ipv6DeviceConfigurationUpdate;
 use netstack3_core::neighbor::LinkResolutionResult;
 use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, Entry, RawMetric};
 use {
@@ -931,64 +931,6 @@ async fn test_list_del_routes() {
             .filter(|route| route != &route1_fwd_entry)
             .collect::<Vec<_>>()
     );
-
-    t
-}
-
-fn get_slaac_secret<'s>(
-    test_stack: &'s mut TestStack,
-    if_id: BindingId,
-) -> Option<StableIidSecret> {
-    test_stack.with_ctx(|ctx| {
-        let device = ctx.bindings_ctx().devices.get_core_id(if_id).unwrap();
-        ctx.api()
-            .device_ip::<Ipv6>()
-            .get_configuration(&device)
-            .config
-            .slaac_config
-            .temporary_address_configuration
-            .map(|t| t.secret_key)
-    })
-}
-
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn test_ipv6_slaac_secret_stable() {
-    const ENDPOINT: &'static str = "endpoint";
-
-    let mut t =
-        TestSetupBuilder::new().add_named_endpoint(ENDPOINT).add_empty_stack().build().await;
-
-    let (endpoint, port_id) = t.get_endpoint(ENDPOINT).await;
-
-    let test_stack = t.get_mut(0);
-    let installer = test_stack.connect_interfaces_installer();
-    let (device_control, server_end) = fidl::endpoints::create_proxy().expect("new proxy");
-    installer.install_device(endpoint, server_end).expect("install device");
-
-    let (interface_control, server_end) = fidl::endpoints::create_proxy().unwrap();
-    device_control
-        .create_interface(
-            &port_id,
-            server_end,
-            &fidl_fuchsia_net_interfaces_admin::Options::default(),
-        )
-        .expect("create interface");
-
-    let if_id = BindingId::new(interface_control.get_id().await.unwrap()).unwrap();
-    let installed_secret =
-        get_slaac_secret(test_stack, if_id).expect("has temporary address secret");
-
-    // Bringing the interface up does not change the secret.
-    assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
-    let enabled_secret = get_slaac_secret(test_stack, if_id).expect("has temporary address secret");
-    assert_eq!(enabled_secret, installed_secret);
-
-    // Bringing the interface down and up does not change the secret.
-    assert_eq!(true, interface_control.disable().await.expect("FIDL call").expect("disabled"));
-    assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
-
-    assert_eq!(get_slaac_secret(test_stack, if_id), Some(enabled_secret));
 
     t
 }

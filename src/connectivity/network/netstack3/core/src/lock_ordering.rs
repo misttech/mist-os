@@ -159,6 +159,9 @@ pub struct UdpCounters<I>(PhantomData<I>, Never);
 pub enum SlaacCounters {}
 // Provides unlocked access to a device's routing metric.
 pub enum RoutingMetric {}
+// Provides unlocked access to the secret key used to generate temporary SLAAC
+// addresses.
+pub enum SlaacTempSecretKey {}
 
 pub struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub struct IpDeviceGmp<I>(PhantomData<I>, Never);

@@ -172,6 +172,8 @@ pub struct SlaacAddrsMutAndConfig<'a, BT: SlaacBindingsTypes, A: SlaacAddresses<
     pub retrans_timer: Duration,
     /// The device's interface identifier.
     pub interface_identifier: [u8; 8],
+    /// Secret key for generating temporary addresses.
+    pub temp_secret_key: StableIidSecret,
     #[allow(missing_docs)]
     pub _marker: PhantomData<BT>,
 }
@@ -206,6 +208,7 @@ pub trait SlaacContext<BC: SlaacBindingsContext>: DeviceIdContext<AnyDevice> {
                  dad_transmits: _,
                  retrans_timer: _,
                  interface_identifier: _,
+                 temp_secret_key: _,
                  _marker,
              },
              state| cb(addrs, state),
@@ -322,6 +325,7 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
                 dad_transmits,
                 retrans_timer,
                 interface_identifier: iid,
+                temp_secret_key,
                 _marker,
             } = addrs_config;
             // Apply the update to each existing address, static or temporary, for the
@@ -417,6 +421,7 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
                     dad_transmits,
                     retrans_timer,
                     iid,
+                    temp_secret_key,
                 );
             }
         });
@@ -515,6 +520,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
         dad_transmits,
         retrans_timer,
         interface_identifier: iid,
+        temp_secret_key,
         _marker,
     } = addrs_config;
     let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } = config;
@@ -566,6 +572,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
         dad_transmits,
         retrans_timer,
         iid,
+        temp_secret_key,
     )
 }
 
@@ -701,7 +708,6 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                          temp_idgen_retries,
                          temp_preferred_lifetime: _,
                          temp_valid_lifetime: _,
-                         secret_key: _,
                      }| {
                         let regen_advance = regen_advance(
                             temp_idgen_retries,
@@ -984,11 +990,6 @@ pub struct TemporarySlaacAddressConfiguration {
     /// detects a duplicate before stopping and giving up on temporary address
     /// generation for that prefix.
     pub temp_idgen_retries: u8,
-
-    /// The secret to use when generating new temporary addresses. This should
-    /// be initialized from a random number generator before generating any
-    /// temporary addresses.
-    pub secret_key: StableIidSecret,
 }
 
 impl TemporarySlaacAddressConfiguration {
@@ -1009,13 +1010,12 @@ impl TemporarySlaacAddressConfiguration {
     /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
     pub const DEFAULT_TEMP_IDGEN_RETRIES: u8 = 3;
 
-    /// Constructs a new instance with default values and the given secret key.
-    pub fn default_with_secret_key(secret_key: StableIidSecret) -> Self {
+    /// Constructs a new instance with default values.
+    pub fn rfc_default() -> Self {
         Self {
             temp_valid_lifetime: Self::DEFAULT_TEMP_VALID_LIFETIME,
             temp_preferred_lifetime: Self::DEFAULT_TEMP_PREFERRED_LIFETIME,
             temp_idgen_retries: Self::DEFAULT_TEMP_IDGEN_RETRIES,
-            secret_key,
         }
     }
 }
@@ -1149,6 +1149,7 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
         dad_transmits,
         retrans_timer,
         interface_identifier: iid,
+        temp_secret_key,
         _marker,
     } = addrs_config;
     let SlaacState { timers } = slaac_state;
@@ -1225,7 +1226,6 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
             temp_valid_lifetime,
             temp_preferred_lifetime: _,
             temp_idgen_retries: _,
-            secret_key: _,
         } = match temporary_address_configuration {
             Some(configuration) => configuration,
             None => return Action::SkipRegen,
@@ -1270,6 +1270,7 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
             dad_transmits,
             retrans_timer,
             iid,
+            temp_secret_key,
         ),
     }
 }
@@ -1350,7 +1351,7 @@ fn generate_global_static_address(
     address
 }
 
-/// Generate a temporary IPv6 Global Address as defined by RFC 8981 section 3.4.6
+/// Generate a temporary IPv6 Global Address.
 ///
 /// The generated address will be of the format:
 ///
@@ -1374,6 +1375,8 @@ fn generate_global_temporary_address(
     assert_eq!(usize::from(Ipv6Addr::BYTES) - prefix_len, iid.len());
     let mut address = prefix.network().ipv6_bytes();
 
+    // TODO(https://fxbug.dev/368449998): Use the algorithm in RFC 8981
+    // instead of the one for stable SLAAc addresses as described in RFC 7217.
     let interface_identifier = OpaqueIid::new(
         /* prefix */ *prefix,
         /* net_iface */ iid,
@@ -1404,6 +1407,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     dad_transmits: Option<NonZeroU16>,
     retrans_timer: Duration,
     iid: [u8; 8],
+    temp_secret_key: StableIidSecret,
 ) {
     if subnet.prefix() != REQUIRED_PREFIX_BITS {
         // If the sum of the prefix length and interface identifier length does
@@ -1486,7 +1490,6 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 dad_transmits.map_or(0, NonZeroU16::get),
             );
 
-            let secret_key = temporary_address_config.secret_key;
             let mut seed = per_attempt_random_seed;
             let addresses = either::Either::Right(core::iter::repeat_with(move || {
                 // RFC 8981 Section 3.3.3 specifies that
@@ -1499,7 +1502,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 //   and the algorithm should be restarted from the first step.
                 loop {
                     let address =
-                        generate_global_temporary_address(&subnet, &iid, seed, &secret_key);
+                        generate_global_temporary_address(&subnet, &iid, seed, &temp_secret_key);
                     seed = seed.wrapping_add(1);
 
                     if has_iana_allowed_iid(address.addr().get()) {
@@ -1870,6 +1873,7 @@ mod tests {
                     dad_transmits: *dad_transmits,
                     retrans_timer: *retrans_timer,
                     interface_identifier: *iid,
+                    temp_secret_key: SECRET_KEY,
                     _marker: PhantomData,
                 },
                 slaac_state,
@@ -2419,7 +2423,6 @@ mod tests {
                         temp_valid_lifetime: ONE_HOUR,
                         temp_preferred_lifetime: preferred_lifetime_config,
                         temp_idgen_retries,
-                        secret_key: SECRET_KEY,
                     }
                 }),
                 ..Default::default()
@@ -2554,7 +2557,6 @@ mod tests {
                     .unwrap(),
                     temp_preferred_lifetime: NonZeroDuration::new(pl_config).unwrap(),
                     temp_idgen_retries,
-                    secret_key: SECRET_KEY,
                 }),
                 ..Default::default()
             },

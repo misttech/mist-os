@@ -23,7 +23,7 @@ use netstack3_icmp_echo::{
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
     IcmpSockets,
 };
-use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
+use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt, StableIidSecret};
 use netstack3_ip::icmp::{
     self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, InnerIcmpContext,
     InnerIcmpv4Context, NdpCounters,
@@ -887,5 +887,16 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacket
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv4.next_packet_id
+    }
+}
+
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacTempSecretKey>
+    for StackState<BT>
+{
+    type Data = StableIidSecret;
+    type Guard<'l> = &'l StableIidSecret where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.ipv6.slaac_temp_secret_key
     }
 }

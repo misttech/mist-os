@@ -163,12 +163,6 @@ mod ctx {
             &self.bindings_ctx
         }
 
-        // Gets a new `RngImpl` as if we have an implementation of `RngContext`,
-        // but without needing `&mut self`.
-        pub(crate) fn rng(&self) -> RngImpl {
-            RngImpl::new()
-        }
-
         /// Destroys the last standing clone of [`Ctx`].
         pub(crate) fn try_destroy_last(self) -> Result<(), DestructionError> {
             let Self { bindings_ctx: BindingsCtx(bindings_ctx), core_ctx } = self;

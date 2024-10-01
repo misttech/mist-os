@@ -24,13 +24,10 @@ use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
 use netstack3_ip::device::{
     InnerSlaacTimerId, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
-    SLAAC_MIN_REGEN_ADVANCE,
+    SlaacConfiguration, TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
 };
 use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
 use netstack3_ip::{self as ip};
-
-const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;
 
 const SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("200a::/64");
 
@@ -104,7 +101,6 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
                         temp_valid_lifetime: ONE_HOUR,
                         temp_preferred_lifetime: ONE_HOUR,
                         temp_idgen_retries: 0,
-                        secret_key: SECRET_KEY,
                     }),
                 }),
                 ..Default::default()
