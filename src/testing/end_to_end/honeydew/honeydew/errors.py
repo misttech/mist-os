@@ -114,6 +114,10 @@ class HoneydewNetstackError(HoneydewError):
     """Raised by netstack affordances."""
 
 
+class HoneydewLocationError(HoneydewError):
+    """Raised by location affordance."""
+
+
 class NetworkInterfaceNotFoundError(HoneydewError):
     """Raised when a matching network interface is not found."""
 

@@ -24,6 +24,7 @@ from honeydew import errors
 from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
+from honeydew.affordances.fuchsia_controller import location as location_fc
 from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
@@ -583,6 +584,20 @@ class FuchsiaDevice(
             netstack.Netstack object
         """
         return netstack_fc.Netstack(
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
+
+    @properties.Affordance
+    def location(self) -> location_fc.Location:
+        """Returns a location affordance object.
+
+        Returns:
+            location.Location object
+        """
+        return location_fc.Location(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
