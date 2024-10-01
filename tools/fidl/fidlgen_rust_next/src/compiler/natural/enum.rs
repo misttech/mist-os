@@ -15,7 +15,7 @@ pub fn emit_enum<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let e = &compiler.library.enum_declarations[ident];
+    let e = &compiler.schema.enum_declarations[ident];
 
     let name = &e.name.type_name();
     let natural_ty = int_type_natural_name(e.ty);
@@ -54,14 +54,19 @@ pub fn emit_enum<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::Encode for {name} {{
+        impl ::fidl::Encodable for {name} {{
             type Encoded<'buf> = Wire{name};
+        }}
 
+        impl<___E> ::fidl::Encode<___E> for {name}
+        where
+            ___E: ?Sized,
+        {{
             fn encode(
                 &mut self,
-                encoder: &mut ::fidl::encode::Encoder,
+                _: &mut ___E,
                 slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+            ) -> Result<(), ::fidl::EncodeError> {{
                 ::fidl::munge!(let Wire{name} {{ mut value }} = slot);
                 *value = {wire_ty}::from(match *self {{
         "#,

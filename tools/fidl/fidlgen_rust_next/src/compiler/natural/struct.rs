@@ -15,7 +15,7 @@ pub fn emit_struct<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let s = &compiler.library.struct_declarations[ident];
+    let s = &compiler.schema.struct_declarations[ident];
 
     let is_wire_static = compiler.query::<IsWireStatic>(ident);
 
@@ -48,14 +48,29 @@ pub fn emit_struct<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::Encode for {name} {{
+        impl ::fidl::Encodable for {name} {{
             type Encoded<'buf> = Wire{name}{wire_params};
+        }}
 
+        impl<___E> ::fidl::Encode<___E> for {name}
+        where
+        "#,
+    )?;
+
+    for member in &s.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl::Encode<___E>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn encode(
                 &mut self,
-                encoder: &mut ::fidl::encode::Encoder,
+                encoder: &mut ___E,
                 slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+            ) -> Result<(), ::fidl::EncodeError> {{
         "#,
     )?;
 
@@ -85,17 +100,23 @@ pub fn emit_struct<W: Write>(
             }}
         }}
 
-        impl ::fidl::EncodeOption for Box<{name}> {{
+        impl ::fidl::EncodableOption for Box<{name}> {{
             type EncodedOption<'buf> =
                 ::fidl::WireBox<'buf, Wire{name}{wire_params}>;
+        }}
 
+        impl<___E> ::fidl::EncodeOption<___E> for Box<{name}>
+        where
+            ___E: ::fidl::Encoder + ?Sized,
+            {name}: ::fidl::Encode<___E>,
+        {{
             fn encode_option(
                 this: Option<&mut Self>,
-                encoder: &mut ::fidl::encode::Encoder,
+                encoder: &mut ___E,
                 slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+            ) -> Result<(), ::fidl::EncodeError> {{
                 if let Some(inner) = this {{
-                    encoder.encode(inner)?;
+                    ::fidl::EncoderExt::encode(encoder, inner)?;
                     ::fidl::WireBox::encode_present(slot);
                 }} else {{
                     ::fidl::WireBox::encode_absent(slot);

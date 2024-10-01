@@ -15,14 +15,19 @@ pub enum MyEmptyFlexibleEnum {
     Unknown(u32),
 }
 
-impl ::fidl::Encode for MyEmptyFlexibleEnum {
+impl ::fidl::Encodable for MyEmptyFlexibleEnum {
     type Encoded<'buf> = WireMyEmptyFlexibleEnum;
+}
 
+impl<___E> ::fidl::Encode<___E> for MyEmptyFlexibleEnum
+where
+    ___E: ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        _: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireMyEmptyFlexibleEnum { mut value } = slot);
         *value = ::fidl::u32_le::from(match *self {
             MyEmptyFlexibleEnum::Unknown(value) => value,
@@ -54,11 +59,11 @@ pub struct WireMyEmptyFlexibleEnum {
 
 impl WireMyEmptyFlexibleEnum {}
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireMyEmptyFlexibleEnum {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireMyEmptyFlexibleEnum
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, _: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         Ok(())
     }
 }
@@ -81,14 +86,19 @@ pub enum MyFlexibleEnum {
     Unknown(u32),
 }
 
-impl ::fidl::Encode for MyFlexibleEnum {
+impl ::fidl::Encodable for MyFlexibleEnum {
     type Encoded<'buf> = WireMyFlexibleEnum;
+}
 
+impl<___E> ::fidl::Encode<___E> for MyFlexibleEnum
+where
+    ___E: ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        _: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireMyFlexibleEnum { mut value } = slot);
         *value = ::fidl::u32_le::from(match *self {
             MyFlexibleEnum::Foo => 1,
@@ -129,11 +139,11 @@ impl WireMyFlexibleEnum {
         WireMyFlexibleEnum { value: ::fidl::u32_le::from_native(2) };
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireMyFlexibleEnum {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireMyFlexibleEnum
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, _: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         Ok(())
     }
 }
@@ -159,14 +169,19 @@ pub enum MyFlexibleEnumWithCustomUnknown {
     Unknown(u32),
 }
 
-impl ::fidl::Encode for MyFlexibleEnumWithCustomUnknown {
+impl ::fidl::Encodable for MyFlexibleEnumWithCustomUnknown {
     type Encoded<'buf> = WireMyFlexibleEnumWithCustomUnknown;
+}
 
+impl<___E> ::fidl::Encode<___E> for MyFlexibleEnumWithCustomUnknown
+where
+    ___E: ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        _: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireMyFlexibleEnumWithCustomUnknown { mut value } = slot);
         *value = ::fidl::u32_le::from(match *self {
             MyFlexibleEnumWithCustomUnknown::Foo => 1,
@@ -213,11 +228,11 @@ impl WireMyFlexibleEnumWithCustomUnknown {
         WireMyFlexibleEnumWithCustomUnknown { value: ::fidl::u32_le::from_native(3) };
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireMyFlexibleEnumWithCustomUnknown {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireMyFlexibleEnumWithCustomUnknown
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, _: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         Ok(())
     }
 }
@@ -246,14 +261,19 @@ pub enum MyStrictEnum {
     Bar = 2,
 }
 
-impl ::fidl::Encode for MyStrictEnum {
+impl ::fidl::Encodable for MyStrictEnum {
     type Encoded<'buf> = WireMyStrictEnum;
+}
 
+impl<___E> ::fidl::Encode<___E> for MyStrictEnum
+where
+    ___E: ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        _: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireMyStrictEnum { mut value } = slot);
         *value = ::fidl::u32_le::from(match *self {
             MyStrictEnum::Foo => 1,
@@ -291,16 +311,16 @@ impl WireMyStrictEnum {
     pub const BAR: WireMyStrictEnum = WireMyStrictEnum { value: ::fidl::u32_le::from_native(2) };
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireMyStrictEnum {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireMyStrictEnum
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, _: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { value } = slot);
 
         match u32::from(*value) {
             1 | 2 => (),
-            unknown => return Err(::fidl::decode::Error::InvalidEnumOrdinal(unknown as usize)),
+            unknown => return Err(::fidl::DecodeError::InvalidEnumOrdinal(unknown as usize)),
         }
 
         Ok(())

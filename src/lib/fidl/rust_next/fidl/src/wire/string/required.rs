@@ -8,7 +8,9 @@ use core::str::{from_utf8, from_utf8_unchecked, from_utf8_unchecked_mut};
 
 use munge::munge;
 
-use crate::{decode, encode, Decode, Encode, Slot, TakeFrom, WireVector};
+use crate::{
+    decode, encode, Decode, Decoder, Encodable, Encode, Encoder, Slot, TakeFrom, WireVector,
+};
 
 /// A FIDL string
 #[derive(Default)]
@@ -70,11 +72,8 @@ impl fmt::Debug for WireString<'_> {
     }
 }
 
-unsafe impl<'buf> Decode<'buf> for WireString<'buf> {
-    fn decode(
-        slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'buf>,
-    ) -> Result<(), decode::Error> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString<'buf> {
+    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
         munge!(let Self { mut vec } = slot);
 
         WireVector::decode(vec.as_mut(), decoder)?;
@@ -85,15 +84,17 @@ unsafe impl<'buf> Decode<'buf> for WireString<'buf> {
     }
 }
 
-impl Encode for String {
+impl Encodable for String {
     type Encoded<'buf> = WireString<'buf>;
+}
 
+impl<E: Encoder + ?Sized> Encode<E> for String {
     fn encode(
         &mut self,
-        encoder: &mut encode::Encoder,
+        encoder: &mut E,
         slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), encode::Error> {
-        encoder.write_bytes(self.as_bytes());
+    ) -> Result<(), encode::EncodeError> {
+        encoder.write(self.as_bytes());
         WireString::encode_present(slot, self.len() as u64);
         Ok(())
     }

@@ -4,8 +4,7 @@
 
 use munge::munge;
 
-use crate::wire::WireEnvelope;
-use crate::{decode, encode, u64_le, Decode, Encode, Slot};
+use crate::{decode, encode, u64_le, Decode, Decoder, Encode, Encoder, Slot, WireEnvelope};
 
 /// A raw FIDL union
 #[repr(C)]
@@ -24,12 +23,12 @@ impl<'buf> RawWireUnion<'buf> {
     }
 
     /// Encodes a value and ordinal in a slot.
-    pub fn encode_as<T: Encode>(
+    pub fn encode_as<E: Encoder + ?Sized, T: Encode<E>>(
         value: &mut T,
         ord: u64,
-        encoder: &mut encode::Encoder,
+        encoder: &mut E,
         slot: Slot<'_, Self>,
-    ) -> Result<(), encode::Error> {
+    ) -> Result<(), encode::EncodeError> {
         munge!(let Self { mut ordinal, envelope } = slot);
 
         *ordinal = u64_le::from_native(ord);
@@ -43,10 +42,10 @@ impl<'buf> RawWireUnion<'buf> {
     }
 
     /// Decodes an absent union from a slot.
-    pub fn decode_absent(slot: Slot<'_, Self>) -> Result<(), decode::Error> {
+    pub fn decode_absent(slot: Slot<'_, Self>) -> Result<(), decode::DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         if !WireEnvelope::is_encoded_zero(envelope) {
-            return Err(decode::Error::InvalidUnionEnvelope);
+            return Err(decode::DecodeError::InvalidUnionEnvelope);
         }
         Ok(())
     }
@@ -54,21 +53,21 @@ impl<'buf> RawWireUnion<'buf> {
     /// Decodes an unknown value from a union.
     ///
     /// The handles owned by the unknown value are discarded.
-    pub fn decode_unknown(
+    pub fn decode_unknown<D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'buf>,
-    ) -> Result<(), decode::Error> {
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
         WireEnvelope::decode_unknown(envelope, decoder)
     }
 
     /// Decodes the typed value in a union.
-    pub fn decode_as<T: Decode<'buf>>(
+    pub fn decode_as<D: Decoder<'buf> + ?Sized, T: Decode<D>>(
         slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'buf>,
-    ) -> Result<(), decode::Error> {
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
         munge!(let Self { ordinal: _, envelope } = slot);
-        WireEnvelope::decode_as::<T>(envelope, decoder)
+        WireEnvelope::decode_as::<D, T>(envelope, decoder)
     }
 
     /// The null (absent) union.

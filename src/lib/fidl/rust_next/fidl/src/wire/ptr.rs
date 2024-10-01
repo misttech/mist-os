@@ -7,8 +7,7 @@ use core::ptr::{null_mut, NonNull};
 
 use munge::munge;
 
-use crate::decode::{Error, Owned};
-use crate::{u64_le, Chunk, Slot};
+use crate::{u64_le, Chunk, DecodeError, Owned, Slot};
 
 /// A raw FIDL pointer
 #[repr(C, align(8))]
@@ -30,12 +29,12 @@ impl<'buf, T> WirePointer<'buf, T> {
     }
 
     /// Returns whether the wire pointer was encoded present.
-    pub fn is_encoded_present(slot: Slot<'_, Self>) -> Result<bool, Error> {
+    pub fn is_encoded_present(slot: Slot<'_, Self>) -> Result<bool, DecodeError> {
         munge!(let Self { encoded } = slot);
         match encoded.to_native() {
             0 => Ok(false),
             u64::MAX => Ok(true),
-            x => Err(Error::InvalidPointerPresence(x)),
+            x => Err(DecodeError::InvalidPointerPresence(x)),
         }
     }
 

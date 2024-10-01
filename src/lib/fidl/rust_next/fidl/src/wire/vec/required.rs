@@ -8,8 +8,10 @@ use core::ptr::NonNull;
 
 use munge::munge;
 
-use crate::wire::vec::raw::RawWireVector;
-use crate::{decode, encode, Decode, Encode, Slot, TakeFrom};
+use super::raw::RawWireVector;
+use crate::{
+    decode, encode, Decode, Decoder, Encodable, Encode, Encoder, EncoderExt as _, Slot, TakeFrom,
+};
 
 /// A FIDL vector
 #[repr(transparent)]
@@ -89,31 +91,30 @@ impl<T: fmt::Debug> fmt::Debug for WireVector<'_, T> {
     }
 }
 
-unsafe impl<'buf, T: Decode<'buf>> Decode<'buf> for WireVector<'buf, T> {
-    fn decode(
-        mut slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'buf>,
-    ) -> Result<(), decode::Error> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireVector<'buf, T> {
+    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
         munge!(let Self { raw } = slot.as_mut());
         RawWireVector::decode(raw, decoder)?;
 
         let this = unsafe { slot.deref_unchecked() };
         if this.raw.as_ptr().is_null() {
-            return Err(decode::Error::RequiredValueAbsent);
+            return Err(decode::DecodeError::RequiredValueAbsent);
         }
 
         Ok(())
     }
 }
 
-impl<T: Encode> Encode for Vec<T> {
+impl<T: Encodable> Encodable for Vec<T> {
     type Encoded<'buf> = WireVector<'buf, T::Encoded<'buf>>;
+}
 
+impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
     fn encode(
         &mut self,
-        encoder: &mut encode::Encoder,
+        encoder: &mut E,
         slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), encode::Error> {
+    ) -> Result<(), encode::EncodeError> {
         encoder.encode_slice(self.as_mut_slice())?;
         WireVector::encode_present(slot, self.len() as u64);
         Ok(())

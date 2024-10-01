@@ -18,20 +18,26 @@ impl EmptyTable {
     }
 }
 
-impl ::fidl::Encode for EmptyTable {
+impl ::fidl::Encodable for EmptyTable {
     type Encoded<'buf> = WireEmptyTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for EmptyTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireEmptyTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -58,11 +64,11 @@ pub struct WireEmptyTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireEmptyTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireEmptyTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
@@ -90,20 +96,26 @@ impl ExtensionTable {
     }
 }
 
-impl ::fidl::Encode for ExtensionTable {
+impl ::fidl::Encodable for ExtensionTable {
     type Encoded<'buf> = WireExtensionTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ExtensionTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireExtensionTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -130,11 +142,11 @@ pub struct WireExtensionTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireExtensionTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireExtensionTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
@@ -176,20 +188,30 @@ impl NewerSimpleTable {
     }
 }
 
-impl ::fidl::Encode for NewerSimpleTable {
+impl ::fidl::Encodable for NewerSimpleTable {
     type Encoded<'buf> = WireNewerSimpleTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for NewerSimpleTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireNewerSimpleTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -244,30 +266,34 @@ pub struct WireNewerSimpleTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireNewerSimpleTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireNewerSimpleTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             5 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             6 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -340,20 +366,28 @@ impl OlderSimpleTable {
     }
 }
 
-impl ::fidl::Encode for OlderSimpleTable {
+impl ::fidl::Encodable for OlderSimpleTable {
     type Encoded<'buf> = WireOlderSimpleTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for OlderSimpleTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    i64: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOlderSimpleTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -388,18 +422,20 @@ pub struct WireOlderSimpleTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOlderSimpleTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOlderSimpleTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -452,20 +488,30 @@ impl ReverseOrdinalTable {
     }
 }
 
-impl ::fidl::Encode for ReverseOrdinalTable {
+impl ::fidl::Encodable for ReverseOrdinalTable {
     type Encoded<'buf> = WireReverseOrdinalTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ReverseOrdinalTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireReverseOrdinalTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -520,30 +566,34 @@ pub struct WireReverseOrdinalTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireReverseOrdinalTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireReverseOrdinalTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             2 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             3 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -620,20 +670,29 @@ impl SimpleTable {
     }
 }
 
-impl ::fidl::Encode for SimpleTable {
+impl ::fidl::Encodable for SimpleTable {
     type Encoded<'buf> = WireSimpleTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for SimpleTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireSimpleTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -679,24 +738,27 @@ pub struct WireSimpleTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireSimpleTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireSimpleTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             5 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -1005,20 +1067,91 @@ impl SixtyFourOrdinalTable {
     }
 }
 
-impl ::fidl::Encode for SixtyFourOrdinalTable {
+impl ::fidl::Encodable for SixtyFourOrdinalTable {
     type Encoded<'buf> = WireSixtyFourOrdinalTable<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for SixtyFourOrdinalTable
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    i64: ::fidl::Encode<___E>,
+    crate::ExtensionTable: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireSixtyFourOrdinalTable { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -1878,396 +2011,461 @@ pub struct WireSixtyFourOrdinalTable<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireSixtyFourOrdinalTable<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireSixtyFourOrdinalTable<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+    crate::WireExtensionTable<'buf>: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             2 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             3 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             4 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             5 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             6 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             7 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             8 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             9 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             10 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             11 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             12 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             13 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             14 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             15 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             16 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             17 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             18 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             19 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             20 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             21 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             22 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             23 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             24 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             25 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             26 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             27 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             28 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             29 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             30 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             31 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             32 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             33 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             34 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             35 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             36 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             37 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             38 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             39 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             40 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             41 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             42 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             43 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             44 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             45 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             46 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             47 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             48 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             49 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             50 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             51 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             52 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             53 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             54 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             55 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             56 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             57 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             58 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             59 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             60 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             61 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             62 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             63 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
 
             64 => {
-                ::fidl::WireEnvelope::decode_as::<crate::WireExtensionTable<'buf>>(
+                ::fidl::WireEnvelope::decode_as::<___D, crate::WireExtensionTable<'buf>>(
                     slot.as_mut(),
                     decoder,
                 )?;
@@ -3136,20 +3334,28 @@ impl TableWithAttributes {
     }
 }
 
-impl ::fidl::Encode for TableWithAttributes {
+impl ::fidl::Encodable for TableWithAttributes {
     type Encoded<'buf> = WireTableWithAttributes<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for TableWithAttributes
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    i64: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireTableWithAttributes { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -3184,18 +3390,20 @@ pub struct WireTableWithAttributes<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireTableWithAttributes<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireTableWithAttributes<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<::fidl::i64_le>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, ::fidl::i64_le>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }

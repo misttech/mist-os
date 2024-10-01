@@ -14,14 +14,19 @@ pub struct ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     pub s: String,
 }
 
-impl ::fidl::Encode for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
+impl ::fidl::Encodable for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     type Encoded<'buf> = WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
+where
+    String: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 s,
@@ -32,17 +37,23 @@ impl ::fidl::Encode for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ExampleUseOfErrorSyntaxCallWhichMayFailRequest> {
+impl ::fidl::EncodableOption for Box<ExampleUseOfErrorSyntaxCallWhichMayFailRequest> {
     type EncodedOption<'buf> =
         ::fidl::WireBox<'buf, WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'buf>>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ExampleUseOfErrorSyntaxCallWhichMayFailRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -66,19 +77,20 @@ pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'buf> {
     pub s: ::fidl::WireString<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf>
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
     for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'buf>
+where
+    ___D: ?Sized,
+
+    ::fidl::WireString<'buf>: ::fidl::Decode<___D>,
 {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut s,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(s.as_mut(), decoder)?;
+        ::fidl::Decode::decode(s.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -88,14 +100,19 @@ pub struct ExampleUseOfErrorSyntax_CallWhichMayFail_Response {
     pub value: i64,
 }
 
-impl ::fidl::Encode for ExampleUseOfErrorSyntax_CallWhichMayFail_Response {
+impl ::fidl::Encodable for ExampleUseOfErrorSyntax_CallWhichMayFail_Response {
     type Encoded<'buf> = WireExampleUseOfErrorSyntax_CallWhichMayFail_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for ExampleUseOfErrorSyntax_CallWhichMayFail_Response
+where
+    i64: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 value,
@@ -106,17 +123,23 @@ impl ::fidl::Encode for ExampleUseOfErrorSyntax_CallWhichMayFail_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ExampleUseOfErrorSyntax_CallWhichMayFail_Response> {
+impl ::fidl::EncodableOption for Box<ExampleUseOfErrorSyntax_CallWhichMayFail_Response> {
     type EncodedOption<'buf> =
         ::fidl::WireBox<'buf, WireExampleUseOfErrorSyntax_CallWhichMayFail_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ExampleUseOfErrorSyntax_CallWhichMayFail_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ExampleUseOfErrorSyntax_CallWhichMayFail_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -140,17 +163,19 @@ pub struct WireExampleUseOfErrorSyntax_CallWhichMayFail_Response {
     pub value: ::fidl::i64_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireExampleUseOfErrorSyntax_CallWhichMayFail_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireExampleUseOfErrorSyntax_CallWhichMayFail_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i64_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut value,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(value.as_mut(), decoder)?;
+        ::fidl::Decode::decode(value.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -162,40 +187,57 @@ pub enum ExampleUseOfErrorSyntax_CallWhichMayFail_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for ExampleUseOfErrorSyntax_CallWhichMayFail_Result {
+impl ::fidl::Encodable for ExampleUseOfErrorSyntax_CallWhichMayFail_Result {
     type Encoded<'buf> = WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ExampleUseOfErrorSyntax_CallWhichMayFail_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::ExampleUseOfErrorSyntax_CallWhichMayFail_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireExampleUseOfErrorSyntax_CallWhichMayFail_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::ExampleUseOfErrorSyntax_CallWhichMayFail_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<ExampleUseOfErrorSyntax_CallWhichMayFail_Result> {
+impl ::fidl::EncodableOption for Box<ExampleUseOfErrorSyntax_CallWhichMayFail_Result> {
     type EncodedOption<'buf> = WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ExampleUseOfErrorSyntax_CallWhichMayFail_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ExampleUseOfErrorSyntax_CallWhichMayFail_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -279,21 +321,27 @@ impl WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf>
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
     for WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
                 crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response,
             >(raw, decoder)?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -363,19 +411,25 @@ impl<'buf> Default for WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Resu
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf>
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
     for WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
                 crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response,
             >(raw, decoder)?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,

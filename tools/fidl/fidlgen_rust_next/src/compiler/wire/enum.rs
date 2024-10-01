@@ -15,7 +15,7 @@ pub fn emit_enum<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let e = &compiler.library.enum_declarations[ident];
+    let e = &compiler.schema.enum_declarations[ident];
 
     let name = e.name.type_name();
     let natural_ty = int_type_natural_name(e.ty);
@@ -68,11 +68,14 @@ pub fn emit_enum<W: Write>(
     writeln!(
         out,
         r#"
-        unsafe impl<'buf> ::fidl::Decode<'buf> for Wire{name} {{
+        unsafe impl<___D> ::fidl::Decode<___D> for Wire{name}
+        where
+            ___D: ?Sized,
+        {{
             fn decode(
                 slot: ::fidl::Slot<'_, Self>,
-                decoder: &mut ::fidl::decode::Decoder<'buf>,
-            ) -> Result<(), ::fidl::decode::Error> {{
+                _: &mut ___D,
+            ) -> Result<(), ::fidl::DecodeError> {{
         "#,
     )?;
 
@@ -95,7 +98,7 @@ pub fn emit_enum<W: Write>(
             out,
             r#"
                 => (),
-                unknown => return Err(::fidl::decode::Error::InvalidEnumOrdinal(
+                unknown => return Err(::fidl::DecodeError::InvalidEnumOrdinal(
                     unknown as usize,
                 )),
             }}

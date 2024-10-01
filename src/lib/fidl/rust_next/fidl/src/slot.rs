@@ -6,6 +6,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr::slice_from_raw_parts_mut;
+use core::slice::from_raw_parts;
 
 use munge::{Destructure, Move, Restructure};
 
@@ -19,7 +20,7 @@ use crate::{FromBytes, IntoBytes};
 #[repr(transparent)]
 pub struct Slot<'buf, T: ?Sized> {
     ptr: *mut T,
-    _phantom: PhantomData<&'buf mut T>,
+    _phantom: PhantomData<&'buf mut [u8]>,
 }
 
 impl<'buf, T: ?Sized> Slot<'buf, T> {
@@ -85,6 +86,13 @@ impl<'buf, T: ?Sized> Slot<'buf, T> {
         unsafe {
             self.as_mut_ptr().write(value);
         }
+    }
+}
+
+impl<'buf, T> Slot<'buf, T> {
+    /// Returns a slice of the underlying bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe { from_raw_parts(self.ptr.cast::<u8>(), size_of::<T>()) }
     }
 }
 

@@ -14,14 +14,19 @@ pub struct ByteAndBytes {
     pub single_byte: u8,
 }
 
-impl ::fidl::Encode for ByteAndBytes {
+impl ::fidl::Encodable for ByteAndBytes {
     type Encoded<'buf> = WireByteAndBytes;
+}
 
+impl<___E> ::fidl::Encode<___E> for ByteAndBytes
+where
+    u8: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 single_byte,
@@ -32,16 +37,22 @@ impl ::fidl::Encode for ByteAndBytes {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ByteAndBytes> {
+impl ::fidl::EncodableOption for Box<ByteAndBytes> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireByteAndBytes>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ByteAndBytes>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ByteAndBytes: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -63,17 +74,19 @@ pub struct WireByteAndBytes {
     pub single_byte: u8,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireByteAndBytes {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireByteAndBytes
+where
+    ___D: ?Sized,
+
+    u8: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut single_byte,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(single_byte.as_mut(), decoder)?;
+        ::fidl::Decode::decode(single_byte.as_mut(), decoder)?;
         Ok(())
     }
 }

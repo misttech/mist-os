@@ -32,8 +32,8 @@ use std::process::Command;
 
 use argh::FromArgs;
 
-use self::compiler::{Compiler, Config};
-use self::ir::Library;
+use self::compiler::{Compiler, Config, ResourceBindings};
+use self::ir::Schema;
 
 /// Generate Rust bindings from FIDL IR
 #[derive(FromArgs)]
@@ -56,10 +56,11 @@ fn main() {
     let args = argh::from_env::<Fidlgen>();
 
     let file = File::open(&args.json).expect("failed to open source JSON IR file");
-    let library = serde_json::from_reader::<_, Library>(BufReader::new(file))
+    let schema = serde_json::from_reader::<_, Schema>(BufReader::new(file))
         .expect("failed to parse source JSON IR");
 
-    let mut compiler = Compiler::new(&library, Config { emit_debug_impls: true });
+    let config = Config { emit_debug_impls: true, resource_bindings: ResourceBindings::default() };
+    let mut compiler = Compiler::new(&schema, config);
     let out = File::create(&args.output_filename).expect("failed to create output file");
     compiler.emit(&mut BufWriter::new(out)).expect("failed to emit FIDL bindings");
 

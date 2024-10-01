@@ -7,7 +7,10 @@ use core::ptr::addr_of_mut;
 
 use munge::munge;
 
-use crate::{decode, encode, u16_le, u32_le, Chunk, Decode, Slot, CHUNK_SIZE};
+use crate::{
+    decode, encode, u16_le, u32_le, Chunk, Decode, Decoder, DecoderExt as _, Encode, Encoder,
+    EncoderExt as _, Slot, CHUNK_SIZE,
+};
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -43,11 +46,11 @@ impl<'buf> WireEnvelope<'buf> {
     }
 
     /// Encodes a value into an envelope with an encoder.
-    pub fn encode_value<T: encode::Encode>(
+    pub fn encode_value<E: Encoder + ?Sized, T: Encode<E>>(
         value: &mut T,
-        encoder: &mut encode::Encoder,
+        encoder: &mut E,
         slot: Slot<'_, Self>,
-    ) -> Result<(), encode::Error> {
+    ) -> Result<(), encode::EncodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -58,7 +61,7 @@ impl<'buf> WireEnvelope<'buf> {
             } = slot;
         }
 
-        let handles_before = encoder.handle_count();
+        let handles_before = encoder.__internal_handle_count();
 
         if size_of::<T::Encoded<'_>>() <= 4 {
             let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
@@ -66,16 +69,17 @@ impl<'buf> WireEnvelope<'buf> {
 
             *flags = u16_le::from_native(Self::IS_INLINE_BIT);
         } else {
-            let bytes_before = encoder.byte_count();
+            let bytes_before = encoder.bytes_written();
 
             encoder.encode(value)?;
 
             *maybe_num_bytes =
-                u32_le::from_native((encoder.byte_count() - bytes_before).try_into().unwrap());
+                u32_le::from_native((encoder.bytes_written() - bytes_before).try_into().unwrap());
         }
 
-        *num_handles =
-            u16_le::from_native((encoder.handle_count() - handles_before).try_into().unwrap());
+        *num_handles = u16_le::from_native(
+            (encoder.__internal_handle_count() - handles_before).try_into().unwrap(),
+        );
 
         Ok(())
     }
@@ -99,14 +103,14 @@ impl<'buf> WireEnvelope<'buf> {
     fn out_of_line_chunks(
         maybe_num_bytes: Slot<'_, u32_le>,
         flags: Slot<'_, u16_le>,
-    ) -> Result<Option<usize>, decode::Error> {
+    ) -> Result<Option<usize>, decode::DecodeError> {
         if flags.to_native() & Self::IS_INLINE_BIT == 0 {
             let num_bytes = maybe_num_bytes.to_native();
             if num_bytes as usize % CHUNK_SIZE != 0 {
-                return Err(decode::Error::InvalidEnvelopeSize(num_bytes));
+                return Err(decode::DecodeError::InvalidEnvelopeSize(num_bytes));
             }
             if num_bytes <= 4 {
-                return Err(decode::Error::OutOfLineValueTooSmall(num_bytes));
+                return Err(decode::DecodeError::OutOfLineValueTooSmall(num_bytes));
             }
             Ok(Some(num_bytes as usize / CHUNK_SIZE))
         } else {
@@ -115,10 +119,10 @@ impl<'buf> WireEnvelope<'buf> {
     }
 
     /// Decodes and discards an unknown value in an envelope.
-    pub fn decode_unknown(
+    pub fn decode_unknown<D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'_>,
-    ) -> Result<(), decode::Error> {
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -133,18 +137,16 @@ impl<'buf> WireEnvelope<'buf> {
             decoder.take_chunks(count)?;
         }
 
-        for _ in 0..num_handles.to_native() {
-            decoder.take_handle()?;
-        }
+        decoder.__internal_take_handles(num_handles.to_native() as usize)?;
 
         Ok(())
     }
 
     /// Decodes a value of a known type from an envelope.
-    pub fn decode_as<T: Decode<'buf>>(
+    pub fn decode_as<D: Decoder<'buf> + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'buf>,
-    ) -> Result<(), decode::Error> {
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
@@ -155,7 +157,7 @@ impl<'buf> WireEnvelope<'buf> {
              } = slot.as_mut();
         }
 
-        let handles_before = decoder.handles_remaining();
+        let handles_before = decoder.__internal_handles_remaining();
         let num_handles = num_handles.to_native() as usize;
 
         let out_of_line_chunks = Self::out_of_line_chunks(maybe_num_bytes.as_mut(), flags)?;
@@ -179,16 +181,16 @@ impl<'buf> WireEnvelope<'buf> {
         } else {
             // Decode inline value
             if size_of::<T>() > 4 {
-                return Err(decode::Error::InlineValueTooBig(size_of::<T>()));
+                return Err(decode::DecodeError::InlineValueTooBig(size_of::<T>()));
             }
             munge!(let Self { mut decoded_inline } = slot);
             let mut slot = unsafe { Slot::<T>::new_unchecked(decoded_inline.as_mut_ptr().cast()) };
             T::decode(slot.as_mut(), decoder)?;
         }
 
-        let handles_consumed = handles_before - decoder.handles_remaining();
+        let handles_consumed = handles_before - decoder.__internal_handles_remaining();
         if handles_consumed != num_handles {
-            return Err(decode::Error::IncorrectNumberOfHandlesConsumed {
+            return Err(decode::DecodeError::IncorrectNumberOfHandlesConsumed {
                 expected: num_handles,
                 actual: handles_consumed,
             });

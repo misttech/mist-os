@@ -14,7 +14,7 @@ pub fn emit_table<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let t = &compiler.library.table_declarations[ident];
+    let t = &compiler.schema.table_declarations[ident];
 
     let name = t.name.type_name();
 
@@ -70,14 +70,30 @@ pub fn emit_table<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::Encode for {name} {{
+        impl ::fidl::Encodable for {name} {{
             type Encoded<'buf> = Wire{name}<'buf>;
+        }}
 
+        impl<___E> ::fidl::Encode<___E> for {name}
+        where
+            ___E: ::fidl::Encoder + ?Sized,
+        "#,
+    )?;
+
+    for member in &t.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl::Encode<___E>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn encode(
                 &mut self,
-                encoder: &mut ::fidl::encode::Encoder,
+                encoder: &mut ___E,
                 slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+            ) -> Result<(), ::fidl::EncodeError> {{
                 ::fidl::munge!(let Wire{name} {{ table }} = slot);
 
                 let max_ord = self.__max_ordinal();
@@ -85,9 +101,9 @@ pub fn emit_table<W: Write>(
                 let mut backing = ::core::mem::MaybeUninit::<
                     ::fidl::WireEnvelope<'_>
                 >::uninit();
-                let mut preallocated = encoder.preallocate::<
+                let mut preallocated = ::fidl::EncoderExt::preallocate::<
                     ::fidl::WireEnvelope<'_>
-                >(max_ord);
+                >(encoder, max_ord);
 
                 for i in 1..=max_ord {{
                     let mut slot = ::fidl::Slot::new(&mut backing);

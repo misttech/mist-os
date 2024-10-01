@@ -12,14 +12,16 @@
 #[derive(Clone, Debug)]
 pub struct MyStruct {}
 
-impl ::fidl::Encode for MyStruct {
+impl ::fidl::Encodable for MyStruct {
     type Encoded<'buf> = WireMyStruct;
+}
 
+impl<___E> ::fidl::Encode<___E> for MyStruct {
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
             } = slot;
@@ -29,16 +31,22 @@ impl ::fidl::Encode for MyStruct {
     }
 }
 
-impl ::fidl::EncodeOption for Box<MyStruct> {
+impl ::fidl::EncodableOption for Box<MyStruct> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireMyStruct>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<MyStruct>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    MyStruct: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -58,11 +66,11 @@ impl ::fidl::TakeFrom<WireMyStruct> for MyStruct {
 #[repr(C)]
 pub struct WireMyStruct {}
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireMyStruct {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireMyStruct
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
             } = slot;

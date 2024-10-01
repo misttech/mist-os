@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::decode::{Decoder, Owned};
-use crate::encode::Encoder;
-use crate::{Chunk, Decode, Encode, Handle};
+use crate::decoder::BasicDecoder;
+use crate::encoder::BasicEncoder;
+use crate::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned};
 
 macro_rules! chunks {
     ($(
@@ -19,20 +19,18 @@ macro_rules! chunks {
     }
 }
 
-pub fn assert_encoded<T: Encode>(mut value: T, chunks: &[Chunk], handles: &[Handle]) {
-    let mut encoder = Encoder::new();
+pub fn assert_encoded<T: Encode<BasicEncoder>>(mut value: T, chunks: &[Chunk]) {
+    let mut encoder = BasicEncoder::new();
     encoder.encode(&mut value).unwrap();
-    let (encoded_chunks, encoded_handles) = encoder.finish();
+    let encoded_chunks = encoder.finish();
     assert_eq!(encoded_chunks, chunks, "encoded chunks did not match");
-    assert_eq!(encoded_handles, handles, "encoded handles did not match");
 }
 
-pub fn assert_decoded<'buf, T: Decode<'buf>>(
+pub fn assert_decoded<'buf, T: Decode<BasicDecoder<'buf>>>(
     chunks: &'buf mut [Chunk],
-    handles: Vec<Handle>,
     f: impl FnOnce(Owned<'buf, T>),
 ) {
-    let mut decoder = Decoder::new(chunks, handles);
+    let mut decoder = BasicDecoder::new(chunks);
     let value = decoder.decode_next::<T>().expect("failed to decode");
     f(value)
 }

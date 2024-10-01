@@ -26,9 +26,13 @@ pub use rend::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
 
 pub use self::bytes::*;
 pub use self::chunk::*;
-pub use self::decode::{from_chunks, Decode};
-pub use self::encode::{to_chunks, Encode, EncodeOption};
-pub use self::handle::*;
+pub use self::decode::*;
+pub use self::decoder::{Decoder, DecoderExt};
+pub use self::encode::*;
+pub use self::encoder::{Encoder, EncoderExt};
+#[cfg(target_os = "fuchsia")]
+pub use self::fuchsia::*;
+pub use self::owned::*;
 pub use self::slot::*;
 pub use self::take::*;
 pub use self::wire::*;
@@ -40,8 +44,12 @@ mod test_util;
 mod bytes;
 mod chunk;
 pub mod decode;
+pub mod decoder;
 pub mod encode;
-mod handle;
+pub mod encoder;
+#[cfg(target_os = "fuchsia")]
+mod fuchsia;
+mod owned;
 mod slot;
 mod take;
 mod wire;

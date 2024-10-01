@@ -14,14 +14,19 @@ pub struct ShouldNeverAppearInAnyBinding4 {
     pub a: bool,
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding4 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding4 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding4;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding4
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -32,16 +37,22 @@ impl ::fidl::Encode for ShouldNeverAppearInAnyBinding4 {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ShouldNeverAppearInAnyBinding4> {
+impl ::fidl::EncodableOption for Box<ShouldNeverAppearInAnyBinding4> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireShouldNeverAppearInAnyBinding4>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ShouldNeverAppearInAnyBinding4>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ShouldNeverAppearInAnyBinding4: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -63,17 +74,19 @@ pub struct WireShouldNeverAppearInAnyBinding4 {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding4 {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding4
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -93,20 +106,28 @@ impl ShouldNeverAppearInAnyBinding5 {
     }
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding5 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding5 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding5<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding5
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireShouldNeverAppearInAnyBinding5 { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -143,18 +164,20 @@ pub struct WireShouldNeverAppearInAnyBinding5<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding5<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding5<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<bool>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, bool>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -191,21 +214,30 @@ pub enum ShouldNeverAppearInAnyBinding6 {
     Unknown(u64),
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding6 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding6 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding6<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding6
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireShouldNeverAppearInAnyBinding6 { raw } = slot);
 
         match self {
-            Self::A(value) => ::fidl::RawWireUnion::encode_as::<bool>(value, 1, encoder, raw)?,
+            Self::A(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+            }
 
             Self::Unknown(ordinal) => {
-                return Err(::fidl::encode::Error::UnknownUnionOrdinal(*ordinal as usize))
+                return Err(::fidl::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
 
@@ -213,19 +245,25 @@ impl ::fidl::Encode for ShouldNeverAppearInAnyBinding6 {
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<ShouldNeverAppearInAnyBinding6> {
+impl ::fidl::EncodableOption for Box<ShouldNeverAppearInAnyBinding6> {
     type EncodedOption<'buf> = WireOptionalShouldNeverAppearInAnyBinding6<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ShouldNeverAppearInAnyBinding6>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ShouldNeverAppearInAnyBinding6: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalShouldNeverAppearInAnyBinding6 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -295,14 +333,19 @@ impl WireShouldNeverAppearInAnyBinding6<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding6<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding6<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<bool>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
         }
 
@@ -367,14 +410,19 @@ impl<'buf> Default for WireOptionalShouldNeverAppearInAnyBinding6<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalShouldNeverAppearInAnyBinding6<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOptionalShouldNeverAppearInAnyBinding6<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<bool>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -397,14 +445,21 @@ pub struct Allowed_Denied_Response {
     pub should_never_appear_in_any_binding_6: crate::ShouldNeverAppearInAnyBinding6,
 }
 
-impl ::fidl::Encode for Allowed_Denied_Response {
+impl ::fidl::Encodable for Allowed_Denied_Response {
     type Encoded<'buf> = WireAllowed_Denied_Response<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for Allowed_Denied_Response
+where
+    crate::ShouldNeverAppearInAnyBinding4: ::fidl::Encode<___E>,
+    crate::ShouldNeverAppearInAnyBinding5: ::fidl::Encode<___E>,
+    crate::ShouldNeverAppearInAnyBinding6: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 should_never_appear_in_any_binding_4,
@@ -431,16 +486,22 @@ impl ::fidl::Encode for Allowed_Denied_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<Allowed_Denied_Response> {
+impl ::fidl::EncodableOption for Box<Allowed_Denied_Response> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireAllowed_Denied_Response<'buf>>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<Allowed_Denied_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    Allowed_Denied_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -474,11 +535,15 @@ pub struct WireAllowed_Denied_Response<'buf> {
     pub should_never_appear_in_any_binding_6: crate::WireShouldNeverAppearInAnyBinding6<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireAllowed_Denied_Response<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireAllowed_Denied_Response<'buf>
+where
+    ___D: ?Sized,
+
+    crate::WireShouldNeverAppearInAnyBinding4: ::fidl::Decode<___D>,
+    crate::WireShouldNeverAppearInAnyBinding5<'buf>: ::fidl::Decode<___D>,
+    crate::WireShouldNeverAppearInAnyBinding6<'buf>: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut should_never_appear_in_any_binding_4,
@@ -486,9 +551,9 @@ unsafe impl<'buf> ::fidl::Decode<'buf> for WireAllowed_Denied_Response<'buf> {
                 mut should_never_appear_in_any_binding_6,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_4.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_5.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_6.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_4.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_5.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_6.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -500,40 +565,57 @@ pub enum Allowed_Denied_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for Allowed_Denied_Result {
+impl ::fidl::Encodable for Allowed_Denied_Result {
     type Encoded<'buf> = WireAllowed_Denied_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for Allowed_Denied_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::Allowed_Denied_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireAllowed_Denied_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::Allowed_Denied_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<Allowed_Denied_Result> {
+impl ::fidl::EncodableOption for Box<Allowed_Denied_Result> {
     type EncodedOption<'buf> = WireOptionalAllowed_Denied_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<Allowed_Denied_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    Allowed_Denied_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalAllowed_Denied_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -611,19 +693,25 @@ impl WireAllowed_Denied_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireAllowed_Denied_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireAllowed_Denied_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireAllowed_Denied_Response<'buf>: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<crate::WireAllowed_Denied_Response<'buf>>(
+            1 => ::fidl::RawWireUnion::decode_as::<___D, crate::WireAllowed_Denied_Response<'buf>>(
                 raw, decoder,
             )?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -690,17 +778,23 @@ impl<'buf> Default for WireOptionalAllowed_Denied_Result<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalAllowed_Denied_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOptionalAllowed_Denied_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireAllowed_Denied_Response<'buf>: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<crate::WireAllowed_Denied_Response<'buf>>(
+            1 => ::fidl::RawWireUnion::decode_as::<___D, crate::WireAllowed_Denied_Response<'buf>>(
                 raw, decoder,
             )?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -721,14 +815,19 @@ pub struct ShouldNeverAppearInAnyBinding1 {
     pub a: bool,
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding1 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding1 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding1;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding1
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -739,16 +838,22 @@ impl ::fidl::Encode for ShouldNeverAppearInAnyBinding1 {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ShouldNeverAppearInAnyBinding1> {
+impl ::fidl::EncodableOption for Box<ShouldNeverAppearInAnyBinding1> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireShouldNeverAppearInAnyBinding1>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ShouldNeverAppearInAnyBinding1>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ShouldNeverAppearInAnyBinding1: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -770,17 +875,19 @@ pub struct WireShouldNeverAppearInAnyBinding1 {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding1 {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding1
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -800,20 +907,28 @@ impl ShouldNeverAppearInAnyBinding2 {
     }
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding2 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding2 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding2<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding2
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireShouldNeverAppearInAnyBinding2 { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -850,18 +965,20 @@ pub struct WireShouldNeverAppearInAnyBinding2<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding2<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding2<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<bool>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, bool>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -898,21 +1015,30 @@ pub enum ShouldNeverAppearInAnyBinding3 {
     Unknown(u64),
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding3 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding3 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding3<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding3
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireShouldNeverAppearInAnyBinding3 { raw } = slot);
 
         match self {
-            Self::A(value) => ::fidl::RawWireUnion::encode_as::<bool>(value, 1, encoder, raw)?,
+            Self::A(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+            }
 
             Self::Unknown(ordinal) => {
-                return Err(::fidl::encode::Error::UnknownUnionOrdinal(*ordinal as usize))
+                return Err(::fidl::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
 
@@ -920,19 +1046,25 @@ impl ::fidl::Encode for ShouldNeverAppearInAnyBinding3 {
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<ShouldNeverAppearInAnyBinding3> {
+impl ::fidl::EncodableOption for Box<ShouldNeverAppearInAnyBinding3> {
     type EncodedOption<'buf> = WireOptionalShouldNeverAppearInAnyBinding3<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ShouldNeverAppearInAnyBinding3>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ShouldNeverAppearInAnyBinding3: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalShouldNeverAppearInAnyBinding3 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -1002,14 +1134,19 @@ impl WireShouldNeverAppearInAnyBinding3<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding3<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding3<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<bool>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
         }
 
@@ -1074,14 +1211,19 @@ impl<'buf> Default for WireOptionalShouldNeverAppearInAnyBinding3<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalShouldNeverAppearInAnyBinding3<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOptionalShouldNeverAppearInAnyBinding3<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<bool>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -1104,14 +1246,21 @@ pub struct DeniedShouldNeverAppearInAnyBindingRequest {
     pub should_never_appear_in_any_binding_3: crate::ShouldNeverAppearInAnyBinding3,
 }
 
-impl ::fidl::Encode for DeniedShouldNeverAppearInAnyBindingRequest {
+impl ::fidl::Encodable for DeniedShouldNeverAppearInAnyBindingRequest {
     type Encoded<'buf> = WireDeniedShouldNeverAppearInAnyBindingRequest<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DeniedShouldNeverAppearInAnyBindingRequest
+where
+    crate::ShouldNeverAppearInAnyBinding1: ::fidl::Encode<___E>,
+    crate::ShouldNeverAppearInAnyBinding2: ::fidl::Encode<___E>,
+    crate::ShouldNeverAppearInAnyBinding3: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 should_never_appear_in_any_binding_1,
@@ -1138,17 +1287,23 @@ impl ::fidl::Encode for DeniedShouldNeverAppearInAnyBindingRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DeniedShouldNeverAppearInAnyBindingRequest> {
+impl ::fidl::EncodableOption for Box<DeniedShouldNeverAppearInAnyBindingRequest> {
     type EncodedOption<'buf> =
         ::fidl::WireBox<'buf, WireDeniedShouldNeverAppearInAnyBindingRequest<'buf>>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DeniedShouldNeverAppearInAnyBindingRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DeniedShouldNeverAppearInAnyBindingRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -1184,11 +1339,16 @@ pub struct WireDeniedShouldNeverAppearInAnyBindingRequest<'buf> {
     pub should_never_appear_in_any_binding_3: crate::WireShouldNeverAppearInAnyBinding3<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDeniedShouldNeverAppearInAnyBindingRequest<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
+    for WireDeniedShouldNeverAppearInAnyBindingRequest<'buf>
+where
+    ___D: ?Sized,
+
+    crate::WireShouldNeverAppearInAnyBinding1: ::fidl::Decode<___D>,
+    crate::WireShouldNeverAppearInAnyBinding2<'buf>: ::fidl::Decode<___D>,
+    crate::WireShouldNeverAppearInAnyBinding3<'buf>: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut should_never_appear_in_any_binding_1,
@@ -1196,9 +1356,9 @@ unsafe impl<'buf> ::fidl::Decode<'buf> for WireDeniedShouldNeverAppearInAnyBindi
                 mut should_never_appear_in_any_binding_3,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_1.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_2.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_3.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_1.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_2.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_3.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1208,14 +1368,19 @@ pub struct ShouldNeverAppearInAnyBinding7 {
     pub a: bool,
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding7 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding7 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding7;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding7
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -1226,16 +1391,22 @@ impl ::fidl::Encode for ShouldNeverAppearInAnyBinding7 {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ShouldNeverAppearInAnyBinding7> {
+impl ::fidl::EncodableOption for Box<ShouldNeverAppearInAnyBinding7> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireShouldNeverAppearInAnyBinding7>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ShouldNeverAppearInAnyBinding7>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ShouldNeverAppearInAnyBinding7: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -1257,17 +1428,19 @@ pub struct WireShouldNeverAppearInAnyBinding7 {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding7 {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding7
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1287,20 +1460,28 @@ impl ShouldNeverAppearInAnyBinding8 {
     }
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding8 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding8 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding8<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding8
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireShouldNeverAppearInAnyBinding8 { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -1337,18 +1518,20 @@ pub struct WireShouldNeverAppearInAnyBinding8<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding8<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding8<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {
             0 => unsafe { ::core::hint::unreachable_unchecked() },
 
             1 => {
-                ::fidl::WireEnvelope::decode_as::<bool>(slot.as_mut(), decoder)?;
+                ::fidl::WireEnvelope::decode_as::<___D, bool>(slot.as_mut(), decoder)?;
 
                 Ok(())
             }
@@ -1385,21 +1568,30 @@ pub enum ShouldNeverAppearInAnyBinding9 {
     Unknown(u64),
 }
 
-impl ::fidl::Encode for ShouldNeverAppearInAnyBinding9 {
+impl ::fidl::Encodable for ShouldNeverAppearInAnyBinding9 {
     type Encoded<'buf> = WireShouldNeverAppearInAnyBinding9<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ShouldNeverAppearInAnyBinding9
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireShouldNeverAppearInAnyBinding9 { raw } = slot);
 
         match self {
-            Self::A(value) => ::fidl::RawWireUnion::encode_as::<bool>(value, 1, encoder, raw)?,
+            Self::A(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
+            }
 
             Self::Unknown(ordinal) => {
-                return Err(::fidl::encode::Error::UnknownUnionOrdinal(*ordinal as usize))
+                return Err(::fidl::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
 
@@ -1407,19 +1599,25 @@ impl ::fidl::Encode for ShouldNeverAppearInAnyBinding9 {
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<ShouldNeverAppearInAnyBinding9> {
+impl ::fidl::EncodableOption for Box<ShouldNeverAppearInAnyBinding9> {
     type EncodedOption<'buf> = WireOptionalShouldNeverAppearInAnyBinding9<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ShouldNeverAppearInAnyBinding9>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ShouldNeverAppearInAnyBinding9: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalShouldNeverAppearInAnyBinding9 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -1489,14 +1687,19 @@ impl WireShouldNeverAppearInAnyBinding9<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireShouldNeverAppearInAnyBinding9<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireShouldNeverAppearInAnyBinding9<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<bool>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
         }
 
@@ -1561,14 +1764,19 @@ impl<'buf> Default for WireOptionalShouldNeverAppearInAnyBinding9<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalShouldNeverAppearInAnyBinding9<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOptionalShouldNeverAppearInAnyBinding9<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<bool>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -1591,14 +1799,21 @@ pub struct DeniedAnonymous {
     pub should_never_appear_in_any_binding_9: crate::ShouldNeverAppearInAnyBinding9,
 }
 
-impl ::fidl::Encode for DeniedAnonymous {
+impl ::fidl::Encodable for DeniedAnonymous {
     type Encoded<'buf> = WireDeniedAnonymous<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DeniedAnonymous
+where
+    crate::ShouldNeverAppearInAnyBinding7: ::fidl::Encode<___E>,
+    crate::ShouldNeverAppearInAnyBinding8: ::fidl::Encode<___E>,
+    crate::ShouldNeverAppearInAnyBinding9: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 should_never_appear_in_any_binding_7,
@@ -1625,16 +1840,22 @@ impl ::fidl::Encode for DeniedAnonymous {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DeniedAnonymous> {
+impl ::fidl::EncodableOption for Box<DeniedAnonymous> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDeniedAnonymous<'buf>>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DeniedAnonymous>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DeniedAnonymous: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -1668,11 +1889,15 @@ pub struct WireDeniedAnonymous<'buf> {
     pub should_never_appear_in_any_binding_9: crate::WireShouldNeverAppearInAnyBinding9<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDeniedAnonymous<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDeniedAnonymous<'buf>
+where
+    ___D: ?Sized,
+
+    crate::WireShouldNeverAppearInAnyBinding7: ::fidl::Decode<___D>,
+    crate::WireShouldNeverAppearInAnyBinding8<'buf>: ::fidl::Decode<___D>,
+    crate::WireShouldNeverAppearInAnyBinding9<'buf>: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut should_never_appear_in_any_binding_7,
@@ -1680,9 +1905,9 @@ unsafe impl<'buf> ::fidl::Decode<'buf> for WireDeniedAnonymous<'buf> {
                 mut should_never_appear_in_any_binding_9,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_7.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_8.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(should_never_appear_in_any_binding_9.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_7.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_8.as_mut(), decoder)?;
+        ::fidl::Decode::decode(should_never_appear_in_any_binding_9.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1692,14 +1917,19 @@ pub struct DenyEachBindingOnlyDenyCppRequest {
     pub a: bool,
 }
 
-impl ::fidl::Encode for DenyEachBindingOnlyDenyCppRequest {
+impl ::fidl::Encodable for DenyEachBindingOnlyDenyCppRequest {
     type Encoded<'buf> = WireDenyEachBindingOnlyDenyCppRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBindingOnlyDenyCppRequest
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -1710,16 +1940,22 @@ impl ::fidl::Encode for DenyEachBindingOnlyDenyCppRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBindingOnlyDenyCppRequest> {
+impl ::fidl::EncodableOption for Box<DenyEachBindingOnlyDenyCppRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBindingOnlyDenyCppRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBindingOnlyDenyCppRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBindingOnlyDenyCppRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -1741,17 +1977,19 @@ pub struct WireDenyEachBindingOnlyDenyCppRequest {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBindingOnlyDenyCppRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBindingOnlyDenyCppRequest
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1761,14 +1999,19 @@ pub struct DenyEachBinding_OnlyDenyCpp_Response {
     pub b: i32,
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyCpp_Response {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyCpp_Response {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyCpp_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyCpp_Response
+where
+    i32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 b,
@@ -1779,16 +2022,22 @@ impl ::fidl::Encode for DenyEachBinding_OnlyDenyCpp_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBinding_OnlyDenyCpp_Response> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyCpp_Response> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBinding_OnlyDenyCpp_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyCpp_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyCpp_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -1812,17 +2061,19 @@ pub struct WireDenyEachBinding_OnlyDenyCpp_Response {
     pub b: ::fidl::i32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyCpp_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyCpp_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1834,40 +2085,57 @@ pub enum DenyEachBinding_OnlyDenyCpp_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyCpp_Result {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyCpp_Result {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyCpp_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyCpp_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::DenyEachBinding_OnlyDenyCpp_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireDenyEachBinding_OnlyDenyCpp_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::DenyEachBinding_OnlyDenyCpp_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<DenyEachBinding_OnlyDenyCpp_Result> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyCpp_Result> {
     type EncodedOption<'buf> = WireOptionalDenyEachBinding_OnlyDenyCpp_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyCpp_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyCpp_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalDenyEachBinding_OnlyDenyCpp_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -1949,21 +2217,26 @@ impl WireDenyEachBinding_OnlyDenyCpp_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyCpp_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyCpp_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyCpp_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => {
-                ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyCpp_Response>(
-                    raw, decoder,
-                )?
-            }
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyCpp_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -2033,19 +2306,25 @@ impl<'buf> Default for WireOptionalDenyEachBinding_OnlyDenyCpp_Result<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalDenyEachBinding_OnlyDenyCpp_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
+    for WireOptionalDenyEachBinding_OnlyDenyCpp_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyCpp_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => {
-                ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyCpp_Response>(
-                    raw, decoder,
-                )?
-            }
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyCpp_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -2066,14 +2345,19 @@ pub struct DenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
 
-impl ::fidl::Encode for DenyEachBindingOnlyDenyDartRequest {
+impl ::fidl::Encodable for DenyEachBindingOnlyDenyDartRequest {
     type Encoded<'buf> = WireDenyEachBindingOnlyDenyDartRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBindingOnlyDenyDartRequest
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -2084,16 +2368,22 @@ impl ::fidl::Encode for DenyEachBindingOnlyDenyDartRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBindingOnlyDenyDartRequest> {
+impl ::fidl::EncodableOption for Box<DenyEachBindingOnlyDenyDartRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBindingOnlyDenyDartRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBindingOnlyDenyDartRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBindingOnlyDenyDartRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -2117,17 +2407,19 @@ pub struct WireDenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBindingOnlyDenyDartRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBindingOnlyDenyDartRequest
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -2137,14 +2429,19 @@ pub struct DenyEachBinding_OnlyDenyDart_Response {
     pub b: i32,
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyDart_Response {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyDart_Response {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyDart_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyDart_Response
+where
+    i32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 b,
@@ -2155,16 +2452,22 @@ impl ::fidl::Encode for DenyEachBinding_OnlyDenyDart_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBinding_OnlyDenyDart_Response> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyDart_Response> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBinding_OnlyDenyDart_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyDart_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyDart_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -2188,17 +2491,19 @@ pub struct WireDenyEachBinding_OnlyDenyDart_Response {
     pub b: ::fidl::i32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyDart_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyDart_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -2210,40 +2515,57 @@ pub enum DenyEachBinding_OnlyDenyDart_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyDart_Result {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyDart_Result {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyDart_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyDart_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::DenyEachBinding_OnlyDenyDart_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireDenyEachBinding_OnlyDenyDart_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::DenyEachBinding_OnlyDenyDart_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<DenyEachBinding_OnlyDenyDart_Result> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyDart_Result> {
     type EncodedOption<'buf> = WireOptionalDenyEachBinding_OnlyDenyDart_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyDart_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyDart_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalDenyEachBinding_OnlyDenyDart_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -2325,21 +2647,26 @@ impl WireDenyEachBinding_OnlyDenyDart_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyDart_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyDart_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyDart_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => {
-                ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyDart_Response>(
-                    raw, decoder,
-                )?
-            }
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyDart_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -2409,19 +2736,25 @@ impl<'buf> Default for WireOptionalDenyEachBinding_OnlyDenyDart_Result<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalDenyEachBinding_OnlyDenyDart_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
+    for WireOptionalDenyEachBinding_OnlyDenyDart_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyDart_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => {
-                ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyDart_Response>(
-                    raw, decoder,
-                )?
-            }
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyDart_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -2442,14 +2775,19 @@ pub struct DenyEachBindingOnlyDenyGoRequest {
     pub a: bool,
 }
 
-impl ::fidl::Encode for DenyEachBindingOnlyDenyGoRequest {
+impl ::fidl::Encodable for DenyEachBindingOnlyDenyGoRequest {
     type Encoded<'buf> = WireDenyEachBindingOnlyDenyGoRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBindingOnlyDenyGoRequest
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -2460,16 +2798,22 @@ impl ::fidl::Encode for DenyEachBindingOnlyDenyGoRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBindingOnlyDenyGoRequest> {
+impl ::fidl::EncodableOption for Box<DenyEachBindingOnlyDenyGoRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBindingOnlyDenyGoRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBindingOnlyDenyGoRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBindingOnlyDenyGoRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -2491,17 +2835,19 @@ pub struct WireDenyEachBindingOnlyDenyGoRequest {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBindingOnlyDenyGoRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBindingOnlyDenyGoRequest
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -2511,14 +2857,19 @@ pub struct DenyEachBinding_OnlyDenyGo_Response {
     pub b: i32,
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyGo_Response {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyGo_Response {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyGo_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyGo_Response
+where
+    i32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 b,
@@ -2529,16 +2880,22 @@ impl ::fidl::Encode for DenyEachBinding_OnlyDenyGo_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBinding_OnlyDenyGo_Response> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyGo_Response> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBinding_OnlyDenyGo_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyGo_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyGo_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -2562,17 +2919,19 @@ pub struct WireDenyEachBinding_OnlyDenyGo_Response {
     pub b: ::fidl::i32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyGo_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyGo_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -2584,40 +2943,57 @@ pub enum DenyEachBinding_OnlyDenyGo_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyGo_Result {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyGo_Result {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyGo_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyGo_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::DenyEachBinding_OnlyDenyGo_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireDenyEachBinding_OnlyDenyGo_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::DenyEachBinding_OnlyDenyGo_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<DenyEachBinding_OnlyDenyGo_Result> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyGo_Result> {
     type EncodedOption<'buf> = WireOptionalDenyEachBinding_OnlyDenyGo_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyGo_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyGo_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalDenyEachBinding_OnlyDenyGo_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -2699,19 +3075,26 @@ impl WireDenyEachBinding_OnlyDenyGo_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyGo_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyGo_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyGo_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyGo_Response>(
-                raw, decoder,
-            )?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyGo_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -2781,17 +3164,24 @@ impl<'buf> Default for WireOptionalDenyEachBinding_OnlyDenyGo_Result<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalDenyEachBinding_OnlyDenyGo_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOptionalDenyEachBinding_OnlyDenyGo_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyGo_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyGo_Response>(
-                raw, decoder,
-            )?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyGo_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -2812,14 +3202,19 @@ pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
 }
 
-impl ::fidl::Encode for DenyEachBindingOnlyDenyLibfuzzerRequest {
+impl ::fidl::Encodable for DenyEachBindingOnlyDenyLibfuzzerRequest {
     type Encoded<'buf> = WireDenyEachBindingOnlyDenyLibfuzzerRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBindingOnlyDenyLibfuzzerRequest
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -2830,16 +3225,22 @@ impl ::fidl::Encode for DenyEachBindingOnlyDenyLibfuzzerRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBindingOnlyDenyLibfuzzerRequest> {
+impl ::fidl::EncodableOption for Box<DenyEachBindingOnlyDenyLibfuzzerRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBindingOnlyDenyLibfuzzerRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBindingOnlyDenyLibfuzzerRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBindingOnlyDenyLibfuzzerRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -2863,17 +3264,19 @@ pub struct WireDenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBindingOnlyDenyLibfuzzerRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBindingOnlyDenyLibfuzzerRequest
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -2883,14 +3286,19 @@ pub struct DenyEachBinding_OnlyDenyLibfuzzer_Response {
     pub b: i32,
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyLibfuzzer_Response {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyLibfuzzer_Response {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyLibfuzzer_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyLibfuzzer_Response
+where
+    i32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 b,
@@ -2901,17 +3309,23 @@ impl ::fidl::Encode for DenyEachBinding_OnlyDenyLibfuzzer_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBinding_OnlyDenyLibfuzzer_Response> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyLibfuzzer_Response> {
     type EncodedOption<'buf> =
         ::fidl::WireBox<'buf, WireDenyEachBinding_OnlyDenyLibfuzzer_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyLibfuzzer_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyLibfuzzer_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -2935,17 +3349,19 @@ pub struct WireDenyEachBinding_OnlyDenyLibfuzzer_Response {
     pub b: ::fidl::i32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyLibfuzzer_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyLibfuzzer_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -2957,40 +3373,57 @@ pub enum DenyEachBinding_OnlyDenyLibfuzzer_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyLibfuzzer_Result {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyLibfuzzer_Result {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyLibfuzzer_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyLibfuzzer_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::DenyEachBinding_OnlyDenyLibfuzzer_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireDenyEachBinding_OnlyDenyLibfuzzer_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::DenyEachBinding_OnlyDenyLibfuzzer_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<DenyEachBinding_OnlyDenyLibfuzzer_Result> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyLibfuzzer_Result> {
     type EncodedOption<'buf> = WireOptionalDenyEachBinding_OnlyDenyLibfuzzer_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyLibfuzzer_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyLibfuzzer_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalDenyEachBinding_OnlyDenyLibfuzzer_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -3072,19 +3505,26 @@ impl WireDenyEachBinding_OnlyDenyLibfuzzer_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyLibfuzzer_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyLibfuzzer_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyLibfuzzer_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
                 crate::WireDenyEachBinding_OnlyDenyLibfuzzer_Response,
             >(raw, decoder)?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -3154,19 +3594,25 @@ impl<'buf> Default for WireOptionalDenyEachBinding_OnlyDenyLibfuzzer_Result<'buf
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf>
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
     for WireOptionalDenyEachBinding_OnlyDenyLibfuzzer_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyLibfuzzer_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
                 crate::WireDenyEachBinding_OnlyDenyLibfuzzer_Response,
             >(raw, decoder)?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -3187,14 +3633,19 @@ pub struct DenyEachBindingOnlyDenyRustRequest {
     pub a: bool,
 }
 
-impl ::fidl::Encode for DenyEachBindingOnlyDenyRustRequest {
+impl ::fidl::Encodable for DenyEachBindingOnlyDenyRustRequest {
     type Encoded<'buf> = WireDenyEachBindingOnlyDenyRustRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBindingOnlyDenyRustRequest
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -3205,16 +3656,22 @@ impl ::fidl::Encode for DenyEachBindingOnlyDenyRustRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBindingOnlyDenyRustRequest> {
+impl ::fidl::EncodableOption for Box<DenyEachBindingOnlyDenyRustRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBindingOnlyDenyRustRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBindingOnlyDenyRustRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBindingOnlyDenyRustRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -3238,17 +3695,19 @@ pub struct WireDenyEachBindingOnlyDenyRustRequest {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBindingOnlyDenyRustRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBindingOnlyDenyRustRequest
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -3258,14 +3717,19 @@ pub struct DenyEachBinding_OnlyDenyRust_Response {
     pub b: i32,
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyRust_Response {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyRust_Response {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyRust_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyRust_Response
+where
+    i32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 b,
@@ -3276,16 +3740,22 @@ impl ::fidl::Encode for DenyEachBinding_OnlyDenyRust_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBinding_OnlyDenyRust_Response> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyRust_Response> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBinding_OnlyDenyRust_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyRust_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyRust_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -3309,17 +3779,19 @@ pub struct WireDenyEachBinding_OnlyDenyRust_Response {
     pub b: ::fidl::i32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyRust_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyRust_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -3331,40 +3803,57 @@ pub enum DenyEachBinding_OnlyDenyRust_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenyRust_Result {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenyRust_Result {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenyRust_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenyRust_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::DenyEachBinding_OnlyDenyRust_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireDenyEachBinding_OnlyDenyRust_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::DenyEachBinding_OnlyDenyRust_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<DenyEachBinding_OnlyDenyRust_Result> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenyRust_Result> {
     type EncodedOption<'buf> = WireOptionalDenyEachBinding_OnlyDenyRust_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenyRust_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenyRust_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalDenyEachBinding_OnlyDenyRust_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -3446,21 +3935,26 @@ impl WireDenyEachBinding_OnlyDenyRust_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenyRust_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenyRust_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyRust_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => {
-                ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyRust_Response>(
-                    raw, decoder,
-                )?
-            }
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyRust_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -3530,19 +4024,25 @@ impl<'buf> Default for WireOptionalDenyEachBinding_OnlyDenyRust_Result<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalDenyEachBinding_OnlyDenyRust_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
+    for WireOptionalDenyEachBinding_OnlyDenyRust_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenyRust_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => {
-                ::fidl::RawWireUnion::decode_as::<crate::WireDenyEachBinding_OnlyDenyRust_Response>(
-                    raw, decoder,
-                )?
-            }
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
+                crate::WireDenyEachBinding_OnlyDenyRust_Response,
+            >(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -3563,14 +4063,19 @@ pub struct DenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
 
-impl ::fidl::Encode for DenyEachBindingOnlyDenySyzkallerRequest {
+impl ::fidl::Encodable for DenyEachBindingOnlyDenySyzkallerRequest {
     type Encoded<'buf> = WireDenyEachBindingOnlyDenySyzkallerRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBindingOnlyDenySyzkallerRequest
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -3581,16 +4086,22 @@ impl ::fidl::Encode for DenyEachBindingOnlyDenySyzkallerRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBindingOnlyDenySyzkallerRequest> {
+impl ::fidl::EncodableOption for Box<DenyEachBindingOnlyDenySyzkallerRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDenyEachBindingOnlyDenySyzkallerRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBindingOnlyDenySyzkallerRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBindingOnlyDenySyzkallerRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -3614,17 +4125,19 @@ pub struct WireDenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBindingOnlyDenySyzkallerRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBindingOnlyDenySyzkallerRequest
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -3634,14 +4147,19 @@ pub struct DenyEachBinding_OnlyDenySyzkaller_Response {
     pub b: i32,
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenySyzkaller_Response {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenySyzkaller_Response {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenySyzkaller_Response;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenySyzkaller_Response
+where
+    i32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 b,
@@ -3652,17 +4170,23 @@ impl ::fidl::Encode for DenyEachBinding_OnlyDenySyzkaller_Response {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DenyEachBinding_OnlyDenySyzkaller_Response> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenySyzkaller_Response> {
     type EncodedOption<'buf> =
         ::fidl::WireBox<'buf, WireDenyEachBinding_OnlyDenySyzkaller_Response>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenySyzkaller_Response>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenySyzkaller_Response: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -3686,17 +4210,19 @@ pub struct WireDenyEachBinding_OnlyDenySyzkaller_Response {
     pub b: ::fidl::i32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenySyzkaller_Response {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenySyzkaller_Response
+where
+    ___D: ?Sized,
+
+    ::fidl::i32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -3708,40 +4234,57 @@ pub enum DenyEachBinding_OnlyDenySyzkaller_Result {
     Err(u32),
 }
 
-impl ::fidl::Encode for DenyEachBinding_OnlyDenySyzkaller_Result {
+impl ::fidl::Encodable for DenyEachBinding_OnlyDenySyzkaller_Result {
     type Encoded<'buf> = WireDenyEachBinding_OnlyDenySyzkaller_Result<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for DenyEachBinding_OnlyDenySyzkaller_Result
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    crate::DenyEachBinding_OnlyDenySyzkaller_Response: ::fidl::Encode<___E>,
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireDenyEachBinding_OnlyDenySyzkaller_Result { raw } = slot);
 
         match self {
             Self::Response(value) => ::fidl::RawWireUnion::encode_as::<
+                ___E,
                 crate::DenyEachBinding_OnlyDenySyzkaller_Response,
             >(value, 1, encoder, raw)?,
-            Self::Err(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 2, encoder, raw)?,
+            Self::Err(value) => {
+                ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 2, encoder, raw)?
+            }
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<DenyEachBinding_OnlyDenySyzkaller_Result> {
+impl ::fidl::EncodableOption for Box<DenyEachBinding_OnlyDenySyzkaller_Result> {
     type EncodedOption<'buf> = WireOptionalDenyEachBinding_OnlyDenySyzkaller_Result<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<DenyEachBinding_OnlyDenySyzkaller_Result>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    DenyEachBinding_OnlyDenySyzkaller_Result: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalDenyEachBinding_OnlyDenySyzkaller_Result { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -3823,19 +4366,26 @@ impl WireDenyEachBinding_OnlyDenySyzkaller_Result<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDenyEachBinding_OnlyDenySyzkaller_Result<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireDenyEachBinding_OnlyDenySyzkaller_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenySyzkaller_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
                 crate::WireDenyEachBinding_OnlyDenySyzkaller_Response,
             >(raw, decoder)?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -3905,19 +4455,25 @@ impl<'buf> Default for WireOptionalDenyEachBinding_OnlyDenySyzkaller_Result<'buf
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf>
+unsafe impl<'buf, ___D> ::fidl::Decode<___D>
     for WireOptionalDenyEachBinding_OnlyDenySyzkaller_Result<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    crate::WireDenyEachBinding_OnlyDenySyzkaller_Response: ::fidl::Decode<___D>,
+    ::fidl::u32_le: ::fidl::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl::RawWireUnion::decode_as::<
+                ___D,
                 crate::WireDenyEachBinding_OnlyDenySyzkaller_Response,
             >(raw, decoder)?,
-            2 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            2 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -3938,14 +4494,19 @@ pub struct MemberOnlyAppearsInImportingLibrary {
     pub a: bool,
 }
 
-impl ::fidl::Encode for MemberOnlyAppearsInImportingLibrary {
+impl ::fidl::Encodable for MemberOnlyAppearsInImportingLibrary {
     type Encoded<'buf> = WireMemberOnlyAppearsInImportingLibrary;
+}
 
+impl<___E> ::fidl::Encode<___E> for MemberOnlyAppearsInImportingLibrary
+where
+    bool: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 a,
@@ -3956,16 +4517,22 @@ impl ::fidl::Encode for MemberOnlyAppearsInImportingLibrary {
     }
 }
 
-impl ::fidl::EncodeOption for Box<MemberOnlyAppearsInImportingLibrary> {
+impl ::fidl::EncodableOption for Box<MemberOnlyAppearsInImportingLibrary> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireMemberOnlyAppearsInImportingLibrary>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<MemberOnlyAppearsInImportingLibrary>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    MemberOnlyAppearsInImportingLibrary: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -3989,17 +4556,19 @@ pub struct WireMemberOnlyAppearsInImportingLibrary {
     pub a: bool,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireMemberOnlyAppearsInImportingLibrary {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireMemberOnlyAppearsInImportingLibrary
+where
+    ___D: ?Sized,
+
+    bool: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut a,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
+        ::fidl::Decode::decode(a.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -4009,14 +4578,19 @@ pub struct OnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: crate::MemberOnlyAppearsInImportingLibrary,
 }
 
-impl ::fidl::Encode for OnlyAppearsInImportingLibrary {
+impl ::fidl::Encodable for OnlyAppearsInImportingLibrary {
     type Encoded<'buf> = WireOnlyAppearsInImportingLibrary;
+}
 
+impl<___E> ::fidl::Encode<___E> for OnlyAppearsInImportingLibrary
+where
+    crate::MemberOnlyAppearsInImportingLibrary: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 member_only_appears_in_importing_library,
@@ -4031,16 +4605,22 @@ impl ::fidl::Encode for OnlyAppearsInImportingLibrary {
     }
 }
 
-impl ::fidl::EncodeOption for Box<OnlyAppearsInImportingLibrary> {
+impl ::fidl::EncodableOption for Box<OnlyAppearsInImportingLibrary> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireOnlyAppearsInImportingLibrary>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<OnlyAppearsInImportingLibrary>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    OnlyAppearsInImportingLibrary: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -4066,17 +4646,19 @@ pub struct WireOnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: crate::WireMemberOnlyAppearsInImportingLibrary,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOnlyAppearsInImportingLibrary {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireOnlyAppearsInImportingLibrary
+where
+    ___D: ?Sized,
+
+    crate::WireMemberOnlyAppearsInImportingLibrary: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut member_only_appears_in_importing_library,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(member_only_appears_in_importing_library.as_mut(), decoder)?;
+        ::fidl::Decode::decode(member_only_appears_in_importing_library.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -4087,14 +4669,19 @@ pub enum OnlyDart {
     A = 1,
 }
 
-impl ::fidl::Encode for OnlyDart {
+impl ::fidl::Encodable for OnlyDart {
     type Encoded<'buf> = WireOnlyDart;
+}
 
+impl<___E> ::fidl::Encode<___E> for OnlyDart
+where
+    ___E: ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        _: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOnlyDart { mut value } = slot);
         *value = ::fidl::u32_le::from(match *self {
             OnlyDart::A => 1,
@@ -4129,16 +4716,16 @@ impl WireOnlyDart {
     pub const A: WireOnlyDart = WireOnlyDart { value: ::fidl::u32_le::from_native(1) };
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOnlyDart {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireOnlyDart
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, _: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { value } = slot);
 
         match u32::from(*value) {
             1 => (),
-            unknown => return Err(::fidl::decode::Error::InvalidEnumOrdinal(unknown as usize)),
+            unknown => return Err(::fidl::DecodeError::InvalidEnumOrdinal(unknown as usize)),
         }
 
         Ok(())
@@ -4156,14 +4743,16 @@ impl ::core::convert::From<OnlyDart> for WireOnlyDart {
 #[derive(Clone, Debug)]
 pub struct OnlyGo {}
 
-impl ::fidl::Encode for OnlyGo {
+impl ::fidl::Encodable for OnlyGo {
     type Encoded<'buf> = WireOnlyGo;
+}
 
+impl<___E> ::fidl::Encode<___E> for OnlyGo {
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
             } = slot;
@@ -4173,16 +4762,22 @@ impl ::fidl::Encode for OnlyGo {
     }
 }
 
-impl ::fidl::EncodeOption for Box<OnlyGo> {
+impl ::fidl::EncodableOption for Box<OnlyGo> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireOnlyGo>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<OnlyGo>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    OnlyGo: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -4202,11 +4797,11 @@ impl ::fidl::TakeFrom<WireOnlyGo> for OnlyGo {
 #[repr(C)]
 pub struct WireOnlyGo {}
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOnlyGo {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireOnlyGo
+where
+    ___D: ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
             } = slot;
@@ -4222,37 +4817,50 @@ pub enum OnlyLlcpp {
     X(u32),
 }
 
-impl ::fidl::Encode for OnlyLlcpp {
+impl ::fidl::Encodable for OnlyLlcpp {
     type Encoded<'buf> = WireOnlyLlcpp<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for OnlyLlcpp
+where
+    ___E: ::fidl::Encoder + ?Sized,
+
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOnlyLlcpp { raw } = slot);
 
         match self {
-            Self::X(value) => ::fidl::RawWireUnion::encode_as::<u32>(value, 1, encoder, raw)?,
+            Self::X(value) => ::fidl::RawWireUnion::encode_as::<___E, u32>(value, 1, encoder, raw)?,
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::encode::EncodeOption for Box<OnlyLlcpp> {
+impl ::fidl::EncodableOption for Box<OnlyLlcpp> {
     type EncodedOption<'buf> = WireOptionalOnlyLlcpp<'buf>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<OnlyLlcpp>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    OnlyLlcpp: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOptionalOnlyLlcpp { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl::encode::Encode::encode(&mut **inner, encoder, slot)?;
+            ::fidl::Encode::encode(&mut **inner, encoder, slot)?;
         } else {
             ::fidl::RawWireUnion::encode_absent(raw);
         }
@@ -4312,16 +4920,21 @@ impl WireOnlyLlcpp<'_> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOnlyLlcpp<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOnlyLlcpp<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(ord as usize)),
+            ord => return Err(fidl::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
 
         Ok(())
@@ -4385,14 +4998,19 @@ impl<'buf> Default for WireOptionalOnlyLlcpp<'buf> {
     }
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptionalOnlyLlcpp<'buf> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOptionalOnlyLlcpp<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
     fn decode(
         mut slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl::RawWireUnion::decode_as::<::fidl::u32_le>(raw, decoder)?,
+            1 => ::fidl::RawWireUnion::decode_as::<___D, ::fidl::u32_le>(raw, decoder)?,
 
             0 => ::fidl::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -4417,20 +5035,26 @@ impl OnlyRust {
     }
 }
 
-impl ::fidl::Encode for OnlyRust {
+impl ::fidl::Encodable for OnlyRust {
     type Encoded<'buf> = WireOnlyRust<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for OnlyRust
+where
+    ___E: ::fidl::Encoder + ?Sized,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge!(let WireOnlyRust { table } = slot);
 
         let max_ord = self.__max_ordinal();
 
         let mut backing = ::core::mem::MaybeUninit::<::fidl::WireEnvelope<'_>>::uninit();
-        let mut preallocated = encoder.preallocate::<::fidl::WireEnvelope<'_>>(max_ord);
+        let mut preallocated =
+            ::fidl::EncoderExt::preallocate::<::fidl::WireEnvelope<'_>>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl::Slot::new(&mut backing);
@@ -4457,11 +5081,11 @@ pub struct WireOnlyRust<'buf> {
     table: ::fidl::WireTable<'buf>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOnlyRust<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireOnlyRust<'buf>
+where
+    ___D: ::fidl::Decoder<'buf> + ?Sized,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge!(let Self { table } = slot);
 
         ::fidl::WireTable::decode_with(table, decoder, |ordinal, mut slot, decoder| match ordinal {

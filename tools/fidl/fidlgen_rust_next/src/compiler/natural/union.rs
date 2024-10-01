@@ -14,7 +14,7 @@ pub fn emit_union<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let u = &compiler.library.union_declarations[ident];
+    let u = &compiler.schema.union_declarations[ident];
 
     let name = &u.name.type_name();
 
@@ -53,14 +53,30 @@ pub fn emit_union<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::Encode for {name} {{
+        impl ::fidl::Encodable for {name} {{
             type Encoded<'buf> = Wire{name}<'buf>;
+        }}
 
+        impl<___E> ::fidl::Encode<___E> for {name}
+        where
+            ___E: ::fidl::Encoder + ?Sized,
+        "#,
+    )?;
+
+    for member in &u.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl::Encode<___E>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn encode(
                 &mut self,
-                encoder: &mut ::fidl::encode::Encoder,
+                encoder: &mut ___E,
                 slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+            ) -> Result<(), ::fidl::EncodeError> {{
                 ::fidl::munge!(let Wire{name} {{ raw }} = slot);
 
                 match self {{
@@ -71,7 +87,7 @@ pub fn emit_union<W: Write>(
         let member_name = snake_to_camel(&member.name);
         let ord = member.ordinal;
 
-        writeln!(out, "Self::{member_name}(value) => ::fidl::RawWireUnion::encode_as::<",)?;
+        writeln!(out, "Self::{member_name}(value) => ::fidl::RawWireUnion::encode_as::<___E, ",)?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(out, ">(value, {ord}, encoder, raw)?,")?;
     }
@@ -81,7 +97,7 @@ pub fn emit_union<W: Write>(
             out,
             r#"
             Self::Unknown(ordinal) => return Err(
-                ::fidl::encode::Error::UnknownUnionOrdinal(
+                ::fidl::EncodeError::UnknownUnionOrdinal(
                     *ordinal as usize
                 )
             ),
@@ -98,21 +114,27 @@ pub fn emit_union<W: Write>(
             }}
         }}
 
-        impl ::fidl::encode::EncodeOption for Box<{name}> {{
+        impl ::fidl::EncodableOption for Box<{name}> {{
             type EncodedOption<'buf> = WireOptional{name}<'buf>;
+        }}
 
+        impl<___E> ::fidl::EncodeOption<___E> for Box<{name}>
+        where
+            ___E: ::fidl::Encoder + ?Sized,
+            {name}: ::fidl::Encode<___E>,
+        {{
             fn encode_option(
                 this: Option<&mut Self>,
-                encoder: &mut ::fidl::encode::Encoder,
+                encoder: &mut ___E,
                 mut slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+            ) -> Result<(), ::fidl::EncodeError> {{
                 ::fidl::munge!(let WireOptional{name} {{ raw }} = slot.as_mut());
 
                 if let Some(inner) = this {{
                     let slot = unsafe {{
                         ::fidl::Slot::new_unchecked(slot.as_mut_ptr().cast())
                     }};
-                    ::fidl::encode::Encode::encode(
+                    ::fidl::Encode::encode(
                         &mut **inner,
                         encoder,
                         slot,

@@ -5,5 +5,5 @@
 mod optional;
 mod required;
 
-pub use self::optional::WireOptionalString;
-pub use self::required::WireString;
+pub use self::optional::*;
+pub use self::required::*;

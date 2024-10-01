@@ -14,14 +14,19 @@ pub struct Payload {
     pub value: u32,
 }
 
-impl ::fidl::Encode for Payload {
+impl ::fidl::Encodable for Payload {
     type Encoded<'buf> = WirePayload;
+}
 
+impl<___E> ::fidl::Encode<___E> for Payload
+where
+    u32: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 value,
@@ -32,16 +37,22 @@ impl ::fidl::Encode for Payload {
     }
 }
 
-impl ::fidl::EncodeOption for Box<Payload> {
+impl ::fidl::EncodableOption for Box<Payload> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePayload>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<Payload>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    Payload: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -63,17 +74,19 @@ pub struct WirePayload {
     pub value: ::fidl::u32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePayload {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WirePayload
+where
+    ___D: ?Sized,
+
+    ::fidl::u32_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut value,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(value.as_mut(), decoder)?;
+        ::fidl::Decode::decode(value.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -83,14 +96,19 @@ pub struct OneWaySendRequest {
     pub payload: crate::Payload,
 }
 
-impl ::fidl::Encode for OneWaySendRequest {
+impl ::fidl::Encodable for OneWaySendRequest {
     type Encoded<'buf> = WireOneWaySendRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for OneWaySendRequest
+where
+    crate::Payload: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 payload,
@@ -101,16 +119,22 @@ impl ::fidl::Encode for OneWaySendRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<OneWaySendRequest> {
+impl ::fidl::EncodableOption for Box<OneWaySendRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireOneWaySendRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<OneWaySendRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    OneWaySendRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -132,17 +156,19 @@ pub struct WireOneWaySendRequest {
     pub payload: crate::WirePayload,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireOneWaySendRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireOneWaySendRequest
+where
+    ___D: ?Sized,
+
+    crate::WirePayload: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut payload,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(payload.as_mut(), decoder)?;
+        ::fidl::Decode::decode(payload.as_mut(), decoder)?;
         Ok(())
     }
 }

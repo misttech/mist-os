@@ -7,9 +7,10 @@ use core::ptr::NonNull;
 
 use munge::munge;
 
-use crate::encode::{self, EncodeOption};
-use crate::wire::WirePointer;
-use crate::{decode, Decode, Encode, Slot, TakeFrom};
+use crate::{
+    decode, encode, Decode, Decoder, DecoderExt as _, Encodable, Encode, Slot, TakeFrom,
+    WirePointer,
+};
 
 /// A boxed (optional) FIDL value.
 #[repr(C)]
@@ -73,11 +74,8 @@ impl<T: fmt::Debug> fmt::Debug for WireBox<'_, T> {
     }
 }
 
-unsafe impl<'buf, T: Decode<'buf>> Decode<'buf> for WireBox<'buf, T> {
-    fn decode(
-        slot: Slot<'_, Self>,
-        decoder: &mut decode::Decoder<'buf>,
-    ) -> Result<(), decode::Error> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireBox<'buf, T> {
+    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
         munge!(let Self { mut ptr } = slot);
 
         if WirePointer::is_encoded_present(ptr.as_mut())? {
@@ -89,14 +87,16 @@ unsafe impl<'buf, T: Decode<'buf>> Decode<'buf> for WireBox<'buf, T> {
     }
 }
 
-impl<T: EncodeOption> Encode for Option<T> {
+impl<T: encode::EncodableOption> Encodable for Option<T> {
     type Encoded<'buf> = T::EncodedOption<'buf>;
+}
 
+impl<E: ?Sized, T: encode::EncodeOption<E>> Encode<E> for Option<T> {
     fn encode(
         &mut self,
-        encoder: &mut encode::Encoder,
+        encoder: &mut E,
         slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), encode::Error> {
+    ) -> Result<(), encode::EncodeError> {
         T::encode_option(self.as_mut(), encoder, slot)
     }
 }

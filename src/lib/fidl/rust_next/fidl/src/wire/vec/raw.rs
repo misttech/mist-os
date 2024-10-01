@@ -6,13 +6,20 @@ use core::ptr::slice_from_raw_parts_mut;
 
 use munge::munge;
 
-use crate::decode::{Decoder, Error, Owned};
-use crate::{u64_le, Decode, Slot, WirePointer};
+use crate::{u64_le, Decode, DecodeError, Decoder, DecoderExt, Owned, Slot, WirePointer};
 
 #[repr(C)]
 pub struct RawWireVector<'buf, T> {
     len: u64_le,
     ptr: WirePointer<'buf, T>,
+}
+
+impl<'buf, T> Drop for RawWireVector<'buf, T> {
+    fn drop(&mut self) {
+        unsafe {
+            self.as_slice_ptr().drop_in_place();
+        }
+    }
 }
 
 impl<'buf, T> RawWireVector<'buf, T> {
@@ -49,8 +56,8 @@ impl<'buf, T> RawWireVector<'buf, T> {
     }
 }
 
-unsafe impl<'buf, T: Decode<'buf>> Decode<'buf> for RawWireVector<'buf, T> {
-    fn decode(slot: Slot<'_, Self>, decoder: &mut Decoder<'buf>) -> Result<(), Error> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<'buf, T> {
+    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);
 
         let len = len.to_native();

@@ -4,9 +4,9 @@
 
 use munge::munge;
 
-use crate::decode::{Decoder, Error, Owned};
-use crate::wire::{WireEnvelope, WirePointer};
-use crate::{u64_le, Slot};
+use crate::{
+    u64_le, DecodeError, Decoder, DecoderExt as _, Owned, Slot, WireEnvelope, WirePointer,
+};
 
 /// A FIDL table
 #[repr(C)]
@@ -26,11 +26,11 @@ impl<'buf> WireTable<'buf> {
     /// Decodes the fields of the table with a decoding function.
     ///
     /// The decoding function receives the ordinal of the field, its slot, and the decoder.
-    pub fn decode_with(
+    pub fn decode_with<D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
-        decoder: &mut Decoder<'buf>,
-        f: impl Fn(i64, Slot<'_, WireEnvelope<'buf>>, &mut Decoder<'buf>) -> Result<(), Error>,
-    ) -> Result<(), Error> {
+        decoder: &mut D,
+        f: impl Fn(i64, Slot<'_, WireEnvelope<'buf>>, &mut D) -> Result<(), DecodeError>,
+    ) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);
 
         let len = len.to_native();
@@ -48,7 +48,7 @@ impl<'buf> WireTable<'buf> {
             let envelopes = unsafe { Owned::new_unchecked(envelopes_ptr) };
             WirePointer::set_decoded(ptr, envelopes);
         } else if len != 0 {
-            return Err(Error::InvalidOptionalSize(len));
+            return Err(DecodeError::InvalidOptionalSize(len));
         }
 
         Ok(())

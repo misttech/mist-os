@@ -6,5 +6,5 @@ mod optional;
 mod raw;
 mod required;
 
-pub use self::optional::WireOptionalVector;
-pub use self::required::WireVector;
+pub use self::optional::*;
+pub use self::required::*;

@@ -8,12 +8,10 @@ use core::mem::forget;
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 
-use crate::Chunk;
-
 /// An owned value in borrowed backing memory.
 pub struct Owned<'buf, T: ?Sized> {
     ptr: NonNull<T>,
-    _phantom: PhantomData<&'buf mut [Chunk]>,
+    _phantom: PhantomData<&'buf mut [u8]>,
 }
 
 impl<T: ?Sized> Drop for Owned<'_, T> {

@@ -14,7 +14,7 @@ pub fn emit_prefixed_comp_ident<W: Write>(
     prefix: &str,
 ) -> Result<(), Error> {
     let (lib, ty) = ident.split();
-    if lib == compiler.library.name {
+    if lib == compiler.schema.name {
         write!(out, "crate::{prefix}{ty}")?;
     } else {
         let escaped = lib.replace(".", "_");
@@ -37,7 +37,7 @@ pub fn emit_wire_comp_ident<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    match compiler.library.declarations[ident] {
+    match compiler.schema.declarations[ident] {
         DeclType::Enum | DeclType::Struct | DeclType::Table | DeclType::Union => {
             emit_prefixed_comp_ident(compiler, out, ident, "Wire")
         }

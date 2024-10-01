@@ -15,14 +15,20 @@ pub struct ExampleUseOfVectors {
     pub vector_of_vector_of_bool: Vec<Vec<bool>>,
 }
 
-impl ::fidl::Encode for ExampleUseOfVectors {
+impl ::fidl::Encodable for ExampleUseOfVectors {
     type Encoded<'buf> = WireExampleUseOfVectors<'buf>;
+}
 
+impl<___E> ::fidl::Encode<___E> for ExampleUseOfVectors
+where
+    Vec<u8>: ::fidl::Encode<___E>,
+    Vec<Vec<bool>>: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 vector_of_uint8,
@@ -39,16 +45,22 @@ impl ::fidl::Encode for ExampleUseOfVectors {
     }
 }
 
-impl ::fidl::EncodeOption for Box<ExampleUseOfVectors> {
+impl ::fidl::EncodableOption for Box<ExampleUseOfVectors> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireExampleUseOfVectors<'buf>>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<ExampleUseOfVectors>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    ExampleUseOfVectors: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -76,19 +88,22 @@ pub struct WireExampleUseOfVectors<'buf> {
     pub vector_of_vector_of_bool: ::fidl::WireVector<'buf, ::fidl::WireVector<'buf, bool>>,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireExampleUseOfVectors<'buf> {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<'buf, ___D> ::fidl::Decode<___D> for WireExampleUseOfVectors<'buf>
+where
+    ___D: ?Sized,
+
+    ::fidl::WireVector<'buf, u8>: ::fidl::Decode<___D>,
+    ::fidl::WireVector<'buf, ::fidl::WireVector<'buf, bool>>: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut vector_of_uint8,
                 mut vector_of_vector_of_bool,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(vector_of_uint8.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(vector_of_vector_of_bool.as_mut(), decoder)?;
+        ::fidl::Decode::decode(vector_of_uint8.as_mut(), decoder)?;
+        ::fidl::Decode::decode(vector_of_vector_of_bool.as_mut(), decoder)?;
         Ok(())
     }
 }

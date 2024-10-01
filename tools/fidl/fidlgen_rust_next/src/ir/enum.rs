@@ -30,7 +30,7 @@ impl Index for Enum {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnumMember {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     #[serde(flatten)]
     pub attributes: Attributes,
     pub name: String,

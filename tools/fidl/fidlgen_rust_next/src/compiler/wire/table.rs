@@ -14,7 +14,7 @@ pub fn emit_table<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let t = &compiler.library.table_declarations[ident];
+    let t = &compiler.schema.table_declarations[ident];
 
     let name = t.name.type_name();
 
@@ -36,11 +36,25 @@ pub fn emit_table<W: Write>(
     writeln!(
         out,
         r#"
-        unsafe impl<'buf> ::fidl::Decode<'buf> for Wire{name}<'buf> {{
+        unsafe impl<'buf, ___D> ::fidl::Decode<___D> for Wire{name}<'buf>
+        where
+            ___D: ::fidl::Decoder<'buf> + ?Sized,
+        "#,
+    )?;
+
+    for member in &t.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl::Decode<___D>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn decode(
                 slot: ::fidl::Slot<'_, Self>,
-                decoder: &mut ::fidl::decode::Decoder<'buf>,
-            ) -> Result<(), ::fidl::decode::Error> {{
+                decoder: &mut ___D,
+            ) -> Result<(), ::fidl::DecodeError> {{
                 ::fidl::munge!(let Self {{ table }} = slot);
 
                 ::fidl::WireTable::decode_with(
@@ -58,7 +72,7 @@ pub fn emit_table<W: Write>(
             out,
             r#"
             {ord} => {{
-                ::fidl::WireEnvelope::decode_as::<
+                ::fidl::WireEnvelope::decode_as::<___D, 
             "#,
         )?;
         emit_type(compiler, out, &member.ty)?;
@@ -77,7 +91,7 @@ pub fn emit_table<W: Write>(
                 writeln!(out, ">() }};")
             },
             &member.name,
-            &member.ty.kind,
+            &member.ty,
         )?;
         writeln!(
             out,

@@ -15,14 +15,20 @@ pub struct TwoWayAddRequest {
     pub addend2: u16,
 }
 
-impl ::fidl::Encode for TwoWayAddRequest {
+impl ::fidl::Encodable for TwoWayAddRequest {
     type Encoded<'buf> = WireTwoWayAddRequest;
+}
 
+impl<___E> ::fidl::Encode<___E> for TwoWayAddRequest
+where
+    u16: ::fidl::Encode<___E>,
+    u16: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 addend1,
@@ -35,16 +41,22 @@ impl ::fidl::Encode for TwoWayAddRequest {
     }
 }
 
-impl ::fidl::EncodeOption for Box<TwoWayAddRequest> {
+impl ::fidl::EncodableOption for Box<TwoWayAddRequest> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireTwoWayAddRequest>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<TwoWayAddRequest>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    TwoWayAddRequest: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -70,19 +82,22 @@ pub struct WireTwoWayAddRequest {
     pub addend2: ::fidl::u16_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireTwoWayAddRequest {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireTwoWayAddRequest
+where
+    ___D: ?Sized,
+
+    ::fidl::u16_le: ::fidl::Decode<___D>,
+    ::fidl::u16_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut addend1,
                 mut addend2,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(addend1.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(addend2.as_mut(), decoder)?;
+        ::fidl::Decode::decode(addend1.as_mut(), decoder)?;
+        ::fidl::Decode::decode(addend2.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -92,14 +107,19 @@ pub struct TwoWayAddResponse {
     pub sum: u16,
 }
 
-impl ::fidl::Encode for TwoWayAddResponse {
+impl ::fidl::Encodable for TwoWayAddResponse {
     type Encoded<'buf> = WireTwoWayAddResponse;
+}
 
+impl<___E> ::fidl::Encode<___E> for TwoWayAddResponse
+where
+    u16: ::fidl::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         ::fidl::munge! {
             let Self::Encoded {
                 sum,
@@ -110,16 +130,22 @@ impl ::fidl::Encode for TwoWayAddResponse {
     }
 }
 
-impl ::fidl::EncodeOption for Box<TwoWayAddResponse> {
+impl ::fidl::EncodableOption for Box<TwoWayAddResponse> {
     type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireTwoWayAddResponse>;
+}
 
+impl<___E> ::fidl::EncodeOption<___E> for Box<TwoWayAddResponse>
+where
+    ___E: ::fidl::Encoder + ?Sized,
+    TwoWayAddResponse: ::fidl::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
+        encoder: &mut ___E,
         slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+    ) -> Result<(), ::fidl::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
+            ::fidl::EncoderExt::encode(encoder, inner)?;
             ::fidl::WireBox::encode_present(slot);
         } else {
             ::fidl::WireBox::encode_absent(slot);
@@ -141,17 +167,19 @@ pub struct WireTwoWayAddResponse {
     pub sum: ::fidl::u16_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireTwoWayAddResponse {
-    fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
+unsafe impl<___D> ::fidl::Decode<___D> for WireTwoWayAddResponse
+where
+    ___D: ?Sized,
+
+    ::fidl::u16_le: ::fidl::Decode<___D>,
+{
+    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
         ::fidl::munge! {
             let Self {
                 mut sum,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(sum.as_mut(), decoder)?;
+        ::fidl::Decode::decode(sum.as_mut(), decoder)?;
         Ok(())
     }
 }

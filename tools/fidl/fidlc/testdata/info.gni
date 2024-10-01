@@ -190,6 +190,10 @@ fidl_testdata_info = [
   {
     name = "encapsulated_structs"
     target = "//tools/fidl/fidlc/testdata:test.encapsulatedstructs"
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "enum"
@@ -260,6 +264,10 @@ fidl_testdata_info = [
   {
     name = "handles_in_types"
     target = "//tools/fidl/fidlc/testdata:test.handlesintypes"
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "imported_const_values"

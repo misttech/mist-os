@@ -7,14 +7,8 @@ use serde::Deserialize;
 use crate::ir::{CompIdent, HandleRights, HandleSubtype, ObjectType, PrimSubtype};
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct Type {
-    #[serde(flatten)]
-    pub kind: TypeKind,
-}
-
-#[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum TypeKind {
+pub enum Type {
     Array {
         element_type: Box<Type>,
         element_count: u32,
@@ -32,21 +26,20 @@ pub enum TypeKind {
     },
     Handle {
         nullable: bool,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         obj_type: ObjectType,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         rights: HandleRights,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         subtype: HandleSubtype,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         resource_identifier: String,
     },
     Request {
-        #[allow(dead_code)]
         nullable: bool,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         subtype: CompIdent,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         protocol_transport: String,
     },
     Primitive {
@@ -55,8 +48,17 @@ pub enum TypeKind {
     Identifier {
         identifier: CompIdent,
         nullable: bool,
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         #[serde(default)]
         protocol_transport: String,
     },
+    Internal {
+        subtype: InternalSubtype,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InternalSubtype {
+    FrameworkError,
 }
