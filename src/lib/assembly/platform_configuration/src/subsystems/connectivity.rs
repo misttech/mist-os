@@ -147,7 +147,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     builder.platform_bundle("netstack3");
                     builder.platform_bundle(maybe_gub_bundle("netstack3_packages").as_ref());
                 }
-                (false, NetstackVersion::Netstack2) => builder.platform_bundle("netstack2"),
+                (false, NetstackVersion::Netstack2) => {
+                    if connectivity_config.network.netstack_thread_count.is_some() {
+                        anyhow::bail!("netstack_thread_count only affects Netstack3, but Netstack2 was selected");
+                    }
+
+                    builder.platform_bundle("netstack2");
+                }
                 (false, NetstackVersion::NetstackMigration) => {
                     builder.platform_bundle("netstack_migration");
                     builder
@@ -166,7 +172,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 builder
                     .package(package)
                     .component(component)?
-                    .field("num_threads", connectivity_config.network.netstack_thread_count.get())?
+                    .field(
+                        "num_threads",
+                        connectivity_config.network.netstack_thread_count.unwrap_or_default().get(),
+                    )?
                     .field("debug_logs", false)?
                     // Routed from fuchsia.power.SuspendEnabled capability.
                     //
