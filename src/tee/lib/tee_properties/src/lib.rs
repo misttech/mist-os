@@ -2,16 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow as _;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use indexmap::IndexMap;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::path::Path;
-use tee_internal::binding::{TEE_Identity, TEE_UUID};
+use tee_internal::binding::{
+    TEE_Identity, TEE_LOGIN_APPLICATION, TEE_LOGIN_APPLICATION_GROUP, TEE_LOGIN_APPLICATION_USER,
+    TEE_LOGIN_GROUP, TEE_LOGIN_PUBLIC, TEE_LOGIN_TRUSTED_APP, TEE_LOGIN_USER, TEE_UUID,
+};
 use thiserror::Error;
-use uuid::Uuid;
+
+const EMPTY_UUID: TEE_UUID =
+    TEE_UUID { timeLow: 0, timeMid: 0, timeHiAndVersion: 0, clockSeqAndNode: [0; 8] };
 
 // Maps to GlobalPlatform TEE Internal Core API Section 4.4: Property Access Functions
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -37,6 +43,18 @@ pub enum PropertyError {
     Generic { msg: String },
 }
 
+#[repr(u32)]
+#[derive(FromPrimitive)]
+enum Login {
+    Public = TEE_LOGIN_PUBLIC,
+    User = TEE_LOGIN_USER,
+    Group = TEE_LOGIN_GROUP,
+    Application = TEE_LOGIN_APPLICATION,
+    ApplicationUser = TEE_LOGIN_APPLICATION_USER,
+    ApplicationGroup = TEE_LOGIN_APPLICATION_GROUP,
+    TrustedApp = TEE_LOGIN_TRUSTED_APP,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TeeProperty {
     name: String,
@@ -45,42 +63,6 @@ pub struct TeeProperty {
 }
 
 pub type TeeProperties = Vec<TeeProperty>;
-
-// Maps to GlobalPlatform TEE Internal Core API Section 4.2.2: Login Types
-#[derive(Debug, Deserialize, Serialize)]
-pub enum LoginType {
-    // Client
-    PublicTeecLoginPublic,
-    UserTeecLoginUser,
-    GroupTeecLoginGroup,
-    ApplicationTeecLoginApplication,
-    ApplicationUserTeecLoginApplicationUser,
-    ApplicationGroup,
-    // TA
-    TrustedApp,
-}
-
-impl LoginType {
-    fn to_u32(&self) -> u32 {
-        match self {
-            LoginType::PublicTeecLoginPublic => 0x00000000,
-            LoginType::UserTeecLoginUser => 0x00000001,
-            LoginType::GroupTeecLoginGroup => 0x00000002,
-            LoginType::ApplicationTeecLoginApplication => 0x00000004,
-            LoginType::ApplicationUserTeecLoginApplicationUser => 0x00000005,
-            LoginType::ApplicationGroup => 0x00000006,
-            LoginType::TrustedApp => 0xF0000000,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TeeIdentity {
-    login_type: LoginType,
-    // This assumes the UUID is serialized in standard string format rather than the TEE_UUID struct
-    // e.g. 5b9e0e40-2636-11e1-ad9e-0002a5d5c51b. An extra parsing step will be required.
-    uuid: String,
-}
 
 // Maps to GlobalPlatform TEE Internal Core API Section 4.2.4: Property Set Pseudo-Handles
 // TeePropSetTeeImplementation = 0xFFFFFFFD,
@@ -279,6 +261,8 @@ fn parse_bool(value: String) -> Result<bool, PropertyError> {
     }
 }
 
+// TODO(https://fxbug.dev/369916290): Support the full list of integer value encodings (See 4.4 in
+// the spec).
 fn parse_uint32(value: String) -> Result<u32, PropertyError> {
     match value.parse::<u32>() {
         Ok(val) => Ok(val),
@@ -286,6 +270,8 @@ fn parse_uint32(value: String) -> Result<u32, PropertyError> {
     }
 }
 
+// TODO(https://fxbug.dev/369916290): Support the full list of integer value encodings (See 4.4 in
+// the spec).
 fn parse_uint64(value: String) -> Result<u64, PropertyError> {
     match value.parse::<u64>() {
         Ok(val) => Ok(val),
@@ -302,7 +288,7 @@ fn parse_binary_block(value: String) -> Result<Vec<u8>, PropertyError> {
 }
 
 fn parse_uuid(value: String) -> Result<TEE_UUID, PropertyError> {
-    match Uuid::parse_str(&value) {
+    match uuid::Uuid::parse_str(&value) {
         Ok(uuid) => {
             let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) = uuid.as_fields();
             Ok(TEE_UUID {
@@ -317,20 +303,25 @@ fn parse_uuid(value: String) -> Result<TEE_UUID, PropertyError> {
 }
 
 fn parse_identity(value: String) -> Result<TEE_Identity, PropertyError> {
-    let res: Result<TeeIdentity, serde_json5::Error> = serde_json5::from_str(&value);
-    match res {
-        Ok(identity) => {
-            let tee_uuid = parse_uuid(identity.uuid)?;
-            Ok(TEE_Identity { login: identity.login_type.to_u32(), uuid: tee_uuid })
-        }
-        Err(_) => Err(PropertyError::BadFormat { prop_type: PropType::Identity, value }),
-    }
+    // Encoded as `integer (':' uuid)?`.
+    let (login_str, uuid) = match value.split_once(':') {
+        Some((login_str, uuid_str)) => (login_str, parse_uuid(uuid_str.to_string())?),
+        None => (value.as_str(), EMPTY_UUID),
+    };
+    let login_val = match login_str.parse::<u32>() {
+        Ok(val) => val,
+        Err(_) => return Err(PropertyError::BadFormat { prop_type: PropType::Identity, value }),
+    };
+    let _ = Login::from_u32(login_val)
+        .ok_or(PropertyError::BadFormat { prop_type: PropType::Identity, value })?;
+    Ok(TEE_Identity { login: login_val, uuid })
 }
 
 // TODO(b/366015756): Parsing logic should be fuzzed for production-hardening.
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use tee_internal::binding::TEE_LOGIN_TRUSTED_APP;
 
     const TEST_PROP_NAME_STRING: &str = "gpd.tee.test.string";
     const TEST_PROP_NAME_BOOL: &str = "gpd.tee.test.bool";
@@ -345,16 +336,19 @@ pub mod tests {
     const TEST_PROP_VAL_U32: &str = "57";
     const TEST_PROP_VAL_U64: &str = "4294967296"; // U32::MAX + 1
     const TEST_PROP_VAL_BINARY_BLOCK: &str = "ZnVjaHNpYQ=="; // base64 encoding of "fuchsia"
+
     const TEST_PROP_VAL_UUID: &str = "5b9e0e40-2636-11e1-ad9e-0002a5d5c51b"; // OS Test TA UUID
+    const TEST_PROP_UUID: TEE_UUID = TEE_UUID {
+        timeLow: 0x5b9e0e40,
+        timeMid: 0x2636,
+        timeHiAndVersion: 0x11e1,
+        clockSeqAndNode: [0xad, 0x9e, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b],
+    };
 
-    fn create_test_tee_identity() -> TeeIdentity {
-        TeeIdentity { login_type: LoginType::TrustedApp, uuid: TEST_PROP_VAL_UUID.to_string() }
-    }
-
-    fn create_test_tee_identity_string() -> String {
-        let identity = create_test_tee_identity();
-        serde_json5::to_string(&identity).expect("serializing json")
-    }
+    // TODO(https://fxbug.dev/369916290): Spell as 0xf0000000 when hex encodings are supported.
+    const TEST_PROP_VAL_IDENTITY: &str = "4026531840:5b9e0e40-2636-11e1-ad9e-0002a5d5c51b";
+    const TEST_PROP_IDENTITY: TEE_Identity =
+        TEE_Identity { login: TEE_LOGIN_TRUSTED_APP, uuid: TEST_PROP_UUID };
 
     fn create_test_prop_map() -> PropertiesMap {
         let mut props: IndexMap<String, (PropType, String)> = IndexMap::new();
@@ -384,7 +378,7 @@ pub mod tests {
         );
         props.insert(
             TEST_PROP_NAME_IDENTITY.to_string(),
-            (PropType::Identity, create_test_tee_identity_string()),
+            (PropType::Identity, TEST_PROP_VAL_IDENTITY.to_string()),
         );
         props
     }
@@ -519,14 +513,10 @@ pub mod tests {
         assert_eq!(PropType::Uuid, prop_type);
 
         let prop_val: TEE_UUID = enumerator.get_property_as_uuid().expect("getting prop as uuid");
-        let uuid_expected =
-            Uuid::parse_str("5b9e0e40-2636-11e1-ad9e-0002a5d5c51b").expect("parsing uuid str");
-        let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) =
-            uuid_expected.as_fields();
-        assert_eq!(time_low, prop_val.timeLow);
-        assert_eq!(time_mid, prop_val.timeMid);
-        assert_eq!(time_hi_and_version, prop_val.timeHiAndVersion);
-        assert_eq!(*clock_seq_and_node, prop_val.clockSeqAndNode);
+        assert_eq!(TEST_PROP_UUID.timeLow, prop_val.timeLow);
+        assert_eq!(TEST_PROP_UUID.timeMid, prop_val.timeMid);
+        assert_eq!(TEST_PROP_UUID.timeHiAndVersion, prop_val.timeHiAndVersion);
+        assert_eq!(TEST_PROP_UUID.clockSeqAndNode, prop_val.clockSeqAndNode);
 
         // Identity.
         enumerator.next().expect("moving enumerator to next prop");
@@ -539,13 +529,12 @@ pub mod tests {
 
         let prop_val: TEE_Identity =
             enumerator.get_property_as_identity().expect("getting prop as identity");
-        let identity_expected = create_test_tee_identity();
-        assert_eq!(identity_expected.login_type.to_u32(), prop_val.login);
+        assert_eq!(TEST_PROP_IDENTITY.login, prop_val.login);
         // This should have the same test UUID; can reuse parsed expected uuid fields.
-        assert_eq!(time_low, prop_val.uuid.timeLow);
-        assert_eq!(time_mid, prop_val.uuid.timeMid);
-        assert_eq!(time_hi_and_version, prop_val.uuid.timeHiAndVersion);
-        assert_eq!(*clock_seq_and_node, prop_val.uuid.clockSeqAndNode);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.timeLow, prop_val.uuid.timeLow);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.timeMid, prop_val.uuid.timeMid);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.timeHiAndVersion, prop_val.uuid.timeHiAndVersion);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.clockSeqAndNode, prop_val.uuid.clockSeqAndNode);
 
         // Test error upon going out of bounds and attempting to query next property.
         enumerator.next().expect("moving enumerator to next prop");
@@ -744,13 +733,10 @@ pub mod tests {
             .get_uuid_property(TEST_PROP_NAME_UUID.to_string())
             .expect("getting uuid prop val");
 
-        let uuid_expected = Uuid::parse_str(TEST_PROP_VAL_UUID).expect("parsing uuid str");
-        let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) =
-            uuid_expected.as_fields();
-        assert_eq!(time_low, val.timeLow);
-        assert_eq!(time_mid, val.timeMid);
-        assert_eq!(time_hi_and_version, val.timeHiAndVersion);
-        assert_eq!(*clock_seq_and_node, val.clockSeqAndNode);
+        assert_eq!(TEST_PROP_UUID.timeLow, val.timeLow);
+        assert_eq!(TEST_PROP_UUID.timeMid, val.timeMid);
+        assert_eq!(TEST_PROP_UUID.timeHiAndVersion, val.timeHiAndVersion);
+        assert_eq!(TEST_PROP_UUID.clockSeqAndNode, val.clockSeqAndNode);
     }
 
     #[test]
@@ -772,15 +758,11 @@ pub mod tests {
             .get_identity_property(TEST_PROP_NAME_IDENTITY.to_string())
             .expect("getting identity prop val");
 
-        assert_eq!(LoginType::TrustedApp.to_u32(), val.login);
-
-        let uuid_expected = Uuid::parse_str(TEST_PROP_VAL_UUID).expect("parsing uuid str");
-        let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) =
-            uuid_expected.as_fields();
-        assert_eq!(time_low, val.uuid.timeLow);
-        assert_eq!(time_mid, val.uuid.timeMid);
-        assert_eq!(time_hi_and_version, val.uuid.timeHiAndVersion);
-        assert_eq!(*clock_seq_and_node, val.uuid.clockSeqAndNode);
+        assert_eq!(TEST_PROP_IDENTITY.login, val.login);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.timeLow, val.uuid.timeLow);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.timeMid, val.uuid.timeMid);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.timeHiAndVersion, val.uuid.timeHiAndVersion);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.clockSeqAndNode, val.uuid.clockSeqAndNode);
     }
 
     #[test]
@@ -1022,34 +1004,25 @@ pub mod tests {
 
     #[test]
     pub fn test_parse_identity_success() {
-        let valid_uuid = "5b9e0e40-2636-11e1-ad9e-0002a5d5c51b".to_string();
-        let identity = TeeIdentity { login_type: LoginType::TrustedApp, uuid: valid_uuid };
-        let json = serde_json5::to_string(&identity).expect("serializing json");
-
-        let res = parse_identity(json);
-
+        let res = parse_identity(TEST_PROP_VAL_IDENTITY.to_string());
         assert!(res.is_ok());
     }
 
     #[test]
     pub fn test_parse_identity_empty_uuid() {
-        let identity = TeeIdentity { login_type: LoginType::TrustedApp, uuid: "".to_string() };
-        let json = serde_json5::to_string(&identity).expect("serializing json");
-
-        let res = parse_identity(json);
-
-        match res.err() {
-            Some(PropertyError::BadFormat { .. }) => (),
-            _ => assert!(false, "Unexpected error type"),
-        }
+        // TODO(https://fxbug.dev/369916290): Spell as 0xf0000000 when hex encodings are supported.
+        let res = parse_identity("4026531840".to_string());
+        assert!(res.is_ok());
+        let id = res.unwrap();
+        assert_eq!(EMPTY_UUID, id.uuid);
     }
 
     #[test]
     pub fn test_parse_identity_invalid_login_type() {
-        let json = "{\"login_type\":\"SomeRandomValue\",\"uuid\":\"5b9e0e40-2636-11e1-ad9e-0002a5d5c51b\"}".to_string();
-
-        let res = parse_identity(json);
-
+        // 0xefffffff is an implementation-reserved value.
+        //
+        // TODO(https://fxbug.dev/369916290): Spell as 0xefffffff when hex encodings are supported.
+        let res = parse_identity("4026531839:5b9e0e40-2636-11e1-ad9e-0002a5d5c51b".to_string());
         match res.err() {
             Some(PropertyError::BadFormat { .. }) => (),
             _ => assert!(false, "Unexpected error type"),
