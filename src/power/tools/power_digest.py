@@ -190,6 +190,69 @@ def compute_deps_per_line(
     return i_maps
 
 
+def lease_hash_in_list(lease_hash: str, leases: list[tuple[int, str]]) -> bool:
+    for _, h in leases:
+        if lease_hash == h:
+            return True
+    return False
+
+
+# Data structure.
+#   For each event in history, we have a map, element->[(level,lease-hash)]
+#   that for each element, returns the active leases on that element,
+#   as a list of (level,lease-hash) tuples.
+#   It would be more precise (and handy) to have (element,level) be the
+#   hash key, but the lease Drop lifecycle event does not notate the lease's
+#   level, only its element.
+# Lifecycle.
+#   On "lease_status Satf elem 2 hash": add entry (elem, (2,hash)) to map
+#   On "lease Drop elem hash": remove (?,hash) from elem's list value
+#      (it may not exist due to event truncation)
+#   On "lease_status Pend elem 2 hash": remove (2,hash) from elem's list value
+#      (it may not exist due to event truncation)
+# Usage.
+#   For an element at level 2 that rolls up to a dependency on execution_state,
+#   report all (2,hash) entries from the list returned by map[element].
+#   These are the leases on (element,2) that prevent the element from occupying
+#   a lower power level.
+def compute_leases_per_line(
+    lines: list[Any],
+) -> list[dict[str, list[tuple[int, str]]]]:
+    # for each line, a map: elem -> [(level,hash), (level, hash)]
+    l_maps = []
+    l_map: dict[str, list[tuple[int, str]]] = {}
+    for line in lines:
+        if line[2] == "lease_status" and line[3] == "Satf":
+            tokens = line[4].split()
+            elem, level, lease_hash = tokens[0], int(tokens[1]), tokens[2]
+            l_map = l_map.copy()  # shallow copy: list values point to old lists
+            leases = l_map.setdefault(elem, []).copy()  # don't mutate the past
+            leases.append((level, lease_hash))
+            l_map[elem] = leases
+        elif line[2] == "lease" and line[3] == "Drop":
+            tokens = line[4].split()
+            elem, lease_hash = tokens[0], tokens[1]
+            if lease_hash_in_list(lease_hash, l_map.get(elem, [])):
+                l_map = (
+                    l_map.copy()
+                )  # shallow copy: list values point to old lists
+                l_map[elem] = [lh for lh in l_map[elem] if lh[1] != lease_hash]
+                if len(l_map[elem]) == 0:
+                    del l_map[elem]
+        elif line[2] == "lease_status" and line[3] == "Pend":
+            tokens = line[4].split()
+            elem, level, lease_hash = tokens[0], int(tokens[1]), tokens[2]
+            if lease_hash_in_list(lease_hash, l_map.get(elem, [])):
+                l_map = (
+                    l_map.copy()
+                )  # shallow copy: list values point to old lists
+                l_map[elem] = [lh for lh in l_map[elem] if lh[1] != lease_hash]
+                if len(l_map[elem]) == 0:
+                    del l_map[elem]
+        l_maps.append(l_map)
+    return l_maps
+
+
 def transitive_active_elements_of_dep(
     in_deps: dict[tuple[str, int], list[tuple[str, int]]],
     levels: dict[str, int],
@@ -305,7 +368,15 @@ def main() -> int:
                 # lease lifecycle
                 line.append(f"lease_status")
                 line.append("Pend")
-                line.append(f'{curr["vertex_id"]}')
+                # key's format: lease_status_abcd@level_23
+                level_suffix_idx = curr["key"].rindex("@")
+                level = curr["key"][level_suffix_idx + len("@level_") :]
+                lease_hash = curr["key"][
+                    len("lease_status_") : level_suffix_idx
+                ][
+                    0:6
+                ]  # hash truncated to first 6 chars, everywhere
+                line.append(f'{curr["vertex_id"]} {level} {lease_hash}')
                 # reverse search for matching event
                 for r in range(int(n) - 1, start_idx - 1, -1):
                     prev = events[str(r)]
@@ -318,11 +389,18 @@ def main() -> int:
                             curr["vertex_id"],
                             dur,
                         )
+                        break
             elif curr["update"] == "Satisfied":
                 # lease lifecycle
                 line.append("lease_status")
                 line.append("Satf")
-                line.append(f'{curr["vertex_id"]}')
+                # key's format: lease_status_abcd@level_23
+                level_suffix_idx = curr["key"].rindex("@")
+                level = curr["key"][level_suffix_idx + len("@level_") :]
+                lease_hash = curr["key"][
+                    len("lease_status_") : level_suffix_idx
+                ][0:6]
+                line.append(f'{curr["vertex_id"]} {level} {lease_hash}')
                 # reverse search for matching event
                 for r in range(int(n) - 1, start_idx - 1, -1):
                     prev = events[str(r)]
@@ -335,16 +413,19 @@ def main() -> int:
                             curr["vertex_id"],
                             dur,
                         )
+                        break
         elif what == "update_key" and curr["key"].startswith("lease_"):
             # lease lifecycle, start
             line.append("lease")
             line.append("New")
-            line.append(f'{curr["vertex_id"]}')
+            lease_hash = curr["key"][len("lease_") :][0:6]
+            line.append(f'{curr["vertex_id"]} {lease_hash}')
         elif what == "drop_key" and curr["key"].startswith("lease_"):
             # lease lifecycle, end
             line.append("lease")
             line.append("Drop")
-            line.append(f'{curr["vertex_id"]}')
+            lease_hash = curr["key"][len("lease_") :][0:6]
+            line.append(f'{curr["vertex_id"]} {lease_hash}')
         elif what == "add_vertex":
             # element lifecycle, start
             line.append("element")
@@ -483,6 +564,7 @@ def main() -> int:
     # AUXILIARY DATA
     elem_levels_per_line = compute_elem_levels_per_line(lines)
     in_deps_per_line = compute_deps_per_line(lines, graph["topology"])
+    leases_per_line = compute_leases_per_line(lines)
 
     # ANALYSES
     args.output.write("\nLevel change durations, Top 10\n")
@@ -512,7 +594,7 @@ def main() -> int:
         args.output.write(f"#{key}: {value[0]:<{name_max}} {value[1]} us\n")
 
     # This analysis reports "active" elements through each suspend-resume
-    # sequence's minimum non-zero energy level period. Specifically, we
+    # sequence's minimum non-zero power level period. Specifically, we
     # make use of contemporaneous current level and inbound-dep edges
     # at the time of each event to compute the reason(s) execution_state is
     # non-zero. Intuitively, we grab execution_state at level 2 or 1, and
@@ -564,8 +646,8 @@ def main() -> int:
             print(f"  Duration: {lines[s_idx][1]} -> {lines[r_idx][1]}")
             print(f"  Skipping, incomplete level data for {es}")
             continue
-        # execution_state minimum energy level and its index bracket, inclusive
-        # assumes suspend->resume has a V-shaped trajectory, one contiguous duration of minimum energy
+        # execution_state minimum power level and its index bracket, inclusive
+        # assumes suspend->resume has a V-shaped trajectory, a contiguous duration of minimum power
         es_min_level, es_min_idx_a, es_min_idx_b = 255, line_max, line_max
         for idx in range(s_idx, r_idx + 1):
             es_level = elem_levels_per_line[idx][es]
@@ -585,7 +667,9 @@ def main() -> int:
                 print(f" at event idx {lines[idx][0]}:")
                 for elem in elems_involved:
                     print(f"  elem {elem} is at level {levels[elem]}")
-        # TODO(jaeheon): track lease lifecycle and print held leases too
+                # TODO(jaeheon) very long leases may not have lifecycle events
+                # within history window but still be in the final lease set.
+                print(f"  leases: {leases_per_line[idx]}")
 
     print("... done")
 
