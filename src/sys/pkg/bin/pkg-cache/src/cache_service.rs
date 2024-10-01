@@ -120,19 +120,15 @@ pub(crate) async fn serve(
                 }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
-                    let () = serve_package_index(
-                        base_packages.root_package_urls_and_hashes().clone().into_iter(),
-                        stream,
-                    )
-                    .await;
+                    let () =
+                        serve_package_index(base_packages.root_package_urls_and_hashes(), stream)
+                            .await;
                 }
                 PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
-                    let () = serve_package_index(
-                        cache_packages.root_package_urls_and_hashes().clone().into_iter(),
-                        stream,
-                    )
-                    .await;
+                    let () =
+                        serve_package_index(cache_packages.root_package_urls_and_hashes(), stream)
+                            .await;
                 }
                 PackageCacheRequest::Sync { responder } => {
                     responder.send(blobfs.sync().await.map_err(|e| {
@@ -755,13 +751,13 @@ async fn open_blob(
 /// Serves the `PackageIndexIteratorRequestStream` with as many base package index entries per
 /// request as will fit in a fidl message.
 async fn serve_package_index(
-    packages: impl IntoIterator<Item = (fuchsia_url::UnpinnedAbsolutePackageUrl, Hash)>,
+    packages: impl IntoIterator<Item = (&fuchsia_url::UnpinnedAbsolutePackageUrl, &Hash)>,
     stream: PackageIndexIteratorRequestStream,
 ) {
     let mut package_entries = packages
         .into_iter()
-        .map(|(mut url, hash)| PackageIndexEntry {
-            package_url: fpkg::PackageUrl { url: url.clear_variant().to_string() },
+        .map(|(url, hash)| PackageIndexEntry {
+            package_url: fpkg::PackageUrl { url: url.to_string() },
             meta_far_blob_id: BlobId::from(*hash).into(),
         })
         .collect::<Vec<PackageIndexEntry>>();
@@ -2336,7 +2332,7 @@ mod serve_package_index_tests {
                 UnpinnedAbsolutePackageUrl::new(
                     "fuchsia-pkg://fuchsia.test".parse().unwrap(),
                     "name0".parse().unwrap(),
-                    Some(fuchsia_url::PackageVariant::zero()),
+                    None,
                 ),
                 Hash::from([0u8; 32]),
             ),
@@ -2344,23 +2340,17 @@ mod serve_package_index_tests {
                 UnpinnedAbsolutePackageUrl::new(
                     "fuchsia-pkg://fuchsia.test".parse().unwrap(),
                     "name1".parse().unwrap(),
-                    Some("1".parse().unwrap()),
-                ),
-                Hash::from([1u8; 32]),
-            ),
-            (
-                UnpinnedAbsolutePackageUrl::new(
-                    "fuchsia-pkg://fuchsia.test".parse().unwrap(),
-                    "name2".parse().unwrap(),
                     None,
                 ),
-                Hash::from([2u8; 32]),
+                Hash::from([1u8; 32]),
             ),
         ];
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
-        let task = Task::local(serve_package_index(cache_packages, stream));
+        let task = Task::local(async move {
+            serve_package_index(cache_packages.iter().map(|(url, hash)| (url, hash)), stream).await
+        });
 
         let entries = proxy.next().await.unwrap();
         assert_eq!(
@@ -2378,12 +2368,6 @@ mod serve_package_index_tests {
                     },
                     meta_far_blob_id: fpkg::BlobId { merkle_root: [1u8; 32] }
                 },
-                fpkg::PackageIndexEntry {
-                    package_url: fpkg::PackageUrl {
-                        url: "fuchsia-pkg://fuchsia.test/name2".to_string()
-                    },
-                    meta_far_blob_id: fpkg::BlobId { merkle_root: [2u8; 32] }
-                }
             ]
         );
 

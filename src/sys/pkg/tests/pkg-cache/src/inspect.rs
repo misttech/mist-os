@@ -86,7 +86,7 @@ async fn cache_packages() {
         hierarchy,
         root: contains {
             "cache-packages": {
-                "fuchsia-pkg://fuchsia.com/a-cache-package/0": {
+                "fuchsia-pkg://fuchsia.com/a-cache-package": {
                     "hash": cache_package.hash().to_string()
                 }
             }
