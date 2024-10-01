@@ -477,7 +477,6 @@ async fn connecting_state<'a>(
     common_options.proxy.connect(&sme_connect_request, Some(remote)).map_err(|e| {
         ExitReason(Err(format_err!("Failed to send command to wlanstack: {:?}", e)))
     })?;
-    let start_time = fasync::Time::now();
 
     // Wait for connect result or timeout.
     let stream = connect_txn.take_event_stream();
@@ -500,8 +499,6 @@ async fn connecting_state<'a>(
                 credential: options.connect_selection.target.credential.clone(),
                 ess_connect_reason: options.connect_selection.reason,
                 multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
-                connection_attempt_time: start_time,
-                time_to_connect: fasync::Time::now() - start_time,
                 network_is_likely_hidden,
             };
             Ok(connected_state(common_options, connected_options).into_state())
@@ -608,10 +605,6 @@ struct ConnectedOptions {
     ess_connect_reason: types::ConnectReason,
     connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
     network_is_likely_hidden: bool,
-    /// Time at which connect was first attempted, historical data for network scoring.
-    pub connection_attempt_time: fasync::Time,
-    /// Duration from connection attempt to success, historical data for network scoring.
-    pub time_to_connect: zx::Duration,
 }
 
 /// The CONNECTED state monitors the SME status. It handles the SME status response:
@@ -930,8 +923,6 @@ async fn record_disconnect(
     let uptime = curr_time - connect_start_time;
     let data = PastConnectionData::new(
         options.ap_state.original().bssid,
-        options.connection_attempt_time,
-        options.time_to_connect,
         curr_time,
         uptime,
         reason,
@@ -1403,8 +1394,6 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(123));
         let mut test_values = test_setup();
 
-        let connection_attempt_time = fasync::Time::now();
-
         let connect_selection = generate_connect_selection();
         let bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());
@@ -1539,8 +1528,6 @@ mod tests {
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: types::Bssid::from(bss_description.bssid),
-                connection_attempt_time,
-                time_to_connect,
                 disconnect_time: fasync::Time::now(),
                 connection_uptime: zx::Duration::from_minutes(0),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
@@ -2026,8 +2013,6 @@ mod tests {
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let connection_attempt_time = fasync::Time::now();
-        let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             ap_state: Box::new(init_ap_state.clone()),
@@ -2036,8 +2021,6 @@ mod tests {
             ess_connect_reason: connect_selection.reason,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time,
-            time_to_connect,
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2137,8 +2120,6 @@ mod tests {
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: init_ap_state.original().bssid,
-                connection_attempt_time,
-                time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::FidlStopClientConnectionsRequest,
@@ -2181,8 +2162,6 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
-        let connection_attempt_time = fasync::Time::now();
-        let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             ap_state: Box::new(init_ap_state.clone()),
@@ -2191,8 +2170,6 @@ mod tests {
             ess_connect_reason: connect_selection.reason,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time,
-            time_to_connect,
         };
 
         // Start the state machine in the connected state.
@@ -2225,8 +2202,6 @@ mod tests {
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: init_ap_state.original().bssid,
-                connection_attempt_time,
-                time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
@@ -2283,8 +2258,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2444,8 +2417,6 @@ mod tests {
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: types::Bssid::from(bss_description.bssid),
-                connection_attempt_time,
-                time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(5),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
@@ -2485,8 +2456,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2529,8 +2498,6 @@ mod tests {
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let connection_attempt_time = fasync::Time::now();
-        let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
             ap_state: Box::new(first_ap_state.clone()),
             network_identifier: first_connect_selection.target.network.clone(),
@@ -2539,8 +2506,6 @@ mod tests {
             multiple_bss_candidates: first_connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time,
-            time_to_connect,
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2697,8 +2662,6 @@ mod tests {
             credential: first_connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: types::Bssid::from(first_bss_desc.bssid),
-                connection_attempt_time,
-                time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::ProactiveNetworkSwitch,
@@ -2738,8 +2701,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2802,8 +2763,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2861,8 +2820,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2981,8 +2938,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -3082,8 +3037,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -3167,8 +3120,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -3238,8 +3189,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -3306,8 +3255,6 @@ mod tests {
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
         };
         let initial_state = connected_state(test_values.common_options, options);
 

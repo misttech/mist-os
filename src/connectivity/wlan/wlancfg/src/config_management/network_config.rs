@@ -133,10 +133,6 @@ impl Timestamped for ConnectFailure {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PastConnectionData {
     pub bssid: client_types::Bssid,
-    /// Time at which connect was first attempted
-    pub connection_attempt_time: fasync::Time,
-    /// Duration from connection attempt to success
-    pub time_to_connect: zx::Duration,
     /// Time at which the connection was ended
     pub disconnect_time: fasync::Time,
     /// The time that the connection was up - from established to disconnected.
@@ -152,8 +148,6 @@ pub struct PastConnectionData {
 impl PastConnectionData {
     pub fn new(
         bssid: client_types::Bssid,
-        connection_attempt_time: fasync::Time,
-        time_to_connect: zx::Duration,
         disconnect_time: fasync::Time,
         connection_uptime: zx::Duration,
         disconnect_reason: client_types::DisconnectReason,
@@ -162,8 +156,6 @@ impl PastConnectionData {
     ) -> Self {
         Self {
             bssid,
-            connection_attempt_time,
-            time_to_connect,
             disconnect_time,
             connection_uptime,
             disconnect_reason,

@@ -327,8 +327,6 @@ pub fn random_connection_data() -> PastConnectionData {
     let disconnect_time = connect_time + time_to_connect + uptime;
     PastConnectionData::new(
         client_types::Bssid::from(rng.gen::<[u8; 6]>()),
-        connect_time,
-        time_to_connect,
         disconnect_time,
         uptime,
         client_types::DisconnectReason::DisconnectDetectedFromSme,
