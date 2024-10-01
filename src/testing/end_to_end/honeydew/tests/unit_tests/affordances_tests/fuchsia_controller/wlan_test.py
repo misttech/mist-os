@@ -160,6 +160,10 @@ class WlanFCTests(unittest.TestCase):
             spec=fc_transport.FuchsiaController,
             autospec=True,
         )
+        self.fuchsia_device_close_obj = mock.MagicMock(
+            spec=affordances_capable.FuchsiaDeviceClose,
+            autospec=True,
+        )
         self.ffx_transport_obj = mock.MagicMock(
             spec=ffx_transport.FFX,
             autospec=True,
@@ -174,6 +178,7 @@ class WlanFCTests(unittest.TestCase):
             ffx=self.ffx_transport_obj,
             fuchsia_controller=self.fc_transport_obj,
             reboot_affordance=self.reboot_affordance_obj,
+            fuchsia_device_close=self.fuchsia_device_close_obj,
         )
 
     def test_verify_supported(self) -> None:
@@ -185,6 +190,7 @@ class WlanFCTests(unittest.TestCase):
                 ffx=self.ffx_transport_obj,
                 fuchsia_controller=self.fc_transport_obj,
                 reboot_affordance=self.reboot_affordance_obj,
+                fuchsia_device_close=self.fuchsia_device_close_obj,
             )
 
     def _mock_list_ifaces(self, zx_err: int | None = None) -> None:

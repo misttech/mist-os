@@ -562,6 +562,7 @@ class FuchsiaDevice(
                 ffx=self.ffx,
                 fuchsia_controller=self.fuchsia_controller,
                 reboot_affordance=self,
+                fuchsia_device_close=self,
             )
 
     @properties.Affordance

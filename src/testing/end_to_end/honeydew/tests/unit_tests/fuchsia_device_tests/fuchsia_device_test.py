@@ -532,6 +532,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             ffx=self.fd_fc_obj.ffx,
             fuchsia_controller=self.fd_fc_obj.fuchsia_controller,
             reboot_affordance=self.fd_fc_obj,
+            fuchsia_device_close=self.fd_fc_obj,
         )
 
     def test_wlan_fc_preferred(self) -> None:
