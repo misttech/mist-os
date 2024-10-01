@@ -89,6 +89,21 @@ type SensorMeasurementUnit = flexible enum : uint32 {
     COULOMBS = 25;
 };
 
+/// Exponential scaling value for measurement, derived from SI units.
+type SensorMeasurementScale = flexible enum : int16 {
+    NANO = -9;
+    MICRO = -6;
+    MILLI = -3;
+    CENTI = -2;
+    DECI = -1;
+    NONE = 0;
+    DECA = 1;
+    HECTO = 2;
+    KILO = 3;
+    MEGA = 6;
+    GIGA = 9;
+};
+
 /// Describes a sensor's wake-up behavior. A wake-up sensor will wake up the
 /// application processor when there is new data available. A non wake-up sensor
 /// will not.
@@ -168,6 +183,10 @@ type SensorInfo = table {
 
     /// The unit type of returned measurements.
     8: measurement_unit SensorMeasurementUnit;
+
+    /// The magnitude of returned measurements as an exponent.
+    /// Measurement = |value| * 10^|measurement_scale| units.
+    9: measurement_scale SensorMeasurementScale;
 };
 
 /// Uncalibrated samples from 3 axis sensors (eg. accelerometer, gyroscope,
