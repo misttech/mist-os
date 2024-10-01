@@ -17,8 +17,8 @@ The versioning rules are simple:
    schema change such as adding a new required field.
 
 ### Examples
-`hardware-f6f47515.json` schema file has an ID of
-`"https://fuchsia.dev/schema/product_bundle/hardware-f6f47515.json"`.
+`hardware.json` schema file has an ID of
+`"https://fuchsia.dev/schema/product_bundle/hardware.json"`.
 
 ## Organization
 Each significant effort should allocate a sub-directory to house its schemata.

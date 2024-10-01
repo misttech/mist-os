@@ -52,6 +52,6 @@
         }
     },
     "description": "Specifies the mapping between the supported API levels and ABI revisons. See https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning for details.",
-    "id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
+    "id": "https://fuchsia.dev/schema/version_history.json",
     "title": "Schema for Fuchsia platform version history"
 }

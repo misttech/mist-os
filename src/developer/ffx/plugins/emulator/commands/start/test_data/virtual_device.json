@@ -1,5 +1,5 @@
 {
-    "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
+    "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json",
     "data": {
         "description": "Some device description",
         "type": "virtual_device",

@@ -123,7 +123,7 @@ impl VirtualDeviceV1 {
 
 impl JsonObject for Envelope<VirtualDeviceV1> {
     fn get_schema() -> &'static str {
-        include_str!("../../virtual_device-93A41932.json")
+        include_str!("../../virtual_device.json")
     }
 
     fn get_referenced_schemata() -> &'static [&'static str] {
@@ -140,7 +140,7 @@ mod tests {
         kind = Envelope::<VirtualDeviceV1>,
         data = r#"
         {
-            "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
+            "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json",
             "data": {
                 "name": "generic-x64",
                 "type": "virtual_device",
@@ -180,7 +180,7 @@ mod tests {
         kind = Envelope::<VirtualDeviceV1>,
         data = r#"
         {
-            "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
+            "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json",
             "data": {
                 "name": "generic-x64",
                 "type": "cc_prebuilt_library",

@@ -20,14 +20,14 @@ schemas = [
   "ffx_tool.json",
   "fhcp_tests.json",
   "fidl_library.json",
-  "hardware-f6f47515.json",
+  "hardware.json",
   "host_tool.json",
   "loadable_module.json",
   "manifest.json",
   "package.json",
   "sysroot.json",
-  "version_history-22rnd667.json",
-  "virtual_device-93A41932.json",
+  "version_history.json",
+  "virtual_device.json",
 ]
 
 sdk_documentation("meta") {
@@ -103,14 +103,14 @@ if (is_host) {
     inputs = [
       "common.json",
       "ffx_tool.json",
-      "hardware-f6f47515.json",
+      "hardware.json",
       "host_tool.json",
       "manifest.json",
       "test_data/virtual_device.json",
       "test_data/empty_vd_manifest.json",
       "test_data/single_vd_manifest.json",
       "test_data/multi_vd_manifest.json",
-      "virtual_device-93A41932.json",
+      "virtual_device.json",
     ]
   }
 }

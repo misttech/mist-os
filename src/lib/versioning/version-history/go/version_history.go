@@ -16,7 +16,7 @@ import (
 var versionHistoryBytes []byte
 var history VersionHistory
 
-const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history-22rnd667.json"
+const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history.json"
 const versionHistoryName string = "Platform version map"
 const versionHistoryType string = "version_history"
 

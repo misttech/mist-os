@@ -78,7 +78,7 @@ template("sdk_version_history") {
     meta = {
       dest = "version_history.json"
       source = _files.compiled
-      schema = "version_history-22rnd667"
+      schema = "version_history"
       type = "version_history"
     }
     non_sdk_deps = [ ":${_labels.compile}" ]

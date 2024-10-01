@@ -15,7 +15,7 @@ ARCH = struct(
 def _fuchsia_virtual_device_impl(ctx):
     virtual_device_file = ctx.actions.declare_file(ctx.attr.device_name + ".json")
     virtual_device = {
-        "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
+        "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json",
         "data": {
             "type": "virtual_device",
             "name": ctx.attr.device_name,

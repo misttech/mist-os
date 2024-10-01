@@ -34,5 +34,5 @@
         },
         "type": "virtual_device"
     },
-    "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json"
+    "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json"
 }
