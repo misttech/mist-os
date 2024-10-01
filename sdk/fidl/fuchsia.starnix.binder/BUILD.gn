@@ -8,9 +8,7 @@ fidl("fuchsia.starnix.binder") {
   sdk_category = "internal"
   sources = [ "binder.fidl" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.posix",
-    "//sdk/fidl/fuchsia.unknown",
     "//zircon/vdso/zx",
   ]
 }

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
-use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, Kernel};
@@ -51,10 +50,7 @@ use syncio::{
     XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::{ProtocolsExt, ToFlags};
-use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder,
-    fidl_fuchsia_unknown as funknown, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub fn new_remote_fs(
     _locked: &mut Locked<'_, Unlocked>,
@@ -317,32 +313,10 @@ pub fn new_remote_file_ops(handle: zx::Handle) -> Result<Box<dyn FileOps>, Errno
 }
 
 fn remote_file_attrs_and_ops(
-    mut handle: zx::Handle,
+    handle: zx::Handle,
 ) -> Result<(zxio_node_attr, Box<dyn FileOps>), Errno> {
     let handle_type =
         handle.basic_info().map_err(|status| from_status_like_fdio!(status))?.object_type;
-
-    // Check whether the channel implements a Starnix specific protoocol.
-    if handle_type == zx::ObjectType::CHANNEL {
-        let channel = zx::Channel::from(handle);
-        let queryable = funknown::QueryableSynchronousProxy::new(channel);
-        if let Ok(name) = queryable.query(zx::MonotonicTime::INFINITE) {
-            if name == fbinder::UNIX_DOMAIN_SOCKET_PROTOCOL_NAME.as_bytes() {
-                let socket_ops = RemoteUnixDomainSocket::new(queryable.into_channel())?;
-                let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-                let file_ops = SocketFile::new(socket);
-                let attr = zxio_node_attr {
-                    has: zxio_node_attr_has_t { mode: true, ..zxio_node_attr_has_t::default() },
-                    mode: 0o777,
-                    ..zxio_node_attr::default()
-                };
-                return Ok((attr, file_ops));
-            }
-        };
-        handle = queryable.into_channel().into_handle();
-    };
-
-    // Otherwise, use zxio based objects.
     let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
     let attrs = zxio
         .attr_get(zxio_node_attr_has_t {
@@ -369,7 +343,7 @@ fn remote_file_attrs_and_ops(
         | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
             let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
             let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-            SocketFile::new(socket)
+            SocketFile::new(socket.clone())
         }
         _ => return error!(ENOTSUP),
     };
