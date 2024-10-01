@@ -219,6 +219,46 @@ pub struct BoardKernelConfig {
     /// The system will halt on a kernel panic instead of rebooting.
     #[serde(default)]
     pub halt_on_panic: bool,
+
+    /// OOM related configurations.
+    #[serde(default)]
+    pub oom: Option<OOM>,
+}
+
+/// This struct defines supported Out of memory features.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct OOM {
+    /// This option triggers eviction of file pages at the Warning pressure
+    /// state, in addition to the default behavior, which is to evict at the
+    /// Critical and OOM states.
+    #[serde(default)]
+    pub evict_at_warning: bool,
+
+    /// This option configures kernel eviction to run continually in the
+    /// background to try and keep the system out of memory pressure, as opposed
+    /// to triggering one-shot eviction only at memory pressure level
+    /// transitions.
+    #[serde(default)]
+    pub evict_continuous: bool,
+
+    /// This option specifies the free-memory threshold at which the
+    /// out-of-memory (OOM) thread will trigger an out-of-memory event and begin
+    /// killing processes, or rebooting the system.
+    #[serde(default)]
+    pub out_of_memory_mb: Option<u32>,
+
+    /// This option specifies the free-memory threshold at which the
+    /// out-of-memory (OOM) thread will trigger a critical memory pressure
+    /// event, signaling that processes should free up memory.
+    #[serde(default)]
+    pub critical_mb: Option<u32>,
+
+    /// This option specifies the free-memory threshold at which the
+    /// out-of-memory (OOM) thread will trigger a warning memory pressure event,
+    /// signaling that processes should slow down memory allocations.
+    #[serde(default)]
+    pub warning_mb: Option<u32>,
 }
 
 /// This struct defines platform configurations specified by board.
@@ -399,6 +439,7 @@ mod test {
                 quiet_early_boot: false,
                 serial: None,
                 halt_on_panic: false,
+                oom: None,
             },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),

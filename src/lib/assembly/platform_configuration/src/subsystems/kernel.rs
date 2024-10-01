@@ -93,6 +93,27 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg(arg);
         }
 
+        if let Some(oom) = &context.board_info.kernel.oom {
+            if oom.evict_at_warning {
+                builder.kernel_arg("kernel.oom.evict-at-warning=true".to_owned());
+            }
+            if oom.evict_continuous {
+                builder.kernel_arg("kernel.oom.evict-continuous=true".to_owned());
+            }
+            if let Some(outofmemory_mb) = oom.out_of_memory_mb {
+                let arg = format!("kernel.oom.outofmemory-mb={}", outofmemory_mb);
+                builder.kernel_arg(arg);
+            }
+            if let Some(critical_mb) = oom.critical_mb {
+                let arg = format!("kernel.oom.critical-mb={}", critical_mb);
+                builder.kernel_arg(arg);
+            }
+            if let Some(warning_mb) = oom.warning_mb {
+                let arg = format!("kernel.oom.warning-mb={}", warning_mb);
+                builder.kernel_arg(arg);
+            }
+        }
+
         if context.board_info.kernel.halt_on_panic {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
