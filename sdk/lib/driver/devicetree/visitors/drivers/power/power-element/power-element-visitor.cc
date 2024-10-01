@@ -14,6 +14,7 @@
 #include <vector>
 
 namespace {
+using fuchsia_hardware_power::CpuPowerElement;
 using fuchsia_hardware_power::LevelTuple;
 using fuchsia_hardware_power::ParentElement;
 using fuchsia_hardware_power::PowerDependency;
@@ -174,6 +175,12 @@ std::optional<ParentElement> PowerElementVisitor::GetParentElementFromLevelRef(
     FDF_LOG(ERROR, "Power level reference node '%s' is an invalid SAG element '%s'.",
             level_in_parent.name().c_str(), power_element.name().c_str());
     return std::nullopt;
+  }
+
+  if (device_node.name() == "cpu") {
+    if (power_element.name() == "cpu-element") {
+      return ParentElement::WithCpuControl(CpuPowerElement::kCpu);
+    }
   }
 
   auto parent_name = GetElementName(power_element.name());
