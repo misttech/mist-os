@@ -54,6 +54,9 @@ exports_files(
     # prebuilt drivers
     glob(["prebuilt/vendor/google/drivers/**/*.far"]) +
 
+    # mcu firmwares
+    glob(["prebuilt/mcu/firmware/**/*"]) +
+
     # build/info
     [
         "integration/.git/HEAD",
