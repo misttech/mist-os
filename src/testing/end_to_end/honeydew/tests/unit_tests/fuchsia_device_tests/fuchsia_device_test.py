@@ -106,9 +106,13 @@ def _custom_test_name_func(
 ) -> str:
     """Custom test name function method."""
     test_func_name: str = testcase_func.__name__
+    test_label: str
 
-    params_dict: dict[str, Any] = param_arg.args[0]
-    test_label: str = parameterized.to_safe_name(params_dict["label"])
+    try:
+        params_dict: dict[str, Any] = param_arg.args[0]
+        test_label = parameterized.to_safe_name(params_dict["label"])
+    except Exception:  # pylint: disable=broad-except
+        test_label = parameterized.to_safe_name(param_arg.kwargs["label"])
 
     return f"{test_func_name}_with_{test_label}"
 

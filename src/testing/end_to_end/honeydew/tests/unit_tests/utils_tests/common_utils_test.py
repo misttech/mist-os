@@ -4,10 +4,47 @@
 """Unit tests for honeydew.utils.common.py."""
 
 import unittest
+from collections.abc import Callable
+from typing import Any
 from unittest import mock
+
+from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.utils import common
+
+CONFIG_DICT: dict[str, Any] = {
+    "affordances": {
+        "bluetooth": {
+            "implementation": "fuchsia-controller",
+        },
+        "wlan": {
+            "implementation": "fuchsia-controller",
+        },
+    },
+    "transports": {
+        "ffx": {
+            "ssh_keepalive_timeout": 123,
+        },
+    },
+    "supported": {
+        "features": [
+            "trace",
+            "inspect",
+            "snapshot",
+        ]
+    },
+}
+
+
+def _custom_test_name_func(
+    testcase_func: Callable[..., None], _: str, param_arg: param
+) -> str:
+    """Custom test name function method."""
+    test_func_name: str = testcase_func.__name__
+    test_label: str = parameterized.to_safe_name(param_arg.kwargs["label"])
+
+    return f"{test_func_name}_with_{test_label}"
 
 
 class CommonUtilsTests(unittest.TestCase):
@@ -94,3 +131,90 @@ class CommonUtilsTests(unittest.TestCase):
 
         mock_time.assert_called()
         mock_sleep.assert_called()
+
+    @parameterized.expand(
+        [
+            param(
+                label="returning_dict",
+                dictionary=CONFIG_DICT,
+                key_path=(
+                    "affordances",
+                    "bluetooth",
+                ),
+                should_exist=True,
+                expected_value={
+                    "implementation": "fuchsia-controller",
+                },
+            ),
+            param(
+                label="returning_str",
+                dictionary=CONFIG_DICT,
+                key_path=(
+                    "affordances",
+                    "bluetooth",
+                    "implementation",
+                ),
+                should_exist=True,
+                expected_value="fuchsia-controller",
+            ),
+            param(
+                label="returning_list",
+                dictionary=CONFIG_DICT,
+                key_path=(
+                    "supported",
+                    "features",
+                ),
+                should_exist=True,
+                expected_value=[
+                    "trace",
+                    "inspect",
+                    "snapshot",
+                ],
+            ),
+            param(
+                label="invalid_path_without_should_exist",
+                dictionary=CONFIG_DICT,
+                key_path=(
+                    "affordances",
+                    "invalid",
+                    "implementation",
+                ),
+                should_exist=False,
+                expected_value=None,
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    def test_read_from_dict(
+        self,
+        label: str,  # pylint: disable=unused-argument,
+        dictionary: dict[str, Any],
+        key_path: tuple[str, ...],
+        should_exist: bool,
+        expected_value: Any,
+    ) -> None:
+        """Test case for common.read_from_dict() static method."""
+        self.assertEqual(
+            common.read_from_dict(
+                dictionary,
+                key_path,
+                should_exist,
+            ),
+            expected_value,
+        )
+
+    def test_read_from_dict_exception(self) -> None:
+        """Test case for common.read_from_dict() static method raising exception."""
+        with self.assertRaisesRegex(
+            errors.ConfigError,
+            r"'affordances', 'invalid'.*does not exist in the config dict passed during init",
+        ):
+            common.read_from_dict(
+                d=CONFIG_DICT,
+                key_path=(
+                    "affordances",
+                    "invalid",
+                    "implementation",
+                ),
+                should_exist=True,
+            )

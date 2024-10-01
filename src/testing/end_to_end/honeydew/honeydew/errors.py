@@ -26,6 +26,10 @@ class HoneydewError(Exception):
         _LOGGER.debug(repr(self), exc_info=True)
 
 
+class ConfigError(HoneydewError):
+    """Exception for reporting invalid config passed to Honeydew."""
+
+
 class HostCmdError(HoneydewError):
     """Exception for reporting host command failures."""
 

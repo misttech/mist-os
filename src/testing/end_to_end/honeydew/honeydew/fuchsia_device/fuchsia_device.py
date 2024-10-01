@@ -1049,29 +1049,25 @@ class FuchsiaDevice(
             bluetooth_types.Implementation
 
         Raises:
-            ValueError: If bluetooth affordance implementation detail is missing or not valid.
+            errors.ConfigError: If bluetooth affordance implementation detail is missing or not valid.
         """
-        if (
-            self._config is None
-            or "affordances" not in self._config
-            or "bluetooth" not in self._config["affordances"]
-            or "implementation" not in self._config["affordances"]["bluetooth"]
-            and should_exist is True
-        ):
-            if should_exist is True:
-                raise ValueError(
-                    "Bluetooth affordance info need to be provided in order to use bluetooth "
-                    "affordances. Please pass config['affordances']['bluetooth']['implementation]"
-                )
-            else:
-                return None
+        if self._config is None:
+            return None
+
+        bluetooth_affordance_implementation: str | None = common.read_from_dict(
+            self._config,
+            key_path=("affordances", "bluetooth", "implementation"),
+            should_exist=should_exist,
+        )
+        if bluetooth_affordance_implementation is None:
+            return None
 
         try:
             return bluetooth_types.Implementation(
-                self._config["affordances"]["bluetooth"]["implementation"]
+                bluetooth_affordance_implementation
             )
         except ValueError as err:
-            raise ValueError(
+            raise errors.ConfigError(
                 f"Invalid value passed in config['affordances']['bluetooth']['implementation]. "
                 f"Valid values are: {list(map(str, bluetooth_types.Implementation))}"
             ) from err
@@ -1088,24 +1084,19 @@ class FuchsiaDevice(
         Raises:
             ValueError: If wlan affordance implementation detail is missing or not valid.
         """
-        if (
-            self._config is None
-            or "affordances" not in self._config
-            or "wlan" not in self._config["affordances"]
-            or "implementation" not in self._config["affordances"]["wlan"]
-        ):
-            if should_exist is True:
-                raise ValueError(
-                    "WLAN affordance info need to be provided in order to use WLAN affordances. "
-                    "Please pass config['affordances']['wlan']['implementation]."
-                )
-            else:
-                return None
+        if self._config is None:
+            return None
+
+        wlan_affordance_implementation: str | None = common.read_from_dict(
+            self._config,
+            key_path=("affordances", "wlan", "implementation"),
+            should_exist=should_exist,
+        )
+        if wlan_affordance_implementation is None:
+            return None
 
         try:
-            return wlan_types.Implementation(
-                self._config["affordances"]["wlan"]["implementation"]
-            )
+            return wlan_types.Implementation(wlan_affordance_implementation)
         except ValueError as err:
             raise ValueError(
                 f"Invalid value passed in config['affordances']['wlan']['implementation]. "
