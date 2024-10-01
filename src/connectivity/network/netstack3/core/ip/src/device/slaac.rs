@@ -632,8 +632,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     // Since it's possible to change NDP configuration for a
                     // device during runtime, we can end up here, with a
                     // temporary address on an interface even though temporary
-                    // addressing is disabled. Setting its validity period to 0
-                    // will force it to be removed ASAP.
+                    // addressing is disabled. Don't update the valid lifetime
+                    // in this case.
                     None => {
                         (ValidLifetimeBound::FromMaxBound(Duration::ZERO), None, *entry_valid_until)
                     }
@@ -1726,6 +1726,7 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
     use core::convert::TryFrom as _;
 
     use net_declare::net::ip_v6;
@@ -2105,6 +2106,7 @@ mod tests {
     const ONE_HOUR_AS_SECS: u32 = 60 * 60;
     const TWO_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 2;
     const THREE_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 3;
+    const FOUR_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 4;
     const INFINITE_LIFETIME: u32 = u32::MAX;
     const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE_AS_SECS: u32 =
         MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE.get().as_secs() as u32;
@@ -2374,22 +2376,22 @@ mod tests {
         0 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER /* retrans_timer */,
         0 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with no DAD transmits")]
+    ); "preferred lifetime less than regen advance with no DAD transmits")]
     #[test_case(DontGenerateTemporaryAddressTest::with_pl_less_than_regen_advance(
         1 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER /* retrans_timer */,
         0 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with DAD transmits")]
+    ); "preferred lifetime less than regen advance with DAD transmits")]
     #[test_case(DontGenerateTemporaryAddressTest::with_pl_less_than_regen_advance(
         1 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER /* retrans_timer */,
         1 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with DAD transmits and retries")]
+    ); "preferred lifetime less than regen advance with DAD transmits and retries")]
     #[test_case(DontGenerateTemporaryAddressTest::with_pl_less_than_regen_advance(
         2 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER + Duration::from_secs(1) /* retrans_timer */,
         3 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with multiple DAD transmits and multiple retries")]
+    ); "preferred lifetime less than regen advance with multiple DAD transmits and multiple retries")]
     #[test_case(DontGenerateTemporaryAddressTest {
         preferred_lifetime_config: SLAAC_MIN_REGEN_ADVANCE,
         preferred_lifetime_secs: ONE_HOUR_AS_SECS,
@@ -2414,10 +2416,7 @@ mod tests {
             SlaacConfiguration {
                 temporary_address_configuration: enable.then(|| {
                     TemporarySlaacAddressConfiguration {
-                        temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(
-                            ONE_HOUR_AS_SECS.into(),
-                        ))
-                        .unwrap(),
+                        temp_valid_lifetime: ONE_HOUR,
                         temp_preferred_lifetime: preferred_lifetime_config,
                         temp_idgen_retries,
                         secret_key: SECRET_KEY,
@@ -2727,5 +2726,52 @@ mod tests {
             (third_invalidate_timer_id, (), third_valid_until),
             (third_regenerate_timer_id, (), third_preferred_until - regen_advance.get()),
         ]);
+    }
+
+    #[test]
+    fn temporary_address_not_updated_while_disabled() {
+        let want_valid_until =
+            FakeInstant::default() + Duration::from_secs(THREE_HOURS_AS_SECS.into());
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
+            SlaacConfiguration {
+                enable_stable_addresses: false,
+                temporary_address_configuration: None,
+            },
+            FakeSlaacAddrs {
+                slaac_addrs: vec![SlaacAddressEntry {
+                    addr_sub: testutil::calculate_slaac_addr_sub(SUBNET, IID),
+                    deprecated: false,
+                    config: SlaacConfig::Temporary(TemporarySlaacConfig {
+                        valid_until: want_valid_until,
+                        desync_factor: Duration::default(),
+                        creation_time: FakeInstant::default(),
+                        dad_counter: 0,
+                    }),
+                }],
+                ..Default::default()
+            },
+            None, /* dad_transmits */
+            DEFAULT_RETRANS_TIMER,
+        );
+
+        SlaacHandler::apply_slaac_update(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            SUBNET,
+            NonZeroNdpLifetime::from_u32_with_infinite(FOUR_HOURS_AS_SECS),
+            NonZeroNdpLifetime::from_u32_with_infinite(FOUR_HOURS_AS_SECS),
+        );
+        let addrs = core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>();
+        assert_eq!(addrs.len(), 1);
+        assert_matches!(addrs[0], SlaacAddressEntry {
+            config: SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until,
+                ..
+            }),
+            ..
+        } => {
+            assert_eq!(valid_until, want_valid_until);
+        });
     }
 }
