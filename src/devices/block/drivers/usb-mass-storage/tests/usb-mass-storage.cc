@@ -5,6 +5,7 @@
 #include "../usb-mass-storage.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
@@ -565,6 +566,33 @@ struct IncomingNamespace {
   UsbBanjoServer usb_banjo_server;
 };
 
+class TestUsbMassStorageDevice : public ums::UsbMassStorageDevice {
+ public:
+  TestUsbMassStorageDevice(fdf::DriverStartArgs start_args,
+                           fdf::UnownedSynchronizedDispatcher dispatcher)
+      : UsbMassStorageDevice(std::move(start_args), std::move(dispatcher)) {
+    auto timer = fbl::MakeRefCounted<FakeTimer>();
+    timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
+      if (duration == 0) {
+        has_zero_duration_ = true;
+      }
+      if (duration == ZX_TIME_INFINITE) {
+        return sync_completion_wait(completion, duration);
+      }
+      return ZX_OK;
+    });
+    set_waiter(std::move(timer));
+  }
+
+  void PrepareStop(fdf::PrepareStopCompleter completer) override {
+    ASSERT_FALSE(has_zero_duration_);
+    UsbMassStorageDevice::PrepareStop(std::move(completer));
+  }
+
+ private:
+  bool has_zero_duration_ = false;
+};
+
 // WARNING: Don't use this test as a template for new tests as it uses the old driver testing
 // library.
 class UmsTest : public zxtest::Test {
@@ -589,8 +617,6 @@ class UmsTest : public zxtest::Test {
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
 
     EXPECT_OK(dut_.Stop());
-
-    ASSERT_FALSE(has_zero_duration_);
   }
 
  protected:
@@ -599,7 +625,7 @@ class UmsTest : public zxtest::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::internal::DriverUnderTest<ums::UsbMassStorageDevice> dut_;
+  fdf_testing::internal::DriverUnderTest<TestUsbMassStorageDevice> dut_;
 
   void StartDriver(ErrorInjection inject_failure = NoFault) {
     // Device parameters for physical (parent) device
@@ -627,18 +653,6 @@ class UmsTest : public zxtest::Test {
     // Start dut_.
     ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
 
-    auto timer = fbl::MakeRefCounted<FakeTimer>();
-    timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
-      if (duration == 0) {
-        has_zero_duration_ = true;
-      }
-      if (duration == ZX_TIME_INFINITE) {
-        return sync_completion_wait(completion, duration);
-      }
-      return ZX_OK;
-    });
-    dut_->set_waiter(std::move(timer));
-
     while (true) {
       if (dut_->block_devs().size() >= 2) {
         break;
@@ -646,9 +660,6 @@ class UmsTest : public zxtest::Test {
       usleep(10);
     }
   }
-
- private:
-  bool has_zero_duration_ = false;
 };
 
 // UMS read test
@@ -803,5 +814,7 @@ TEST_F(UmsTest, TestTrim) {
 TEST_F(UmsTest, CbwStallDoesNotFreezeDriver) { StartDriver(RejectCacheCbw); }
 
 TEST_F(UmsTest, DataStageStallDoesNotFreezeDriver) { StartDriver(RejectCacheDataStage); }
+
+FUCHSIA_DRIVER_EXPORT(TestUsbMassStorageDevice);
 
 }  // namespace

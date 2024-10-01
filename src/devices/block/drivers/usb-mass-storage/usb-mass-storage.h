@@ -96,9 +96,11 @@ class UsbMassStorageDevice : public fdf::DriverBase, public scsi::Controller {
 
   // Visible for testing.
   const std::vector<std::unique_ptr<scsi::BlockDevice>>& block_devs() const { return block_devs_; }
-  void set_waiter(fbl::RefPtr<WaiterInterface> waiter) { waiter_ = std::move(waiter); }
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbMassStorageDevice);
+
+ protected:
+  void set_waiter(fbl::RefPtr<WaiterInterface> waiter) { waiter_ = std::move(waiter); }
 
  private:
   zx_status_t Reset();

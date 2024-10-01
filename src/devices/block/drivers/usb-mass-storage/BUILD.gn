@@ -23,7 +23,10 @@ fuchsia_driver("usb-mass-storage-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "usb-mass-storage.cc" ]
+  sources = [
+    "driver-export.cc",
+    "usb-mass-storage.cc",
+  ]
   deps = [
     ":usb_mass_storage_bind",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
