@@ -54,41 +54,6 @@ fuchsia_unittest_package("ld-tests") {
   disable_elf_binaries_checks = true
 }
 
-# This collects the -DLD_TEST_LIBPREFIX=... flag in the response file.
-generated_file("ld-test-switches.rsp") {
-  visibility = [ ":*" ]
-  testonly = true
-  output_conversion = "list lines"
-  data_keys = [ "ld_test_switches" ]
-  outputs = [ "$target_gen_dir/$target_name" ]
-  data_deps = [ ":load-test-data" ]
-  metadata = {
-    # Don't let manifests roll up ld.so.1 from here just because test code
-    # depends on this target.
-    distribution_entries_barrier = []
-  }
-}
-
-# Depending on this plumbs through the response file into cflags.
-group("ld-test-switches") {
-  visibility = [
-    ":*",
-    "../testing:*",
-    "//sdk/lib/dl/test:*",
-  ]
-  testonly = true
-
-  public_deps = [ ":ld-test-switches.rsp" ]
-  public_configs = [ ":ld-test-switches.config" ]
-}
-
-config("ld-test-switches.config") {
-  visibility = [ ":*" ]
-
-  inputs = get_target_outputs(":ld-test-switches.rsp")
-  cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
-}
-
 source_set("load-tests") {
   visibility = [ ":*" ]
   testonly = true
@@ -106,8 +71,7 @@ source_set("load-tests") {
     "load-tests.h",
   ]
   deps = [
-    ":ld-test-switches",
-    ":load-tests-load-sets",
+    ":load-tests.load-sets",
     "..:abi-headers",
     "..:headers",
     "..:posix.headers",
@@ -117,7 +81,7 @@ source_set("load-tests") {
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
   ]
-  data_deps = [ ":load-test-data" ]
+  data_deps = [ ":load-tests.test-data" ]
   if (is_fuchsia) {
     sources += [
       "ld-load-zircon-ldsvc-tests-base.h",
@@ -143,6 +107,8 @@ source_set("load-tests") {
     ]
   } else {
     sources += [
+      "ld-load-tests-posix-base.cc",
+      "ld-load-tests-posix-base.h",
       "ld-startup-in-process-tests-posix.cc",
       "ld-startup-in-process-tests-posix.h",
       "ld-startup-spawn-process-tests-posix.cc",
@@ -156,17 +122,75 @@ source_set("load-tests") {
   configs -= [ "//build/config:no_rtti" ]
 }
 
-# This gets the ld::testing::TestElfLoadSet data used by the
-# load-tests-symbolizer.cc test cases.
-test_elf_source_set("load-tests-load-sets") {
-  visibility = [ ":*" ]
-  deps = [ ":load-tests-load-sets.basic" ]
+# Collect all the .test-data deps used by load-tests.
+load_tests_in_process = [
+  "passive-abi-basic",
+  "passive-abi-rdebug",
+  "passive-abi-many-deps",
+  "init-fini",
+  "ret17",
+  "partial-page-bss",
+  "partial-page-bss-garbage-at-eof",
+  "ld-dep",
+  "basic-dep",
+  "indirect-deps",
+  "many-deps",
+  "relative-reloc",
+  "symbolic-reloc",
+  "symbolic-namespace",
+  "indirect-deps",
+  "tls-exec-only",
+  "tls-shlib-only",
+  "tls-exec-shlib",
+  "tls-ie",
+  "tls-gd",
+  "tls-desc",
+  "tls-ld",
+  "tls-exec-only",
+  "tls-ie",
+]
+
+load_tests = [
+  "missing-dep",
+  "missing-sym",
+  "missing-transitive-dep",
+  "relro",
+  "fixed-load-address",
+  "backtrace",
+]
+
+if (is_fuchsia) {
+  load_tests_in_process += [ "llvm-profdata" ]
+  load_tests += [
+    "second-session",
+    "second-session-module",
+    "zygote",
+    "zygote-secondary",
+  ]
 }
 
-user_basic_redirect("load-tests-load-sets.basic") {
+user_basic_redirect("load-tests.test-data") {
   visibility = [ ":*" ]
   testonly = true
-  exclude_toolchain_tags = [ "instrumentation-runtime" ]
+  public_deps = []
+  foreach(test, load_tests_in_process + load_tests) {
+    public_deps += [ "modules:$test.test-data" ]
+  }
+  foreach(test, load_tests_in_process) {
+    public_deps += [ "modules:$test.in-process.test-data" ]
+  }
+}
+
+# This gets the ld::testing::TestElfLoadSet data used by the
+# load-tests-symbolizer.cc test cases.
+test_elf_source_set("load-tests.load-sets") {
+  visibility = [ ":*" ]
+  deps = [ ":load-tests.load-sets.basic" ]
+}
+
+user_basic_redirect("load-tests.load-sets.basic") {
+  visibility = [ ":*" ]
+  testonly = true
   public_deps = [
     "modules:indirect-deps.in-process.load-set",
     "modules:indirect-deps.load-set",
@@ -181,89 +205,4 @@ source_set("test-chdir-guard") {
     "//src/lib/elfldltl/testing",
     "//third_party/googletest:gtest",
   ]
-}
-
-if (!is_fuchsia) {
-  # For host tests, the test binaries must be packaged in host_test_data() at
-  # the expected path where elfldltl::testing::GetTestLib will find them.
-  test_tc = ""
-  if (is_linux) {
-    # The linux_$cpu (vs host_$cpu) handles shared libraries.
-    test_tc = "(//build/toolchain:linux_$current_cpu)"
-  }
-
-  group("load-test-data") {
-    visibility = [
-      "./*",
-      "//sdk/lib/dl/test/*",
-    ]
-    testonly = true
-    deps = [ "modules$test_tc" ]
-  }
-
-  # This is reached via data_deps from the test_executable() targets in
-  # modules/ where they will be instantiated in the same toolchain via variant
-  # selection as the test, so that ld.so.1 gets the right libprefix.
-  if (current_toolchain != shlib_toolchain) {
-    # host_test_data() adds a dep on $target_name(${toolchain_variant.base}),
-    # which drops the shlib qualifier, so there is an extra dependency on this
-    # target that shouldn't really exist.  It's crucial that the real target in
-    # $shlib_toolchain be the one reached via data_deps in modules.
-    group("ld-startup.test-data") {
-      visibility = [ "./*" ]
-      testonly = true
-    }
-  } else {
-    host_out_dir = get_label_info(".($host_toolchain)", "root_out_dir")
-    host_test_data("ld-startup.test-data") {
-      visibility = [ "./*" ]
-      deps = [ "..:ld-startup" ]
-      sources = [ "$root_out_dir/libld-startup.so" ]
-      outputs = [ "$host_out_dir/test_data/elfldltl/${toolchain_variant.libprefix}ld.so.1" ]
-    }
-  }
-} else {
-  # On Fuchsia these are just included in /pkg/... implicitly by dint of being
-  # in data_deps of the test code.  But we want to repackage those deps to put
-  # them into /pkg/lib/test/... instead so they can be fetched as executable
-  # via fuchsia.ldsvc.
-
-  distribution_manifest("load-test-data") {
-    visibility = [
-      "./*",
-      "//sdk/lib/dl/test/*",
-    ]
-    testonly = true
-
-    # This will collect the files from deps that would go into /pkg/... and
-    # rewrite their manifest entries to use /pkg/lib/test/... instead.
-    prefix = "lib/test"
-
-    deps = [ ":modules.basic" ]
-
-    # Make this manifest itself an input for collections via deps on this.
-    outputs = [ "$target_gen_dir/$target_name.json" ]
-    metadata = {
-      distribution_entries_files = [
-        {
-          file = rebase_path(outputs[0], root_build_dir)
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
-      ]
-    }
-  }
-
-  user_basic_redirect("modules.basic") {
-    visibility = [ ":*" ]
-    testonly = true
-    public_deps = [ "modules" ]
-  }
-
-  # The dependency on this should already be in the user.basic environment
-  # because it comes from modules:test-executable, which is reached via the
-  # modules.basic redirect above.
-  group("ld-startup.test-data") {
-    testonly = true
-    public_deps = [ "..:ld-startup" ]
-  }
 }

@@ -5,6 +5,12 @@
 #ifndef LIB_LD_TEST_LOAD_TESTS_H_
 #define LIB_LD_TEST_LOAD_TESTS_H_
 
+#include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/testing/diagnostics.h>
+
+#include <span>
+#include <string>
+
 #include <gtest/gtest.h>
 
 #ifdef __Fuchsia__
@@ -48,6 +54,36 @@ using FailTypes = TestTypes<>;
 
 TYPED_TEST_SUITE(LdLoadTests, LoadTypes);
 TYPED_TEST_SUITE(LdLoadFailureTests, FailTypes);
+
+template <typename T>
+using NewArray = elfldltl::NewArrayFromFile<T>;
+
+template <template <class Diagnostics> class File, typename FileArg>
+inline std::string FindInterp(FileArg&& file_arg) {
+  std::string result;
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  File file{std::forward<FileArg>(file_arg), diag};
+  auto scan_phdrs = [&file, &result](const auto& ehdr, const auto& phdrs) -> bool {
+    for (const auto& phdr : phdrs) {
+      if (phdr.type == elfldltl::ElfPhdrType::kInterp) {
+        size_t len = phdr.filesz;
+        if (len > 0) {
+          auto read_chars =
+              file.template ReadArrayFromFile<char>(phdr.offset, NewArray<char>{}, len - 1);
+          if (read_chars) {
+            std::span<const char> chars = read_chars->get();
+            result = std::string_view{chars.data(), chars.size()};
+            return true;
+          }
+        }
+        return false;
+      }
+    }
+    return true;
+  };
+  EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile<NewArray>(diag, file, scan_phdrs));
+  return result;
+}
 
 }  // namespace ld::testing
 

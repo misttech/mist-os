@@ -5,12 +5,12 @@
 #include "dl-system-tests.h"
 
 #include <dlfcn.h>
-#include <lib/elfldltl/testing/get-test-data.h>
 
-#include <filesystem>
+#include <cstring>
+
+#include <gtest/gtest.h>
 
 namespace dl::testing {
-
 namespace {
 
 // Consume the pending dlerror() state after a <dlfcn.h> call that failed.
@@ -56,6 +56,7 @@ fit::result<Error, void*> DlSystemTests::DlSym(void* module, const char* ref) {
 }
 
 #ifdef __Fuchsia__
+
 // Call dlopen with the mock fuchsia_ldsvc::Loader installed and check that all
 // its Needed/Expect* expectations were satisfied before clearing them.
 void* DlSystemTests::CallDlOpen(const char* file, int mode) {
@@ -64,17 +65,19 @@ void* DlSystemTests::CallDlOpen(const char* file, int mode) {
   VerifyAndClearNeeded();
   return result;
 }
-#else
-// Call dlopen with the test path modified for POSIX.
+
+#else  // POSIX, not __Fuchsia__
+
+// Call dlopen with the unadorned name, which the DT_RUNPATH in the host test
+// executable will find in a subdirectory relative to that test executable.
 void* DlSystemTests::CallDlOpen(const char* file, int mode) {
-  std::filesystem::path path;
   if (file) {
-    path = elfldltl::testing::GetTestDataPath(file);
-    file = path.c_str();
+    EXPECT_EQ(strchr(file, '/'), nullptr) << file;
   }
   return dlopen(file, mode);
 }
-#endif
+
+#endif  // __Fuchsia__
 
 void DlSystemTests::NoLoadCheck(std::string_view name) {
   auto result = DlOpen(std::string{name}.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);

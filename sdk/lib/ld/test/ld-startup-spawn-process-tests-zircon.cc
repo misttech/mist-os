@@ -21,6 +21,8 @@
 
 #include <gtest/gtest.h>
 
+#include "load-tests.h"
+
 namespace ld::testing {
 namespace {
 
@@ -97,35 +99,6 @@ class SpawnPlan {
   std::vector<fdio_spawn_action_t> actions_;
 };
 
-template <typename T>
-using NewArray = elfldltl::NewArrayFromFile<T>;
-
-std::string FindInterp(zx::unowned_vmo vmo) {
-  std::string result;
-  auto diag = elfldltl::testing::ExpectOkDiagnostics();
-  elfldltl::UnownedVmoFile file{vmo->borrow(), diag};
-  auto scan_phdrs = [&file, &result](const auto& ehdr, const auto& phdrs) -> bool {
-    for (const auto& phdr : phdrs) {
-      if (phdr.type == elfldltl::ElfPhdrType::kInterp) {
-        size_t len = phdr.filesz;
-        if (len > 0) {
-          auto read_chars = file.ReadArrayFromFile<char>(
-              phdr.offset, elfldltl::NewArrayFromFile<char>{}, len - 1);
-          if (read_chars) {
-            cpp20::span<const char> chars = read_chars->get();
-            result = std::string_view{chars.data(), chars.size()};
-            return true;
-          }
-        }
-        return false;
-      }
-    }
-    return true;
-  };
-  EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile<NewArray>(diag, file, scan_phdrs));
-  return result;
-}
-
 }  // namespace
 
 LdStartupSpawnProcessTests::~LdStartupSpawnProcessTests() = default;
@@ -137,6 +110,9 @@ void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> ar
 }
 
 void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
+  // This points GetLibVmo() to the right place.
+  LdsvcPathPrefix(executable_name);
+
   ASSERT_NO_FATAL_FAILURE(executable_ = GetExecutableVmo(executable_name));
 
   // The program launcher service first uses the loader service channel to look
@@ -144,10 +120,13 @@ void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
   // the dynamic linker.  So inject an expectation before any from the test
   // itself calling Needed.
   std::string interp;
-  ASSERT_NO_FATAL_FAILURE(interp = FindInterp(executable_.borrow()));
+  ASSERT_NO_FATAL_FAILURE(interp = FindInterp<elfldltl::UnownedVmoFile>(executable_.borrow()));
   if (!interp.empty()) {
     ASSERT_NO_FATAL_FAILURE(LdsvcExpectDependency(interp));
   }
+
+  // Prime the mock loader service from the Needed() calls.
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 }
 
 int64_t LdStartupSpawnProcessTests::Run() {

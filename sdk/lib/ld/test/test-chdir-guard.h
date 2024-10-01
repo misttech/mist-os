@@ -5,15 +5,18 @@
 #ifndef LIB_LD_TEST_TEST_CHDIR_GUARD_H_
 #define LIB_LD_TEST_TEST_CHDIR_GUARD_H_
 
+#include <fbl/unique_fd.h>
+
 namespace ld::testing {
 
 class TestChdirGuard {
  public:
-  explicit TestChdirGuard();
+  explicit TestChdirGuard(int dir_fd);
+
   ~TestChdirGuard();
 
  private:
-  int cwd_ = -1;
+  fbl::unique_fd cwd_;
 };
 
 }  // namespace ld::testing

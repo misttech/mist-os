@@ -358,13 +358,7 @@ source_set("startup-load") {
 }
 
 shared_library("ld-startup") {
-  visibility = [
-    ":*",
-
-    # TODO(https://fxbug.dev/335737373): The test-data bits will be refactored
-    # soon to go via the ld-startup.user target.
-    "test:ld-startup.test-data",
-  ]
+  visibility = [ ":*" ]
 
   configs += [ ":abi-soname" ]
 
@@ -412,16 +406,9 @@ shared_library("ld-startup") {
       {
         destination = "lib/${toolchain_variant.libprefix}$abi_soname"
         source = rebase_path(output_path, root_build_dir)
-        label = get_label_info(target_name, "label_with_toolchain")
+        label = get_label_info(":$target_name", "label_with_toolchain")
       },
     ]
-
-    # This is collected by test:ld-test-switches.rsp.  The user_basic_redirect
-    # may wind up in a different variant than the one requested, if the test's
-    # variant isn't available in user.basic, so we don't know statically which
-    # libprefix the test should load from.
-    ld_test_switches =
-        [ "'-DLD_TEST_LIBPREFIX=\"${toolchain_variant.libprefix}\"'" ]
   }
 }
 

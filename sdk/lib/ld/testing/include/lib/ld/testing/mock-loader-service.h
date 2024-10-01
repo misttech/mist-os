@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
 #include <lib/zx/result.h>
 
+#include <filesystem>
 #include <string_view>
 
 #include <gmock/gmock.h>
@@ -94,6 +95,13 @@ class MockLoaderServiceForTest {
   MockLoaderServiceForTest(const MockLoaderServiceForTest&) = delete;
   MockLoaderServiceForTest(MockLoaderServiceForTest&&) = delete;
 
+  // Set the prefix used on names to look up using the ambient loader service.
+  void set_path_prefix(const std::filesystem::path& path) { path_prefix_ = path; }
+
+  // Fetch a VMO from the ambient loader service using the prefix set by
+  // set_path_prefix().
+  zx::vmo GetVmo(std::string_view name);
+
   // Prime the mock loader with the VMOs for the list of dependency names, and
   // add the expectation on the mock loader that it will receive a LoadObject
   // request for each of these dependencies in the order that they are listed.
@@ -148,19 +156,14 @@ class MockLoaderServiceForTest {
   // satisfied and then clear its expectations list.
   void VerifyAndClearExpectations();
 
-  // Fetch a the root module VMO from a specific path in the test package.
-  static zx::vmo GetRootModuleVmo(std::string_view name);
-
   // Short-circuit the FIDL protocol and just do what the protocol call would.
   zx::result<zx::vmo> LoadObject(std::string_view name);
 
  private:
   void ReadyMock();
 
-  // Fetch a dependency VMO from a specific path in the test package.
-  static zx::vmo GetDepVmo(std::string_view name);
-
   std::unique_ptr<MockLoaderService> mock_loader_;
+  std::filesystem::path path_prefix_;
 };
 
 }  // namespace ld::testing

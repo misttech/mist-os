@@ -40,16 +40,24 @@ class LdLoadTestsBase {
 
   std::string CollectLog();
 
-  // This is the least-common-denominator version used in non-Fuchsia tests.
-  // All the Fuchsia-specific test fixtures should override this (e.g. via
-  // LdLoadZirconLdsvcTestsBase).
+  // These just append to the TakeNeededLibs() list, which will be consumed by
+  // the subclass Load() method in the appropriate fashion for its context.
   void Needed(std::initializer_list<std::string_view> names);
-
   void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
   ~LdLoadTestsBase();
 
  protected:
+  struct NeededLib {
+    // Convertible from the initializer list elements in Needed calls.
+    explicit(false) NeededLib(std::string_view lib_name) : name{lib_name} {}
+    explicit(false) NeededLib(std::pair<std::string_view, bool> pair)
+        : name{pair.first}, found{pair.second} {}
+
+    std::string name;
+    bool found = true;
+  };
+
   static constexpr std::string_view kTestExecutableInProcessSuffix = ".in-process";
 
   // This is overridden by LdStartupInProcessTests.
@@ -73,12 +81,12 @@ class LdLoadTestsBase {
     std::move(diag).Release();
   }
 
+  std::vector<NeededLib> TakeNeededLibs() { return std::exchange(needed_libs_, {}); }
+
  private:
+  std::vector<NeededLib> needed_libs_;
   std::unique_ptr<elfldltl::testing::TestPipeReader> log_;
 };
-
-// The name given to elfldltl::GetTestLib to find the dynamic linker.
-extern const std::string kLdStartupName;
 
 }  // namespace ld::testing
 

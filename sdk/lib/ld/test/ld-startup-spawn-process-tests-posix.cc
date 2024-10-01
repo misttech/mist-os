@@ -32,17 +32,14 @@ std::vector<char*> ArgvPtrs(const std::vector<std::string>& argv) {
   return argv_ptrs;
 }
 
-// TODO(mcgrathr): The nicer thing to use is posix_spawn, and that's a closer
-// parallel with fdio_spawn that is used on Fuchsia.  However, the POSIX
-// standard API doesn't have the features like addfchdir_np and it's nicer to
-// only change that state in the child rather than also in the parent.  Newer
-// glibc (Linux) versions support extensions that are sufficient for the needs,
-// but //prebuilt/third_party/sysroot/linux currently uses an older glibc
-// without them.  So this code can be used at some point in the future and is a
-// bit preferable then, but the alternative below using the traditional
-// fork/exec model that actually underlies posix_spawn on traditional POSIX
-// systems is used instead for now.
-#if 0
+// The nicer thing to use is posix_spawn, and that's a closer parallel with
+// fdio_spawn that is used on Fuchsia.  However, the POSIX standard API doesn't
+// have the features like addfchdir_np and it's nicer to only change that state
+// in the child rather than also in the parent.  Newer glibc (Linux) versions
+// support extensions that are sufficient for the needs:
+//  * 2.29 added posix_spawn_file_actions_addfchdir_np.
+//  * 2.34 added posix_spawn_file_actions_addclosefrom_np
+#if defined(__GLIBC_PREREQ) && __GLIBC_PREREQ(2, 34)
 
 // The SpawnPlan object collects actions to be applied by posix_spawn.
 // All the fd's passed to it must remain live until posix_spawn is called.
@@ -161,17 +158,16 @@ void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> ar
 }
 
 void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
+  ASSERT_NO_FATAL_FAILURE(LoadTestDir(executable_name));
   executable_ = executable_name;
+  ASSERT_NO_FATAL_FAILURE(CheckNeededLibs());
 }
 
 int64_t LdStartupSpawnProcessTests::Run() {
   SpawnPlan spawn;
 
   // Change into the directory where all the test ELF files can be found.
-  std::filesystem::path test_dir_path = elfldltl::testing::GetTestDataPath(".");
-  fbl::unique_fd test_dir{open(test_dir_path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
-  EXPECT_TRUE(test_dir) << test_dir_path << ": " << strerror(errno);
-  spawn.Fchdir(test_dir.get());
+  spawn.Fchdir(test_dir());
 
   // Put /dev/null on stdin and stdout.  They should not be used.
   fbl::unique_fd null_fd{open("/dev/null", O_RDWR, O_CLOEXEC)};

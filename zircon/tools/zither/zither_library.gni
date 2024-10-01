@@ -329,6 +329,10 @@ template("_zither") {
         }
       }
       deps = [ fidl_ir_target ]
+
+      metadata = {
+        distribution_entries_barrier = []
+      }
     }
 
     # Ensures that the outputs were fully specified above.

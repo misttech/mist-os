@@ -46,14 +46,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});
 
-  void Needed(std::initializer_list<std::string_view> names) { mock_loader_.Needed(names); }
-
-  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
-    mock_loader_.Needed(name_found_pairs);
-  }
-
-  void VerifyAndClearNeeded() { mock_loader_.VerifyAndClearExpectations(); }
-
   void Load(std::string_view executable_name) {
     elfldltl::testing::ExpectOkDiagnostics diag;
     ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name, false));
@@ -86,7 +78,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   auto GetDepFunction(Diagnostics& diag) {
     return [this, &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
       RemoteModule::Decoded::Ptr decoded;
-      auto vmo = mock_loader_.LoadObject(soname.str());
+      auto vmo = mock().LoadObject(soname.str());
       if (vmo.is_ok()) [[likely]] {
         // If it returned fit::ok(zx::vmo{}), keep going without this module.
         if (*vmo) [[likely]] {
@@ -123,6 +115,12 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   template <class Diagnostics>
   void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
     Linker linker;
+
+    // This points GetLibVmo() to the right place.
+    LdsvcPathPrefix(executable_name);
+
+    // Prime the mock loader service from the Needed() calls.
+    ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
     // Decode the main executable.
     zx::vmo vmo;
@@ -222,7 +220,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   zx::vmar root_vmar_;
   zx::thread thread_;
   zx::channel bootstrap_sender_;
-  MockLoaderServiceForTest mock_loader_;
 };
 
 }  // namespace ld::testing
