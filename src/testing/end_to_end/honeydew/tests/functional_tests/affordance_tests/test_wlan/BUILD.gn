@@ -13,7 +13,13 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller-preferred"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
   }
 
@@ -24,7 +30,13 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller-preferred"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
@@ -37,7 +49,13 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
@@ -50,7 +68,13 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]

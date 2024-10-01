@@ -22,7 +22,6 @@ class DriverFactory:
     def __init__(
         self,
         honeydew_config: dict[str, Any],
-        transport: str,
         multi_device: bool = False,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
@@ -31,7 +30,6 @@ class DriverFactory:
         """Initializes the instance.
         Args:
           honeydew_config: Honeydew configuration.
-          transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly testbed params file.
@@ -39,7 +37,6 @@ class DriverFactory:
           ssh_path: absolute path to the SSH binary.
         """
         self._honeydew_config = honeydew_config
-        self._transport = transport
         self._multi_device = multi_device
         self._config_path = config_path
         self._params_path = params_path
@@ -58,7 +55,6 @@ class DriverFactory:
         if not botanist_config_path:
             return local.LocalDriver(
                 honeydew_config=self._honeydew_config,
-                transport=self._transport,
                 multi_device=self._multi_device,
                 config_path=self._config_path,
                 params_path=self._params_path,
@@ -67,7 +63,6 @@ class DriverFactory:
             return infra.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],
                 honeydew_config=self._honeydew_config,
-                transport=self._transport,
                 params_path=self._params_path,
                 ssh_path=self._ssh_path,
             )

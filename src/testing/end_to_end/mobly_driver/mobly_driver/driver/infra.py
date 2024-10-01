@@ -31,7 +31,6 @@ class InfraDriver(base.BaseDriver):
         self,
         tb_json_path: str,
         honeydew_config: dict[str, Any],
-        transport: str,
         output_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ssh_path: Optional[str] = None,
@@ -41,7 +40,6 @@ class InfraDriver(base.BaseDriver):
         Args:
           tb_json_path: absolute path to the testbed definition JSON file.
           honeydew_config: Honeydew configuration.
-          transport: host->target transport type to use.
           output_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
 
@@ -50,7 +48,6 @@ class InfraDriver(base.BaseDriver):
         """
         super().__init__(
             honeydew_config=honeydew_config,
-            transport=transport,
             output_path=output_path,
             params_path=params_path,
         )
@@ -100,7 +97,6 @@ class InfraDriver(base.BaseDriver):
                 testbed_name=self._TESTBED_NAME,
                 output_path=self._output_path,
                 honeydew_config=self._honeydew_config,
-                transport=self._transport,
                 mobly_controllers=tb_config,
                 test_params_dict=test_params,
                 botanist_honeydew_map=botanist_honeydew_translation_map,

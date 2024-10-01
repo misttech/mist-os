@@ -48,7 +48,6 @@ class BaseMoblyDriverTest(unittest.TestCase):
         with patch.dict(os.environ, test_env, clear=True):
             d = base.BaseDriver(  # type: ignore[abstract]
                 honeydew_config={},
-                transport="transport",
                 output_path=output_path,
             )
             self.assertEqual(d._output_path, expected_output_path)
@@ -60,6 +59,4 @@ class BaseMoblyDriverTest(unittest.TestCase):
         """Test case for initialization failure"""
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(KeyError):
-                base.BaseDriver(  # type: ignore[abstract]
-                    honeydew_config={}, transport="transport"
-                )
+                base.BaseDriver(honeydew_config={})  # type: ignore[abstract]

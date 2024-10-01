@@ -35,7 +35,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for successful config generation from file"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
             config_path="config/path",
             params_path="params/path",
@@ -56,7 +55,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for successful config without params generation"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
             config_path="config/path",
         )
@@ -77,7 +75,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for exception being raised on invalid YAML content"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
             config_path="config/path",
         )
@@ -94,7 +91,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for exception being raised for invalid path"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
             config_path="/does/not/exist",
         )
@@ -128,7 +124,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for successful env config generation"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
         )
         ret = driver.generate_test_config()
@@ -178,7 +173,6 @@ class LocalDriverTest(unittest.TestCase):
 
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
             multi_device=True,
         )
@@ -226,7 +220,6 @@ class LocalDriverTest(unittest.TestCase):
 
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
             multi_device=False,
         )
@@ -255,7 +248,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for exception being raised when no devices are found"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
@@ -273,7 +265,6 @@ class LocalDriverTest(unittest.TestCase):
         """Test case for exception being raised from discovery failure"""
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
@@ -299,7 +290,6 @@ class LocalDriverTest(unittest.TestCase):
         mock_check_output.return_value = discovery_output
         driver = local.LocalDriver(
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="output/path",
         )
         with self.assertRaises(common.DriverException):

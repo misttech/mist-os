@@ -19,6 +19,16 @@ import fidl.fuchsia_wlan_sme as f_wlan_sme
 _PSK_LENGTH = 64
 
 
+class Implementation(enum.StrEnum):
+    """Different WLAN affordance implementations available."""
+
+    # Use WLAN affordances that is implemented using Fuchsia-Controller
+    FUCHSIA_CONTROLLER = "fuchsia-controller"
+
+    # Use WLAN affordances that is implemented using SL4F
+    SL4F = "sl4f"
+
+
 @dataclass(frozen=True)
 class MacAddress:
     """MAC address following the EUI-48 identifier format.

@@ -19,10 +19,12 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 # List all the public methods
 def create_device(
     device_info: custom_types.DeviceInfo,
-    transport: custom_types.TRANSPORT,
     ffx_config: custom_types.FFXConfig,
     # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
     config: dict[str, Any] | None = None,
+    # TODO(b/369445945): will be deleted after antlion migrates to use "config"
+    # pylint: disable-next=unused-argument
+    transport: custom_types.TRANSPORT | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -90,7 +92,6 @@ def create_device(
         return fuchsia_device.FuchsiaDevice(
             device_info,
             ffx_config,
-            transport,
             config,
         )
     except errors.HoneydewError as err:

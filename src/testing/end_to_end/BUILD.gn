@@ -55,7 +55,7 @@ template("group_with_no_dir_target_deps") {
 # core.x64
 group_with_no_dir_target_deps("core_x64_stable_sl4f_tests") {
   testonly = true
-  public_deps = [ "examples/test_soft_reboot:test_soft_reboot_fc_preferred" ]
+  public_deps = [ "examples/test_soft_reboot:test_soft_reboot_sl4f" ]
 }
 
 group_with_no_dir_target_deps("core_x64_stable_tests") {

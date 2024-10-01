@@ -52,18 +52,14 @@ class DriverFactoryTest(unittest.TestCase):
         expected_driver_type: type,
     ) -> None:
         """Test case to ensure driver resolution success"""
-        factory = driver_factory.DriverFactory(
-            honeydew_config=_HONEYDEW_CONFIG, transport="transport"
-        )
+        factory = driver_factory.DriverFactory(honeydew_config=_HONEYDEW_CONFIG)
         with mock.patch.dict(os.environ, test_env, clear=True):
             driver = factory.get_driver()
         self.assertEqual(type(driver), expected_driver_type)
 
     def test_get_driver_unexpected_env_raises_exception(self) -> None:
         """Test case to ensure exception is raised on unexpected env"""
-        factory = driver_factory.DriverFactory(
-            honeydew_config=_HONEYDEW_CONFIG, transport="transport"
-        )
+        factory = driver_factory.DriverFactory(honeydew_config=_HONEYDEW_CONFIG)
 
         # Undefined "api_infra.BOT_ENV_TEST_OUTDIR".
         invalid_infra_env = {api_infra.BOT_ENV_TESTBED_CONFIG: "botanist.json"}

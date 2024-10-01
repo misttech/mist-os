@@ -172,11 +172,6 @@ import("//build/testing/host_test_data.gni")
 #     Even if these keys are present in the original user specified honeydew_config, they will be
 #     over written by mobly-driver with appropriate information.
 #
-#  transport (required)
-#    Transport to be used by HoneyDew while performing majority of the
-#    host-target interactions. Valid values are "fuchsia-controller" and "fuchsia-controller-preferred".
-#    Type: String
-#
 #  ssh_path (optional)
 #    Path to the ssh binary to be used by Antlion connectivity testbeds for connecting
 #    to access points.
@@ -233,11 +228,6 @@ import("//build/testing/host_test_data.gni")
 
 template("python_mobly_test") {
   assert(defined(invoker.main_source), "main_source is required")
-  assert(defined(invoker.transport), "transport is required")
-  assert(
-      invoker.transport == "fuchsia-controller" ||
-          invoker.transport == "fuchsia-controller-preferred",
-      "transport should be either 'fuchsia-controller' or 'fuchsia-controller-preferred' but received: " + invoker.transport)
 
   _test_name = "${target_name}"
   if (defined(invoker.test_name)) {
@@ -349,8 +339,6 @@ template("python_mobly_test") {
   _common_host_test_args = [
     "--ffx-path",
     rebase_path("${host_tools_dir}/ffx", root_build_dir),
-    "--transport",
-    invoker.transport,
     "--ffx-subtools-path",
     rebase_path(host_tools_dir, root_build_dir),
     "--ssh-path",
@@ -358,6 +346,14 @@ template("python_mobly_test") {
   ]
   if (defined(invoker.multi_fuchsia_device) && invoker.multi_fuchsia_device) {
     _common_host_test_args += [ "--multi-device" ]
+  }
+
+  # TODO(b/369445945): will be deleted after removing "transport" arg from all of "python_mobly_tests()"
+  if (defined(invoker.transport)) {
+    _common_host_test_args += [
+      "--transport",
+      invoker.transport,
+    ]
   }
 
   _additional_deps = []

@@ -23,6 +23,7 @@ class LEVEL(enum.StrEnum):
     ERROR = "Error"
 
 
+# TODO(b/369445945): will be deleted after antlion migrates to use "config" param in create_device()
 class TRANSPORT(enum.StrEnum):
     """Different Host-(Fuchsia)Target interaction transports supported."""
 
