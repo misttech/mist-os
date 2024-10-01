@@ -83,7 +83,7 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
       }
     }
     // On failure, |Vfs::Serve()| will close the channel with an epitaph.
-    vfs->Serve(vn, server_end.TakeChannel(), *clone_options);
+    vfs->ServeDeprecated(vn, server_end.TakeChannel(), *clone_options);
     return ZX_OK;
   }();
 

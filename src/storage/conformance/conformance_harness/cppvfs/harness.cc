@@ -72,7 +72,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
     ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
     zx_status_t status =
-        vfs_->Serve(std::move(dir), request.directory_request().TakeChannel(), *options);
+        vfs_->ServeDeprecated(std::move(dir), request.directory_request().TakeChannel(), *options);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Serving directory failed: " << zx_status_get_string(status);
       return;

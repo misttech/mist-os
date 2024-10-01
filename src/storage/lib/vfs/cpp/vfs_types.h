@@ -365,35 +365,13 @@ constexpr fuchsia_io::NodeProtocolKinds GetProtocols(fuchsia_io::Flags flags) {
 constexpr fuchsia_io::Rights FlagsToRights(fuchsia_io::Flags flags) {
   using fuchsia_io::Flags;
   using fuchsia_io::Rights;
-  Rights rights = {};
-  if (flags & Flags::kPermRead) {
-    rights |= Rights::kReadBytes;
-  }
-  if (flags & Flags::kPermWrite) {
-    rights |= Rights::kWriteBytes;
-  }
-  if (flags & Flags::kPermExecute) {
-    rights |= Rights::kExecute;
-  }
-  if (flags & Flags::kPermSetAttributes) {
-    rights |= Rights::kUpdateAttributes;
-  }
-  if (flags & Flags::kPermEnumerate) {
-    rights |= Rights::kEnumerate;
-  }
-  if (flags & Flags::kPermModify) {
-    rights |= Rights::kModifyDirectory;
-  }
-  if (flags & Flags::kPermConnect) {
-    rights |= Rights::kConnect;
-  }
-  if (flags & Flags::kPermTraverse) {
-    rights |= Rights::kTraverse;
-  }
-  if (flags & Flags::kPermGetAttributes) {
-    rights |= Rights::kGetAttributes;
-  }
-  return rights;
+  return static_cast<Rights>(static_cast<uint64_t>(flags) & static_cast<uint64_t>(Rights::kMask));
+}
+
+constexpr fuchsia_io::Flags RightsToFlags(fuchsia_io::Rights rights) {
+  using fuchsia_io::Flags;
+  using fuchsia_io::Rights;
+  return static_cast<Flags>(static_cast<uint64_t>(rights));
 }
 
 // Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending

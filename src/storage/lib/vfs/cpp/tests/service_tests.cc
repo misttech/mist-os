@@ -45,8 +45,8 @@ TEST(Service, ApiTest) {
   // open
   fbl::RefPtr<fs::Vnode> redirect;
   auto result = svc->ValidateOptions({});
-  EXPECT_TRUE(result.is_ok());
-  EXPECT_EQ(svc->Open(&redirect), ZX_OK);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(svc->Open(&redirect), ZX_OK);
   EXPECT_TRUE(!redirect);
 
   // protocols and attributes
@@ -57,17 +57,17 @@ TEST(Service, ApiTest) {
 
   // make some channels we can use for testing
   zx::channel c1, c2;
-  EXPECT_EQ(zx::channel::create(0u, &c1, &c2), ZX_OK);
+  ASSERT_EQ(zx::channel::create(0u, &c1, &c2), ZX_OK);
   zx_handle_t hc1 = c1.get();
 
   // serve, the connector will return success the first time
   fs::SynchronousVfs vfs;
-  EXPECT_EQ(vfs.Serve(svc, std::move(c1), {}), ZX_OK);
+  ASSERT_EQ(vfs.Serve(svc, std::move(c1), fio::Flags::kProtocolService), ZX_OK);
   EXPECT_EQ(hc1, bound_channel.get());
 
   // The connector will return failure because bound_channel is still valid we test that the error
   // is propagated back up through Serve,
-  EXPECT_EQ(ZX_ERR_IO, vfs.Serve(svc, std::move(c2), {}));
+  ASSERT_EQ(ZX_ERR_IO, vfs.Serve(svc, std::move(c2), fio::Flags::kProtocolService));
   EXPECT_EQ(hc1, bound_channel.get());
 }
 
@@ -76,8 +76,8 @@ TEST(Service, ServeDirectory) {
 
   // open client
   zx::channel c1, c2;
-  EXPECT_EQ(zx::channel::create(0u, &c1, &c2), ZX_OK);
-  EXPECT_EQ(fdio_service_connect_at(root.client.borrow().channel()->get(), "abc", c2.release()),
+  ASSERT_EQ(zx::channel::create(0u, &c1, &c2), ZX_OK);
+  ASSERT_EQ(fdio_service_connect_at(root.client.borrow().channel()->get(), "abc", c2.release()),
             ZX_OK);
 
   // Close client. We test the semantic that a pending open is processed even if the client has been
@@ -95,7 +95,7 @@ TEST(Service, ServeDirectory) {
   });
   directory->AddEntry("abc", vnode);
 
-  EXPECT_EQ(vfs.ServeDirectory(directory, std::move(root.server)), ZX_OK);
+  ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root.server)), ZX_OK);
   EXPECT_EQ(ZX_ERR_BAD_STATE, loop.RunUntilIdle());
 }
 

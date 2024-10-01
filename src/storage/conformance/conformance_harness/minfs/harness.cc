@@ -91,8 +91,8 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
     PopulateDirectory(request.root().entries(), *directory);
     zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
     ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
-    zx_status_t status =
-        runner_->Serve(std::move(directory), request.directory_request().TakeChannel(), *options);
+    zx_status_t status = runner_->ServeDeprecated(
+        std::move(directory), request.directory_request().TakeChannel(), *options);
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve test directory: %s",
                   zx_status_get_string(status));
   }

@@ -24,6 +24,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
+#include "fidl/fuchsia.io/cpp/common_types.h"
 #include "src/storage/lib/vfs/cpp/vfs.h"
 
 namespace fs {
@@ -59,6 +60,8 @@ struct FilesystemInfo {
 // Vfs specialization that adds Fuchsia-specific
 class FuchsiaVfs : public Vfs {
  private:
+  friend class internal::DirectoryConnection;  // To allow access to ServeResult
+
   // To deal with the lifetime issues with connections, we roll our own (limited) shared/weak
   // pointers.  We can't easily use shared_ptr because that would involve changing all the clients,
   // or would incur some overheads that we don't need.  Connections cannot be terminated
@@ -162,19 +165,21 @@ class FuchsiaVfs : public Vfs {
   //
   // *NOTE*: |vnode| must be opened before calling this function, and will be automatically closed
   // on failure. This does not apply to node reference connections, which should not open |vnode|.
-  zx_status_t Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
-                    VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
+  // TODO(https://fxbug.dev/324111653): Remove this method when we no longer need to support Open1.
+  zx_status_t ServeDeprecated(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
+                              VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
-  // Serve |open_result| using negotiated protocol and specified |rights|. On failure,
-  // |object_request| is left in a usable state for the caller to close.
+  // Begins serving VFS messages over the specified channel. The protocol to use will be determined
+  // by the intersection of the protocols requested in |flags| and those supported by |vnode|.
+  // The connection rights will be set to the |fuchsia.io/Flags.PERM_*| bits present in |flags|.
+  // |server_end| usually speaks a protocol that composes |fuchsia.io/Node|, but may speak an
+  // arbitrary arbitrary protocol for service connections.
   //
-  // *NOTE*: |rights| and |flags| are ignored for services.
-  zx::result<> Serve3(Open2Result open_result, fuchsia_io::Rights rights,
-                      zx::channel& object_request, fuchsia_io::Flags flags,
-                      const fuchsia_io::wire::Options& options);
+  // On failure, |channel| will be closed with an epitaph matching the returned status.
+  zx_status_t Serve(fbl::RefPtr<Vnode> vn, zx::channel channel, fuchsia_io::Flags flags);
 
-  // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
-  // be a directory.
+  // Serves a Vnode over the specified channel (used for creating new filesystems); the
+  // Vnode must be a directory.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,
                              fidl::ServerEnd<fuchsia_io::Directory> server_end,
                              fuchsia_io::Rights rights);
@@ -199,10 +204,22 @@ class FuchsiaVfs : public Vfs {
   // |Shutdown| returns.
   virtual void Shutdown(ShutdownCallback closure) = 0;
 
+  // Serve |open_result| using negotiated protocol and specified |rights|. On failure, if
+  // |object_request| was not consumed, the caller should close it with an epitaph.
+  //
+  // *NOTE*: |rights| and |flags| are ignored for services.
+  zx::result<> ServeResult(Open2Result open_result, fuchsia_io::Rights rights,
+                           zx::channel& object_request, fuchsia_io::Flags flags,
+                           const fuchsia_io::wire::Options& options);
+
+  // On success, starts handling requests for |vnode| over |server_end|. On failure, callers are
+  // responsible for closing |server_end|.
+  zx_status_t ServeImpl(fbl::RefPtr<Vnode> vn, zx::channel& server_end, fuchsia_io::Flags flags);
+
   // On success, starts handling requests for |vnode| over |server_end|. On failure, callers are
   // responsible for closing |vnode| and |server_end|.
-  zx_status_t ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
-                        VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
+  zx_status_t ServeDeprecatedImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
+                                  VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of
   // |connection|. Consumes |channel| on success. On error, callers must close the associated vnode.

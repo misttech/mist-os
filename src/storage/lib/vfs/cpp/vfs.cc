@@ -193,12 +193,12 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
   FS_PRETTY_TRACE_DEBUG("Vfs::Open3: path: '", path, "', flags: ", flags, ", options: ", *options,
                         ", rights: ", connection_rights);
 
-  const bool should_truncate = static_cast<bool>(flags & fio::Flags::kFileTruncate);
-  if (should_truncate && !(connection_rights & fio::Rights::kWriteBytes)) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
   std::lock_guard lock(vfs_lock_);
+
+  if (ReadonlyLocked() && (connection_rights & fs::kAllMutableIo2Rights)) {
+    FS_PRETTY_TRACE_DEBUG("Vfs::Open3: Rights incompatible, filesystem is read-only.");
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
   // Traverse directory tree until last component, updating |vndir| and |path| in-place.
   if (zx_status_t status = Traverse(vndir, path); status != ZX_OK) {
     return zx::error(status);
@@ -264,17 +264,12 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
     return Open2Result::Remote(std::move(vn), ".");
   }
 
-  if (ReadonlyLocked() && (connection_rights & fs::kAllMutableIo2Rights)) {
-    FS_PRETTY_TRACE_DEBUG("Vfs::Open3: Rights incompatible, filesystem is read-only.");
-    return zx::error(ZX_ERR_ACCESS_DENIED);
-  }
+  // Determine if the protocols and rights specified in |flags| are compatible with |vn|.
   zx::result protocol = internal::NegotiateProtocol(flags, vn->GetProtocols());
   if (protocol.is_error()) {
     return protocol.take_error();
   }
-
-  const fuchsia_io::Rights rights = internal::FlagsToRights(flags);
-  if (!vn->ValidateRights(rights)) {
+  if (!vn->ValidateRights(internal::FlagsToRights(flags))) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
@@ -283,14 +278,16 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
     return Open2Result::Local(std::move(vn), *protocol);
   }
 
-  zx::result opened_node = Open2Result::OpenVnode(std::move(vn), *protocol);
-  // If we opened the node as a file, truncate it if required.
-  if (opened_node.is_ok() && opened_node->protocol() == VnodeProtocol::kFile && should_truncate) {
-    if (zx_status_t status = opened_node->vnode()->Truncate(0); status != ZX_OK) {
+  // Open the Vnode with the negotiated protocol.
+  zx::result open_result = Open2Result::OpenVnode(std::move(vn), *protocol);
+  // Handle truncating the vnode if we opened a file and the request requires it.
+  const bool truncate = (*protocol == VnodeProtocol::kFile) && (flags & fio::Flags::kFileTruncate);
+  if (open_result.is_ok() && truncate) {
+    if (zx_status_t status = open_result->vnode()->Truncate(0); status != ZX_OK) {
       return zx::error(status);
     }
   }
-  return opened_node;
+  return open_result;
 }
 
 zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool must_be_dir) {

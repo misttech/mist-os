@@ -16,6 +16,7 @@
 
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "zircon/status.h"
 
 namespace {
 
@@ -37,7 +38,7 @@ class TestVNode : public fs::Vnode {
   }
 };
 
-TEST(ConnectionRightsTest, GetBackingMemoryWithServe) {
+TEST(ConnectionRightsTest, GetBackingMemoryWithServeDeprecated) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_EQ(loop.StartThread(), ZX_OK);
 
@@ -98,7 +99,7 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe) {
       auto file = fidl::Endpoints<fio::File>::Create();
       zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(row.connection_flags);
       ASSERT_TRUE(options.is_ok());
-      vfs->Serve(vnode, file.server.TakeChannel(), *options);
+      vfs->ServeDeprecated(vnode, file.server.TakeChannel(), *options);
 
       // Call FileGetBuffer on the channel with the testcase's request flags. Check that we get the
       // expected result.
@@ -128,14 +129,14 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe) {
   loop.Shutdown();
 }
 
-TEST(ConnectionRightsTest, GetBackingMemoryWithServe3) {
+TEST(ConnectionRightsTest, GetBackingMemoryWithServe) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_EQ(loop.StartThread(), ZX_OK);
 
   std::unique_ptr<fs::ManagedVfs> vfs = std::make_unique<fs::ManagedVfs>(loop.dispatcher());
 
   struct TestCase {
-    fio::Rights rights;
+    fio::Flags flags;
     fio::VmoFlags get_backing_memory_flags;
     zx_status_t get_backing_memory_result;  // What we expect FileGetBuffer to return.
   };
@@ -143,33 +144,31 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe3) {
   TestCase test_data[] = {
       // If the connection has all rights, then everything should work.
       {
-          .rights = fio::Rights::kReadBytes | fio::Rights::kWriteBytes | fio::Rights::kExecute,
+          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead,
           .get_backing_memory_result = ZX_OK,
       },
       {
-          .rights = fio::Rights::kReadBytes | fio::Rights::kWriteBytes | fio::Rights::kExecute,
+          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kWrite,
           .get_backing_memory_result = ZX_OK,
       },
       {
-          .rights = fio::Rights::kReadBytes | fio::Rights::kWriteBytes | fio::Rights::kExecute,
+          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute,
           .get_backing_memory_result = ZX_OK,
       },
       // If the connection is missing the EXECUTABLE right, then requests with
       // fio::wire::VmoFlags::kExecute should fail.
       {
-          .rights = fio::Rights::kReadBytes | fio::Rights::kWriteBytes,
+          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute,
           .get_backing_memory_result = ZX_ERR_ACCESS_DENIED,
       },
-
       // If the connection is missing the WRITABLE right, then requests with
       // fio::wire::VmoFlags::kWrite should fail.
       {
-
-          .rights = fio::Rights::kReadBytes | fio::Rights::kExecute,
+          .flags = fio::Flags::kPermRead | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kWrite,
           .get_backing_memory_result = ZX_ERR_ACCESS_DENIED,
       },
@@ -179,13 +178,9 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe3) {
     auto vnode = fbl::MakeRefCounted<TestVNode>();
     for (const auto& test_case : test_data) {
       // Set up a vfs connection with the testcase's connection flags
-      zx::result open_result = fs::Vfs::Open2Result::OpenVnode(vnode, fs::VnodeProtocol::kFile);
-      ASSERT_TRUE(open_result.is_ok()) << open_result.status_string();
-
       auto file = fidl::Endpoints<fio::File>::Create();
-      auto serve_result =
-          vfs->Serve3(*std::move(open_result), test_case.rights, file.server.channel(), {}, {});
-      ASSERT_TRUE(serve_result.is_ok()) << serve_result.status_string();
+      auto serve_result = vfs->Serve(vnode, file.server.TakeChannel(), test_case.flags);
+      ASSERT_EQ(serve_result, ZX_OK) << zx_status_get_string(serve_result);
       // Call FileGetBuffer on the channel with the testcase's request flags. Check that we get the
       // expected result.
       const fidl::WireResult result =
