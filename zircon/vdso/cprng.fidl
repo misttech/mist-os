@@ -33,9 +33,7 @@ closed protocol Cprng {
     ///
     /// Clients that require a large volume of randomness should consider using these
     /// bytes to seed a user-space random number generator for better performance.
-    /// "Large" here would mean a large multiple of `ZX_CPRNG_DRAW_MAX_LEN`, which is
-    /// currently 256. As always, test the actual latency of your call site before
-    /// optimizing.
+    /// As always, test the actual latency of your call site before optimizing.
     ///
     /// ## Rights
     ///
