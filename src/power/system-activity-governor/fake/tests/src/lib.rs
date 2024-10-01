@@ -33,7 +33,7 @@ async fn create_test_env() -> TestEnv {
     let component_ref = builder
         .add_child(
             "fake-system-activity-governor",
-            "#meta/fake-system-activity-governor.cm",
+            "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
             ChildOptions::new(),
         )
         .await
@@ -51,6 +51,17 @@ async fn create_test_env() -> TestEnv {
                 .capability(Capability::protocol_by_name("fuchsia.power.broker.Topology"))
                 .from(&power_broker_ref)
                 .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+
+    // Expose config capabilities to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.UseSuspender"))
+                .from(Ref::void())
+                .to(&component_ref),
         )
         .await
         .unwrap();

@@ -35,7 +35,7 @@
             url: "power-broker#meta/power-broker.cm",
         },
         {
-            name: "system-activity-governor",
+            name: "test-system-activity-governor",
             url: "system-activity-governor#meta/system-activity-governor.cm",
         },
         {
@@ -82,7 +82,7 @@
             to: [
                 "#fake-hrtimer",
                 "#kernel",
-                "#system-activity-governor",
+                "#test-system-activity-governor",
             ],
         },
         {
@@ -95,7 +95,7 @@
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
             ],
-            from: "#system-activity-governor",
+            from: "#test-system-activity-governor",
             to: [ "#kernel" ],
         },
         {

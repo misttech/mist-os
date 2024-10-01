@@ -11,6 +11,7 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon::Duration;
 use futures::{TryFutureExt, TryStreamExt};
+use sag_config::Config;
 use {fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker};
 
 const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(10);
@@ -65,14 +66,31 @@ async fn main() -> Result<()> {
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     fuchsia_inspect::component::health().set_starting_up();
 
+    let config = Config::take_from_startup_handle();
+    inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
+
     // Set up the SystemActivityGovernor.
-    let suspender = match connect_to_suspender().await {
-        Ok(s) => Some(s),
-        Err(e) => {
-            tracing::warn!("Unable to connect to suspender protocol: {e:?}");
-            None
+    let use_suspender = config.use_suspender;
+    tracing::info!("use_suspender={use_suspender}");
+    let suspender = if use_suspender {
+        // TODO(https://fxbug.dev/361403498): Re-attempt to connect to suspender indefinitely once
+        // dependents have aligned on the use of structured config for SAG.
+        tracing::info!("Attempting to connect to suspender...");
+        match connect_to_suspender().await {
+            Ok(s) => {
+                tracing::info!("Connected to suspender");
+                Some(s)
+            }
+            Err(e) => {
+                tracing::warn!("Unable to connect to suspender protocol: {e:?}");
+                None
+            }
         }
+    } else {
+        tracing::info!("Skipping connecting to suspender.");
+        None
     };
+
     let sag = SystemActivityGovernor::new(
         &connect_to_protocol::<fbroker::TopologyMarker>()?,
         inspector.root().clone_weak(),

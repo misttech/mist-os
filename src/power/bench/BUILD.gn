@@ -42,6 +42,7 @@ if (is_fuchsia) {
     ]
     testonly = true
     manifest = "meta/power-framework-microbenchmarks.cml"
+    subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
   }
 }
 
@@ -91,6 +92,7 @@ fuchsia_test_package("package") {
     "//src/power/system-activity-governor:component",
     "//src/power/topology-test-daemon:component",
   ]
+  subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
 }
 
 group("integration") {

@@ -360,6 +360,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -426,6 +429,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -477,6 +483,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -550,6 +559,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -641,6 +653,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -708,6 +723,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -799,6 +817,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -866,6 +887,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -936,6 +960,9 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                 },
                 wake_leases: {},
                 ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+                config: {
+                    use_suspender: true,
+                },
                 "fuchsia.inspect.Health": contains {
                     status: "OK",
                 },
@@ -1009,6 +1036,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1074,6 +1104,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1146,6 +1179,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1202,6 +1238,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1274,6 +1313,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1330,6 +1372,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1535,6 +1580,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1719,6 +1767,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1792,6 +1843,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1909,6 +1963,9 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2094,6 +2151,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2143,6 +2203,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2514,6 +2577,9 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
         activity_governor_moniker,
         root: contains {
             wake_leases: {},
+            config: {
+                use_suspender: true,
+            },
         }
     );
 
@@ -2652,6 +2718,9 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         activity_governor_moniker,
         root: contains {
             wake_leases: {},
+            config: {
+                use_suspender: true,
+            },
         }
     );
 

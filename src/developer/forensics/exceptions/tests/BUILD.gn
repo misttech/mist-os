@@ -306,6 +306,8 @@ fuchsia_test_package("wake-lease-integration-test") {
     "//src/power/broker:component",
     "//src/power/system-activity-governor:component",
   ]
+
+  subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
 }
 
 ###############################################################################

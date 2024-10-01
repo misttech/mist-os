@@ -37,6 +37,7 @@ fuchsia_unittest_package("topology-test-daemon-integration-test") {
   test_specs = {
     environments = basic_envs
   }
+  subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
 }
 
 group("tests") {

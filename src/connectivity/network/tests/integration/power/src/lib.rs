@@ -41,11 +41,25 @@ async fn create_power_realm<'a>(
     const PB_URL: &str = "#meta/power-broker.cm";
     const PB_NAME: &str = "power-broker";
 
+    const CONFIG_NO_SUSPENDER_URL: &str = "config-no-suspender#meta/config-no-suspender.cm";
+    const CONFIG_NO_SUSPENDER_NAME: &str = "config-no-suspender";
+    const CONFIG_NO_SUSPENDER_CONFIG: &str = "fuchsia.power.UseSuspender";
+
     fn power_broker_dep() -> fnetemul::Capability {
         fnetemul::Capability::ChildDep(fnetemul::ChildDep {
             name: Some(PB_NAME.to_string()),
             capability: Some(fnetemul::ExposedCapability::Protocol(
                 fpower_broker::TopologyMarker::PROTOCOL_NAME.to_string(),
+            )),
+            ..Default::default()
+        })
+    }
+
+    fn sag_config_cap_dep() -> fnetemul::Capability {
+        fnetemul::Capability::ChildDep(fnetemul::ChildDep {
+            name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
+            capability: Some(fnetemul::ExposedCapability::Configuration(
+                CONFIG_NO_SUSPENDER_CONFIG.to_string(),
             )),
             ..Default::default()
         })
@@ -77,6 +91,7 @@ async fn create_power_realm<'a>(
         uses: Some(fnetemul::ChildUses::Capabilities(vec![
             fnetemul::Capability::LogSink(fnetemul::Empty {}),
             power_broker_dep(),
+            sag_config_cap_dep(),
         ])),
         exposes: Some(vec![
             fpower_system::ActivityGovernorMarker::PROTOCOL_NAME.to_string(),
@@ -94,7 +109,15 @@ async fn create_power_realm<'a>(
         ..Default::default()
     };
 
-    sandbox.create_realm(name, [netstack_def, sag_def, pb_def]).expect("failed to create realm")
+    let sag_config_def = fnetemul::ChildDef {
+        source: Some(fnetemul::ChildSource::Component(CONFIG_NO_SUSPENDER_URL.to_string())),
+        name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
+        ..Default::default()
+    };
+
+    sandbox
+        .create_realm(name, [netstack_def, sag_def, pb_def, sag_config_def])
+        .expect("failed to create realm")
 }
 
 fn extract_udp_frame_in_ipv6_packet(ipv6_frame: &[u8]) -> Option<&[u8]> {

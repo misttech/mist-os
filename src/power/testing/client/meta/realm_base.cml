@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/power/system-activity-governor/meta/use-suspender-for-test-sag.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [
         {
             name: "test-system-activity-governor",
-            url: "#meta/fake-system-activity-governor.cm",
+            url: "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
         },
         {
             name: "test-power-broker",

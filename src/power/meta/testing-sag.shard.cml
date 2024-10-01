@@ -14,6 +14,12 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.power.UseSuspender" ],
+            from: "void",
+            to: "#system-activity-governor",
+            availability: "optional",
+        },
+        {
             protocol: "test.suspendcontrol.Device",
             from: "#fake-suspend",
             to: "#system-activity-governor",

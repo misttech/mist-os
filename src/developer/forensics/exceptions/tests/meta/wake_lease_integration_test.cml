@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/power/system-activity-governor/meta/no-suspender-for-test-sag.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",

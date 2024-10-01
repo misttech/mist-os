@@ -77,6 +77,7 @@ tests = [
       "//src/power/broker:component",
       "//src/power/system-activity-governor/fake:component",
     ]
+    subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
   },
   {
     label = "product-flow"
@@ -143,6 +144,10 @@ foreach(test, tests) {
   if (defined(test.package_deps)) {
     _package_deps += test.package_deps
   }
+  _subpackages = []
+  if (defined(test.subpackages)) {
+    _subpackages += test.subpackages
+  }
   _name = "netstack-${_label}-integration-test"
 
   _component_label = "${_name}"
@@ -161,6 +166,7 @@ foreach(test, tests) {
       package_name = _name
       test_components = [ ":${_component_label}" ]
       deps = _package_deps
+      subpackages = _subpackages
     }
 
     all_test_packages += [ ":${_package_label}" ]
@@ -177,6 +183,7 @@ foreach(test, tests) {
       expectations = "expects/${_name}.json5"
       treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
       deps = _package_deps
+      subpackages = _subpackages
       if (_long) {
         test_specs = {
           # Longer timeout to reduce flake (https://fxbug.dev/42055260)
@@ -190,6 +197,7 @@ foreach(test, tests) {
       expectations = "expects/${_name}.json5"
       treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
       deps = _package_deps
+      subpackages = _subpackages
       test_specs = {
         log_settings = {
           max_severity = "ERROR"

@@ -52,6 +52,12 @@
             from: "parent",
             to: [ "#system-activity-governor" ],
         },
+        {
+            config: "fuchsia.power.UseSuspender",
+            from: "parent",
+            to: [ "#system-activity-governor" ],
+            availability: "optional",
+        },
     ],
     expose: [
         {

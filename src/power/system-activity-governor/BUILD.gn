@@ -13,6 +13,7 @@ rustc_binary("bin") {
     "src/system_activity_governor.rs",
   ]
   deps = [
+    ":sag_config",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
@@ -43,12 +44,24 @@ fuchsia_component_manifest("manifest") {
   component_name = "system-activity-governor"
 }
 
+fuchsia_structured_config_rust_lib("sag_config") {
+  cm_label = ":manifest"
+}
+
 group("system-activity-governor") {
   testonly = true
   deps = [
     ":bin",
     ":tests",
   ]
+}
+
+fuchsia_package_with_single_component("config-no-suspender") {
+  manifest = "meta/config-no-suspender.cml"
+}
+
+fuchsia_package_with_single_component("config-use-suspender") {
+  manifest = "meta/config-use-suspender.cml"
 }
 
 fuchsia_component("component") {

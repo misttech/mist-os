@@ -160,6 +160,15 @@ async fn create_test_env() -> TestEnv {
         .await
         .expect("Failed to add child: system-activity-governor");
 
+    let config_no_suspender_ref = builder
+        .add_child(
+            "config-no-suspender",
+            "config-no-suspender#meta/config-no-suspender.cm",
+            ChildOptions::new(),
+        )
+        .await
+        .expect("Failed to add child: config-no-suspender");
+
     // Expose capabilities from power-broker.
     builder
         .add_route(
@@ -189,6 +198,17 @@ async fn create_test_env() -> TestEnv {
                 .capability(Capability::protocol_by_name("fuchsia.power.broker.Topology"))
                 .from(&power_broker_ref)
                 .to(&component_ref),
+        )
+        .await
+        .unwrap();
+
+    // Offer capabilities from config-no-suspender to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.UseSuspender"))
+                .from(&config_no_suspender_ref)
+                .to(&system_activity_governor_ref),
         )
         .await
         .unwrap();

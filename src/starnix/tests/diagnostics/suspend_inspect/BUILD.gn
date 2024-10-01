@@ -82,6 +82,7 @@ fuchsia_package("starnix_suspend_inspect_test") {
     "//src/starnix/kernel:starnix_kernel_package",
     "//src/power/broker:package",
     "//src/power/system-activity-governor:package",
+    "//src/power/system-activity-governor:config-use-suspender",
   ]
 }
 
