@@ -22,6 +22,7 @@ common_board_configuration = {
   }
 
   provided_features = [
+    "fuchsia::fake_battery",
     "fuchsia::intel_hda",
     "fuchsia::paravirtualization",
     "fuchsia::paver",
@@ -257,11 +258,6 @@ board_input_bundle("x64_common") {
       package_target = "//src/ui/input/drivers/pc-ps2:package"
       package_set = "bootfs"
       driver_components = [ "meta/pc-ps2.cm" ]
-    },
-    {
-      package_target = "//src/power/fake-powersource:fake-battery"
-      package_set = "base"
-      driver_components = [ "meta/fake_battery.cm" ]
     },
     {
       package_target = "//src/devices/acpi/drivers/acpi-battery:acpi-battery"
