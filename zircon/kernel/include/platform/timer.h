@@ -18,8 +18,6 @@
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
 
-using zx_instant_boot_t = int64_t;
-
 namespace internal {
 
 // A modifier that converts a raw ticks counter value to a point on the monotonic ticks timeline.
