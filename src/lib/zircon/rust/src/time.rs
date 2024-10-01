@@ -136,8 +136,8 @@ impl BootInstant {
     /// suspend in the near future. This will be migrated to the boot clock before the monotonic
     /// clock begins pausing during suspend.
     pub fn get() -> Self {
-        // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
-        unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
+        // SAFETY: FFI call that is always sound to call.
+        unsafe { Self::from_nanos(sys::zx_clock_get_boot()) }
     }
 
     /// Compute a deadline for the time in the future that is the given `Duration` away.
@@ -189,8 +189,8 @@ impl BootTicks {
     /// suspend in the near future. This will be migrated to the boot clock before the monotonic
     /// clock begins pausing during suspend.
     pub fn get() -> Self {
-        // TODO(https://fxbug.dev/328306129) switch to zx_clock_get_boot, add docs link above
-        Self(MonotonicTicks::get().0, std::marker::PhantomData)
+        // SAFETY: FFI call that is always sound to call.
+        Self(unsafe { sys::zx_ticks_get_boot() }, std::marker::PhantomData)
     }
 }
 
