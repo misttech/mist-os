@@ -119,7 +119,7 @@ device:
 
 
 Note: For more details on the package development workflow, see
-[Developing with Fuchsia packages](/docs/concepts/packages/package_update.md).
+[Developing with Fuchsia packages](/docs/development/build/package_update.md).
 
 * Base packages can only be updated by performing a whole system update (OTA).
   Trigger a system update using `fx ota` or flash a new system image on the

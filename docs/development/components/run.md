@@ -399,7 +399,7 @@ Starting component instance...
 [lifecycle-doc]: /docs/concepts/components/v2/lifecycle.md
 [manifest-children]: https://fuchsia.dev/reference/cml#children
 [manifest-collections]: https://fuchsia.dev/reference/cml#collections
-[package-server]: /docs/concepts/packages/package_update.md#connecting_host_and_target
-[package-updates]: /docs/concepts/packages/package_update.md#triggering_package_updates
+[package-server]: /docs/development/build/package_update.md#connecting_host_and_target
+[package-updates]: /docs/development/build/package_update.md#triggering_package_updates
 [run-session]: /docs/development/sessions/building-and-running-a-session.md
 [run-test]: /docs/development/testing/run_fuchsia_tests.md

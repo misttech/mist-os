@@ -10,8 +10,6 @@ toc:
   path: /docs/concepts/packages/README.md
 - title: "Fuchsia packages"
   path: /docs/concepts/packages/package.md
-- title: "Developing with Fuchsia packages"
-  path: /docs/concepts/packages/package_update.md
 - title: "Fuchsia package URLs"
   path: /docs/concepts/packages/package_url.md
 - title: "Fuchsia package server"

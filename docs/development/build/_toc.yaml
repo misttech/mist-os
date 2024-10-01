@@ -12,6 +12,11 @@ toc:
   path: /docs/development/build/build_workbench.md
 - title: "fx workflows"
   path: /docs/development/build/fx.md
+- title: "Developing with Fuchsia packages"
+  path: /docs/development/build/package_update.md
+- title: "Build system"
+  section:
+  - include: /docs/development/build/build_system/_toc.yaml
 - title: "Advanced"
   section:
   - title: "Build Clang toolchain"
@@ -39,6 +44,3 @@ toc:
   - title: "Bazel concepts"
     section:
     - include: /docs/development/build/bazel_concepts/_toc.yaml
-- title: "Build system"
-  section:
-  - include: /docs/development/build/build_system/_toc.yaml

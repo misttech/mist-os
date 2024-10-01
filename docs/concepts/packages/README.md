@@ -7,9 +7,6 @@ and securing software within a Fuchsia ecosystem.
 
 * [**Fuchsia packages**][fuchsia-packages]: Provides an overview of
   Fuchsia packages, including their types and structure.
-* [**Developing with Fuchsia packages**][develop-with-packages]:
-  Covers the workflows for creating, building, and updating Fuchsia
-  packages.
 * [**Fuchsia package URLs**][package-url]: Explains the format
   and structure of Fuchsia package uniform resource locators (URLs).
 * [**Fuchsia package server**][fuchsia-package-server]: Explains the
@@ -29,13 +26,19 @@ and securing software within a Fuchsia ecosystem.
   collection process performed to free up disk space on a device for
   OTA.
 
+## Additional resources
+
+For more information on creating, building, and updating Fuchsia
+packages, see
+[**Developing with Fuchsia packages**][develop-with-packages].
+
 <!-- Reference links -->
 
 [fuchsia-packages]: package.md
-[develop-with-packages]: package_update.md
 [package-url]: package_url.md
 [fuchsia-package-server]: fuchsia_package_server.md
 [ota]: ota.md
 [update-package]: update_pkg.md
 [software-update-system]: software_update_system.md
 [garbage-collection]: garbage_collection.md
+[develop-with-packages]: /docs/development/build/package_update.md

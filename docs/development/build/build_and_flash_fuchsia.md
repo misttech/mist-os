@@ -3,7 +3,7 @@
 This document walks through how to build and flash a Fuchsia image
 on a hardware device using `fx` commands.
 
-For more information on these commands, run `fx help <COMMAND>`.
+Note: For more information on these commands, run `fx help <COMMAND>`.
 
 ## Identify USB drive device path {:#usb-drive-device-path .numbered}
 

@@ -15,9 +15,8 @@ first.
 
  - [Download the Fuchsia source code](/docs/get-started/get_fuchsia_source.md)
  - [fx workflows](build/fx.md)
- - [Developing with Fuchsia packages](/docs/concepts/packages/package_update.md)
+ - [Developing with Fuchsia packages](/docs/development/build/package_update.md)
  - [Fuchsia build system](/docs/development/build/build_system/fuchsia_build_system_overview.md)
- - [Make changes across different petals](source_code/working_across_petals.md)
  - [Workflow tips and questions](source_code/workflow_tips_and_faq.md)
  - [Testing: Questions and Answers](testing/faq.md)
 
