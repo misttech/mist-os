@@ -237,6 +237,7 @@ group("non_hermetic_deps") {
     "//src/chromium:web_engine_pkg",
     "//src/chromium:web_engine_shell_pkg",
     "//src/connectivity/bluetooth/core/bt-host:bt-host-oot",
+    "//src/connectivity/bluetooth/hci/virtual:virtual",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
     "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
     "//src/devices/rtc/drivers/nxp:pcf8563",

@@ -62,14 +62,18 @@ const TEST_ADDR2: Address = Address::Public([1, 2, 3, 4, 5, 6]);
 const TEST_NAME1: &str = "Name1";
 const TEST_NAME2: &str = "Name2";
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-bonding-integration-tests#meta/bt-bonding-integration-tests-component.cm"
+)]
 async fn test_restore_no_bonds_succeeds(harness: HostHarness) {
     let errors = restore_bonds(&harness, vec![]).await.unwrap();
     assert_eq!(errors, vec![]);
 }
 
 // Tests initializing bonded LE devices.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-bonding-integration-tests#meta/bt-bonding-integration-tests-component.cm"
+)]
 async fn test_restore_bonded_devices_success(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
@@ -94,7 +98,9 @@ async fn test_restore_bonded_devices_success(harness: HostHarness) {
     let _ = host::expectation::peer(&harness, expected2).await.unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-bonding-integration-tests#meta/bt-bonding-integration-tests-component.cm"
+)]
 async fn test_restore_bonded_devices_no_ltk_fails(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
@@ -106,7 +112,9 @@ async fn test_restore_bonded_devices_no_ltk_fails(harness: HostHarness) {
     assert_eq!(harness.write_state().peers().len(), 0);
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-bonding-integration-tests#meta/bt-bonding-integration-tests-component.cm"
+)]
 async fn test_restore_bonded_devices_duplicate_entry(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
@@ -135,7 +143,9 @@ async fn test_restore_bonded_devices_duplicate_entry(harness: HostHarness) {
 
 // Tests that adding a list of bonding data with malformed content succeeds for the valid entries
 // but reports an error.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-bonding-integration-tests#meta/bt-bonding-integration-tests-component.cm"
+)]
 async fn test_restore_bonded_devices_invalid_entry(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);

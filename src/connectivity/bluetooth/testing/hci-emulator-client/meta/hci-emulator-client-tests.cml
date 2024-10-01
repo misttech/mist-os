@@ -10,9 +10,22 @@
     program: {
         binary: "bin/hci_emulator_client_lib_test",
     },
+    use: [
+        { protocol: "fuchsia.component.resolution.Resolver-hermetic" },
+    ],
     offer: [
         {
             protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-hermetic",
             from: "parent",
             to: "#realm_builder",
         },

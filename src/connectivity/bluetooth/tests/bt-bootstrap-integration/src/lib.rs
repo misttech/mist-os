@@ -49,7 +49,9 @@ fn example_emulator_identity() -> Identity {
     Identity { host: host_data, bonds }
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-bootstrap-integration-tests#meta/bt-bootstrap-integration-tests-component.cm"
+)]
 async fn test_add_and_commit_identities((bootstrap, access): (BootstrapHarness, AccessHarness)) {
     let bootstrap = bootstrap.aux().clone();
 

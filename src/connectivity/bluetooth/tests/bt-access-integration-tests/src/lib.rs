@@ -72,7 +72,9 @@ async fn make_discoverable(access: &AccessHarness) -> Result<ProcedureTokenProxy
 // Test that we can
 //  * Enable discovery via fuchsia.bluetooth.sys.Access.StartDiscovery()
 //  * Receive peer information via fuchsia.bluetooth.sys.Access.WatchPeers()
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-access-integration-tests#meta/bt-access-integration-tests-component.cm"
+)]
 async fn test_watch_peers((access, host_watcher): (AccessHarness, HostWatcherHarness)) {
     let (_host, mut hci) = activate_fake_host(host_watcher).await.unwrap();
 
@@ -100,7 +102,9 @@ async fn test_watch_peers((access, host_watcher): (AccessHarness, HostWatcherHar
     hci.destroy_and_wait().await.unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-access-integration-tests#meta/bt-access-integration-tests-component.cm"
+)]
 async fn test_disconnect((access, host_watcher): (AccessHarness, HostWatcherHarness)) {
     let (_host, mut hci) = activate_fake_host(host_watcher.clone()).await.unwrap();
 
@@ -146,7 +150,9 @@ async fn test_disconnect((access, host_watcher): (AccessHarness, HostWatcherHarn
 // Test that we can
 //  * Set local name via fuchsia.bluetooth.sys.Access.SetLocalName()
 //  * Receive host information via fuchsia.bluetooth.sys.HostWatcher.Watch()
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-access-integration-tests#meta/bt-access-integration-tests-component.cm"
+)]
 async fn test_set_local_name((access, host_watcher): (AccessHarness, HostWatcherHarness)) {
     let (_host, mut hci) = activate_fake_host(host_watcher.clone()).await.unwrap();
 
@@ -169,7 +175,9 @@ async fn test_set_local_name((access, host_watcher): (AccessHarness, HostWatcher
 // Test that we can
 //  * Enable discovery via fuchsia.bluetooth.sys.Access.StartDiscovery()
 //  * Disable discovery by dropping our token
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-access-integration-tests#meta/bt-access-integration-tests-component.cm"
+)]
 async fn test_discovery((access, host_watcher): (AccessHarness, HostWatcherHarness)) {
     let (host, mut hci) = activate_fake_host(host_watcher.clone()).await.unwrap();
     let discovery_token = start_discovery(&access).await.unwrap();
@@ -195,7 +203,9 @@ async fn test_discovery((access, host_watcher): (AccessHarness, HostWatcherHarne
 // Test that we can
 //  * Enable discoverable via fuchsia.bluetooth.sys.Access.StartDiscoverable()
 //  * Disable discoverable by dropping our token
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-access-integration-tests#meta/bt-access-integration-tests-component.cm"
+)]
 async fn test_discoverable((access, host_watcher): (AccessHarness, HostWatcherHarness)) {
     let (host, mut hci) = activate_fake_host(host_watcher.clone()).await.unwrap();
     let discoverable_token = make_discoverable(&access).await.unwrap();

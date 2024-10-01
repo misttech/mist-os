@@ -9,8 +9,8 @@
 //! environments.
 
 use proc_macro::TokenStream;
-use quote::quote_spanned;
-use syn::{parse_macro_input, Error, Visibility};
+use quote::{quote, quote_spanned};
+use syn::{parse_macro_input, AttributeArgs, Error, Lit, Meta, NestedMeta, Visibility};
 
 fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), syn::Error> {
     // Disallow const, unsafe or abi linkage, generics etc
@@ -70,7 +70,30 @@ fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), s
 ///     }
 ///     ```
 #[proc_macro_attribute]
-pub fn run_singlethreaded_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn run_singlethreaded_test(args: TokenStream, item: TokenStream) -> TokenStream {
+    let attr_args = parse_macro_input!(args as AttributeArgs);
+    let mut test_component: Option<String> = None;
+    for arg in attr_args {
+        match arg {
+            NestedMeta::Meta(Meta::NameValue(nv)) => {
+                if nv.path.is_ident("test_component") {
+                    if let Lit::Str(lit_str) = nv.lit {
+                        test_component = Some(lit_str.value());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let test_component = match test_component {
+        Some(component) => quote! {
+            Some(String::from(#component))
+        },
+        None => quote! {
+            None
+        },
+    };
+
     let item = parse_macro_input!(item as syn::ItemFn);
     let syn::ItemFn { attrs, sig, vis, block } = item;
 
@@ -81,7 +104,6 @@ pub fn run_singlethreaded_test(_attr: TokenStream, item: TokenStream) -> TokenSt
     let inputs = sig.inputs;
     let span = sig.ident.span();
     let ident = sig.ident;
-
     let output = quote_spanned! {span=>
         // Preserve any original attributes.
         #(#attrs)* #[test]
@@ -91,7 +113,7 @@ pub fn run_singlethreaded_test(_attr: TokenStream, item: TokenStream) -> TokenSt
             // TODO(https://fxbug.dev/42157203): Try to improve the Rust compiler to ease
             // this restriction.
             async fn func(#inputs) #block
-            let func = move |_| { ::test_harness::run_with_harness(func) };
+            let func = move |_| { ::test_harness::run_with_harness(func, #test_component) };
             ::test_harness::run_singlethreaded_test(func)
           }
     };

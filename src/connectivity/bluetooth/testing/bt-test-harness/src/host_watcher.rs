@@ -16,7 +16,7 @@ use hci_emulator_client::Emulator;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use test_harness::{SharedState, TestHarness};
+use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
 use tracing::error;
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
@@ -85,8 +85,11 @@ impl TestHarness for HostWatcherHarness {
     ) -> BoxFuture<'static, Result<(Self, Self::Env, Self::Runner), Error>> {
         let shared_state = shared_state.clone();
         async move {
-            let realm =
-                shared_state.get_or_insert_with(SHARED_STATE_INDEX, CoreRealm::create).await?;
+            let test_component: Arc<String> = shared_state
+                .get(SHARED_STATE_TEST_COMPONENT_INDEX)
+                .expect("SharedState must have TEST-COMPONENT")?;
+            let inserter = move || CoreRealm::create(test_component.to_string());
+            let realm = shared_state.get_or_insert_with(SHARED_STATE_INDEX, inserter).await?;
             let harness = new_host_watcher_harness(realm.clone()).await?;
             let run_host_watcher = watch_hosts(harness.clone())
                 .map_err(|e| e.context("Error running HostWatcher harness"))

@@ -38,7 +38,21 @@ pub struct HostRealm {
 }
 
 impl HostRealm {
-    pub async fn create() -> Result<Self, Error> {
+    pub async fn create(test_component: String) -> Result<Self, Error> {
+        // We need to resolve our test component manually. Eventually component framework could provide
+        // an introspection way of resolving your own component.
+        let resolved_test_component = {
+            let client = fuchsia_component::client::connect_to_protocol_at_path::<
+                fidl_fuchsia_component_resolution::ResolverMarker,
+            >("/svc/fuchsia.component.resolution.Resolver-hermetic")
+            .unwrap();
+            client
+                .resolve(test_component.as_str())
+                .await
+                .unwrap()
+                .expect("Failed to resolve test component")
+        };
+
         let builder = RealmBuilder::new().await?;
         let _ = builder.driver_test_realm_setup().await?;
 
@@ -132,6 +146,7 @@ impl HostRealm {
                 device_name: "bt-hci-emulator".to_string(),
                 device_id: bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_BT_HCI_EMULATOR,
             }]),
+            test_component: Some(resolved_test_component),
             ..Default::default()
         };
         instance.driver_test_realm_start(args).await?;

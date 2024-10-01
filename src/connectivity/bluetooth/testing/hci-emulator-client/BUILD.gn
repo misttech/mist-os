@@ -29,6 +29,7 @@ rustc_library("hci-emulator-client") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/lib/fuchsia",
@@ -49,9 +50,10 @@ fuchsia_unittest_package("hci-emulator-client-tests") {
     ":hci-emulator-client_test",
 
     # No bt-host driver because we want to check the HCI device lifecycle directly.
-    "//src/connectivity/bluetooth/hci/virtual:driver",
     "//src/devices/bus/drivers/platform",
   ]
+
+  subpackages = [ "//src/connectivity/bluetooth/hci/virtual" ]
 
   test_specs = {
     log_settings = {
