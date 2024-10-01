@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::mm::memory::MemoryObject;
-use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
+use crate::mm::{
+    read_to_object_as_bytes, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
+};
 use crate::task::CurrentTask;
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
@@ -41,28 +43,384 @@ type RingIndex = u32;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 struct ControlHeader {
+    /// The index of the first element in the submission queue.
+    ///
+    /// These values use the full range of u32, wrapping around on overflow. To find the entry in
+    /// the ring buffer, you need to take this index modulo `sq_ring_entries` or, equivalently,
+    /// mask this value with `sq_ring_mask`.
     sq_head: u32,
+
+    /// The index of the first element beyond the end of the submission queue.
+    ///
+    /// The number of items in the queue is defined to be `sq_tail` - `sq_head`, which means the
+    /// queue is empty if the head and tail are equal.
     sq_tail: u32,
+
+    /// The index of the first element in the completion queue.
+    ///
+    /// These values use the full range of u32, wrapping around on overflow. To find the entry in
+    /// the ring buffer, you need to take this index modulo `cq_ring_entries` or, equivalently,
+    /// mask this value with `cq_ring_mask`.
     cq_head: u32,
+
+    /// The index of the first element beyond the end of the completion queue.
+    ///
+    /// The number of items in the queue is defined to be `cq_tail` - `cq_head`, which means the
+    /// queue is empty if the head and tail are equal.
     cq_tail: u32,
+
+    /// The mask to apply to map `sq_head` and `sq_tail` into the ring buffer.
     sq_ring_mask: u32,
+
+    /// The mask to apply to map `cq_head` and `cq_tail` into the ring buffer.
     cq_ring_mask: u32,
+
+    /// The number of entries in the submission queue.
     sq_ring_entries: u32,
+
+    /// The number of entries in the completion queue.
     cq_ring_entries: u32,
+
+    /// The number of submission queue entries that were dropped for being malformed.
     sq_dropped: u32,
+
     sq_flags: u32,
     cq_flags: u32,
+
+    /// The number of completion queue entries that were not placed in the completion queue because
+    /// there were no slots available in the ring buffer.
     cq_overflow: u32,
+
     _padding: [u8; 16],
 }
 
 // From params.cq_off.cqes reported by sys_io_uring_setup.
 static_assertions::const_assert_eq!(std::mem::size_of::<ControlHeader>(), 64);
 
-pub struct IoUringFileObject {
-    ring_buffer: Arc<MemoryObject>,
-    sq_entries: Arc<MemoryObject>,
+/// An entry in the submission queue.
+///
+/// We cannot use the bindgen type generated for `io_uring_sqe` directly because that type contains
+/// unions. Instead, we redefine the type here and assert that the layout matches the one that
+/// defined by bindgen.
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+struct SqEntry {
+    opcode: u8,
+    flags: u8,
+    ioprio: u16,
+    fd: i32,
+    field0: u64,
+    field1: u64,
+    len: u32,
+    op_flags: u32,
+    user_data: u64,
+    buf_index_or_group: u16,
+    personality: u16,
+    field2: u32,
+    field3: [u64; 2usize],
+}
 
+static_assertions::assert_eq_size!(SqEntry, io_uring_sqe);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, opcode),
+    std::mem::offset_of!(io_uring_sqe, opcode)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, flags),
+    std::mem::offset_of!(io_uring_sqe, flags)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, ioprio),
+    std::mem::offset_of!(io_uring_sqe, ioprio)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, fd),
+    std::mem::offset_of!(io_uring_sqe, fd)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, field0),
+    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_1)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, field1),
+    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_2)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, len),
+    std::mem::offset_of!(io_uring_sqe, len)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, op_flags),
+    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_3)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, user_data),
+    std::mem::offset_of!(io_uring_sqe, user_data)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, buf_index_or_group),
+    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_4)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, personality),
+    std::mem::offset_of!(io_uring_sqe, personality)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, field2),
+    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_5)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(SqEntry, field3),
+    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_6)
+);
+
+/// An entry in the completion queue.
+///
+/// We cannot use the bindgen type generated for `io_uring_cqe` directly because that type contains
+/// a variable length array. Instead, we redefine the type here and assert that the layout matches
+/// the one that defined by bindgen.
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+struct CqEntry {
+    pub user_data: u64,
+    pub res: i32,
+    pub flags: u32,
+}
+
+static_assertions::assert_eq_size!(CqEntry, io_uring_cqe);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(CqEntry, user_data),
+    std::mem::offset_of!(io_uring_cqe, user_data)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(CqEntry, res),
+    std::mem::offset_of!(io_uring_cqe, res)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(CqEntry, res),
+    std::mem::offset_of!(io_uring_cqe, res)
+);
+
+const CQES_OFFSET: usize = std::mem::size_of::<ControlHeader>();
+
+struct IoUringMetadata {
+    /// The number of entries in the submission queue.
+    sq_entries: u32,
+
+    /// The number of entries in the completion queue.
+    cq_entries: u32,
+}
+
+impl IoUringMetadata {
+    /// The offset of the compleition queue entry with the given index.
+    ///
+    /// The offset is from the start of the `ring_buffer` VMO.
+    fn cq_entry_offset(&self, index: u32) -> u64 {
+        let index = index % self.cq_entries;
+        (CQES_OFFSET + index as usize * std::mem::size_of::<io_uring_cqe>()) as u64
+    }
+
+    /// The offset of first completion queue entry in the `ring_buffer` VMO.
+    fn cqes_offset(&self) -> usize {
+        CQES_OFFSET
+    }
+
+    /// The offset of submission queue indirection array in the `ring_buffer` VMO.
+    fn array_offset(&self) -> usize {
+        CQES_OFFSET + self.cq_entries as usize * std::mem::size_of::<io_uring_cqe>()
+    }
+
+    /// The offset of submission queue indirection array entry with the given index in the
+    /// `ring_buffer` VMO.
+    fn array_entry_offset(&self, index: u32) -> u64 {
+        let index = index % self.sq_entries;
+        (self.array_offset() + index as usize * std::mem::size_of::<RingIndex>()) as u64
+    }
+
+    /// The number of bytes in the `ring_buffer` VMO.
+    fn ring_buffer_size(&self) -> usize {
+        self.array_offset() + self.sq_entries as usize * std::mem::size_of::<RingIndex>()
+    }
+
+    /// The offset of the submission queue entry with the given index in the `sq_entries` VMO.
+    ///
+    /// This index is the actual index of the submission queue entry, after indirecting through the
+    /// indirecton array.
+    fn sq_entry_offset(&self, index: u32) -> u64 {
+        let index = index % self.sq_entries;
+        (index as usize * std::mem::size_of::<io_uring_sqe>()) as u64
+    }
+
+    /// The number of bytes in the `sq_entries` VMO.
+    fn sq_entries_size(&self) -> usize {
+        self.sq_entries as usize * std::mem::size_of::<io_uring_sqe>()
+    }
+}
+
+// Currently, we read and write the memory shared with userspace via the VMOs. In the future, we
+// will likely want to map the memory for these VMOs into the kernel address space so that we can
+// access their contents more efficiently and so that we can perform the appropriate atomic
+// operations.
+
+// TODO(https://fxbug.dev/297431387): Map `ring_buffer` and `sq_entries` into kernel memory so that
+// this operation becomes memcpy.
+fn read_object<T: FromBytes>(memory_object: &MemoryObject, offset: u64) -> Result<T, Errno> {
+    // SAFETY: read_uninit returns an error if not all the bytes were read.
+    unsafe {
+        read_to_object_as_bytes(|buf| {
+            memory_object.read_uninit(buf, offset).map_err(|_| errno!(EFAULT))?;
+            Ok(())
+        })
+    }
+}
+
+// TODO(https://fxbug.dev/297431387): Map `ring_buffer` and `sq_entries` into kernel memory so that
+// this operation becomes memcpy.
+fn write_object<T: IntoBytes + Immutable>(
+    memory_object: &MemoryObject,
+    offset: u64,
+    value: &T,
+) -> Result<(), Errno> {
+    memory_object.write(value.as_bytes(), offset).map_err(|_| errno!(EFAULT))
+}
+
+/// The memory the IoUring shares with userspace.
+struct IoUringQueue {
+    /// Metadata about the layout of this memory.
+    metadata: IoUringMetadata,
+
+    /// The primary ring buffer.
+    ///
+    /// The ring buffer's memory layout is as follows:
+    ///
+    ///   ControlHeader
+    ///   N completion queue entries
+    ///   An array of u32 values used to indirect indices to the submission queue entries
+    ///
+    /// The ControlHeader is a fixed size, which means the completion queue entries always start
+    /// at the same offset in this VMO.
+    ring_buffer: Arc<MemoryObject>,
+
+    /// A separate VMO for the submission queue entries.
+    ///
+    /// This entries are not necessarily populated in order. Instead, userspace uses the array of
+    /// submission queue indices in the `ring_buffer` in order. That array gives the indices of
+    /// the actual submission queue entries.
+    ///
+    /// IoUring uses this index indirection scheme because submission queue entries do not always
+    /// complete in the same order they were submitted.
+    sq_entries: Arc<MemoryObject>,
+}
+
+impl IoUringQueue {
+    fn new(metadata: IoUringMetadata) -> Result<Self, Errno> {
+        let ring_buffer =
+            zx::Vmo::create(metadata.ring_buffer_size() as u64).map_err(|_| errno!(ENOMEM))?;
+        let sq_entries =
+            zx::Vmo::create(metadata.sq_entries_size() as u64).map_err(|_| errno!(ENOMEM))?;
+
+        Ok(Self {
+            metadata,
+            ring_buffer: Arc::new(ring_buffer.into()),
+            sq_entries: Arc::new(sq_entries.into()),
+        })
+    }
+
+    fn write_header(&self, header: ControlHeader) -> Result<(), Errno> {
+        write_object(&self.ring_buffer, 0, &header).map_err(|_| errno!(ENOMEM))
+    }
+
+    fn read_sq_head(&self) -> Result<u32, Errno> {
+        read_object(&self.ring_buffer, std::mem::offset_of!(ControlHeader, sq_head) as u64)
+    }
+
+    fn write_sq_head(&self, value: u32) -> Result<(), Errno> {
+        write_object(&self.ring_buffer, std::mem::offset_of!(ControlHeader, sq_head) as u64, &value)
+    }
+
+    fn read_sq_tail(&self) -> Result<u32, Errno> {
+        // TODO(https://fxbug.dev/297431387): Reading the tail field should be atomic with ordering
+        // acquire once we map these buffers into kernel memory.
+        read_object(&self.ring_buffer, std::mem::offset_of!(ControlHeader, sq_tail) as u64)
+    }
+
+    fn read_cq_head(&self) -> Result<u32, Errno> {
+        // TODO(https://fxbug.dev/297431387): Reading the head field should be atomic with ordering
+        // acquire once we map these buffers into kernel memory.
+        read_object(&self.ring_buffer, std::mem::offset_of!(ControlHeader, cq_head) as u64)
+    }
+
+    fn read_cq_tail(&self) -> Result<u32, Errno> {
+        read_object(&self.ring_buffer, std::mem::offset_of!(ControlHeader, cq_tail) as u64)
+    }
+
+    fn write_cq_tail(&self, value: u32) -> Result<(), Errno> {
+        // TODO(https://fxbug.dev/297431387): Writing the tail field should be atomic with ordering
+        // release once we map these buffers into kernel memory.
+        write_object(&self.ring_buffer, std::mem::offset_of!(ControlHeader, cq_tail) as u64, &value)
+    }
+
+    fn read_array_entry(&self, index: u32) -> Result<u32, Errno> {
+        read_object(&self.ring_buffer, self.metadata.array_entry_offset(index))
+    }
+
+    fn read_sq_entry(&self, index: u32) -> Result<SqEntry, Errno> {
+        let sqe_index = self.read_array_entry(index)?;
+        read_object(&self.sq_entries, self.metadata.sq_entry_offset(sqe_index))
+    }
+
+    fn write_cq_entry(&self, index: u32, entry: &CqEntry) -> Result<(), Errno> {
+        write_object(&self.ring_buffer, self.metadata.cq_entry_offset(index), entry)
+    }
+
+    fn increment_overflow(&self) -> Result<(), Errno> {
+        // TODO(https://fxbug.dev/297431387): Incrementing the overflow count should be an atomic
+        // operation.
+        let offset = std::mem::offset_of!(ControlHeader, cq_overflow) as u64;
+        let mut overflow: u32 = read_object(&self.ring_buffer, offset)?;
+        overflow = overflow.saturating_add(1);
+        write_object(&self.ring_buffer, offset, &overflow)
+    }
+
+    /// Pop an entry off the submission queue and update the head to let userspace queue more
+    /// entries.
+    ///
+    /// Returns `None` if the submission queue is empty.
+    fn pop_sq_entry(&self) -> Result<Option<SqEntry>, Errno> {
+        let tail = self.read_sq_tail()?;
+        let head = self.read_sq_head()?;
+        if head != tail {
+            let sq_entry = self.read_sq_entry(head)?;
+            self.write_sq_head(head.wrapping_add(1))?;
+            Ok(Some(sq_entry))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Push an entry onto the completion queue and update the tail to let userspace know a new
+    /// entry is available.
+    ///
+    /// If there is no room in the completion queue, this function will increment the overflow
+    /// counter.
+    fn push_cq_entry(&self, entry: &CqEntry) -> Result<(), Errno> {
+        let head = self.read_cq_head()?;
+        let tail = self.read_cq_tail()?;
+        let next_tail = tail.wrapping_add(1);
+        // Check that the offset for the next tail location doesn't collide with the head of the
+        // queue. This can happen because the entries are stored in a ring buffer.
+        if self.metadata.cq_entry_offset(next_tail) != self.metadata.cq_entry_offset(head) {
+            self.write_cq_entry(next_tail, entry)?;
+            self.write_cq_tail(next_tail)?;
+        } else {
+            self.increment_overflow()?;
+        }
+        Ok(())
+    }
+}
+
+pub struct IoUringFileObject {
+    queue: IoUringQueue,
     registered_buffers: Mutex<UserBuffers>,
 }
 
@@ -89,25 +447,16 @@ impl IoUringFileObject {
             sq_entries * 2
         };
 
-        let cqes_offset = std::mem::size_of::<ControlHeader>();
-        let array_offset =
-            cqes_offset + (cq_entries as usize) * std::mem::size_of::<io_uring_cqe>();
-        let ring_buffer_size =
-            array_offset + (sq_entries as usize) * std::mem::size_of::<RingIndex>();
-        let sq_entries_size = (sq_entries as usize) * std::mem::size_of::<io_uring_sqe>();
+        let queue =
+            IoUringQueue::new(IoUringMetadata { sq_entries: sq_entries, cq_entries: cq_entries })?;
 
-        let ring_buffer_vmo =
-            zx::Vmo::create(ring_buffer_size as u64).map_err(|_| errno!(ENOMEM))?;
-        let sq_entries_vmo = zx::Vmo::create(sq_entries_size as u64).map_err(|_| errno!(ENOMEM))?;
-
-        let header = ControlHeader {
+        queue.write_header(ControlHeader {
             sq_ring_mask: sq_entries - 1,
             cq_ring_mask: cq_entries - 1,
             sq_ring_entries: sq_entries,
             cq_ring_entries: cq_entries,
             ..Default::default()
-        };
-        ring_buffer_vmo.write(header.as_bytes(), 0).map_err(|_| errno!(ENOMEM))?;
+        })?;
 
         params.sq_entries = sq_entries;
         params.cq_entries = cq_entries;
@@ -119,7 +468,7 @@ impl IoUringFileObject {
             ring_entries: std::mem::offset_of!(ControlHeader, sq_ring_entries) as u32,
             flags: std::mem::offset_of!(ControlHeader, sq_flags) as u32,
             dropped: std::mem::offset_of!(ControlHeader, sq_dropped) as u32,
-            array: array_offset as u32,
+            array: queue.metadata.array_offset() as u32,
             ..Default::default()
         };
         params.cq_off = io_cqring_offsets {
@@ -128,16 +477,12 @@ impl IoUringFileObject {
             ring_mask: std::mem::offset_of!(ControlHeader, cq_ring_mask) as u32,
             ring_entries: std::mem::offset_of!(ControlHeader, cq_ring_entries) as u32,
             overflow: std::mem::offset_of!(ControlHeader, cq_overflow) as u32,
-            cqes: cqes_offset as u32,
+            cqes: queue.metadata.cqes_offset() as u32,
             flags: std::mem::offset_of!(ControlHeader, cq_flags) as u32,
             ..Default::default()
         };
 
-        let object = Box::new(IoUringFileObject {
-            ring_buffer: Arc::new(ring_buffer_vmo.into()),
-            sq_entries: Arc::new(sq_entries_vmo.into()),
-            registered_buffers: Default::default(),
-        });
+        let object = Box::new(IoUringFileObject { queue, registered_buffers: Default::default() });
         Ok(Anon::new_file(current_task, object, OpenFlags::RDWR))
     }
 
@@ -154,8 +499,17 @@ impl IoUringFileObject {
     }
 
     pub fn enter(&self, to_submit: u32, _min_complete: u32, _flags: u32) -> Result<u32, Errno> {
-        // TODO(https://fxbug.dev/297431387): Actually process the ops in the buffer.
-        Ok(to_submit)
+        let mut submitted = 0;
+        while let Some(sq_entry) = self.queue.pop_sq_entry()? {
+            submitted += 1;
+            // TODO(https://fxbug.dev/297431387): Actually perform the requested operation.
+            let cq_entry = CqEntry { user_data: sq_entry.user_data, res: 0, flags: 0 };
+            self.queue.push_cq_entry(&cq_entry)?;
+            if submitted >= to_submit {
+                break;
+            }
+        }
+        Ok(submitted)
     }
 }
 
@@ -181,8 +535,8 @@ impl FileOps for IoUringFileObject {
         }
         let magic_offset: u32 = memory_offset.try_into().map_err(|_| errno!(EINVAL))?;
         let memory = match magic_offset {
-            IORING_OFF_SQ_RING | IORING_OFF_CQ_RING => self.ring_buffer.clone(),
-            IORING_OFF_SQES => self.sq_entries.clone(),
+            IORING_OFF_SQ_RING | IORING_OFF_CQ_RING => self.queue.ring_buffer.clone(),
+            IORING_OFF_SQES => self.queue.sq_entries.clone(),
             _ => return error!(EINVAL),
         };
         current_task.mm().map_memory(

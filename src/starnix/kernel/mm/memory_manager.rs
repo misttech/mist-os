@@ -2168,7 +2168,7 @@ pub unsafe fn read_to_array<T: FromBytes, E, const N: usize>(
 ///
 /// # Safety
 ///
-/// THe read function must only return `Ok(())` if all the bytes were read to.
+/// The read function must only return `Ok(())` if all the bytes were read to.
 #[inline]
 pub unsafe fn read_to_object_as_bytes<T: FromBytes, E>(
     read_fn: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<(), E>,

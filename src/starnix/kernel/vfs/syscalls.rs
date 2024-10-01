@@ -3111,7 +3111,7 @@ pub fn sys_io_uring_enter(
         return error!(ENOSYS);
     }
     let file = current_task.files.get(fd)?;
-    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EOPNOTSUPP))?;
     // TODO(https://fxbug.dev/297431387): Use `_sig` to change the signal mask for `current_task`.
     io_uring.enter(to_submit, min_complete, flags)
 }
@@ -3128,9 +3128,10 @@ pub fn sys_io_uring_register(
         return error!(ENOSYS);
     }
     let file = current_task.files.get(fd)?;
-    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EOPNOTSUPP))?;
     match opcode {
         IORING_REGISTER_BUFFERS => {
+            // TODO(https://fxbug.dev/297431387): Check nr_args for zero and return EINVAL here.
             let buffers = current_task.read_iovec(arg, nr_args)?;
             io_uring.register_buffers(buffers);
             return Ok(SUCCESS);
