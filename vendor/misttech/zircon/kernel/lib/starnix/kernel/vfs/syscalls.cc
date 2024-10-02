@@ -97,9 +97,9 @@ fit::result<Errno, size_t> do_writev(const CurrentTask& current_task, FdNumber f
 fit::result<Errno, size_t> sys_read(const CurrentTask& current_task, FdNumber fd,
                                     starnix_uapi::UserAddress address, size_t length) {
   auto file = current_task->files.get(fd) _EP(file);
-  // file->read(current_task, UserBuffersOutputBuffer::unified_new_at(current_task, address,
-  // length))
-  return fit::error(errno(ENOSYS));
+  auto buffer =
+      UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address, length);
+  return map_eintr(file->read(current_task, &*buffer), errno(ERESTARTSYS));
 }
 
 fit::result<Errno, size_t> sys_write(const CurrentTask& current_task, FdNumber fd,
