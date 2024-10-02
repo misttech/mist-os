@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/util/default_construct.h>
 #include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
@@ -26,7 +27,7 @@ bool test_prctl_set_vma_anon_name() {
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
 
-  auto mapped_address = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto mapped_address = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
   auto name_addr = mapped_address + 128u;
 
   ASSERT_TRUE((*current_task).write_memory(name_addr, {(uint8_t*)"test-name\0", 10}).is_ok(),
