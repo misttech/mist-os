@@ -258,12 +258,24 @@ class RangeMap {
     return result;
   }
 
-  // Return a new map to iterate over the ranges in the RangeMap, starting at the first range
-  // starting after or at the given point.
+  // Iterate over the ranges in the map, starting at the first range starting after or at the given
+  // point.
   IterMapType iter_starting_at(const KeyType& point) const {
     IterMapType result;
     auto begin = map_.lower_bound(RangeStart<KeyType>::FromPoint(point));
     for (auto it = begin; it != map_.end(); ++it) {
+      const auto [range_start, value] = *it;
+      result[range_start.range] = value;
+    }
+    return result;
+  }
+
+  // Iterate over the ranges in the map, starting at the last range starting before or at the given
+  // point.
+  IterMapType iter_ending_at(const KeyType& point) const {
+    IterMapType result;
+    auto end = map_.upper_bound(RangeStart<KeyType>::FromPoint(point));
+    for (auto it = map_.begin(); it != end; ++it) {
       const auto [range_start, value] = *it;
       result[range_start.range] = value;
     }
@@ -295,6 +307,9 @@ class RangeMap {
   [[nodiscard]] bool empty() const { return map_.empty(); }
 
   [[nodiscard]] size_t size() const { return map_.size(); }
+
+  IterType begin() { return map_.begin(); }
+  ConstIterType begin() const { return map_.begin(); }
 
   IterType end() { return map_.end(); }
   ConstIterType end() const { return map_.end(); }
