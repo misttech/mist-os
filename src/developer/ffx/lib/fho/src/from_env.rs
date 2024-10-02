@@ -117,7 +117,7 @@ pub async fn connection_behavior(
     injector: &Arc<dyn Injector>,
     env: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {
-    if ffx.global.core {
+    if ffx.global.strict {
         let connector = Overnet::<ffx_target::ssh_connector::SshConnector>::new(env).await?;
         Ok(crate::from_env::FhoConnectionBehavior::DirectConnector(Rc::new(connector)))
     } else {

@@ -91,10 +91,10 @@ impl EnvironmentContext {
 
     /// Initializes an environment type that is just the bare minimum, containing no ambient configuration, only
     /// the runtime args.
-    pub fn core(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
+    pub fn strict(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
         let cache = Arc::default();
         let res = Self {
-            kind: EnvironmentKind::CoreContext,
+            kind: EnvironmentKind::StrictContext,
             exe_kind: exe_kind.clone(),
             // For simplicity, the runtime_args will be kept empty.
             runtime_args: ConfigMap::new(),

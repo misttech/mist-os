@@ -6,7 +6,7 @@ use argh::{ArgsInfo, FromArgs, SubCommands};
 use async_utils::async_once;
 use errors::ffx_error;
 use ffx_command::{
-    analytics_command, check_core_constraints, return_bug, return_user_error,
+    analytics_command, check_strict_constraints, return_bug, return_user_error,
     send_enhanced_analytics, CliArgsInfo, Error, FfxCommandLine, FfxContext, FfxToolInfo,
     MetricsSession, Optionality, Result, ToolRunner, ToolSuite,
 };
@@ -30,7 +30,7 @@ struct FfxSubCommand {
 
 /// Wrapper around an FfxSubCommand which has stricter checks on it before it is
 /// actually run
-struct FfxCoreSubCommand {
+struct FfxStrictSubCommand {
     /// The command to be invoked and everything it needs to invoke
     subcommand: FfxSubCommand,
 }
@@ -188,8 +188,8 @@ impl ToolSuite for FfxSuite {
             Some(name) if SubCommand::COMMANDS.iter().any(|c| c.name == name) => {
                 let cmd = FfxBuiltIn::from_args(&Vec::from_iter(ffx_cmd.cmd_iter()), &args)
                     .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
-                if ffx_cmd.global.core {
-                    Ok(Some(Box::new(FfxCoreSubCommand {
+                if ffx_cmd.global.strict {
+                    Ok(Some(Box::new(FfxStrictSubCommand {
                         subcommand: FfxSubCommand { cmd, context, app },
                     })))
                 } else {
@@ -202,14 +202,14 @@ impl ToolSuite for FfxSuite {
 }
 
 #[async_trait::async_trait(?Send)]
-impl ToolRunner for FfxCoreSubCommand {
+impl ToolRunner for FfxStrictSubCommand {
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
-        if !self.subcommand.app.global.core {
+        if !self.subcommand.app.global.strict {
             return_bug!(
-                "We are running a Core SubCommand but the args do not specify we should be core"
+                "We are running a Strict SubCommand but the args do not specify we should be strict"
             );
         }
-        check_core_constraints(&self.subcommand.app.global)?;
+        check_strict_constraints(&self.subcommand.app.global)?;
 
         Box::new(self.subcommand).run(metrics).await
     }
