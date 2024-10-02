@@ -33,6 +33,12 @@ namespace unit_testing {
 bool test_get_contiguous_mappings_at();
 bool test_unmap_returned_mappings();
 bool test_unmap_returns_multiple_mappings();
+bool test_unmap_beginning();
+bool test_unmap_end();
+bool test_unmap_middle();
+bool test_preserve_name_snapshot();
+bool test_read_write_errors();
+bool test_read_write_crossing_mappings();
 
 }  // namespace unit_testing
 
@@ -232,9 +238,9 @@ struct MappingBackingMemory {
 
  private:
   friend bool unit_testing::test_unmap_returned_mappings();
-  // friend bool unit_testing::test_unmap_beginning();
-  // friend bool unit_testing::test_unmap_end();
-  // friend bool unit_testing::test_unmap_middle();
+  friend bool unit_testing::test_unmap_beginning();
+  friend bool unit_testing::test_unmap_end();
+  friend bool unit_testing::test_unmap_middle();
   friend class MemoryManager;
   friend struct MemoryManagerState;
 };
@@ -325,10 +331,9 @@ struct Mapping {
   MappingFlags flags() const { return flags_; }
 
  private:
-  // ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_beginning);
-  // ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_end);
-  // ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_middle);
-  // ZXTEST_FRIEND_TEST(MemoryManager, test_preserve_name_snapshot);
+  friend bool unit_testing::test_unmap_beginning();
+  friend bool unit_testing::test_unmap_end();
+  friend bool unit_testing::test_unmap_middle();
   friend class MemoryManager;
 
   friend struct MemoryManagerState;
@@ -637,8 +642,8 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
  private:
   friend bool unit_testing::test_get_contiguous_mappings_at();
-  // friend bool unit_testing::test_read_write_crossing_mappings();
-  // friend bool unit_testing::test_read_write_errors();
+  friend bool unit_testing::test_read_write_crossing_mappings();
+  friend bool unit_testing::test_read_write_errors();
 
   MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar_info);
 };
