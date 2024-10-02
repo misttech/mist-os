@@ -30,7 +30,7 @@
 namespace audio {
 namespace intel_hda {
 
-// A DspChannel manages a inter-processor communications channel from the
+// A DspChannel manages a inter-processor communication channel from the
 // Intel HDA driver to the DSP.
 class DspChannel {
  public:

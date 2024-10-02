@@ -32,17 +32,20 @@
       "type": "string",
       "enum": [
         "background",
+        "communication",
         "communications",
         "interruption",
         "media",
         "system_agent",
         "render:background",
+        "render:communication",
         "render:communications",
         "render:interruption",
         "render:media",
         "render:system_agent",
         "render:ultrasound",
         "capture:background",
+        "capture:communication",
         "capture:communications",
         "capture:foreground",
         "capture:system_agent",
@@ -59,8 +62,8 @@
         "name": "string",
         // The number of channels in the audio stream output by this effect. If unspecified this
         // will be equal to the number of input channels.
-        "output_channels": {"$ref": "#/definitions/channel_count"},
-        "config": {},
+        "output_channels": { "$ref": "#/definitions/channel_count" },
+        "config": { },
         "_comment": "string"
       },
       "required": ["lib", "effect", "name"],
@@ -110,7 +113,7 @@
         // _before_ applying any effects, which could apply further rechannelizations.
         //
         // This will default to '2' if unspecified.
-        "output_channels": {"$ref": "#/definitions/channel_count"},
+        "output_channels": { "$ref": "#/definitions/channel_count" },
 
         // Gain limits for this stage.
         "min_gain_db": "number",  // defaults to fuchsia::media::audio::MUTED_GAIN_DB if unspecified
@@ -121,9 +124,9 @@
     "mix_profile": {
       "type": "object",
       "properties": {
-        "capacity_usec": {"type": "integer", "minimum": 1 },
-        "deadline_usec": {"type": "integer", "minimum": 1 },
-        "period_usec": {"type": "integer", "minimum": 1 }
+        "capacity_usec": { "type": "integer", "minimum": 1 },
+        "deadline_usec": { "type": "integer", "minimum": 1 },
+        "period_usec": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": false
     },
@@ -132,8 +135,8 @@
       "properties": {
         "device_id": {
           "oneOf": [
-            {"$ref": "#/definitions/device_id"},
-            {"$ref": "#/definitions/device_id_list"}
+            { "$ref": "#/definitions/device_id" },
+            { "$ref": "#/definitions/device_id_list" }
           ]
         },
         "supported_output_stream_types": {
@@ -157,7 +160,7 @@
         "driver_gain_db": "number",
 
         // The mix pipeline to construct for this device.
-        "pipeline": {"$ref": "#/definitions/mix_group"}
+        "pipeline": { "$ref": "#/definitions/mix_group" }
       },
       "required": ["device_id"],
       "oneOf": [
@@ -189,14 +192,14 @@
       "properties": {
         "device_id": {
           "oneOf": [
-            {"$ref": "#/definitions/device_id"},
-            {"$ref": "#/definitions/device_id_list"}
+            { "$ref": "#/definitions/device_id" },
+            { "$ref": "#/definitions/device_id_list" }
           ]
         },
 
         "supported_stream_types": {
           "type": "array",
-          "items": {"$ref": "#/definitions/stream_type"}
+          "items": { "$ref": "#/definitions/stream_type" }
         },
 
         // The target rate for this device. A different rate may be chosen if the driver does
@@ -232,15 +235,15 @@
     },
     "output_devices": {
       "type": "array",
-      "items": {"$ref": "#/definitions/output_device_profile"}
+      "items": { "$ref": "#/definitions/output_device_profile" }
     },
     "input_devices": {
       "type": "array",
-      "items": {"$ref": "#/definitions/input_device_profile"}
+      "items": { "$ref": "#/definitions/input_device_profile" }
     },
     "thermal_states": {
       "type": "array",
-      "items": {"$ref": "#/definitions/thermal_state_format"}
+      "items": { "$ref": "#/definitions/thermal_state_format" }
     }
   },
   "required": ["volume_curve"],

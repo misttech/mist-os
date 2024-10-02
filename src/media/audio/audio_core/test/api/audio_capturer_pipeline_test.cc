@@ -153,7 +153,7 @@ class AudioCapturerPipelineSWGainTest : public AudioCapturerPipelineTest {
                 "device_id": "*",
                 "supported_stream_types": [
                     "capture:background",
-                    "capture:communications",
+                    "capture:communication",
                     "capture:foreground",
                     "capture:system_agent"
                 ],

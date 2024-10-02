@@ -46,7 +46,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent"
@@ -55,7 +55,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
                   "name": "default",
                   "streams": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -150,7 +150,7 @@ class AudioRendererGainLimitsTest
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent"
@@ -159,7 +159,7 @@ class AudioRendererGainLimitsTest
                   "name": "default",
                   "streams": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -265,7 +265,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent"
@@ -274,7 +274,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
                   "name": "default",
                   "streams": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -331,7 +331,7 @@ class AudioRendererEffectsV1Test
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent"
@@ -340,7 +340,7 @@ class AudioRendererEffectsV1Test
                   "name": "default",
                   "streams": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -391,7 +391,7 @@ class AudioRendererEffectsV2Test
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent"
@@ -400,7 +400,7 @@ class AudioRendererEffectsV2Test
                   "name": "default",
                   "streams": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -450,7 +450,7 @@ class AudioRendererPipelineTuningTest
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent"
@@ -459,7 +459,7 @@ class AudioRendererPipelineTuningTest
                   "name": "default",
                   "streams": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"

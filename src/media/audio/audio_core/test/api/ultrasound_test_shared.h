@@ -67,7 +67,7 @@ class UltrasoundTest : public HermeticAudioTest {
                 "device_id": "*",
                 "supported_stream_types": [
                   "render:background",
-                  "render:communications",
+                  "render:communication",
                   "render:interruption",
                   "render:media",
                   "render:system_agent",
@@ -86,7 +86,7 @@ class UltrasoundTest : public HermeticAudioTest {
                       "name": "mix",
                       "streams": [
                         "render:background",
-                        "render:communications",
+                        "render:communication",
                         "render:interruption",
                         "render:media",
                         "render:system_agent"
@@ -101,7 +101,7 @@ class UltrasoundTest : public HermeticAudioTest {
                 "device_id": "*",
                 "supported_stream_types": [
                   "capture:background",
-                  "capture:communications",
+                  "capture:communication",
                   "capture:foreground",
                   "capture:system_agent",
                   "capture:ultrasound"

@@ -54,7 +54,7 @@ component_testing::DirectoryContents HermeticAudioTest::MakeAudioCoreConfig(
         "device_id": "*",
         "supported_stream_types": [
           "render:background",
-          "render:communications",
+          "render:communication",
           "render:interruption",
           "render:media",
           "render:system_agent"
@@ -66,7 +66,7 @@ component_testing::DirectoryContents HermeticAudioTest::MakeAudioCoreConfig(
         "device_id": "*",
         "supported_stream_types": [
           "capture:background",
-          "capture:communications",
+          "capture:communication",
           "capture:foreground",
           "capture:system_agent"
         ],

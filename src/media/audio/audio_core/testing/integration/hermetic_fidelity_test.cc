@@ -92,7 +92,7 @@ constexpr int64_t kFreqTestBufSize = 65536;
 // When testing fidelity, we compare actual measured dB to expected dB. These tests are designed
 // to pass if 'actual >= expected', OR less but within the following tolerance. This tolerance
 // also sets the digits of precision for 'expected' values, when stored or displayed.
-// TODO(https://fxbug.dev/42067680): Revisit our "measurement vs. enforcement" stance; revert this to 0.001.
+// TODO(https://fxbug.dev/42067680): Revisit "measurement vs. enforcement"; revert this to 0.001.
 constexpr double kFidelityDbTolerance = 1.0;
 // If kDisplayAnalysisDataOnFailureDbTolerance, display freq bins with magnitude >= this val.
 constexpr double kMinAnalysisMagnitudeToDisplay = 1e-4;
@@ -294,7 +294,7 @@ AudioBuffer<OutputFormat> HermeticFidelityTest::GetRendererOutput(
     }
 
     fuchsia::media::AudioRenderUsage usage = fuchsia::media::AudioRenderUsage::MEDIA;
-    if (path == RenderPath::Communications) {
+    if (path == RenderPath::Communications || path == RenderPath::Communication) {
       usage = fuchsia::media::AudioRenderUsage::COMMUNICATION;
     }
     auto audio_renderer =

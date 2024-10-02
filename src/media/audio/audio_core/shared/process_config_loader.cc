@@ -130,7 +130,8 @@ std::optional<RenderUsage> RenderUsageFromString(std::string_view string) {
   if (string == "background" || string == "render:background") {
     return RenderUsage::BACKGROUND;
   }
-  if (string == "communications" || string == "render:communications") {
+  if (string == "communication" || string == "render:communication" || string == "communications" ||
+      string == "render:communications") {
     return RenderUsage::COMMUNICATION;
   }
   if (string == "interruption" || string == "render:interruption") {
@@ -152,7 +153,8 @@ std::optional<CaptureUsage> CaptureUsageFromString(std::string_view string) {
   if (string == "background" || string == "capture:background") {
     return CaptureUsage::BACKGROUND;
   }
-  if (string == "communications" || string == "capture:communications") {
+  if (string == "communication" || string == "capture:communication" ||
+      string == "communications" || string == "capture:communications") {
     return CaptureUsage::COMMUNICATION;
   }
   if (string == "foreground" || string == "capture:foreground") {

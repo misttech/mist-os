@@ -23,7 +23,7 @@ static constexpr char kShowCursor[] = "\x1b[?25h";
 static const std::pair<fuchsia::media::AudioRenderUsage, std::string>
     kRenderUsages[fuchsia::media::RENDER_USAGE_COUNT] = {
         {fuchsia::media::AudioRenderUsage::BACKGROUND, "Backgd"},
-        {fuchsia::media::AudioRenderUsage::COMMUNICATION, "Comms "},
+        {fuchsia::media::AudioRenderUsage::COMMUNICATION, "Comm  "},
         {fuchsia::media::AudioRenderUsage::INTERRUPTION, "Interr"},
         {fuchsia::media::AudioRenderUsage::MEDIA, "Media "},
         {fuchsia::media::AudioRenderUsage::SYSTEM_AGENT, "SysAgt"},
@@ -32,7 +32,7 @@ static const std::pair<fuchsia::media::AudioRenderUsage, std::string>
 static const std::pair<fuchsia::media::AudioCaptureUsage, std::string>
     kCaptureUsages[fuchsia::media::CAPTURE_USAGE_COUNT] = {
         {fuchsia::media::AudioCaptureUsage::BACKGROUND, "Backgd"},
-        {fuchsia::media::AudioCaptureUsage::COMMUNICATION, "Comms "},
+        {fuchsia::media::AudioCaptureUsage::COMMUNICATION, "Comm  "},
         {fuchsia::media::AudioCaptureUsage::FOREGROUND, "Foregd"},
         {fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT, "SysAgt"},
 };
@@ -424,7 +424,7 @@ void DisplayUsage(const std::string& name, std::optional<std::string> error_str 
   printf("numerical keys 1-4 (handy when arrow keys are unavailable).\n\n");
 
   printf("In Activity mode, for every usage a six-letter abbreviation is displayed IFF it is\n");
-  printf("active: Backgd, Comms, Foregd, Interr, Media, SysAgt.\n\n");
+  printf("active: Backgd, Comm, Foregd, Interr, Media, SysAgt.\n\n");
 
   printf("In State, Volume and Gain modes, the first letter of each usage is shown alongside\n");
   printf("that usage's information.\n\n");
