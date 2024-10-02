@@ -257,17 +257,6 @@ pub struct LogCommand {
     #[argh(option, default = "TimeFormat::Monotonic")]
     pub clock: TimeFormat,
 
-    /// if provided, logs will not be symbolized
-    #[argh(switch)]
-    pub raw: bool,
-
-    /// if provided, the symbolizer will not be spawned
-    /// like raw, but actually disables the symbolizer
-    /// process.
-    #[cfg(not(target_os = "fuchsia"))]
-    #[argh(switch)]
-    pub no_symbolize: bool,
-
     /// configure symbolization options. Valid options are:
     /// - pretty (default): pretty concise symbolization
     /// - off: disables all symbolization
@@ -328,7 +317,6 @@ impl Default for LogCommand {
             kernel: false,
             severity: Severity::Info,
             show_metadata: false,
-            raw: false,
             force_select: false,
             force_set_severity: false,
             since: None,
@@ -343,8 +331,6 @@ impl Default for LogCommand {
             tid: None,
             #[cfg(target_os = "fuchsia")]
             json: false,
-            #[cfg(not(target_os = "fuchsia"))]
-            no_symbolize: false,
             #[cfg(not(target_os = "fuchsia"))]
             symbolize: SymbolizeMode::Pretty,
         }

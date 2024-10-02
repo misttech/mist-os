@@ -194,22 +194,6 @@
       "hidden": false
     },
     {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--raw",
-      "short": null,
-      "description": "if provided, logs will not be symbolized",
-      "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--no-symbolize",
-      "short": null,
-      "description": "if provided, the symbolizer will not be spawned like raw, but actually disables the symbolizer process.",
-      "hidden": false
-    },
-    {
       "kind": {
         "Option": {
           "arg_name": "symbolize"

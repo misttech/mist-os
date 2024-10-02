@@ -70,7 +70,7 @@ pub async fn log_impl(
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     // TODO(b/333908164): We have 3 different flags that all do the same thing.
     // Remove them when possible.
-    let symbolize_disabled = cmd.symbolize.is_symbolize_disabled() || cmd.no_symbolize || cmd.raw;
+    let symbolize_disabled = cmd.symbolize.is_symbolize_disabled();
     let prettification_disabled = cmd.symbolize.is_prettification_disabled();
     log_main(
         writer,
