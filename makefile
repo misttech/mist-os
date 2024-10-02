@@ -84,16 +84,20 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 	-z $(OUTPUT)/kernel_x64/kernel.zbi -c "kernel.shell=true" -- -no-reboot
 .PHONY: rain
 
-test: host_test gen info ## Run test kernel-unittests-boot-test.zbi
-	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin kernel_x64/kernel.zbi kernel-unittests-boot-test
+kernel_unit_test: gen info ## Make kernel-unittests-boot-test.zbi
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin kernel-unittests-boot-test
+.PHONY: kernel_unit_test
+
+run_kernel_unit_test: ## Run test kernel-unittests-boot-test.zbi
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-s 1 \
+	-m 4096 \
 	-t $(OUTPUT)/kernel.phys32/linux-x86-boot-shim.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-boot-test.zbi \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
-.PHONY: test
+.PHONY: run_kernel_unit_test
 
-ci: debug kasan info gen ## Run test kernel-zxtest.zbi with kasan
+ci: debug kasan gen info ## Run test kernel-zxtest.zbi with kasan
 	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin kernel_x64/kernel.zbi
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-s 1 \
@@ -103,7 +107,7 @@ ci: debug kasan info gen ## Run test kernel-zxtest.zbi with kasan
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: ci
 
-starnix_lite_kernel: info gen
+starnix_lite_kernel: gen info
 	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin starnix_lite_kernel_zbi
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-s 1 \
