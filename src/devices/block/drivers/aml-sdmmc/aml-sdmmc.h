@@ -49,10 +49,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   static constexpr char kHardwarePowerElementName[] = "aml-sdmmc-hardware";
 
-  // TODO(https://fxbug.dev/368409324): Remove this once removal of this element in the device tree
-  // has rolled.
-  static constexpr char kSystemWakeOnRequestPowerElementName[] = "aml-sdmmc-system-wake-on-request";
-
   // Levels for hardware power element.
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;

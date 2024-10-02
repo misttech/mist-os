@@ -384,9 +384,6 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client.value()), dispatcher());
       hardware_power_assertive_token_ = std::move(description.assertive_token);
-    } else if (config.element.name == kSystemWakeOnRequestPowerElementName) {
-      // TODO(https://fxbug.dev/368409324): Remove this block once removal of this element in the
-      // device tree has rolled.
     } else {
       FDF_LOGL(ERROR, logger(), "Unexpected power element: %s", config.element.name.c_str());
       return zx::error(ZX_ERR_BAD_STATE);
