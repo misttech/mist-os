@@ -15,6 +15,7 @@ use fuchsia_repo::repo_builder::RepoBuilder;
 use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repo_keys::RepoKeys;
 use fuchsia_repo::repository::{Error as RepoError, PmRepository, RepoProvider as _};
+use fuchsia_repo::util::copy_dir;
 use futures::{AsyncReadExt as _, StreamExt as _};
 use sdk_metadata::get_repositories;
 use std::collections::BTreeSet;
@@ -119,14 +120,40 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
 }
 
 async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
-    if !cmd.repo_path.exists() {
-        std::fs::create_dir_all(&cmd.repo_path).expect("creating repository parent dir");
+    // Avoid tainting a product bundle. They are intended to be immutable.
+    let repo_path = &cmd.repo_path;
+    if is_product_bundle(&repo_path).await? {
+        let cmdline = format!(
+            "--<your args> --blob-repo-dir {}/blobs /desired/path/to/dir/to/be/created",
+            repo_path
+        );
+        anyhow::bail!(
+            "The repo path {} points to a product bundle. Product bundles are immutable and so should not be published to. You probably want arguments like '{}'",
+            repo_path,
+            cmdline
+        );
     }
-    let dir = cmd.repo_path.join("repository");
-    if !dir.exists() {
-        std::fs::create_dir_all(&dir).expect("creating repository dir");
+
+    // If the request is to publish the packages in a product bundle only
+    // allowing for metadata refresh, we copy the metadata into the provided
+    // empty dir. This avoids the product bundle being altered in the process.
+    if let Some(p) = &cmd.blob_repo_dir {
+        if p.ends_with("blobs") {
+            let pb_dir = p.parent().ok_or(anyhow!("{p} is not a valid directory"))?;
+            if is_product_bundle(&pb_dir.to_path_buf()).await? {
+                if repo_path.as_path().read_dir()?.next().is_some() {
+                    return Err(anyhow!("When publishing from a product bundle (to refresh the TUF metadata), the provided repo_path should be pointing at an empty directory. {repo_path} is not empty"));
+                } else {
+                    populate_keys_and_metadata(&pb_dir.to_path_buf(), &repo_path).await?;
+                }
+            }
+        }
     }
-    let lock_file = lock_repository(&dir).await?;
+
+    let tuf_metadata_path = cmd.repo_path.join("repository");
+    std::fs::create_dir_all(&tuf_metadata_path)
+        .expect("ensure /path/to/repo_dir/repository exists");
+    let lock_file = lock_repository(&tuf_metadata_path).await?;
     let publish_result = repo_publish_oneshot(cmd).await;
     lock_file.unlock()?;
     publish_result
@@ -198,12 +225,6 @@ pub async fn repo_package_manifest_list(
 }
 
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
-    if is_product_bundle(cmd.repo_path.clone()).await? {
-        anyhow::bail!(
-            "{} is a product bundle. They should not be used directly to publish from.",
-            cmd.repo_path.clone()
-        );
-    }
     let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
         .copy_mode(cmd.copy_mode)
         .delivery_blob_type(cmd.delivery_blob_type.try_into()?);
@@ -412,7 +433,8 @@ fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -
     Ok(builder.build())
 }
 
-async fn is_product_bundle(path: Utf8PathBuf) -> Result<bool> {
+/// Checks whether a provided path looks like a complete product bundle
+async fn is_product_bundle(path: &Utf8PathBuf) -> Result<bool> {
     let expected_pb_json = path.join("product_bundle.json");
     if let Ok(f) = std::fs::metadata(expected_pb_json.as_std_path()) {
         if f.is_file() {
@@ -423,6 +445,14 @@ async fn is_product_bundle(path: Utf8PathBuf) -> Result<bool> {
     } else {
         Ok(false)
     }
+}
+
+/// Populates an empty dir with a copy of the keys and metadata from a given TUF repo dir
+async fn populate_keys_and_metadata(src: &Utf8PathBuf, dst: &Utf8PathBuf) -> Result<()> {
+    for d in ["keys", "repository"] {
+        copy_dir(&src.as_std_path().join(d), &dst.as_std_path().join(d))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1455,7 +1485,7 @@ mod tests {
         assert_eq!(pkg_list.len(), 2);
 
         // Also, "product_bundle.json" should exist in the tree.
-        let pbj = is_product_bundle(pb_dir.clone()).await.unwrap();
+        let pbj = is_product_bundle(&pb_dir).await.unwrap();
         assert!(pbj);
 
         let cmd = RepoPublishCommand {
@@ -1464,5 +1494,54 @@ mod tests {
             ..default_command_for_test()
         };
         assert!(cmd_repo_publish(cmd).await.is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_populate_empty_metadata_dir() {
+        let tempdir = TempDir::new().unwrap();
+        let wrkdir = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        // Populate a repo with packages in a product bundle
+        let pb_dir = wrkdir.join("pb_dir");
+        let pb_metadata_dir = pb_dir.join("repository");
+        let pb_blobs_dir = pb_dir.join("blobs");
+        let pb_keys_dir = pb_dir.join("keys");
+        test_utils::make_repo_dir(pb_metadata_dir.as_std_path(), pb_blobs_dir.as_std_path()).await;
+        test_utils::make_repo_keys_dir(&pb_keys_dir);
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: pb_metadata_dir,
+                blobs_path: pb_blobs_dir.clone(),
+                delivery_blob_type: 1,
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
+            }],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(&pb_dir).unwrap();
+
+        // Make a metadata dir for copying over from the product bundle
+        let mutable_metadata_dir = wrkdir.join("metadata");
+        std::fs::create_dir_all(&mutable_metadata_dir).unwrap();
+
+        assert!(populate_keys_and_metadata(&pb_dir, &mutable_metadata_dir).await.is_ok());
+        for f in ["root.json", "snapshot.json", "targets.json", "timestamp.json"] {
+            for d in ["keys", "repository"] {
+                let filepath = mutable_metadata_dir.join(d).join(f);
+                assert!(std::fs::exists(filepath).unwrap());
+            }
+        }
     }
 }

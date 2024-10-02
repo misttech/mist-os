@@ -11,6 +11,7 @@ pub mod repo_keys;
 pub mod repository;
 pub mod resource;
 pub mod test_utils;
+pub mod util;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub mod manager;
@@ -20,5 +21,3 @@ pub mod package_manifest_watcher;
 pub mod repo_client;
 #[cfg(not(target_os = "fuchsia"))]
 pub mod server;
-
-mod util;

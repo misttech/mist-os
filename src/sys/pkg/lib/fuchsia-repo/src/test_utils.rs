@@ -4,7 +4,7 @@
 
 use crate::repo_keys::RepoKeys;
 use crate::repository::PmRepository;
-use anyhow::{Context, Result};
+use crate::util::copy_dir;
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl_fuchsia_pkg_ext::RepositoryKey;
 use fuchsia_hash::Hash;
@@ -13,7 +13,7 @@ use fuchsia_url::RelativePackageUrl;
 use futures::io::AllowStdIo;
 use maplit::hashmap;
 use std::collections::HashSet;
-use std::fs::{copy, create_dir, create_dir_all, File};
+use std::fs::{create_dir, create_dir_all, File};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use tuf::crypto::{Ed25519PrivateKey, HashAlgorithm};
@@ -21,7 +21,6 @@ use tuf::metadata::{Delegation, Delegations, MetadataDescription, MetadataPath, 
 use tuf::pouf::Pouf1;
 use tuf::repo_builder::RepoBuilder;
 use tuf::repository::FileSystemRepositoryBuilder;
-use walkdir::WalkDir;
 
 #[cfg(not(target_os = "fuchsia"))]
 use crate::repo_client::RepoClient;
@@ -127,26 +126,6 @@ pub fn repo_private_key() -> Ed25519PrivateKey {
     .unwrap()
 }
 
-fn copy_dir(from: &Path, to: &Path) -> Result<()> {
-    let walker = WalkDir::new(from);
-    for entry in walker.into_iter() {
-        let entry = entry?;
-        let to_path = to.join(entry.path().strip_prefix(from)?);
-        if entry.metadata()?.is_dir() {
-            if to_path.exists() {
-                continue;
-            } else {
-                create_dir_all(&to_path).with_context(|| format!("creating {to_path:?}"))?;
-            }
-        } else {
-            copy(entry.path(), &to_path)
-                .with_context(|| format!("copying {:?} to {:?}", entry.path(), to_path))?;
-        }
-    }
-
-    Ok(())
-}
-
 pub fn make_repo_keys() -> RepoKeys {
     let keys_dir = Utf8PathBuf::from(EMPTY_REPO_PATH).join("keys");
     let repo_keys = RepoKeys::from_dir(keys_dir.as_std_path()).unwrap();
@@ -170,7 +149,7 @@ pub fn make_empty_pm_repo_dir(root: &Utf8Path) {
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-pub async fn make_readonly_empty_repository() -> Result<RepoClient<Box<dyn RepoProvider>>> {
+pub async fn make_readonly_empty_repository() -> anyhow::Result<RepoClient<Box<dyn RepoProvider>>> {
     let backend = PmRepository::new(Utf8PathBuf::from(EMPTY_REPO_PATH));
     let mut client = RepoClient::from_trusted_remote(Box::new(backend) as Box<_>)
         .await
@@ -182,7 +161,7 @@ pub async fn make_readonly_empty_repository() -> Result<RepoClient<Box<dyn RepoP
 #[cfg(not(target_os = "fuchsia"))]
 pub async fn make_writable_empty_repository(
     root: Utf8PathBuf,
-) -> Result<RepoClient<Box<dyn RepoProvider>>> {
+) -> anyhow::Result<RepoClient<Box<dyn RepoProvider>>> {
     make_empty_pm_repo_dir(&root);
     let backend = PmRepository::new(root);
     let mut client = RepoClient::from_trusted_remote(Box::new(backend) as Box<_>).await?;
