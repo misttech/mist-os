@@ -1649,6 +1649,10 @@ assembly_input_bundle("feedback_large_disk") {
       [ "//src/developer/forensics:feedback_large_disk_product_config" ]
 }
 
+assembly_input_bundle("feedback_upload_config") {
+  config_data_labels = [ "//src/developer/forensics:feedback_upload_config" ]
+}
+
 assembly_input_bundle("feedback_userdebug_config") {
   config_data_labels = [ "//src/developer/forensics:feedback_userdebug_config" ]
 }

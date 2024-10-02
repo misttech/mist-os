@@ -386,6 +386,9 @@ eng_only_platform_aib_names =
 
       # Bluetooth testing support
       "bluetooth_pandora",
+
+      # Forensics
+      "feedback_upload_config",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names

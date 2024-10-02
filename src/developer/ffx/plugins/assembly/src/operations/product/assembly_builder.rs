@@ -447,7 +447,7 @@ impl ImageAssemblyConfigBuilder {
     fn map_package_set(&self, set: &PackageSet, is_platform: bool) -> Result<PackageSet> {
         // Ensure that the developer didn't set `all_packages_in_base` for
         // configurations that do not support it.
-        if let Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }) =
+        if let Some(DeveloperOnlyOptions { all_packages_in_base: true, .. }) =
             self.developer_only_options
         {
             if self.image_mode == FilesystemImageMode::NoImage {
@@ -474,13 +474,9 @@ impl ImageAssemblyConfigBuilder {
                 // When the all_packages_in_base developer override option is
                 // enabled, that takes precedence over all the rest on eng and userdebug
                 // build-types.
-                (
-                    _,
-                    _,
-                    Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
-                    _,
-                    _,
-                ) => PackageSet::Base,
+                (_, _, Some(DeveloperOnlyOptions { all_packages_in_base: true, .. }), _, _) => {
+                    PackageSet::Base
+                }
 
                 // The Flexible package set is in Cache for eng builds, and base
                 // for user/userdebug.

@@ -130,7 +130,7 @@ pub(crate) struct ConfigurationContext<'a> {
     pub board_info: &'a BoardInformation,
     pub gendir: Utf8PathBuf,
     pub resource_dir: Utf8PathBuf,
-    pub _developer_only_options: Option<&'a DeveloperOnlyOptions>,
+    pub developer_only_options: Option<&'a DeveloperOnlyOptions>,
 }
 
 impl<'a> ConfigurationContext<'a> {
@@ -902,7 +902,7 @@ impl ConfigurationContext<'_> {
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
             gendir: Utf8PathBuf::new(),
             resource_dir: Utf8PathBuf::new(),
-            _developer_only_options: Default::default(),
+            developer_only_options: Default::default(),
         }
     }
 }
@@ -1179,7 +1179,7 @@ mod tests {
             },
             gendir: "gendir".into(),
             resource_dir: "resources".into(),
-            _developer_only_options: Default::default(),
+            developer_only_options: Default::default(),
         };
         let result = context.ensure_build_type_and_feature_set_level(
             &[BuildType::Eng],
@@ -1201,7 +1201,7 @@ mod tests {
             },
             gendir: "gendir".into(),
             resource_dir: "resources".into(),
-            _developer_only_options: Default::default(),
+            developer_only_options: Default::default(),
         };
         let result = context.ensure_build_type_and_feature_set_level(
             &[BuildType::User, BuildType::UserDebug],
@@ -1227,7 +1227,7 @@ mod tests {
             },
             gendir: "gendir".into(),
             resource_dir: "resources".into(),
-            _developer_only_options: Default::default(),
+            developer_only_options: Default::default(),
         };
         let result = context.ensure_build_type_and_feature_set_level(
             &[BuildType::Eng],

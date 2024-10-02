@@ -101,7 +101,7 @@ pub fn define_configuration(
                 board_info,
                 gendir,
                 resource_dir,
-                _developer_only_options: developer_only_options,
+                developer_only_options,
             },
         };
 

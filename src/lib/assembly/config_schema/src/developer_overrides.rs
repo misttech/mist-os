@@ -10,6 +10,26 @@ use std::collections::BTreeMap;
 use crate::assembly_config::{CompiledPackageDefinition, ShellCommands};
 use crate::PackageDetails;
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+pub enum FeedbackBuildTypeConfig {
+    #[serde(rename = "eng_with_upload")]
+    EngWithUpload,
+
+    #[serde(rename = "userdebug")]
+    UserDebug,
+
+    #[serde(rename = "user")]
+    User,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ForensicsOptions {
+    /// The build type config Feedback should use.
+    #[serde(default)]
+    pub build_type_override: Option<FeedbackBuildTypeConfig>,
+}
+
 // LINT.IfChange
 
 /// Developer Overrides struct that is similar to the AssemblyConfig struct,
@@ -90,6 +110,9 @@ pub struct DeveloperOnlyOptions {
     /// Whether to enable netboot mode for assembly.
     #[serde(default)]
     pub netboot_mode: bool,
+
+    #[serde(default)]
+    pub forensics_options: Option<ForensicsOptions>,
 }
 
 /// Kernel options and settings that are only to be used in the context of local
