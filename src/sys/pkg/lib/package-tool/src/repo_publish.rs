@@ -198,12 +198,6 @@ pub async fn repo_package_manifest_list(
 }
 
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
-    if is_product_bundle(cmd.repo_path.clone()).await? {
-        anyhow::bail!(
-            "{} is a product bundle. They should not be used directly to publish from.",
-            cmd.repo_path.clone()
-        );
-    }
     let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
         .copy_mode(cmd.copy_mode)
         .delivery_blob_type(cmd.delivery_blob_type.try_into()?);
@@ -410,19 +404,6 @@ fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -
     }
 
     Ok(builder.build())
-}
-
-async fn is_product_bundle(path: Utf8PathBuf) -> Result<bool> {
-    let expected_pb_json = path.join("product_bundle.json");
-    if let Ok(f) = std::fs::metadata(expected_pb_json.as_std_path()) {
-        if f.is_file() {
-            Ok(true)
-        } else {
-            Err(anyhow!("{expected_pb_json} exists but is not a file"))
-        }
-    } else {
-        Ok(false)
-    }
 }
 
 #[cfg(test)]
@@ -1410,59 +1391,5 @@ mod tests {
                 std::fs::read(repo_blob_path).unwrap()
             );
         }
-    }
-
-    #[fuchsia::test]
-    async fn test_mistreat_product_bundle_as_tuf_repo() {
-        let tempdir = TempDir::new().unwrap();
-        let wrkdir = Utf8Path::from_path(tempdir.path()).unwrap();
-
-        // Populate a repo with packages in a product bundle
-        let pb_dir = wrkdir.join("pb_dir");
-        let pb_metadata_dir = pb_dir.join("repository");
-        let pb_blobs_dir = pb_dir.join("blobs");
-        test_utils::make_repo_dir(pb_metadata_dir.as_std_path(), pb_blobs_dir.as_std_path()).await;
-        let pb_client =
-            test_utils::make_file_system_repository(&pb_metadata_dir, &pb_blobs_dir).await;
-
-        let pb = ProductBundle::V2(ProductBundleV2 {
-            product_name: "".to_string(),
-            product_version: "".to_string(),
-            partitions: PartitionsConfig::default(),
-            sdk_version: "".to_string(),
-            system_a: None,
-            system_b: None,
-            system_r: None,
-            repositories: vec![Repository {
-                name: "fuchsia.com".into(),
-                metadata_path: pb_metadata_dir,
-                blobs_path: pb_blobs_dir.clone(),
-                delivery_blob_type: 1,
-                root_private_key_path: None,
-                targets_private_key_path: None,
-                snapshot_private_key_path: None,
-                timestamp_private_key_path: None,
-            }],
-            update_package_hash: None,
-            virtual_devices_path: None,
-        });
-        pb.write(&pb_dir).unwrap();
-
-        let pkg_list = pb_client.list_packages().await.unwrap();
-
-        // test_utils::make_repo_dir should have created two test packages
-        // in the product bundle directory tree
-        assert_eq!(pkg_list.len(), 2);
-
-        // Also, "product_bundle.json" should exist in the tree.
-        let pbj = is_product_bundle(pb_dir.clone()).await.unwrap();
-        assert!(pbj);
-
-        let cmd = RepoPublishCommand {
-            repo_path: pb_dir.to_path_buf(),
-            clean: true,
-            ..default_command_for_test()
-        };
-        assert!(cmd_repo_publish(cmd).await.is_err());
     }
 }
