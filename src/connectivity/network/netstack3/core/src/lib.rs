@@ -209,7 +209,7 @@ pub mod tcp {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use netstack3_base::WorkQueueReport;
+    pub use netstack3_base::{Counter, WorkQueueReport};
 }
 
 /// Methods for dealing with UDP sockets.

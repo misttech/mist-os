@@ -99,6 +99,7 @@ common_test_deps = [
 
 common_sources = [
   "src/bindings.rs",
+  "src/bindings/counters.rs",
   "src/bindings/debug_fidl_worker.rs",
   "src/bindings/devices.rs",
   "src/bindings/filter.rs",

@@ -11,6 +11,7 @@
 #[cfg(test)]
 mod integration_tests;
 
+mod counters;
 mod debug_fidl_worker;
 mod devices;
 mod filter;
@@ -70,6 +71,7 @@ use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceU
 use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
+use crate::bindings::counters::BindingsCounters;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
 use crate::bindings::time::{AtomicStackTime, StackTime};
 use crate::bindings::util::TaskWaitGroup;
@@ -319,6 +321,7 @@ pub(crate) struct BindingsCtxInner {
     resource_removal: ResourceRemovalSink,
     multicast_admin: MulticastAdminEventSinks,
     config: GlobalConfig,
+    counters: BindingsCounters,
 }
 
 impl BindingsCtxInner {
@@ -335,6 +338,7 @@ impl BindingsCtxInner {
             resource_removal,
             multicast_admin,
             config,
+            counters: Default::default(),
         }
     }
 }

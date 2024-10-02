@@ -11,6 +11,7 @@ use std::pin::pin;
 use assert_matches::assert_matches;
 use cm_rust::NativeIntoFidl as _;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl::AsHandleRef;
 use fuchsia_async::TimeoutExt as _;
 use futures::StreamExt as _;
 use net_declare::{fidl_subnet, std_socket_addr_v6};
@@ -24,6 +25,7 @@ use packet_formats::udp::{UdpPacket, UdpParseArgs};
 use test_case::test_case;
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_power_broker as fpower_broker, fidl_fuchsia_power_system as fpower_system,
@@ -314,5 +316,86 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
         // SAG is still in the inactive state, because netstack is not observing
         // suspension.
         assert_eq!(udp_frame_stream.next().await.unwrap(), payload);
+    }
+}
+
+#[netstack_test]
+#[test_case(true; "suspend enabled")]
+#[test_case(false; "suspend disabled")]
+async fn rx_lease_drops(name: &str, netstack_suspend_enabled: bool) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = create_power_realm(&sandbox, name, netstack_suspend_enabled).await;
+    let (tun_device, device) =
+        netstack_testing_common::devices::create_tun_device_with(fnet_tun::DeviceConfig {
+            blocking: Some(true),
+            ..Default::default()
+        });
+    let (tun_port, port) = netstack_testing_common::devices::create_ip_tun_port(
+        &tun_device,
+        netstack_testing_common::devices::TUN_DEFAULT_PORT_ID,
+    )
+    .await;
+    tun_port.set_online(true).await.expect("set online");
+    let device_control = netstack_testing_common::devices::install_device(&realm, device);
+    let interface_control = finterfaces_ext::admin::Control::new(
+        netstack_testing_common::devices::add_pure_ip_interface(&port, &device_control, name).await,
+    );
+    let if_id = interface_control.get_id().await.expect("get id");
+    assert_matches!(interface_control.enable().await, Ok(Ok(true)));
+
+    let interfaces_state =
+        realm.connect_to_protocol::<fnet_interfaces::StateMarker>().expect("connect to protocol");
+    netstack_testing_common::interfaces::wait_for_online(&interfaces_state, if_id, true)
+        .await
+        .expect("wait online");
+
+    for packet_number in 1..=4 {
+        let (lease, send_lease) = zx::Channel::create();
+        let frame = fnet_tun::Frame {
+            frame_type: Some(fhardware_network::FrameType::Ipv4),
+            // NB: We don't need to send a proper packet, we just need it to
+            // make it to netstack.
+            data: Some(vec![0x01, 0x02, 0x03, 0x04]),
+            port: Some(netstack_testing_common::devices::TUN_DEFAULT_PORT_ID),
+            ..Default::default()
+        };
+        let delegated_lease = fhardware_network::DelegatedRxLease {
+            handle: Some(fhardware_network::DelegatedRxLeaseHandle::Channel(send_lease)),
+            hold_until_frame: Some(packet_number),
+            ..Default::default()
+        };
+
+        // Make the test more interesting by changing the order of things
+        // reaching tun.
+        if packet_number % 2 == 0 {
+            tun_device.delegate_rx_lease(delegated_lease).expect("delegate lease");
+            tun_device.write_frame(&frame).await.expect("write frame").expect("write frame error");
+        } else {
+            tun_device.write_frame(&frame).await.expect("write frame").expect("write frame error");
+            tun_device.delegate_rx_lease(delegated_lease).expect("delegate lease");
+        };
+        // Lease should always be dropped because netdevice drops leases even
+        // when netstack is not subscribed to it.
+        assert_eq!(
+            lease
+                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE)
+                .expect("wait closed"),
+            zx::Signals::CHANNEL_PEER_CLOSED
+        );
+
+        // Check that netstack was the one dropping the lease via inspect. It's
+        // sad to depend on the inspect interface here, but we're guaranteeing
+        // this is not racy because we're waiting for the lease to be closed
+        // above before checking.
+        let expect_inspect_value = if netstack_suspend_enabled { packet_number } else { 0 };
+        let property = netstack_testing_common::get_inspect_property(
+            &realm,
+            "netstack",
+            "root/Counters/Bindings/Power:DroppedRxLeases",
+            netstack_testing_common::constants::inspect::DEFAULT_INSPECT_TREE_NAME,
+        )
+        .await
+        .expect("getting inspect property");
+        assert_eq!(property.uint(), Some(expect_inspect_value));
     }
 }

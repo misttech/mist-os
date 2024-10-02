@@ -756,6 +756,7 @@ async fn inspect_counters(name: &str) {
     println!("Got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Counters": {
+            "Bindings": contains {},
             "Device": {
                 "Rx": {
                     TotalFrames: 1u64,
