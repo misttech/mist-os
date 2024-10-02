@@ -724,14 +724,11 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   }
 
   // Create our logger.
-  zx::result logger_result = fdf::Logger::Create(*incoming(), dispatcher(), note->payload.name);
-  if (logger_result.is_error()) {
-    return logger_result.take_error();
-  }
+  auto logger = fdf::Logger::Create(*incoming(), dispatcher(), note->payload.name);
 
   // Move the logger over into a shared_ptr instead of unique_ptr so we can pass it to the global
   // logging manager and compat::Device.
-  inner_logger_ = std::shared_ptr<fdf::Logger>(logger_result.value().release());
+  inner_logger_ = std::shared_ptr<fdf::Logger>(logger.release());
   device_.set_logger(inner_logger_);
   {
     std::lock_guard guard(kGlobalLoggerListLock);

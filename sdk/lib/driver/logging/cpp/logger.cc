@@ -40,26 +40,29 @@ void Logger::BeginRecord(flog::LogBuffer& buffer, FuchsiaLogSeverity severity,
   buffer.WriteKeyValue("tag", tag_);
 }
 
-zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
-                                                   async_dispatcher_t* dispatcher,
-                                                   std::string_view name,
-                                                   FuchsiaLogSeverity min_severity,
-                                                   bool wait_for_initial_interest) {
+std::unique_ptr<Logger> Logger::NoOp() {
+  fidl::WireClient<fuchsia_logger::LogSink> log_sink;
+  return std::make_unique<Logger>("", FUCHSIA_LOG_INFO, zx::socket(), std::move(log_sink));
+}
+
+std::unique_ptr<Logger> Logger::Create(const Namespace& ns, async_dispatcher_t* dispatcher,
+                                       std::string_view name, FuchsiaLogSeverity min_severity,
+                                       bool wait_for_initial_interest) {
   zx::socket client_end, server_end;
   zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &client_end, &server_end);
   if (status != ZX_OK) {
-    return zx::error(status);
+    return Logger::NoOp();
   }
 
   auto ns_result = ns.Connect<fuchsia_logger::LogSink>();
   if (ns_result.is_error()) {
-    return ns_result.take_error();
+    return Logger::NoOp();
   }
 
   fidl::WireClient<fuchsia_logger::LogSink> log_sink(std::move(*ns_result), dispatcher);
   auto sink_result = log_sink->ConnectStructured(std::move(server_end));
   if (!sink_result.ok()) {
-    return zx::error(sink_result.status());
+    return Logger::NoOp();
   }
 
   auto logger =
@@ -68,7 +71,7 @@ zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
   if (wait_for_initial_interest) {
     auto interest_result = logger->log_sink_.sync()->WaitForInterestChange();
     if (!interest_result.ok()) {
-      return zx::error(interest_result.status());
+      return Logger::NoOp();
     }
     // We are guanteed to not call this twice to we can ignore the application error.
     logger->HandleInterest(interest_result->value()->data);
@@ -77,7 +80,7 @@ zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
   logger->log_sink_->WaitForInterestChange().Then(
       fit::bind_member(logger.get(), &Logger::OnInterestChange));
 
-  return zx::ok(std::move(logger));
+  return logger;
 }
 
 Logger* Logger::GlobalInstance() {

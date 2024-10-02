@@ -24,14 +24,19 @@ class Logger final {
  public:
   // Creates a logger with a given |name|, which will only send logs that are of
   // at least |min_severity|.
+  //
   // |dispatcher| must be single threaded or synchornized. Create must be called from the context of
   // the |dispatcher|.
+  //
   // If |wait_for_initial_interest| is true we this will synchronously query the
   // fuchsia.logger/LogSink for the min severity it should expect, overriding the min_severity
   // supplied.
-  static zx::result<std::unique_ptr<Logger>> Create(
-      const Namespace& ns, async_dispatcher_t* dispatcher, std::string_view name,
-      FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO, bool wait_for_initial_interest = true);
+  //
+  // If we fail to connect to LogSink, or if there's any error the returned logger will be no-op.
+  static std::unique_ptr<Logger> Create(const Namespace& ns, async_dispatcher_t* dispatcher,
+                                        std::string_view name,
+                                        FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO,
+                                        bool wait_for_initial_interest = true);
 
   static Logger* GlobalInstance();
   static void SetGlobalInstance(Logger*);
@@ -71,9 +76,13 @@ class Logger final {
   // on LogBuffer directly.
   bool FlushRecord(fuchsia_syslog::LogBuffer& buffer, uint32_t dropped);
 
+  bool IsNoOp() { return !socket_.is_valid(); }
+
  private:
   Logger(const Logger& other) = delete;
   Logger& operator=(const Logger& other) = delete;
+
+  static std::unique_ptr<Logger> NoOp();
 
   void HandleInterest(fuchsia_diagnostics::wire::Interest interest);
   void OnInterestChange(

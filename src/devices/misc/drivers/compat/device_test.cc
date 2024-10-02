@@ -42,8 +42,7 @@ class DeviceTest : public ::testing::Test {
     ASSERT_EQ(ZX_OK, ns.status_value());
 
     auto logger = fdf::Logger::Create(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
-    ASSERT_EQ(ZX_OK, logger.status_value());
-    logger_ = std::shared_ptr<fdf::Logger>((*logger).release());
+    logger_ = std::shared_ptr<fdf::Logger>(logger.release());
   }
 
   bool RunLoopUntilIdle() {

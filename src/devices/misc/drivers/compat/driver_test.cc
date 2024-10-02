@@ -830,8 +830,7 @@ class GlobalLoggerListTest : public testing::Test {
     ZX_ASSERT(ZX_OK == ns.status_value());
 
     auto logger = fdf::Logger::Create(*ns, dispatcher(), name, FUCHSIA_LOG_INFO, false);
-    ZX_ASSERT(ZX_OK == logger.status_value());
-    return std::shared_ptr<fdf::Logger>((*logger).release());
+    return std::shared_ptr<fdf::Logger>(logger.release());
   }
   async_dispatcher_t* dispatcher() { return fdf::Dispatcher::GetCurrent()->async_dispatcher(); }
 
