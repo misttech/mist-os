@@ -131,6 +131,70 @@ bool test_data_input_buffer() {
   END_TEST;
 }
 
+bool test_data_output_buffer() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+
+  size_t page_size = PAGE_SIZE;
+  auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), 64ul * page_size);
+
+  auto mm = *current_task;
+  fbl::Vector<uint8_t> data;
+  for (int i = 0; i < 1024; ++i) {
+    fbl::AllocChecker ac;
+    data.push_back(static_cast<uint8_t>(i % 256), &ac);
+    ZX_DEBUG_ASSERT(ac.check());
+  }
+
+  // Test incorrect callback.
+  {
+    util::SmallVector<UserBuffer, 1> output_iovec;
+    output_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
+    output_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
+
+    auto output_buffer =
+        UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(output_iovec));
+    ASSERT_TRUE(output_buffer.is_ok(), "UserBuffersOutputBuffer");
+    ASSERT_TRUE(
+        output_buffer->write_each([](auto data) { return fit::ok(data.size() + 1); }).is_error());
+  }
+
+  // Test write
+  {
+    util::SmallVector<UserBuffer, 1> output_iovec;
+    output_iovec.push_back(UserBuffer{.address_ = addr, .length_ = 25});
+    output_iovec.push_back(UserBuffer{.address_ = addr + 64ul, .length_ = 12});
+
+    auto output_buffer =
+        UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new(mm, ktl::move(output_iovec));
+    ASSERT_TRUE(output_buffer.is_ok(), "UserBuffersOutputBuffer");
+    ASSERT_EQ(37u, output_buffer->available());
+    ASSERT_EQ(0u, output_buffer->bytes_written());
+    ktl::span bytes_to_write1{data.data(), 20};
+    auto write_result = output_buffer->write_all(bytes_to_write1);
+    ASSERT_TRUE(write_result.is_ok(), "write");
+    ASSERT_EQ(20u, write_result.value());
+    ASSERT_EQ(17u, output_buffer->available());
+    ASSERT_EQ(20u, output_buffer->bytes_written());
+    ktl::span bytes_to_write2 = ktl::span{data.data() + 20, data.data() + 37};
+    write_result = output_buffer->write_all(bytes_to_write2);
+    ASSERT_TRUE(write_result.is_ok(), "write");
+    ASSERT_EQ(17u, write_result.value());
+    ASSERT_EQ(0u, output_buffer->available());
+    ASSERT_EQ(37u, output_buffer->bytes_written());
+    ktl::span bytes_to_write3 = ktl::span{data.data() + 37, data.data() + 50};
+    write_result = output_buffer->write_all(bytes_to_write3);
+    ASSERT_TRUE(write_result.is_error());
+
+    auto buffer = current_task->read_memory_to_array<128>(addr);
+    ASSERT_BYTES_EQ(data.data(), buffer->data(), 25);
+    ASSERT_BYTES_EQ(data.data() + 25, buffer->data() + 64, 12);
+  }
+
+  END_TEST;
+}
+
 bool test_vec_input_buffer() {
   BEGIN_TEST;
 
@@ -235,6 +299,7 @@ bool test_vec_write_buffer() {
 
 UNITTEST_START_TESTCASE(starnix_io_buffers)
 UNITTEST("test data input buffer", unit_testing::test_data_input_buffer)
+UNITTEST("test data output buffer", unit_testing::test_data_output_buffer)
 UNITTEST("test vec input buffer", unit_testing::test_vec_input_buffer)
 UNITTEST("test vec output buffer", unit_testing::test_vec_output_buffer)
 UNITTEST("test vec write buffer", unit_testing::test_vec_write_buffer)
