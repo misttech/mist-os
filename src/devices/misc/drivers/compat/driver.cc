@@ -51,9 +51,8 @@ std::mutex kDriverGlobalsLock;
 
 namespace {
 
-constexpr auto kOpenFlags = fio::wire::OpenFlags::kRightReadable |
-                            fio::wire::OpenFlags::kRightExecutable |
-                            fio::wire::OpenFlags::kNotDirectory;
+constexpr auto kOpenFlags =
+    fio::Flags::kPermRead | fio::Flags::kPermExecute | fio::Flags::kProtocolFile;
 constexpr auto kVmoFlags =
     fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute | fio::wire::VmoFlags::kPrivateClone;
 constexpr auto kLibDriverPath = "/pkg/driver/compat.so";
@@ -63,8 +62,7 @@ std::string_view GetFilename(std::string_view path) {
   return index == std::string_view::npos ? path : path.substr(index + 1);
 }
 
-zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path,
-                            fuchsia_io::wire::OpenFlags flags) {
+zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path, fuchsia_io::Flags flags) {
   zx::result file = ns.Open<fuchsia_io::File>(path, flags);
   if (file.is_error()) {
     return file.take_error();

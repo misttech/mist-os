@@ -13,6 +13,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl_driver/cpp/transport.h>
+#include <zircon/availability.h>
 
 namespace fdf {
 
@@ -127,11 +128,11 @@ class Namespace final {
     return component::OpenServiceAt<FidlService>(svc_dir(), instance);
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
   // Protocol must compose fuchsia.io/Node.
   // DriverTransport is not supported. Protocols using DriverTransport must be service members.
   template <typename Protocol>
-  zx::result<fidl::ClientEnd<Protocol>> Open(const char* path,
-                                             fuchsia_io::wire::OpenFlags flags) const {
+  zx::result<fidl::ClientEnd<Protocol>> Open(const char* path, fuchsia_io::Flags flags) const {
     static_assert(!fidl::IsServiceMemberV<Protocol>, "Protocol must not be a ServiceMember.");
     static_assert((std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>),
                   "Protocol must use ChannelTransport. Use a ServiceMember for DriverTransport.");
@@ -142,11 +143,26 @@ class Namespace final {
     }
     return zx::ok(std::move(client_end));
   }
+#endif
 
-  // Opens the |path| in the driver's namespace.
-  // DriverTransport is not supported.
-  zx::result<> Open(const char* path, fuchsia_io::wire::OpenFlags flags,
-                    zx::channel server_end) const;
+  // Protocol must compose fuchsia.io/Node. Uses deprecated fuchsia.io/Directory.Open1.
+  // DriverTransport is not supported. Protocols using DriverTransport must be service members.
+  // TODO(https://fxbug.dev/324080864): Remove this when we no longer support io1.
+  template <typename Protocol>
+  zx::result<fidl::ClientEnd<Protocol>> Open(const char* path, fuchsia_io::OpenFlags flags) const
+      ZX_DEPRECATED_SINCE(
+          1, NEXT,
+          "Use new signature that takes fuchsia.io/Flags instead of fuchsia.io/OpenFlags.") {
+    static_assert(!fidl::IsServiceMemberV<Protocol>, "Protocol must not be a ServiceMember.");
+    static_assert((std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>),
+                  "Protocol must use ChannelTransport. Use a ServiceMember for DriverTransport.");
+    auto [client_end, server_end] = fidl::Endpoints<Protocol>::Create();
+    zx::result result = OpenDeprecated(path, flags, server_end.TakeChannel());
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::ok(std::move(client_end));
+  }
 
   // Connects to the |ServiceMember| protocol.
   //
@@ -203,6 +219,16 @@ class Namespace final {
 
   Namespace(const Namespace& other) = delete;
   Namespace& operator=(const Namespace& other) = delete;
+
+  // Opens the |path| in the driver's namespace with Open1. DriverTransport is not supported.
+  // TODO(https://fxbug.dev/324080864): Remove this when we no longer support io1.
+  zx::result<> OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
+                              zx::channel server_end) const;
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // Opens the |path| in the driver's namespace with Open3. DriverTransport is not supported.
+  zx::result<> Open(const char* path, fuchsia_io::Flags flags, zx::channel server_end) const;
+#endif
 
   fdio_ns_t* incoming_ = nullptr;
   fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;

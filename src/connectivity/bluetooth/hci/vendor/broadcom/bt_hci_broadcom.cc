@@ -402,8 +402,7 @@ fpromise::promise<> BtHciBroadcom::LogControllerFallbackBdaddr() {
       });
 }
 
-constexpr auto kOpenFlags =
-    fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kNotDirectory;
+constexpr auto kOpenFlags = fuchsia_io::Flags::kPermRead | fuchsia_io::Flags::kProtocolFile;
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;

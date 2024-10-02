@@ -4,13 +4,29 @@
 
 #include <lib/driver/promise/cpp/promise.h>
 #include <lib/fpromise/bridge.h>
+#include <zircon/availability.h>
 
 namespace fdf {
 
 namespace internal {
+fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResultDeprecated(
+    const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
+    fuchsia_io::OpenFlags flags) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  auto file = ns.Open<fuchsia_io::File>(path, flags);
+#pragma clang diagnostic pop
+  if (file.is_error()) {
+    return fpromise::error(file.status_value());
+  }
+  fidl::WireSharedClient client(std::move(*file), dispatcher);
+  return fpromise::ok(std::move(client));
+}
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
-    fuchsia_io::wire::OpenFlags flags) {
+    fuchsia_io::Flags flags) {
   auto file = ns.Open<fuchsia_io::File>(path, flags);
   if (file.is_error()) {
     return fpromise::error(file.status_value());
@@ -18,6 +34,8 @@ fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWith
   fidl::WireSharedClient client(std::move(*file), dispatcher);
   return fpromise::ok(std::move(client));
 }
+
+#endif
 }  // namespace internal
 
 fpromise::promise<void, fuchsia_driver_framework::wire::NodeError> AddChild(
