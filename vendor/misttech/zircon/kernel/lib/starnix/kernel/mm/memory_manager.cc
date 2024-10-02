@@ -41,6 +41,7 @@
 
 #include "../kernel_priv.h"
 #include "lib/mistos/starnix_uapi/math.h"
+#include "lib/mistos/util/default_construct.h"
 
 #include <ktl/enforce.h>
 
@@ -120,7 +121,7 @@ Vmars Vmars::New(Vmar vmar, zx_info_vmar_t vmar_info) {
 
 Vmar& Vmars::vmar_for_addr(UserAddress addr) {
   if (lower_4gb.has_value()) {
-    if (addr < LOWER_4GB_LIMIT.ptr()) {
+    if (addr < LOWER_4GB_LIMIT) {
       return lower_4gb.value();
     }
   }
@@ -335,12 +336,12 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_memory(
 fit::result<Errno, ktl::optional<UserAddress>> MemoryManagerState::try_remap_in_place(
     fbl::RefPtr<MemoryManager> mm, UserAddress old_addr, size_t old_length, size_t new_length,
     fbl::Vector<Mapping>& released_mappings) {
-  auto old_end_range = mtl::checked_add(old_addr.ptr(), old_length);
+  auto old_end_range = old_addr.checked_add(old_length);
   if (!old_end_range.has_value()) {
     return fit::error(errno(EINVAL));
   }
 
-  auto new_end_range = mtl::checked_add(old_addr.ptr(), new_length);
+  auto new_end_range = old_addr.checked_add(new_length);
   if (!new_end_range.has_value()) {
     return fit::error(errno(EINVAL));
   }
@@ -468,7 +469,7 @@ bool MemoryManagerState::check_has_unauthorized_splits(UserAddress addr, size_t 
 fit::result<Errno, fbl::Vector<ktl::pair<Mapping, size_t>>>
 MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) const {
   fbl::Vector<ktl::pair<Mapping, size_t>> result;
-  UserAddress end_addr;
+  UserAddress end_addr(0ul);
   if (auto r = addr.checked_add(length); r) {
     end_addr = r.value();
   } else {
@@ -534,7 +535,7 @@ fit::result<Errno> MemoryManagerState::unmap(fbl::RefPtr<MemoryManager> mm, User
 
   // Unmap the range, including the the tail of any range that would have been split. This
   // operation is safe because we're operating on another process.
-  zx_status_t status = user_vmars.unmap(addr.ptr(), length_or_error.value()).error_value();
+  zx_status_t status = user_vmars.unmap(addr, length_or_error.value()).error_value();
   switch (status) {
     case ZX_OK:
     case ZX_ERR_NOT_FOUND:
@@ -573,7 +574,7 @@ fit::result<Errno> MemoryManagerState::unmap(fbl::RefPtr<MemoryManager> mm, User
 fit::result<Errno> MemoryManagerState::update_after_unmap(fbl::RefPtr<MemoryManager> mm,
                                                           UserAddress addr, size_t length,
                                                           fbl::Vector<Mapping>& released_mappings) {
-  UserAddress end_addr;
+  UserAddress end_addr(0ul);
   if (auto result = addr.checked_add(length); result) {
     end_addr = result.value();
   } else {
@@ -1057,17 +1058,6 @@ MemoryManager::MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar
 
   auto _state = state.Write();
   _state->user_vmars = Vmars::New(ktl::move(user_vmar), user_vmar_info);
-  _state->forkable_state_ = MemoryManagerForkableState{.brk = {},
-                                                       .stack_base = 0,
-                                                       .stack_size = 0,
-                                                       .stack_start = 0,
-                                                       .auxv_start = 0,
-                                                       .auxv_end = 0,
-                                                       .argv_start = 0,
-                                                       .argv_end = 0,
-                                                       .environ_start = 0,
-                                                       .environ_end = 0,
-                                                       .vdso_base = 0};
 }
 
 fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& current_task,
@@ -1182,7 +1172,7 @@ bool MemoryManager::extend_brk(MemoryManagerState& _state, fbl::RefPtr<MemoryMan
   // extend that mapping, rather than making a new allocation.
   auto existing = [&]() -> ktl::optional<ktl::pair<util::Range<UserAddress>, Mapping>> {
     if (old_end > brk_base) {
-      auto last_page = old_end.ptr() - PAGE_SIZE;
+      auto last_page = old_end - static_cast<size_t>(PAGE_SIZE);
       if (auto opt = _state.mappings.get(last_page); opt) {
         auto [_, m] = *opt;
         if (m.name_.type == MappingNameType::Heap) {
@@ -1613,7 +1603,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
                            return new_mapping;
                          },
                          [](PrivateAnonymous&) {
-                           return Mapping::New(0, fbl::RefPtr<MemoryObject>(), 0,
+                           return Mapping::New(UserAddress::NULL_, fbl::RefPtr<MemoryObject>(), 0,
                                                MappingFlagsImpl(MappingFlags::empty()));
                          },
                      },
@@ -1659,7 +1649,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
                            return new_mapping;
                          },
                          [](PrivateAnonymous&) {
-                           return Mapping::New(0, fbl::RefPtr<MemoryObject>(), 0,
+                           return Mapping::New(UserAddress::NULL_, fbl::RefPtr<MemoryObject>(), 0,
                                                MappingFlagsImpl(MappingFlags::empty()));
                          },
                      },

@@ -22,5 +22,5 @@ long sys_a0012_brk(unsigned long brk) {
   LTRACEF_LEVEL(2, "brk=0x%lx\n", brk);
 
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_brk, current_task, brk);
+  return execute_syscall(starnix::sys_brk, current_task, starnix_uapi::UserAddress(brk));
 }
