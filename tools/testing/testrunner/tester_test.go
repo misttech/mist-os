@@ -192,6 +192,8 @@ func TestSubprocessTester(t *testing.T) {
 				"--bindmount_ro",
 				"/etc/ssl/certs:/etc/ssl/certs",
 				"--bindmount_ro",
+				"/usr/share/ca-certificates:/usr/share/ca-certificates",
+				"--bindmount_ro",
 				"/lib:/lib",
 				"--bindmount_ro",
 				"/lib64:/lib64",
