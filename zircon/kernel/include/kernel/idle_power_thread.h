@@ -194,8 +194,7 @@ class IdlePowerThread final {
 
   // A timer on the boot timeline used to resume the system at the given boot time if no other wake
   // events occur by then.
-  inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){
-      Timer::ReferenceTimeline::kBoot};
+  inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){ZX_CLOCK_BOOT};
 
   // A bespoke wake vector used by the resume timer handler to wake the system when the resume boot
   // time is reached.

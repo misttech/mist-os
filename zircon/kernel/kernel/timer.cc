@@ -194,9 +194,8 @@ void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t lat
   DEBUG_ASSERT(arch_ints_disabled());
   LTRACEF("timer %p, cpu %u, scheduled %" PRIi64 "\n", timer, arch_curr_cpu_num(),
           timer->scheduled_time_);
-  fbl::DoublyLinkedList<Timer*>& timer_list = timer->timeline_ == Timer::ReferenceTimeline::kMono
-                                                  ? monotonic_timer_list_
-                                                  : boot_timer_list_;
+  fbl::DoublyLinkedList<Timer*>& timer_list =
+      timer->clock_id_ == ZX_CLOCK_MONOTONIC ? monotonic_timer_list_ : boot_timer_list_;
   InsertIntoTimerList(timer_list, timer, earliest_deadline, latest_deadline);
 }
 
@@ -348,22 +347,16 @@ void Timer::Set(const Deadline& deadline, Callback callback, void* arg) {
   LTRACEF("scheduled time %" PRIi64 "\n", scheduled_time_);
 
   TimerQueue& timer_queue = percpu::Get(cpu).timer_queue;
-  // For now we should only ever have one boottime timer, which is the one that wakes up the
-  // system. So, we can assert that either this is a monotonic timer, or the boottime timer queue
-  // is empty.
-  // TODO(https://fxbug.dev/328306129): Remove this assert once we support generic boot timers.
-  DEBUG_ASSERT(timeline_ == Timer::ReferenceTimeline::kMono ||
-               timer_queue.boot_timer_list_.is_empty());
   timer_queue.Insert(this, earliest_deadline, latest_deadline);
 
-  switch (timeline_) {
-    case Timer::ReferenceTimeline::kMono:
+  switch (clock_id_) {
+    case ZX_CLOCK_MONOTONIC:
       if (!timer_queue.monotonic_timer_list_.is_empty() &&
           &timer_queue.monotonic_timer_list_.front() == this) {
         timer_queue.UpdatePlatformTimerMono(deadline.when());
       }
       break;
-    case Timer::ReferenceTimeline::kBoot:
+    case ZX_CLOCK_BOOT:
       if (!timer_queue.boot_timer_list_.is_empty() &&
           &timer_queue.boot_timer_list_.front() == this) {
         timer_queue.UpdatePlatformTimerBoot(deadline.when());
@@ -412,7 +405,7 @@ bool Timer::Cancel() {
 
     // Save a copy of the old head of the queue so later we can see if we modified the head.
     const Timer* oldhead = nullptr;
-    fbl::DoublyLinkedList<Timer*>& timer_list = timeline_ == Timer::ReferenceTimeline::kMono
+    fbl::DoublyLinkedList<Timer*>& timer_list = clock_id_ == ZX_CLOCK_MONOTONIC
                                                     ? timer_queue.monotonic_timer_list_
                                                     : timer_queue.boot_timer_list_;
     if (!timer_list.is_empty()) {

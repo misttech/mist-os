@@ -106,6 +106,8 @@ class clock final : public object<clock> {
   }
 
   static time get_monotonic() ZX_AVAILABLE_SINCE(7) { return time(zx_clock_get_monotonic()); }
+
+  static time_boot get_boot() ZX_AVAILABLE_SINCE(NEXT) { return time_boot(zx_clock_get_boot()); }
 } ZX_AVAILABLE_SINCE(7);
 
 using unowned_clock = unowned<clock> ZX_AVAILABLE_SINCE(7);
