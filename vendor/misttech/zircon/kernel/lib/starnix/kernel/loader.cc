@@ -28,6 +28,7 @@
 #include <lib/mistos/starnix_uapi/time.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/cprng.h>
+#include <lib/mistos/util/default_construct.h>
 #include <lib/starnix/elfldtl/vmo.h>
 #include <trace.h>
 #include <zircon/compiler.h>
@@ -476,7 +477,7 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
         FileWriteGuardRef(None),
     )?;
   */
-  auto vdso_base = UserAddress();
+  auto vdso_base = mtl::DefaultConstruct<UserAddress>();
 
   auto creds = current_task->creds();
   auto secure = [&creds]() {
@@ -530,8 +531,9 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
       ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::WRITE);
 
   auto stack_base = current_task->mm()->map_anonymous(
-      {.type = DesiredAddressType::Any, .address = 0}, stack_size_result.value(), prot_flags,
-      MappingOptionsFlags(MappingOptions::ANONYMOUS), {.type = MappingNameType::Stack});
+      {.type = DesiredAddressType::Any, .address = mtl::DefaultConstruct<UserAddress>()},
+      stack_size_result.value(), prot_flags, MappingOptionsFlags(MappingOptions::ANONYMOUS),
+      {.type = MappingNameType::Stack});
   if (stack_base.is_error()) {
     TRACEF("Failed map stack\n");
     return stack_base.take_error();
@@ -550,7 +552,6 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   }
 
   auto mm_state = current_task->mm()->state.Write();
-  (*mm_state)->stack_base = stack_base.value();
   (*mm_state)->stack_size = stack_size_result.value();
   (*mm_state)->stack_start = stack_result->stack_pointer;
   (*mm_state)->auxv_start = stack_result->auxv_start;
@@ -562,7 +563,8 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
 
   (*mm_state)->vdso_base = vdso_base;
 
-  return fit::ok(ThreadStartInfo{.entry = entry, .stack = stack_result->stack_pointer});
+  return fit::ok(
+      ThreadStartInfo{.entry = UserAddress(entry), .stack = stack_result->stack_pointer});
 }
 
 fit::result<Errno, StackResult> test_populate_initial_stack(

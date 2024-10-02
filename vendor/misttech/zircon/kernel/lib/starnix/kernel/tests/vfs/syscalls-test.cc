@@ -35,7 +35,7 @@ bool test_sys_open_cloexec() {
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked_with_bootfs();
 
-  auto path_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto path_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
   ktl::string_view path("data/testfile.txt");
   auto result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
   ASSERT_TRUE(result.is_ok());

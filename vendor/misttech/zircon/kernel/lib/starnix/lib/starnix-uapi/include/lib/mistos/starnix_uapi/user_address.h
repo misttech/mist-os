@@ -19,8 +19,11 @@
 namespace starnix_uapi {
 
 class UserAddress {
- private:
+ public:
+  explicit UserAddress(uint64_t address) : address_(address) {}
+
   // impl UserAddress
+ private:
   static constexpr uint64_t NULL_PTR = 0;
 
  public:
@@ -28,13 +31,13 @@ class UserAddress {
 
   // TODO(lindkvist): Remove this in favor of marking the From<u64> trait const once feature is
   // stabilized.
-  static const UserAddress const_from(uint64_t address) { return UserAddress(address); }
+  static UserAddress const_from(uint64_t address) { return UserAddress(address); }
 
   static UserAddress from_ptr(zx_vaddr_t ptr) { return UserAddress(static_cast<uint64_t>(ptr)); }
 
   zx_vaddr_t ptr() const { return static_cast<zx_vaddr_t>(address_); }
 
-  fit::result<Errno, UserAddress> round_up(uint64_t increment) {
+  fit::result<Errno, UserAddress> round_up(uint64_t increment) const {
     auto result =
         round_up_to_increment(static_cast<size_t>(address_), static_cast<size_t>(increment));
     if (result.is_error()) {
@@ -50,6 +53,14 @@ class UserAddress {
   ktl::optional<UserAddress> checked_add(size_t rhs) const {
     uint64_t result;
     if (add_overflow(address_, rhs, &result)) {
+      return ktl::nullopt;
+    }
+    return UserAddress(result);
+  }
+
+  ktl::optional<UserAddress> checked_sub(size_t rhs) const {
+    uint64_t result;
+    if (sub_overflow(address_, rhs, &result)) {
       return ktl::nullopt;
     }
     return UserAddress(result);
@@ -90,12 +101,12 @@ class UserAddress {
 
   static UserAddress from(uint64_t value) { return UserAddress(value); }
 
- public:
-  // TODO (Herrera) make it private
-  UserAddress() = default;
-  UserAddress(uint64_t address) : address_(address) {}
-
  private:
+  template <typename U>
+  friend U mtl::DefaultConstruct();
+
+  UserAddress() = default;
+
   uint64_t address_ = NULL_PTR;
 };
 
@@ -107,14 +118,14 @@ class UserRef {
   // impl<T> UserRef<T>
   static UserRef<T> New(UserAddress addr) { return UserRef<T>(addr); }
 
-  inline UserAddress addr() { return addr_; }
+  UserAddress addr() { return addr_; }
 
-  inline UserRef<T> next() { return UserRef::New(addr() + sizeof(T)); }
+  UserRef<T> next() { return UserRef::New(addr() + sizeof(T)); }
 
-  inline UserRef at(size_t index) { UserRef<T>::New(addr() + index * sizeof(T)); }
+  UserRef at(size_t index) { UserRef<T>::New(addr() + (index * sizeof(T))); }
 
   template <typename S>
-  inline UserRef<S> cast() {
+  UserRef<S> cast() {
     return UserRef<S>::New(addr_);
   }
 
@@ -125,10 +136,11 @@ class UserRef {
   template <typename U>
   friend U mtl::DefaultConstruct();
 
-  UserRef() : addr_(UserAddress::NULL_) {}
-  UserRef(UserAddress addr) : addr_(addr) {}
+  UserRef() = default;
 
-  UserAddress addr_;
+  explicit UserRef(UserAddress addr) : addr_(addr) {}
+
+  UserAddress addr_ = mtl::DefaultConstruct<UserAddress>();
 };
 
 }  // namespace starnix_uapi
