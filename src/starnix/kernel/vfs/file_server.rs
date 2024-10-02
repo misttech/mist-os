@@ -834,6 +834,9 @@ mod tests {
         })
         .await;
         scope.shutdown();
+        // Yield once to let task in scope in the current thread finish.
+        futures_lite::future::yield_now().await;
+        scope.wait().await;
         // This ensures fs cannot be captures in the thread.
         std::mem::drop(fs);
     }
@@ -913,6 +916,9 @@ mod tests {
         })
         .await;
         scope.shutdown();
+        // Yield once to let task in scope in the current thread finish.
+        futures_lite::future::yield_now().await;
+        scope.wait().await;
 
         // This ensures fs cannot be captured in the thread.
         std::mem::drop(fs);
