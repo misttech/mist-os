@@ -339,12 +339,10 @@ impl Eq for RawRepr {}
 
 impl Hash for RawRepr {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        match self.project() {
-            // Hash the value of the pointer rather than the pointed-to string since there's
-            // only one copy of the string allocated ever.
-            SafeRepr::Heap(ptr) => ptr.hash(h),
-            SafeRepr::Inline(i) => i.hash(h),
-        }
+        // SAFETY: it is always OK to interpret a pointer as a byte array as long as we don't expect
+        // to retain provenance.
+        let this = unsafe { &self.inline };
+        this.hash(h);
     }
 }
 
