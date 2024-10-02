@@ -417,6 +417,26 @@ closed protocol NetworkDeviceIfc {
     strict Snoop(struct {
         rx vector<RxBuffer>:MAX_RX_BUFFERS;
     });
+
+    /// Transfers a receive wake lease up to the application.
+    ///
+    /// Devices that allow applications to fully deal with a frame after a wake
+    /// from network traffic may use this method as a "lease baton passing"
+    /// strategy. Applications that support wake handling hold on to the lease
+    /// until the rx traffic is fully processed.
+    ///
+    /// Devices must keep track of the number of rx frames sent over
+    /// [`NetworkDeviceIfc.CompleteRx`] and use the latest issued frame number
+    /// as [`fuchsia.hardware.network/DelegatedRxLease.hold_until_frame`] to
+    /// guarantee processing. *Every* frame successfully given to `CompleteRx`
+    /// should increase the rx frame count. Note that the frame number is
+    /// 1-based, see `hold_until_frame` docs for details.
+    ///
+    /// Note that this is a one-way method and flow-control is enforced via the
+    /// regular rx space -> rx completion flow.
+    strict DelegateRxLease(resource struct {
+        delegated fuchsia.hardware.network.DelegatedRxLease;
+    });
 };
 
 /// Static device information.

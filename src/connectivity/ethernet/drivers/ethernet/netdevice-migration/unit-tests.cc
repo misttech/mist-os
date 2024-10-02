@@ -89,6 +89,7 @@ class MockNetworkDeviceIfc : public ddk::Device<MockNetworkDeviceIfc>,
   MOCK_METHOD(void, NetworkDeviceIfcCompleteRx, (const rx_buffer_t* rx_list, size_t rx_count));
   MOCK_METHOD(void, NetworkDeviceIfcCompleteTx, (const tx_result_t* rx_list, size_t tx_count));
   MOCK_METHOD(void, NetworkDeviceIfcSnoop, (const rx_buffer_t* rx_list, size_t rx_count));
+  MOCK_METHOD(void, NetworkDeviceIfcDelegateRxLease, (const delegated_rx_lease_t* delegated));
 
  private:
   network_device_ifc_protocol_t proto_;

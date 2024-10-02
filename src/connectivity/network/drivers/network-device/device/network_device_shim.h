@@ -61,6 +61,7 @@ class NetworkDeviceShim : public fdf::WireServer<netdriver::NetworkDeviceImpl>,
   void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count);
   void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count);
   void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count);
+  void NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated);
 
  private:
   using NetworkPortShimList = fbl::SizedDoublyLinkedList<std::unique_ptr<NetworkPortShim>>;

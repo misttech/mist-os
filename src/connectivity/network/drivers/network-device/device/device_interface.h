@@ -92,6 +92,8 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
                   CompleteTxCompleter::Sync& completer) override;
   void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
              SnoopCompleter::Sync& completer) override;
+  void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
+                       fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override;
 
   uint16_t rx_fifo_depth() const;
   uint16_t tx_fifo_depth() const;
@@ -190,6 +192,18 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   void NotifyTxComplete();
 
   DiagnosticsService& diagnostics() { return diagnostics_; }
+
+  static void DropDelegatedRxLease(netdev::DelegatedRxLease lease);
+
+  // Delegates a pending lease to the primary session.
+  //
+  // The lease is delegated if |completed_frame_index| is larger than the lease's
+  // hold_until_frame value.
+  //
+  // The primary session receives the lease if one exists _and_ the session is
+  // opted in to receive leases. Drops the pending lease immediately otherwise.
+  void TryDelegateRxLease(uint64_t completed_frame_index) __TA_REQUIRES_SHARED(control_lock_)
+      __TA_REQUIRES(rx_lock_);
 
  private:
   friend testing::NetworkDeviceTest;
@@ -332,6 +346,8 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   std::unique_ptr<RxQueue> rx_queue_;
 
   DeviceStatus device_status_ __TA_GUARDED(control_lock_) = DeviceStatus::STOPPED;
+
+  std::optional<netdev::DelegatedRxLease> rx_lease_pending_ __TA_GUARDED(rx_lock_);
 
   fbl::Mutex rx_lock_;
   fbl::Mutex tx_lock_ __TA_ACQUIRED_AFTER(rx_lock_);

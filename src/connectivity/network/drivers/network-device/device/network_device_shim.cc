@@ -429,4 +429,8 @@ void NetworkDeviceShim::NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t
   // needed.
 }
 
+void NetworkDeviceShim::NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {
+  ZX_PANIC("Lease delegation not supported for legacy banjo drivers");
+}
+
 }  // namespace network

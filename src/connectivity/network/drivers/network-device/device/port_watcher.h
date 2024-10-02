@@ -75,7 +75,7 @@ class PortWatcher : public fbl::DoublyLinkedListable<std::unique_ptr<PortWatcher
 
   fbl::Mutex lock_;
   ClosedCallback closed_cb_;
-  std::optional<WatchCompleter ::Async> pending_txn_ __TA_GUARDED(lock_);
+  std::optional<WatchCompleter::Async> pending_txn_ __TA_GUARDED(lock_);
   fbl::DoublyLinkedList<std::unique_ptr<Event>, fbl::DefaultObjectTag, fbl::SizeOrder::Constant>
       event_queue_ __TA_GUARDED(lock_);
   std::optional<fidl::ServerBindingRef<netdev::PortWatcher>> binding_ __TA_GUARDED(lock_);

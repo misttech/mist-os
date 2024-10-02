@@ -4,6 +4,7 @@
 
 #include "session.h"
 
+#include <fidl/fuchsia.hardware.network/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/epitaph.h>
@@ -43,6 +44,10 @@ bool Session::IsPrimary() const {
 }
 
 bool Session::IsPaused() const { return paused_; }
+
+bool Session::AllowRxLeaseDelegation() const {
+  return static_cast<bool>(flags_ & netdev::wire::SessionFlags::kReceiveRxPowerLeases);
+}
 
 bool Session::ShouldTakeOverPrimary(const Session* current_primary) const {
   if ((!IsPrimary()) || current_primary == this) {
@@ -235,10 +240,37 @@ void Session::OnUnbind(fidl::UnbindInfo info, fidl::ServerEnd<netdev::Session> c
     dying_ = true;
   }
 
+  {
+    fbl::AutoLock lock(&rx_lease_lock_);
+    auto lease = std::exchange(rx_lease_completer_, std::nullopt);
+    if (lease.has_value()) {
+      lease.value().Close(ZX_ERR_CANCELED);
+    }
+  }
+
   // NOTE: the parent may destroy the session synchronously in
   // NotifyDeadSession, this is the last thing we can do safely with this
   // session object.
   parent_->NotifyDeadSession(*this);
+}
+
+void Session::DelegateRxLease(netdev::DelegatedRxLease lease) {
+  fbl::AutoLock lock(&rx_lease_lock_);
+  // Always update the delivered frame index, rx queue guarantees to deliver
+  // frames to sessions before delegating leases, so our value must be up to
+  // date if this was called.
+  lease.hold_until_frame() = rx_delivered_frame_index_;
+  if (rx_lease_completer_.has_value()) {
+    fidl::Arena arena;
+    netdev::wire::DelegatedRxLease wire = fidl::ToWire(arena, std::move(lease));
+    rx_lease_completer_.value().Reply(wire);
+    rx_lease_completer_.reset();
+    return;
+  }
+  if (rx_lease_pending_.has_value()) {
+    DeviceInterface::DropDelegatedRxLease(std::move(rx_lease_pending_.value()));
+  }
+  rx_lease_pending_.emplace(std::move(lease));
 }
 
 void Session::InstallTx() {
@@ -609,6 +641,24 @@ void Session::Detach(DetachRequestView request, DetachCompleter::Sync& completer
 
 void Session::Close(CloseCompleter::Sync& _completer) { Kill(); }
 
+void Session::WatchDelegatedRxLease(WatchDelegatedRxLeaseCompleter::Sync& completer) {
+  fbl::AutoLock lock(&rx_lease_lock_);
+  if (rx_lease_completer_.has_value()) {
+    // Can't have two pending calls.
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
+  }
+  if (!rx_lease_pending_.has_value()) {
+    rx_lease_completer_ = completer.ToAsync();
+    return;
+  }
+  netdev::DelegatedRxLease lease = std::move(rx_lease_pending_.value());
+  rx_lease_pending_.reset();
+  fidl::Arena arena;
+  netdev::wire::DelegatedRxLease wire = fidl::ToWire(arena, std::move(lease));
+  completer.Reply(wire);
+}
+
 void Session::MarkTxReturnResult(uint16_t descriptor_index, zx_status_t status) {
   buffer_descriptor_t& desc = descriptor(descriptor_index);
   using netdev::wire::TxReturnFlags;
@@ -766,10 +816,16 @@ bool Session::CompleteRx(const RxFrameInfo& frame_info) {
   if (IsSubscribedToFrameType(frame_info.meta.port,
                               static_cast<netdev::wire::FrameType>(frame_info.meta.frame_type)) &&
       !paused_.load()) {
-    // Allow reuse if any issue happens loading descriptor configuration.
-    // NB: Error logging happens at LoadRxInfo at a greater granularity, we only care about success
-    // here.
-    allow_reuse &= LoadRxInfo(frame_info) != ZX_OK;
+    if (LoadRxInfo(frame_info) == ZX_OK) {
+      rx_delivered_frame_index_++;
+      allow_reuse = false;
+    } else {
+      // Allow reuse if any issue happens loading descriptor configuration.
+      //
+      // NB: Error logging happens at LoadRxInfo at a greater granularity, we
+      // only care about success here.
+      allow_reuse &= true;
+    }
   } else if (!IsValidFrameType(frame_info.meta.frame_type)) {
     // Help parent driver authors to debug common contract violation.
     LOGF_WARN("%s: rx frame has unspecified frame type, dropping frame", name());

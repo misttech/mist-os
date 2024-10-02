@@ -123,6 +123,8 @@ class NetworkDeviceIfc : public fdf::WireServer<netdriver::NetworkDeviceIfc> {
   }
   void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
              SnoopCompleter::Sync& completer) override {}
+  void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
+                       fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override {}
 
  private:
   fdf_dispatcher_t* dispatcher_ = nullptr;

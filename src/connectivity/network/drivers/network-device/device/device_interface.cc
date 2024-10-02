@@ -570,6 +570,31 @@ void DeviceInterface::Snoop(fuchsia_hardware_network_driver::wire::NetworkDevice
   // LISTEN is ever in place.
 }
 
+void DeviceInterface::DelegateRxLease(
+    netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request, fdf::Arena& arena,
+    DelegateRxLeaseCompleter::Sync&) {
+  netdev::wire::DelegatedRxLease& lease = request->delegated;
+  // Ensure all required fields are set.
+  ZX_ASSERT_MSG(lease.has_handle() && lease.has_hold_until_frame(),
+                "missing required fields in DelegatedRxLease");
+
+  fbl::AutoLock lock(&rx_lock_);
+  if (rx_lease_pending_.has_value()) {
+    netdev::DelegatedRxLease& pending = rx_lease_pending_.value();
+    // Only keep one of the pending leases. Drop the old one if the new one has
+    // a later hold_until frame value.
+    if (pending.hold_until_frame().value() > lease.hold_until_frame()) {
+      return;
+    }
+    DropDelegatedRxLease(std::move(pending));
+  }
+  rx_lease_pending_.emplace(fidl::ToNatural(lease));
+
+  SharedAutoLock control_lock(&control_lock_);
+  rx_queue_->AssertParentRxLocked(*this);
+  TryDelegateRxLease(rx_queue_->rx_completed_frame_index());
+}
+
 void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
   LOGF_TRACE("%s", __FUNCTION__);
 
@@ -1458,6 +1483,35 @@ zx_status_t DeviceInterface::CanCreatePortWithId(uint8_t port_id) {
 void DeviceInterface::NotifyRxQueuePacket(uint64_t key) { evt_rx_queue_packet_.Trigger(key); }
 
 void DeviceInterface::NotifyTxComplete() { evt_tx_complete_.Trigger(); }
+
+void DeviceInterface::DropDelegatedRxLease(netdev::DelegatedRxLease lease) {
+  // Expand all variants in case the representation of a lease changes such that
+  // simply destroying the natural type is not enough to drop the lease.
+  switch (lease.handle()->Which()) {
+    case netdev::DelegatedRxLeaseHandle::Tag::kChannel:
+    case netdev::DelegatedRxLeaseHandle::Tag::_do_not_handle_this__write_a_default_case_instead:
+      break;
+  }
+}
+
+void DeviceInterface::TryDelegateRxLease(uint64_t completed_frame_index) {
+  if (!rx_lease_pending_.has_value()) {
+    return;
+  }
+  netdev::DelegatedRxLease& pending = rx_lease_pending_.value();
+  if (completed_frame_index < pending.hold_until_frame().value()) {
+    return;
+  }
+
+  if (primary_session_ && primary_session_->AllowRxLeaseDelegation()) {
+    primary_session_->AssertParentControlLockShared(*this);
+    primary_session_->AssertParentRxLock(*this);
+    primary_session_->DelegateRxLease(std::move(pending));
+  } else {
+    DropDelegatedRxLease(std::move(pending));
+  }
+  rx_lease_pending_.reset();
+}
 
 DeviceInterface::DeviceInterface(const DeviceInterfaceDispatchers& dispatchers)
     : dispatchers_(dispatchers),
