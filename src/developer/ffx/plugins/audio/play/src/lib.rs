@@ -58,10 +58,10 @@ async fn play_impl(
         }
 
         AudioRenderUsageExtended::Background(usage)
-        | AudioRenderUsageExtended::Media(usage)
-        | AudioRenderUsageExtended::SystemAgent(usage)
         | AudioRenderUsageExtended::Communication(usage)
-        | AudioRenderUsageExtended::Interruption(usage) => {
+        | AudioRenderUsageExtended::Interruption(usage)
+        | AudioRenderUsageExtended::Media(usage)
+        | AudioRenderUsageExtended::SystemAgent(usage) => {
             fac::RendererConfig::StandardRenderer(fac::StandardRendererConfig {
                 usage: Some(usage),
                 clock: Some(command.clock),

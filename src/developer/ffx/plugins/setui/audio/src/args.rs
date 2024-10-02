@@ -35,12 +35,12 @@ pub struct Audio {
 fn str_to_audio_stream(src: &str) -> Result<fidl_fuchsia_media::AudioRenderUsage, String> {
     match src.to_lowercase().as_str() {
         "background" | "b" => Ok(fidl_fuchsia_media::AudioRenderUsage::Background),
-        "media" | "m" => Ok(fidl_fuchsia_media::AudioRenderUsage::Media),
+        "communication" | "c" => Ok(fidl_fuchsia_media::AudioRenderUsage::Communication),
         "interruption" | "i" => Ok(fidl_fuchsia_media::AudioRenderUsage::Interruption),
+        "media" | "m" => Ok(fidl_fuchsia_media::AudioRenderUsage::Media),
         "system_agent" | "systemagent" | "system agent" | "s" => {
             Ok(fidl_fuchsia_media::AudioRenderUsage::SystemAgent)
         }
-        "communication" | "c" => Ok(fidl_fuchsia_media::AudioRenderUsage::Communication),
         _ => Err(String::from("Couldn't parse audio stream type")),
     }
 }

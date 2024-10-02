@@ -132,10 +132,10 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicy) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "capture:loopback"
         ]
       },
@@ -164,8 +164,8 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicy) {
 
   auto& config = result.value().device_config();
 
-  EXPECT_TRUE(config.output_device_profile(expected_id).supports_usage(RenderUsage::MEDIA));
   EXPECT_TRUE(config.output_device_profile(expected_id).supports_usage(RenderUsage::INTERRUPTION));
+  EXPECT_TRUE(config.output_device_profile(expected_id).supports_usage(RenderUsage::MEDIA));
   EXPECT_FALSE(config.output_device_profile(expected_id).supports_usage(RenderUsage::SYSTEM_AGENT));
 
   EXPECT_FALSE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::INTERRUPTION));
@@ -201,10 +201,10 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingMultipleDeviceIds) {
       {
         "device_id": "*",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ]
@@ -226,11 +226,11 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingMultipleDeviceIds) {
 
   auto& config = result.value().device_config();
   for (const auto& device_id : {expected_id1, expected_id2}) {
-    EXPECT_TRUE(config.output_device_profile(device_id).supports_usage(RenderUsage::MEDIA));
-    EXPECT_FALSE(config.output_device_profile(device_id).supports_usage(RenderUsage::INTERRUPTION));
     EXPECT_FALSE(config.output_device_profile(device_id).supports_usage(RenderUsage::BACKGROUND));
     EXPECT_FALSE(
         config.output_device_profile(device_id).supports_usage(RenderUsage::COMMUNICATION));
+    EXPECT_FALSE(config.output_device_profile(device_id).supports_usage(RenderUsage::INTERRUPTION));
+    EXPECT_TRUE(config.output_device_profile(device_id).supports_usage(RenderUsage::MEDIA));
     EXPECT_FALSE(config.output_device_profile(device_id).supports_usage(RenderUsage::SYSTEM_AGENT));
 
     EXPECT_FALSE(config.output_device_profile(device_id).eligible_for_loopback());
@@ -255,10 +255,10 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyNoDefault) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "render:ultrasound",
           "capture:loopback"
@@ -278,10 +278,10 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyNoDefault) {
 
   auto& config = result.value().device_config();
 
-  EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::MEDIA));
-  EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::INTERRUPTION));
   EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::BACKGROUND));
   EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::COMMUNICATION));
+  EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::INTERRUPTION));
+  EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::MEDIA));
   EXPECT_TRUE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::SYSTEM_AGENT));
   EXPECT_FALSE(config.output_device_profile(unknown_id).supports_usage(RenderUsage::ULTRASOUND));
 
@@ -305,10 +305,10 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithUnknownStreamTypes) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "render:invalid"
         ]
@@ -344,8 +344,8 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyInsufficientCove
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
           "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ]
@@ -379,10 +379,10 @@ TEST(ProcessConfigLoaderTest, AllowConfigWithoutUltrasound) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ]
@@ -413,10 +413,10 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithOutputGains) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ],
@@ -533,22 +533,22 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithInputDevices) {
   EXPECT_TRUE(config.input_device_profile(expected_id)
                   .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::BACKGROUND)));
   EXPECT_FALSE(config.input_device_profile(expected_id)
+                   .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::COMMUNICATION)));
+  EXPECT_FALSE(config.input_device_profile(expected_id)
                    .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::FOREGROUND)));
   EXPECT_FALSE(config.input_device_profile(expected_id)
                    .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::SYSTEM_AGENT)));
-  EXPECT_FALSE(config.input_device_profile(expected_id)
-                   .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::COMMUNICATION)));
   EXPECT_FALSE(config.input_device_profile(expected_id)
                    .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::ULTRASOUND)));
   EXPECT_EQ(config.input_device_profile(unknown_id).rate(), 24000u);
   EXPECT_TRUE(config.input_device_profile(unknown_id)
                   .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::BACKGROUND)));
   EXPECT_TRUE(config.input_device_profile(unknown_id)
+                  .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::COMMUNICATION)));
+  EXPECT_TRUE(config.input_device_profile(unknown_id)
                   .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::FOREGROUND)));
   EXPECT_TRUE(config.input_device_profile(unknown_id)
                   .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::SYSTEM_AGENT)));
-  EXPECT_TRUE(config.input_device_profile(unknown_id)
-                  .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::COMMUNICATION)));
   EXPECT_FALSE(config.input_device_profile(unknown_id)
                    .supports_usage(StreamUsage::WithCaptureUsage(CaptureUsage::ULTRASOUND)));
 }
@@ -564,19 +564,19 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV1) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ],
         "pipeline": {
           "streams": [
             "render:background",
-            "render:system_agent",
+            "render:interruption",
             "render:media",
-            "render:interruption"
+            "render:system_agent"
           ],
           "output_rate": 96000,
           "output_channels": 4,
@@ -674,9 +674,9 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV1) {
     EXPECT_EQ("", mix_group.name);
     EXPECT_EQ(4u, mix_group.input_streams.size());
     EXPECT_EQ(RenderUsage::BACKGROUND, mix_group.input_streams[0]);
-    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[1]);
+    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[1]);
     EXPECT_EQ(RenderUsage::MEDIA, mix_group.input_streams[2]);
-    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[3]);
+    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[3]);
     ASSERT_EQ(1u, mix_group.effects_v1.size());
     {
       const auto& effect = mix_group.effects_v1[0];
@@ -782,19 +782,19 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV2) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ],
         "pipeline": {
           "streams": [
-            "render:background",
-            "render:system_agent",
-            "render:media",
-            "render:interruption"
+          "render:background",
+          "render:interruption",
+          "render:media",
+          "render:system_agent"
           ],
           "output_rate": 96000,
           "output_channels": 4,
@@ -854,9 +854,9 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV2) {
     EXPECT_EQ("", mix_group.name);
     EXPECT_EQ(4u, mix_group.input_streams.size());
     EXPECT_EQ(RenderUsage::BACKGROUND, mix_group.input_streams[0]);
-    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[1]);
+    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[1]);
     EXPECT_EQ(RenderUsage::MEDIA, mix_group.input_streams[2]);
-    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[3]);
+    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[3]);
     ASSERT_TRUE(mix_group.effects_v2.has_value());
     {
       const auto& effect = mix_group.effects_v2.value();
@@ -991,10 +991,10 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithMultipleLoopbackStages) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ],
@@ -1002,9 +1002,9 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithMultipleLoopbackStages) {
           "inputs": [
             {
               "streams": [
-                "render:media",
-                "render:interruption",
                 "render:background",
+                "render:interruption",
+                "render:media",
                 "render:system_agent"
               ],
               "loopback": true
@@ -1046,19 +1046,19 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithoutLoopbackPointSpecified) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent",
           "capture:loopback"
         ],
         "pipeline": {
           "streams": [
-            "render:media",
-            "render:interruption",
             "render:background",
             "render:communications",
+            "render:interruption",
+            "render:media",
             "render:system_agent"
           ]
         }
@@ -1093,18 +1093,18 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidChannelCount) {
         {
           "device_id": "*",
           "supported_stream_types": [
-            "render:media",
-            "render:interruption",
             "render:background",
             "render:communications",
+            "render:interruption",
+            "render:media",
             "render:system_agent"
           ],
           "pipeline": {
             "streams": [
-              "render:media",
-              "render:interruption",
               "render:background",
               "render:communications",
+              "render:interruption",
+              "render:media",
               "render:system_agent"
             ],
             "output_channels": )JSON"
@@ -1401,7 +1401,7 @@ TEST(ProcessConfigLoaderTest, MalformedThermalConfigs) {
     const auto [bad_case_name, bad_config] = kMalformedThermalConfigs[idx];
     ASSERT_TRUE(
         files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
-        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << '\n';
 
     auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
     EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "'";
@@ -1425,17 +1425,17 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyWithDefaultPipeline) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
-          "capture:loopback",
-          "render:media"
+          "render:media",
+          "capture:loopback"
         ]
       },
       {
         "device_id": "*",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent"
         ]
       }
@@ -1483,10 +1483,10 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyWithNoSupportedStreamTypes) 
       {
         "device_id": "*",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent"
         ]
       }
@@ -1540,10 +1540,10 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyVolumeCurve) {
       {
         "device_id": "*",
         "supported_stream_types": [
-          "render:media",
-          "render:interruption",
           "render:background",
           "render:communications",
+          "render:interruption",
+          "render:media",
           "render:system_agent"
         ]
       }
@@ -1583,10 +1583,10 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
           {
             "device_id": "34384e7da9d52c8062a9765baeb6053a",
             "supported_stream_types": [
-              "render:media",
-              "render:interruption",
               "render:background",
               "render:communications",
+              "render:interruption",
+              "render:media",
               "render:system_agent",
               "capture:loopback"
             ],
@@ -1601,10 +1601,10 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
           {
             "device_id": "34384e7da9d52c8062a9765baeb6053a",
             "supported_stream_types": [
-              "render:media",
-              "render:interruption",
               "render:background",
               "render:communications",
+              "render:interruption",
+              "render:media",
               "render:system_agent",
               "capture:loopback"
             ],
@@ -1619,10 +1619,10 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
           {
             "device_id": "34384e7da9d52c8062a9765baeb6053a",
             "supported_stream_types": [
-              "render:media",
-              "render:interruption",
               "render:background",
               "render:communications",
+              "render:interruption",
+              "render:media",
               "render:system_agent",
               "capture:loopback"
             ],
@@ -1714,7 +1714,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
     const auto [bad_case_name, bad_config] = kMalformedDeviceGainDbs[idx];
     ASSERT_TRUE(
         files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
-        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << '\n';
 
     auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
     EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "'";
@@ -1737,7 +1737,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithNonPositiveInputDeviceRate) {
 
   ASSERT_TRUE(files::WriteFile(kTestAudioCoreConfigFilename, kMalformedDeviceRate.data(),
                                kMalformedDeviceRate.size()))
-      << "Could not write file" << std::endl;
+      << "Could not write file" << '\n';
   auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
   EXPECT_TRUE(result.is_error()) << "Non-positive device rate";
 }
@@ -1751,12 +1751,14 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [ "render:background", "render:communications",
-              "render:interruption",  "render:media",      "render:system_agent" ],
+          "supported_stream_types": [  "render:background",
+              "render:communications", "render:interruption",  "render:media",
+              "render:system_agent" ],
           "pipeline": {
             "name": "default",
-            "streams": [               "render:background", "render:communications",
-                "render:interruption", "render:media",      "render:system_agent" ],
+            "streams": [                 "render:background",
+                "render:communications", "render:interruption",  "render:media",
+                "render:system_agent" ],
             "max_gain_db": 25.0
           }
         }
@@ -1768,14 +1770,14 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [ "render:background", "render:communications",
-              "render:interruption",  "render:media",      "render:system_agent",
-              "render:ultrasound" ],
+          "supported_stream_types": [  "render:background",
+              "render:communications", "render:interruption",  "render:media",
+              "render:system_agent",   "render:ultrasound" ],
           "pipeline": {
             "name": "default",
-            "streams": [               "render:background", "render:communications",
-                "render:interruption", "render:media",      "render:system_agent",
-                "render:ultrasound" ],
+            "streams": [                 "render:background",
+                "render:communications", "render:interruption",  "render:media",
+                "render:system_agent",   "render:ultrasound" ],
             "max_gain_db": -6.0
           }
         }
@@ -1787,12 +1789,14 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [ "render:background", "render:communications",
-              "render:interruption",  "render:media",      "render:system_agent" ],
+          "supported_stream_types": [  "render:background",
+              "render:communications", "render:interruption",  "render:media",
+              "render:system_agent" ],
           "pipeline": {
             "name": "default",
-            "streams": [               "render:background", "render:communications",
-                "render:interruption", "render:media",      "render:system_agent" ],
+            "streams": [                 "render:background",
+                "render:communications", "render:interruption",  "render:media",
+                "render:system_agent" ],
             "min_gain_db": -161
           }
         }
@@ -1804,14 +1808,14 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [ "render:background", "render:communications",
-              "render:interruption",  "render:media",      "render:system_agent",
-                "render:ultrasound" ],
+          "supported_stream_types": [  "render:background",
+              "render:communications", "render:interruption",  "render:media",
+              "render:system_agent",   "render:ultrasound" ],
           "pipeline": {
             "name": "default",
-            "streams": [               "render:background", "render:communications",
-                "render:interruption", "render:media",      "render:system_agent",
-                "render:ultrasound" ],
+            "streams": [                 "render:background",
+                "render:communications", "render:interruption",  "render:media",
+                "render:system_agent",   "render:ultrasound" ],
             "min_gain_db": -6
           }
         }
@@ -1823,7 +1827,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
     const auto [bad_case_name, bad_config] = kInvalidMixGroupGains[idx];
     ASSERT_TRUE(
         files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
-        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << '\n';
     ASSERT_DEATH(ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename), "")
         << bad_case_name;
   }
@@ -1904,7 +1908,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidVolumeCurves) {
     const auto [bad_case_name, bad_config] = kInvalidVolumeCurves[idx];
     ASSERT_TRUE(
         files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
-        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << '\n';
 
     auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
     EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "'";

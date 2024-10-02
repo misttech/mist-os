@@ -11,10 +11,10 @@
         "01010101010101010101010101010101"
       ],
       "supported_stream_types": [
-        "render:media",
-        "render:interruption",
         "render:background",
         "render:communications",
+        "render:interruption",
+        "render:media",
         "render:system_agent",
         "render:ultrasound",
         "capture:loopback"

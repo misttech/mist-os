@@ -17,6 +17,7 @@
 namespace media::audio {
 
 static_assert(fuchsia::media::RENDER_USAGE_COUNT == 5);
+// These must be listed in the order of the fuchsia::media::AudioRenderUsage enum.
 #define EXPAND_EACH_FIDL_RENDER_USAGE \
   EXPAND_RENDER_USAGE(BACKGROUND)     \
   EXPAND_RENDER_USAGE(MEDIA)          \
@@ -31,6 +32,7 @@ static constexpr uint32_t kStreamInternalRenderUsageCount = 1;
   EXPAND_EACH_FIDL_RENDER_USAGE  \
   EXPAND_EACH_INTERNAL_RENDER_USAGE
 
+// These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
 static_assert(fuchsia::media::CAPTURE_USAGE_COUNT == 4);
 #define EXPAND_EACH_FIDL_CAPTURE_USAGE \
   EXPAND_CAPTURE_USAGE(BACKGROUND)     \
@@ -199,7 +201,7 @@ StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage& usage);
 
 template <typename Container>
 static StreamUsageSet StreamUsageSetFromRenderUsages(const Container& container) {
-  static_assert(std::is_same<typename Container::value_type, RenderUsage>::value);
+  static_assert(std::is_same_v<typename Container::value_type, RenderUsage>);
   StreamUsageSet result;
   std::transform(container.cbegin(), container.cend(), std::inserter(result, result.begin()),
                  [](const auto& u) { return StreamUsage::WithRenderUsage(u); });
@@ -208,7 +210,7 @@ static StreamUsageSet StreamUsageSetFromRenderUsages(const Container& container)
 
 template <typename Container>
 static StreamUsageSet StreamUsageSetFromCaptureUsages(const Container& container) {
-  static_assert(std::is_same<typename Container::value_type, CaptureUsage>::value);
+  static_assert(std::is_same_v<typename Container::value_type, CaptureUsage>);
   StreamUsageSet result;
   std::transform(container.cbegin(), container.cend(), std::inserter(result, result.begin()),
                  [](const auto& u) { return StreamUsage::WithCaptureUsage(u); });

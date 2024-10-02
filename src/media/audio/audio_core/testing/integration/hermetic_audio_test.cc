@@ -53,11 +53,11 @@ component_testing::DirectoryContents HermeticAudioTest::MakeAudioCoreConfig(
     options.output_device_config = R"x(
         "device_id": "*",
         "supported_stream_types": [
-          "render:media",
           "render:background",
+          "render:communications",
           "render:interruption",
-          "render:system_agent",
-          "render:communications"
+          "render:media",
+          "render:system_agent"
         ]
       )x";
   }

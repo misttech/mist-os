@@ -61,7 +61,7 @@ class PipelineConfig {
     std::optional<float> min_gain_db;
     std::optional<float> max_gain_db;
     bool loopback = false;
-    // TODO(https://fxbug.dev/42149909): rename these fields require that they be specified explicitly
+    // TODO(https://fxbug.dev/42149909): rename - these require they be specified explicitly
     int32_t output_rate = kDefaultMixGroupRate;
     int16_t output_channels = kDefaultMixGroupChannels;
   };
@@ -71,8 +71,8 @@ class PipelineConfig {
     PipelineConfig config;
     config.root_.name = "default";
     config.root_.input_streams = {
-        RenderUsage::BACKGROUND,   RenderUsage::MEDIA,         RenderUsage::INTERRUPTION,
-        RenderUsage::SYSTEM_AGENT, RenderUsage::COMMUNICATION,
+        RenderUsage::BACKGROUND, RenderUsage::COMMUNICATION, RenderUsage::INTERRUPTION,
+        RenderUsage::MEDIA,      RenderUsage::SYSTEM_AGENT,
     };
     config.root_.output_rate = frame_rate;
     config.root_.output_channels = channels;

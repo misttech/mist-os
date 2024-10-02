@@ -22,14 +22,14 @@ inline std::optional<StreamType> StreamTypeFromRenderUsage(RenderUsage usage) {
   switch (usage) {
     case RenderUsage::BACKGROUND:
       return StreamType::RENDER_BACKGROUND;
-    case RenderUsage::MEDIA:
-      return StreamType::RENDER_MEDIA;
-    case RenderUsage::INTERRUPTION:
-      return StreamType::RENDER_INTERRUPTION;
-    case RenderUsage::SYSTEM_AGENT:
-      return StreamType::RENDER_SYSTEM_AGENT;
     case RenderUsage::COMMUNICATION:
       return StreamType::RENDER_COMMUNICATION;
+    case RenderUsage::INTERRUPTION:
+      return StreamType::RENDER_INTERRUPTION;
+    case RenderUsage::MEDIA:
+      return StreamType::RENDER_MEDIA;
+    case RenderUsage::SYSTEM_AGENT:
+      return StreamType::RENDER_SYSTEM_AGENT;
     case RenderUsage::ULTRASOUND:
       return StreamType::RENDER_ULTRASOUND;
     default:
@@ -41,14 +41,14 @@ inline std::optional<RenderUsage> RenderUsageFromStreamType(StreamType usage) {
   switch (usage) {
     case StreamType::RENDER_BACKGROUND:
       return RenderUsage::BACKGROUND;
-    case StreamType::RENDER_MEDIA:
-      return RenderUsage::MEDIA;
-    case StreamType::RENDER_INTERRUPTION:
-      return RenderUsage::INTERRUPTION;
-    case StreamType::RENDER_SYSTEM_AGENT:
-      return RenderUsage::SYSTEM_AGENT;
     case StreamType::RENDER_COMMUNICATION:
       return RenderUsage::COMMUNICATION;
+    case StreamType::RENDER_INTERRUPTION:
+      return RenderUsage::INTERRUPTION;
+    case StreamType::RENDER_MEDIA:
+      return RenderUsage::MEDIA;
+    case StreamType::RENDER_SYSTEM_AGENT:
+      return RenderUsage::SYSTEM_AGENT;
     case StreamType::RENDER_ULTRASOUND:
       return RenderUsage::ULTRASOUND;
     default:
@@ -95,8 +95,13 @@ inline fuchsia::media::tuning::AudioMixGroup ToAudioMixGroup(
   }
   auto output_rate = static_cast<uint32_t>(mix_group.output_rate);
   auto output_channels = static_cast<uint16_t>(mix_group.output_channels);
-  return fuchsia::media::tuning::AudioMixGroup{
-      name, loopback, std::move(effects), std::move(inputs), streams, output_rate, output_channels};
+  return fuchsia::media::tuning::AudioMixGroup{.name = name,
+                                               .loopback = loopback,
+                                               .effects = std::move(effects),
+                                               .inputs = std::move(inputs),
+                                               .streams = streams,
+                                               .output_rate = output_rate,
+                                               .output_channels = output_channels};
 }
 
 inline fuchsia::media::tuning::AudioDeviceTuningProfile ToAudioDeviceTuningProfile(
@@ -106,7 +111,8 @@ inline fuchsia::media::tuning::AudioDeviceTuningProfile ToAudioDeviceTuningProfi
 
   std::vector<fuchsia::media::tuning::Volume> volume_curve;
   for (auto mapping : curve.mappings()) {
-    volume_curve.push_back(fuchsia::media::tuning::Volume{mapping.volume, mapping.gain_dbfs});
+    volume_curve.push_back(
+        fuchsia::media::tuning::Volume{.level = mapping.volume, .decibel = mapping.gain_dbfs});
   }
   fuchsia::media::tuning::AudioDeviceTuningProfile final_profile;
   *final_profile.mutable_pipeline() = std::move(pipeline);
@@ -126,9 +132,12 @@ inline PipelineConfig::MixGroup ToPipelineConfigMixGroup(
   }
   std::vector<PipelineConfig::EffectV1> effects;
   for (size_t i = 0; i < mix_group.effects.size(); ++i) {
-    effects.push_back(PipelineConfig::EffectV1{
-        mix_group.effects[i].type().module_name(), mix_group.effects[i].type().effect_name(),
-        mix_group.effects[i].instance_name(), mix_group.effects[i].configuration(), std::nullopt});
+    effects.push_back(
+        PipelineConfig::EffectV1{.lib_name = mix_group.effects[i].type().module_name(),
+                                 .effect_name = mix_group.effects[i].type().effect_name(),
+                                 .instance_name = mix_group.effects[i].instance_name(),
+                                 .effect_config = mix_group.effects[i].configuration(),
+                                 .output_channels = std::nullopt});
     if (mix_group.effects[i].has_output_channels()) {
       effects[i].output_channels = mix_group.effects[i].output_channels();
     }

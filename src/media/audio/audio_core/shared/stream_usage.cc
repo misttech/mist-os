@@ -25,11 +25,11 @@ std::optional<fuchsia::media::AudioCaptureUsage> FidlCaptureUsageFromCaptureUsag
 StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage& usage) {
   if (usage.is_render_usage()) {
     return StreamUsage::WithRenderUsage(usage.render_usage());
-  } else if (usage.is_capture_usage()) {
-    return StreamUsage::WithCaptureUsage(usage.capture_usage());
-  } else {
-    return StreamUsage();
   }
+  if (usage.is_capture_usage()) {
+    return StreamUsage::WithCaptureUsage(usage.capture_usage());
+  }
+  return StreamUsage();
 }
 
 const char* RenderUsageToString(const RenderUsage& usage) {
@@ -55,11 +55,11 @@ const char* CaptureUsageToString(const CaptureUsage& usage) {
 const char* StreamUsage::ToString() const {
   if (is_render_usage()) {
     return RenderUsageToString(render_usage());
-  } else if (is_capture_usage()) {
-    return CaptureUsageToString(capture_usage());
-  } else {
-    return "(empty usage)";
   }
+  if (is_capture_usage()) {
+    return CaptureUsageToString(capture_usage());
+  }
+  return "(empty usage)";
 }
 
 }  // namespace media::audio

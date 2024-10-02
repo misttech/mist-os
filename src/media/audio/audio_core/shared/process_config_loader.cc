@@ -127,17 +127,22 @@ fpromise::result<VolumeCurve, std::string> ParseVolumeCurveFromJsonObject(
 }
 
 std::optional<RenderUsage> RenderUsageFromString(std::string_view string) {
+  if (string == "background" || string == "render:background") {
+    return RenderUsage::BACKGROUND;
+  }
+  if (string == "communications" || string == "render:communications") {
+    return RenderUsage::COMMUNICATION;
+  }
+  if (string == "interruption" || string == "render:interruption") {
+    return RenderUsage::INTERRUPTION;
+  }
   if (string == "media" || string == "render:media") {
     return RenderUsage::MEDIA;
-  } else if (string == "background" || string == "render:background") {
-    return RenderUsage::BACKGROUND;
-  } else if (string == "communications" || string == "render:communications") {
-    return RenderUsage::COMMUNICATION;
-  } else if (string == "interruption" || string == "render:interruption") {
-    return RenderUsage::INTERRUPTION;
-  } else if (string == "system_agent" || string == "render:system_agent") {
+  }
+  if (string == "system_agent" || string == "render:system_agent") {
     return RenderUsage::SYSTEM_AGENT;
-  } else if (string == "ultrasound" || string == "render:ultrasound") {
+  }
+  if (string == "ultrasound" || string == "render:ultrasound") {
     return RenderUsage::ULTRASOUND;
   }
   return std::nullopt;
@@ -146,15 +151,20 @@ std::optional<RenderUsage> RenderUsageFromString(std::string_view string) {
 std::optional<CaptureUsage> CaptureUsageFromString(std::string_view string) {
   if (string == "background" || string == "capture:background") {
     return CaptureUsage::BACKGROUND;
-  } else if (string == "foreground" || string == "capture:foreground") {
-    return CaptureUsage::FOREGROUND;
-  } else if (string == "system_agent" || string == "capture:system_agent") {
-    return CaptureUsage::SYSTEM_AGENT;
-  } else if (string == "communications" || string == "capture:communications") {
+  }
+  if (string == "communications" || string == "capture:communications") {
     return CaptureUsage::COMMUNICATION;
-  } else if (string == "ultrasound" || string == "capture:ultrasound") {
+  }
+  if (string == "foreground" || string == "capture:foreground") {
+    return CaptureUsage::FOREGROUND;
+  }
+  if (string == "system_agent" || string == "capture:system_agent") {
+    return CaptureUsage::SYSTEM_AGENT;
+  }
+  if (string == "ultrasound" || string == "capture:ultrasound") {
     return CaptureUsage::ULTRASOUND;
-  } else if (string == "loopback" || string == "capture:loopback") {
+  }
+  if (string == "loopback" || string == "capture:loopback") {
     return CaptureUsage::LOOPBACK;
   }
   return std::nullopt;

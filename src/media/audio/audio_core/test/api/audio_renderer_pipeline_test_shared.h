@@ -45,20 +45,20 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
                   "render:background",
+                  "render:communications",
                   "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
+                  "render:media",
+                  "render:system_agent"
                 ],
                 "pipeline": {
                   "name": "default",
                   "streams": [
-                    "render:media",
                     "render:background",
+                    "render:communications",
                     "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
+                    "render:media",
+                    "render:system_agent"
                   ],
                   "effects": [
                     {
@@ -149,20 +149,20 @@ class AudioRendererGainLimitsTest
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
                   "render:background",
+                  "render:communications",
                   "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
+                  "render:media",
+                  "render:system_agent"
                 ],
                 "pipeline": {
                   "name": "default",
                   "streams": [
-                    "render:media",
                     "render:background",
+                    "render:communications",
                     "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
+                    "render:media",
+                    "render:system_agent"
                   ],
                   "min_gain_db": -20,
                   "max_gain_db": -10
@@ -264,20 +264,20 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
                   "render:background",
+                  "render:communications",
                   "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
+                  "render:media",
+                  "render:system_agent"
                 ],
                 "pipeline": {
                   "name": "default",
                   "streams": [
-                    "render:media",
                     "render:background",
+                    "render:communications",
                     "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
+                    "render:media",
+                    "render:system_agent"
                   ],
                   "effects": [
                     {
@@ -330,20 +330,20 @@ class AudioRendererEffectsV1Test
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
                   "render:background",
+                  "render:communications",
                   "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
+                  "render:media",
+                  "render:system_agent"
                 ],
                 "pipeline": {
                   "name": "default",
                   "streams": [
-                    "render:media",
                     "render:background",
+                    "render:communications",
                     "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
+                    "render:media",
+                    "render:system_agent"
                   ],
                   "effects": [
                     {
@@ -390,20 +390,20 @@ class AudioRendererEffectsV2Test
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
                   "render:background",
+                  "render:communications",
                   "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
+                  "render:media",
+                  "render:system_agent"
                 ],
                 "pipeline": {
                   "name": "default",
                   "streams": [
-                    "render:media",
                     "render:background",
+                    "render:communications",
                     "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
+                    "render:media",
+                    "render:system_agent"
                   ],
                   "effect_over_fidl": {
                     "name": "inverter"
@@ -429,7 +429,7 @@ class AudioRendererEffectsV2Test
                             std::vector<fuchsia_audio_effects::wire::ProcessMetrics>& metrics) {
     for (uint64_t k = 0; k < num_frames; k++) {
       for (int c = 0; c < kNumChannels; c++) {
-        output[k * kNumChannels + c] = -input[k * kNumChannels + c];
+        output[(k * kNumChannels) + c] = -input[(k * kNumChannels) + c];
       }
     }
     return ZX_OK;
@@ -449,20 +449,20 @@ class AudioRendererPipelineTuningTest
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
                   "render:background",
+                  "render:communications",
                   "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
+                  "render:media",
+                  "render:system_agent"
                 ],
                 "pipeline": {
                   "name": "default",
                   "streams": [
-                    "render:media",
                     "render:background",
+                    "render:communications",
                     "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
+                    "render:media",
+                    "render:system_agent"
                   ],
                   "effects": [
                     {

@@ -23,18 +23,18 @@ static constexpr char kShowCursor[] = "\x1b[?25h";
 static const std::pair<fuchsia::media::AudioRenderUsage, std::string>
     kRenderUsages[fuchsia::media::RENDER_USAGE_COUNT] = {
         {fuchsia::media::AudioRenderUsage::BACKGROUND, "Backgd"},
-        {fuchsia::media::AudioRenderUsage::MEDIA, "Media "},
-        {fuchsia::media::AudioRenderUsage::INTERRUPTION, "Interr"},
-        {fuchsia::media::AudioRenderUsage::SYSTEM_AGENT, "SysAgt"},
         {fuchsia::media::AudioRenderUsage::COMMUNICATION, "Comms "},
+        {fuchsia::media::AudioRenderUsage::INTERRUPTION, "Interr"},
+        {fuchsia::media::AudioRenderUsage::MEDIA, "Media "},
+        {fuchsia::media::AudioRenderUsage::SYSTEM_AGENT, "SysAgt"},
 };
 
 static const std::pair<fuchsia::media::AudioCaptureUsage, std::string>
     kCaptureUsages[fuchsia::media::CAPTURE_USAGE_COUNT] = {
         {fuchsia::media::AudioCaptureUsage::BACKGROUND, "Backgd"},
+        {fuchsia::media::AudioCaptureUsage::COMMUNICATION, "Comms "},
         {fuchsia::media::AudioCaptureUsage::FOREGROUND, "Foregd"},
         {fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT, "SysAgt"},
-        {fuchsia::media::AudioCaptureUsage::COMMUNICATION, "Comms "},
 };
 static constexpr const char* kBlankUsageName = "      ";
 
@@ -423,14 +423,16 @@ void DisplayUsage(const std::string& name, std::optional<std::string> error_str 
   printf("(up | left | down | right for Activity | State | Volume | Gain respectively), or\n");
   printf("numerical keys 1-4 (handy when arrow keys are unavailable).\n\n");
 
-  printf("In Activity mode, for every usage a six-letter abbreviation is displayed iff it is\n");
-  printf("active: Backgd, Media, Interr, Foregd, SysAgt, Comms.\n\n");
+  printf("In Activity mode, for every usage a six-letter abbreviation is displayed IFF it is\n");
+  printf("active: Backgd, Comms, Foregd, Interr, Media, SysAgt.\n\n");
 
   printf("In State, Volume and Gain modes, the first letter of each usage is shown alongside\n");
   printf("that usage's information.\n\n");
 
-  printf("Render Usages include:  Background, Media, Interruption, SystemAgent, Communication\n");
-  printf("Capture Usages include: Background, Foreground, SystemAgent, Communication\n\n");
+  printf(
+      "Render Usages include:  "
+      "Background, Communication, Interruption, Media, SystemAgent\n");
+  printf("Capture Usages include: Background, Communication, Foreground, SystemAgent\n\n");
 
   printf("To quit the %s tool, press Q or [Enter].\n\n", name.c_str());
 }

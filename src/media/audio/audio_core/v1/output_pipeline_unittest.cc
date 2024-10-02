@@ -288,10 +288,10 @@ TEST_F(OutputPipelineTest, Loopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -383,10 +383,10 @@ TEST_F(OutputPipelineTest, LoopbackWithUpsample) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -480,10 +480,10 @@ TEST_F(OutputPipelineTest, UpdateEffect) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 = {},
           .output_rate = 48000,
@@ -535,9 +535,9 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
                      .name = "default",
                      .input_streams =
                          {
+                             RenderUsage::INTERRUPTION,
                              RenderUsage::MEDIA,
                              RenderUsage::SYSTEM_AGENT,
-                             RenderUsage::INTERRUPTION,
                          },
                      .effects_v1 =
                          {
@@ -631,10 +631,10 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 = {},
           .loopback = true,
@@ -770,10 +770,10 @@ TEST_F(OutputPipelineTest, PipelineWithRechannelEffects) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -826,10 +826,10 @@ TEST_F(OutputPipelineTest, LoopbackClock) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -908,10 +908,10 @@ TEST_F(OutputPipelineTest, PipelineWithEffectsV2) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v2 = PipelineConfig::EffectV2{.instance_name = "AddOne"},
           .loopback = true,

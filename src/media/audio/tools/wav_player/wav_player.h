@@ -21,15 +21,16 @@ constexpr std::array<std::pair<const char*, fuchsia::media::AudioRenderUsage>,
                      fuchsia::media::RENDER_USAGE_COUNT>
     kRenderUsageOptions = {{
         {"BACKGROUND", fuchsia::media::AudioRenderUsage::BACKGROUND},
-        {"MEDIA", fuchsia::media::AudioRenderUsage::MEDIA},
-        {"INTERRUPTION", fuchsia::media::AudioRenderUsage::INTERRUPTION},
-        {"SYSTEM_AGENT", fuchsia::media::AudioRenderUsage::SYSTEM_AGENT},
         {"COMMUNICATION", fuchsia::media::AudioRenderUsage::COMMUNICATION},
+        {"INTERRUPTION", fuchsia::media::AudioRenderUsage::INTERRUPTION},
+        {"MEDIA", fuchsia::media::AudioRenderUsage::MEDIA},
+        {"SYSTEM_AGENT", fuchsia::media::AudioRenderUsage::SYSTEM_AGENT},
     }};
 
 // Any audio output device fed by the system audio mixer will have this min_lead_time, at least.
 // Until then, we cannot be confident that our renderer is routed to an actual device.
-// TODO(https://fxbug.dev/42127162): remove the workaround once audio_core fixes the underlying https://fxbug.dev/42127051
+// TODO(https://fxbug.dev/42127162): remove workaround once audio_core fixes the underlying bug:
+// https://fxbug.dev/42127051
 constexpr zx::duration kRealDeviceMinLeadTime = zx::msec(1);
 
 namespace media::tools {
