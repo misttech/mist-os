@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
-#include <lib/ddk/binding.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
