@@ -20,7 +20,7 @@ jobs:
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache jiri-pkg-{{ checksum "integration/jiri.lock" }}
+            - &jiri-cache jiri-{{ checksum "integration/jiri.lock" }}
       - run:
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
@@ -32,34 +32,40 @@ jobs:
           key: *jiri-cache
           paths:
             - .cipd
+            - .git/jiri
             - .jiri_root
             - .jiri_manifest
             - prebuilt
       - persist_to_workspace:
           root: .
           paths:
-            - integration
+            - integration/jiri.lock
 
   build:
     docker:
       - image: cimg/base:current
 
     steps:
-      - run: git clone --depth 1 -b "$CIRCLE_BRANCH" << pipeline.trigger_parameters.github_app.repo_url >>
-      - run: sudo apt-get update && sudo apt-get install -y rsync
+      - checkout
       - attach_workspace:
           at: .
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache jiri-pkg-{{ checksum "integration/jiri.lock" }}
+            - jiri-{{ checksum "integration/jiri.lock" }}
       - run:
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
+            rm -rf integration
+            jiri import -name=integration flower https://github.com/misttech/integration
+            jiri -v -vv project-config
             jiri -v -vv update -fetch-packages=false
+      - run:
+          command: |
+            git checkout "$CIRCLE_BRANCH" 
             echo -n "submodules=false" > build/checkout.gni
             make args gen
-            make it
+            NOECHO= make kernel_unit_test
       - persist_to_workspace:
           root: .
           paths:
@@ -69,20 +75,23 @@ jobs:
       - image: cimg/base:current
 
     steps:
-      - run: git clone --depth 1 -b "$CIRCLE_BRANCH" << pipeline.trigger_parameters.github_app.repo_url >>
-      - run: sudo apt-get update && sudo apt-get install -y rsync
+      - checkout
       - attach_workspace:
           at: .
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache jiri-pkg-{{ checksum "integration/jiri.lock" }}
+            - jiri-{{ checksum "integration/jiri.lock" }}
       - run:
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
+            rm -rf integration
+            jiri import -name=integration flower https://github.com/misttech/integration
             jiri -v -vv update -fetch-packages=false
-            echo -n "submodules=false" > build/checkout.gni
-            make test
+      - run:
+          command: |
+            git checkout "$CIRCLE_BRANCH" 
+            NOECHO= make run_kernel_unit_test
 
 workflows:
   version: 2
