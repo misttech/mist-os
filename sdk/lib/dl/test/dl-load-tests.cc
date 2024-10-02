@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <format>
 #include <thread>
 
 #include <gmock/gmock.h>
@@ -59,6 +60,23 @@ using ::testing::MatchesRegex;
 
 template <class Fixture>
 using DlTests = Fixture;
+
+// The helper function returns a MatchesRegex object that matches the format of the error messages
+// for dlopen() and dlsym() when a symbol is undefined. It is intended to be used with EXPECT_THAT()
+// test macros. Example:
+//    EXPECT_THAT(msg, IsUndefinedSymbolErrMsg(name, module));
+auto IsUndefinedSymbolErrMsg(std::string_view symbol_name, std::string_view module_name) {
+  return MatchesRegex(std::format(
+      // Emitted by Fuchsia-musl when dlsym fails to locate the symbol.
+      "Symbol not found: {}"
+
+      // Emitted by Fuchsia-musl when relocation fails to resolve the symbol.
+      "|.*Error relocating {}: {}: symbol not found"
+
+      // Emitted by Linux-glibc.
+      "|.*{}: undefined symbol: {}",
+      symbol_name, module_name, symbol_name, module_name, symbol_name));
+}
 
 // This lists the test fixture classes to run DlTests tests against. The
 // DlImplTests fixture is a framework for testing the implementation in
@@ -280,18 +298,8 @@ TYPED_TEST(DlTests, MissingSymbol) {
 
   auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
-  if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(),
-              "missing-sym.MissingSymbol.module.so: undefined symbol: missing_sym_MissingSymbol");
-  } else {
-    EXPECT_THAT(
-        result.error_value().take_str(),
-        MatchesRegex(
-            // emitted by Fuchsia-musl
-            "Error relocating missing-sym.MissingSymbol.module.so: missing_sym_MissingSymbol: symbol not found"
-            // emitted by Linux-glibc
-            "|.*missing-sym.MissingSymbol.module.so: undefined symbol: missing_sym_MissingSymbol"));
-  }
+  EXPECT_THAT(result.error_value().take_str(),
+              IsUndefinedSymbolErrMsg(TestSym("missing_sym"), kFile));
 }
 
 // TODO(https://fxbug.dev/3313662773): Test simple case of transitive missing
@@ -1090,20 +1098,12 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
 
   EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValue);
 
+  const std::string symbol_name = TestSym("missing-sym");
+
   // dlsym will not be able to find the global symbol from the local scope
-  auto sym3 = this->DlSym(res2.value(), TestSym("missing_sym").c_str());
+  auto sym3 = this->DlSym(res2.value(), symbol_name.c_str());
   ASSERT_TRUE(sym3.is_error()) << sym3.error_value();
-  if constexpr (TestFixture::kCanMatchExactError || TestFixture::kEmitsSymbolNotFound) {
-    EXPECT_EQ(sym3.error_value().take_str(),
-              "Symbol not found: missing_sym_GlobalSatisfiesMissingSymbol");
-  } else {
-    // emitted by Linux-glibc
-    EXPECT_THAT(
-        sym3.error_value().take_str(),
-        // only the module name is captured from the full test path
-        MatchesRegex(
-            ".*missing-sym.GlobalSatisfiesMissingSymbol.module.so: undefined symbol: missing_sym_GlobalSatisfiesMissingSymbol"));
-  }
+  EXPECT_THAT(sym3.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol_name, kFile2));
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
