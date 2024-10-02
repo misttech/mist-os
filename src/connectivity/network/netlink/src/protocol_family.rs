@@ -20,6 +20,7 @@ use crate::multicast_groups::{
     InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
     MulticastCapableNetlinkFamily,
 };
+use crate::route_tables::{NetlinkRouteTableIndex, NonZeroNetlinkRouteTableIndex};
 
 /// A type representing a Netlink Protocol Family.
 pub(crate) trait ProtocolFamily:
@@ -408,7 +409,7 @@ pub mod route {
         outbound_interface: Option<NonZeroU64>,
         next_hop: Option<SpecifiedAddr<I::Addr>>,
         priority: Option<NonZeroU32>,
-        table: NonZeroU32,
+        table: NonZeroNetlinkRouteTableIndex,
     }
 
     // Extracts unicast route information from a request.
@@ -421,7 +422,8 @@ pub mod route {
         kind: &str,
     ) -> Result<ExtractedRouteRequest<I>, Errno> {
         let destination_prefix_len = message.header.destination_prefix_length;
-        let mut table: u32 = message.header.table.into();
+        let mut table: NetlinkRouteTableIndex =
+            NetlinkRouteTableIndex::new(message.header.table.into());
 
         let mut destination_addr = None;
         let mut outbound_interface = None;
@@ -447,7 +449,7 @@ pub mod route {
                         num
                     );
                 }
-                table = *num
+                table = NetlinkRouteTableIndex::new(*num)
             }
             nla => {
                 log_warn!(
@@ -463,8 +465,11 @@ pub mod route {
         let outbound_interface =
             outbound_interface.map(|id| NonZeroU64::new((*id).into())).flatten();
         let priority = priority.map(NonZeroU32::new).flatten();
-        let table = NonZeroU32::new(table)
-            .unwrap_or(NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap());
+        let table = NonZeroNetlinkRouteTableIndex::new(table).unwrap_or(
+            NonZeroNetlinkRouteTableIndex::new_non_zero(
+                NonZeroU32::new(rt_class_t_RT_TABLE_MAIN.into()).unwrap(),
+            ),
+        );
         let destination_addr = match destination_addr {
             Some(addr) => crate::netlink_packet::ip_addr_from_route::<I>(addr)?,
             None => {
@@ -3350,7 +3355,7 @@ mod test {
     ) -> TestRouteCase<I> {
         let extra_nlas = extra_nlas.into_iter().collect::<Vec<_>>();
         let table_from_nla = extra_nlas.clone().into_iter().find_map(|nla| match nla {
-            RouteAttribute::Table(table) => Some(table),
+            RouteAttribute::Table(table) => Some(NetlinkRouteTableIndex::new(table)),
             _ => None,
         });
         let priority_from_nla = extra_nlas.clone().into_iter().find_map(|nla| match nla {
@@ -3400,7 +3405,8 @@ mod test {
                                     },
                                     priority: priority_from_nla.unwrap_or(priority_default),
                                     // Use the table value from the NLA if provided.
-                                    table: table_from_nla.unwrap_or(table as u32),
+                                    table: table_from_nla
+                                        .unwrap_or(NetlinkRouteTableIndex::new(table as u32)),
                                 },
                             ))
                         }
@@ -3417,14 +3423,16 @@ mod test {
                                     // value is 0, use the value from the header. Default to
                                     // RT_TABLE_MAIN when the header value is unspecified.
                                     table: table_from_nla
-                                        .map(|table_nla| NonZeroU32::new(table_nla))
+                                        .map(|table_nla| {
+                                            NonZeroNetlinkRouteTableIndex::new(table_nla)
+                                        })
                                         .flatten()
-                                        .unwrap_or(
+                                        .unwrap_or(NonZeroNetlinkRouteTableIndex::new_non_zero(
                                             NonZeroU32::new(table as u32).unwrap_or(
                                                 NonZeroU32::new(rt_class_t_RT_TABLE_MAIN as u32)
                                                     .unwrap(),
                                             ),
-                                        ),
+                                        )),
                                 },
                             ))
                         }

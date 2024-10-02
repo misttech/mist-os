@@ -71,6 +71,7 @@ rustc_library("netlink") {
     "src/multicast_groups.rs",
     "src/netlink_packet.rs",
     "src/protocol_family.rs",
+    "src/route_tables.rs",
     "src/routes.rs",
     "src/rules.rs",
     "src/util.rs",
