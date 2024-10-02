@@ -93,7 +93,13 @@ open protocol Debug {
     }) -> () error DriverError;
 
     /// Returns the properties of the host SPMI controller.
-    strict GetControllerProperties() -> (table {});
+    strict GetControllerProperties() -> (table {
+        /// User friendly string for the controller name. If not set, the controller name is
+        /// unknown. If included, this string must be non-empty.
+        ///
+        /// Optional.
+        1: name string:MAX_SPMI_NAME_LEN;
+    });
 };
 
 /// This service can be used by command-line utilities and tests to connect to any target device on
