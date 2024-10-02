@@ -6,6 +6,7 @@
 #include "starnix-loader.h"
 
 #include <lib/mistos/starnix/kernel/mm/memory.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 
 namespace {
 
