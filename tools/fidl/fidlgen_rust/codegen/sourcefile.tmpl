@@ -50,6 +50,7 @@ use fuchsia_zircon as zx;
 {{- end }}
 {{- range .Protocols }}
 {{ template "ProtocolDeclaration" . }}
+{{ template "DriverProtocolDeclaration" . }}
 {{- end }}
 {{- range .Services }}
 {{ template "ServiceDeclaration" . }}

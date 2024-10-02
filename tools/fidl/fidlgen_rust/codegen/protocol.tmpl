@@ -6,6 +6,7 @@
 
 {{- define "ProtocolDeclaration" }}
 {{- $protocol := . }}
+{{- if eq $protocol.OverTransport "Channel" }}
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct {{ $protocol.Marker }};
 
@@ -723,6 +724,7 @@ impl {{ $method.Responder }} {
         )
     }
 }
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

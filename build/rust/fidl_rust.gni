@@ -102,6 +102,10 @@ template("fidl_rust") {
         args += [ "--fdomain=true" ]
       }
 
+      if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
+        args += [ "--include-drivers" ]
+      }
+
       deps = [ fidl_ir_target ]
 
       metadata = {
@@ -160,6 +164,15 @@ template("fidl_rust") {
 
       if (is_fuchsia) {
         deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+        if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
+          deps += [ "//src/lib/fidl/rust/fidl_driver" ]
+
+          # TODO: incorporate this into fidl_driver
+          deps += [ "//src/devices/bin/driver_runtime/rust:fdf_rust_lib" ]
+          features = [ "driver" ]
+        }
+      } else {
+        not_needed(invoker, [ "contains_drivers" ])
       }
 
       if (defined(invoker.public_deps)) {

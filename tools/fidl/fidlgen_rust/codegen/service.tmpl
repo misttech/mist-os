@@ -23,10 +23,12 @@ impl fidl::endpoints::ServiceMarker for {{ .Name }}Marker {
 #[cfg(target_os = "fuchsia")]
 pub enum {{ .Name }}Request {
     {{- range .Members }}
+    {{- if eq .Type.ProtocolTransport "Channel" }}
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
     {{ .CamelName }}({{ .ProtocolType }}RequestStream),
+    {{- end }}
     {{- end }}
 }
 
@@ -37,9 +39,11 @@ impl fidl::endpoints::ServiceRequest for {{ .Name }}Request {
     fn dispatch(name: &str, _channel: fidl::AsyncChannel) -> Self {
         match name {
             {{- range .Members }}
+            {{- if eq .Type.ProtocolTransport "Channel" }}
             "{{ .Name }}" => Self::{{ .CamelName }}(
                 <{{ .ProtocolType }}RequestStream as fidl::endpoints::RequestStream>::from_channel(_channel),
             ),
+            {{- end }}
             {{- end }}
             _ => panic!("no such member protocol name for service {{ .Name }}"),
         }
@@ -48,7 +52,9 @@ impl fidl::endpoints::ServiceRequest for {{ .Name }}Request {
     fn member_names() -> &'static [&'static str] {
         &[
         {{- range .Members }}
+        {{- if eq .Type.ProtocolTransport "Channel" }}
             "{{ .Name }}",
+        {{- end }}
         {{- end }}
         ]
     }
@@ -58,7 +64,7 @@ impl fidl::endpoints::ServiceRequest for {{ .Name }}Request {
 ///{{ . }}
 {{- end }}
 #[cfg(target_os = "fuchsia")]
-pub struct {{ .Name }}Proxy({{ if not .Members }}#[allow(dead_code)] {{ end }}Box<dyn fidl::endpoints::MemberOpener>);
+pub struct {{ .Name }}Proxy(#[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for {{ .Name }}Proxy {
@@ -72,6 +78,7 @@ impl fidl::endpoints::ServiceProxy for {{ .Name }}Proxy {
 #[cfg(target_os = "fuchsia")]
 impl {{ .Name }}Proxy {
     {{- range .Members }}
+    {{- if eq .Type.ProtocolTransport "Channel" }}
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
@@ -85,6 +92,7 @@ impl {{ .Name }}Proxy {
     pub fn connect_channel_to_{{ .SnakeName }}(&self, server_end: fidl::endpoints::ServerEnd<{{ .ProtocolType }}Marker>) -> Result<(), fidl::Error> {
         self.0.open_member("{{ .Name }}", server_end.into_channel())
     }
+    {{- end }}
     {{- end }}
 }
 {{- end }}

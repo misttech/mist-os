@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -2029,6 +2030,30 @@ func (r *Root) ForTransport(transport string) Root {
 		case *Service:
 			for _, member := range e.Members {
 				if member.Type.ProtocolTransport != transport {
+					return false
+				}
+			}
+		}
+		return true
+	})
+}
+
+// ForTransports filters out protocols and services (and any nested anonymous
+// layouts) that do not support the given transports. It returns a new Root and
+// does not modify r.
+func (r *Root) ForTransports(transports []string) Root {
+	return r.filter(func(e Element) bool {
+		switch e := e.(type) {
+		case *Protocol:
+			for _, transport := range transports {
+				if _, ok := e.Transports()[transport]; ok {
+					return true
+				}
+			}
+			return false
+		case *Service:
+			for _, member := range e.Members {
+				if !slices.Contains(transports, member.Type.ProtocolTransport) {
 					return false
 				}
 			}

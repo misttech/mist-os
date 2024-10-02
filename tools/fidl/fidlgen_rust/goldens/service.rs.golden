@@ -730,7 +730,9 @@ impl fidl::endpoints::ServiceRequest for MultiHeterogeneousMemberServiceRequest 
     }
 }
 #[cfg(target_os = "fuchsia")]
-pub struct MultiHeterogeneousMemberServiceProxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct MultiHeterogeneousMemberServiceProxy(
+    #[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>,
+);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for MultiHeterogeneousMemberServiceProxy {
@@ -814,7 +816,9 @@ impl fidl::endpoints::ServiceRequest for MultiHomogeneousMemberServiceRequest {
     }
 }
 #[cfg(target_os = "fuchsia")]
-pub struct MultiHomogeneousMemberServiceProxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct MultiHomogeneousMemberServiceProxy(
+    #[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>,
+);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for MultiHomogeneousMemberServiceProxy {
@@ -892,7 +896,7 @@ impl fidl::endpoints::ServiceRequest for SingleMemberServiceRequest {
     }
 }
 #[cfg(target_os = "fuchsia")]
-pub struct SingleMemberServiceProxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct SingleMemberServiceProxy(#[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for SingleMemberServiceProxy {

@@ -448,6 +448,12 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
         (ptr as *mut T).write_unaligned(num);
     }
 
+    /// Writes the given handle to the handles list.
+    #[inline(always)]
+    pub fn push_next_handle(&mut self, handle: HandleDisposition<'static>) {
+        self.handles.push(handle)
+    }
+
     /// Returns an offset for writing `len` out-of-line bytes. Zeroes padding
     /// bytes at the end if `len` is not a multiple of 8.
     ///
@@ -1940,7 +1946,7 @@ unsafe fn encode_handle(
         return Err(Error::NotNullable);
     }
     encoder.write_num(ALLOC_PRESENT_U32, offset);
-    encoder.handles.push(HandleDisposition::new(
+    encoder.push_next_handle(HandleDisposition::new(
         HandleOp::Move(handle),
         object_type,
         rights,

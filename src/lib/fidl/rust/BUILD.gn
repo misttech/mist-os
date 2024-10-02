@@ -52,6 +52,7 @@ group("tests") {
     "external_tests",
     "fidl:tests",
     "fidl-contrib:tests",
+    "fidl_driver:tests",
     "handle_tests",
   ]
 }

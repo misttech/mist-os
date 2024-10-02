@@ -836,7 +836,7 @@ impl fidl::endpoints::ServiceRequest for ServiceRequest {
     }
 }
 #[cfg(target_os = "fuchsia")]
-pub struct ServiceProxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct ServiceProxy(#[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for ServiceProxy {

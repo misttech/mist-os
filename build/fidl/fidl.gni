@@ -123,6 +123,9 @@ import("//build/testing/host_test_data.gni")
 #   enable_rust (optional flag, default to true)
 #     Set to false to disable Rust bindings for this library
 #
+#   enable_rust_drivers (optional flag, default to false)
+#     Set to true to enable experimental rust driver transport support
+#
 #   enable_bindlib (optional flag, default to true)
 #     Set to false to disable bindlib bindings for this library
 #
@@ -197,11 +200,14 @@ template("fidl") {
   enable_rust_next =
       defined(invoker.enable_rust_next) && invoker.enable_rust_next
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
+  enable_rust_drivers =
+      defined(invoker.enable_rust_drivers) && invoker.enable_rust_drivers
 
   not_needed([
                "enable_bindlib",
                "enable_cpp",
                "enable_rust",
+               "enable_rust_drivers",
                "enable_rust_next",
                "enable_banjo",
                "enable_hlcpp",
@@ -446,6 +452,9 @@ template("fidl") {
                                  "disable_rustdoc",
                                ])
         forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        if (!is_host && enable_rust_drivers) {
+          forward_variables_from(invoker, [ "contains_drivers" ])
+        }
         deps = []
         if (is_host) {
           # Add SDK category markers as Rust is used for ffx host tools.

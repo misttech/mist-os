@@ -16,14 +16,234 @@ use fuchsia_zircon as zx;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
+pub struct OneWaySendRequest {
+    pub payload: Payload,
+}
+
+impl fidl::Persistable for OneWaySendRequest {}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C)]
 pub struct Payload {
     pub value: u32,
 }
 
 impl fidl::Persistable for Payload {}
 
+#[cfg(feature = "driver")]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct OneWayMarker;
+
+#[cfg(feature = "driver")]
+impl fidl_driver::endpoints::DriverProtocolMarker for OneWayMarker {
+    const DEBUG_NAME: &'static str = "(anonymous) OneWay";
+}
+
+#[cfg(feature = "driver")]
+#[derive(Debug)]
+pub enum OneWayRequest {
+    Send_ { payload: Payload },
+}
+
+#[cfg(feature = "driver")]
+impl OneWayRequest {
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_send_(self) -> Option<(Payload,)> {
+        if let OneWayRequest::Send_ { payload } = self {
+            Some((payload,))
+        } else {
+            None
+        }
+    }
+
+    pub fn new_send_(self, payload: Payload) -> Self {
+        Self::Send_ { payload }
+    }
+
+    pub fn r#send__as_message(
+        arena: fdf::Arena,
+        mut payload: &Payload,
+    ) -> Result<fdf::Message<[u8]>, fidl::Error> {
+        let tx_id = 0;
+        let ordinal = 0x6e3b1578a847a9ff;
+        let dynamic_flags = fidl::encoding::DynamicFlags::empty();
+        let body = (payload,);
+        let msg = fidl::encoding::TransactionMessage {
+            header: fidl::encoding::TransactionHeader::new(tx_id, ordinal, dynamic_flags),
+            body,
+        };
+        fidl::encoding::with_tls_encoded::<
+            fidl::encoding::TransactionMessageType<OneWaySendRequest>,
+            fidl::encoding::DefaultFuchsiaResourceDialect,
+            fdf::Message<[u8]>,
+        >(msg, |bytes, mut handles| {
+            let handles = arena.insert_from_iter(
+                std::mem::take(handles)
+                    .into_iter()
+                    .map(fidl_driver::encoding::mixed_from_handle_disposition),
+            );
+            Ok(fdf::Message::new(&arena, Some(arena.insert_slice(bytes)), Some(handles)))
+        })
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn read_from(
+        bytes: &[u8],
+        _handles: &mut [fuchsia_zircon::HandleInfo],
+    ) -> Result<Self, fidl::Error> {
+        let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+
+        match header.ordinal {
+            0x6e3b1578a847a9ff => {
+                header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                let mut req = fidl::new_empty!(
+                    OneWaySendRequest,
+                    fidl::encoding::DefaultFuchsiaResourceDialect
+                );
+                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<OneWaySendRequest>(&header, _body_bytes, _handles, &mut req)?;
+                Ok(OneWayRequest::Send_ { payload: req.payload })
+            }
+            _ => Err(fidl::Error::UnknownOrdinal {
+                ordinal: header.ordinal,
+                protocol_name:
+                    <OneWayMarker as fidl_driver::endpoints::DriverProtocolMarker>::DEBUG_NAME,
+            }),
+        }
+    }
+
+    pub fn read_from_message(
+        mut message: fdf::Message<[u8]>,
+    ) -> Result<(fdf::Arena, Self), fidl::Error> {
+        let (arena, Some(body), Some(handles)) = message.take_arena_boxes() else {
+            return Err(fidl::Error::Invalid);
+        };
+        let mut handles = arena.try_insert_from_iter(
+            handles
+                .into_iter()
+                .map(|handle| unsafe { fidl_driver::encoding::mixed_into_handle_info(handle) }),
+        );
+        let res = match handles {
+            Ok(ref mut handles) => Self::read_from(&*body, handles)?,
+            Err(_) => return Err(fidl::Error::Invalid),
+        };
+        std::mem::drop((body, handles));
+        Ok((message.take_arena(), res))
+    }
+
+    /// Name of the method defined in FIDL
+    pub fn method_name(&self) -> &'static str {
+        match *self {
+            OneWayRequest::Send_ { .. } => "send_",
+        }
+    }
+}
+
+/// Like [`OneWayRequest::read_from_message`] except it drops the [`Arena`].
+#[cfg(feature = "driver")]
+impl std::convert::TryFrom<fdf::Message<[u8]>> for OneWayRequest {
+    type Error = fidl::Error;
+    fn try_from(msg: fdf::Message<[u8]>) -> Result<OneWayRequest, fidl::Error> {
+        Ok(OneWayRequest::read_from_message(msg)?.1)
+    }
+}
+
 mod internal {
     use super::*;
+
+    impl fidl::encoding::ValueTypeMarker for OneWaySendRequest {
+        type Borrowed<'a> = &'a Self;
+        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
+            value
+        }
+    }
+
+    unsafe impl fidl::encoding::TypeMarker for OneWaySendRequest {
+        type Owned = Self;
+
+        #[inline(always)]
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+
+        #[inline(always)]
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            4
+        }
+        #[inline(always)]
+        fn encode_is_copy() -> bool {
+            true
+        }
+
+        #[inline(always)]
+        fn decode_is_copy() -> bool {
+            true
+        }
+    }
+
+    unsafe impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Encode<OneWaySendRequest, D>
+        for &OneWaySendRequest
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<OneWaySendRequest>(offset);
+            unsafe {
+                // Copy the object into the buffer.
+                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
+                (buf_ptr as *mut OneWaySendRequest)
+                    .write_unaligned((self as *const OneWaySendRequest).read());
+                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
+                // done second because the memcpy will write garbage to these bytes.
+            }
+            Ok(())
+        }
+    }
+    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<Payload, D>>
+        fidl::encoding::Encode<OneWaySendRequest, D> for (T0,)
+    {
+        #[inline]
+        unsafe fn encode(
+            self,
+            encoder: &mut fidl::encoding::Encoder<'_, D>,
+            offset: usize,
+            depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            encoder.debug_check_bounds::<OneWaySendRequest>(offset);
+            // Zero out padding regions. There's no need to apply masks
+            // because the unmasked parts will be overwritten by fields.
+            // Write the fields.
+            self.0.encode(encoder, offset + 0, depth)?;
+            Ok(())
+        }
+    }
+
+    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for OneWaySendRequest {
+        #[inline(always)]
+        fn new_empty() -> Self {
+            Self { payload: fidl::new_empty!(Payload, D) }
+        }
+
+        #[inline]
+        unsafe fn decode(
+            &mut self,
+            decoder: &mut fidl::encoding::Decoder<'_, D>,
+            offset: usize,
+            _depth: fidl::encoding::Depth,
+        ) -> fidl::Result<()> {
+            decoder.debug_check_bounds::<Self>(offset);
+            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
+            // Verify that padding bytes are zero.
+            // Copy from the buffer into the object.
+            unsafe {
+                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
+            }
+            Ok(())
+        }
+    }
 
     impl fidl::encoding::ValueTypeMarker for Payload {
         type Borrowed<'a> = &'a Self;

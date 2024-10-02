@@ -20,6 +20,7 @@ if (is_host) {
       "bits.tmpl",
       "codegen.go",
       "const.tmpl",
+      "driver_protocol.tmpl",
       "enum.tmpl",
       "ir.go",
       "ir_test.go",
