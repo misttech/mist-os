@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h"
 
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
+#include <lib/mistos/util/error_propagation.h>
 
 #include <algorithm>
 #include <iterator>
@@ -15,7 +16,7 @@
 
 namespace starnix {
 
-fit::result<Errno, size_t> OutputBuffer::write(const ktl::span<uint8_t>& buffer) {
+fit::result<Errno, size_t> OutputBuffer::write(ktl::span<uint8_t>& buffer) {
   ktl::span buf = buffer;
   return write_each([&](ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
     auto size = ktl::min(buf.size(), data.size());
@@ -28,10 +29,8 @@ fit::result<Errno, size_t> OutputBuffer::write(const ktl::span<uint8_t>& buffer)
 }
 
 fit::result<Errno, size_t> OutputBuffer::write_all(const ktl::span<uint8_t>& buffer) {
-  auto result = write(buffer);
-  if (result.is_error())
-    return result.take_error();
-
+  ktl::span<uint8_t> mut_buffer = buffer;
+  auto result = write(mut_buffer) _EP(result);
   auto size = result.value();
   if (size != buffer.size()) {
     return fit::error(errno(EINVAL));
@@ -51,10 +50,8 @@ fit::result<Errno, fbl::Vector<uint8_t>> InputBuffer::peek_all() {
   // SAFETY: self.peek returns the number of bytes read.
   return read_to_vec<Errno, uint8_t>(
       available(), [&](ktl::span<uint8_t>& buf) -> fit::result<Errno, NumberOfElementsRead> {
-        auto peek_result = this->peek(buf);
-        if (peek_result.is_error())
-          return peek_result.take_error();
-        return fit::ok(NumberOfElementsRead{peek_result.value()});
+        auto peek = this->peek(buf) _EP(peek);
+        return fit::ok(NumberOfElementsRead{peek.value()});
       });
 }
 

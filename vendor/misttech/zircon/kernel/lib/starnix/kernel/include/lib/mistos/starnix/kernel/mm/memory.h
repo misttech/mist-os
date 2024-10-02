@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <zircon/rights.h>
 #include <zircon/types.h>
 
@@ -86,11 +87,9 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
     return ktl::visit(MemoryObject::overloaded{
                           [&](const Vmo& vmo) -> fit::result<zx_status_t, ktl::array<T, N>> {
                             ktl::array<T, N> array;
-                            ktl::span<uint8_t> buf{(uint8_t*)array.data(), array.size()};
-                            auto result = read_uninit(buf, offset);
-                            if (result.is_error()) {
-                              return result.take_error();
-                            }
+                            ktl::span<uint8_t> buf{reinterpret_cast<uint8_t*>(array.data()),
+                                                   array.size()};
+                            auto result = read_uninit(buf, offset) _EP(result);
                             return fit::ok(ktl::move(array));
                           },
                           [](const RingBuf& buf) -> fit::result<zx_status_t, ktl::array<T, N>> {
@@ -134,9 +133,8 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
- private:
-  MemoryObject(Vmo vmo) : variant_(ktl::move(vmo)) {}
-  MemoryObject(RingBuf buf) : variant_(ktl::move(buf)) {}
+  explicit MemoryObject(Vmo vmo) : variant_(ktl::move(vmo)) {}
+  explicit MemoryObject(RingBuf buf) : variant_(ktl::move(buf)) {}
 
   ktl::variant<Vmo, RingBuf> variant_;
 };

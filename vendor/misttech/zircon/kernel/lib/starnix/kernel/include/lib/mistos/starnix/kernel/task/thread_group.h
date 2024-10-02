@@ -109,7 +109,6 @@ class ThreadGroupMutableState {
   /// Thread groups allowed to trace tasks in this this thread group.
   // pub allowed_ptracers: PtraceAllowedPtracers,
 
- public:
   /// impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>>
   pid_t leader() const;
 
@@ -117,7 +116,6 @@ class ThreadGroupMutableState {
 
   size_t tasks_count() const { return tasks_.size(); }
 
- public:
   ThreadGroupMutableState();
 
   ThreadGroupMutableState(ThreadGroup* base, ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
@@ -214,7 +212,6 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   // pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
 
   /// impl ThreadGroup
- public:
   static fbl::RefPtr<ThreadGroup> New(
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
@@ -225,14 +222,14 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   fit::result<Errno> add(fbl::RefPtr<Task> task);
 
   /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
-  const starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard read() const {
+  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard read() const {
     return mutable_state_.Read();
   }
+
   starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard write() {
     return mutable_state_.Write();
   }
 
- public:
   // C++
   ~ThreadGroup();
 
