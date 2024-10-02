@@ -326,12 +326,13 @@ impl RawRepr {
 
 impl PartialEq for RawRepr {
     fn eq(&self, other: &Self) -> bool {
-        match (self.project(), other.project()) {
-            (SafeRepr::Inline(i), SafeRepr::Inline(oi)) => i.eq(oi),
-            // Use pointer value equality since there's only ever one pointer to a given string.
-            (SafeRepr::Heap(ptr), SafeRepr::Heap(other_ptr)) => ptr.eq(&other_ptr),
-            _ => false,
-        }
+        // SAFETY: it is always OK to interpret a pointer as a byte array as long as we don't expect
+        // to retain provenance.
+        let lhs = unsafe { &self.inline };
+        // SAFETY: it is always OK to interpret a pointer as a byte array as long as we don't expect
+        // to retain provenance.
+        let rhs = unsafe { &other.inline };
+        lhs.eq(rhs)
     }
 }
 impl Eq for RawRepr {}
