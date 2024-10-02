@@ -19,6 +19,7 @@ pub struct HostIdentifier {
     pub(crate) system_info_proxy: sysinfo::SysInfoProxy,
     pub(crate) build_info_proxy: buildinfo::ProviderProxy,
     pub(crate) boot_timestamp_nanos: u64,
+    pub(crate) boot_id: u64,
 }
 
 fn connect_to_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>() -> Result<P::Proxy> {
@@ -26,7 +27,7 @@ fn connect_to_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>() -> Resu
 }
 
 impl HostIdentifier {
-    pub fn new() -> Result<Self> {
+    pub fn new(boot_id: u64) -> Result<Self> {
         let interface_state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()?;
         let name_provider_proxy = connect_to_protocol::<fdevice::NameProviderMarker>()?;
         let device_info_proxy = connect_to_protocol::<hwinfo::DeviceMarker>()?;
@@ -41,6 +42,7 @@ impl HostIdentifier {
             system_info_proxy,
             build_info_proxy,
             boot_timestamp_nanos,
+            boot_id,
         });
     }
 
@@ -124,6 +126,8 @@ impl HostIdentifier {
 
         let boot_timestamp_nanos = Some(self.boot_timestamp_nanos);
 
+        let boot_id = Some(self.boot_id);
+
         Ok(rcs::IdentifyHostResponse {
             nodename,
             addresses,
@@ -131,6 +135,7 @@ impl HostIdentifier {
             boot_timestamp_nanos,
             product_config,
             board_config,
+            boot_id,
             ..Default::default()
         })
     }

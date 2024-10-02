@@ -108,6 +108,7 @@ struct DeviceConnection {
     boot_timestamp: u64,
     log_socket: fuchsia_async::Socket,
     log_settings_client: LogSettingsProxy,
+    boot_id: Option<u64>,
 }
 
 async fn connect_to_rcs(
@@ -120,18 +121,26 @@ async fn connect_to_rcs(
 // has support for reconnect handling.
 async fn connect_to_target(
     stream_mode: &mut fidl_fuchsia_diagnostics::StreamMode,
-    prev_timestamp: Option<u64>,
+    prev_boot_id: Option<u64>,
     rcs_connector: &Connector<RemoteControlProxy>,
 ) -> Result<DeviceConnection, LogError> {
     // Connect to device
     let rcs_client = connect_to_rcs(rcs_connector).await?;
-    let boot_timestamp =
-        rcs_client.identify_host().await??.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
+    let host_id = rcs_client.identify_host().await??;
+
+    let boot_timestamp = host_id.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
+    let boot_id = host_id.boot_id;
+
     // If we detect a reboot we want to SnapshotThenSubscribe so
     // we get all of the logs from the reboot. If not, we use Snapshot
     // to avoid getting duplicate logs.
-    match prev_timestamp {
-        Some(timestamp) if timestamp != boot_timestamp => {
+    match prev_boot_id {
+        Some(id) if Some(id) == boot_id => {
+            // Reconnect detected, subscribe.
+            *stream_mode = fidl_fuchsia_diagnostics::StreamMode::Subscribe;
+        }
+        Some(_) => {
+            // Device rebooted
             *stream_mode = fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe;
         }
         _ => {}
@@ -170,6 +179,7 @@ async fn connect_to_target(
         boot_timestamp,
         log_socket: fuchsia_async::Socket::from_socket(local),
         log_settings_client,
+        boot_id,
     })
 }
 
@@ -193,7 +203,7 @@ where
     // a device rebooting and remaining in a consistent state (automatically) after the reboot.
     // Eventually we should have direct support for this in Overnet, but for now we have to
     // handle reconnects manually.
-    let mut prev_timestamp = None;
+    let mut prev_boot_id = None;
     loop {
         let connection;
         // Linear backoff up to 10 seconds.
@@ -201,7 +211,7 @@ where
         let mut last_error = None;
         loop {
             let maybe_connection =
-                connect_to_target(&mut stream_mode, prev_timestamp, &rcs_connector).await;
+                connect_to_target(&mut stream_mode, prev_boot_id, &rcs_connector).await;
             if let Ok(connected) = maybe_connection {
                 connection = connected;
                 break;
@@ -228,7 +238,7 @@ where
             }
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
-        prev_timestamp = Some(connection.boot_timestamp);
+        prev_boot_id = connection.boot_id;
         cmd.maybe_set_interest(
             &connection.log_settings_client,
             realm_query,
@@ -559,7 +569,7 @@ ffx log --force-set-severity.
             Some(TestEvent::Connected(StreamMode::Subscribe))
         );
 
-        environment.reboot_target(42);
+        environment.reboot_target(Some(42));
 
         // Device is paused when we exit the loop because there's nothing
         // polling the future.
@@ -577,6 +587,49 @@ ffx log --force-set-severity.
         environment.disconnect_target();
 
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_works_with_legacy_fuchsia_version() {
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
+            messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
+                "1980-01-01T00:00:03",
+            ))],
+            // No boot ID is present, because this version of Fuchsia
+            // didn't have that field.
+            boot_id: None,
+            send_connected_event: true,
+            ..Default::default()
+        });
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
+            symbolize: SymbolizeMode::Off,
+            clock: TimeFormat::Local,
+            since: Some(log_command::DetailedDateTime {
+                is_now: true,
+                ..parse_time("1980-01-01T00:00:01").unwrap()
+            }),
+            until: None,
+            ..LogCommand::default()
+        };
+
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
+
+        // Intentionally unused. When in streaming mode, this should never return a value.
+        let _result = fasync::Task::local(tool.main(writer));
+
+        // Run the stream until we get the expected message.
+        check_for_message(&buffers, TEST_STR).await;
+
+        // First connection should have used Subscribe mode.
+        assert_matches!(
+            event_stream.next().await,
+            Some(TestEvent::Connected(StreamMode::Subscribe))
+        );
     }
 
     #[fuchsia::test]
@@ -637,7 +690,7 @@ ffx log --force-set-severity.
         // For the third connection, we should get a
         // SnapshotThenSubscribe request because the timestamp
         // changed and it's clear it's actually a separate boot not a disconnect/reconnect
-        environment.reboot_target(42);
+        environment.reboot_target(Some(42));
 
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
 

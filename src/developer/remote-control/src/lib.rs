@@ -41,7 +41,8 @@ struct Client {
 
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
-        Self::new_with_allocator(connector, Box::new(|| HostIdentifier::new()))
+        let boot_id = zx::MonotonicTime::get().into_nanos() as u64;
+        Self::new_with_allocator(connector, Box::new(move || HostIdentifier::new(boot_id)))
     }
 
     pub(crate) fn new_with_allocator(
@@ -537,6 +538,7 @@ mod tests {
                         .unwrap_or_else(|| setup_fake_sysinfo_service(zx::Status::INTERNAL)),
                     build_info_proxy: setup_fake_build_info_service(),
                     boot_timestamp_nanos: BOOT_TIME,
+                    boot_id: 0,
                 })
             },
         ))
