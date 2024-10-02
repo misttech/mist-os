@@ -14,7 +14,7 @@ void DriverManagerTestBase::SetUp() {
 std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateNode(const std::string name) {
   auto node = std::make_shared<driver_manager::Node>(
       name, std::vector<std::weak_ptr<driver_manager::Node>>(), GetNodeManager(), dispatcher(),
-      inspect_.CreateDevice(name, zx::vmo(), 0));
+      inspect_.CreateDevice(name, 0));
   node->AddToDevfsForTesting(root_devnode_.value());
   node->devfs_device().publish();
   return node;
@@ -24,7 +24,7 @@ std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateNode(
     const std::string name, std::weak_ptr<driver_manager::Node> parent) {
   std::vector<std::weak_ptr<driver_manager::Node>> parents = {parent};
   auto node = std::make_shared<driver_manager::Node>(name, parents, GetNodeManager(), dispatcher(),
-                                                     inspect_.CreateDevice(name, zx::vmo(), 0));
+                                                     inspect_.CreateDevice(name, 0));
   node->AddToDevfsForTesting(root_devnode_.value());
   node->devfs_device().publish();
   node->AddToParents();

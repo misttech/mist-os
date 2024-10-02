@@ -16,41 +16,18 @@
 
 namespace driver_manager {
 
-zx::result<InspectDevfs> InspectDevfs::Create(async_dispatcher_t* dispatcher) {
-  InspectDevfs devfs(dispatcher);
-
-  return zx::ok(std::move(devfs));
-}
-
-zx::result<std::string> InspectDevfs::Publish(const char* name, zx::vmo vmo) {
-  if (dispatcher_ == nullptr) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  // TODO(b/324637276): this is the export point for duplicated data from driver components.
-  inspect::PublishVmo(dispatcher_, std::move(vmo), {.tree_name = name});
-
-  return zx::ok(std::move(name));
-}
-
 InspectManager::InspectManager(async_dispatcher_t* dispatcher) : inspector_(dispatcher, {}) {
   inspector_.inspector().CreateStatsNode();
-  zx::result devfs = InspectDevfs::Create(dispatcher);
-  ZX_ASSERT(devfs.is_ok());
-  info_ = fbl::MakeRefCounted<Info>(root_node(), std::move(devfs.value()));
+  info_ = fbl::MakeRefCounted<Info>(root_node());
 }
 
-DeviceInspect InspectManager::CreateDevice(std::string name, zx::vmo vmo, uint32_t protocol_id) {
-  return DeviceInspect(info_, std::move(name), std::move(vmo), protocol_id);
+DeviceInspect InspectManager::CreateDevice(std::string name, uint32_t protocol_id) {
+  return DeviceInspect(info_, std::move(name), protocol_id);
 }
 
-DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, zx::vmo vmo,
+DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name,
                              uint32_t protocol_id)
     : info_(std::move(info)), protocol_id_(protocol_id), name_(std::move(name)) {
-  // Devices are sometimes passed bogus handles. Fun!
-  if (vmo.is_valid()) {
-    dev_vmo_.emplace(std::move(vmo));
-  }
   device_node_ = info_->devices.CreateChild(name_);
   // Increment device count.
   info_->device_count.Add(1);
@@ -63,23 +40,8 @@ DeviceInspect::~DeviceInspect() {
   }
 }
 
-DeviceInspect DeviceInspect::CreateChild(std::string name, zx::vmo vmo, uint32_t protocol_id) {
-  return DeviceInspect(info_, std::move(name), std::move(vmo), protocol_id);
-}
-
-zx::result<> DeviceInspect::Publish() {
-  if (!dev_vmo_.has_value()) {
-    return zx::ok();
-  }
-
-  zx::result link_name = info_->devfs.Publish(name_.c_str(), std::move(*dev_vmo_));
-  dev_vmo_.reset();
-  if (link_name.is_error()) {
-    return link_name.take_error();
-  }
-
-  link_name_ = link_name.value();
-  return zx::ok();
+DeviceInspect DeviceInspect::CreateChild(std::string name, uint32_t protocol_id) {
+  return DeviceInspect(info_, std::move(name), protocol_id);
 }
 
 void DeviceInspect::SetStaticValues(

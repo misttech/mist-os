@@ -34,49 +34,30 @@ static const inline ProtocolInfo kProtoInfos[] = {
 #include <lib/ddk/protodefs.h>
 };
 
-class InspectDevfs {
- public:
-  static zx::result<InspectDevfs> Create(async_dispatcher_t* dispatcher);
-
-  // Publishes a device. Should be called when there's a new devices.
-  // This returns a string, `link_name`, representing the device that was just published.
-  zx::result<std::string> Publish(const char* name, zx::vmo vmo);
-
- private:
-  explicit InspectDevfs(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  inline static std::atomic<uint64_t> inspect_dev_counter_{0};
-  async_dispatcher_t* dispatcher_ = nullptr;
-};
-
 class DeviceInspect;
 
 class InspectManager {
  public:
   // Information that all devices end up editing.
   struct Info : fbl::RefCounted<Info> {
-    Info(inspect::Node& root_node, InspectDevfs inspect_devfs)
+    Info(inspect::Node& root_node)
         : device_count(root_node.CreateUint("device_count", 0)),
-          devices(root_node.CreateChild("devices")),
-          devfs(std::move(inspect_devfs)) {}
+          devices(root_node.CreateChild("devices")) {}
 
     // The total count of devices.
     inspect::UintProperty device_count;
     // The top level node for devices.
     inspect::Node devices;
-    // The inspect nodes for devfs information.
-    InspectDevfs devfs;
   };
 
   explicit InspectManager(async_dispatcher_t* dispatcher);
   InspectManager() = delete;
 
   // Create a new device within inspect.
-  DeviceInspect CreateDevice(std::string name, zx::vmo vmo, uint32_t protocol_id);
+  DeviceInspect CreateDevice(std::string name, uint32_t protocol_id);
 
   // Accessor methods.
   inspect::Node& root_node() { return inspector_.root(); }
-  InspectDevfs& devfs() { return info_->devfs; }
 
  private:
   inspect::ComponentInspector inspector_;
@@ -88,10 +69,7 @@ class DeviceInspect {
   DeviceInspect(DeviceInspect&& other) = default;
   ~DeviceInspect();
 
-  DeviceInspect CreateChild(std::string name, zx::vmo vmo, uint32_t protocol_id);
-
-  // Publish this Device. The device will be automatically unpublished when it is destructed.
-  zx::result<> Publish();
+  DeviceInspect CreateChild(std::string name, uint32_t protocol_id);
 
   // Set the values that should not change during the life of the device.
   // This should only be called once, calling it more than once will create duplicate entries.
@@ -107,8 +85,7 @@ class DeviceInspect {
   friend InspectManager;
 
   // To get a DeviceInspect object you should call InspectManager::CreateDevice.
-  DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, zx::vmo vmo,
-                uint32_t protocol_id);
+  DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, uint32_t protocol_id);
 
   fbl::RefPtr<InspectManager::Info> info_;
 
@@ -122,12 +99,8 @@ class DeviceInspect {
   // Unique id of the device in a driver host
   inspect::UintProperty local_id_;
 
-  // Inspect VMO returned via devfs's inspect nodes.
-  std::optional<zx::vmo> dev_vmo_;
-
   uint32_t protocol_id_;
   std::string name_;
-  std::string link_name_;
 };
 
 }  // namespace driver_manager

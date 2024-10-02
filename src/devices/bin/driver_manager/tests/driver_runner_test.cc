@@ -1637,23 +1637,22 @@ TEST(NodeTest, ToCollection) {
   constexpr char kGrandparentName[] = "grandparent";
   std::shared_ptr<Node> grandparent = std::make_shared<Node>(
       kGrandparentName, std::vector<std::weak_ptr<Node>>{}, nullptr, loop.dispatcher(),
-      inspect.CreateDevice(kGrandparentName, zx::vmo{}, kProtocolId));
+      inspect.CreateDevice(kGrandparentName, kProtocolId));
 
   constexpr char kParentName[] = "parent";
-  std::shared_ptr<Node> parent = std::make_shared<Node>(
-      kParentName, std::vector<std::weak_ptr<Node>>{grandparent}, nullptr, loop.dispatcher(),
-      inspect.CreateDevice(kParentName, zx::vmo{}, kProtocolId));
+  std::shared_ptr<Node> parent =
+      std::make_shared<Node>(kParentName, std::vector<std::weak_ptr<Node>>{grandparent}, nullptr,
+                             loop.dispatcher(), inspect.CreateDevice(kParentName, kProtocolId));
 
   constexpr char kChild1Name[] = "child1";
-  std::shared_ptr<Node> child1 = std::make_shared<Node>(
-      kChild1Name, std::vector<std::weak_ptr<Node>>{parent}, nullptr, loop.dispatcher(),
-      inspect.CreateDevice(kChild1Name, zx::vmo{}, kProtocolId));
+  std::shared_ptr<Node> child1 =
+      std::make_shared<Node>(kChild1Name, std::vector<std::weak_ptr<Node>>{parent}, nullptr,
+                             loop.dispatcher(), inspect.CreateDevice(kChild1Name, kProtocolId));
 
   constexpr char kChild2Name[] = "child2";
   std::shared_ptr<Node> child2 = std::make_shared<Node>(
       kChild2Name, std::vector<std::weak_ptr<Node>>{parent, child1}, nullptr, loop.dispatcher(),
-      inspect.CreateDevice(kChild2Name, zx::vmo{}, kProtocolId), 0,
-      driver_manager::NodeType::kComposite);
+      inspect.CreateDevice(kChild2Name, kProtocolId), 0, driver_manager::NodeType::kComposite);
 
   // Test parentless
   EXPECT_EQ(ToCollection(*grandparent, fdfw::DriverPackageType::kBoot), Collection::kBoot);

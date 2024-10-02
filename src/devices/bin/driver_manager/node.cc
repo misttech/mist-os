@@ -344,8 +344,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     LOGF(ERROR, "Primary node freed before use");
     return zx::error(ZX_ERR_INTERNAL);
   }
-  DeviceInspect inspect =
-      primary_node_ptr->inspect_.CreateChild(std::string(node_name), zx::vmo(), 0);
+  DeviceInspect inspect = primary_node_ptr->inspect_.CreateChild(std::string(node_name), 0);
   std::shared_ptr composite =
       std::make_shared<Node>(node_name, std::move(parents), driver_binder, dispatcher,
                              std::move(inspect), primary_index, NodeType::kComposite);
@@ -771,11 +770,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       return fit::as_error(fdf::wire::NodeError::kNameAlreadyExists);
     }
   };
-  zx::vmo inspect_vmo;
-  if (args.devfs_args().has_value() && args.devfs_args()->inspect().has_value()) {
-    inspect_vmo = std::move(args.devfs_args()->inspect().value());
-  }
-  DeviceInspect inspect = inspect_.CreateChild(std::string(name), std::move(inspect_vmo), 0);
+  DeviceInspect inspect = inspect_.CreateChild(std::string(name), 0);
   std::shared_ptr child =
       std::make_shared<Node>(name, std::vector<std::weak_ptr<Node>>{weak_from_this()},
                              *node_manager_, dispatcher_, std::move(inspect));
@@ -1424,10 +1419,6 @@ void Node::SetAndPublishInspect() {
                            IsComposite() ? kCompositeDeviceTypeString : kDeviceTypeString,
                            property_vector,
                            driver_component_.has_value() ? driver_component_->driver_url : "");
-  if (zx::result result = inspect_.Publish(); result.is_error()) {
-    LOGF(ERROR, "%s: Failed to publish inspect: %s", MakeTopologicalPath().c_str(),
-         result.status_string());
-  }
 }
 
 void Node::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
