@@ -51,9 +51,7 @@ impl GenerateTransferManifest {
         let mut entries = vec![];
         // Add all the blobs to the transfer manifest.
         for repository in &product_bundle.repositories {
-            let canonical_blobs_path = canonical_product_bundle_path
-                .join(&repository.blobs_path)
-                .join(repository.delivery_blob_type.to_string());
+            let canonical_blobs_path = canonical_product_bundle_path.join(&repository.blobs_path);
             let blobs = repository
                 .blobs()
                 .await
@@ -271,7 +269,7 @@ mod tests {
                 entries: vec![
                     TransferEntry {
                         artifact_type: transfer_manifest::ArtifactType::Blobs,
-                        local: "product_bundle/blobs/1".into(),
+                        local: "product_bundle/blobs".into(),
                         remote: "".into(),
                         entries: vec![
                             ArtifactEntry { name: "050907f009ff634f9aa57bff541fb9e9c2c62b587c23578e77637cda3bd69458".into() },
