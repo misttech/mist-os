@@ -48,13 +48,13 @@ constexpr uint64_t kProgramBreakLimit = 64 * 1024 * 1024;
 
 struct ProgramBreak {
   // These base address at which the data segment is mapped.
-  UserAddress base;
+  UserAddress base = mtl::DefaultConstruct<UserAddress>();
 
   // The current program break.
   //
   // The addresses from [base, current.round_up(*PAGE_SIZE)) are mapped into the
   // client address space from the underlying |vmo|.
-  UserAddress current;
+  UserAddress current = mtl::DefaultConstruct<UserAddress>();
 
   // Placeholder memory object mapped to pages reserved for program break growth.
   fbl::RefPtr<MemoryObject> placeholder_memory;
@@ -83,19 +83,22 @@ struct MemoryManagerForkableState {
   /// The namespace node that represents the executable associated with this task.
   // executable_node: Option<NamespaceNode>,
 
-  /// Stack location and size
-  UserAddress stack_base;
-  size_t stack_size;
-  UserAddress stack_start;
-  UserAddress auxv_start;
-  UserAddress auxv_end;
-  UserAddress argv_start;
-  UserAddress argv_end;
-  UserAddress environ_start;
-  UserAddress environ_end;
+  size_t stack_size = 0ul;
+  UserAddress stack_start = mtl::DefaultConstruct<UserAddress>();
+  UserAddress auxv_start = mtl::DefaultConstruct<UserAddress>();
+  UserAddress auxv_end = mtl::DefaultConstruct<UserAddress>();
+  UserAddress argv_start = mtl::DefaultConstruct<UserAddress>();
+  UserAddress argv_end = mtl::DefaultConstruct<UserAddress>();
+  UserAddress environ_start = mtl::DefaultConstruct<UserAddress>();
+  UserAddress environ_end = mtl::DefaultConstruct<UserAddress>();
 
   /// vDSO location
-  UserAddress vdso_base;
+  UserAddress vdso_base = mtl::DefaultConstruct<UserAddress>();
+
+  /// Randomized regions:
+  UserAddress mmap_top = mtl::DefaultConstruct<UserAddress>();
+  UserAddress stack_origin = mtl::DefaultConstruct<UserAddress>();
+  UserAddress brk_origin = mtl::DefaultConstruct<UserAddress>();
 };
 
 // Define DesiredAddress enum
@@ -104,7 +107,7 @@ enum class DesiredAddressType { Any, Hint, Fixed, FixedOverwrite };
 // The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
 struct DesiredAddress {
   DesiredAddressType type;
-  UserAddress address;
+  UserAddress address = mtl::DefaultConstruct<UserAddress>();
 };
 
 // Define MappingName enum

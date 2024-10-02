@@ -42,17 +42,17 @@ fit::result<Errno, size_t> UserBuffer::cap_buffers_to_max_rw_count(UserAddress m
 }
 
 fit::result<Errno> UserBuffer::advance(size_t length) {
-  auto sum_result1 = address_.checked_add(length);
-  if (!sum_result1.has_value()) {
+  auto add = address_.checked_add(length);
+  if (!add.has_value()) {
     return fit::error(errno(EINVAL));
   }
-  address_ = sum_result1.value();
+  address_ = *add;
 
-  auto sum_result2 = mtl::checked_sub(length_, length);
-  if (!sum_result2.has_value()) {
+  auto sub = mtl::checked_sub(length_, length);
+  if (!sub.has_value()) {
     return fit::error(errno(EINVAL));
   }
-  length_ = sum_result2.value();
+  length_ = *sub;
 
   return fit::ok();
 }
