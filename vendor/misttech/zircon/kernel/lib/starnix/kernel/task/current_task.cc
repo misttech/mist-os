@@ -14,7 +14,6 @@
 #include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
@@ -495,7 +494,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     self.notify_robust_list();
   */
 
-  auto exec_result = (*this)->mm()->exec();
+  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name);
   if (exec_result.is_error()) {
     fit::error(errno(from_status_like_fdio(exec_result.error_value())));
   }

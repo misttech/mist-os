@@ -9,6 +9,7 @@
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
@@ -17,10 +18,6 @@
 #include <stdint.h>
 #include <zircon/rights.h>
 #include <zircon/types.h>
-
-#include <functional>
-#include <optional>
-#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_counted.h>
@@ -41,10 +38,25 @@ bool test_unmap_returns_multiple_mappings();
 
 namespace starnix {
 
-using namespace starnix_uapi;
-using namespace starnix_sync;
+constexpr size_t PRIVATE_ASPACE_BASE = USER_ASPACE_BASE;
+constexpr size_t PRIVATE_ASPACE_SIZE = USER_ASPACE_SIZE;
+constexpr size_t ASPACE_HIGHEST_ADDRESS = USER_ASPACE_BASE + USER_ASPACE_SIZE;
 
-constexpr uint64_t kProgramBreakLimit = 64 * 1024 * 1024;
+#ifdef __x86_64__
+constexpr size_t ASLR_RANDOM_BITS = 27;
+
+// #[cfg(target_arch = "aarch64")]
+// const ASLR_RANDOM_BITS: usize = 28;
+
+// #[cfg(target_arch = "riscv64")]
+// const ASLR_RANDOM_BITS: usize = 18;
+#endif
+
+// The biggest we expect stack to be; increase as needed
+// TODO(https://fxbug.dev/322874791): Once setting RLIMIT_STACK is implemented, we should use it.
+constexpr size_t MAX_STACK_SIZE = 512ul * 1024 * 1024;
+
+constexpr uint64_t PROGRAM_BREAK_LIMIT = 64ul * 1024 * 1024;
 
 struct ProgramBreak {
   // These base address at which the data segment is mapped.
@@ -81,7 +93,7 @@ struct MemoryManagerForkableState {
   ktl::optional<ProgramBreak> brk;
 
   /// The namespace node that represents the executable associated with this task.
-  // executable_node: Option<NamespaceNode>,
+  ktl::optional<NamespaceNode> executable_node;
 
   size_t stack_size = 0ul;
   UserAddress stack_start = mtl::DefaultConstruct<UserAddress>();
@@ -102,7 +114,19 @@ struct MemoryManagerForkableState {
 };
 
 // Define DesiredAddress enum
-enum class DesiredAddressType { Any, Hint, Fixed, FixedOverwrite };
+enum class DesiredAddressType : uint8_t {
+  /// Map at any address chosen by the kernel.
+  Any,
+  /// The address is a hint. If the address overlaps an existing mapping a different address may
+  /// be chosen.
+  Hint,
+  /// The address is a requirement. If the address overlaps an existing mapping (and cannot
+  /// overwrite it), mapping fails.
+  Fixed,
+  /// The address is a requirement. If the address overlaps an existing mapping (and cannot
+  /// overwrite it), they should be unmapped.
+  FixedOverwrite
+};
 
 // The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
 struct DesiredAddress {
@@ -111,7 +135,7 @@ struct DesiredAddress {
 };
 
 // Define MappingName enum
-enum class MappingNameType {
+enum class MappingNameType : uint8_t {
   /// No name.
   None,
 
@@ -120,6 +144,9 @@ enum class MappingNameType {
 
   /// This mapping is the heap.
   Heap,
+
+  /// This is an address range we keep reserved to be able to grow the heap.
+  ReservedForHeap,
 
   /// This mapping is the vdso.
   Vdso,
@@ -140,8 +167,13 @@ enum class MappingNameType {
 struct MappingName {
   MappingNameType type;
 
+  /// The file backing this mapping.
   // NamespaceNode fileNode;
 
+  /// The name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
+  /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no
+  /// name and can be reset to the unnamed state by passing NULL to
+  /// prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
   FsString vmaName;
 };
 
@@ -187,7 +219,6 @@ struct MappingBackingMemory {
   // Converts a `UserAddress` to an offset in this mapping's VMO.
   uint64_t address_to_offset(UserAddress addr) const;
 
- public:
   // C++
   MappingBackingMemory(UserAddress base, fbl::RefPtr<MemoryObject> memory, uint64_t memory_offset)
       : base_(base), memory_(ktl::move(memory)), memory_offset_(memory_offset) {}
@@ -212,7 +243,7 @@ struct MappingBacking {
   ktl::variant<MappingBackingMemory, PrivateAnonymous> variant;
 
   // Constructor for MappingBackingVmo
-  MappingBacking(MappingBackingMemory memory) : variant(ktl::move(memory)) {}
+  explicit MappingBacking(MappingBackingMemory memory) : variant(ktl::move(memory)) {}
 
   // Constructor for PrivateAnonymous
   MappingBacking() : variant(PrivateAnonymous{}) {}
@@ -236,18 +267,17 @@ struct Mapping {
   MappingBacking backing_;
 
   // The flags used by the mapping, including protection.
-  // flags: MappingFlags,
   MappingFlags flags_;
 
-  // The name for this mapping.
-  //
-  // This may be a reference to the filesystem node backing this mapping or a userspace-assigned
-  // name. The existence of this field is orthogonal to whether this mapping is anonymous -
-  // mappings of the file '/dev/zero' are treated as anonymous mappings and anonymous mappings may
-  // have a name assigned.
-  //
-  // Because of this exception, avoid using this field to check if a mapping is anonymous.
-  // Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
+  /// The name for this mapping.
+  ///
+  /// This may be a reference to the filesystem node backing this mapping or a userspace-assigned
+  /// name. The existence of this field is orthogonal to whether this mapping is anonymous -
+  /// mappings of the file '/dev/zero' are treated as anonymous mappings and anonymous mappings may
+  /// have a name assigned.
+  ///
+  /// Because of this exception, avoid using this field to check if a mapping is anonymous.
+  /// Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
   MappingName name_;
 
   /// Lock guard held to prevent this file from being written while it's being executed.
@@ -278,7 +308,6 @@ struct Mapping {
 #endif
   }
 
- public:
   // C++
   Mapping() : flags_(MappingFlags::empty()) {}
   Mapping(const Mapping& other) = default;
@@ -308,56 +337,18 @@ struct Mapping {
           MappingFlagsImpl flags, MappingName name);
 };
 
-struct Vmars {
-  /// The VMAR in which userspace mappings occur.
-  ///
-  /// We map userspace memory in this child VMAR so that we can destroy the
-  /// entire VMAR during exec.
-  Vmar vmar;
-
-  /// Cached VmarInfo for vmar.
-  zx_info_vmar_t vmar_info;
-
-  /// TODO(https://fxbug.dev/359302155): Remove this hack. There are parts of Android that want to
-  /// allocate memory in the lower 4 GiB and it does this by probing addresses in that range until
-  /// it finds something free.  To help, we create a sub-vmar so that other allocations don't fill
-  /// up this region.  NOTE: This is different to LOWER_32BIT which, confusingly, only applies to
-  /// the lower *2 GiB*.
-  ktl::optional<Vmar> lower_4gb;
-
- public:
-  // impl Vmars
-  static Vmars New(Vmar vmar, zx_info_vmar_t vmar_info);
-
-  Vmar& vmar_for_addr(UserAddress addr);
-
-  fit::result<Errno, UserAddress> map(DesiredAddress addr, fbl::RefPtr<MemoryObject> memory,
-                                      uint64_t memory_offset, size_t length, MappingFlags flags,
-                                      bool populate) const;
-
-  fit::result<zx_status_t> unmap(UserAddress addr, size_t length);
-
-  fit::result<zx_status_t> protect(UserAddress addr, size_t length, uint32_t flags);
-
-  util::Range<UserAddress> address_range() const;
-
-  fit::result<zx_status_t, size_t> raw_map(fbl::RefPtr<MemoryObject> memory, size_t vmar_offset,
-                                           uint64_t memory_offset, size_t len,
-                                           zx_vm_option_t flags);
-
-  fit::result<zx_status_t> destroy() const;
-
-  UserAddress get_random_base(size_t length) const;
-};
-
-const UserAddress LOWER_4GB_LIMIT = UserAddress::const_from(0x100000000);
-
 class MemoryManager;
 
 struct MemoryManagerState {
  public:
-  /// The vmars for the user.
-  Vmars user_vmars;
+  /// The VMAR in which userspace mappings occur.
+  ///
+  /// We map userspace memory in this child VMAR so that we can destroy the
+  /// entire VMAR during exec.
+  Vmar user_vmar_;
+
+  /// Cached VmarInfo for vmar.
+  zx_info_vmar_t user_vmar_info_;
 
   /// The memory mappings currently used by this address space.
   ///
@@ -374,11 +365,14 @@ struct MemoryManagerState {
  private:
   MemoryManagerForkableState forkable_state_;
 
- private:
   /// impl MemoryManagerState
+ public:
+  ktl::optional<UserAddress> find_next_unused_range(size_t length) const;
 
+ private:
   // Map the memory without updating `self.mappings`.
-  fit::result<Errno, UserAddress> map_internal(DesiredAddress addr, fbl::RefPtr<MemoryObject> vmo,
+  fit::result<Errno, UserAddress> map_internal(DesiredAddress addr,
+                                               fbl::RefPtr<MemoryObject>& memory,
                                                uint64_t memory_offset, size_t length,
                                                MappingFlags flags, bool populate);
 
@@ -399,7 +393,7 @@ struct MemoryManagerState {
                                                 MappingOptionsFlags options, MappingName name,
                                                 fbl::Vector<Mapping>& released_mappings);
 
-  fit::result<Errno, UserAddress> remap(fbl::RefPtr<MemoryManager> mm, UserAddress old_addr,
+  fit::result<Errno, UserAddress> remap(fbl::RefPtr<MemoryManager>& mm, UserAddress old_addr,
                                         size_t old_length,
                                         size_t new_length /*, MremapFlags flags*/,
                                         UserAddress new_addr,
@@ -428,7 +422,7 @@ struct MemoryManagerState {
   fit::result<Errno> unmap(fbl::RefPtr<MemoryManager> mm, UserAddress, size_t length,
                            fbl::Vector<Mapping>& released_mappings);
 
-  fit::result<Errno> update_after_unmap(fbl::RefPtr<MemoryManager> mm, UserAddress addr,
+  fit::result<Errno> update_after_unmap(fbl::RefPtr<MemoryManager>& mm, UserAddress addr,
                                         size_t length, fbl::Vector<Mapping>& released_mappings);
 
   fit::result<Errno> protect(UserAddress addr, size_t length, ProtectionFlags prot_flags);
@@ -510,8 +504,8 @@ struct MemoryManagerState {
 
   fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const;
 
-  fit::result<Errno, size_t> zero_mapping(UserAddress addr, const Mapping& mapping,
-                                          size_t length) const;
+  static fit::result<Errno, size_t> zero_mapping(UserAddress addr, const Mapping& mapping,
+                                                 size_t length);
 };
 
 class CurrentTask;
@@ -531,7 +525,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   // pub futex: FutexTable<PrivateFutexKey>,
 
   // Mutable state for the memory manager.
-  mutable RwLock<MemoryManagerState> state;
+  mutable starnix_sync::RwLock<MemoryManagerState> state;
 
   /// Whether this address space is dumpable.
   // pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,
@@ -539,7 +533,6 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   /// Maximum valid user address for this vmar.
   UserAddress maximum_valid_user_address;
 
- public:
   static fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> New(Vmar root_vmar);
 
   static fbl::RefPtr<MemoryManager> new_empty();
@@ -550,18 +543,30 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
 
  private:
-  bool extend_brk(MemoryManagerState& state, fbl::RefPtr<MemoryManager>& mm, UserAddress old_end,
-                  size_t delta, UserAddress brk_base, fbl::Vector<Mapping>& released_mappings);
+  static bool extend_brk(MemoryManagerState& state, fbl::RefPtr<MemoryManager>& mm,
+                         UserAddress old_end, size_t delta, UserAddress brk_base,
+                         fbl::Vector<Mapping>& released_mappings);
 
  public:
   fit::result<Errno> snapshot_to(fbl::RefPtr<MemoryManager>& target);
 
-  fit::result<zx_status_t> exec(/*NamespaceNode exe_node*/);
+  fit::result<zx_status_t> exec(NamespaceNode exe_node);
 
-  // private:
+  fit::result<Errno> initialize_mmap_layout() const;
+
+  // Test tasks are not initialized by exec; simulate its behavior by initializing memory layout
+  // as if a zero-size executable was loaded.
+  void initialize_mmap_layout_for_test() const;
+
+  fit::result<Errno> initialize_brk_origin(UserAddress executable_end) const;
+
+  // Get a randomised address for loading a position-independent executable.
+  fit::result<Errno, UserAddress> get_random_base_for_executable(size_t length) const;
+
+  ktl::optional<NamespaceNode> executable_node() const;
+
   static Errno get_errno_for_map_err(zx_status_t status);
 
- public:
   fit::result<Errno, UserAddress> map_memory(DesiredAddress addr, fbl::RefPtr<MemoryObject> memory,
                                              uint64_t memory_offset, size_t length,
                                              ProtectionFlags prot_flags,
@@ -570,6 +575,8 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   fit::result<Errno, UserAddress> map_anonymous(DesiredAddress addr, size_t length,
                                                 ProtectionFlags prot_flags,
                                                 MappingOptionsFlags options, MappingName name);
+
+  fit::result<Errno, UserAddress> map_stack(size_t length, ProtectionFlags prot_flags);
 
   // pub fn remap
 
@@ -586,9 +593,6 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   // #[cfg(test)]
   size_t get_mapping_count();
 
-  UserAddress get_random_base(size_t length);
-
- public:
   /// impl MemoryManager
   bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
     return root_vmar.vmar == other->root_vmar.vmar;
