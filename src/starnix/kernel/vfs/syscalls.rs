@@ -3099,7 +3099,7 @@ pub fn sys_io_uring_setup(
 }
 
 pub fn sys_io_uring_enter(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     to_submit: u32,
@@ -3113,7 +3113,7 @@ pub fn sys_io_uring_enter(
     let file = current_task.files.get(fd)?;
     let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EOPNOTSUPP))?;
     // TODO(https://fxbug.dev/297431387): Use `_sig` to change the signal mask for `current_task`.
-    io_uring.enter(to_submit, min_complete, flags)
+    io_uring.enter(locked, current_task, to_submit, min_complete, flags)
 }
 
 pub fn sys_io_uring_register(

@@ -2,25 +2,43 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(non_upper_case_globals)]
+
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
     read_to_object_as_bytes, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
 };
 use crate::task::CurrentTask;
+use crate::vfs::syscalls::{
+    sys_pread64, sys_preadv2, sys_pwrite64, sys_pwritev2, sys_read, sys_write,
+};
 use crate::vfs::{
-    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
-    FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
+    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdNumber,
+    FileHandle, FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
 use fuchsia_zircon as zx;
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::user_buffer::UserBuffers;
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
-    errno, error, io_cqring_offsets, io_sqring_offsets, io_uring_cqe, io_uring_params,
-    io_uring_sqe, IORING_FEAT_SINGLE_MMAP, IORING_OFF_CQ_RING, IORING_OFF_SQES, IORING_OFF_SQ_RING,
-    IORING_SETUP_CQSIZE,
+    errno, error, io_cqring_offsets, io_sqring_offsets, io_uring_cqe, io_uring_op,
+    io_uring_op_IORING_OP_ACCEPT, io_uring_op_IORING_OP_ASYNC_CANCEL, io_uring_op_IORING_OP_CLOSE,
+    io_uring_op_IORING_OP_CONNECT, io_uring_op_IORING_OP_EPOLL_CTL, io_uring_op_IORING_OP_FADVISE,
+    io_uring_op_IORING_OP_FALLOCATE, io_uring_op_IORING_OP_FILES_UPDATE,
+    io_uring_op_IORING_OP_FSYNC, io_uring_op_IORING_OP_LINK_TIMEOUT, io_uring_op_IORING_OP_MADVISE,
+    io_uring_op_IORING_OP_NOP, io_uring_op_IORING_OP_OPENAT, io_uring_op_IORING_OP_OPENAT2,
+    io_uring_op_IORING_OP_POLL_ADD, io_uring_op_IORING_OP_POLL_REMOVE, io_uring_op_IORING_OP_READ,
+    io_uring_op_IORING_OP_READV, io_uring_op_IORING_OP_READ_FIXED, io_uring_op_IORING_OP_RECV,
+    io_uring_op_IORING_OP_RECVMSG, io_uring_op_IORING_OP_SEND, io_uring_op_IORING_OP_SENDMSG,
+    io_uring_op_IORING_OP_STATX, io_uring_op_IORING_OP_SYNC_FILE_RANGE,
+    io_uring_op_IORING_OP_TIMEOUT, io_uring_op_IORING_OP_TIMEOUT_REMOVE,
+    io_uring_op_IORING_OP_WRITE, io_uring_op_IORING_OP_WRITEV, io_uring_op_IORING_OP_WRITE_FIXED,
+    io_uring_params, io_uring_sqe, off_t, IORING_FEAT_SINGLE_MMAP, IORING_OFF_CQ_RING,
+    IORING_OFF_SQES, IORING_OFF_SQ_RING, IORING_SETUP_CQSIZE,
 };
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -108,7 +126,7 @@ struct SqEntry {
     opcode: u8,
     flags: u8,
     ioprio: u16,
-    fd: i32,
+    raw_fd: i32,
     field0: u64,
     field1: u64,
     len: u32,
@@ -134,7 +152,7 @@ static_assertions::const_assert_eq!(
     std::mem::offset_of!(io_uring_sqe, ioprio)
 );
 static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, fd),
+    std::mem::offset_of!(SqEntry, raw_fd),
     std::mem::offset_of!(io_uring_sqe, fd)
 );
 static_assertions::const_assert_eq!(
@@ -174,6 +192,44 @@ static_assertions::const_assert_eq!(
     std::mem::offset_of!(io_uring_sqe, __bindgen_anon_6)
 );
 
+impl SqEntry {
+    fn complete(&self, result: Result<SyscallResult, Errno>) -> CqEntry {
+        let res = match result {
+            Ok(return_value) => return_value.value() as i32,
+            Err(errno) => errno.return_value() as i32,
+        };
+        CqEntry { user_data: self.user_data, res, flags: 0 }
+    }
+
+    fn fd(&self) -> FdNumber {
+        FdNumber::from_raw(self.raw_fd)
+    }
+
+    fn iovec_addr(&self) -> UserAddress {
+        self.field1.into()
+    }
+
+    fn iovec_count(&self) -> UserValue<i32> {
+        (self.len as i32).into()
+    }
+
+    fn address(&self) -> UserAddress {
+        self.field1.into()
+    }
+
+    fn length(&self) -> usize {
+        self.len as usize
+    }
+
+    fn offset(&self) -> off_t {
+        self.field0 as off_t
+    }
+
+    fn buf_index(&self) -> usize {
+        self.buf_index_or_group as usize
+    }
+}
+
 /// An entry in the completion queue.
 ///
 /// We cannot use the bindgen type generated for `io_uring_cqe` directly because that type contains
@@ -197,8 +253,8 @@ static_assertions::const_assert_eq!(
     std::mem::offset_of!(io_uring_cqe, res)
 );
 static_assertions::const_assert_eq!(
-    std::mem::offset_of!(CqEntry, res),
-    std::mem::offset_of!(io_uring_cqe, res)
+    std::mem::offset_of!(CqEntry, flags),
+    std::mem::offset_of!(io_uring_cqe, flags)
 );
 
 const CQES_OFFSET: usize = std::mem::size_of::<ControlHeader>();
@@ -406,14 +462,15 @@ impl IoUringQueue {
     fn push_cq_entry(&self, entry: &CqEntry) -> Result<(), Errno> {
         let head = self.read_cq_head()?;
         let tail = self.read_cq_tail()?;
-        let next_tail = tail.wrapping_add(1);
-        // Check that the offset for the next tail location doesn't collide with the head of the
-        // queue. This can happen because the entries are stored in a ring buffer.
-        if self.metadata.cq_entry_offset(next_tail) != self.metadata.cq_entry_offset(head) {
-            self.write_cq_entry(next_tail, entry)?;
-            self.write_cq_tail(next_tail)?;
-        } else {
+        // Check that the offset for the tail location doesn't collide with the head of the queue.
+        // This can happen because the entries are stored in a ring buffer.
+        if head != tail
+            && self.metadata.cq_entry_offset(tail) == self.metadata.cq_entry_offset(head)
+        {
             self.increment_overflow()?;
+        } else {
+            self.write_cq_entry(tail, entry)?;
+            self.write_cq_tail(tail.wrapping_add(1))?;
         }
         Ok(())
     }
@@ -498,18 +555,144 @@ impl IoUringFileObject {
         self.registered_buffers.lock().clear();
     }
 
-    pub fn enter(&self, to_submit: u32, _min_complete: u32, _flags: u32) -> Result<u32, Errno> {
+    pub fn enter(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        to_submit: u32,
+        _min_complete: u32,
+        _flags: u32,
+    ) -> Result<u32, Errno> {
         let mut submitted = 0;
         while let Some(sq_entry) = self.queue.pop_sq_entry()? {
             submitted += 1;
-            // TODO(https://fxbug.dev/297431387): Actually perform the requested operation.
-            let cq_entry = CqEntry { user_data: sq_entry.user_data, res: 0, flags: 0 };
+            let result = self.execute(locked, current_task, &sq_entry);
+            let cq_entry = sq_entry.complete(result);
             self.queue.push_cq_entry(&cq_entry)?;
             if submitted >= to_submit {
                 break;
             }
         }
         Ok(submitted)
+    }
+
+    fn check_buffer(&self, entry: &SqEntry) -> Result<(), Errno> {
+        let index = entry.buf_index();
+        let buffers = self.registered_buffers.lock();
+        let buffer = buffers.get(index).ok_or_else(|| errno!(EFAULT))?;
+        if !buffer.contains(entry.address(), entry.length()) {
+            error!(EFAULT)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn execute(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        entry: &SqEntry,
+    ) -> Result<SyscallResult, Errno> {
+        match entry.opcode as io_uring_op {
+            io_uring_op_IORING_OP_NOP => Ok(SUCCESS),
+            io_uring_op_IORING_OP_READV => sys_preadv2(
+                locked,
+                current_task,
+                entry.fd(),
+                entry.iovec_addr(),
+                entry.iovec_count(),
+                entry.offset(),
+                SyscallArg::default(),
+                entry.op_flags,
+            )
+            .map(Into::into),
+            io_uring_op_IORING_OP_WRITEV => sys_pwritev2(
+                locked,
+                current_task,
+                entry.fd(),
+                entry.iovec_addr(),
+                entry.iovec_count(),
+                entry.offset(),
+                SyscallArg::default(),
+                entry.op_flags,
+            )
+            .map(Into::into),
+            io_uring_op_IORING_OP_READ_FIXED => {
+                // TODO(https://fxbug.dev/297431387): We're supposed to make a kernel mapping
+                // when the buffers are registered and we should be performing this operation using
+                // those kernel mappings rather than using the userspace mappings.
+                self.check_buffer(entry)?;
+                do_read(locked, current_task, entry)
+            }
+            io_uring_op_IORING_OP_WRITE_FIXED => {
+                // TODO(https://fxbug.dev/297431387): We're supposed to make a kernel mapping
+                // when the buffers are registered and we should be performing this operation using
+                // those kernel mappings rather than using the userspace mappings.
+                self.check_buffer(entry)?;
+                do_write(locked, current_task, entry)
+            }
+            io_uring_op_IORING_OP_READ => do_read(locked, current_task, entry),
+            io_uring_op_IORING_OP_WRITE => do_write(locked, current_task, entry),
+            io_uring_op_IORING_OP_FSYNC
+            | io_uring_op_IORING_OP_POLL_ADD
+            | io_uring_op_IORING_OP_POLL_REMOVE
+            | io_uring_op_IORING_OP_SYNC_FILE_RANGE
+            | io_uring_op_IORING_OP_SENDMSG
+            | io_uring_op_IORING_OP_RECVMSG
+            | io_uring_op_IORING_OP_TIMEOUT
+            | io_uring_op_IORING_OP_TIMEOUT_REMOVE
+            | io_uring_op_IORING_OP_ACCEPT
+            | io_uring_op_IORING_OP_ASYNC_CANCEL
+            | io_uring_op_IORING_OP_LINK_TIMEOUT
+            | io_uring_op_IORING_OP_CONNECT
+            | io_uring_op_IORING_OP_FALLOCATE
+            | io_uring_op_IORING_OP_OPENAT
+            | io_uring_op_IORING_OP_CLOSE
+            | io_uring_op_IORING_OP_FILES_UPDATE
+            | io_uring_op_IORING_OP_STATX
+            | io_uring_op_IORING_OP_FADVISE
+            | io_uring_op_IORING_OP_MADVISE
+            | io_uring_op_IORING_OP_SEND
+            | io_uring_op_IORING_OP_RECV
+            | io_uring_op_IORING_OP_OPENAT2
+            | io_uring_op_IORING_OP_EPOLL_CTL => error!(EOPNOTSUPP),
+            _ => error!(EINVAL),
+        }
+    }
+}
+
+fn do_read(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    entry: &SqEntry,
+) -> Result<SyscallResult, Errno> {
+    let offset = entry.offset();
+    if offset == -1 {
+        sys_read(locked, current_task, entry.fd(), entry.address(), entry.length()).map(Into::into)
+    } else {
+        sys_pread64(locked, current_task, entry.fd(), entry.address(), entry.length(), offset)
+            .map(Into::into)
+    }
+}
+
+fn do_write(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    entry: &SqEntry,
+) -> Result<SyscallResult, Errno> {
+    let offset = entry.offset();
+    if offset == -1 {
+        sys_write(locked, current_task, entry.fd(), entry.address(), entry.length()).map(Into::into)
+    } else {
+        sys_pwrite64(
+            locked,
+            current_task,
+            entry.fd(),
+            entry.address(),
+            entry.length(),
+            entry.offset(),
+        )
+        .map(Into::into)
     }
 }
 
