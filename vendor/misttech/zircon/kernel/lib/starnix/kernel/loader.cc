@@ -26,6 +26,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/math.h>
 #include <lib/mistos/starnix_uapi/time.h>
+#include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/cprng.h>
 #include <lib/mistos/util/default_construct.h>
@@ -36,7 +37,6 @@
 #include <zircon/rights.h>
 #include <zircon/types.h>
 
-#include <numeric>
 #include <optional>
 
 #include <fbl/alloc_checker.h>
@@ -59,7 +59,14 @@
 
 namespace {
 
-using namespace starnix;
+using starnix::CurrentTask;
+using starnix::FileHandle;
+using starnix::MemoryAccessor;
+using starnix::MemoryObject;
+using starnix::ProtectionFlags;
+using starnix::ProtectionFlagsEnum;
+using starnix::StackResult;
+using starnix::StarnixLoader;
 
 constexpr size_t kMaxSegments = 4;
 constexpr size_t kMaxPhdrs = 16;
@@ -112,29 +119,21 @@ fit::result<Errno, StackResult> populate_initial_stack(
     ktl::span<const uint8_t> env{reinterpret_cast<const uint8_t*>(iter->data()),
                                  iter->length() + 1};
     stack_pointer -= env.size();
-    auto result = write_stack(env, stack_pointer);
-    if (result.is_error())
-      return result.take_error();
+    auto result = write_stack(env, stack_pointer) _EP(result);
   }
   auto environ_start = stack_pointer;
 
   // Write the path used with execve.
   stack_pointer -= path.length() + 1;
   auto execfn_addr = stack_pointer;
-  auto result =
-      write_stack({reinterpret_cast<const uint8_t*>(path.data()), path.length() + 1}, execfn_addr);
-  if (result.is_error()) {
-    return result.take_error();
-  }
+  auto result = write_stack({reinterpret_cast<const uint8_t*>(path.data()), path.length() + 1},
+                            execfn_addr) _EP(result);
 
   ktl::array<uint8_t, kRandomSeedBytes> random_seed{};
   cprng_draw(random_seed.data(), random_seed.size());
   stack_pointer -= random_seed.size();
   auto random_seed_addr = stack_pointer;
-  result = write_stack({random_seed.data(), random_seed.size()}, random_seed_addr);
-  if (result.is_error()) {
-    return result.take_error();
-  }
+  result = write_stack({random_seed.data(), random_seed.size()}, random_seed_addr) _EP(result);
   stack_pointer = random_seed_addr;
 
   fbl::AllocChecker ac;
@@ -223,11 +222,18 @@ struct LoadedElf {
   elfldltl::Elf<>::Ehdr file_header;
   size_t file_base;
   size_t vaddr_bias;
+  size_t length;
+};
+
+enum LoadElfUsage : uint8_t {
+  MainElf,
+  Interpreter,
 };
 
 fit::result<Errno, LoadedElf> load_elf(
-    const FileHandle& file, fbl::RefPtr<MemoryObject> elf_memory,
-    const fbl::RefPtr<starnix::MemoryManager>& mm /*file_write_guard: FileWriteGuardRef,*/) {
+    const FileHandle& file, const fbl::RefPtr<MemoryObject>& elf_memory,
+    const fbl::RefPtr<starnix::MemoryManager>& mm,
+    LoadElfUsage usage /*file_write_guard: FileWriteGuardRef,*/) {
   auto vmo = elf_memory->as_vmo();
   if (!vmo) {
     return fit::error(errno(EINVAL));
@@ -244,9 +250,24 @@ fit::result<Errno, LoadedElf> load_elf(
   elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container> load_info;
   ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(PAGE_SIZE)));
 
+  size_t length = load_info.vaddr_size();
   size_t file_base = 0;
   if (ehdr.type == elfldltl::ElfType::kDyn) {
-    file_base = mm->get_random_base(load_info.vaddr_size()).ptr();
+    switch (usage) {
+      case MainElf: {
+        // Location of main position-independent executable is subject to ASLR
+        auto rand_base = mm->get_random_base_for_executable(length) _EP(rand_base);
+        file_base = rand_base->ptr();
+        break;
+      }
+      case Interpreter: {
+        auto next_unused = mm->state.Read()->find_next_unused_range(length);
+        if (!next_unused.has_value()) {
+          return fit::error(errno(EINVAL));
+        }
+        file_base = next_unused->ptr();
+      } break;
+    }
   } else if (ehdr.type == elfldltl::ElfType::kExec) {
     file_base = load_info.vaddr_start();
   } else {
@@ -254,12 +275,13 @@ fit::result<Errno, LoadedElf> load_elf(
   }
   size_t vaddr_bias = file_base - load_info.vaddr_start();
 
-  StarnixLoader loader(mm);
-  ZX_ASSERT(loader.map_elf_segments(diag, load_info, elf_memory, mm->base_addr.ptr(), vaddr_bias));
+  StarnixLoader mapper(mm);
+  ZX_ASSERT(mapper.map_elf_segments(diag, load_info, elf_memory, mm->base_addr.ptr(), vaddr_bias));
 
   LTRACEF("loaded at %lx, entry point %lx\n", file_base, ehdr.entry + vaddr_bias);
 
-  return fit::ok(LoadedElf{.file_header = ehdr, .file_base = file_base, .vaddr_bias = vaddr_bias});
+  return fit::ok(LoadedElf{
+      .file_header = ehdr, .file_base = file_base, .vaddr_bias = vaddr_bias, .length = length});
 }
 
 ktl::optional<ktl::string_view> from_bytes_until_nul(const char* bytes, size_t len) {
@@ -273,7 +295,7 @@ ktl::optional<ktl::string_view> from_bytes_until_nul(const char* bytes, size_t l
 // Resolves a file handle into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     const CurrentTask& current_task, const starnix::FileHandle& file,
-    fbl::RefPtr<MemoryObject> memory, const fbl::Vector<ktl::string_view>& argv,
+    const fbl::RefPtr<MemoryObject>& memory, const fbl::Vector<ktl::string_view>& argv,
     const fbl::Vector<ktl::string_view>& environ
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   auto vmo = memory->as_vmo();
@@ -352,7 +374,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
 
 // Resolves a #! script file into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_script(
-    const starnix::CurrentTask& current_task, fbl::RefPtr<MemoryObject> memory,
+    const starnix::CurrentTask& current_task, const fbl::RefPtr<MemoryObject>& memory,
     const ktl::string_view& path, const fbl::Vector<ktl::string_view>& argv,
     const fbl::Vector<ktl::string_view>& environ, size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
@@ -387,14 +409,11 @@ fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
     }
   }
 
-  if (header.value() == HASH_BANG) {
-    return resolve_script(
-        current_task, ktl::move(memory.value()), path, argv, environ, recursion_depth
-        /*, selinux_state*/);
-  } else {
-    return resolve_elf(current_task, file, ktl::move(memory.value()), argv,
-                       environ /*, selinux_state*/);
+  if (*header == HASH_BANG) {
+    return resolve_script(current_task, *memory, path, argv, environ, recursion_depth
+                          /*, selinux_state*/);
   }
+  return resolve_elf(current_task, file, *memory, argv, environ /*, selinux_state*/);
 }
 
 }  // namespace
@@ -412,20 +431,21 @@ fit::result<Errno, ResolvedElf> resolve_executable(
 fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_task,
                                                     const ResolvedElf& resolved_elf,
                                                     const ktl::string_view& original_path) {
-  auto main_elf = load_elf(resolved_elf.file, resolved_elf.memory, current_task->mm()/*,
-                           resolved_elf.file_write_guard*/);
-  if (main_elf.is_error()) {
-    return main_elf.take_error();
+  auto main_elf = load_elf(resolved_elf.file, resolved_elf.memory, current_task->mm(), LoadElfUsage::MainElf/*,
+                           resolved_elf.file_write_guard*/) _EP(main_elf);
+
+  auto init_brk = UserAddress::from_ptr(main_elf->file_base).checked_add(main_elf->length);
+  if (!init_brk.has_value()) {
+    return fit::error(errno(EINVAL));
   }
+  auto result = current_task->mm()->initialize_brk_origin(*init_brk) _EP(result);
 
   ktl::optional<LoadedElf> interp_elf;
   if (resolved_elf.interp.has_value()) {
     auto& interp = resolved_elf.interp.value();
-    auto load_interp_result = load_elf(interp.file, interp.memory, current_task->mm()/*,
-                           resolved_elf.file_write_guard*/);
-    if (load_interp_result.is_error()) {
-      return load_interp_result.take_error();
-    }
+    auto load_interp_result = load_elf(interp.file, interp.memory,
+                                       current_task->mm() /*,
+resolved_elf.file_write_guard*/, LoadElfUsage::Interpreter) _EP(load_interp_result);
     interp_elf = load_interp_result.value();
   }
 
@@ -483,9 +503,8 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   auto secure = [&creds]() {
     if (creds.uid != creds.euid || creds.gid != creds.egid) {
       return 1;
-    } else {
-      return 0;
     }
+    return 0;
   }();
 
   fbl::AllocChecker ac;
@@ -519,30 +538,19 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
 
   // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
   // this is based on adding 0x1000 each time a segfault appears.
-  auto stack_size_result = round_up_to_system_page_size(
+  auto stack_size = round_up_to_system_page_size(
       get_initial_stack_size(original_path, resolved_elf.argv, resolved_elf.environ, auxv) +
-      0xf0000);
-  if (stack_size_result.is_error()) {
-    LTRACEF("Stack is too big\n");
-    return stack_size_result.take_error();
-  }
+      0xf0000) _EP_MSG(stack_size, "stack is too big");
 
   auto prot_flags =
       ProtectionFlags(ProtectionFlagsEnum::READ) | ProtectionFlags(ProtectionFlagsEnum::WRITE);
 
-  auto stack_base = current_task->mm()->map_anonymous(
-      {.type = DesiredAddressType::Any, .address = mtl::DefaultConstruct<UserAddress>()},
-      stack_size_result.value(), prot_flags, MappingOptionsFlags(MappingOptions::ANONYMOUS),
-      {.type = MappingNameType::Stack});
-  if (stack_base.is_error()) {
-    TRACEF("Failed map stack\n");
-    return stack_base.take_error();
-  }
+  auto stack_base = current_task->mm()->map_stack(*stack_size, prot_flags) _EP(stack_base);
 
-  auto stack = stack_base.value() + (stack_size_result.value() - 8);
+  auto stack = *stack_base + (*stack_size - 8);
 
   LTRACEF("stack [%lx, %lx) sp=%lx\n", stack_base.value().ptr(),
-          stack_base.value().ptr() + stack_size_result.value(), stack.ptr());
+          stack_base.value().ptr() + *stack_size, stack.ptr());
 
   auto stack_result = populate_initial_stack(current_task, original_path, resolved_elf.argv,
                                              resolved_elf.environ, auxv, stack);
@@ -552,7 +560,7 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   }
 
   auto mm_state = current_task->mm()->state.Write();
-  (*mm_state)->stack_size = stack_size_result.value();
+  (*mm_state)->stack_size = *stack_size;
   (*mm_state)->stack_start = stack_result->stack_pointer;
   (*mm_state)->auxv_start = stack_result->auxv_start;
   (*mm_state)->auxv_end = stack_result->auxv_end;
