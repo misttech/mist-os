@@ -45,6 +45,7 @@ group("tests") {
     "fuchsia-async:tests",
     "fuchsia-component:tests",
     "fuchsia-component-test:tests",
+    "fuchsia-cprng:tests",
     "fuchsia-fs:tests",
     "fuchsia-hyper:tests",
     "fuchsia-image-format:tests",
@@ -111,7 +112,6 @@ group("tests") {
     "webpki-roots-fuchsia:webpki-roots-fuchsia_tests",
     "windowed-stats:tests",
     "zbitl:tests",
-    "zircon:tests",
     "zxc:tests",
     "zxdump:tests",
   ]
