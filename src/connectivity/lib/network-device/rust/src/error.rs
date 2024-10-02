@@ -48,6 +48,8 @@ pub enum Error {
     InvalidPortId(u8),
     #[error("buffer is too small: {size} < {offset} + {length}")]
     TooSmall { size: usize, offset: usize, length: usize },
+    #[error("received an invalid lease")]
+    InvalidLease,
 }
 
 /// Common result type for methods in this crate.

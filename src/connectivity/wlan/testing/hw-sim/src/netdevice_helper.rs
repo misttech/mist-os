@@ -80,10 +80,16 @@ pub async fn start_session(
 ) -> (netdevice_client::Session, fuchsia_async::Task<()>) {
     let info = client.device_info().await.expect("get device info");
     let (session, task) = client
-        .primary_session(
+        .new_session_with_derivable_config(
             "wlan-test",
-            info.base_info.max_buffer_length.expect("buffer length not set in DeviceInfo").get()
-                as usize,
+            netdevice_client::DerivableConfig {
+                default_buffer_length: info
+                    .base_info
+                    .max_buffer_length
+                    .expect("buffer length not set in DeviceInfo")
+                    .get() as usize,
+                ..Default::default()
+            },
         )
         .await
         .expect("open primary session");

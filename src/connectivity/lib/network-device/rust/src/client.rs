@@ -13,7 +13,7 @@ use futures::{Stream, StreamExt as _, TryStreamExt as _};
 use std::pin::pin;
 
 use crate::error::{Error, Result};
-use crate::session::{Config, DeviceInfo, Port, Session, Task};
+use crate::session::{Config, DerivableConfig, DeviceInfo, Port, Session, Task};
 
 #[derive(Clone)]
 /// A client that communicates with a network device to send and receive packets.
@@ -114,15 +114,16 @@ impl Client {
         Session::new(&self.device, name, config).await
     }
 
-    /// Creates a primary session.
-    pub async fn primary_session(
+    /// Creates a session using the higher level [`DerivableConfig`] instead of
+    /// a raw [`Config`].
+    pub async fn new_session_with_derivable_config(
         &self,
         name: &str,
-        default_buffer_length: usize,
+        config: DerivableConfig,
     ) -> Result<(Session, Task)> {
         let device_info = self.device_info().await?;
-        let primary_config = device_info.primary_config(default_buffer_length)?;
-        Session::new(&self.device, name, primary_config).await
+        let config = device_info.make_config(config)?;
+        Session::new(&self.device, name, config).await
     }
 }
 

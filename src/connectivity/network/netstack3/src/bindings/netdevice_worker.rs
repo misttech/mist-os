@@ -110,7 +110,16 @@ impl NetdeviceWorker {
         let device =
             netdevice_client::Client::new(device.into_proxy().expect("must be in executor"));
         let (session, task) = device
-            .primary_session("netstack3", DEFAULT_BUFFER_LENGTH)
+            .new_session_with_derivable_config(
+                "netstack3",
+                netdevice_client::DerivableConfig {
+                    default_buffer_length: DEFAULT_BUFFER_LENGTH,
+                    primary: true,
+                    // TODO(https://fxbug.dev/367332654): Watch leases when
+                    // suspension is enabled.
+                    watch_rx_leases: false,
+                },
+            )
             .await
             .map_err(Error::Client)?;
         Ok(Self { ctx, inner: Inner { device, session, state: Default::default() }, task })
