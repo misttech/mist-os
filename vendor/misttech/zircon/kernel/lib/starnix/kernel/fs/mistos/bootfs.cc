@@ -31,8 +31,6 @@
 
 namespace starnix {
 
-using namespace starnix_uapi;
-
 namespace {
 
 using ZbiView = zbitl::View<fbl::RefPtr<VmObject>>;
@@ -62,7 +60,7 @@ class ScratchAllocator {
       return *this;
     }
 
-    Holder(size_t size) {
+    explicit Holder(size_t size) {
       fbl::RefPtr<VmObjectPaged> vmo;
       uint64_t aligned_size;
       zx_status_t status = VmObject::RoundSize(size, &aligned_size);
@@ -198,7 +196,7 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, ktl::move(bootfs), options);
+  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, bootfs, ktl::move(options));
   TreeBuilder tree = TreeBuilder::empty_dir();
   auto mode = FILE_MODE(IFDIR, 0755);
 
@@ -232,10 +230,14 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
   return fit::ok(ktl::move(fs));
 }
 
+namespace {
+
 uint32_t from_be_bytes(const std::array<uint8_t, 4>& bytes) {
   return (static_cast<uint32_t>(bytes[0]) << 24) | (static_cast<uint32_t>(bytes[1]) << 16) |
          (static_cast<uint32_t>(bytes[2]) << 8) | static_cast<uint32_t>(bytes[3]);
 }
+
+}  // namespace
 
 fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
                                                  const CurrentTask& current_task) {

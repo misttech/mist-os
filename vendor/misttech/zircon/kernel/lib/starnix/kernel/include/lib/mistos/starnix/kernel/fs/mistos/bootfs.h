@@ -28,12 +28,10 @@
 
 namespace starnix {
 
-using namespace starnix_sync;
-
 using BootfsReader = zbitl::Bootfs<fbl::RefPtr<VmObject>>;
 using BootfsView = zbitl::BootfsView<fbl::RefPtr<VmObject>>;
 
-class BootFs : public FileSystemOps {
+class BootFs final : public FileSystemOps {
  public:
   static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel, HandleOwner zbi_vmo);
 
@@ -54,66 +52,15 @@ class BootFs : public FileSystemOps {
 
  public:
   // C++
-  BootFs(HandleOwner zbi_vmo);
+  explicit BootFs(HandleOwner zbi_vmo);
 
-  ~BootFs();
+  ~BootFs() final;
 
  private:
   const FsStr name_ = "bootfs";
 
   BootfsReader bootfs_reader_;
 };
-
-#if 0
-class BootfsDirectory : public FsNodeOps {
- private:
-  MemoryXattrStorage xattrs_;
-
-  mutable StarnixMutex<uint32_t> child_count_;
-
- public:
-  static BootfsDirectory* New(BootfsView view);
-
-  /// impl FsNodeOps
-  fs_node_impl_xattr_delegate(xattrs_);
-
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final;
-
-  fit::result<Errno, FsNodeHandle> lookup(const FsNode& node, const CurrentTask& current_task,
-                                          const FsStr& name) final;
-
-  fit::result<Errno, FsNodeHandle> mkdir(const FsNode& node, const CurrentTask& current_task,
-                                         const FsStr& name, FileMode mode, FsCred owner) final;
-
-  fit::result<Errno, FsNodeHandle> mknod(const FsNode& node, const CurrentTask& current_task,
-                                         const FsStr& name, FileMode mode, DeviceType dev,
-                                         FsCred owner) final;
-
-  fit::result<Errno, FsNodeHandle> create_symlink(const FsNode& node,
-                                                  const CurrentTask& current_task,
-                                                  const FsStr& name, const FsStr& target,
-                                                  FsCred owner) final;
-
-  fit::result<Errno, FsNodeHandle> create_tmpfile(const FsNode& node,
-                                                  const CurrentTask& current_task, FileMode mode,
-                                                  FsCred owner) final;
-
-  fit::result<Errno> link(const FsNode& node, const CurrentTask& current_task, const FsStr& name,
-                          const FsNodeHandle& child) final;
-
-  fit::result<Errno> unlink(const FsNode& node, const CurrentTask& current_task, const FsStr& name,
-                            const FsNodeHandle& child) final;
-
- public:
-  BootfsDirectory(BootfsView view) : view_(ktl::move(view)) {}
-
- private:
-  BootfsView view_;
-};
-
-#endif
 
 }  // namespace starnix
 

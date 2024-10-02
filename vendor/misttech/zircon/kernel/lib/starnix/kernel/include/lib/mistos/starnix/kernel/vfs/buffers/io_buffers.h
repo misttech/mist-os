@@ -100,7 +100,7 @@ class OutputBuffer : public Buffer {
   /// be partial.
   ///
   /// Returns the number of bytes written in this buffer.
-  virtual fit::result<Errno, size_t> write(const ktl::span<uint8_t>& _buffer);
+  virtual fit::result<Errno, size_t> write(ktl::span<uint8_t>& buffer);
 
   /// Write the content of `buffer` into this buffer. It is an error to pass a buffer larger than
   /// the number of bytes available in this buffer. In that case, the content of the buffer after
