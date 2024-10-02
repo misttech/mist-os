@@ -1441,14 +1441,14 @@ pub(crate) mod testutil {
 
     use std::sync::{Arc, Mutex};
 
+    use fuchsia_zircon as zx;
     use futures::channel::mpsc;
     use futures::future::Future;
     use futures::stream::Stream;
-    use futures::{FutureExt as _, TryStreamExt as _};
+    use futures::TryStreamExt as _;
     use net_declare::{fidl_subnet, net_addr_subnet};
-    use net_types::ip::{Ipv4, Ipv6};
-    use {fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx};
 
+    use crate::eventloop::{EventLoopComponent, IncludedWorkers, Optional, Required};
     use crate::messaging::testutil::FakeSender;
 
     pub(crate) const LO_INTERFACE_ID: u64 = 1;
@@ -1540,6 +1540,23 @@ pub(crate) mod testutil {
         }
     }
 
+    enum OnlyInterfaces {}
+    impl crate::eventloop::EventLoopSpec for OnlyInterfaces {
+        type InterfacesProxy = Required;
+        type InterfacesStateProxy = Required;
+        type InterfacesHandler = Required;
+        type RouteClients = Required;
+
+        type V4RoutesState = Optional;
+        type V6RoutesState = Optional;
+        type V4RoutesSetProvider = Optional;
+        type V6RoutesSetProvider = Optional;
+
+        type InterfacesWorker = Required;
+        type RoutesV4Worker = Optional;
+        type RoutesV6Worker = Optional;
+    }
+
     pub(crate) struct Setup<E, W> {
         pub event_loop_fut: E,
         pub watcher_stream: W,
@@ -1557,20 +1574,25 @@ pub(crate) mod testutil {
     > {
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_handler, interfaces_handler_sink) = FakeInterfacesHandler::new();
-        let (
-            event_loop,
-            crate::eventloop::testutil::EventLoopServerEnd {
-                interfaces,
-                interfaces_state,
-                v4_routes_state,
-                v6_routes_state,
-                v4_routes_set_provider,
-                v6_routes_set_provider,
-            },
-        ) = crate::eventloop::testutil::event_loop_fixture::<
-            FakeInterfacesHandler,
-            FakeSender<RouteNetlinkMessage>,
-        >(interfaces_handler, route_clients, request_stream);
+        let (interfaces_proxy, interfaces) =
+            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>()
+                .expect("create proxy should succeed");
+        let (interfaces_state_proxy, interfaces_state) =
+            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>()
+                .expect("create proxy should succeed");
+        let event_loop_inputs = crate::eventloop::EventLoopInputs::<_, _, OnlyInterfaces> {
+            route_clients: EventLoopComponent::Present(route_clients),
+            interfaces_handler: EventLoopComponent::Present(interfaces_handler),
+            interfaces_proxy: EventLoopComponent::Present(interfaces_proxy),
+            interfaces_state_proxy: EventLoopComponent::Present(interfaces_state_proxy),
+
+            v4_routes_state: EventLoopComponent::Absent(Optional),
+            v6_routes_state: EventLoopComponent::Absent(Optional),
+            v4_routes_set_provider: EventLoopComponent::Absent(Optional),
+            v6_routes_set_provider: EventLoopComponent::Absent(Optional),
+
+            unified_request_stream: request_stream,
+        };
 
         let interfaces_request_stream = interfaces.into_stream().unwrap();
         let if_stream = interfaces_state.into_stream().unwrap();
@@ -1587,37 +1609,14 @@ pub(crate) mod testutil {
 
         Setup {
             event_loop_fut: async move {
-                let event_loop_result = futures::select! {
-                    result = event_loop.run().fuse() => result,
-                    () = crate::eventloop::testutil::serve_empty_routes::<Ipv4>(
-                            v4_routes_state
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                    () = crate::eventloop::testutil::serve_empty_routes::<Ipv6>(
-                            v6_routes_state
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                    () = fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv4>(
-                            v4_routes_set_provider
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                    () = fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv6>(
-                            v6_routes_set_provider
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                };
-                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
-                match event_loop_result {
-                    Ok(never) => match never {},
-                    Err(e) => {
-                        crate::logging::log_warn!("event loop exited with error: {e:?}");
-                        Err(e)
-                    }
-                }
+                let event_loop = event_loop_inputs
+                    .initialize(IncludedWorkers {
+                        interfaces: EventLoopComponent::Present(()),
+                        routes_v4: EventLoopComponent::Absent(Optional),
+                        routes_v6: EventLoopComponent::Absent(Optional),
+                    })
+                    .await?;
+                event_loop.run().await
             },
             watcher_stream,
             request_sink,
