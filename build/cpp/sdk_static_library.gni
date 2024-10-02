@@ -218,6 +218,16 @@ template("sdk_static_library") {
         forward_variables_from(invoker.metadata, "*")
       }
     }
+
+    # Ensure that 'sdk_static_library()' targets are included in the allowlist.
+    # The allowlist target's `visibility` list ensures that the target using
+    # this template is in the allowlist.
+    if (!is_internal) {
+      assert(
+          invoker.category == "partner",
+          "Create a separate allowlist when adding support for other categories.")
+      deps += [ "//build/sdk:partner_idk_static_libraries_allowlist" ]
+    }
   }
 
   # Identify dependencies and their metadata files.

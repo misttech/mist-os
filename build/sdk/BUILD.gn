@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import("//build/config/fuchsia/target_api_level.gni")
+import("//build/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 
@@ -17,19 +18,30 @@ group("tests") {
   ]
 }
 
-# Contains all stable source sets distributed with the partner or public SDK.
-_sdk_source_sets_list = [
+# The lists below ensure that targets defined with C++ sdk_*() rules are
+# intended to be included in the specified IDK. Unlike
+# //sdk/fidl:sdk_fidl_targets, this does not guarantee that they are actually
+# included in an IDK. Note that these targets may be included in the IDK and its
+# manifest even if the corresponding `_sdk` target may not appear in
+# //sdk/BUILD.gn. This can happen if one of the targets included in that file
+# has one of the following types of dependencies on the target:
+# * `public_deps`
+# * `deps` in an `sdk_source_set()`
+# * `runtime_deps`in an `sdk_*_library()`
+
+# Contains all stable source sets distributed with the partner IDK.
+_partner_idk_source_sets_list = [
   # Stable `sdk_source_set()` targets:
   # keep-sorted: begin
-  "//sdk/lib/async-loop-testing/cpp",
-  "//sdk/lib/component/incoming/cpp",
   "//sdk/lib/async:async-cpp",
   "//sdk/lib/async",
   "//sdk/lib/async-loop:async-loop-cpp",
   "//sdk/lib/async-loop",
+  "//sdk/lib/async-loop-testing/cpp",
   "//sdk/lib/async-testing:async-testing",
   "//sdk/lib/async_patterns/cpp",
   "//sdk/lib/async_patterns/testing/cpp",
+  "//sdk/lib/component/incoming/cpp",
   "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/driver/component/cpp",
   "//sdk/lib/driver/node/cpp",
@@ -97,8 +109,8 @@ _sdk_source_sets_list = [
   "//sdk/testing/sl4f/client",
 ]
 
-# Contains all unstable source sets distributed with the partner or public SDK.
-_sdk_unstable_source_sets_list = [
+# Contains all unstable source sets distributed with the partner IDK.
+_partner_idk_unstable_source_sets_list = [
   # Unstable `sdk_source_set()` targets:
   # keep-sorted: begin
   "//sdk/lib/driver/metadata/cpp",
@@ -115,12 +127,12 @@ _sdk_unstable_source_sets_list = [
 # are built at all supported API levels. See https://fxbug.dev/42083950.
 group("deprecated_sdk_source_sets_to_build_at_all_supported_api_levels") {
   visibility = [ ":*" ]
-  deps = _sdk_source_sets_list
+  deps = _partner_idk_source_sets_list
 
   # Unstable atoms may only be used at "HEAD".
   if (current_build_target_api_level == "HEAD" ||
       current_build_target_api_level == "PLATFORM") {
-    deps += _sdk_unstable_source_sets_list
+    deps += _partner_idk_unstable_source_sets_list
 
     # Some of the allowed libraries are marked testonly.
     testonly = true
@@ -129,15 +141,15 @@ group("deprecated_sdk_source_sets_to_build_at_all_supported_api_levels") {
 
 # All `sdk_source_set()` targets depend on one of these targets to ensure that
 # they are in the appropriate allowlist.
-group("sdk_source_sets_allowlist") {
-  visibility = _sdk_source_sets_list
+group("partner_idk_source_sets_allowlist") {
+  visibility = _partner_idk_source_sets_list
 }
-group("sdk_unstable_source_sets_allowlist") {
-  visibility = _sdk_unstable_source_sets_list
+group("partner_idk_unstable_source_sets_allowlist") {
+  visibility = _partner_idk_unstable_source_sets_list
 }
 
-# Contains all shared libraries distributed with the partner or public SDK.
-_sdk_versioned_shared_libraries_list = [
+# Contains all shared libraries distributed with the partner IDK.
+_partner_idk_versioned_shared_libraries_list = [
   # sdk_shared_library() targets:
   # keep-sorted: begin
   "//sdk/lib/async-default:async-default",
@@ -159,11 +171,50 @@ _sdk_versioned_shared_libraries_list = [
 # are built at all supported API levels. See https://fxbug.dev/42083950.
 group("deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels") {
   visibility = [ ":*" ]
-  deps = _sdk_versioned_shared_libraries_list
+  deps = _partner_idk_versioned_shared_libraries_list
 }
 
-group("sdk_shared_libraries_allowlist") {
-  visibility = _sdk_versioned_shared_libraries_list
+# All `sdk_shared_library()` targets in the partner category depend on this
+# targets to ensure that they are in the appropriate allowlist.
+group("partner_idk_shared_libraries_allowlist") {
+  visibility = _partner_idk_versioned_shared_libraries_list
+}
+
+# Contains all static libraries distributed with the partner IDK.
+_partner_idk_versioned_static_libraries_list = [
+  # sdk_static_library() targets:
+  # keep-sorted: begin
+  "//sdk/lib/async-loop:async-loop-default",
+  "//sdk/lib/magma_client:magma_client",
+  "//zircon/system/ulib/sync:sync",
+  "//zircon/system/ulib/syslog:syslog-headers",
+  "//zircon/system/ulib/trace-vthread:trace-vthread",
+
+  # keep-sorted: end
+]
+
+# TODO(https://fxbug.dev/330709069): Replace this with another mechanism that ensure these targets
+# are built at all supported API levels. See https://fxbug.dev/42083950.
+group("deprecated_sdk_static_libraries_to_build_at_all_supported_api_levels") {
+  visibility = [ ":*" ]
+  deps = _partner_idk_versioned_static_libraries_list
+
+  # magma_client depends indirectly on a `bind_library`, which depends on a host
+  # tool that uses fuchsia.driver.legacy, which was added at 17. This fails on
+  # the bots covered by https://fxbug.dev/330709069 because they do not set
+  # `host_tools_base_path_override` and thus attempt to build the host tool.
+  # TODO(https://fxbug.dev/330709069): Remove this and the `//build/host.gni`
+  # import when either those bots are turned down or API level 16 is retired.
+  if (current_build_target_api_level == 16 &&
+      host_tools_base_path_override == "") {
+    deps -= [ "//sdk/lib/magma_client:magma_client" ]
+  }
+}
+
+# All `sdk_static_library()` targets in the partner category depend on this
+# targets to ensure that they are in the appropriate allowlist.
+group("partner_idk_static_libraries_allowlist") {
+  visibility = _partner_idk_versioned_static_libraries_list
 }
 
 # TODO(https://fxbug.dev/330709069): Remove these once the bots no longer use them.
@@ -178,6 +229,9 @@ group("sdk_versioned_shared_libraries") {
   visibility = [ "//:root_targets" ]
   deps = [
     ":deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels",
+
+    # Include static libraries here too rather than updating the bots.
+    ":deprecated_sdk_static_libraries_to_build_at_all_supported_api_levels",
   ]
 }
 

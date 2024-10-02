@@ -254,13 +254,13 @@ template("sdk_shared_library") {
       }
     }
 
-    # Ensure that 'sdk_shared_library()' targets are included in the  allowlist.
+    # Ensure that 'sdk_shared_library()' targets are included in the allowlist.
     # The allowlist target's `visibility` list ensures that the target using
     # this template is in the allowlist.
     assert(
         invoker.category == "partner",
         "Create a separate allowlist when adding support for other categories.")
-    deps += [ "//build/sdk:sdk_shared_libraries_allowlist" ]
+    deps += [ "//build/sdk:partner_idk_shared_libraries_allowlist" ]
   }
 
   # Base path for source files of this library in SDKs.
