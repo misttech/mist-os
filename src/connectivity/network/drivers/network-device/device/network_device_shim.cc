@@ -430,7 +430,30 @@ void NetworkDeviceShim::NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t
 }
 
 void NetworkDeviceShim::NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {
-  ZX_PANIC("Lease delegation not supported for legacy banjo drivers");
+  // NOTE: This conversion is a bit fraught and relies on the union being a
+  // lease _channel_ because banjo bindings for unions do not carry a tag.
+  //
+  // This should, however, go away along with the last banjo users.
+  constexpr size_t kDelegateRxLeaseRequestSize =
+      fidl::MaxSizeInChannel<netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest,
+                             fidl::MessageDirection::kSending>();
+  fidl::Arena<kDelegateRxLeaseRequestSize> arena;
+  auto handle =
+      netdev::wire::DelegatedRxLeaseHandle::WithChannel(zx::channel(delegated->handle.channel));
+
+  uint64_t hold_until_frame = delegated->hold_until_frame;
+  auto lease =
+      netdev::wire::DelegatedRxLease::Builder(arena)
+          .hold_until_frame(fidl::ObjectView<uint64_t>::FromExternal(&hold_until_frame))
+          .handle(fidl::ObjectView<netdev::wire::DelegatedRxLeaseHandle>::FromExternal(&handle))
+          .Build();
+
+  fdf::Arena fdf_arena('NETD');
+  auto status = device_ifc_.buffer(fdf_arena)->DelegateRxLease(lease);
+
+  if (!status.ok()) {
+    LOGF_ERROR("DelegateRxLease error: %s", status.status_string());
+  }
 }
 
 }  // namespace network

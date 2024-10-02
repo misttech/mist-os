@@ -38,6 +38,7 @@ source_set("src") {
     "//src/connectivity/network/drivers/network-device/device:banjo_shims",
     "//src/connectivity/network/drivers/network-device/device:device",
     "//src/connectivity/network/drivers/network-device/mac",
+    "//src/lib/fsl",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/svc",

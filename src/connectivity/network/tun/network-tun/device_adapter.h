@@ -123,6 +123,8 @@ class DeviceAdapter : public ddk::NetworkDeviceImplProtocol<DeviceAdapter> {
   zx_status_t AddPort(PortAdapter& port);
   // Removes port with |port_id|.
   void RemovePort(uint8_t port_id);
+  // Delegates |lease| up the receive path.
+  zx_status_t DelegateRxLease(fuchsia_hardware_network::wire::DelegatedRxLease& lease);
 
  private:
   static constexpr uint16_t kFifoDepth = fuchsia_net_tun::wire::kFifoDepth;
