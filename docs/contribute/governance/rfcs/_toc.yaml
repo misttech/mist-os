@@ -538,3 +538,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0260_kernel_boot_time_support.md
   - title: "RFC-0261: Fast and efficient user space kernel emulation"
     path: /docs/contribute/governance/rfcs/0261_fast_and_efficient_user_space_kernel_emulation.md
+  - title: "RFC-0262: Expand KMEM_STATS"
+    path: /docs/contribute/governance/rfcs/0262_expand_kmem_stats.md

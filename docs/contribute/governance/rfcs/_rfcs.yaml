@@ -3413,3 +3413,16 @@
   reviewers: ['abarth@google.com', 'adanis@google.com', 'cpu@google.com', 'jamesr@google.com', 'lindkvist@google.com', 'mvanotti@google.com']
   submitted: '2022-06-07'
   reviewed: '2024-10-01'
+
+- name: 'RFC-0262'
+  title: 'Expand KMEM_STATS'
+  short_description: 'Expand the fields and descriptions in ZX_INFO_KMEM_STATS and deprecate ZX_INFO_KMEM_STATS_EXTENDED.'
+  authors: ['adanis@google.com']
+  file: '0262_expand_kmem_stats.md'
+  area: ['Kernel']
+  issue: ['42147338']
+  gerrit_change_id: ['1108953']
+  status: 'Accepted'
+  reviewers: ['maniscalco@google.com', 'mcgrathr@google.com']
+  submitted: '2024-08-28'
+  reviewed: '2024-10-02'
