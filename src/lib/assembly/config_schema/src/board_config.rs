@@ -216,6 +216,12 @@ pub struct BoardKernelConfig {
     #[serde(default)]
     pub serial: Option<String>,
 
+    /// When searching for a CPU on which to place a task, prefer little cores
+    /// over big cores. Enabling this option trades off improved performance in
+    /// favor of reduced power consumption.
+    #[serde(default)]
+    pub scheduler_prefer_little_cpus: bool,
+
     /// The system will halt on a kernel panic instead of rebooting.
     #[serde(default)]
     pub halt_on_panic: bool,
@@ -407,9 +413,9 @@ mod test {
             "devicetree": "test.dtb",
             "kernel": {
                 "contiguous_physical_pages": true,
+                "scheduler_prefer_little_cpus": true,
             },
             "platform": {
-
                 "development_support": {
                     "enable_debug_access_port_for_soc": "amlogic-t931g",
                 }
@@ -438,6 +444,7 @@ mod test {
                 serial_mode: SerialMode::NoOutput,
                 quiet_early_boot: false,
                 serial: None,
+                scheduler_prefer_little_cpus: true,
                 halt_on_panic: false,
                 oom: None,
             },

@@ -76,6 +76,10 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.platform_bundle("kernel_contiguous_physical_pages");
         }
 
+        if context.board_info.kernel.scheduler_prefer_little_cpus {
+            builder.kernel_arg("kernel.scheduler.prefer-little-cpus=true".to_owned());
+        }
+
         if context.board_info.kernel.quiet_early_boot {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
