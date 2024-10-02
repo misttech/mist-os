@@ -15,6 +15,8 @@
 #include <fbl/vector.h>
 #include <ktl/span.h>
 
+#include "lib/mistos/util/default_construct.h"
+
 namespace unit_testing {
 
 using namespace starnix;
@@ -27,7 +29,7 @@ bool test_data_input_buffer() {
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
 
   size_t page_size = PAGE_SIZE;
-  auto addr = map_memory(*current_task, UserAddress(), 64ul * page_size).ptr();
+  auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), 64ul * page_size);
 
   fbl::Vector<uint8_t> data;
   for (int i = 0; i < 1024; ++i) {

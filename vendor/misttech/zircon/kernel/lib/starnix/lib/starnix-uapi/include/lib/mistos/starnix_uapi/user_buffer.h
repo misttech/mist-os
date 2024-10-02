@@ -8,6 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/small_vector.h>
 #include <zircon/types.h>
 
@@ -15,15 +16,15 @@
 
 namespace starnix_uapi {
 
-static size_t MAX_RW_COUNT = static_cast<size_t>(1 << 31) - PAGE_SIZE;
+constexpr size_t MAX_RW_COUNT = static_cast<size_t>(1 << 31) - PAGE_SIZE;
 
 struct UserBuffer;
 using UserBuffers = util::SmallVector<UserBuffer, 1>;
 
 // Matches iovec_t.
 struct UserBuffer {
-  UserAddress address_;
-  size_t length_;
+  UserAddress address_ = mtl::DefaultConstruct<UserAddress>();
+  size_t length_ = 0;
 
  public:
   // impl UserBuffer
