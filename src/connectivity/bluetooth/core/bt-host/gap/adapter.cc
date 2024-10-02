@@ -1530,7 +1530,10 @@ void AdapterImpl::InitializeStep4() {
       adapter_node_, kInspectLowEnergyConnectionManagerNodeName);
 
   le_advertising_manager_ = std::make_unique<LowEnergyAdvertisingManager>(
-      hci_le_advertiser_.get(), le_address_manager_.get());
+      hci_le_advertiser_.get(),
+      le_address_manager_.get(),
+      state().features.HasBit(0,
+                              hci_spec::LMPFeature::kSimultaneousLEAndBREDR));
   low_energy_ = std::make_unique<LowEnergyImpl>(this);
 
   // Initialize the BR/EDR manager objects if the controller supports BR/EDR.
