@@ -11,7 +11,7 @@ common_deps = [
   "//scripts/lib/fx_cmd",
 ]
 
-python_binary("status2") {
+python_binary("status") {
   enable_mypy = true
   main_source = "main.py"
   sources = [
@@ -22,7 +22,7 @@ python_binary("status2") {
 }
 
 if (is_host) {
-  python_host_test("status2_test") {
+  python_host_test("status_test") {
     enable_mypy = true
     main_source = "tests/test_status.py"
     sources = [
@@ -37,11 +37,11 @@ if (is_host) {
 }
 
 install_python_tool("install") {
-  name = "status2"
-  binary = ":status2"
+  name = "status"
+  binary = ":status"
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":status2_test($host_toolchain)" ]
+  deps = [ ":status_test($host_toolchain)" ]
 }

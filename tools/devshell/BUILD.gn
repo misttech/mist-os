@@ -44,7 +44,6 @@ if (!is_host) {
 
       # For compiled dart commands.
       "//scripts/fxtest:fxtest",
-      "//scripts/status:status",
 
       # For `fx bindc`.
       "//tools/bindc:host",
