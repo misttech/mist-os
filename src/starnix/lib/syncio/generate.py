@@ -32,7 +32,7 @@ bindgen.raw_lines = (
     MODULE_DOC_COMMENT
     + """
 
-use zerocopy::{AsBytes, FromBytes, NoCell, FromZeros};
+use zerocopy::{FromBytes, IntoBytes, Immutable, KnownLayout};
 """
 )
 
@@ -73,22 +73,36 @@ bindgen.type_allowlist = [
 # NOTE: Types are matched against the following identifiers as regexes in the order they appear.
 bindgen.set_auto_derive_traits(
     [
-        (r"cmsghdr", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
+        (r"cmsghdr", ["FromBytes", "Immutable", "IntoBytes", "KnownLayout"]),
         (
             r"in_addr",
-            ["PartialEq", "Eq", "AsBytes", "FromBytes", "FromZeros", "NoCell"],
+            [
+                "PartialEq",
+                "Eq",
+                "IntoBytes",
+                "FromBytes",
+                "Immutable",
+                "KnownLayout",
+            ],
         ),
-        (r"in6_addr", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
-        (r"in6_pktinfo", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
+        (r"in6_addr", ["IntoBytes, FromBytes", "Immutable", "KnownLayout"]),
+        (r"in6_pktinfo", ["IntoBytes, FromBytes", "Immutable", "KnownLayout"]),
         # "sockaddr_in6" includes a union type preventing auto deriving Eq/PartialEq, so it
         # must appear before "sockaddr_in" in this list.
         (r"sockaddr_in6", []),
         (
             r"sockaddr_in",
-            ["PartialEq", "Eq", "AsBytes", "FromBytes", "FromZeros", "NoCell"],
+            [
+                "PartialEq",
+                "Eq",
+                "IntoBytes",
+                "FromBytes",
+                "Immutable",
+                "KnownLayout",
+            ],
         ),
-        (r"timespec", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
-        (r"timeval", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
+        (r"timespec", ["IntoBytes, FromBytes", "Immutable", "KnownLayout"]),
+        (r"timeval", ["IntoBytes, FromBytes", "Immutable", "KnownLayout"]),
     ],
 )
 
