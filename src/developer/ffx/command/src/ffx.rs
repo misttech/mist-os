@@ -295,7 +295,7 @@ enum CoreCheckError {
 enum CoreCheckErrorEnum {
     #[error("ffx core requires that the machine writer be specified")]
     MustHaveMachineSpecified,
-    #[error("ffx core requries that the target be explicetly specified")]
+    #[error("ffx core requries that the target be explicitly specified")]
     MustHaveTarget,
     #[error("ffx core requries that the Target be specified by address. Actually passed: \"{}\"", .0)]
     TargetMustBeAddress(String),
