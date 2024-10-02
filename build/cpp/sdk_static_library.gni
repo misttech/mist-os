@@ -229,9 +229,7 @@ template("sdk_static_library") {
   }
   if (defined(invoker.public_deps)) {
     build_deps += invoker.public_deps
-  }
 
-  if (defined(invoker.public_deps)) {
     foreach(dep, invoker.public_deps) {
       full_label = get_label_info(dep, "label_no_toolchain")
       sdk_dep = "${full_label}_sdk"
@@ -243,6 +241,7 @@ template("sdk_static_library") {
   if (defined(invoker.runtime_deps)) {
     sdk_deps += invoker.runtime_deps
   }
+
   foreach(sdk_dep, sdk_deps) {
     gen_dir = get_label_info(sdk_dep, "target_gen_dir")
     name = get_label_info(sdk_dep, "name")

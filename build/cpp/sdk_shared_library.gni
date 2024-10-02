@@ -275,16 +275,16 @@ template("sdk_shared_library") {
   }
   if (defined(invoker.public_deps)) {
     all_deps += invoker.public_deps
-  }
 
-  # If a prebuilt library is only provided for packaging purposes (by not
-  # exposing headers) then its dependencies need not be included in an SDK.
-  if (defined(invoker.public_deps) && !no_headers) {
-    foreach(dep, invoker.public_deps) {
-      full_label = get_label_info(dep, "label_no_toolchain")
-      sdk_dep = "${full_label}_sdk"
-      sdk_deps += [ sdk_dep ]
-      all_deps += [ sdk_dep ]
+    # If a prebuilt library is only provided for packaging purposes (by not
+    # exposing headers) then its dependencies need not be included in an SDK.
+    if (!no_headers) {
+      foreach(dep, invoker.public_deps) {
+        full_label = get_label_info(dep, "label_no_toolchain")
+        sdk_dep = "${full_label}_sdk"
+        sdk_deps += [ sdk_dep ]
+        all_deps += [ sdk_dep ]
+      }
     }
   }
 
@@ -292,6 +292,7 @@ template("sdk_shared_library") {
   if (defined(invoker.runtime_deps)) {
     sdk_deps += invoker.runtime_deps
   }
+
   foreach(sdk_dep, sdk_deps) {
     gen_dir = get_label_info(sdk_dep, "target_gen_dir")
     name = get_label_info(sdk_dep, "name")
