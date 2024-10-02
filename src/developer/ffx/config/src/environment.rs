@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::storage::Config;
-use crate::{BuildOverride, ConfigLevel, ConfigMap};
+use crate::{ConfigLevel, ConfigMap};
 use anyhow::{bail, Context, Result};
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
 use serde::{Deserialize, Serialize};
@@ -95,12 +95,8 @@ impl Environment {
         Ok(())
     }
 
-    pub(crate) fn config_from_cache(
-        self,
-        build_override: Option<BuildOverride<'_>>,
-    ) -> Result<Arc<RwLock<Config>>> {
-        let build_dir = self.override_build_dir(build_override);
-        crate::cache::load_config(&self.context.cache, build_dir, || Config::from_env(&self))
+    pub(crate) fn config_from_cache(self) -> Result<Arc<RwLock<Config>>> {
+        crate::cache::load_config(&self.context.cache, || Config::from_env(&self))
     }
 
     fn load_env_file(path: &Path, context: &EnvironmentContext) -> Result<Self> {
@@ -171,13 +167,9 @@ impl Environment {
 
     /// returns either the directory indicated by the override or the one configured in this
     /// environment.
-    pub fn override_build_dir<'a>(
-        &'a self,
-        build_override: Option<BuildOverride<'a>>,
-    ) -> Option<&'a Path> {
+    pub fn override_build_dir<'a>(&'a self, build_override: Option<&'a Path>) -> Option<&'a Path> {
         match (build_override, self.build_dir()) {
-            (Some(BuildOverride::Path(path)), _) => Some(path),
-            (Some(BuildOverride::NoBuild), _) => None,
+            (Some(path), _) => Some(path),
             (_, maybe_path) => maybe_path,
         }
     }
@@ -200,11 +192,7 @@ impl Environment {
         }
     }
 
-    pub fn set_build(
-        &mut self,
-        to: &Path,
-        build_override: Option<BuildOverride<'_>>,
-    ) -> Result<()> {
+    pub fn set_build(&mut self, to: &Path, build_override: Option<&Path>) -> Result<()> {
         assert!(
             !self.context.no_environment,
             "Cannot set build configuration with --no-environment"

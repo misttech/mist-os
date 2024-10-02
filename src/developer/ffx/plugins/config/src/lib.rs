@@ -7,7 +7,7 @@ use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::api::ConfigError;
 use ffx_config::{
     disable_metrics, enable_basic_metrics, enable_enhanced_metrics, print_config,
-    show_metrics_status, BuildOverride, ConfigLevel, EnvironmentContext,
+    show_metrics_status, ConfigLevel, EnvironmentContext,
 };
 use ffx_config_plugin_args::{
     AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
@@ -148,7 +148,7 @@ async fn exec_env_set<W: Write>(
     s: &EnvSetCommand,
 ) -> Result<()> {
     let build_dir = match (s.level, s.build_dir.as_deref()) {
-        (ConfigLevel::Build, Some(build_dir)) => Some(BuildOverride::Path(build_dir)),
+        (ConfigLevel::Build, Some(build_dir)) => Some(build_dir),
         _ => None,
     };
     let env_file = env_context.env_file_path().context("Getting ffx environment file path")?;

@@ -34,11 +34,10 @@ pub async fn exec_target_default_impl<W: std::io::Write>(
     writer: &mut W,
 ) -> Result<()> {
     match &cmd.subcommand {
-        SubCommand::Get(TargetDefaultGetCommand { level: Some(level), build_dir }) => {
+        SubCommand::Get(TargetDefaultGetCommand { level: Some(level), build_dir: _ }) => {
             let res: String = context
                 .query(TARGET_DEFAULT_KEY)
                 .level(Some(*level))
-                .build(build_dir.as_deref().map(|dir| dir.into()))
                 .get()
                 .unwrap_or("".to_owned());
             writeln!(writer, "{}", res)?;
@@ -51,18 +50,11 @@ pub async fn exec_target_default_impl<W: std::io::Write>(
             context
                 .query(TARGET_DEFAULT_KEY)
                 .level(Some(set.level))
-                .build(set.build_dir.as_deref().map(|dir| dir.into()))
                 .set(serde_json::Value::String(set.nodename.clone()))
                 .await?
         }
         SubCommand::Unset(unset) => {
-            match context
-                .query(TARGET_DEFAULT_KEY)
-                .level(Some(unset.level))
-                .build(unset.build_dir.as_deref().map(|dir| dir.into()))
-                .remove()
-                .await
-            {
+            match context.query(TARGET_DEFAULT_KEY).level(Some(unset.level)).remove().await {
                 Ok(()) => {
                     // TODO(b/351861659): Re enable this if/when the exception process is finalized
                     // eprintln!("Successfully unset the {} level default target.", unset.level);
