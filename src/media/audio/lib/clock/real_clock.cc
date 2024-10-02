@@ -81,10 +81,10 @@ Clock::ToClockMonoSnapshot RealClock::to_clock_mono_snapshot() const {
 
   // get_details gives us mono-to-reference, so invert that to get reference-to-mono.
   return {
-      .to_clock_mono = media::TimelineFunction(details.mono_to_synthetic.reference_offset,
-                                               details.mono_to_synthetic.synthetic_offset,
-                                               details.mono_to_synthetic.rate.reference_ticks,
-                                               details.mono_to_synthetic.rate.synthetic_ticks),
+      .to_clock_mono = media::TimelineFunction(details.reference_to_synthetic.reference_offset,
+                                               details.reference_to_synthetic.synthetic_offset,
+                                               details.reference_to_synthetic.rate.reference_ticks,
+                                               details.reference_to_synthetic.rate.synthetic_ticks),
       .generation = details.generation_counter,
   };
 }

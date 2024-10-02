@@ -51,14 +51,16 @@ void DisplayClockDetails(const zx_clock_details_v1_t& clock_details) {
 
   FX_LOGS(INFO) << "  generation_counter:\t\t" << clock_details.generation_counter;
 
-  FX_LOGS(INFO) << "  mono_to_synthetic -";
-  FX_LOGS(INFO) << "    reference_offset:\t\t" << clock_details.mono_to_synthetic.reference_offset;
-  FX_LOGS(INFO) << "    synthetic_offset:\t\t" << clock_details.mono_to_synthetic.synthetic_offset;
+  FX_LOGS(INFO) << "  reference_to_synthetic -";
+  FX_LOGS(INFO) << "    reference_offset:\t\t"
+                << clock_details.reference_to_synthetic.reference_offset;
+  FX_LOGS(INFO) << "    synthetic_offset:\t\t"
+                << clock_details.reference_to_synthetic.synthetic_offset;
   FX_LOGS(INFO) << "    rate -";
   FX_LOGS(INFO) << "      synthetic_ticks:\t\t"
-                << clock_details.mono_to_synthetic.rate.synthetic_ticks;
+                << clock_details.reference_to_synthetic.rate.synthetic_ticks;
   FX_LOGS(INFO) << "      reference_ticks:\t\t"
-                << clock_details.mono_to_synthetic.rate.reference_ticks;
+                << clock_details.reference_to_synthetic.rate.reference_ticks;
   FX_LOGS(INFO) << "******************************************";
 }
 
@@ -89,12 +91,15 @@ fpromise::result<ClockSnapshot, zx_status_t> SnapshotClock(const zx::clock& ref_
     return fpromise::error(status);
   }
 
-  // The inverse of the clock_details.mono_to_synthetic affine transform.
+  // The inverse of the clock_details.reference_to_synthetic affine transform.
+  // TODO(mpuryear): This should probably be renamed to account for the fact that it may
+  // not be based on the monotonic timeline anymore. Perhaps something like "synthetic_to_reference"
+  // or something similar.
   snapshot.reference_to_monotonic =
-      TimelineFunction(clock_details.mono_to_synthetic.reference_offset,
-                       clock_details.mono_to_synthetic.synthetic_offset,
-                       clock_details.mono_to_synthetic.rate.reference_ticks,
-                       clock_details.mono_to_synthetic.rate.synthetic_ticks);
+      TimelineFunction(clock_details.reference_to_synthetic.reference_offset,
+                       clock_details.reference_to_synthetic.synthetic_offset,
+                       clock_details.reference_to_synthetic.rate.reference_ticks,
+                       clock_details.reference_to_synthetic.rate.synthetic_ticks);
   snapshot.generation = clock_details.generation_counter;
 
   return fpromise::ok(snapshot);
@@ -117,12 +122,12 @@ fpromise::result<zx::time, zx_status_t> ReferenceTimeFromMonotonicTime(const zx:
     return fpromise::error(status);
   }
 
-  return fpromise::ok(zx::time(
-      affine::Transform::Apply(clock_details.mono_to_synthetic.reference_offset,
-                               clock_details.mono_to_synthetic.synthetic_offset,
-                               affine::Ratio(clock_details.mono_to_synthetic.rate.synthetic_ticks,
-                                             clock_details.mono_to_synthetic.rate.reference_ticks),
-                               mono_time.get())));
+  return fpromise::ok(zx::time(affine::Transform::Apply(
+      clock_details.reference_to_synthetic.reference_offset,
+      clock_details.reference_to_synthetic.synthetic_offset,
+      affine::Ratio(clock_details.reference_to_synthetic.rate.synthetic_ticks,
+                    clock_details.reference_to_synthetic.rate.reference_ticks),
+      mono_time.get())));
 }
 
 fpromise::result<zx::time, zx_status_t> MonotonicTimeFromReferenceTime(const zx::clock& ref_clock,
@@ -134,10 +139,10 @@ fpromise::result<zx::time, zx_status_t> MonotonicTimeFromReferenceTime(const zx:
   }
 
   return fpromise::ok(zx::time(affine::Transform::ApplyInverse(
-      clock_details.mono_to_synthetic.reference_offset,
-      clock_details.mono_to_synthetic.synthetic_offset,
-      affine::Ratio(clock_details.mono_to_synthetic.rate.synthetic_ticks,
-                    clock_details.mono_to_synthetic.rate.reference_ticks),
+      clock_details.reference_to_synthetic.reference_offset,
+      clock_details.reference_to_synthetic.synthetic_offset,
+      affine::Ratio(clock_details.reference_to_synthetic.rate.synthetic_ticks,
+                    clock_details.reference_to_synthetic.rate.reference_ticks),
       ref_time.get())));
 }
 
@@ -153,8 +158,8 @@ fpromise::result<zx::time, zx_status_t> ReferenceTimeFromReferenceTime(
     return fpromise::error(status);
   }
 
-  auto mono_to_ref_a = clock_details_a.mono_to_synthetic;
-  auto mono_to_ref_b = clock_details_b.mono_to_synthetic;
+  auto mono_to_ref_a = clock_details_a.reference_to_synthetic;
+  auto mono_to_ref_b = clock_details_b.reference_to_synthetic;
 
   auto mono_time = affine::Transform::ApplyInverse(
       mono_to_ref_a.reference_offset, mono_to_ref_a.synthetic_offset,

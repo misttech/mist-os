@@ -81,11 +81,12 @@ fpromise::result<zx::duration, zx_status_t> GetOffsetFromMonotonic(const zx::clo
     return fpromise::error(status);
   }
 
-  auto synthetic_per_mono = affine::Ratio(clock_details.mono_to_synthetic.rate.synthetic_ticks,
-                                          clock_details.mono_to_synthetic.rate.reference_ticks);
+  auto synthetic_per_mono =
+      affine::Ratio(clock_details.reference_to_synthetic.rate.synthetic_ticks,
+                    clock_details.reference_to_synthetic.rate.reference_ticks);
   auto synthetic_offset_from_mono = affine::Transform::Apply(
-      clock_details.mono_to_synthetic.reference_offset,
-      clock_details.mono_to_synthetic.synthetic_offset, synthetic_per_mono, 0);
+      clock_details.reference_to_synthetic.reference_offset,
+      clock_details.reference_to_synthetic.synthetic_offset, synthetic_per_mono, 0);
 
   return fpromise::ok(zx::duration(synthetic_offset_from_mono));
 }
@@ -151,10 +152,10 @@ void VerifyCanBeRateAdjusted(const zx::clock& clock) {
   EXPECT_EQ(clock.get_details(&clock_details), ZX_OK);
 
   auto ticks_before = affine::Transform::ApplyInverse(
-      clock_details.ticks_to_synthetic.reference_offset,
-      clock_details.ticks_to_synthetic.synthetic_offset,
-      affine::Ratio(clock_details.ticks_to_synthetic.rate.synthetic_ticks,
-                    clock_details.ticks_to_synthetic.rate.reference_ticks),
+      clock_details.reference_ticks_to_synthetic.reference_offset,
+      clock_details.reference_ticks_to_synthetic.synthetic_offset,
+      affine::Ratio(clock_details.reference_ticks_to_synthetic.rate.synthetic_ticks,
+                    clock_details.reference_ticks_to_synthetic.rate.reference_ticks),
       ref_before);
 
   zx_nanosleep(zx_deadline_after(kWaitInterval.get()));
@@ -166,7 +167,7 @@ void VerifyCanBeRateAdjusted(const zx::clock& clock) {
   EXPECT_EQ(clock.get_details(&clock_details), ZX_OK);
 
   EXPECT_GT(clock_details.last_rate_adjust_update_ticks, ticks_before);
-  EXPECT_EQ(clock_details.mono_to_synthetic.rate.synthetic_ticks, 999'900u);
+  EXPECT_EQ(clock_details.reference_to_synthetic.rate.synthetic_ticks, 999'900u);
 }
 
 void VerifyCanBeRateAdjusted(const Clock& audio_clock) {
@@ -178,10 +179,10 @@ void VerifyIsSystemMonotonic(const zx::clock& clock) {
   zx_clock_details_v1_t clock_details;
   EXPECT_EQ(clock.get_details(&clock_details), ZX_OK);
 
-  EXPECT_EQ(clock_details.mono_to_synthetic.reference_offset,
-            clock_details.mono_to_synthetic.synthetic_offset);
-  EXPECT_EQ(clock_details.mono_to_synthetic.rate.reference_ticks,
-            clock_details.mono_to_synthetic.rate.synthetic_ticks);
+  EXPECT_EQ(clock_details.reference_to_synthetic.reference_offset,
+            clock_details.reference_to_synthetic.synthetic_offset);
+  EXPECT_EQ(clock_details.reference_to_synthetic.rate.reference_ticks,
+            clock_details.reference_to_synthetic.rate.synthetic_ticks);
 }
 
 void VerifyIsSystemMonotonic(const Clock& audio_clock) {
@@ -196,10 +197,10 @@ void VerifyIsNotSystemMonotonic(const zx::clock& clock) {
   zx_clock_details_v1_t clock_details;
   EXPECT_EQ(clock.get_details(&clock_details), ZX_OK);
 
-  EXPECT_FALSE(clock_details.mono_to_synthetic.reference_offset ==
-                   clock_details.mono_to_synthetic.synthetic_offset &&
-               clock_details.mono_to_synthetic.rate.reference_ticks ==
-                   clock_details.mono_to_synthetic.rate.synthetic_ticks);
+  EXPECT_FALSE(clock_details.reference_to_synthetic.reference_offset ==
+                   clock_details.reference_to_synthetic.synthetic_offset &&
+               clock_details.reference_to_synthetic.rate.reference_ticks ==
+                   clock_details.reference_to_synthetic.rate.synthetic_ticks);
 }
 
 void VerifyIsNotSystemMonotonic(const Clock& audio_clock) {

@@ -26,10 +26,10 @@ zx::time VirtualAudioStream::MonoTimeFromRefTime(const zx::clock& clock, zx::tim
   ZX_ASSERT_MSG(status == ZX_OK, "Could not get_details on this clock");
 
   zx_time_t mono_time = affine::Transform::ApplyInverse(
-      clock_details.mono_to_synthetic.reference_offset,
-      clock_details.mono_to_synthetic.synthetic_offset,
-      affine::Ratio(clock_details.mono_to_synthetic.rate.synthetic_ticks,
-                    clock_details.mono_to_synthetic.rate.reference_ticks),
+      clock_details.reference_to_synthetic.reference_offset,
+      clock_details.reference_to_synthetic.synthetic_offset,
+      affine::Ratio(clock_details.reference_to_synthetic.rate.synthetic_ticks,
+                    clock_details.reference_to_synthetic.rate.reference_ticks),
       ref_time.get());
 
   return zx::time{mono_time};

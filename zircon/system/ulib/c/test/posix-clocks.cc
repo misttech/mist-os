@@ -336,8 +336,8 @@ TEST_F(ReadWriteUtcClockTestCase, SetTime) {
   ASSERT_NO_FATAL_FAILURE(test_clock_get_details(&details));
 
   zx_time_t expected = unpack_timespec(ts);
-  ASSERT_EQ(expected, details.ticks_to_synthetic.synthetic_offset);
-  ASSERT_EQ(expected, details.mono_to_synthetic.synthetic_offset);
+  ASSERT_EQ(expected, details.reference_ticks_to_synthetic.synthetic_offset);
+  ASSERT_EQ(expected, details.reference_to_synthetic.synthetic_offset);
 
   // Same trick, but using settimeofday instead.  We should see a synthetic
   // offset which is limited to uSec resolution, and a reference offset which is
@@ -351,12 +351,12 @@ TEST_F(ReadWriteUtcClockTestCase, SetTime) {
   ASSERT_NO_FATAL_FAILURE(test_clock_get_details(&details2));
 
   expected = unpack_timeval(tv);
-  ASSERT_EQ(expected, details2.ticks_to_synthetic.synthetic_offset);
-  ASSERT_EQ(expected, details2.mono_to_synthetic.synthetic_offset);
-  ASSERT_LE(details.ticks_to_synthetic.reference_offset,
-            details2.ticks_to_synthetic.reference_offset);
-  ASSERT_LE(details.mono_to_synthetic.reference_offset,
-            details2.mono_to_synthetic.reference_offset);
+  ASSERT_EQ(expected, details2.reference_ticks_to_synthetic.synthetic_offset);
+  ASSERT_EQ(expected, details2.reference_to_synthetic.synthetic_offset);
+  ASSERT_LE(details.reference_ticks_to_synthetic.reference_offset,
+            details2.reference_ticks_to_synthetic.reference_offset);
+  ASSERT_LE(details.reference_to_synthetic.reference_offset,
+            details2.reference_to_synthetic.reference_offset);
 }
 
 TEST(PosixClockTests, InvalidClockId) {

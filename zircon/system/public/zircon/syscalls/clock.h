@@ -89,8 +89,8 @@ typedef struct zx_clock_transformation {
 typedef struct zx_clock_details_v1 {
   uint64_t options;
   zx_time_t backstop_time;
-  zx_clock_transformation_t ticks_to_synthetic;
-  zx_clock_transformation_t mono_to_synthetic;
+  zx_clock_transformation_t reference_ticks_to_synthetic;
+  zx_clock_transformation_t reference_to_synthetic;
   uint64_t error_bound;
   zx_ticks_t query_ticks;
   zx_ticks_t last_value_update_ticks;

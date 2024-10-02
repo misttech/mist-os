@@ -121,7 +121,7 @@ inline zx::time MapRefToSynth(const zx::clock& clock, zx::time ref_time) {
   zx_status_t status = clock.get_details(&details);
   EXPECT_OK(status);
   return (status == ZX_OK)
-             ? zx::time{UnpackTransform(details.mono_to_synthetic).Apply(ref_time.get())}
+             ? zx::time{UnpackTransform(details.reference_to_synthetic).Apply(ref_time.get())}
              : zx::time{0};
 }
 
@@ -325,8 +325,8 @@ TEST(KernelClocksTestCase, GetDetails) {
       // Both initial transformations should indicate that the clock has never
       // been set.  This is done by setting the numerator of the
       // transformation to 0, effectively stopping the synthetic clock.
-      ASSERT_EQ(0, details.ticks_to_synthetic.rate.synthetic_ticks);
-      ASSERT_EQ(0, details.mono_to_synthetic.rate.synthetic_ticks);
+      ASSERT_EQ(0, details.reference_ticks_to_synthetic.rate.synthetic_ticks);
+      ASSERT_EQ(0, details.reference_to_synthetic.rate.synthetic_ticks);
 
       // Record the details we just observed so we can observe how they change
       // as we update.
@@ -374,14 +374,14 @@ TEST(KernelClocksTestCase, GetDetails) {
 
       // The synthetic clock offset for both transformations should be the
       // initial value we set for the clock.
-      ASSERT_EQ(INITIAL_VALUE.get(), details.ticks_to_synthetic.synthetic_offset);
-      ASSERT_EQ(INITIAL_VALUE.get(), details.mono_to_synthetic.synthetic_offset);
+      ASSERT_EQ(INITIAL_VALUE.get(), details.reference_ticks_to_synthetic.synthetic_offset);
+      ASSERT_EQ(INITIAL_VALUE.get(), details.reference_to_synthetic.synthetic_offset);
 
       // The rate of the mono <-> synthetic transformation should be 1:1.  We
       // have not adjusted its rate yet, and its nominal rate is the same as
       // clock monotonic.
-      ASSERT_EQ(1, details.mono_to_synthetic.rate.synthetic_ticks);
-      ASSERT_EQ(1, details.mono_to_synthetic.rate.reference_ticks);
+      ASSERT_EQ(1, details.reference_to_synthetic.rate.synthetic_ticks);
+      ASSERT_EQ(1, details.reference_to_synthetic.rate.reference_ticks);
 
       // The expected ticks reference should be the update time.
       //
@@ -391,7 +391,8 @@ TEST(KernelClocksTestCase, GetDetails) {
       // write the equation for a line many different ways.  Even so, we
       // expect the kernel to be using the method we validate here because it
       // is simple, cheap, and precise.
-      ASSERT_EQ(details.last_value_update_ticks, details.ticks_to_synthetic.reference_offset);
+      ASSERT_EQ(details.last_value_update_ticks,
+                details.reference_ticks_to_synthetic.reference_offset);
 
       // The rate of the ticks <-> synthetic should be equal to the ticks to
       // clock monotonic ratio.  Right now, however, we don't have a good way
@@ -402,9 +403,10 @@ TEST(KernelClocksTestCase, GetDetails) {
       // TODO(johngro): consider exposing this ratio from a VDSO based
       // syscall.
       int64_t expected_mono_reference;
-      affine::Ratio ticks_to_mono = UnpackRatio(details.ticks_to_synthetic.rate);
-      expected_mono_reference = ticks_to_mono.Scale(details.ticks_to_synthetic.reference_offset);
-      ASSERT_EQ(expected_mono_reference, details.mono_to_synthetic.reference_offset);
+      affine::Ratio ticks_to_mono = UnpackRatio(details.reference_ticks_to_synthetic.rate);
+      expected_mono_reference =
+          ticks_to_mono.Scale(details.reference_ticks_to_synthetic.reference_offset);
+      ASSERT_EQ(expected_mono_reference, details.reference_to_synthetic.reference_offset);
 
       // Update the last_details and move on to the next phase.
       last_details = details;
@@ -461,18 +463,21 @@ TEST(KernelClocksTestCase, GetDetails) {
       // the projected value of the last_rate_adjust_ticks time using the previous
       // transformation.
       int64_t expected_synth_offset;
-      affine::Transform last_ticks_to_synth = UnpackTransform(last_details.ticks_to_synthetic);
+      affine::Transform last_ticks_to_synth =
+          UnpackTransform(last_details.reference_ticks_to_synthetic);
       expected_synth_offset = last_ticks_to_synth.Apply(details.last_rate_adjust_update_ticks);
 
-      ASSERT_EQ(expected_synth_offset, details.ticks_to_synthetic.synthetic_offset);
-      ASSERT_EQ(expected_synth_offset, details.mono_to_synthetic.synthetic_offset);
+      ASSERT_EQ(expected_synth_offset, details.reference_ticks_to_synthetic.synthetic_offset);
+      ASSERT_EQ(expected_synth_offset, details.reference_to_synthetic.synthetic_offset);
 
       // The reference offset for ticks <-> synth should be the update time.
       // The reference for mono <-> synth should be the ticks reference
       // converted to mono.
-      expected_mono_reference = ticks_to_mono.Scale(details.ticks_to_synthetic.reference_offset);
-      ASSERT_EQ(expected_mono_reference, details.mono_to_synthetic.reference_offset);
-      ASSERT_EQ(details.last_rate_adjust_update_ticks, details.ticks_to_synthetic.reference_offset);
+      expected_mono_reference =
+          ticks_to_mono.Scale(details.reference_ticks_to_synthetic.reference_offset);
+      ASSERT_EQ(expected_mono_reference, details.reference_to_synthetic.reference_offset);
+      ASSERT_EQ(details.last_rate_adjust_update_ticks,
+                details.reference_ticks_to_synthetic.reference_offset);
 
       // Check our ratios.  We need to be a bit careful here; one cannot
       // simply compare ratios for equality without reducing them first.
@@ -480,7 +485,7 @@ TEST(KernelClocksTestCase, GetDetails) {
       // The mono <-> synth ratio should just be a function of the PPM
       // adjustment we applied.
       affine::Ratio expected_mono_ratio{1'000'000 + PPM_ADJ, 1'000'000};
-      affine::Ratio actual_mono_ratio = UnpackRatio(details.mono_to_synthetic.rate);
+      affine::Ratio actual_mono_ratio = UnpackRatio(details.reference_to_synthetic.rate);
 
       expected_mono_ratio.Reduce();
       actual_mono_ratio.Reduce();
@@ -491,7 +496,7 @@ TEST(KernelClocksTestCase, GetDetails) {
       // The ticks <-> synth ratio should be the product of ticks to mono and
       // mono to synth.
       affine::Ratio expected_ticks_ratio = ticks_to_mono * expected_mono_ratio;
-      affine::Ratio actual_ticks_ratio = UnpackRatio(details.ticks_to_synthetic.rate);
+      affine::Ratio actual_ticks_ratio = UnpackRatio(details.reference_ticks_to_synthetic.rate);
 
       expected_ticks_ratio.Reduce();
       actual_ticks_ratio.Reduce();
@@ -547,10 +552,10 @@ TEST(KernelClocksTestCase, GetDetails) {
         ASSERT_EQ(expected.rate.reference_ticks, expected.rate.reference_ticks);
       };
 
-      ASSERT_NO_FAILURES(
-          CompareTransformation(last_details.ticks_to_synthetic, details.ticks_to_synthetic));
-      ASSERT_NO_FAILURES(
-          CompareTransformation(last_details.mono_to_synthetic, details.mono_to_synthetic));
+      ASSERT_NO_FAILURES(CompareTransformation(last_details.reference_ticks_to_synthetic,
+                                               details.reference_ticks_to_synthetic));
+      ASSERT_NO_FAILURES(CompareTransformation(last_details.reference_to_synthetic,
+                                               details.reference_to_synthetic));
 
       ////////////////////////////////////////////////////////////////////////
       //
@@ -810,7 +815,7 @@ void DoUpdateTest() {
           ASSERT_OK(v.clock.get_details(&details));
 
           affine::Ratio expected_ratio = affine::Ratio(1'000'000 + rate_adj, 1'000'000);
-          affine::Ratio actual_ratio = UnpackRatio(details.mono_to_synthetic.rate);
+          affine::Ratio actual_ratio = UnpackRatio(details.reference_to_synthetic.rate);
 
           expected_ratio.Reduce();
           actual_ratio.Reduce();
@@ -852,7 +857,7 @@ void DoUpdateTest() {
             ASSERT_OK(v.clock.get_details(&details));
 
             affine::Ratio expected_ratio = affine::Ratio(1'000'000 + rate_adj, 1'000'000);
-            affine::Ratio actual_ratio = UnpackRatio(details.mono_to_synthetic.rate);
+            affine::Ratio actual_ratio = UnpackRatio(details.reference_to_synthetic.rate);
 
             expected_ratio.Reduce();
             actual_ratio.Reduce();
@@ -1023,7 +1028,7 @@ TEST(KernelClocksTestCase, StartedSignal) {
         // When the clock is started, it should be ticking.
         zx_clock_details_v1_t details;
         ASSERT_OK(clock.get_details(&details));
-        ASSERT_GT(details.mono_to_synthetic.rate.synthetic_ticks, 0);
+        ASSERT_GT(details.reference_to_synthetic.rate.synthetic_ticks, 0);
       }
     }
   }
@@ -1183,11 +1188,11 @@ void DoAutoStartedTest() {
     // should be identity.
     zx_clock_details_v1_t details;
     ASSERT_OK(clock.get_details(&details));
-    ASSERT_EQ(details.mono_to_synthetic.reference_offset,
-              details.mono_to_synthetic.synthetic_offset);
-    ASSERT_EQ(details.mono_to_synthetic.rate.reference_ticks,
-              details.mono_to_synthetic.rate.synthetic_ticks);
-    ASSERT_NE(0, details.mono_to_synthetic.rate.reference_ticks);
+    ASSERT_EQ(details.reference_to_synthetic.reference_offset,
+              details.reference_to_synthetic.synthetic_offset);
+    ASSERT_EQ(details.reference_to_synthetic.rate.reference_ticks,
+              details.reference_to_synthetic.rate.synthetic_ticks);
+    ASSERT_NE(0, details.reference_to_synthetic.rate.reference_ticks);
 
     // We omitted the create args structure, so the backstop time should be 0.
     ASSERT_EQ(0, details.backstop_time);
@@ -1340,22 +1345,22 @@ TEST(KernelClocksTestCase, TrivialRateUpdates) {
       // These should all be unchanged
       ASSERT_EQ(last_details.options, curr_details.options);
       ASSERT_EQ(last_details.backstop_time, curr_details.backstop_time);
-      ASSERT_EQ(last_details.ticks_to_synthetic.reference_offset,
-                curr_details.ticks_to_synthetic.reference_offset);
-      ASSERT_EQ(last_details.ticks_to_synthetic.synthetic_offset,
-                curr_details.ticks_to_synthetic.synthetic_offset);
-      ASSERT_EQ(last_details.ticks_to_synthetic.rate.reference_ticks,
-                curr_details.ticks_to_synthetic.rate.reference_ticks);
-      ASSERT_EQ(last_details.ticks_to_synthetic.rate.synthetic_ticks,
-                curr_details.ticks_to_synthetic.rate.synthetic_ticks);
-      ASSERT_EQ(last_details.mono_to_synthetic.reference_offset,
-                curr_details.mono_to_synthetic.reference_offset);
-      ASSERT_EQ(last_details.mono_to_synthetic.synthetic_offset,
-                curr_details.mono_to_synthetic.synthetic_offset);
-      ASSERT_EQ(last_details.mono_to_synthetic.rate.reference_ticks,
-                curr_details.mono_to_synthetic.rate.reference_ticks);
-      ASSERT_EQ(last_details.mono_to_synthetic.rate.synthetic_ticks,
-                curr_details.mono_to_synthetic.rate.synthetic_ticks);
+      ASSERT_EQ(last_details.reference_ticks_to_synthetic.reference_offset,
+                curr_details.reference_ticks_to_synthetic.reference_offset);
+      ASSERT_EQ(last_details.reference_ticks_to_synthetic.synthetic_offset,
+                curr_details.reference_ticks_to_synthetic.synthetic_offset);
+      ASSERT_EQ(last_details.reference_ticks_to_synthetic.rate.reference_ticks,
+                curr_details.reference_ticks_to_synthetic.rate.reference_ticks);
+      ASSERT_EQ(last_details.reference_ticks_to_synthetic.rate.synthetic_ticks,
+                curr_details.reference_ticks_to_synthetic.rate.synthetic_ticks);
+      ASSERT_EQ(last_details.reference_to_synthetic.reference_offset,
+                curr_details.reference_to_synthetic.reference_offset);
+      ASSERT_EQ(last_details.reference_to_synthetic.synthetic_offset,
+                curr_details.reference_to_synthetic.synthetic_offset);
+      ASSERT_EQ(last_details.reference_to_synthetic.rate.reference_ticks,
+                curr_details.reference_to_synthetic.rate.reference_ticks);
+      ASSERT_EQ(last_details.reference_to_synthetic.rate.synthetic_ticks,
+                curr_details.reference_to_synthetic.rate.synthetic_ticks);
       ASSERT_EQ(last_details.error_bound, curr_details.error_bound);
       ASSERT_EQ(last_details.last_value_update_ticks, curr_details.last_value_update_ticks);
       ASSERT_EQ(last_details.last_error_bounds_update_ticks,

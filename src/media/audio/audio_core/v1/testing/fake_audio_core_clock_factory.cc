@@ -76,13 +76,13 @@ TimelineFunction FakeAudioCoreClockFactory::RefToMonoTransform(const zx::clock& 
 
   // Calculate clock offset from kernel monotonic, which is used to create a
   // |ref_time_to_mono_time_transform| based on fake |mono_time_|.
-  auto offset = clock_details.mono_to_synthetic.synthetic_offset -
-                clock_details.mono_to_synthetic.reference_offset;
+  auto offset = clock_details.reference_to_synthetic.synthetic_offset -
+                clock_details.reference_to_synthetic.reference_offset;
 
   auto now = mono_time();
   return TimelineFunction(now.get(), now.get() + offset,
-                          clock_details.mono_to_synthetic.rate.reference_ticks,
-                          clock_details.mono_to_synthetic.rate.synthetic_ticks);
+                          clock_details.reference_to_synthetic.rate.reference_ticks,
+                          clock_details.reference_to_synthetic.rate.synthetic_ticks);
 }
 
 }  // namespace media::audio::testing

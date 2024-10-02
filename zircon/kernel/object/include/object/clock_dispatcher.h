@@ -34,7 +34,7 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
 
  private:
   struct Params {
-    affine::Transform mono_to_synthetic{0, 0, {0, 1}};
+    affine::Transform reference_to_synthetic{0, 0, {0, 1}};
     uint64_t error_bound = ZX_CLOCK_UNKNOWN_ERROR;
     zx_ticks_t last_value_update_ticks = 0;
     zx_ticks_t last_rate_adjust_update_ticks = 0;
@@ -55,7 +55,7 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
     // should ensure that there are no other threads writing to this memory
     // location concurrent with our read, meaning there is no formal data race
     // here.
-    return params_.unsynchronized_get().mono_to_synthetic.numerator() != 0;
+    return params_.unsynchronized_get().reference_to_synthetic.numerator() != 0;
   }
 
   const uint64_t options_;
@@ -63,9 +63,9 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
 
   // The transformation "payload" parameters, and the sequence lock which protects them.
   //
-  // Note that the ticks_to_synthetic transformation is kept separate from the
+  // Note that the reference_ticks_to_synthetic transformation is kept separate from the
   // rest of the parameters.  While we need to observe all of the parameters
-  // during a call to GetDetails, we only need to observe ticks_to_synthetic
+  // during a call to GetDetails, we only need to observe reference_ticks_to_synthetic
   // during Read, and keeping the parameters separate makes this a bit easier.
   DECLARE_SEQLOCK_FENCE_SYNC(ClockDispatcher) seq_lock_;
   template <typename T>
@@ -73,7 +73,7 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
   template <typename Policy>
   using SeqLockGuard = Guard<decltype(seq_lock_)::LockType, Policy>;
   TA_GUARDED(seq_lock_)
-  Payload<affine::Transform> ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
+  Payload<affine::Transform> reference_ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
   TA_GUARDED(seq_lock_) Payload<Params> params_;
 };
 
