@@ -3264,6 +3264,7 @@ impl MemoryManager {
         result
     }
 
+    /// Map the stack into a pre-selected address region
     pub fn map_stack(
         self: &Arc<Self>,
         length: usize,
@@ -3271,13 +3272,27 @@ impl MemoryManager {
     ) -> Result<UserAddress, Errno> {
         assert!(length <= MAX_STACK_SIZE);
         let addr = self.state.read().stack_origin;
-        self.map_anonymous(
-            DesiredAddress::Fixed(addr),
+        // The address range containing stack_origin should normally be available: it's above the
+        // mmap_top, and this method is called early enough in the process lifetime that only the
+        // main ELF and the interpreter are already loaded. However, in the rare case that the
+        // static position-independent executable is overlapping the chosen address, mapping as Hint
+        // will make mmap choose a new place for it.
+        // TODO(https://fxbug.dev/370027241): Consider a more robust approach
+        let stack_addr = self.map_anonymous(
+            DesiredAddress::Hint(addr),
             length,
             prot_flags,
             MappingOptions::ANONYMOUS,
             MappingName::Stack,
-        )
+        )?;
+        if stack_addr != addr {
+            log_warn!(
+                "An address designated for stack ({}) was unavailable, mapping at {} instead.",
+                addr,
+                stack_addr
+            );
+        }
+        Ok(stack_addr)
     }
 
     pub fn remap(
