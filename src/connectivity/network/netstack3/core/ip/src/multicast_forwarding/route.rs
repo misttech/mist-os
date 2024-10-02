@@ -7,12 +7,13 @@
 use alloc::fmt::Debug;
 use alloc::sync::Arc;
 use core::hash::Hash;
+use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope};
 use net_types::{
     MulticastAddr, MulticastAddress as _, NonMappedAddr, ScopeableAddress as _, SpecifiedAddr,
     SpecifiedAddress as _, UnicastAddr,
 };
-use netstack3_base::{IpExt, StrongDeviceIdentifier};
+use netstack3_base::{InstantBindingsTypes, IpExt, StrongDeviceIdentifier};
 
 /// A witness type wrapping [`Ipv4Addr`], proving the following properties:
 /// * the inner address is specified, and
@@ -217,6 +218,16 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
     }
 }
 
+/// An entry in the multicast route table.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub struct MulticastRouteEntry<D: StrongDeviceIdentifier, BT: InstantBindingsTypes> {
+    pub(crate) route: MulticastRoute<D>,
+    // NB: Hold the statistics as an AtomicInstant so that they can be updated
+    // without write-locking the multicast route table.
+    pub(crate) stats: MulticastRouteStats<BT::AtomicInstant>,
+}
+
 /// All attributes of a multicast route, excluding the [`MulticastRouteKey`].
 ///
 /// This type acts as a witness that the route is valid.
@@ -304,6 +315,20 @@ impl<D: StrongDeviceIdentifier> MulticastRoute<D> {
 
         Ok(MulticastRoute { input_interface, action: Action::Forward(targets) })
     }
+}
+
+/// Statistics about a [`MulticastRoute`].
+#[derive(Debug, Eq, PartialEq)]
+pub struct MulticastRouteStats<Instant> {
+    /// The last time the route was used to route a packet.
+    ///
+    /// This value is initialized to the current time when a route is installed
+    /// in the route table, and updated every time the route is selected during
+    /// multicast route lookup. Notably, it is updated regardless of whether the
+    /// packet is actually forwarded; it might be dropped after the routing
+    /// decision for a number reasons (e.g. dropped by the filtering engine,
+    /// dropped at the device layer, etc).
+    pub last_used: Instant,
 }
 
 #[cfg(test)]

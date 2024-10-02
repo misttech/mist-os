@@ -9,27 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                // TODO(https://fxbug.dev/323052525): Support Multicast Routing.
-                "get_route_stats_errors_v4_ns3::link_local_multicast_destination_address",
-                "get_route_stats_errors_v4_ns3::link_local_unicast_source_address",
-                "get_route_stats_errors_v4_ns3::any_source_address",
-                "get_route_stats_errors_v4_ns3::no_matching_route_for_destination_address",
-                "get_route_stats_errors_v4_ns3::multicast_source_address",
-                "get_route_stats_errors_v4_ns3::unicast_destination_address",
-                "get_route_stats_errors_v4_ns3::no_matching_route_for_source_address",
-                "get_route_stats_errors_v6_ns3::link_local_unicast_source_address",
-                "get_route_stats_errors_v6_ns3::no_matching_route_for_destination_address",
-                "get_route_stats_errors_v6_ns3::link_local_multicast_destination_address",
-                "get_route_stats_errors_v6_ns3::multicast_source_address",
-                "get_route_stats_errors_v6_ns3::any_source_address",
-                "get_route_stats_v4_ns3",
-                "get_route_stats_errors_v6_ns3::unicast_destination_address",
-                "get_route_stats_v6_ns3",
-                "get_route_stats_errors_v6_ns3::no_matching_route_for_source_address",
-            ],
-        },
     ],
 }

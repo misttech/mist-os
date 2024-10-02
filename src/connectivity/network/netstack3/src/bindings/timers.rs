@@ -646,7 +646,7 @@ mod scheduled_instant {
 
     impl From<ScheduledInstant> for StackTime {
         fn from(value: ScheduledInstant) -> Self {
-            Self(value.into())
+            StackTime::new(value.into())
         }
     }
 }

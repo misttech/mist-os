@@ -133,7 +133,7 @@ pub mod ip {
     };
     pub use netstack3_ip::multicast_forwarding::{
         ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
-        MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
+        MulticastRoute, MulticastRouteKey, MulticastRouteStats, MulticastRouteTarget,
     };
     pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,

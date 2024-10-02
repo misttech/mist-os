@@ -97,6 +97,11 @@ pub trait InstantContext: InstantBindingsTypes {
     /// `now` guarantees that two subsequent calls to `now` will return
     /// monotonically non-decreasing values.
     fn now(&self) -> Self::Instant;
+
+    /// Returns the current instant, as an [`Self::AtomicInstant`].
+    fn now_atomic(&self) -> Self::AtomicInstant {
+        Self::AtomicInstant::new(self.now())
+    }
 }
 
 /// Opaque types provided by bindings used by [`TimerContext`].

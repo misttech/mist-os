@@ -18,16 +18,20 @@ pub(crate) mod packet_queue;
 pub(crate) mod route;
 pub(crate) mod state;
 
+use core::sync::atomic::Ordering;
+
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, EventContext, FrameDestination, HandleableTimer,
+    AnyDevice, AtomicInstant, DeviceIdContext, EventContext, FrameDestination, HandleableTimer,
     InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::ip::IpPacket;
 use zerocopy::SplitByteSlice;
 
 use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
-use crate::internal::multicast_forwarding::route::{Action, MulticastRouteTargets};
+use crate::internal::multicast_forwarding::route::{
+    Action, MulticastRouteEntry, MulticastRouteTargets,
+};
 use crate::multicast_forwarding::{
     MulticastForwardingPendingPacketsContext, MulticastForwardingState,
     MulticastForwardingStateContext, MulticastRoute, MulticastRouteKey,
@@ -206,7 +210,11 @@ where
             return None;
         };
         ctx.with_route_table(state, |route_table, ctx| {
-            if let Some(MulticastRoute { input_interface, action }) = route_table.get(&key) {
+            if let Some(MulticastRouteEntry {
+                route: MulticastRoute { input_interface, action },
+                stats,
+            }) = route_table.get(&key)
+            {
                 if dev != input_interface {
                     // TODO(https://fxbug.dev/352570820): Increment a counter.
                     bindings_ctx.on_event(
@@ -219,6 +227,9 @@ where
                     );
                     return None;
                 }
+
+                stats.last_used.store_max(bindings_ctx.now(), Ordering::Relaxed);
+
                 match action {
                     // TODO(https://fxbug.dev/352570820): Increment a counter.
                     Action::Forward(targets) => return Some(targets.clone()),
@@ -409,7 +420,10 @@ mod testutil {
         type Ctx<'a> = FakeCoreCtx<I, D>;
         fn with_route_table<
             O,
-            F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+            F: FnOnce(
+                &MulticastRouteTable<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
+                &mut Self::Ctx<'_>,
+            ) -> O,
         >(
             &mut self,
             state: &MulticastForwardingEnabledState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
@@ -420,7 +434,10 @@ mod testutil {
         }
         fn with_route_table_mut<
             O,
-            F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+            F: FnOnce(
+                &mut MulticastRouteTable<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
+                &mut Self::Ctx<'_>,
+            ) -> O,
         >(
             &mut self,
             state: &MulticastForwardingEnabledState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
@@ -550,12 +567,15 @@ mod tests {
     use super::*;
 
     use alloc::vec;
+    use core::time::Duration;
+
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::MultipleDevicesId;
     use packet::ParseBuffer;
     use test_case::test_case;
     use testutil::TestIpExt;
 
+    use crate::internal::multicast_forwarding::route::MulticastRouteStats;
     use crate::multicast_forwarding::MulticastRouteTarget;
 
     struct LookupTestCase {
@@ -598,7 +618,7 @@ mod tests {
             // installation fails.
             assert_eq!(
                 api.add_multicast_route(
-                    expected_key,
+                    expected_key.clone(),
                     MulticastRoute::new_forward(
                         expected_dev,
                         [MulticastRouteTarget {
@@ -615,11 +635,16 @@ mod tests {
 
         api.core_ctx().state.set_multicast_forwarding_enabled_for_dev(actual_dev, dev_enabled);
 
+        let (core_ctx, bindings_ctx) = api.contexts();
+        let creation_time = bindings_ctx.now();
+        bindings_ctx.timers.instant.sleep(Duration::from_secs(5));
+        let lookup_time = bindings_ctx.now();
+        assert!(lookup_time > creation_time);
+
         let buf = testutil::new_ip_packet_buf::<I>(actual_key.src_addr(), actual_key.dst_addr());
         let mut buf_ref = buf.as_ref();
         let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
 
-        let (core_ctx, bindings_ctx) = api.contexts();
         let route = lookup_multicast_route_or_stash_packet(
             core_ctx,
             bindings_ctx,
@@ -648,6 +673,18 @@ mod tests {
         }
         assert_eq!(bindings_ctx.take_events(), expected_events);
 
-        route.is_some()
+        let lookup_succeeded = route.is_some();
+
+        if enabled {
+            // Verify that on success, the last_used field in stats is updated.
+            let expected_stats = if lookup_succeeded {
+                MulticastRouteStats { last_used: lookup_time }
+            } else {
+                MulticastRouteStats { last_used: creation_time }
+            };
+            assert_eq!(api.get_route_stats(&expected_key), Ok(Some(expected_stats)));
+        }
+
+        lookup_succeeded
     }
 }

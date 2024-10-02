@@ -5,31 +5,56 @@
 //! Declares the API for configuring multicast forwarding within the netstack.
 
 use alloc::collections::btree_map;
+use core::sync::atomic::Ordering;
 
 use log::warn;
 use net_types::ip::{Ip, IpVersionMarker};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    AnyDevice, ContextPair, CoreTimerContext, DeviceIdContext, WeakDeviceIdentifier,
+    AnyDevice, AtomicInstant, ContextPair, CoreTimerContext, DeviceIdContext, InstantBindingsTypes,
+    InstantContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 
 use crate::internal::base::IpLayerForwardingContext;
 use crate::internal::multicast_forwarding::packet_queue::{PacketQueue, QueuedPacket};
 use crate::internal::multicast_forwarding::route::{
-    Action, MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
+    Action, MulticastRoute, MulticastRouteEntry, MulticastRouteKey, MulticastRouteStats,
+    MulticastRouteTarget,
 };
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingEnabledState, MulticastForwardingPendingPacketsContext as _,
     MulticastForwardingState, MulticastForwardingStateContext, MulticastRouteTableContext as _,
 };
 use crate::internal::multicast_forwarding::{
-    MulticastForwardingDeviceContext, MulticastForwardingEvent, MulticastForwardingTimerId,
+    MulticastForwardingBindingsTypes, MulticastForwardingDeviceContext, MulticastForwardingEvent,
+    MulticastForwardingTimerId,
 };
 use crate::{IpLayerBindingsContext, IpLayerIpExt, IpPacketDestination};
 
 /// The API action can not be performed while multicast forwarding is disabled.
 #[derive(Debug, Eq, PartialEq)]
 pub struct MulticastForwardingDisabledError {}
+
+trait MulticastForwardingStateExt<
+    I: IpLayerIpExt,
+    D: StrongDeviceIdentifier,
+    BT: MulticastForwardingBindingsTypes,
+>
+{
+    fn try_enabled(
+        &self,
+    ) -> Result<&MulticastForwardingEnabledState<I, D, BT>, MulticastForwardingDisabledError>;
+}
+
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: MulticastForwardingBindingsTypes>
+    MulticastForwardingStateExt<I, D, BT> for MulticastForwardingState<I, D, BT>
+{
+    fn try_enabled(
+        &self,
+    ) -> Result<&MulticastForwardingEnabledState<I, D, BT>, MulticastForwardingDisabledError> {
+        self.enabled().ok_or(MulticastForwardingDisabledError {})
+    }
+}
 
 /// The multicast forwarding API.
 pub struct MulticastForwardingApi<I: Ip, C> {
@@ -110,11 +135,16 @@ where
     > {
         let (core_ctx, bindings_ctx) = self.contexts();
         let (orig_route, packet_queue_and_new_route) = core_ctx.with_state_mut(|state, ctx| {
-            let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
+            let state = state.try_enabled()?;
             ctx.with_route_table_mut(state, |route_table, ctx| {
+                let stats = MulticastRouteStats { last_used: bindings_ctx.now_atomic() };
                 match route_table.entry(key.clone()) {
                     btree_map::Entry::Occupied(mut entry) => {
-                        let orig_route = entry.insert(route);
+                        // NB: We consider the stats to be associated with the
+                        // `route` rather than the route's key. As such we
+                        // replace the stats instead of preserving them.
+                        let MulticastRouteEntry { route: orig_route, stats: _ } =
+                            entry.insert(MulticastRouteEntry { route, stats });
                         // NB: Check the invariant that any key present in the
                         // route table is not also present in the pending table.
                         #[cfg(debug_assertions)]
@@ -124,7 +154,8 @@ where
                         Ok((Some(orig_route), None))
                     }
                     btree_map::Entry::Vacant(entry) => {
-                        let new_route_ref = entry.insert(route);
+                        let MulticastRouteEntry { route: new_route_ref, stats: _ } =
+                            entry.insert(MulticastRouteEntry { route, stats });
                         let packet_queue_and_new_route = ctx
                             .with_pending_table_mut(state, |pending_table| {
                                 pending_table.remove(&key, bindings_ctx)
@@ -160,8 +191,10 @@ where
         MulticastForwardingDisabledError,
     > {
         self.core_ctx().with_state_mut(|state, ctx| {
-            let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
-            ctx.with_route_table_mut(state, |route_table, _ctx| Ok(route_table.remove(key)))
+            let state = state.try_enabled()?;
+            ctx.with_route_table_mut(state, |route_table, _ctx| {
+                Ok(route_table.remove(key).map(|MulticastRouteEntry { route, stats: _ }| route))
+            })
         })
     }
 
@@ -184,30 +217,56 @@ where
                 return;
             };
             ctx.with_route_table_mut(state, |route_table, _ctx| {
-                route_table.retain(|_route_key, MulticastRoute { action, input_interface }| {
-                    if dev == &*input_interface {
-                        return false;
-                    }
-                    match action {
-                        Action::Forward(ref mut targets) => {
-                            // If all targets reference the device, we should
-                            // discard the route entirely.
-                            if targets.iter().all(|target| dev == &target.output_interface) {
-                                return false;
-                            }
-                            // Otherwise, if any target references the device,
-                            // we should remove it from the set of targets.
-                            if targets.iter().any(|target| dev == &target.output_interface) {
-                                *targets = targets
-                                    .iter()
-                                    .filter(|target| dev != &target.output_interface)
-                                    .cloned()
-                                    .collect();
+                route_table.retain(
+                    |_route_key,
+                     MulticastRouteEntry {
+                         route: MulticastRoute { action, input_interface },
+                         stats: _,
+                     }| {
+                        if dev == &*input_interface {
+                            return false;
+                        }
+                        match action {
+                            Action::Forward(ref mut targets) => {
+                                // If all targets reference the device, we should
+                                // discard the route entirely.
+                                if targets.iter().all(|target| dev == &target.output_interface) {
+                                    return false;
+                                }
+                                // Otherwise, if any target references the device,
+                                // we should remove it from the set of targets.
+                                if targets.iter().any(|target| dev == &target.output_interface) {
+                                    *targets = targets
+                                        .iter()
+                                        .filter(|target| dev != &target.output_interface)
+                                        .cloned()
+                                        .collect();
+                                }
                             }
                         }
-                    }
-                    true
-                })
+                        true
+                    },
+                )
+            })
+        })
+    }
+
+    /// Returns the [`MulticastRouteStats`], if any, for the given key.
+    pub fn get_route_stats(
+        &mut self,
+        key: &MulticastRouteKey<I>,
+    ) -> Result<
+        Option<MulticastRouteStats<<C::BindingsContext as InstantBindingsTypes>::Instant>>,
+        MulticastForwardingDisabledError,
+    > {
+        self.core_ctx().with_state_mut(|state, ctx| {
+            let state = state.try_enabled()?;
+            ctx.with_route_table(state, |route_table, _ctx| {
+                Ok(route_table.get(key).map(
+                    |MulticastRouteEntry { route: _, stats: MulticastRouteStats { last_used } }| {
+                        MulticastRouteStats { last_used: last_used.load(Ordering::Relaxed) }
+                    },
+                ))
             })
         })
     }
@@ -267,6 +326,13 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
             );
             continue;
         }
+
+        // NB: We could choose to update the `last_used` value on the route's
+        // statistics here, but that's probably overkill. We only end up in this
+        // function as part of route installation, which will have appropriately
+        // initialized `last_used`. It's not worth re-acquiring the route table
+        // lock to update it again here, as the change in time will be
+        // negligible.
 
         // TODO(https://fxbug.dev/352570820): Increment a counter.
         match &action {
@@ -341,6 +407,7 @@ mod tests {
 
     use alloc::vec;
     use core::ops::Deref;
+    use core::time::Duration;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
@@ -561,6 +628,40 @@ mod tests {
             Ok(Some(MulticastRoute::new_forward(GOOD_DEV1, [GOOD_TARGET2].into()).unwrap()))
         );
         assert_eq!(api.remove_multicast_route(&key4), Ok(Some(no_ref_to_dev)));
+    }
+
+    #[ip_test(I)]
+    fn get_route_stats<I: TestIpExt>() {
+        let key = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
+
+        let mut api = multicast_forwarding::testutil::new_api::<I>();
+
+        // Verify that get_route_stats fails when forwarding is disabled.
+        assert_eq!(api.get_route_stats(&key), Err(MulticastForwardingDisabledError {}));
+
+        // Verify that get_route_stats returns `None` if the route doesn't exist.
+        assert!(api.enable());
+        assert_eq!(api.get_route_stats(&key), Ok(None));
+
+        // Install a route and verify that get_route_stats succeeds.
+        let route = MulticastRoute::new_forward(
+            MultipleDevicesId::A,
+            [MulticastRouteTarget { output_interface: MultipleDevicesId::B, min_ttl: 0 }].into(),
+        )
+        .unwrap();
+        assert_eq!(api.add_multicast_route(key.clone(), route.clone()), Ok(None));
+        let original_time = api.ctx.bindings_ctx().now();
+        let expected_stats = MulticastRouteStats { last_used: original_time };
+        assert_eq!(api.get_route_stats(&key), Ok(Some(expected_stats)));
+
+        // Advance the timer and overwrite the route to prove we initialize
+        // stats with an up-to-date instant.
+        api.ctx.bindings_ctx().timers.instant.sleep(Duration::from_secs(5));
+        let new_time = api.ctx.bindings_ctx().now();
+        assert!(new_time > original_time);
+        let expected_stats = MulticastRouteStats { last_used: new_time };
+        assert_eq!(api.add_multicast_route(key.clone(), route.clone()), Ok(Some(route)));
+        assert_eq!(api.get_route_stats(&key), Ok(Some(expected_stats)));
     }
 
     #[test_case(0)]

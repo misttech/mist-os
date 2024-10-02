@@ -1180,7 +1180,7 @@ fn add_address(
     let valid_until = if valid_lifetime_end == INFINITE_NANOS {
         Lifetime::Infinite
     } else {
-        Lifetime::Finite(StackTime(fasync::Time::from_nanos(valid_lifetime_end)))
+        Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(valid_lifetime_end)))
     };
 
     let addr_subnet_either = match addr_subnet_either {
@@ -1712,7 +1712,9 @@ fn dispatch_address_state_provider_request(
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
             let valid_lifetime_end = valid_lifetime_end_nanos
-                .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
+                .map(|nanos| {
+                    Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(nanos)))
+                })
                 .unwrap_or(Lifetime::Infinite);
             let result = match address.into() {
                 IpAddr::V4(address) => ctx.api().device_ip::<Ipv4>().set_addr_properties(

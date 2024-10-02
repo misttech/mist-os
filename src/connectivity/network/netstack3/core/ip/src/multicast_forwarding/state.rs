@@ -11,7 +11,7 @@ use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{AnyDevice, CoreTimerContext, DeviceIdContext, StrongDeviceIdentifier};
 
 use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
-use crate::internal::multicast_forwarding::route::{MulticastRoute, MulticastRouteKey};
+use crate::internal::multicast_forwarding::route::{MulticastRouteEntry, MulticastRouteKey};
 use crate::internal::multicast_forwarding::{
     MulticastForwardingBindingsContext, MulticastForwardingBindingsTypes,
     MulticastForwardingTimerId,
@@ -58,7 +58,7 @@ pub struct MulticastForwardingEnabledState<
     /// The stack's multicast route table.
     ///
     /// Keys here must not be present in `pending_table`.
-    route_table: RwLock<MulticastRouteTable<I, D>>,
+    route_table: RwLock<MulticastRouteTable<I, D, BT>>,
     /// The stack's table of pending multicast packets.
     ///
     /// Keys here must not be present in `route_table`.
@@ -80,7 +80,7 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: MulticastForwardingBindings
 
     // Helper function to circumvent lock ordering, for tests.
     #[cfg(test)]
-    pub(super) fn route_table(&self) -> &RwLock<MulticastRouteTable<I, D>> {
+    pub(super) fn route_table(&self) -> &RwLock<MulticastRouteTable<I, D, BC>> {
         &self.route_table
     }
     // Helper function to circumvent lock ordering, for tests.
@@ -93,12 +93,12 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: MulticastForwardingBindings
 }
 
 /// A table of multicast routes specifying how to forward multicast packets.
-pub type MulticastRouteTable<I, D> = BTreeMap<MulticastRouteKey<I>, MulticastRoute<D>>;
+pub type MulticastRouteTable<I, D, BT> = BTreeMap<MulticastRouteKey<I>, MulticastRouteEntry<D, BT>>;
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: MulticastForwardingBindingsTypes>
-    OrderedLockAccess<MulticastRouteTable<I, D>> for MulticastForwardingEnabledState<I, D, BT>
+    OrderedLockAccess<MulticastRouteTable<I, D, BT>> for MulticastForwardingEnabledState<I, D, BT>
 {
-    type Lock = RwLock<MulticastRouteTable<I, D>>;
+    type Lock = RwLock<MulticastRouteTable<I, D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.route_table)
     }
@@ -162,7 +162,7 @@ pub trait MulticastRouteTableContext<I: IpLayerIpExt, BT: MulticastForwardingBin
     /// Provides immutable access to the route table.
     fn with_route_table<
         O,
-        F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&MulticastRouteTable<I, Self::DeviceId, BT>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         state: &MulticastForwardingEnabledState<I, Self::DeviceId, BT>,
@@ -171,7 +171,7 @@ pub trait MulticastRouteTableContext<I: IpLayerIpExt, BT: MulticastForwardingBin
     /// Provides mutable access to the route table.
     fn with_route_table_mut<
         O,
-        F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId, BT>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         state: &MulticastForwardingEnabledState<I, Self::DeviceId, BT>,

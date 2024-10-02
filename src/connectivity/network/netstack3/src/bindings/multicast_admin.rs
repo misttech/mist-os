@@ -11,11 +11,11 @@ use derivative::Derivative;
 use explicit::ResultExt;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream};
 use fidl_fuchsia_net_multicast_admin::{
-    self as fnet_multicast_admin, RoutingEvent, TableControllerCloseReason, WrongInputInterface,
-    MAX_ROUTING_EVENTS,
+    self as fnet_multicast_admin, RouteStats, RoutingEvent, TableControllerCloseReason,
+    WrongInputInterface, MAX_ROUTING_EVENTS,
 };
 use fidl_fuchsia_net_multicast_ext::{
-    AddRouteError, DelRouteError, FidlMulticastAdminIpExt, FidlResponder as _,
+    AddRouteError, DelRouteError, FidlMulticastAdminIpExt, FidlResponder as _, GetRouteStatsError,
     Route as FidlExtRoute, TableControllerRequest, TerminalEventControlHandle,
     UnicastSourceAndMulticastDestination, WatchRoutingEventsResponse,
 };
@@ -28,10 +28,11 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::ip::{
     ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
-    MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
+    MulticastRoute, MulticastRouteKey, MulticastRouteStats, MulticastRouteTarget,
 };
 use netstack3_core::IpExt;
 
+use crate::bindings::time::StackTime;
 use crate::bindings::util::{
     DeviceNotFoundError, IntoFidl, IntoFidlWithContext, ResultExt as _, TryFromFidl,
     TryFromFidlWithContext, TryIntoCore as _, TryIntoCoreWithContext,
@@ -501,10 +502,13 @@ fn handle_request<I: IpExt + FidlMulticastAdminIpExt>(
             Ok(())
         }
         TableControllerRequest::GetRouteStats { addresses, responder } => {
-            // TODO(https://fxbug.dev/323052525): Support getting multicast route stats.
-            warn!("not getting routes stats; unimplemented: addresses={addresses:?}");
-            let stats = fnet_multicast_admin::RouteStats::default();
-            responder.try_send(Ok(&stats)).unwrap_or_log("failed to respond");
+            let result = handle_get_route_stats(ctx, addresses);
+            if let Err(e) = &result {
+                warn!("failed to get route stats: {e:?}")
+            }
+            responder
+                .try_send(result.as_ref().map_err(Clone::clone))
+                .unwrap_or_log("failed to respond");
             Ok(())
         }
         TableControllerRequest::WatchRoutingEvents { responder } => {
@@ -544,7 +548,23 @@ fn handle_del_route<I: IpExt + FidlMulticastAdminIpExt>(
         Ok(None) => Err(DelRouteError::NotFound),
         Ok(Some(_route)) => Ok(()),
         Err(MulticastForwardingDisabledError {}) => {
-            unreachable!("the existance of a `MulticastAdminClient` proves the api is enabled")
+            unreachable!("the existence of a `MulticastAdminClient` proves the api is enabled")
+        }
+    }
+}
+
+/// Gets statistics for a multicast route.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_route_stats<I: IpExt + FidlMulticastAdminIpExt>(
+    ctx: &mut Ctx,
+    addresses: UnicastSourceAndMulticastDestination<I>,
+) -> Result<RouteStats, GetRouteStatsError> {
+    let key = addresses.try_into_core().map_err(IntoFidl::<GetRouteStatsError>::into_fidl)?;
+    match ctx.api().multicast_forwarding().get_route_stats(&key) {
+        Ok(None) => Err(GetRouteStatsError::NotFound),
+        Ok(Some(stats)) => Ok(stats.into_fidl()),
+        Err(MulticastForwardingDisabledError {}) => {
+            unreachable!("the existence of a `MulticastAdminClient` proves the api is enabled")
         }
     }
 }
@@ -564,6 +584,13 @@ impl IntoFidl<DelRouteError> for MulticastRouteAddressError {
     fn into_fidl(self) -> DelRouteError {
         let MulticastRouteAddressError {} = self;
         DelRouteError::InvalidAddress
+    }
+}
+
+impl IntoFidl<GetRouteStatsError> for MulticastRouteAddressError {
+    fn into_fidl(self) -> GetRouteStatsError {
+        let MulticastRouteAddressError {} = self;
+        GetRouteStatsError::InvalidAddress
     }
 }
 
@@ -629,6 +656,16 @@ impl TryFromFidlWithContext<FidlExtRoute> for MulticastRoute<DeviceId<BindingsCt
                     }
                 })
             }
+        }
+    }
+}
+
+impl IntoFidl<RouteStats> for MulticastRouteStats<StackTime> {
+    fn into_fidl(self) -> RouteStats {
+        let MulticastRouteStats { last_used } = self;
+        RouteStats {
+            last_used: Some(last_used.into_fidl()),
+            __source_breaking: fidl::marker::SourceBreaking,
         }
     }
 }

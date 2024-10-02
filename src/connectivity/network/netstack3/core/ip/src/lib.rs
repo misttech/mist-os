@@ -189,8 +189,8 @@ pub mod multicast_forwarding {
     };
     pub use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
     pub use crate::internal::multicast_forwarding::route::{
-        ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
-        MulticastRouteTargets,
+        ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteStats,
+        MulticastRouteTarget, MulticastRouteTargets,
     };
     pub use crate::internal::multicast_forwarding::state::{
         MulticastForwardingEnabledState, MulticastForwardingPendingPacketsContext,

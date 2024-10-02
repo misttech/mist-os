@@ -284,7 +284,7 @@ trait LifetimeExt {
 impl LifetimeExt for Lifetime<StackTime> {
     fn into_zx_time(self) -> zx::MonotonicInstant {
         match self {
-            Lifetime::Finite(StackTime(time)) => time.into_zx(),
+            Lifetime::Finite(time) => time.into_zx(),
             Lifetime::Infinite => zx::MonotonicInstant::INFINITE,
         }
     }
@@ -369,7 +369,7 @@ impl InstantBindingsTypes for BindingsCtx {
 
 impl InstantContext for BindingsCtx {
     fn now(&self) -> StackTime {
-        StackTime(fasync::Time::now())
+        StackTime::now()
     }
 }
 
@@ -457,10 +457,10 @@ impl TimerContext for BindingsCtx {
 
     fn schedule_timer_instant(
         &mut self,
-        StackTime(time): Self::Instant,
+        time: Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
-        timer.schedule(time).map(Into::into)
+        timer.schedule(time.into_fuchsia_time()).map(Into::into)
     }
 
     fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {

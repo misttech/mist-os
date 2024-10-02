@@ -9,11 +9,41 @@ use std::time::Duration;
 use fuchsia_async as fasync;
 use netstack3_core::{AtomicInstant, Instant};
 
-use crate::bindings::{InspectableValue, Inspector};
+use crate::bindings::util::IntoFidl;
+use crate::bindings::{zx, InspectableValue, Inspector};
 
 /// A thin wrapper around `fuchsia_async::Time` that implements `core::Instant`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
-pub(crate) struct StackTime(pub(crate) fasync::Time);
+pub(crate) struct StackTime(fasync::Time);
+
+impl StackTime {
+    /// Construct a new [`StackTime`] from the given [`fasync::Time`].
+    pub(crate) fn new(time: fasync::Time) -> StackTime {
+        StackTime(time)
+    }
+
+    /// Construct a new [`StackTime`] at the current time.
+    pub(crate) fn now() -> StackTime {
+        StackTime(fasync::Time::now())
+    }
+
+    /// Construct a new [`StackTime`] from a [`zx::MonotonicInstant`].
+    pub(crate) fn from_zx(time: zx::MonotonicInstant) -> StackTime {
+        StackTime(fasync::Time::from_zx(time))
+    }
+
+    /// Convert [`StackTime`] into a [`zx::MonotonicInstant`].
+    pub(crate) fn into_zx(self) -> zx::MonotonicInstant {
+        let StackTime(time) = self;
+        time.into_zx()
+    }
+
+    /// Convert [`StackTime`] into a [`fasync::Time`]
+    pub(crate) fn into_fuchsia_time(self) -> fasync::Time {
+        let StackTime(time) = self;
+        time
+    }
+}
 
 impl Instant for StackTime {
     fn checked_duration_since(&self, earlier: StackTime) -> Option<Duration> {
@@ -47,6 +77,12 @@ impl InspectableValue for StackTime {
     fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
         let Self(inner) = self;
         inspector.record_int(name, inner.into_nanos())
+    }
+}
+
+impl IntoFidl<i64> for StackTime {
+    fn into_fidl(self) -> i64 {
+        self.into_zx().into_nanos()
     }
 }
 
