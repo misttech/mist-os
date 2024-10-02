@@ -26,7 +26,7 @@ use pkg::repo::{
     aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, repo_spec_to_backend,
     update_repository, Registrar, RepoInner, SaveConfig, ServerState,
 };
-use pkg::{config as pkg_config, metrics, write_instance_info, PathType, ServerMode};
+use pkg::{config as pkg_config, metrics, write_instance_info, ServerMode};
 use protocols::prelude::*;
 use shared_child::SharedChild;
 use std::net::SocketAddr;
@@ -913,18 +913,6 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
         }
     };
     for (name, repo_spec) in pkg::config::get_repositories().await {
-        let (repo_path, aliases) = match repo_spec {
-            RepositorySpec::FileSystem { ref metadata_repo_path, ref aliases, .. } => {
-                (metadata_repo_path.as_std_path().into(), aliases)
-            }
-            RepositorySpec::Pm { ref path, ref aliases } => (path.as_std_path().into(), aliases),
-            RepositorySpec::Http { ref metadata_repo_url, ref aliases, .. } => {
-                (PathType::Url(metadata_repo_url.clone()), aliases)
-            }
-            RepositorySpec::Gcs { ref metadata_repo_url, ref aliases, .. } => {
-                (PathType::Url(metadata_repo_url.clone()), aliases)
-            }
-        };
         let valid = if inner.read().await.manager.get(&name).is_some() {
             tracing::debug!("repo {name} not added because it is already added");
             true
@@ -956,7 +944,6 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
                         http::Uri::default()
                     }
                 };
-
                 if let Ok(repo_config) =
                     repo_client.read().await.get_config(repo_url, mirror_url, None)
                 {
@@ -965,8 +952,7 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
                         ServerMode::Daemon,
                         &name,
                         &addr,
-                        repo_path.into(),
-                        aliases.into_iter().map(ToString::to_string).collect(),
+                        repo_spec.clone(),
                         RepositoryStorageType::Ephemeral,
                         RepositoryRegistrationAliasConflictMode::Replace.into(),
                         repo_config,

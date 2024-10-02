@@ -28,6 +28,8 @@ ffx_plugin("ffx_target_repository_deregister") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
+    "//src/sys/pkg/lib/fuchsia-repo",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
   ]
 

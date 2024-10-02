@@ -217,6 +217,7 @@ async fn remove_aliases(repo_url: &str, rewrite_proxy: EngineProxy) -> Result<()
 #[cfg(test)]
 mod test {
     use super::*;
+    use camino::Utf8PathBuf;
     use ffx_config::ConfigLevel;
     use fho::TestBuffers;
     use fidl::endpoints::ServerEnd;
@@ -231,8 +232,8 @@ mod test {
     use futures::channel::oneshot::{channel, Receiver};
     use futures::StreamExt;
     use pkg::PkgServerInfo;
+    use std::collections::BTreeSet;
     use std::net::Ipv4Addr;
-    use std::path::PathBuf;
     use std::process;
 
     const REPO_NAME: &str = "some-name";
@@ -330,8 +331,11 @@ mod test {
         mgr.write_instance(&PkgServerInfo {
             name,
             address,
-            repo_path: PathBuf::from("/somewhere").as_path().into(),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/somewhere"),
+                aliases: BTreeSet::new(),
+            }
+            .into(),
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode,

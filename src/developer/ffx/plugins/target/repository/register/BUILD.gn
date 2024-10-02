@@ -29,6 +29,8 @@ ffx_plugin("ffx_target_repository_register") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
+    "//src/sys/pkg/lib/fuchsia-repo",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
   ]

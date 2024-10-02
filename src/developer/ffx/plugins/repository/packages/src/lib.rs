@@ -277,7 +277,7 @@ async fn connect_to_repo(
             .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
         let mgr = PkgServerInstances::new(instance_root);
         if let Some(info) = mgr.get_instance(repo_name.clone())? {
-            Some(info.get_repository_spec()?)
+            Some(info.repo_spec())
         } else if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
             .await
             .with_context(|| format!("Finding repo spec for {repo_name}"))?

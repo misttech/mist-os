@@ -264,3 +264,14 @@ pub enum RepositorySpec {
         aliases: BTreeSet<String>,
     },
 }
+
+impl RepositorySpec {
+    pub fn aliases(&self) -> BTreeSet<String> {
+        match self {
+            RepositorySpec::FileSystem { aliases, .. } => aliases.clone(),
+            RepositorySpec::Pm { aliases, .. } => aliases.clone(),
+            RepositorySpec::Http { aliases, .. } => aliases.clone(),
+            RepositorySpec::Gcs { aliases, .. } => aliases.clone(),
+        }
+    }
+}

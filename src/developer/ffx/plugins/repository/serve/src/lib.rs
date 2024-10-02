@@ -231,12 +231,12 @@ pub fn serve_impl_validate_args(
         // if we're starting using a product bundle, the name will be different so compare the repo_path
         // which is the path to the product bundle
         if let Some(pb_path) = &cmd.product_bundle {
-            if pb_path.to_string() != duplicate.repo_path.to_string() {
+            if pb_path.to_string() != duplicate.repo_path_display() {
                 return_user_error!("Repository address conflict. \
                 Cannot start a server named {repo_name} serving {repo_path:?}. \
                 Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\
                 Use `ffx  repository server list` to list running servers",
-                 duplicate.name, duplicate.repo_path.to_string());
+                 duplicate.name, duplicate.repo_path_display());
             }
         } else {
             if repo_name != duplicate.name {
@@ -244,7 +244,7 @@ pub fn serve_impl_validate_args(
                 Cannot start a server named {repo_name} serving {repo_path:?}. \
                 Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\
                 Use `ffx  repository server list` to list running servers",
-                 duplicate.name, duplicate.repo_path.to_string());
+                 duplicate.name, duplicate.repo_path_display());
             }
         }
         return Ok(Some(duplicate.clone()));
@@ -259,7 +259,7 @@ pub fn serve_impl_validate_args(
             Use `ffx  repository server list` to list running servers",
                 dupe_name=duplicate.name,
                 dupe_addr=duplicate.address,
-                dupe_path=duplicate.repo_path.to_string()
+                dupe_path=duplicate.repo_path_display()
             );
         }
         return Ok(Some(duplicate.clone()));
@@ -283,7 +283,9 @@ pub async fn serve_impl<W: Write + 'static>(
         writeln!(
             writer,
             "A server named {} is already serving on address {} the repo path: {}",
-            running.name, running.address, running.repo_path
+            running.name,
+            running.address,
+            running.repo_path_display()
         )
         .map_err(|e| bug!(e))?;
         return Ok(());
@@ -402,13 +404,13 @@ pub async fn serve_impl<W: Write + 'static>(
             .await
             .get_config(repo_url, mirror_url, storage_type.clone())
             .map_err(|e| bug!("{e}"))?;
+        let repo_spec = repo_client.read().await.spec();
         if let Err(e) = write_instance_info(
             Some(context.clone()),
             mode.clone(),
             &name,
             &server_addr,
-            repo_path.as_std_path().into(),
-            cmd.alias.clone(),
+            repo_spec,
             storage_type.clone().unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
             match cmd.alias_conflict_mode {
                 fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => {
@@ -1112,8 +1114,10 @@ mod test {
         let server_info = PkgServerInfo {
             name: instance_name.into(),
             address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-            repo_path: repo_path.as_path().into(),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::new(),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode:
                 fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
@@ -1145,7 +1149,7 @@ mod test {
             Cannot start a server named another-name serving {repo_path:?}. \
             Repository server  \"{name}\" is already running on {addr} serving a different path: {dupe_path}\n\
             Use `ffx  repository server list` to list running servers",
-             addr=server_info.address, name=server_info.name, dupe_path=server_info.repo_path.to_string()))
+             addr=server_info.address, name=server_info.name, dupe_path=server_info.repo_path_display()))
     ),
     (
         ServeCommand {
@@ -1187,7 +1191,7 @@ mod test {
         name=instance_name,
         dupe_name=instance_name,
         addr=server_info.address,
-        dupe_path=server_info.repo_path.to_string()
+        dupe_path=server_info.repo_path_display()
        ))
    )
     ];

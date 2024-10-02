@@ -368,9 +368,7 @@ pub async fn register_target_with_repo_instance(
         let aliases: BTreeSet<String> = if let Some(aliases) = &repo_target_info.aliases {
             aliases.clone()
         } else {
-            BTreeSet::<String>::from_iter(
-                repo_instance.registration_aliases.iter().map(String::to_string),
-            )
+            repo_instance.repo_spec().aliases()
         };
 
         // If the registration conflict mode is ErrorOut, read the aliases from the device

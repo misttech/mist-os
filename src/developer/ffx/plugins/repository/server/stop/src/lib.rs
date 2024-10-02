@@ -98,7 +98,7 @@ impl RepoStopTool {
             }
         } else if let Some(product_bundle) = &self.cmd.product_bundle {
             if let Some(instance) =
-                instances.iter().find(|s| s.repo_path.to_string() == product_bundle.to_string())
+                instances.iter().find(|s| s.repo_path_display() == product_bundle.to_string())
             {
                 return Self::stop_instance(instance, &None).await;
             } else {
@@ -177,14 +177,15 @@ mod tests {
     use ffx_config::TestEnv;
     use fho::Format;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
+    use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
     use fidl_fuchsia_pkg_ext::{
         RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
     };
     use futures::channel::oneshot::channel;
     use serde_json::Value;
+    use std::collections::BTreeSet;
     use std::net::Ipv4Addr;
     use std::os::unix::fs::PermissionsExt as _;
-    use std::path::PathBuf;
     use std::process::{Child, Command};
     use std::{fs, process};
 
@@ -220,17 +221,13 @@ mod tests {
 
         let address = (Ipv4Addr::LOCALHOST, 1234).into();
 
-        let repo_path: PathBuf = if let Some(pb) = product_bundle_path {
-            pb.into()
-        } else {
-            PathBuf::from("/somewhere")
-        };
+        let repo_path: Utf8PathBuf =
+            if let Some(pb) = product_bundle_path { pb } else { Utf8PathBuf::from("/somewhere") };
 
         mgr.write_instance(&PkgServerInfo {
             name,
             address,
-            repo_path: repo_path.as_path().into(),
-            registration_aliases: vec![],
+            repo_spec: RepositorySpec::Pm { path: repo_path, aliases: BTreeSet::new() }.into(),
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
@@ -253,8 +250,11 @@ mod tests {
         mgr.write_instance(&PkgServerInfo {
             name,
             address,
-            repo_path: PathBuf::from("/somewhere").as_path().into(),
-            registration_aliases: vec![],
+            repo_spec: RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/somewhere"),
+                aliases: BTreeSet::new(),
+            }
+            .into(),
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Daemon,

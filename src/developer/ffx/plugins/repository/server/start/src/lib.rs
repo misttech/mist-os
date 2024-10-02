@@ -96,7 +96,9 @@ impl FfxMain for ServerStartTool {
                     writeln!(
                         writer,
                         "A server named {} is serving on address {} the repo path: {}",
-                        running.name, running.address, running.repo_path
+                        running.name,
+                        running.address,
+                        running.repo_path_display()
                     )
                     .map_err(|e| bug!(e))?;
                     return Ok(());
