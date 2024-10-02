@@ -60,10 +60,6 @@ template("sdk_version_history") {
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
-
-    if (sdk_legacy_unstable_abi_revisions) {
-      args += [ "--legacy-unstable-abi-revisions" ]
-    }
   }
 
   # SDK metadata.
