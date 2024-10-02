@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_buffer.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <zircon/assert.h>
 
 #include <functional>
@@ -28,8 +29,6 @@ bool test_vec_output_buffer();
 }  // namespace unit_testing
 
 namespace starnix {
-
-using namespace starnix_uapi;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
 /// order, and must return for each, how many bytes has been written.
@@ -240,7 +239,179 @@ class InputBuffer : public Buffer {
 class InputBufferExt : public InputBuffer {};
 
 /// An OutputBuffer that write data to user space memory through a `TaskMemoryAccessor`.
-class UserBuffersOutputBuffer {};
+template <typename M>
+class UserBuffersOutputBuffer : public OutputBuffer {
+ public:
+  static fit::result<Errno, UserBuffersOutputBuffer> new_inner(const M* mm, UserBuffers buffers) {
+    auto available = UserBuffer::cap_buffers_to_max_rw_count(mm->maximum_valid_address(), buffers);
+    if (available.is_error()) {
+      return available.take_error();
+    }
+
+    //  Reverse the buffers as the element will be removed as they are handled.
+    buffers.reverse();
+    return fit::ok(
+        ktl::move(UserBuffersOutputBuffer(mm, ktl::move(buffers), available.value(), 0ul)));
+  }
+
+  template <typename B, typename F>
+  fit::result<Errno, size_t> write_each_inner(F&& callback) {
+    auto bytes_written = 0;
+    while (!buffers_.is_empty()) {
+      auto buffer = buffers_.pop();
+      if (!buffer.has_value()) {
+        break;
+      }
+
+      if (buffer->is_null()) {
+        continue;
+      }
+
+      fit::result<Errno, B> bytes = callback(buffer->length_) _EP(bytes);
+
+      auto result = mm_->write_memory(buffer->address_, bytes.value()) _EP(result);
+      bytes_written += result.value();
+      auto bytes_len = bytes->size();
+      auto adv_result = buffer->advance(bytes_len) _EP(adv_result);
+      this->available_ -= bytes_len;
+      this->bytes_written_ += bytes_len;
+      if (!buffer->is_empty()) {
+        buffers_.push_back(buffer.value());
+        break;
+      }
+    }
+
+    return fit::ok(bytes_written);
+  }
+
+  static fit::result<Errno, UserBuffersOutputBuffer> unified_new(const CurrentTask& mm,
+                                                                 UserBuffers buffers) {
+    return new_inner(&static_cast<const TaskMemoryAccessor&>(mm), ktl::move(buffers));
+  }
+
+  static fit::result<Errno, UserBuffersOutputBuffer> unified_new_at(const CurrentTask& mm,
+                                                                    UserAddress address,
+                                                                    size_t length) {
+    util::SmallVector<UserBuffer, 1> input_iovec;
+    input_iovec.push_back(UserBuffer{.address_ = address, .length_ = length});
+    return unified_new(mm, ktl::move(input_iovec));
+  }
+
+  fit::result<Errno, size_t> segments_count() const final { return fit::ok(buffers_.size()); }
+
+  fit::result<Errno> peek_each_segment(PeekBufferSegmentsCallback callback) final {
+    // This `UserBuffersOutputBuffer` made sure that each segment only pointed
+    // to valid user-space address ranges on creation so each `buffer` is
+    // safe to write to.
+    for (auto& buffer : std::ranges::reverse_view(buffers_)) {
+      if (buffer.is_null()) {
+        continue;
+      }
+      callback(buffer);
+    }
+
+    return fit::ok();
+  }
+
+  fit::result<Errno, size_t> write(ktl::span<uint8_t>& bytes) final {
+    return write_each_inner<ktl::span<uint8_t>>(
+        [&](size_t buflen) -> fit::result<Errno, ktl::span<uint8_t>> {
+          auto bytes_len = ktl::min(bytes.size(), buflen);
+          auto to_write = bytes.subspan(0, bytes_len);
+          auto remaining = bytes.subspan(bytes_len);
+          bytes = remaining;
+          return fit::ok(to_write);
+        });
+  }
+
+  fit::result<Errno, size_t> write_each(OutputBufferCallback callback) final {
+    return write_each_inner<fbl::Vector<uint8_t>>(
+        [&](size_t buflen) -> fit::result<Errno, fbl::Vector<uint8_t>> {
+          return read_to_vec<Errno, uint8_t>(
+              buflen, [&](ktl::span<uint8_t>& buf) -> fit::result<Errno, NumberOfElementsRead> {
+                auto result = callback(buf) _EP(result);
+                if (result.value() > buflen) {
+                  return fit::error(errno(EINVAL));
+                }
+                return fit::ok(NumberOfElementsRead(result.value()));
+              });
+        });
+  }
+
+  size_t available() const final { return available_; }
+
+  size_t bytes_written() const final { return bytes_written_; }
+
+  fit::result<Errno, size_t> zero() final {
+    auto bytes_written = 0;
+    while (!buffers_.is_empty()) {
+      auto buffer = buffers_.pop();
+      if (!buffer.has_value()) {
+        break;
+      }
+
+      if (buffer->is_null()) {
+        continue;
+      }
+
+      auto count = mm_->zero(buffer->address_, buffer->length_) _EP(count);
+      auto result = buffer->advance(count.value()) _EP(result);
+      bytes_written += count.value();
+
+      this->available_ -= count.value();
+      this->bytes_written_ += count.value();
+
+      if (!buffer->is_empty()) {
+        buffers_.push_back(buffer.value());
+        break;
+      }
+    }
+
+    return fit::ok(bytes_written);
+  }
+
+  fit::result<Errno> advance(size_t length) final {
+    if (length > available_) {
+      return fit::error(errno(EINVAL));
+    }
+
+    while (!buffers_.is_empty()) {
+      auto buffer = buffers_.pop();
+      if (!buffer.has_value()) {
+        break;
+      }
+
+      if (buffer->is_null()) {
+        continue;
+      }
+
+      auto advance_by = ktl::min(length, buffer->length_);
+      auto result = buffer->advance(advance_by) _EP(result);
+      this->available_ -= advance_by;
+      this->bytes_written_ += advance_by;
+      if (!buffer->is_empty()) {
+        buffers_.push_back(buffer.value());
+        break;
+      }
+      length -= advance_by;
+    }
+
+    return fit::ok();
+  }
+
+ private:
+  explicit UserBuffersOutputBuffer(const M* mm, UserBuffers buffers, size_t available,
+                                   size_t bytes_written)
+      : mm_(mm),
+        buffers_(ktl::move(buffers)),
+        available_(available),
+        bytes_written_(bytes_written) {}
+
+  const M* mm_;
+  UserBuffers buffers_;
+  size_t available_;
+  size_t bytes_written_;
+};
 
 /// An InputBuffer that read data from user space memory through a `TaskMemoryAccessor`.
 template <typename M>
