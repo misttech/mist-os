@@ -37,12 +37,11 @@ use crate::internal::rtt::Estimator;
 ///       Maximum Segment Lifetime, the time a TCP segment can exist in
 ///       the internetwork system.  Arbitrarily defined to be 2 minutes.
 pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
-// TODO(https://fxbug.dev/42069155): With the current usage of netstack3 on mostly
-// link-local workloads, these values are large enough to accommodate most cases
-// so it can help us detect failure faster. We should make them agree with other
-// common implementations once we can configure them through socket options.
+
 const DEFAULT_MAX_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(12));
-const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
+/// Assuming a 200ms RTT, with 12 retries, the timeout should be at least 0.2 * (2 ^ 12 - 1) = 819s.
+/// Rounding it up to have some extra buffer.
+const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(900);
 
 /// Default maximum SYN's to send before giving up an attempt to connect.
 // TODO(https://fxbug.dev/42077087): Make these constants configurable.
@@ -5693,6 +5692,9 @@ mod test {
         );
     }
 
+    const TEST_USER_TIMEOUT: NonZeroDuration =
+        const_unwrap_option(NonZeroDuration::from_secs(2 * 60));
+
     // We can use a smaller and a larger RTT so that when using the smaller one,
     // we can reach maximum retransmit retires and when using the larger one, we
     // timeout before reaching maximum retries.
@@ -5739,8 +5741,12 @@ mod test {
         });
         let mut times = 1;
         let start = clock.now();
-        while let Some(seg) = state.poll_send_with_default_options(u32::MAX, clock.now(), &counters)
-        {
+        while let Some(seg) = state.poll_send(
+            &counters,
+            u32::MAX,
+            clock.now(),
+            &SocketOptions { user_timeout: Some(TEST_USER_TIMEOUT), ..SocketOptions::default() },
+        ) {
             if zero_window_probe {
                 let zero_window_ack = Segment::ack(
                     seg.header.ack.unwrap(),
@@ -5748,12 +5754,17 @@ mod test {
                     UnscaledWindowSize::from(0),
                 );
                 assert_eq!(
-                    state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
+                    state.on_segment::<(), ClientlessBufferProvider>(
+                        &counters,
                         zero_window_ack,
                         clock.now(),
-                        &counters,
+                        &SocketOptions {
+                            user_timeout: Some(TEST_USER_TIMEOUT),
+                            ..SocketOptions::default()
+                        },
+                        false,
                     ),
-                    (None, None)
+                    (None, None, DataAcked::No)
                 );
             }
             let deadline = state.poll_send_at().expect("must have a retransmission timer");
@@ -5761,7 +5772,7 @@ mod test {
             times += 1;
         }
         let elapsed = clock.now().checked_duration_since(start).unwrap();
-        assert_eq!(elapsed, DEFAULT_USER_TIMEOUT);
+        assert_eq!(elapsed, TEST_USER_TIMEOUT.get());
         if max_retries {
             assert_eq!(times, DEFAULT_MAX_RETRIES.get());
         } else {
