@@ -3,24 +3,34 @@
 // found in the LICENSE file.
 
 #include <assert.h>
+#include <lib/standalone-test/standalone.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/resource.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <lib/zx/timer.h>
 #include <stdio.h>
 #include <threads.h>
 #include <unistd.h>
+#include <zircon/syscalls-next.h>
+#include <zircon/syscalls/resource.h>
 
 #include <zxtest/zxtest.h>
 
+#include "../needs-next.h"
+
+NEEDS_NEXT_SYSCALL(zx_system_suspend_enter);
+
 namespace {
 
-#define INVALID_CLOCK ((zx_clock_t)1)
+#define INVALID_CLOCK ((zx_clock_t)2)
 
 void CheckInfo(const zx::timer& timer, uint32_t options, zx_time_t deadline, zx_duration_t slack) {
   zx_info_timer_t info = {};
   ASSERT_OK(timer.get_info(ZX_INFO_TIMER, &info, sizeof(info), nullptr, nullptr));
   EXPECT_EQ(info.options, options);
   EXPECT_EQ(info.deadline, deadline);
-  EXPECT_GE(info.slack, slack);
+  EXPECT_EQ(info.slack, slack);
 }
 
 TEST(Timer, DeadlineAfter) {
@@ -213,6 +223,32 @@ void CheckCoalescing(uint32_t mode) {
   } else {
     assert(false);
   }
+}
+
+// This test verifies that timers on the boot timeline elapse during periods of suspension.
+// TODO(https://fxbug.dev/341785588): Once we start pausing the monotonic clock during suspend, we
+// should test that timers on the monotonic timeline do not elapse during periods of suspension.
+TEST(Timer, BootTimersElapseDuringSuspend) {
+  NEEDS_NEXT_SKIP(zx_system_suspend_enter);
+
+  // Create a boot timer and set its deadline to 5 seconds in the future.
+  zx::timer timer_boot;
+  ASSERT_OK(zx::timer::create(0, ZX_CLOCK_BOOT, &timer_boot));
+  const zx::time_boot deadline_boot = zx::clock::get_boot() + zx::sec(5);
+  ASSERT_OK(timer_boot.set(deadline_boot, zx::nsec(0)));
+
+  // Suspend the system for 7 seconds.
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+  const zx::result resource_result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_CPU_BASE);
+  ASSERT_OK(resource_result.status_value());
+  const zx::time_boot deadline_suspend = zx::clock::get_boot() + zx::sec(7);
+  ASSERT_OK(zx_system_suspend_enter(resource_result->get(), deadline_suspend.get()));
+
+  // Verify that the boot timer has signaled.
+  zx_signals_t pending_boot;
+  EXPECT_OK(timer_boot.wait_one(ZX_TIMER_SIGNALED, zx::time::infinite_past(), &pending_boot));
+  EXPECT_EQ(pending_boot, ZX_TIMER_SIGNALED);
 }
 
 // Test is disabled, see |CheckCoalescing|.

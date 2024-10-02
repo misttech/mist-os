@@ -29,7 +29,7 @@
   "pkg/zx/include/lib/zx/task.h": "9de6ec6bb57181825ff36f732db23436",
   "pkg/zx/include/lib/zx/thread.h": "3a417e20e74a7198d1ceeb097d4c8ab7",
   "pkg/zx/include/lib/zx/time.h": "3c1ec299579d25815379283c568af92a",
-  "pkg/zx/include/lib/zx/timer.h": "f91bc42de3e3a20877e2770259623a6b",
+  "pkg/zx/include/lib/zx/timer.h": "bccfacf36ff94e357db55c69697ffc0f",
   "pkg/zx/include/lib/zx/vcpu.h": "830ce0b65c469d394cca3cad0ee51ad9",
   "pkg/zx/include/lib/zx/vmar.h": "6748f652d7d60879374addc12e6b03b4",
   "pkg/zx/include/lib/zx/vmo.h": "707c4ec7901a990bf86814795876f745"

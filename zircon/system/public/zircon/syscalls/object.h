@@ -192,7 +192,8 @@ typedef struct zx_info_timer {
     // The options passed to zx_timer_create().
     uint32_t options;
 
-    uint8_t padding1[4];
+    // The reference timeline this timer is operating on.
+    zx_clock_t clock_id;
 
     // The deadline with respect to ZX_CLOCK_MONOTONIC at which the timer will
     // fire next.

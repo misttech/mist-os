@@ -6,6 +6,8 @@ source_set("timer") {
   testonly = true
   sources = [ "timer.cc" ]
   deps = [
+    "..:needs-next",
+    "//src/zircon/testing/standalone-test",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

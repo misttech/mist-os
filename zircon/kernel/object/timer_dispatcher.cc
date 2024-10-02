@@ -29,8 +29,8 @@ static void timer_irq_callback(Timer* timer, zx_time_t now, void* arg) {
 
 static void dpc_callback(Dpc* d) { d->arg<TimerDispatcher>()->OnTimerFired(); }
 
-zx_status_t TimerDispatcher::Create(uint32_t options, KernelHandle<TimerDispatcher>* handle,
-                                    zx_rights_t* rights) {
+zx_status_t TimerDispatcher::Create(uint32_t options, zx_clock_t clock_id,
+                                    KernelHandle<TimerDispatcher>* handle, zx_rights_t* rights) {
   if (options > ZX_TIMER_SLACK_LATE)
     return ZX_ERR_INVALID_ARGS;
 
@@ -44,7 +44,7 @@ zx_status_t TimerDispatcher::Create(uint32_t options, KernelHandle<TimerDispatch
   };
 
   fbl::AllocChecker ac;
-  KernelHandle new_handle(fbl::AdoptRef(new (&ac) TimerDispatcher(options)));
+  KernelHandle new_handle(fbl::AdoptRef(new (&ac) TimerDispatcher(options, clock_id)));
   if (!ac.check())
     return ZX_ERR_NO_MEMORY;
 
@@ -53,12 +53,15 @@ zx_status_t TimerDispatcher::Create(uint32_t options, KernelHandle<TimerDispatch
   return ZX_OK;
 }
 
-TimerDispatcher::TimerDispatcher(uint32_t options)
+TimerDispatcher::TimerDispatcher(uint32_t options, zx_clock_t clock_id)
     : options_(options),
+      clock_id_(clock_id),
       timer_dpc_(&dpc_callback, this),
       deadline_(0u),
       slack_amount_(0u),
-      cancel_pending_(false) {
+      cancel_pending_(false),
+      timer_(clock_id) {
+  DEBUG_ASSERT(clock_id == ZX_CLOCK_MONOTONIC || clock_id == ZX_CLOCK_BOOT);
   kcounter_add(dispatcher_timer_create_count, 1);
 }
 
@@ -89,7 +92,8 @@ zx_status_t TimerDispatcher::Set(zx_time_t deadline, zx_duration_t slack_amount)
 
   // If the timer is already due, then we can set the signal immediately without
   // starting the timer.
-  if ((deadline == 0u) || (deadline <= current_time())) {
+  const zx_time_t now = (clock_id_ == ZX_CLOCK_MONOTONIC ? current_time() : current_boot_time());
+  if ((deadline == 0u) || (deadline <= now)) {
     UpdateStateLocked(0u, ZX_TIMER_SIGNALED);
     return ZX_OK;
   }
@@ -216,6 +220,7 @@ void TimerDispatcher::GetInfo(zx_info_timer_t* info) const {
 
   Guard<CriticalMutex> guard{get_lock()};
   info->options = options_;
+  info->clock_id = clock_id_;
   info->deadline = deadline_;
   info->slack = slack_amount_;
 }

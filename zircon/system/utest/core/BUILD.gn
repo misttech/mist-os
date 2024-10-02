@@ -52,7 +52,6 @@ core_tests = [
   "syscall-generation",
   "thread-initial-state",
   "time",
-  "timer",
   "version",
 ]
 
@@ -120,6 +119,7 @@ unified_only = [
   "system-cpu",
   "system-suspend",
   "thread-sampler",
+  "timer",
 ]
 assert(core_tests + core_tests_with_custom_manifests -
            core_tests_with_custom_manifests == core_tests,

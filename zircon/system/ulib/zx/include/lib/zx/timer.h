@@ -32,7 +32,9 @@ class timer final : public object<timer> {
   static zx_status_t create(uint32_t options, zx_clock_t clock_id, timer* result)
       ZX_AVAILABLE_SINCE(7);
 
-  zx_status_t set(zx::time deadline, zx::duration slack) const ZX_AVAILABLE_SINCE(7) {
+  template <zx_clock_t clockId>
+  zx_status_t set(zx::basic_time<clockId> deadline, zx::duration slack) const
+      ZX_AVAILABLE_SINCE(7) {
     return zx_timer_set(get(), deadline.get(), slack.get());
   }
 
