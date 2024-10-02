@@ -11,7 +11,7 @@ use crate::rtc::Rtc;
 use crate::time_source_manager::{KernelMonotonicProvider, TimeSourceManager};
 use crate::{Command, Config, UtcTransform};
 use chrono::prelude::*;
-use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcTime};
+use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcInstant};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::mpsc;
 use futures::{select, FutureExt, SinkExt, StreamExt};
@@ -130,7 +130,7 @@ struct Step {
     /// Monotonic time at the step.
     monotonic: zx::MonotonicInstant,
     /// UTC time after the step.
-    utc: UtcTime,
+    utc: UtcInstant,
     /// Rate adjust in PPM after the step.
     rate_adjust_ppm: i32,
     /// Error bound after the step.
@@ -665,7 +665,7 @@ mod tests {
     const BASE_RATE: i32 = -9;
     const BASE_RATE_2: i32 = 2;
     const STD_DEV: zx::Duration = zx::Duration::from_millis(88);
-    const BACKSTOP_TIME: UtcTime = UtcTime::from_nanos(222222 * NANOS_PER_SECOND);
+    const BACKSTOP_TIME: UtcInstant = UtcInstant::from_nanos(222222 * NANOS_PER_SECOND);
     const ERROR_GROWTH_PPM: u32 = 30;
 
     lazy_static! {
@@ -718,7 +718,7 @@ mod tests {
     /// Creates a new transform.
     fn create_transform(
         monotonic: zx::MonotonicInstant,
-        synthetic: UtcTime,
+        synthetic: UtcInstant,
         rate_adjust_ppm: i32,
         std_dev: zx::Duration,
     ) -> UtcTransform {
@@ -738,13 +738,13 @@ mod tests {
         // running since then with a small rate adjustment.
         let initial_transform = create_transform(
             mono - zx::Duration::from_minutes(1),
-            UtcTime::from_nanos((mono - zx::Duration::from_minutes(1) + OFFSET).into_nanos()),
+            UtcInstant::from_nanos((mono - zx::Duration::from_minutes(1) + OFFSET).into_nanos()),
             BASE_RATE,
             zx::Duration::from_nanos(0),
         );
         let final_transform = create_transform(
             mono,
-            UtcTime::from_nanos((mono + OFFSET + zx::Duration::from_millis(50)).into_nanos()),
+            UtcInstant::from_nanos((mono + OFFSET + zx::Duration::from_millis(50)).into_nanos()),
             BASE_RATE_2,
             STD_DEV,
         );
@@ -781,13 +781,13 @@ mod tests {
         let mono = zx::MonotonicInstant::get();
         let initial_transform = create_transform(
             mono,
-            UtcTime::from_nanos((mono + OFFSET).into_nanos()),
+            UtcInstant::from_nanos((mono + OFFSET).into_nanos()),
             BASE_RATE,
             STD_DEV,
         );
         let final_transform = create_transform(
             mono,
-            UtcTime::from_nanos((mono + OFFSET - zx::Duration::from_millis(500)).into_nanos()),
+            UtcInstant::from_nanos((mono + OFFSET - zx::Duration::from_millis(500)).into_nanos()),
             BASE_RATE,
             STD_DEV,
         );
@@ -825,13 +825,13 @@ mod tests {
         let mono = zx::MonotonicInstant::get();
         let initial_transform = create_transform(
             mono - zx::Duration::from_minutes(1),
-            UtcTime::from_nanos((mono - zx::Duration::from_minutes(1) + OFFSET).into_nanos()),
+            UtcInstant::from_nanos((mono - zx::Duration::from_minutes(1) + OFFSET).into_nanos()),
             0,
             zx::Duration::from_nanos(0),
         );
         let final_transform = create_transform(
             mono,
-            UtcTime::from_nanos((mono + OFFSET + zx::Duration::from_hours(1)).into_nanos()),
+            UtcInstant::from_nanos((mono + OFFSET + zx::Duration::from_hours(1)).into_nanos()),
             BASE_RATE_2,
             STD_DEV,
         );
@@ -966,7 +966,7 @@ mod tests {
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
             vec![Sample::new(
-                UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 monotonic_ref,
                 STD_DEV,
             )],
@@ -999,7 +999,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
@@ -1021,7 +1021,7 @@ mod tests {
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
             vec![Sample::new(
-                UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 monotonic_ref,
                 STD_DEV,
             )],
@@ -1074,7 +1074,7 @@ mod tests {
             let clock_manager = create_clock_manager(
                 Arc::clone(&clock),
                 vec![Sample::new(
-                    UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                    UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                     monotonic_ref,
                     STD_DEV,
                 )],
@@ -1120,7 +1120,7 @@ mod tests {
             let clock_manager = create_clock_manager(
                 Arc::clone(&clock),
                 vec![Sample::new(
-                    UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                    UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                     monotonic_ref,
                     STD_DEV,
                 )],
@@ -1154,7 +1154,7 @@ mod tests {
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
             vec![Sample::new(
-                UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 monotonic_ref,
                 STD_DEV,
             )],
@@ -1198,7 +1198,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
@@ -1219,12 +1219,12 @@ mod tests {
             Arc::clone(&clock),
             vec![
                 Sample::new(
-                    UtcTime::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
+                    UtcInstant::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
                     monotonic_ref - SAMPLE_SPACING,
                     STD_DEV,
                 ),
                 Sample::new(
-                    UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                    UtcInstant::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                     monotonic_ref,
                     STD_DEV,
                 ),
@@ -1261,14 +1261,14 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref - SAMPLE_SPACING,
-                utc: UtcTime::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos((monotonic_ref + expected_offset).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref + expected_offset).into_nanos()),
                 sqrt_covariance: zx::Duration::from_nanos(62225396),
             },
             Event::FrequencyWindowDiscarded {
@@ -1302,12 +1302,12 @@ mod tests {
             Arc::clone(&clock),
             vec![
                 Sample::new(
-                    UtcTime::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
+                    UtcInstant::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
                     monotonic_ref - SAMPLE_SPACING,
                     STD_DEV,
                 ),
                 Sample::new(
-                    UtcTime::from_nanos((monotonic_ref + OFFSET + delta_offset).into_nanos()),
+                    UtcInstant::from_nanos((monotonic_ref + OFFSET + delta_offset).into_nanos()),
                     monotonic_ref,
                     STD_DEV,
                 ),
@@ -1386,14 +1386,14 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref - SAMPLE_SPACING,
-                utc: UtcTime::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos(
+                utc: UtcInstant::from_nanos(
                     (monotonic_ref + OFFSET + filtered_delta_offset).into_nanos(),
                 ),
                 sqrt_covariance: zx::Duration::from_nanos(62225396),

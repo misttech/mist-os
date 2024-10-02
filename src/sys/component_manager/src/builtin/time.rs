@@ -6,7 +6,7 @@ use crate::bootfs::BootfsSvc;
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_time as ftime;
 use fuchsia_fs::{file, OpenFlags};
-use fuchsia_runtime::{UtcClock, UtcTime};
+use fuchsia_runtime::{UtcClock, UtcInstant};
 use fuchsia_zircon::{ClockOpts, HandleBased, Rights};
 use futures::prelude::*;
 use std::sync::Arc;
@@ -15,13 +15,13 @@ use std::sync::Arc;
 /// maintains a UTC clock, vending out handles with write access.
 /// Consumers of this protocol are meant to keep the clock synchronized
 /// with external time sources.
-pub struct UtcTimeMaintainer {
+pub struct UtcInstantMaintainer {
     utc_clock: Arc<UtcClock>,
 }
 
-impl UtcTimeMaintainer {
+impl UtcInstantMaintainer {
     pub fn new(utc_clock: Arc<UtcClock>) -> Self {
-        UtcTimeMaintainer { utc_clock }
+        UtcInstantMaintainer { utc_clock }
     }
 
     pub async fn serve(
@@ -37,7 +37,7 @@ impl UtcTimeMaintainer {
     }
 }
 
-async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<UtcTime, Error> {
+async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<UtcInstant, Error> {
     let file_contents: String;
     if bootfs.is_none() {
         let file_proxy = file::open_in_namespace_deprecated(path, OpenFlags::RIGHT_READABLE)
@@ -61,7 +61,7 @@ async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Utc
     }
     let parsed_time =
         file_contents.trim().parse::<i64>().context("failed to parse backstop time")?;
-    Ok(UtcTime::from_nanos(
+    Ok(UtcInstant::from_nanos(
         parsed_time
             .checked_mul(1_000_000_000)
             .ok_or_else(|| anyhow!("backstop time is too large"))?,

@@ -42,7 +42,7 @@ use super::{InspectType, Property, StringProperty};
 use injectable_time::TimeSource;
 
 #[cfg(not(target_os = "fuchsia"))]
-use injectable_time::UtcTime as TimeType;
+use injectable_time::UtcInstant as TimeType;
 
 #[cfg(target_os = "fuchsia")]
 use injectable_time::MonotonicInstant as TimeType;

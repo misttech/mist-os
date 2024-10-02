@@ -6,7 +6,7 @@ use crate::arch::vdso::VDSO_SIGRETURN_NAME;
 use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
-use fuchsia_runtime::{UtcClockTransform, UtcTime};
+use fuchsia_runtime::{UtcClockTransform, UtcInstant};
 use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use process_builder::elf_parse;
@@ -64,7 +64,7 @@ impl MemoryMappedVvar {
             reference_offset: zx::MonotonicInstant::from_nanos(
                 vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
             ),
-            synthetic_offset: UtcTime::from_nanos(
+            synthetic_offset: UtcInstant::from_nanos(
                 vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
             ),
             rate: zx::sys::zx_clock_rate_t {

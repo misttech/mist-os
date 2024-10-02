@@ -7,7 +7,7 @@ use crate::signals::{RunState, SignalEvent};
 use crate::task::{ClockId, CurrentTask, Timeline, TimerId, TimerWakeup};
 use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_runtime::UtcTime;
+use fuchsia_runtime::UtcInstant;
 use fuchsia_zircon::{
     Task, {self as zx},
 };
@@ -74,7 +74,7 @@ pub fn sys_clock_gettime(
     } else {
         match which_clock as u32 {
             CLOCK_REALTIME | CLOCK_REALTIME_COARSE => {
-                profile_duration!("GetUtcTime");
+                profile_duration!("GetUtcInstant");
                 utc_now().into_nanos()
             }
             CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
@@ -237,7 +237,7 @@ fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
     is_absolute: bool,
     deadline: zx::MonotonicInstant,
-    original_utc_deadline: Option<UtcTime>,
+    original_utc_deadline: Option<UtcInstant>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();

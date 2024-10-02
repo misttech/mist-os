@@ -4,7 +4,7 @@
 
 use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::{
-    duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcClockTransform, UtcTime,
+    duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcClockTransform, UtcInstant,
 };
 use fuchsia_zircon::{
     AsHandleRef, ClockTransformation, {self as zx},
@@ -31,7 +31,7 @@ impl UtcClock {
             - zx::MonotonicInstant::get().into_nanos();
         let current_transform = ClockTransformation {
             reference_offset: zx::MonotonicInstant::default(),
-            synthetic_offset: UtcTime::from_nanos(offset),
+            synthetic_offset: UtcInstant::from_nanos(offset),
             rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
         let mut utc_clock = Self {
@@ -63,7 +63,7 @@ impl UtcClock {
         }
     }
 
-    pub fn now(&self) -> UtcTime {
+    pub fn now(&self) -> UtcInstant {
         let monotonic_time = zx::MonotonicInstant::get();
         // Utc time is calculated using the same transform as the one stored in vvar. This is
         // to ensure that utc calculations are the same whether using a syscall or the vdso
@@ -71,7 +71,7 @@ impl UtcClock {
         self.current_transform.apply(monotonic_time)
     }
 
-    pub fn estimate_monotonic_deadline(&self, utc: UtcTime) -> zx::MonotonicInstant {
+    pub fn estimate_monotonic_deadline(&self, utc: UtcInstant) -> zx::MonotonicInstant {
         self.current_transform.apply_inverse(utc)
     }
 
@@ -106,7 +106,7 @@ pub fn update_utc_clock(dest: &MemoryMappedVvar) {
     (*UTC_CLOCK).lock().update_utc_clock(dest);
 }
 
-pub fn utc_now() -> UtcTime {
+pub fn utc_now() -> UtcInstant {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING
@@ -118,7 +118,7 @@ pub fn utc_now() -> UtcTime {
     (*UTC_CLOCK).lock().now()
 }
 
-pub fn estimate_monotonic_deadline_from_utc(utc: UtcTime) -> zx::MonotonicInstant {
+pub fn estimate_monotonic_deadline_from_utc(utc: UtcInstant) -> zx::MonotonicInstant {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING.with(|cell| {

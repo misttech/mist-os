@@ -556,7 +556,7 @@ mod tests {
     use crate::enums::WriteRtcOutcome;
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
-    use fuchsia_runtime::{UtcClockUpdate, UtcTime};
+    use fuchsia_runtime::{UtcClockUpdate, UtcInstant};
     use lazy_static::lazy_static;
     use std::matches;
     use std::pin::pin;
@@ -567,9 +567,9 @@ mod tests {
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(1111_333);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(44);
-    const INVALID_RTC_TIME: UtcTime = UtcTime::from_nanos(111111 * NANOS_PER_SECOND);
-    const BACKSTOP_TIME: UtcTime = UtcTime::from_nanos(222222 * NANOS_PER_SECOND);
-    const VALID_RTC_TIME: UtcTime = UtcTime::from_nanos(333333 * NANOS_PER_SECOND);
+    const INVALID_RTC_TIME: UtcInstant = UtcInstant::from_nanos(111111 * NANOS_PER_SECOND);
+    const BACKSTOP_TIME: UtcInstant = UtcInstant::from_nanos(222222 * NANOS_PER_SECOND);
+    const VALID_RTC_TIME: UtcInstant = UtcInstant::from_nanos(333333 * NANOS_PER_SECOND);
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
@@ -652,7 +652,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                        UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -665,7 +665,7 @@ mod tests {
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Network },
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                        UtcInstant::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -697,7 +697,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -710,7 +710,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Monitor,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -741,7 +741,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                        UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -788,7 +788,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                utc: UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -818,7 +818,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                        UtcInstant::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -1050,17 +1050,17 @@ mod tests {
     #[fuchsia::test]
     fn test_initial_clock_state() {
         let clock =
-            UtcClock::create(zx::ClockOpts::empty(), Some(UtcTime::from_nanos(1_000))).unwrap();
+            UtcClock::create(zx::ClockOpts::empty(), Some(UtcInstant::from_nanos(1_000))).unwrap();
         // The clock must be started with an initial value.
         clock
-            .update(UtcClockUpdate::builder().approximate_value(UtcTime::from_nanos(1_000)))
+            .update(UtcClockUpdate::builder().approximate_value(UtcInstant::from_nanos(1_000)))
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
         assert!(matches!(state, InitialClockState::NotSet));
 
         // Update the clock, which is already running.
         clock
-            .update(UtcClockUpdate::builder().approximate_value(UtcTime::from_nanos(1_000_000)))
+            .update(UtcClockUpdate::builder().approximate_value(UtcInstant::from_nanos(1_000_000)))
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
         assert_eq!(state, InitialClockState::PreviouslySet);

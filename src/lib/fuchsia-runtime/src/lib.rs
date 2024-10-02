@@ -353,7 +353,7 @@ pub struct UtcTimeline;
 impl Timeline for UtcTimeline {}
 
 /// A UTC timestamp, measured in nanoseconds since Jan 1 1970.
-pub type UtcTime = Instant<UtcTimeline>;
+pub type UtcInstant = Instant<UtcTimeline>;
 
 /// A clock that will return UTC timestamps.
 // TODO(https://fxbug.dev/356911500) switch to boot timeline
@@ -404,7 +404,7 @@ pub fn swap_utc_clock_handle(new_clock: UtcClock) -> Result<UtcClock, Status> {
 /// Panics if there is no UTC clock registered with the runtime or the registered handle does not
 /// have the required rights.
 #[inline]
-pub fn utc_time() -> UtcTime {
+pub fn utc_time() -> UtcInstant {
     utc_clock().read().expect("Failed to read UTC clock")
 }
 

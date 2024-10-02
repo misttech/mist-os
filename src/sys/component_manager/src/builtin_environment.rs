@@ -21,7 +21,7 @@ use crate::builtin::realm_builder::{
 use crate::builtin::runner::{BuiltinRunner, BuiltinRunnerFactory};
 use crate::builtin::svc_stash_provider::SvcStashCapability;
 use crate::builtin::system_controller::SystemController;
-use crate::builtin::time::{create_utc_clock, UtcTimeMaintainer};
+use crate::builtin::time::{create_utc_clock, UtcInstantMaintainer};
 use crate::capability::{self, BuiltinCapability, FrameworkCapability};
 use crate::framework::binder::BinderFrameworkCapability;
 use crate::framework::capability_store::CapabilityStore;
@@ -960,7 +960,7 @@ impl BuiltinEnvironment {
 
         // Register the UTC time maintainer.
         if let Some(clock) = utc_clock {
-            let utc_time_maintainer = Arc::new(UtcTimeMaintainer::new(clock));
+            let utc_time_maintainer = Arc::new(UtcInstantMaintainer::new(clock));
             root_input_builder.add_builtin_protocol_if_enabled::<ftime::MaintenanceMarker>(
                 move |stream| utc_time_maintainer.clone().serve(stream).boxed(),
             );
