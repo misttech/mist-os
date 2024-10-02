@@ -8,6 +8,7 @@
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
@@ -16,12 +17,9 @@
 #include <lib/unittest/unittest.h>
 #include <lib/unittest/user_memory.h>
 
-#include <cstdint>
-#include <tuple>
-#include <utility>
-
 #include <arch/defines.h>
 #include <fbl/alloc_checker.h>
+#include <ktl/optional.h>
 #include <lockdep/guard.h>
 
 #include <linux/prctl.h>
@@ -35,78 +33,92 @@ using namespace starnix::testing;
 bool test_brk() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_and_task();
-
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
   auto mm = current_task->mm();
 
   // Look up the given addr in the mappings table.
-  auto get_range = [&mm](const UserAddress& addr) -> util::Range<UserAddress> {
+  auto get_range =
+      [&mm](
+          const UserAddress& addr) -> ktl::optional<ktl::pair<util::Range<UserAddress>, Mapping>> {
     auto state = mm->state.Read();
     if (auto opt = state->mappings.get(addr); opt) {
-      return opt->first;
+      return ktl::pair(opt->first, opt->second);
     }
-    return util::Range<UserAddress>({.start = mtl::DefaultConstruct<UserAddress>(),
-                                     .end = mtl::DefaultConstruct<UserAddress>()});
+    return ktl::nullopt;
   };
 
   // Initialize the program break.
-  auto base_addr = mm->set_brk(*current_task, mtl::DefaultConstruct<UserAddress>());
-  ASSERT_FALSE(base_addr.is_error(), "failed to set initial program break");
-  ASSERT_TRUE(base_addr.value() > mtl::DefaultConstruct<UserAddress>());
+  auto brk_result = mm->set_brk(*current_task, mtl::DefaultConstruct<UserAddress>());
+  ASSERT_FALSE(brk_result.is_error(), "failed to set initial program break");
+  auto base_addr = *brk_result;
+  ASSERT_TRUE(base_addr > mtl::DefaultConstruct<UserAddress>());
 
-  // Page containing the program break address should not be mapped.
-  ASSERT_TRUE(util::Range<UserAddress>(
-                  {mtl::DefaultConstruct<UserAddress>(), mtl::DefaultConstruct<UserAddress>()}) ==
-              get_range(base_addr.value()));
+  // Page containing the program break address should be reserved.
+  auto result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should point to a reserved range");
+  auto& [_, mapping] = result.value();
+  ASSERT_EQ(MappingNameType::ReservedForHeap, mapping.name().type);
 
   // Growing it by a single byte results in that page becoming mapped.
-  auto addr0 = mm->set_brk(*current_task, base_addr.value() + 1ul);
+  auto addr0 = mm->set_brk(*current_task, base_addr + 1ul);
   ASSERT_FALSE(addr0.is_error(), "failed to grow brk");
-  ASSERT_TRUE(addr0.value() > base_addr.value());
-  auto range0 = get_range(base_addr.value());
-  ASSERT_TRUE(range0.start == base_addr.value());
-  ASSERT_TRUE(range0.end == base_addr.value() + static_cast<uint64_t>(PAGE_SIZE));
+  ASSERT_TRUE(*addr0 > base_addr);
+  result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should be mapped");
+  auto [range0, _m0] = result.value();
+  ASSERT_EQ(base_addr.ptr(), range0.start.ptr());
+  ASSERT_EQ((base_addr + static_cast<uint64_t>(PAGE_SIZE)).ptr(), range0.end.ptr());
 
   // Grow the program break by another byte, which won't be enough to cause additional pages to be
   // mapped.
-  auto addr1 = mm->set_brk(*current_task, base_addr.value() + 2ul);
+  auto addr1 = mm->set_brk(*current_task, base_addr + 2ul);
   ASSERT_FALSE(addr1.is_error(), "failed to grow brk");
-  ASSERT_TRUE(addr1.value() == base_addr.value() + 2u);
-  auto range1 = get_range(base_addr.value());
-  ASSERT_TRUE(range1.start == range0.start);
-  ASSERT_TRUE(range1.end == range0.end);
+  ASSERT_EQ((base_addr + 2u).ptr(), addr1->ptr());
+  result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should be mapped");
+  auto [range1, _m1] = result.value();
+  ASSERT_EQ(range0.start.ptr(), range1.start.ptr());
+  ASSERT_EQ(range0.end.ptr(), range1.end.ptr());
 
   // Grow the program break by a non-trival amount and observe the larger mapping.
-  auto addr2 = mm->set_brk(*current_task, base_addr.value() + 24893ul);
+  auto addr2 = mm->set_brk(*current_task, base_addr + 24893ul);
   ASSERT_FALSE(addr2.is_error(), "failed to grow brk");
-  ASSERT_TRUE(addr2.value() == base_addr.value() + 24893ul);
-  auto range2 = get_range(base_addr.value());
-  ASSERT_TRUE(range2.start == base_addr.value());
-  ASSERT_TRUE(range2.end == addr2->round_up(PAGE_SIZE).value());
+  ASSERT_EQ((base_addr + 24893ul).ptr(), addr2->ptr());
+  result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should be mapped");
+  auto [range2, _m2] = result.value();
+  ASSERT_EQ(base_addr.ptr(), range2.start.ptr());
+  ASSERT_EQ(addr2->round_up(PAGE_SIZE)->ptr(), range2.end.ptr());
 
   // Shrink the program break and observe the smaller mapping.
-  auto addr3 = mm->set_brk(*current_task, base_addr.value() + 14832ul);
+  auto addr3 = mm->set_brk(*current_task, base_addr + 14832ul);
   ASSERT_FALSE(addr3.is_error(), "failed to shrink brk");
-  ASSERT_TRUE(addr3.value() == base_addr.value() + 14832ul);
-  auto range3 = get_range(base_addr.value());
-  ASSERT_TRUE(range3.start == base_addr.value());
+  ASSERT_EQ((base_addr + 14832ul).ptr(), addr3->ptr());
+  result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should be mapped");
+  auto [range3, _m3] = result.value();
+  ASSERT_TRUE(range3.start == base_addr);
   ASSERT_TRUE(range3.end == addr3->round_up(PAGE_SIZE).value());
 
   // Shrink the program break close to zero and observe the smaller mapping.
-  auto addr4 = mm->set_brk(*current_task, base_addr.value() + 3ul);
+  auto addr4 = mm->set_brk(*current_task, base_addr + 3ul);
   ASSERT_FALSE(addr4.is_error(), "failed to drastically shrink brk");
-  ASSERT_TRUE(addr4.value() == base_addr.value() + 3ul);
-  auto range4 = get_range(base_addr.value());
-  ASSERT_TRUE(range4.start == base_addr.value());
+  ASSERT_TRUE(addr4.value() == base_addr + 3ul);
+  result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should be mapped");
+  auto [range4, _m4] = result.value();
+  ASSERT_TRUE(range4.start == base_addr);
   ASSERT_TRUE(range4.end == addr4->round_up(PAGE_SIZE).value());
 
-  // Shrink the program break close to zero and observe that the mapping is not entirely
-  auto addr5 = mm->set_brk(*current_task, base_addr.value());
+  // Shrink the program break to zero and observe that the mapping is gone and replaced by a
+  // reserved memory.
+  auto addr5 = mm->set_brk(*current_task, base_addr);
   ASSERT_FALSE(addr5.is_error(), "failed to drastically shrink brk to zero");
-  ASSERT_TRUE(addr5.value() == base_addr.value());
-  ASSERT_TRUE(util::Range<UserAddress>(
-                  {mtl::DefaultConstruct<UserAddress>(), mtl::DefaultConstruct<UserAddress>()}) ==
-              get_range(base_addr.value()));
+  ASSERT_TRUE(addr5.value() == base_addr);
+  result = get_range(base_addr);
+  ASSERT_TRUE(result.has_value(), "base_addr should point to a reserved range");
+  auto [_range5, m] = result.value();
+  ASSERT_EQ(MappingNameType::ReservedForHeap, m.name().type);
 
   END_TEST;
 }
@@ -114,29 +126,28 @@ bool test_brk() {
 bool test_mm_exec() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_and_task();
-
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
   auto mm = current_task->mm();
 
-  auto has = [&mm](UserAddress addr) -> bool {
+  auto has = [&mm](const UserAddress& addr) -> bool {
     auto state = mm->state.Read();
     return state->mappings.get(addr).has_value();
   };
 
   auto brk_addr = mm->set_brk(*current_task, mtl::DefaultConstruct<UserAddress>());
   EXPECT_TRUE(brk_addr.is_ok(), "failed to set initial program break");
-  ASSERT_TRUE(brk_addr.value() > mtl::DefaultConstruct<UserAddress>());
+  ASSERT_TRUE(brk_addr > mtl::DefaultConstruct<UserAddress>());
 
   // Allocate a single page of BRK space, so that the break base address is mapped.
   auto _ = mm->set_brk(*current_task, brk_addr.value() + 1u);
-  ASSERT_TRUE(has(brk_addr.value()));
+  ASSERT_TRUE(has(brk_addr.value()), "failed to grow program break");
 
   auto mapped_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
   ASSERT_TRUE(mapped_addr > mtl::DefaultConstruct<UserAddress>());
   ASSERT_TRUE(has(mapped_addr));
 
-  /*let node = current_task.lookup_path_from_root("/".into()).unwrap();*/
-  auto exec_result = mm->exec(/*node*/);
+  auto node = (*current_task).lookup_path_from_root("/").value();
+  auto exec_result = mm->exec(node);
   EXPECT_TRUE(exec_result.is_ok(), "failed to exec memory manager");
 
   ASSERT_FALSE(has(brk_addr.value()));
@@ -144,9 +155,9 @@ bool test_mm_exec() {
 
   // Check that the old addresses are actually available for mapping.
   auto brk_addr2 = map_memory(*current_task, brk_addr.value(), PAGE_SIZE);
-  ASSERT_TRUE(brk_addr.value() == brk_addr2);
+  ASSERT_EQ(brk_addr->ptr(), brk_addr2.ptr());
   auto mapped_addr2 = map_memory(*current_task, mapped_addr, PAGE_SIZE);
-  ASSERT_TRUE(mapped_addr == mapped_addr2);
+  ASSERT_EQ(mapped_addr.ptr(), mapped_addr2.ptr());
 
   END_TEST;
 }
@@ -154,27 +165,27 @@ bool test_mm_exec() {
 bool test_get_contiguous_mappings_at() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_and_task();
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
   auto mm = current_task->mm();
 
   // Create four one-page mappings with a hole between the third one and the fourth one.
   size_t page_size = PAGE_SIZE;
-  UserAddress addr_a = mm->base_addr + 10 * page_size;
-  UserAddress addr_b = mm->base_addr + 11 * page_size;
-  UserAddress addr_c = mm->base_addr + 12 * page_size;
-  UserAddress addr_d = mm->base_addr + 14 * page_size;
+  auto addr_a = mm->base_addr + 10 * page_size;
+  auto addr_b = mm->base_addr + 11 * page_size;
+  auto addr_c = mm->base_addr + 12 * page_size;
+  auto addr_d = mm->base_addr + 14 * page_size;
 
-  ASSERT_EQ(map_memory(*current_task, addr_a, PAGE_SIZE).ptr(), addr_a.ptr());
-  ASSERT_EQ(map_memory(*current_task, addr_b, PAGE_SIZE).ptr(), addr_b.ptr());
-  ASSERT_EQ(map_memory(*current_task, addr_c, PAGE_SIZE).ptr(), addr_c.ptr());
-  ASSERT_EQ(map_memory(*current_task, addr_d, PAGE_SIZE).ptr(), addr_d.ptr());
+  ASSERT_EQ(addr_a.ptr(), map_memory(*current_task, addr_a, PAGE_SIZE).ptr());
+  ASSERT_EQ(addr_b.ptr(), map_memory(*current_task, addr_b, PAGE_SIZE).ptr());
+  ASSERT_EQ(addr_c.ptr(), map_memory(*current_task, addr_c, PAGE_SIZE).ptr());
+  ASSERT_EQ(addr_d.ptr(), map_memory(*current_task, addr_d, PAGE_SIZE).ptr());
 
   {
     auto mm_state = mm->state.Read();
 
     // Verify that requesting an unmapped address returns an empty iterator.
-    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100u, 50)->is_empty());
-    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100u, 200)->is_empty());
+    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100ul, 50)->is_empty());
+    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100ul, 200)->is_empty());
 
     // Verify that requesting zero bytes returns an empty iterator.
     ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a, 0)->is_empty());
@@ -448,7 +459,7 @@ bool test_read_c_string_to_vec() {
   // Map a page at a fixed address and write an unterminated string at the end of it.
   ASSERT_TRUE(addr == map_memory(*current_task, addr, page_size));
 
-  ktl::span<const uint8_t> test_str((const uint8_t*)"foo!", 4);
+  ktl::span<const uint8_t> test_str(reinterpret_cast<const uint8_t*>("foo!"), 4);
   auto test_addr = addr + page_size - test_str.size();
   ASSERT_TRUE(ma.write_memory(test_addr, test_str).is_ok(), "failed to write test string");
 
@@ -541,15 +552,58 @@ bool test_read_c_string() {
   END_TEST;
 }
 
+bool test_find_next_unused_range() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto mm = current_task->mm();
+
+  auto mmap_top = mm->state.Read()->find_next_unused_range(0).value().ptr();
+  auto page_size = static_cast<size_t>(PAGE_SIZE);
+  ASSERT(mmap_top <= ASPACE_HIGHEST_ADDRESS);
+
+  // No mappings - top address minus requested size is available
+  ASSERT_EQ(mm->state.Read()->find_next_unused_range(page_size).value().ptr(),
+            UserAddress::from_ptr(mmap_top - page_size).ptr());
+
+  // Fill it.
+  auto addr = UserAddress::from_ptr(mmap_top - page_size);
+  ASSERT_EQ(map_memory(*current_task, addr, PAGE_SIZE).ptr(), addr.ptr());
+
+  // The next available range is right before the new mapping.
+  ASSERT_EQ(mm->state.Read()->find_next_unused_range(page_size).value().ptr(),
+            UserAddress::from_ptr(addr.ptr() - page_size).ptr());
+
+  // Allocate an extra page before a one-page gap.
+  auto addr2 = UserAddress::from_ptr(addr.ptr() - (2 * page_size));
+  ASSERT_EQ(map_memory(*current_task, addr2, PAGE_SIZE).ptr(), addr2.ptr());
+
+  // Searching for one-page range still gives the same result
+  ASSERT_EQ(mm->state.Read()->find_next_unused_range(page_size).value().ptr(),
+            UserAddress::from_ptr(addr.ptr() - page_size).ptr());
+
+  // Searching for a bigger range results in the area before the second mapping
+  ASSERT_EQ(mm->state.Read()->find_next_unused_range(2 * page_size).value().ptr(),
+            UserAddress::from_ptr(addr2.ptr() - (2 * page_size)).ptr());
+
+  // Searching for more memory than available should fail.
+  ASSERT_TRUE(mm->state.Read()->find_next_unused_range(mmap_top) == ktl::nullopt);
+
+  END_TEST;
+}
+
 bool test_unmap_returned_mappings() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
-  auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE * 2ul);
+
+  auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(),
+                         static_cast<uint64_t>(PAGE_SIZE) * 2);
 
   fbl::Vector<Mapping> released_mappings;
-  auto unmap_result = mm->state.Write()->unmap(mm, addr, PAGE_SIZE, released_mappings);
+  auto unmap_result =
+      mm->state.Write()->unmap(mm, addr, static_cast<size_t>(PAGE_SIZE), released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(1u, released_mappings.size());
 
@@ -561,11 +615,14 @@ bool test_unmap_returns_multiple_mappings() {
 
   auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
+
+  // find_next_unused_range
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
-  map_memory(*current_task, addr + (2u * PAGE_SIZE), PAGE_SIZE);
+  map_memory(*current_task, addr + (2 * static_cast<uint64_t>(PAGE_SIZE)), PAGE_SIZE);
 
   fbl::Vector<Mapping> released_mappings;
-  auto unmap_result = mm->state.Write()->unmap(mm, addr, PAGE_SIZE * 3ul, released_mappings);
+  auto unmap_result =
+      mm->state.Write()->unmap(mm, addr, static_cast<size_t>(PAGE_SIZE) * 3, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(2u, released_mappings.size());
 
@@ -924,8 +981,7 @@ bool test_preserve_name_snapshot() {
   auto target = create_task(kernel, "another-task");
 
   auto result = current_task->mm()->snapshot_to(target->mm());
-  ASSERT_TRUE(
-      result.is_ok());  //, "snapshot_to failed error %d", result.error_value().error_code());
+  ASSERT_TRUE(result.is_ok(), "snapshot_to failed");
 
   {
     auto state = target->mm()->state.Read();
@@ -947,6 +1003,7 @@ UNITTEST("test mm exec", unit_testing::test_mm_exec)
 UNITTEST("test get contiguous mappings at", unit_testing::test_get_contiguous_mappings_at)
 UNITTEST("test read c string to vec", unit_testing::test_read_c_string_to_vec)
 UNITTEST("test read c string", unit_testing::test_read_c_string)
+UNITTEST("test find next unused range", unit_testing::test_find_next_unused_range)
 UNITTEST("test unmap returned mappings", unit_testing::test_unmap_returned_mappings)
 UNITTEST("test unmap returns multiple mappings", unit_testing::test_unmap_returns_multiple_mappings)
 UNITTEST("test preserve name snapshot", unit_testing::test_preserve_name_snapshot)

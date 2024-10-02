@@ -8,6 +8,7 @@
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
+#include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/mm/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -19,11 +20,10 @@
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/starnix/bootfs/tests/data/bootfs.zbi.h>
 #include <lib/starnix/bootfs/tests/zbi_file.h>
+#include <zircon/assert.h>
 
 #include <fbl/ref_ptr.h>
 #include <phys/handoff.h>
-
-using namespace starnix;
 
 namespace starnix::testing {
 
@@ -33,7 +33,7 @@ fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/)
 
 template <typename CreateFsFn>
 fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
-                                              CreateFsFn create_fs) {
+                                              CreateFsFn&& create_fs) {
   return FsContext::New(Namespace::New(create_fs(kernel)));
 }
 
@@ -41,6 +41,8 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
   auto init_pid = kernel->pids.Write()->allocate_pid();
   ASSERT(init_pid == 1);
   auto init_task = CurrentTask::create_init_process(kernel, init_pid, "test-task", fs);
+
+  init_task->mm()->initialize_mmap_layout_for_test();
 
   /*let system_task =
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
@@ -52,10 +54,14 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
 template <typename CreateFsFn>
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_fs_and_selinux(
-    CreateFsFn create_fs /*,security_server: Arc<SecurityServer>*/) {
+    CreateFsFn&& create_fs /*,security_server: Arc<SecurityServer>*/) {
   auto kernel = create_test_kernel();
-  auto fs = create_test_fs_context(kernel, create_fs);
-  auto init_task = create_test_init_task(kernel, fs);
+  auto fs = create_fs(kernel);
+  auto fs_context =
+      create_test_fs_context(kernel, [&fs](const fbl::RefPtr<Kernel>&) { return fs; });
+  auto init_task = create_test_init_task(kernel, fs_context);
+  // security::file_system_resolve_security(&init_task, &fs)
+  //       .expect("Failed to resolve root filesystem labeling");
   return ktl::pair(kernel, testing::AutoReleasableTask::From(ktl::move(init_task)));
 }
 
@@ -94,8 +100,10 @@ ktl::pair<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
 }
 
 AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const ktl::string_view& task_name) {
-  auto init_task = CurrentTask::create_init_child_process(kernel, task_name);
-  return ktl::move(testing::AutoReleasableTask::From(init_task.value()));
+  auto task = CurrentTask::create_init_child_process(kernel, task_name);
+  ZX_ASSERT_MSG(task.is_ok(), "failed to create second task");
+  task->mm()->initialize_mmap_layout_for_test();
+  return ktl::move(testing::AutoReleasableTask::From(task.value()));
 }
 
 UserAddress map_memory(CurrentTask& current_task, UserAddress address, uint64_t length) {
