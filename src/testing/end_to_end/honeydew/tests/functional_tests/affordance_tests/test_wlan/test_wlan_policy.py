@@ -12,9 +12,10 @@ from antlion.controllers import access_point
 from antlion.controllers.ap_lib import hostapd_constants
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, signals, test_runner
+from utils import wait_for_interface
 
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.netstack import InterfaceProperties
+from honeydew.typing.netstack import PortClass
 from honeydew.typing.wlan import (
     ClientStateSummary,
     ConnectionState,
@@ -67,17 +68,7 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             access_points[0] if access_points else None
         )
 
-        # Wait for a WLAN interface to become available.
-        interfaces: list[InterfaceProperties] = []
-        end_time = time.time() + WLAN_INTERFACE_TIMEOUT
-        while time.time() < end_time:
-            interfaces = self.device.netstack.list_interfaces()
-            for interface in interfaces:
-                if "wlan" in interface.name:
-                    return
-        asserts.abort_class(
-            f"Expected presence of a WLAN interface, got {interfaces}"
-        )
+        wait_for_interface(self.device.netstack, PortClass.WLAN_CLIENT)
 
     def setup_test(self) -> None:
         super().setup_test()
