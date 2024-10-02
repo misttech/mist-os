@@ -29,9 +29,7 @@ class ThreadDispatcher;
 
 namespace starnix {
 
-using namespace starnix_sync;
-
-enum class ExitStatusType { Exit, Kill, CoreDump, Stop, Continue };
+enum class ExitStatusType : uint8_t { Exit, Kill, CoreDump, Stop, Continue };
 
 class ExitStatus {
  public:
@@ -146,7 +144,7 @@ enum class TaskStateCode {
 };
 
 class TaskPersistentInfoState;
-using TaskPersistentInfo = fbl::RefPtr<StarnixMutex<TaskPersistentInfoState>>;
+using TaskPersistentInfo = fbl::RefPtr<starnix_sync::StarnixMutex<TaskPersistentInfoState>>;
 
 /// The information of the task that needs to be available to the `ThreadGroup` while computing
 /// which process a wait can target. It is necessary to shared this data with the `ThreadGroup` so
@@ -244,7 +242,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   //
   // Some tasks lack an underlying Zircon thread. These tasks are used internally by the
   // Starnix kernel to track background work, typically on a `kthread`.
-  mutable RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>> thread;
+  mutable starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>> thread;
 
   // The file descriptor table for this task.
   //
@@ -256,7 +254,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   ktl::optional<fbl::RefPtr<MemoryManager>> mm_;
 
   // The file system for this task.
-  ktl::optional<RwLock<fbl::RefPtr<FsContext>>> fs_;
+  ktl::optional<starnix_sync::RwLock<fbl::RefPtr<FsContext>>> fs_;
 
  public:
   /// The namespace for abstract AF_UNIX sockets for this task.
@@ -277,7 +275,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   // flags: AtomicTaskFlags,
 
   // The mutable state of the Task.
-  mutable RwLock<TaskMutableState> mutable_state_;
+  mutable starnix_sync::RwLock<TaskMutableState> mutable_state_;
 
  public:
   // The information of the task that needs to be available to the `ThreadGroup` while computing
@@ -301,7 +299,6 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   /// Tell you whether you are tracing syscall entry / exit without a lock.
   // pub trace_syscalls: AtomicBool,
 
- public:
   /// impl Task
   fbl::RefPtr<Kernel>& kernel() const;
 
@@ -354,7 +351,6 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   ktl::string_view command() const { return persistent_info->Lock()->command(); }
 
- public:
   // impl MemoryAccessor for Task
   /// impl MemoryAccessor for CurrentTask
   fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
@@ -374,9 +370,8 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final;
 
- public:
   // C++
-  ~Task();
+  ~Task() override;
 
  private:
   friend class CurrentTask;

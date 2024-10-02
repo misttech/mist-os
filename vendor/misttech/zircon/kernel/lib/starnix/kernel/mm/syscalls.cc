@@ -23,12 +23,15 @@ namespace starnix {
 
 using namespace starnix_uapi;
 
+namespace {
 #ifdef __x86_64__
 // Returns any platform-specific mmap flags
 uint32_t get_valid_platform_mmap_flags() { return MAP_32BIT; }
 #else
 uint32_t get_valid_platform_mmap_flags() { return 0; }
 #endif
+
+}  // namespace
 
 fit::result<Errno, UserAddress> sys_mmap(const CurrentTask& current_task, UserAddress addr,
                                          size_t length, uint32_t prot, uint32_t flags, FdNumber fd,
@@ -84,25 +87,32 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   }
 
   // TODO(tbodt): should we consider MAP_NORESERVE?
+  fit::result<Errno, DesiredAddress> daddr = [&]() -> fit::result<Errno, DesiredAddress> {
+    auto cond1 = (flags & MAP_FIXED) != 0;
+    auto cond2 = (flags & MAP_FIXED_NOREPLACE) != 0;
+    if (addr == UserAddress::NULL_) {
+      if (!cond1 && !cond2) {
+        return fit::ok(
+            DesiredAddress{.type = DesiredAddressType::Any, .address = UserAddress::NULL_});
+      }
+      if (cond1 || cond2) {
+        return fit::error(errno(EINVAL));
+      }
+    } else {
+      if (!cond1 && !cond2) {
+        return fit::ok(DesiredAddress{.type = DesiredAddressType::Hint, .address = addr});
+      }
 
-  auto cond1 = (flags & MAP_FIXED) != 0;
-  auto cond2 = (flags & MAP_FIXED_NOREPLACE) != 0;
-  DesiredAddress daddr;
-  if (addr == 0) {
-    if (cond1 == false && cond2 == false) {
-      daddr = {.type=DesiredAddressType::Any, .address=0};
-    } else if (cond1 == true || cond2 == true) {
-      return fit::error(errno(EINVAL));
+      if (cond2) {
+        return fit::ok(DesiredAddress{.type = DesiredAddressType::Fixed, .address = addr});
+      }
+
+      if (cond1 && !cond2) {
+        return fit::ok(DesiredAddress{.type = DesiredAddressType::FixedOverwrite, .address = addr});
+      }
     }
-  } else {
-    if (cond1 == false && cond2 == false) {
-      daddr = {.type=DesiredAddressType::Hint, .address=addr};
-    } else if (cond2) {
-      daddr = {.type=DesiredAddressType::Fixed, .address=addr};
-    } else if (cond1 == true && cond2 == false) {
-      daddr = {.type=DesiredAddressType::FixedOverwrite, .address=addr};
-    }
-  }
+    return fit::ok(DesiredAddress{.address = UserAddress::NULL_});
+  }() _EP(daddr);
 
   // uint64_t memory_offset = (flags & MAP_ANONYMOUS) ? 0 : offset;
 
@@ -127,8 +137,8 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   }
 
   if ((flags & MAP_ANONYMOUS) != 0) {
-    return current_task->mm()->map_anonymous(daddr, length, prot_flags.value(), options,
-                                             {.type=MappingNameType::None});
+    return current_task->mm()->map_anonymous(*daddr, length, prot_flags.value(), options,
+                                             {.type = MappingNameType::None});
   } else {
     /*
     // TODO(tbodt): maximize protection flags so that mprotect works

@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/starnix_uapi/user_buffer.h>
 #include <lib/mistos/starnix_uapi/user_value.h>
+#include <lib/mistos/util/error_propagation.h>
 
 #include <fbl/vector.h>
 #include <ktl/array.h>
@@ -52,11 +53,9 @@ inline fit::result<E, fbl::Vector<T>> read_to_vec(size_t max_len, ReadFn&& read_
   }
 
   ktl::span<T> capacity(buffer.data(), max_len);
-  auto read_fn_result = read_fn(capacity);
-  if (read_fn_result.is_error())
-    return read_fn_result.take_error();
+  auto read_result = read_fn(capacity) _EP(read_result);
 
-  NumberOfElementsRead read_elements{read_fn_result.value()};
+  NumberOfElementsRead read_elements{read_result.value()};
   DEBUG_ASSERT_MSG(read_elements.n_elements <= max_len, "read_elements=%zu, max_len=%zu",
                    read_elements.n_elements, max_len);
   // SAFETY: The new length is equal to the number of elements successfully
@@ -73,14 +72,12 @@ inline fit::result<E, fbl::Vector<T>> read_to_vec(size_t max_len, ReadFn&& read_
 ///
 /// The read function must only return `Ok(())` if all the bytes were read to.
 template <typename E, typename T, size_t N, typename ReadFn>
-inline fit::result<E, ktl::array<T, N>> read_to_array(size_t max_len, ReadFn&& read_fn) {
+inline fit::result<E, ktl::array<T, N>> read_to_array(ReadFn&& read_fn) {
   static_assert(std::is_invocable_r_v<fit::result<E>, ReadFn, ktl::span<T>&>);
 
   ktl::array<T, N> buffer;
   ktl::span<T> span{buffer.data(), N};
-  auto read_fn_result = read_fn(span);
-  if (read_fn_result.is_error())
-    return read_fn_result.take_error();
+  auto read_fn_result = read_fn(span) _EP(read_fn_result);
   return fit::ok(ktl::move(buffer));
 }
 
@@ -97,9 +94,7 @@ inline fit::result<E, T> read_to_object_as_bytes(ReadFn&& read_fn) {
 
   T object;
   ktl::span<uint8_t> span{reinterpret_cast<uint8_t*>(&object), sizeof(T)};
-  auto read_fn_result = read_fn(span);
-  if (read_fn_result.is_error())
-    return read_fn_result.take_error();
+  auto read_fn_result = read_fn(span) _EP(read_fn_result);
   return fit::ok(ktl::move(object));
 }
 
@@ -179,12 +174,9 @@ class MemoryAccessorExt : public MemoryAccessor {
   // Read exactly `N` bytes from `addr`, returning them as an array.
   template <size_t N>
   fit::result<Errno, ktl::array<uint8_t, N>> read_memory_to_array(UserAddress addr) const {
-    return read_to_array([&](ktl::span<uint8_t>& buf) {
-      auto read_result = this->read_memory(addr, buf);
-      if (read_result.is_error()) {
-        return read_result.take_error();
-      }
-      DEBUG_ASSERT(N == read_result.value().size());
+    return read_to_array<Errno, uint8_t, N>([&](ktl::span<uint8_t>& buf) -> fit::result<Errno> {
+      auto read_result = this->read_memory(addr, buf) _EP(read_result);
+      DEBUG_ASSERT(N == read_result->size());
       return fit::ok();
     });
   }
@@ -192,12 +184,9 @@ class MemoryAccessorExt : public MemoryAccessor {
   /// Read an instance of T from `user`.
   template <typename T>
   fit::result<Errno, T> read_object(UserRef<T> user) const {
-    return read_to_object_as_bytes([&](ktl::span<uint8_t>& buf) {
-      auto read_result = this->read_memory(user.addr(), buf);
-      if (read_result.is_error()) {
-        return read_result.take_error();
-      }
-      DEBUG_ASSERT(sizeof(T) == read_result.value().size());
+    return read_to_object_as_bytes([&](ktl::span<uint8_t>& buf) -> fit::result<Errno> {
+      auto read_result = this->read_memory(user.addr(), buf) _EP(read_result);
+      DEBUG_ASSERT(sizeof(T) == read_result->size());
       return fit::ok();
     });
   }
@@ -240,10 +229,7 @@ class MemoryAccessorExt : public MemoryAccessor {
     auto objects_len = objects.size();
 
     ktl::span<uint8_t> as_bytes{reinterpret_cast<uint8_t*>(objects.data()), objects.size_bytes()};
-    auto read_result = read_memory(user.addr(), as_bytes);
-    if (read_result.is_error()) {
-      return read_result.take_error();
-    }
+    auto read_result = read_memory(user.addr(), as_bytes) _EP(read_result);
     DEBUG_ASSERT(objects_len * sizeof(T) == read_result->size());
 
     return fit::ok(ktl::span{reinterpret_cast<T*>(read_result->data()), objects_len});
@@ -254,10 +240,7 @@ class MemoryAccessorExt : public MemoryAccessor {
   fit::result<Errno, fbl::Vector<T>> read_objects_to_vec(UserRef<T> user, size_t len) const {
     return read_to_vec<Errno, T>(len,
                                  [&](ktl::span<T>& b) -> fit::result<Errno, NumberOfElementsRead> {
-                                   auto read_result = this->read_objects(user, b);
-                                   if (read_result.is_error()) {
-                                     return read_result.take_error();
-                                   }
+                                   auto read_result = this->read_objects(user, b) _EP(read_result);
                                    DEBUG_ASSERT(len == read_result->size());
                                    return fit::ok(NumberOfElementsRead{len});
                                  });
@@ -268,17 +251,12 @@ class MemoryAccessorExt : public MemoryAccessor {
   fit::result<Errno, util::SmallVector<T, N>> read_objects_to_smallvec(UserRef<T> user,
                                                                        size_t len) const {
     if (len > N) {
-      auto result = read_objects_to_vec<T>(user, len);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      return fit::ok(util::SmallVector<T, N>::from_vec(ktl::move(result.value())));
-    } else {
-      ktl::array<T, N> buffer;
-      auto result = read_objects(user, {buffer.data(), buffer.size()});
-      return fit::ok(util::SmallVector<T, N>::from_buf_and_len_unchecked(result->data(), len));
+      auto read_result = read_objects_to_vec<T>(user, len) _EP(read_result);
+      return fit::ok(util::SmallVector<T, N>::from_vec(ktl::move(*read_result)));
     }
-    return fit::error(errno(EOPNOTSUPP));
+    ktl::array<T, N> buffer;
+    auto read_result = read_objects(user, {buffer.data(), buffer.size()}) _EP(read_result);
+    return fit::ok(util::SmallVector<T, N>::from_buf_and_len_unchecked(read_result->data(), len));
   }
 
   /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
