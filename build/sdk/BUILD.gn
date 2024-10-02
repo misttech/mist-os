@@ -187,7 +187,6 @@ _partner_idk_versioned_static_libraries_list = [
   "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/magma_client:magma_client",
   "//zircon/system/ulib/sync:sync",
-  "//zircon/system/ulib/syslog:syslog-headers",
   "//zircon/system/ulib/trace-vthread:trace-vthread",
 
   # keep-sorted: end
