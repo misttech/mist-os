@@ -8,7 +8,6 @@ use crate::environment::{Environment, FshostEnvironment};
 use crate::inspect::register_stats;
 use anyhow::{format_err, Error};
 use fidl::prelude::*;
-use fuchsia_component::directory::AsRefDirectory;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use fuchsia_zircon::sys::zx_debug_write;
 use futures::channel::mpsc;
@@ -131,13 +130,13 @@ async fn main() -> Result<(), Error> {
                 .add_entry(
                     fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
                     vfs::service::endpoint(move |_scope, server_end| {
-                        dir.as_ref_directory()
-                            .open(
-                                fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                                fio::OpenFlags::empty(),
-                                server_end.into(),
-                            )
-                            .unwrap();
+                        dir.open3(
+                            fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
+                            fio::Flags::PROTOCOL_SERVICE,
+                            &fio::Options::default(),
+                            server_end.into(),
+                        )
+                        .unwrap();
                     }),
                 )
                 .unwrap();
