@@ -5306,10 +5306,10 @@ mod tests {
     use net_types::LinkLocalAddr;
     use netstack3_base::sync::{DynDebugReferences, Mutex};
     use netstack3_base::testutil::{
-        new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
-        FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId, FakeTimerCtx,
-        FakeTimerId, FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData,
-        StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
+        new_rng, run_with_many_seeds, set_logger_for_test, FakeAtomicInstant, FakeCoreCtx,
+        FakeCryptoRng, FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId,
+        FakeTimerCtx, FakeTimerId, FakeWeakDeviceId, InstantAndData, MultipleDevicesId,
+        PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
         ContextProvider, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _, InstantContext,
@@ -5547,6 +5547,7 @@ mod tests {
     /// Delegate implementation to internal thing.
     impl<D: FakeStrongDeviceId> InstantBindingsTypes for TcpBindingsCtx<D> {
         type Instant = FakeInstant;
+        type AtomicInstant = FakeAtomicInstant;
     }
 
     /// Delegate implementation to internal thing.

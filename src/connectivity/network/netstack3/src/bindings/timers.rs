@@ -612,7 +612,7 @@ impl FusedFuture for TimerWaiter {
 /// A separate module for [`ScheduledInstant`] so it can't be constructed
 /// violating its invariants.
 mod scheduled_instant {
-    use crate::bindings::StackTime;
+    use crate::bindings::time::StackTime;
 
     use super::{fasync, UNSCHEDULED_SENTINEL};
 

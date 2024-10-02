@@ -1,0 +1,95 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use std::num::TryFromIntError;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::time::Duration;
+
+use fuchsia_async as fasync;
+use netstack3_core::{AtomicInstant, Instant};
+
+use crate::bindings::{InspectableValue, Inspector};
+
+/// A thin wrapper around `fuchsia_async::Time` that implements `core::Instant`.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
+pub(crate) struct StackTime(pub(crate) fasync::Time);
+
+impl Instant for StackTime {
+    fn checked_duration_since(&self, earlier: StackTime) -> Option<Duration> {
+        match u64::try_from(self.0.into_nanos() - earlier.0.into_nanos()) {
+            Ok(nanos) => Some(Duration::from_nanos(nanos)),
+            Err(TryFromIntError { .. }) => None,
+        }
+    }
+
+    fn checked_add(&self, duration: Duration) -> Option<StackTime> {
+        Some(StackTime(fasync::Time::from_nanos(
+            self.0.into_nanos().checked_add(i64::try_from(duration.as_nanos()).ok()?)?,
+        )))
+    }
+
+    fn checked_sub(&self, duration: Duration) -> Option<StackTime> {
+        Some(StackTime(fasync::Time::from_nanos(
+            self.0.into_nanos().checked_sub(i64::try_from(duration.as_nanos()).ok()?)?,
+        )))
+    }
+}
+
+impl std::fmt::Display for StackTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(time) = *self;
+        write!(f, "{:.6}", time.into_nanos() as f64 / 1_000_000_000f64)
+    }
+}
+
+impl InspectableValue for StackTime {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        let Self(inner) = self;
+        inspector.record_int(name, inner.into_nanos())
+    }
+}
+
+/// A wrapper around [`AtomicI64`] to implement [`AtomicInstant`].
+#[derive(Debug)]
+pub(crate) struct AtomicStackTime(AtomicI64);
+
+impl AtomicInstant<StackTime> for AtomicStackTime {
+    fn new(instant: StackTime) -> AtomicStackTime {
+        AtomicStackTime(AtomicI64::new(instant.0.into_nanos()))
+    }
+
+    fn load(&self, ordering: Ordering) -> StackTime {
+        StackTime(fasync::Time::from_nanos(self.0.load(ordering)))
+    }
+
+    fn store(&self, instant: StackTime, ordering: Ordering) {
+        self.0.store(instant.0.into_nanos(), ordering);
+    }
+
+    fn store_max(&self, instant: StackTime, ordering: Ordering) {
+        let _prev = self.0.fetch_max(instant.0.into_nanos(), ordering);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn atomic_stack_time() {
+        let t1 = StackTime(fasync::Time::from_nanos(1));
+        let t2 = StackTime(fasync::Time::from_nanos(1));
+        let t3 = StackTime(fasync::Time::from_nanos(1));
+        let time = AtomicStackTime::new(t1);
+        assert_eq!(time.load(Ordering::Relaxed), t1);
+        time.store(t2, Ordering::Relaxed);
+        assert_eq!(time.load(Ordering::Relaxed), t2);
+
+        // Verify `store_max`.
+        time.store_max(t1, Ordering::Relaxed);
+        assert_eq!(time.load(Ordering::Relaxed), t2);
+        time.store_max(t3, Ordering::Relaxed);
+        assert_eq!(time.load(Ordering::Relaxed), t3);
+    }
+}

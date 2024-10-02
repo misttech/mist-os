@@ -28,8 +28,8 @@ use net_types::ip::{
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::{DynDebugReferences, Mutex};
 use netstack3_base::testutil::{
-    FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
-    FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs,
+    FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks,
+    FakeNetworkSpec, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs,
     WithFakeFrameContext, WithFakeTimerContext,
 };
 use netstack3_base::{
@@ -757,6 +757,7 @@ impl WithFakeFrameContext<DispatchedFrame> for FakeBindingsCtx {
 
 impl InstantBindingsTypes for FakeBindingsCtx {
     type Instant = FakeInstant;
+    type AtomicInstant = FakeAtomicInstant;
 }
 
 impl InstantContext for FakeBindingsCtx {

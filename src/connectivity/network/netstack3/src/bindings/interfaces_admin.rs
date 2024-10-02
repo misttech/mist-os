@@ -71,11 +71,12 @@ use crate::bindings::devices::{
 };
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
+use crate::bindings::time::StackTime;
 use crate::bindings::util::{
     IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
     TryIntoCore,
 };
-use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime};
+use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack};
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
     req.filter_map(|req| {

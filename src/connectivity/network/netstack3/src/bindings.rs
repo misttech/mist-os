@@ -28,20 +28,19 @@ mod routes;
 mod socket;
 mod stack_fidl_worker;
 
+mod time;
 mod timers;
 mod util;
 mod verifier_worker;
 
 use std::collections::HashMap;
-use std::convert::{Infallible as Never, TryFrom as _};
+use std::convert::Infallible as Never;
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
-use std::num::TryFromIntError;
 use std::ops::Deref;
 use std::pin::pin;
 use std::sync::Arc;
-use std::time::Duration;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
@@ -72,6 +71,7 @@ use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
+use crate::bindings::time::{AtomicStackTime, StackTime};
 use crate::bindings::util::TaskWaitGroup;
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -358,47 +358,9 @@ where
     }
 }
 
-/// A thin wrapper around `fuchsia_async::Time` that implements `core::Instant`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
-pub(crate) struct StackTime(fasync::Time);
-
-impl netstack3_core::Instant for StackTime {
-    fn checked_duration_since(&self, earlier: StackTime) -> Option<Duration> {
-        match u64::try_from(self.0.into_nanos() - earlier.0.into_nanos()) {
-            Ok(nanos) => Some(Duration::from_nanos(nanos)),
-            Err(TryFromIntError { .. }) => None,
-        }
-    }
-
-    fn checked_add(&self, duration: Duration) -> Option<StackTime> {
-        Some(StackTime(fasync::Time::from_nanos(
-            self.0.into_nanos().checked_add(i64::try_from(duration.as_nanos()).ok()?)?,
-        )))
-    }
-
-    fn checked_sub(&self, duration: Duration) -> Option<StackTime> {
-        Some(StackTime(fasync::Time::from_nanos(
-            self.0.into_nanos().checked_sub(i64::try_from(duration.as_nanos()).ok()?)?,
-        )))
-    }
-}
-
-impl std::fmt::Display for StackTime {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self(time) = *self;
-        write!(f, "{:.6}", time.into_nanos() as f64 / 1_000_000_000f64)
-    }
-}
-
-impl InspectableValue for StackTime {
-    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
-        let Self(inner) = self;
-        inspector.record_int(name, inner.into_nanos())
-    }
-}
-
 impl InstantBindingsTypes for BindingsCtx {
     type Instant = StackTime;
+    type AtomicInstant = AtomicStackTime;
 }
 
 impl InstantContext for BindingsCtx {

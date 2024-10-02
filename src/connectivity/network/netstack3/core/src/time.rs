@@ -19,7 +19,7 @@ use crate::ip::integration::IpAddrCtxSpec;
 use crate::transport::TransportLayerTimerId;
 use crate::BindingsTypes;
 
-pub use netstack3_base::Instant;
+pub use netstack3_base::{AtomicInstant, Instant};
 
 /// The identifier for any timer event.
 #[derive(Derivative, GenericOverIp)]

@@ -385,7 +385,7 @@ mod tests {
     use alloc::vec::Vec;
     use core::convert::Infallible as Never;
 
-    use crate::testutil::{FakeInstant, FakeInstantCtx};
+    use crate::testutil::{FakeAtomicInstant, FakeInstant, FakeInstantCtx};
     use crate::InstantContext;
 
     use super::*;
@@ -397,6 +397,7 @@ mod tests {
 
     impl InstantBindingsTypes for FakeTimerCtx {
         type Instant = FakeInstant;
+        type AtomicInstant = FakeAtomicInstant;
     }
 
     impl InstantContext for FakeTimerCtx {

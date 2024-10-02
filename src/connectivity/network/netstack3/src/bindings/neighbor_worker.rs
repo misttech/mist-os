@@ -25,7 +25,8 @@ use net_types::ip::{IpAddr, IpAddress, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 
 use crate::bindings::devices::{BindingId, DeviceIdAndName};
-use crate::bindings::{BindingsCtx, Ctx, StackTime};
+use crate::bindings::time::StackTime;
+use crate::bindings::{BindingsCtx, Ctx};
 use netstack3_core::device::{
     DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
 };

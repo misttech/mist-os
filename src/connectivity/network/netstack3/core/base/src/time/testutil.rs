@@ -11,14 +11,17 @@ use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use core::hash::Hash;
 use core::ops;
+use core::sync::atomic::Ordering;
 use core::time::Duration;
+use netstack3_sync::Mutex;
 
 use assert_matches::assert_matches;
 
 use crate::context::CtxPair;
 use crate::ref_counted_hash_map::{RefCountedHashSet, RemoveResult};
 use crate::time::{
-    Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext, TimerHandler,
+    AtomicInstant, Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
+    TimerHandler,
 };
 
 /// A fake implementation of `Instant` for use in testing.
@@ -94,6 +97,33 @@ impl Debug for FakeInstant {
     }
 }
 
+/// A fake implementation of [`AtomicInstant`] for use in testing.
+#[derive(Debug)]
+pub struct FakeAtomicInstant {
+    value: Mutex<FakeInstant>,
+}
+
+impl AtomicInstant<FakeInstant> for FakeAtomicInstant {
+    fn new(instant: FakeInstant) -> FakeAtomicInstant {
+        FakeAtomicInstant { value: Mutex::new(instant) }
+    }
+
+    fn load(&self, _ordering: Ordering) -> FakeInstant {
+        *self.value.lock()
+    }
+
+    fn store(&self, instant: FakeInstant, _ordering: Ordering) {
+        *self.value.lock() = instant
+    }
+
+    fn store_max(&self, instant: FakeInstant, _ordering: Ordering) {
+        let mut guard = self.value.lock();
+        if *guard < instant {
+            *guard = instant
+        }
+    }
+}
+
 /// A fake [`InstantContext`] which stores the current time as a
 /// [`FakeInstant`].
 #[derive(Default)]
@@ -111,6 +141,7 @@ impl FakeInstantCtx {
 
 impl InstantBindingsTypes for FakeInstantCtx {
     type Instant = FakeInstant;
+    type AtomicInstant = FakeAtomicInstant;
 }
 
 impl InstantContext for FakeInstantCtx {
@@ -366,6 +397,7 @@ impl<Id: PartialEq> FakeTimerCtx<Id> {
 
 impl<Id> InstantBindingsTypes for FakeTimerCtx<Id> {
     type Instant = FakeInstant;
+    type AtomicInstant = FakeAtomicInstant;
 }
 
 impl<Id> InstantContext for FakeTimerCtx<Id> {

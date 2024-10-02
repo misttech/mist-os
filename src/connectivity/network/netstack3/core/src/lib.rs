@@ -229,7 +229,7 @@ pub use netstack3_base::{
     ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
 };
 pub use state::{StackState, StackStateBuilder};
-pub use time::{Instant, TimerId};
+pub use time::{AtomicInstant, Instant, TimerId};
 
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;

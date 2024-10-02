@@ -94,7 +94,8 @@ pub(crate) mod testutil {
 
     use net_types::ip::Ip;
     use netstack3_base::testutil::{
-        FakeCryptoRng, FakeInstant, FakeTimerCtx, FakeWeakDeviceId, WithFakeTimerContext,
+        FakeAtomicInstant, FakeCryptoRng, FakeInstant, FakeTimerCtx, FakeWeakDeviceId,
+        WithFakeTimerContext,
     };
     use netstack3_base::{InstantContext, IntoCoreTimerCtx};
 
@@ -197,6 +198,7 @@ pub(crate) mod testutil {
 
     impl<I: Ip> InstantBindingsTypes for FakeBindingsCtx<I> {
         type Instant = FakeInstant;
+        type AtomicInstant = FakeAtomicInstant;
     }
 
     impl<I: Ip> FilterBindingsTypes for FakeBindingsCtx<I> {

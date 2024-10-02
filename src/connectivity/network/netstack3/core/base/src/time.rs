@@ -11,6 +11,7 @@ pub(crate) mod testutil;
 use core::convert::Infallible as Never;
 use core::fmt::Debug;
 use core::marker::PhantomData;
+use core::sync::atomic::Ordering;
 use core::time::Duration;
 
 use crate::inspect::InspectableValue;
@@ -56,6 +57,21 @@ pub trait Instant:
     fn checked_sub(&self, duration: Duration) -> Option<Self>;
 }
 
+/// A type representing an instant in time that can be atomically updated.
+pub trait AtomicInstant<I: Instant>: Debug {
+    /// Instantiates [`Self`] from the given instant.
+    fn new(instant: I) -> Self;
+
+    /// Loads an [`Instant`], atomically.
+    fn load(&self, ordering: Ordering) -> I;
+
+    /// Stores an [`Instant`], atomically,
+    fn store(&self, instant: I, ordering: Ordering);
+
+    /// Store the maximum of the current value and the provided value.
+    fn store_max(&self, instant: I, ordering: Ordering);
+}
+
 /// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
 /// implementation.
 ///
@@ -69,6 +85,9 @@ pub trait InstantBindingsTypes {
     /// real-world time (e.g., [`std::time::Instant`]), or may be faked in
     /// testing using a fake clock.
     type Instant: Instant + 'static;
+
+    /// An atomic representation of [`Self::Instant`].
+    type AtomicInstant: AtomicInstant<Self::Instant>;
 }
 
 /// A context that provides access to a monotonic clock.
