@@ -165,6 +165,20 @@ void SimInterface::ConnectConf(ConnectConfRequestView request,
   completer.Reply();
 }
 
+void SimInterface::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
+  ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
+  ZX_ASSERT(request->has_status_code());
+  if (request->status_code() == wlan_ieee80211::StatusCode::kSuccess) {
+    ++stats_.roam_successes;
+    ZX_ASSERT(request->has_selected_bssid());
+    ZX_ASSERT(request->selected_bssid().size() == ETH_ALEN);
+    memcpy(assoc_ctx_.bssid.byte, request->selected_bssid().data(), ETH_ALEN);
+  } else {
+    assoc_ctx_.state = AssocContext::kNone;
+  }
+  completer.Reply();
+}
+
 void SimInterface::RoamStartInd(RoamStartIndRequestView request,
                                 RoamStartIndCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
@@ -379,6 +393,26 @@ void SimInterface::AssociateWith(const simulation::FakeAp& ap, std::optional<zx:
   } else {
     StartConnect(ap.GetBssid(), ap.GetSsid(), ap.GetChannel());
   }
+}
+
+void SimInterface::StartRoam(const common::MacAddr& bssid,
+                             const wlan_common::WlanChannel& channel) {
+  // This should only be performed on a Client interface
+  ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
+  ++stats_.roam_attempts;
+
+  // Send roam request
+  auto builder = wlan_fullmac_wire::WlanFullmacImplRoamRequest::Builder(test_arena_);
+  fuchsia_wlan_common::wire::BssDescription bss;
+  memcpy(bss.bssid.data(), bssid.byte, ETH_ALEN);
+  auto ies =
+      std::vector<uint8_t>(assoc_ctx_.ies.data(), assoc_ctx_.ies.data() + assoc_ctx_.ies.size());
+  bss.ies = fidl::VectorView(test_arena_, ies);
+  bss.channel = channel;
+  bss.bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure;
+  builder.selected_bss(bss);
+  auto result = client_.buffer(test_arena_)->Roam(builder.Build());
+  ZX_ASSERT(result.ok());
 }
 
 void SimInterface::DisassociateFrom(const common::MacAddr& bssid,

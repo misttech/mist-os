@@ -125,6 +125,9 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             Reconnect(req) => {
                 self.device.reconnect(mlme_to_fullmac::convert_reconnect_request(req))?;
             }
+            Roam(req) => {
+                self.device.roam(mlme_to_fullmac::convert_roam_request(req))?;
+            }
             AuthResponse(resp) => {
                 self.device.auth_resp(mlme_to_fullmac::convert_authenticate_response(resp))?;
             }
@@ -232,6 +235,17 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                     self.set_link_state(fidl_mlme::ControlledPortState::Open)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::ConnectConf { resp });
+            }
+            FullmacDriverEvent::RoamConf { conf } => {
+                if *mac_role == fidl_common::WlanMacRole::Client {
+                    // Like for connect, SME will open the controlled port for a protected BSS.
+                    if !self.is_bss_protected
+                        && conf.status_code == fidl_ieee80211::StatusCode::Success
+                    {
+                        self.set_link_state(fidl_mlme::ControlledPortState::Open)?;
+                    }
+                }
+                self.mlme_event_sink.send(fidl_mlme::MlmeEvent::RoamConf { conf });
             }
             FullmacDriverEvent::RoamStartInd { ind } => {
                 if *mac_role == fidl_common::WlanMacRole::Client {

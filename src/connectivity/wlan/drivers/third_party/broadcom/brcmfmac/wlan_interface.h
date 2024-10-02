@@ -91,6 +91,7 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void StartScan(StartScanRequestView request, StartScanCompleter::Sync& completer) override;
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
   void Reconnect(ReconnectRequestView request, ReconnectCompleter::Sync& completer) override;
+  void Roam(RoamRequestView request, RoamCompleter::Sync& completer) override;
   void AuthResp(AuthRespRequestView request, AuthRespCompleter::Sync& completer) override;
   void Deauth(DeauthRequestView request, DeauthCompleter::Sync& completer) override;
   void AssocResp(AssocRespRequestView request, AssocRespCompleter::Sync& completer) override;

@@ -61,6 +61,14 @@ pub fn convert_reconnect_request(
     }
 }
 
+pub fn convert_roam_request(
+    req: fidl_mlme::RoamRequest,
+) -> fidl_fullmac::WlanFullmacImplRoamRequest {
+    fidl_fullmac::WlanFullmacImplRoamRequest {
+        selected_bss: Some(req.selected_bss),
+        ..Default::default()
+    }
+}
 pub fn convert_authenticate_response(
     resp: fidl_mlme::AuthenticateResponse,
 ) -> fidl_fullmac::WlanFullmacImplAuthRespRequest {

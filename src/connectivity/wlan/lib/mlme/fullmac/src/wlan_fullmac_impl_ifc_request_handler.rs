@@ -43,6 +43,12 @@ fn handle_one_request(
                 resp: fullmac_to_mlme::convert_connect_confirm(resp),
             });
         }
+        fidl_fullmac::WlanFullmacImplIfcRequest::RoamConf { payload, responder } => {
+            responder.send().context("Failed to respond to RoamConf")?;
+            driver_event_sink.0.send(FullmacDriverEvent::RoamConf {
+                conf: fullmac_to_mlme::convert_roam_confirm(payload)?,
+            });
+        }
         fidl_fullmac::WlanFullmacImplIfcRequest::RoamStartInd { payload, responder } => {
             responder.send().context("Failed to respond to RoamStartInd")?;
             driver_event_sink.0.send(FullmacDriverEvent::RoamStartInd {

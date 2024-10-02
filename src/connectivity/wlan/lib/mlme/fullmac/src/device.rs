@@ -27,6 +27,7 @@ pub trait DeviceOps {
     fn start_scan(&self, req: fidl_fullmac::WlanFullmacImplStartScanRequest) -> anyhow::Result<()>;
     fn connect(&self, req: fidl_fullmac::WlanFullmacImplConnectRequest) -> anyhow::Result<()>;
     fn reconnect(&self, req: fidl_fullmac::WlanFullmacImplReconnectRequest) -> anyhow::Result<()>;
+    fn roam(&self, req: fidl_fullmac::WlanFullmacImplRoamRequest) -> anyhow::Result<()>;
     fn auth_resp(&self, resp: fidl_fullmac::WlanFullmacImplAuthRespRequest) -> anyhow::Result<()>;
     fn deauth(&self, req: fidl_fullmac::WlanFullmacImplDeauthRequest) -> anyhow::Result<()>;
     fn assoc_resp(&self, resp: fidl_fullmac::WlanFullmacImplAssocRespRequest)
@@ -128,6 +129,9 @@ impl DeviceOps for FullmacDevice {
         self.fullmac_impl_sync_proxy
             .reconnect(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on Reconnect")
+    }
+    fn roam(&self, req: fidl_fullmac::WlanFullmacImplRoamRequest) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy.roam(&req, zx::Time::INFINITE).context("FIDL error on Roam")
     }
     fn auth_resp(&self, resp: fidl_fullmac::WlanFullmacImplAuthRespRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
@@ -249,6 +253,7 @@ pub mod test_utils {
         StartScan { req: fidl_fullmac::WlanFullmacImplStartScanRequest },
         ConnectReq { req: fidl_fullmac::WlanFullmacImplConnectRequest },
         ReconnectReq { req: fidl_fullmac::WlanFullmacImplReconnectRequest },
+        RoamReq { req: fidl_fullmac::WlanFullmacImplRoamRequest },
         AuthResp { resp: fidl_fullmac::WlanFullmacImplAuthRespRequest },
         DeauthReq { req: fidl_fullmac::WlanFullmacImplDeauthRequest },
         AssocResp { resp: fidl_fullmac::WlanFullmacImplAssocRespRequest },
@@ -433,6 +438,10 @@ pub mod test_utils {
             req: fidl_fullmac::WlanFullmacImplReconnectRequest,
         ) -> anyhow::Result<()> {
             self.driver_call_sender.send(DriverCall::ReconnectReq { req });
+            Ok(())
+        }
+        fn roam(&self, req: fidl_fullmac::WlanFullmacImplRoamRequest) -> anyhow::Result<()> {
+            self.driver_call_sender.send(DriverCall::RoamReq { req });
             Ok(())
         }
         fn auth_resp(

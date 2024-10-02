@@ -719,6 +719,27 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
       }
       break;
     }
+    case BRCMF_C_REASSOC: {
+      BRCMF_DBG(SIM, "REASSOC");
+      status = SIM_FW_CHK_CMD_LEN(dcmd->len, sizeof(wl_reassoc_params_t));
+      if (status == ZX_OK) {
+        auto fw_params = (reinterpret_cast<wl_reassoc_params_t*>(data));
+        BRCMF_DBG(SIM, "REASSOC OK, target BSSID " FMT_MAC, FMT_MAC_ARGS(fw_params->bssid));
+        auto reassoc_opts = std::make_unique<ReassocOpts>();
+
+        wlan_common::WlanChannel target_bss_channel;
+        chanspec_to_channel(&d11_inf_, fw_params->chanspec_list[0], &target_bss_channel);
+        memcpy(reassoc_opts->bssid.byte, fw_params->bssid, ETH_ALEN);
+
+        // Must remember which channel original BSS was on, for future communication with it.
+        wlan_common::WlanChannel orig_bss_channel;
+        chanspec_to_channel(&d11_inf_, iface_tbl_[kClientIfidx].chanspec, &orig_bss_channel);
+        reassoc_opts->orig_bss_channel = orig_bss_channel;
+        reassoc_opts->firmware_initiated = false;
+        ReassocInit(std::move(reassoc_opts), target_bss_channel);
+      }
+      break;
+    }
 
     default:
       BRCMF_DBG(SIM, "Unimplemented firmware message %d", dcmd->cmd);
@@ -1807,9 +1828,11 @@ zx_status_t SimFirmware::ReassocToDifferentAp(
   // Send the LINK event with a delay.
   SendEventToDriver(0, nullptr, BRCMF_E_LINK, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr,
                     BRCMF_EVENT_MSG_LINK, 0, assoc_state_.reassoc_opts->bssid, kLinkEventDelay);
-  // Send the ROAM event with a delay.
-  SendEventToDriver(0, nullptr, BRCMF_E_ROAM, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, 0,
-                    assoc_state_.reassoc_opts->bssid, kRoamEventDelay);
+  if (assoc_state_.reassoc_opts->firmware_initiated) {
+    // Firmware-initiated roam includes a final ROAM event. Send the ROAM event with a delay.
+    SendEventToDriver(0, nullptr, BRCMF_E_ROAM, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, 0,
+                      assoc_state_.reassoc_opts->bssid, kRoamEventDelay);
+  }
   // Set the Assoc state just after REASSOC event is sent to the driver.
   hw_.RequestCallback(
       [this, bss_type] {
@@ -1923,6 +1946,10 @@ void SimFirmware::RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame
   wlan_common::WlanChannel orig_bss_channel;
   chanspec_to_channel(&d11_inf_, iface_tbl_[kClientIfidx].chanspec, &orig_bss_channel);
   reassoc_opts->orig_bss_channel = orig_bss_channel;
+
+  // In current brcmfmac implementation, only firmware is capable of roaming in response to a BTM
+  // request frame. This may change in the future if we implement BTM in driver or upper layers.
+  reassoc_opts->firmware_initiated = true;
   ReassocInit(std::move(reassoc_opts), chan);
 }
 
@@ -2051,6 +2078,7 @@ void SimFirmware::SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::spa
 void SimFirmware::ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts,
                               wlan_common::WlanChannel& channel) {
   if (assoc_state_.state != AssocState::ASSOCIATED) {
+    BRCMF_DBG(SIM, "Cannot reassociate because STA is not associated");
     BRCMF_WARN("Cannot reassociate because STA is not associated");
     return;
   }
@@ -2083,8 +2111,14 @@ void SimFirmware::ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts,
   SetIFChanspec(kClientIfidx, chanspec);
   hw_.SetChannel(channel);
   const auto kRoamPrepEventDelay = zx::msec(15);
-  SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, BRCMF_E_STATUS_ATTEMPT, kClientIfidx, nullptr, 0,
-                    0, assoc_state_.reassoc_opts->bssid, kReassocEventDelay);
+
+  // The first REASSOC event status differs based on whether roam is firmware/user-initiated.
+  const auto reassoc_status = assoc_state_.reassoc_opts->firmware_initiated
+                                  ? BRCMF_E_STATUS_ATTEMPT
+                                  : BRCMF_E_STATUS_NEWASSOC;
+  SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, reassoc_status, kClientIfidx, nullptr, 0, 0,
+                    assoc_state_.reassoc_opts->bssid, kReassocEventDelay);
+
   SendEventToDriver(0, nullptr, BRCMF_E_ROAM_PREP, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
                     0, assoc_state_.reassoc_opts->bssid, kRoamPrepEventDelay);
   // Send the AUTH event with a delay.
@@ -2099,6 +2133,7 @@ void SimFirmware::ReassocStart() {
   const common::MacAddr srcAddr(GetMacAddr(kClientIfidx));
 
   if (assoc_state_.state != AssocState::REASSOCIATING) {
+    BRCMF_DBG(SIM, "Cannot reassociate because STA left reassociating state");
     BRCMF_WARN("Cannot reassociate because STA left reassociating state");
     assoc_state_.reassoc_opts.reset();
     return;

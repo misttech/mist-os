@@ -54,6 +54,8 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   struct Stats {
     size_t connect_attempts = 0;
     size_t connect_successes = 0;
+    size_t roam_attempts = 0;
+    size_t roam_successes = 0;
     std::list<wlan_fullmac_wire::WlanFullmacConnectConfirm> connect_results;
     std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacAuthInd> auth_indications;
@@ -98,6 +100,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
                     OnScanResultCompleter::Sync& completer) override;
   void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
   void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
+  void RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) override;
   void RoamStartInd(RoamStartIndRequestView request,
                     RoamStartIndCompleter::Sync& completer) override;
   void RoamResultInd(RoamResultIndRequestView request,
@@ -150,6 +153,10 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
                     const wlan_common::WlanChannel& channel);
   void AssociateWith(const simulation::FakeAp& ap,
                      std::optional<zx::duration> delay = std::nullopt);
+
+  // Start a roam attempt with a fake AP. Note: like connect, only non-authenticated associations
+  // are supported.
+  void StartRoam(const common::MacAddr& bssid, const wlan_common::WlanChannel& channel);
 
   void DisassociateFrom(const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);
   void DeauthenticateFrom(const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);

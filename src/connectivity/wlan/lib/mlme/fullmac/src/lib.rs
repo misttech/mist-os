@@ -66,6 +66,7 @@ enum FullmacDriverEvent {
     OnScanResult { result: fidl_mlme::ScanResult },
     OnScanEnd { end: fidl_mlme::ScanEnd },
     ConnectConf { resp: fidl_mlme::ConnectConfirm },
+    RoamConf { conf: fidl_mlme::RoamConfirm },
     RoamStartInd { ind: fidl_mlme::RoamStartIndication },
     RoamResultInd { ind: fidl_mlme::RoamResultIndication },
     AuthInd { ind: fidl_mlme::AuthenticateIndication },
