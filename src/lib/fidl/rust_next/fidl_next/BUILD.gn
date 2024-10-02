@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
-rustc_library("fidl") {
+rustc_library("fidl_next") {
   edition = "2021"
   sources = [
     "src/bytes.rs",
@@ -67,14 +67,14 @@ rustc_library("fidl") {
   ]
 }
 
-fuchsia_unittest_package("fidl_test_package") {
-  deps = [ ":fidl_test" ]
+fuchsia_unittest_package("fidl_next_test_package") {
+  deps = [ ":fidl_next_test" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":fidl_test($host_toolchain)",
-    ":fidl_test_package",
+    ":fidl_next_test($host_toolchain)",
+    ":fidl_next_test_package",
   ]
 }

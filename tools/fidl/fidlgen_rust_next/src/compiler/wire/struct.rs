@@ -55,7 +55,7 @@ pub fn emit_struct<W: Write>(
     writeln!(
         out,
         r#"
-        unsafe impl<{decode_params}___D> ::fidl::Decode<___D> for Wire{name}{params}
+        unsafe impl<{decode_params}___D> ::fidl_next::Decode<___D> for Wire{name}{params}
         where
             ___D: ?Sized,
         "#,
@@ -63,7 +63,7 @@ pub fn emit_struct<W: Write>(
 
     for member in &s.members {
         emit_type(compiler, out, &member.ty)?;
-        writeln!(out, ": ::fidl::Decode<___D>,")?;
+        writeln!(out, ": ::fidl_next::Decode<___D>,")?;
     }
 
     writeln!(
@@ -71,16 +71,16 @@ pub fn emit_struct<W: Write>(
         r#"
         {{
             fn decode(
-                slot: ::fidl::Slot<'_, Self>,
+                slot: ::fidl_next::Slot<'_, Self>,
                 decoder: &mut ___D,
-            ) -> Result<(), ::fidl::DecodeError> {{
+            ) -> Result<(), ::fidl_next::DecodeError> {{
         "#,
     )?;
 
     // Have to do some nasty manual formatting to get destructuring to be
     // formatted correctly
 
-    writeln!(out, "::fidl::munge! {{")?;
+    writeln!(out, "::fidl_next::munge! {{")?;
     writeln!(out, "            let Self {{")?;
 
     for member in &s.members {
@@ -93,7 +93,7 @@ pub fn emit_struct<W: Write>(
 
     for member in &s.members {
         let name = &member.name;
-        write!(out, "::fidl::Decode::decode({name}.as_mut(), decoder)?;")?;
+        write!(out, "::fidl_next::Decode::decode({name}.as_mut(), decoder)?;")?;
         emit_type_check(
             out,
             |out| writeln!(out, "let {name} = unsafe {{ {name}.deref_unchecked() }};"),

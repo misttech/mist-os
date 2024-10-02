@@ -26,7 +26,7 @@ pub fn emit_table<W: Write>(
         r#"
         #[repr(C)]
         pub struct Wire{name}<'buf> {{
-            table: ::fidl::WireTable<'buf>,
+            table: ::fidl_next::WireTable<'buf>,
         }}
         "#,
     )?;
@@ -36,15 +36,15 @@ pub fn emit_table<W: Write>(
     writeln!(
         out,
         r#"
-        unsafe impl<'buf, ___D> ::fidl::Decode<___D> for Wire{name}<'buf>
+        unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for Wire{name}<'buf>
         where
-            ___D: ::fidl::Decoder<'buf> + ?Sized,
+            ___D: ::fidl_next::Decoder<'buf> + ?Sized,
         "#,
     )?;
 
     for member in &t.members {
         emit_type(compiler, out, &member.ty)?;
-        writeln!(out, ": ::fidl::Decode<___D>,")?;
+        writeln!(out, ": ::fidl_next::Decode<___D>,")?;
     }
 
     writeln!(
@@ -52,12 +52,12 @@ pub fn emit_table<W: Write>(
         r#"
         {{
             fn decode(
-                slot: ::fidl::Slot<'_, Self>,
+                slot: ::fidl_next::Slot<'_, Self>,
                 decoder: &mut ___D,
-            ) -> Result<(), ::fidl::DecodeError> {{
-                ::fidl::munge!(let Self {{ table }} = slot);
+            ) -> Result<(), ::fidl_next::DecodeError> {{
+                ::fidl_next::munge!(let Self {{ table }} = slot);
 
-                ::fidl::WireTable::decode_with(
+                ::fidl_next::WireTable::decode_with(
                     table,
                     decoder,
                     |ordinal, mut slot, decoder| match ordinal {{
@@ -72,7 +72,7 @@ pub fn emit_table<W: Write>(
             out,
             r#"
             {ord} => {{
-                ::fidl::WireEnvelope::decode_as::<___D, 
+                ::fidl_next::WireEnvelope::decode_as::<___D, 
             "#,
         )?;
         emit_type(compiler, out, &member.ty)?;
@@ -105,7 +105,7 @@ pub fn emit_table<W: Write>(
     writeln!(
         out,
         r#"
-                        _ => ::fidl::WireEnvelope::decode_unknown(
+                        _ => ::fidl_next::WireEnvelope::decode_unknown(
                             slot,
                             decoder,
                         ),

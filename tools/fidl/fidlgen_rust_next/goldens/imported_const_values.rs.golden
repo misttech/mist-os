@@ -12,17 +12,17 @@
 #[derive(Clone, Debug)]
 pub struct MyStruct {}
 
-impl ::fidl::Encodable for MyStruct {
+impl ::fidl_next::Encodable for MyStruct {
     type Encoded<'buf> = WireMyStruct;
 }
 
-impl<___E> ::fidl::Encode<___E> for MyStruct {
+impl<___E> ::fidl_next::Encode<___E> for MyStruct {
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::EncodeError> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
             } = slot;
         }
@@ -31,32 +31,32 @@ impl<___E> ::fidl::Encode<___E> for MyStruct {
     }
 }
 
-impl ::fidl::EncodableOption for Box<MyStruct> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireMyStruct>;
+impl ::fidl_next::EncodableOption for Box<MyStruct> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireMyStruct>;
 }
 
-impl<___E> ::fidl::EncodeOption<___E> for Box<MyStruct>
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<MyStruct>
 where
-    ___E: ::fidl::Encoder + ?Sized,
-    MyStruct: ::fidl::Encode<___E>,
+    ___E: ::fidl_next::Encoder + ?Sized,
+    MyStruct: ::fidl_next::Encode<___E>,
 {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::EncodeError> {
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            ::fidl::EncoderExt::encode(encoder, inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WireMyStruct> for MyStruct {
+impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
     fn take_from(from: &mut WireMyStruct) -> Self {
         Self {}
     }
@@ -66,12 +66,15 @@ impl ::fidl::TakeFrom<WireMyStruct> for MyStruct {
 #[repr(C)]
 pub struct WireMyStruct {}
 
-unsafe impl<___D> ::fidl::Decode<___D> for WireMyStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyStruct
 where
     ___D: ?Sized,
 {
-    fn decode(slot: ::fidl::Slot<'_, Self>, decoder: &mut ___D) -> Result<(), ::fidl::DecodeError> {
-        ::fidl::munge! {
+    fn decode(
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
             } = slot;
         }

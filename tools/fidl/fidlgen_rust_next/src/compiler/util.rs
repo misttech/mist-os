@@ -75,13 +75,13 @@ pub fn snake_to_camel(s: &str) -> String {
 pub fn int_type_wire_name(int: IntType) -> &'static str {
     match int {
         IntType::Int8 => "i8",
-        IntType::Int16 => "::fidl::i16_le",
-        IntType::Int32 => "::fidl::i32_le",
-        IntType::Int64 => "::fidl::i64_le",
+        IntType::Int16 => "::fidl_next::i16_le",
+        IntType::Int32 => "::fidl_next::i32_le",
+        IntType::Int64 => "::fidl_next::i64_le",
         IntType::Uint8 => "u8",
-        IntType::Uint16 => "::fidl::u16_le",
-        IntType::Uint32 => "::fidl::u32_le",
-        IntType::Uint64 => "::fidl::u64_le",
+        IntType::Uint16 => "::fidl_next::u16_le",
+        IntType::Uint32 => "::fidl_next::u32_le",
+        IntType::Uint64 => "::fidl_next::u64_le",
     }
 }
 
@@ -101,15 +101,15 @@ pub fn int_type_natural_name(int: IntType) -> &'static str {
 pub fn prim_subtype_wire_name(prim: PrimSubtype) -> &'static str {
     match prim {
         PrimSubtype::Bool => "bool",
-        PrimSubtype::Float32 => "::fidl::f32_le",
-        PrimSubtype::Float64 => "::fidl::f64_le",
+        PrimSubtype::Float32 => "::fidl_next::f32_le",
+        PrimSubtype::Float64 => "::fidl_next::f64_le",
         PrimSubtype::Int8 => "i8",
-        PrimSubtype::Int16 => "::fidl::i16_le",
-        PrimSubtype::Int32 => "::fidl::i32_le",
-        PrimSubtype::Int64 => "::fidl::i64_le",
+        PrimSubtype::Int16 => "::fidl_next::i16_le",
+        PrimSubtype::Int32 => "::fidl_next::i32_le",
+        PrimSubtype::Int64 => "::fidl_next::i64_le",
         PrimSubtype::Uint8 => "u8",
-        PrimSubtype::Uint16 => "::fidl::u16_le",
-        PrimSubtype::Uint32 => "::fidl::u32_le",
-        PrimSubtype::Uint64 => "::fidl::u64_le",
+        PrimSubtype::Uint16 => "::fidl_next::u16_le",
+        PrimSubtype::Uint32 => "::fidl_next::u32_le",
+        PrimSubtype::Uint64 => "::fidl_next::u64_le",
     }
 }

@@ -113,7 +113,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
             }
         }
         Type::Internal { subtype } => match subtype {
-            InternalSubtype::FrameworkError => write!(out, "::fidl::FrameworkError")?,
+            InternalSubtype::FrameworkError => write!(out, "::fidl_next::FrameworkError")?,
         },
     }
 

@@ -30,18 +30,18 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
         }
         Type::Vector { element_type, nullable, .. } => {
             if *nullable {
-                write!(out, "::fidl::WireOptionalVector<'buf, ")?;
+                write!(out, "::fidl_next::WireOptionalVector<'buf, ")?;
             } else {
-                write!(out, "::fidl::WireVector<'buf, ")?;
+                write!(out, "::fidl_next::WireVector<'buf, ")?;
             }
             emit_type(compiler, out, element_type)?;
             write!(out, ">")?;
         }
         Type::String { nullable, .. } => {
             if *nullable {
-                write!(out, "::fidl::WireOptionalString<'buf>")?;
+                write!(out, "::fidl_next::WireOptionalString<'buf>")?;
             } else {
-                write!(out, "::fidl::WireString<'buf>")?;
+                write!(out, "::fidl_next::WireString<'buf>")?;
             }
         }
         // Handle and request could eventually be unified under "resource types"
@@ -73,7 +73,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 }
                 DeclType::Struct => {
                     if *nullable {
-                        write!(out, "::fidl::WireBox<'buf, ")?;
+                        write!(out, "::fidl_next::WireBox<'buf, ")?;
                     }
                     emit_wire_comp_ident(compiler, out, identifier)?;
                     if !compiler.query::<IsWireStatic>(identifier) {
@@ -112,7 +112,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
             }
         }
         Type::Internal { subtype } => match subtype {
-            InternalSubtype::FrameworkError => write!(out, "::fidl::FrameworkError")?,
+            InternalSubtype::FrameworkError => write!(out, "::fidl_next::FrameworkError")?,
         },
     }
 
@@ -137,7 +137,7 @@ fn emit_type_check<W: Write>(
                     out,
                     r#"
                 if {name}.len() > {limit} {{
-                    return Err(::fidl::DecodeError::VectorTooLong {{
+                    return Err(::fidl_next::DecodeError::VectorTooLong {{
                         size: {name}.len() as u64,
                         limit: {limit},
                     }});
@@ -159,7 +159,7 @@ fn emit_type_check<W: Write>(
                     out,
                     r#"
                 if {name}.len() > {limit} {{
-                    return Err(::fidl::DecodeError::VectorTooLong {{
+                    return Err(::fidl_next::DecodeError::VectorTooLong {{
                         size: {name}.len() as u64,
                         limit: {limit},
                     }});

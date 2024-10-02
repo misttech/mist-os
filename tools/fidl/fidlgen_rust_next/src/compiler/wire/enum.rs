@@ -68,14 +68,14 @@ pub fn emit_enum<W: Write>(
     writeln!(
         out,
         r#"
-        unsafe impl<___D> ::fidl::Decode<___D> for Wire{name}
+        unsafe impl<___D> ::fidl_next::Decode<___D> for Wire{name}
         where
             ___D: ?Sized,
         {{
             fn decode(
-                slot: ::fidl::Slot<'_, Self>,
+                slot: ::fidl_next::Slot<'_, Self>,
                 _: &mut ___D,
-            ) -> Result<(), ::fidl::DecodeError> {{
+            ) -> Result<(), ::fidl_next::DecodeError> {{
         "#,
     )?;
 
@@ -83,7 +83,7 @@ pub fn emit_enum<W: Write>(
         writeln!(
             out,
             r#"
-            ::fidl::munge!(let Self {{ value }} = slot);
+            ::fidl_next::munge!(let Self {{ value }} = slot);
 
             match {natural_ty}::from(*value) {{
             "#,
@@ -98,7 +98,7 @@ pub fn emit_enum<W: Write>(
             out,
             r#"
                 => (),
-                unknown => return Err(::fidl::DecodeError::InvalidEnumOrdinal(
+                unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(
                     unknown as usize,
                 )),
             }}

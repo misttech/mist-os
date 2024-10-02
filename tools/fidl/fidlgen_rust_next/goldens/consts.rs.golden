@@ -16,21 +16,21 @@ pub enum EnumType {
     True = 2,
 }
 
-impl ::fidl::Encodable for EnumType {
+impl ::fidl_next::Encodable for EnumType {
     type Encoded<'buf> = WireEnumType;
 }
 
-impl<___E> ::fidl::Encode<___E> for EnumType
+impl<___E> ::fidl_next::Encode<___E> for EnumType
 where
     ___E: ?Sized,
 {
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::EncodeError> {
-        ::fidl::munge!(let WireEnumType { mut value } = slot);
-        *value = ::fidl::i32_le::from(match *self {
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireEnumType { mut value } = slot);
+        *value = ::fidl_next::i32_le::from(match *self {
             EnumType::Value => 1,
             EnumType::True => 2,
         });
@@ -49,7 +49,7 @@ impl ::core::convert::From<WireEnumType> for EnumType {
     }
 }
 
-impl ::fidl::TakeFrom<WireEnumType> for EnumType {
+impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
     fn take_from(from: &mut WireEnumType) -> Self {
         EnumType::from(*from)
     }
@@ -58,24 +58,27 @@ impl ::fidl::TakeFrom<WireEnumType> for EnumType {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireEnumType {
-    value: ::fidl::i32_le,
+    value: ::fidl_next::i32_le,
 }
 
 impl WireEnumType {
-    pub const VALUE: WireEnumType = WireEnumType { value: ::fidl::i32_le::from_native(1) };
-    pub const TRUE: WireEnumType = WireEnumType { value: ::fidl::i32_le::from_native(2) };
+    pub const VALUE: WireEnumType = WireEnumType { value: ::fidl_next::i32_le::from_native(1) };
+    pub const TRUE: WireEnumType = WireEnumType { value: ::fidl_next::i32_le::from_native(2) };
 }
 
-unsafe impl<___D> ::fidl::Decode<___D> for WireEnumType
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireEnumType
 where
     ___D: ?Sized,
 {
-    fn decode(slot: ::fidl::Slot<'_, Self>, _: &mut ___D) -> Result<(), ::fidl::DecodeError> {
-        ::fidl::munge!(let Self { value } = slot);
+    fn decode(
+        slot: ::fidl_next::Slot<'_, Self>,
+        _: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge!(let Self { value } = slot);
 
         match i32::from(*value) {
             1 | 2 => (),
-            unknown => return Err(::fidl::DecodeError::InvalidEnumOrdinal(unknown as usize)),
+            unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(unknown as usize)),
         }
 
         Ok(())
