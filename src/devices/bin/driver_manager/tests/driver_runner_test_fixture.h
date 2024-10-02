@@ -321,7 +321,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   TestDirectory driver_dir_{dispatcher()};
   TestDriverHost driver_host_;
   fidl::ServerBindingGroup<fuchsia_component::Realm> realm_bindings_;
-  std::optional<fidl::ServerBinding<fdh::DriverHost>> driver_host_binding_;
+  fidl::ServerBindingGroup<fdh::DriverHost> driver_host_bindings_;
 
   std::optional<Devfs> devfs_;
   InspectManager inspect_{dispatcher()};

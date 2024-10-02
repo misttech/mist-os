@@ -61,6 +61,8 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
 
   std::unique_ptr<driver_loader::Loader> loader_;
   std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner_;
+
+  driver_runner::TestDirectory driver_host_dir_{dispatcher()};
 };
 
 void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
@@ -82,11 +84,20 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
   ASSERT_EQ(ZX_OK, status);
 
+  auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  realm().SetOpenExposedDirHandler(
+      [this, kCollection, kDriverHostName](fdecl::ChildRef child, auto exposed_dir) {
+        EXPECT_EQ(kCollection, child.collection().value_or(""));
+        EXPECT_EQ(kDriverHostName, child.name().substr(0, kDriverHostName.size()));
+        driver_host_dir_.Bind(std::move(exposed_dir));
+      });
+
   // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
   // entire thing.
   bool got_cb = false;
   driver_host_runner_->StartDriverHost(
-      loader_.get(), std::move(bootstrap_receiver),
+      loader_.get(), std::move(bootstrap_receiver), std::move(endpoints.server),
       [&](zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) {
         ASSERT_EQ(ZX_OK, result.status_value());
         ASSERT_TRUE(result->is_valid());
