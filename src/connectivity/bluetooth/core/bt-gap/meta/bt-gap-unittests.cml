@@ -33,10 +33,5 @@
             from: "parent",
             to: [ "#secure-stash" ],
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#secure-stash" ],
-        },
     ],
 }

@@ -40,16 +40,10 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#guest_pkg" ],
-        },
-        {
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.media.Audio",
                 "fuchsia.net.virtualization.Control",
                 "fuchsia.scheduler.RoleManager",

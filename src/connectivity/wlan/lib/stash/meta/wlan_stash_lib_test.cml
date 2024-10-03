@@ -38,14 +38,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#stash",
-                "#stash_secure",
-            ],
-        },
-        {
             storage: "data",
             from: "parent",
             to: [

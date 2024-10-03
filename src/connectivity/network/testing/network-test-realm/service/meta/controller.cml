@@ -35,13 +35,6 @@
             ],
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#enclosed-network",
-        },
-    ],
     expose: [
         {
             protocol: "fuchsia.net.test.realm.Controller",

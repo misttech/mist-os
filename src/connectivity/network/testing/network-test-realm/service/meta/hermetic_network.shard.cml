@@ -33,17 +33,6 @@
             to: [ "#netstack" ],
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#dhcpd",
-                "#dhcpv6-client",
-                "#dns-resolver",
-                "#netstack",
-                "#stubs",
-            ],
-        },
-        {
             protocol: [ "fuchsia.net.name.Lookup" ],
             from: "#dns-resolver",
             to: [ "#dhcpd" ],

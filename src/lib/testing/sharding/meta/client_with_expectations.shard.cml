@@ -26,16 +26,6 @@
             from: "#sharder",
             to: "#expectation-comparer",
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#sharder",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#expectation-comparer",
-        },
     ],
     expose: [
         {

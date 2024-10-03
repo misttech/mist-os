@@ -49,13 +49,13 @@
             ],
         },
         {
-            from: "#pkg-cache-config",
-            to: "#pkg-cache",
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
+            from: "#pkg-cache-config",
+            to: "#pkg-cache",
         },
         {
             // Needed for passing repository configs to pkg-resolver
@@ -77,20 +77,6 @@
             from: "parent",
             to: "#system-updater",
             rights: [ "r*" ],
-        },
-        {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.metrics.MetricEventLoggerFactory",
-            ],
-            from: "parent",
-            to: [
-                "#fake-system-update-committer",
-                "#pkg-cache",
-                "#pkg-cache-config",
-                "#pkg-resolver",
-                "#system-updater",
-            ],
         },
         {
             protocol: [ "fuchsia.boot.Arguments" ],

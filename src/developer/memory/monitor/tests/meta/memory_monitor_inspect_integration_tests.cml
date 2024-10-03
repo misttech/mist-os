@@ -50,16 +50,10 @@
             protocol: [
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
-                "fuchsia.logger.LogSink",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
             to: "#test_apps",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#memfs",
         },
     ],
 }

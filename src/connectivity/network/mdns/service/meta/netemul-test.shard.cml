@@ -74,26 +74,16 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.network.PrimaryInterface" ],
             from: "void",
             to: [
                 "#local-name-provider",
                 "#remote-name-provider",
             ],
             availability: "optional",
-            config: [ "fuchsia.network.PrimaryInterface" ],
         },
 
         // ================== local node ==================
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#local-mdns",
-                "#local-name-provider",
-                "#local-netstack",
-                "#test-driver",
-            ],
-        },
         {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "#local-name-provider",

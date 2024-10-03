@@ -18,11 +18,6 @@
             from: "self",
             to: "#sharder",
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#sharder",
-        },
     ],
     expose: [
         {

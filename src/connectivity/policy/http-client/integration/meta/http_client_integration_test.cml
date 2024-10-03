@@ -55,29 +55,20 @@
     ],
     offer: [
         {
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             from: "#http-client-config-never-idle",
             to: "#never_idle",
-            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
         },
         {
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             from: "#http-client-config-idle-1ms",
             to: "#idle_1ms",
-            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
         },
         {
             protocol: "fuchsia.posix.socket.Provider",
             from: "#netstack-debug",
             to: [
                 "#idle_1ms",
-                "#never_idle",
-            ],
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#idle_1ms",
-                "#netstack-debug",
                 "#never_idle",
             ],
         },

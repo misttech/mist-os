@@ -32,10 +32,7 @@
     // Capabilities required by components under test.
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "parent",
             to: "#calc_server",
         },

@@ -25,10 +25,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "parent",
             to: "#realm_api_collection",
         },
