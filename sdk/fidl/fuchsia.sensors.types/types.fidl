@@ -9,7 +9,7 @@ using zx;
 
 /// Labels for different types of sensors.
 ///
-/// These values are from:
+/// These values are derived from:
 /// https://android.googlesource.com/platform/hardware/interfaces/+/main/sensors/1.0/types.hal#118
 type SensorType = flexible enum : uint32 {
     /// Raw inertial measurement.
@@ -53,6 +53,9 @@ type SensorType = flexible enum : uint32 {
     /// Biometric.
     HEART_RATE = 21;
     HEART_BEAT = 31;
+
+    /// Power and electrical.
+    POWER = 1001;
 
     /// Base for device manufacturers' private sensor types.
     DEVICE_PRIVATE_BASE = 0x10000;
