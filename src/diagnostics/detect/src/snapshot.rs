@@ -8,7 +8,6 @@ use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use injectable_time::TimeSource;
 use std::cell::RefCell;
-use std::rc::Rc;
 use tracing::{error, warn};
 use {fidl_fuchsia_feedback as fidl_feedback, fuchsia_async as fasync};
 
@@ -68,7 +67,7 @@ where
         Self { time_source, max_pending_crash_reports: MAX_PENDING_CRASH_REPORTS, proxy: None }
     }
 
-    pub async fn build(self) -> Result<Rc<CrashReportHandler>, Error> {
+    pub async fn build(self) -> Result<CrashReportHandler, Error> {
         // Proxy is only pre-set for tests. If a proxy was not specified,
         // this is a good time to configure for our crash reporting product.
         if matches!(self.proxy, None) {
@@ -83,11 +82,7 @@ where
         // Connect to the CrashReporter service if a proxy wasn't specified
         let proxy =
             self.proxy.unwrap_or(connect_to_protocol::<fidl_feedback::CrashReporterMarker>()?);
-        Ok(Rc::new(CrashReportHandler::new(
-            proxy,
-            self.time_source,
-            self.max_pending_crash_reports,
-        )))
+        Ok(CrashReportHandler::new(proxy, self.time_source, self.max_pending_crash_reports))
     }
 }
 

@@ -18,6 +18,7 @@ rustc_library("lib") {
 
   deps = [
     ":triage-detect-config",
+    "fidl:fuchsia.diagnostics.test_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//src/diagnostics/lib/inspect-fetcher",
     "//src/diagnostics/lib/triage",
@@ -51,6 +52,7 @@ rustc_library("lib") {
     "src/diagnostics.rs",
     "src/lib.rs",
     "src/snapshot.rs",
+    "src/test_invoker.rs",
     "src/triage_shim.rs",
   ]
 }

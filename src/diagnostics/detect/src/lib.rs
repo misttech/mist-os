@@ -7,24 +7,29 @@
 mod delay_tracker;
 mod diagnostics;
 mod snapshot;
+mod test_invoker;
 mod triage_shim;
 
-use anyhow::{bail, Error};
+use anyhow::{bail, Context, Error};
 use argh::FromArgs;
 use delay_tracker::DelayTracker;
+use fidl_fuchsia_diagnostics_test::DetectControllerRequestStream;
 use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
-use fuchsia_component::server::ServiceFs;
+use fuchsia_async::Task;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{Inspect, WithInspect};
 use fuchsia_triage::{inspect_logger, SnapshotTrigger};
-use futures::StreamExt;
+use futures::lock::Mutex;
+use futures::{join, StreamExt};
 use glob::glob;
 use injectable_time::MonotonicInstant;
 use serde_derive::Deserialize;
 use snapshot::SnapshotRequest;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 use triage_detect_config::Config as ComponentConfig;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
@@ -33,7 +38,7 @@ const MINIMUM_CHECK_TIME_NANOS: i64 = 60 * 1_000_000_000;
 const CONFIG_GLOB: &str = "/config/data/*.triage";
 const PROGRAM_CONFIG_PATH: &str = "/config/data/config.json";
 const SIGNATURE_PREFIX: &str = "fuchsia-detect-";
-// Minimum time between sending any particular signature (except in test mode)
+// Minimum time between sending any particular signature (except in integration test mode)
 const MINIMUM_SIGNATURE_INTERVAL_NANOS: i64 = 3600 * 1_000_000_000;
 // The max number of warnings to store (for example, "Snapshot trigger was not boolean"...)
 const WARNING_LIST_MAX_SIZE: usize = 100;
@@ -46,9 +51,11 @@ pub const PROGRAM_NAME: &str = "detect";
 #[argh(subcommand, name = "detect")]
 pub struct CommandLine {}
 
+/// Mode::IntegrationTest is for integration testing. It's unrelated to test_invoker, which is
+/// used for performance testing. test_invoker will typically be used in Production mode.
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub(crate) enum Mode {
-    Test,
+    IntegrationTest,
     Production,
 }
 
@@ -94,12 +101,12 @@ fn load_configuration_files() -> Result<HashMap<String, String>, Error> {
 /// appropriate_check_interval determines the interval to check diagnostics, or signals error.
 ///
 /// If the command line can't be evaluated to an integer, an error is returned.
-/// If the integer is below minimum and mode isn't Test, an error is returned.
+/// If the integer is below minimum and mode isn't IntegrationTest, an error is returned.
 /// If a valid integer is determined, it is returned as a zx::Duration.
-fn appropriate_check_interval(expression: &str, mode: &Mode) -> Result<zx::Duration, Error> {
+fn appropriate_check_interval(expression: &str, mode: Mode) -> Result<zx::Duration, Error> {
     let check_every = triage_shim::evaluate_int_math(&expression)
         .or_else(|e| bail!("Check_every argument must be Minutes(n), Hours(n), etc. but: {}", e))?;
-    if check_every < MINIMUM_CHECK_TIME_NANOS && *mode != Mode::Test {
+    if check_every < MINIMUM_CHECK_TIME_NANOS && mode != Mode::IntegrationTest {
         bail!(
             "Minimum time to check is {} seconds; {} nanos is too small",
             MINIMUM_CHECK_TIME_NANOS / 1_000_000_000,
@@ -128,7 +135,7 @@ fn build_signature(snapshot: SnapshotTrigger, mode: Mode) -> String {
         .collect();
     if sanitized != snapshot.signature {
         let message = format!("Signature {} was sanitized to {}", snapshot.signature, sanitized);
-        if mode == Mode::Test {
+        if mode == Mode::IntegrationTest {
             warn!("{}", message);
         } else {
             error!("{}", message);
@@ -139,7 +146,7 @@ fn build_signature(snapshot: SnapshotTrigger, mode: Mode) -> String {
         let new_signature =
             signature.chars().take(MAX_CRASH_SIGNATURE_LENGTH as usize).collect::<String>();
         let message = format!("Signature '{}' truncated to '{}'", signature, new_signature);
-        if mode == Mode::Test {
+        if mode == Mode::IntegrationTest {
             warn!("{}", message);
         } else {
             error!("{}", message);
@@ -149,21 +156,10 @@ fn build_signature(snapshot: SnapshotTrigger, mode: Mode) -> String {
     signature
 }
 
-// on_error logs any errors from `value` and then returns a Result.
-// value must return a Result; error_message must contain one {} to put the error in.
-macro_rules! on_error {
-    ($value:expr, $error_message:expr) => {
-        $value.or_else(|e| {
-            let message = format!($error_message, e);
-            warn!("{}", message);
-            bail!("{}", message)
-        })
-    };
-}
-
 #[derive(Inspect, Default)]
 struct Stats {
     scan_count: inspect::UintProperty,
+    scan_test_count: inspect::UintProperty,
     missed_deadlines: inspect::UintProperty,
     triage_warnings: inspect::UintProperty,
     issues_detected: inspect::UintProperty,
@@ -173,23 +169,15 @@ struct Stats {
     inspect_node: fuchsia_inspect::Node,
 }
 
-impl Stats {
-    fn new() -> Self {
-        Self::default()
-    }
+// Detect serves a test-invoker protocol for performance testing.
+enum IncomingService {
+    DetectController(DetectControllerRequestStream),
 }
 
 pub async fn main() -> Result<(), Error> {
     let inspector = inspect::component::inspector();
     let _inspect_server_task =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
-
-    let mut service_fs = ServiceFs::new();
-    service_fs.take_and_serve_directory_handle()?;
-    fasync::Task::spawn(async move {
-        service_fs.collect::<()>().await;
-    })
-    .detach();
 
     let component_config = ComponentConfig::take_from_startup_handle();
     inspector
@@ -201,35 +189,60 @@ pub async fn main() -> Result<(), Error> {
         WARNING_LIST_MAX_SIZE,
     ));
 
-    let stats = Stats::new().with_inspect(inspector.root(), "stats")?;
+    let stats = Stats::default().with_inspect(inspector.root(), "stats")?;
     let mode = match component_config.test_only {
-        true => Mode::Test,
+        true => Mode::IntegrationTest,
         false => Mode::Production,
     };
-    let check_every = on_error!(
-        appropriate_check_interval(&component_config.check_every, &mode),
-        "Invalid command line arg for check time: {}"
-    )?;
-    let program_config = on_error!(load_program_config(), "Error loading program config: {}")?;
+    let check_every = appropriate_check_interval(&component_config.check_every, mode)
+        .context("Invalid command line arg for check time")?;
+    let program_config = load_program_config().context("Error loading program config")?;
     info!("Test mode: {:?}, program config: {:?}", mode, program_config);
-    let configuration =
-        on_error!(load_configuration_files(), "Error reading configuration files: {}")?;
+    let configuration = load_configuration_files().context("Error reading configuration files")?;
 
-    let triage_engine = on_error!(
-        triage_shim::TriageLib::new(configuration),
-        "Failed to parse Detect configuration files: {}"
-    )?;
+    let triage_engine = triage_shim::TriageLib::new(configuration)
+        .context("Failed to parse Detect configuration files")?;
     info!("Loaded and parsed .triage files");
 
     let selectors = triage_engine.selectors();
-    let mut diagnostic_source = diagnostics::DiagnosticFetcher::create(selectors)?;
+    let diagnostic_source = diagnostics::DiagnosticFetcher::create(selectors)?;
     let snapshot_service =
         snapshot::CrashReportHandlerBuilder::new(MonotonicInstant::new()).build().await?;
     let system_time = MonotonicInstant::new();
-    let mut delay_tracker = DelayTracker::new(&system_time, &mode);
-
+    let delay_tracker = DelayTracker::new(Arc::new(system_time), mode);
+    let detection_runner = DetectionRunner {
+        stats,
+        mode,
+        diagnostic_source,
+        snapshot_service,
+        delay_tracker,
+        program_config,
+        triage_engine,
+    };
+    // The test_invoker system may ask us to do stuff. We shouldn't do any main-loop stuff while
+    // the test stuff is going on.
+    let detection_runner = Arc::new(Mutex::new(detection_runner));
+    let mut service_fs: ServiceFs<ServiceObj<'_, IncomingService>> = ServiceFs::new();
+    service_fs.dir("svc").add_fidl_service(IncomingService::DetectController);
+    service_fs.take_and_serve_directory_handle()?;
+    const MAX_CONCURRENT: usize = 10_000;
+    let runner_clone = detection_runner.clone();
+    let test_invoker_task = Task::local(service_fs.for_each_concurrent(
+        MAX_CONCURRENT,
+        move |IncomingService::DetectController(stream)| {
+            test_invoker::run_test_service(stream, runner_clone.clone())
+        },
+    ));
     inspect::component::health().set_ok();
 
+    let main_loop_fut = main_loop(detection_runner, check_every);
+
+    join!(main_loop_fut, test_invoker_task);
+
+    Ok(())
+}
+
+async fn main_loop(detection_runner: Arc<Mutex<impl RunsDetection>>, check_every: zx::Duration) {
     // Start the first scan as soon as the program starts, via the "missed deadline" logic below.
     let mut next_check_time = fasync::Time::INFINITE_PAST;
     loop {
@@ -237,7 +250,7 @@ pub async fn main() -> Result<(), Error> {
             // We missed a deadline, so don't wait at all; start the check. But first
             // schedule the next check time at now() + check_every.
             if next_check_time != fasync::Time::INFINITE_PAST {
-                stats.missed_deadlines.add(1);
+                (*detection_runner.lock().await).stats().missed_deadlines.add(1);
                 warn!(
                     "Missed diagnostic check deadline {:?} by {:?} nanos",
                     next_check_time,
@@ -253,40 +266,95 @@ pub async fn main() -> Result<(), Error> {
             // next_check_time.
             next_check_time += check_every;
         }
-        stats.scan_count.add(1);
-        let diagnostics = diagnostic_source.get_diagnostics().await;
-        let diagnostics = match diagnostics {
-            Ok(diagnostics) => diagnostics,
-            Err(e) => {
-                // This happens when the integration tester runs out of Inspect data.
-                if mode != Mode::Test {
-                    error!("Fetching diagnostics failed: {}", e);
-                }
-                continue;
+        detection_runner.lock().await.run_detection(DetectionOpts::default()).await;
+    }
+}
+
+pub(crate) trait RunsDetection {
+    //async fn run_detection(&mut self, opts: DetectionOpts);
+    fn run_detection(
+        &mut self,
+        opts: DetectionOpts,
+    ) -> impl std::future::Future<Output = ()> + std::marker::Send;
+
+    fn stats(&self) -> &Stats;
+}
+
+// If we're in test mode, don't update the stats and don't actually file snapshots.
+struct DetectionRunner {
+    stats: Stats,
+    mode: Mode,
+    diagnostic_source: diagnostics::DiagnosticFetcher,
+    snapshot_service: snapshot::CrashReportHandler,
+    delay_tracker: DelayTracker,
+    program_config: ProgramConfig,
+    triage_engine: triage_shim::TriageLib,
+}
+
+#[derive(Default)]
+pub(crate) struct DetectionOpts {
+    cpu_test: bool,
+}
+
+impl RunsDetection for DetectionRunner {
+    fn stats(&self) -> &Stats {
+        &self.stats
+    }
+
+    //async fn run_detection(&mut self, opts: DetectionOpts) {
+    fn run_detection(
+        &mut self,
+        opts: DetectionOpts,
+    ) -> impl std::future::Future<Output = ()> + std::marker::Send {
+        async move {
+            if opts.cpu_test {
+                self.stats().scan_test_count.add(1);
+            } else {
+                self.stats().scan_count.add(1);
             }
-        };
-
-        let (snapshot_requests, warnings) = triage_engine.evaluate(diagnostics);
-        stats.triage_warnings.add(warnings.len() as u64);
-
-        for snapshot in snapshot_requests.into_iter() {
-            stats.issues_detected.add(1);
-            if delay_tracker.ok_to_send(&snapshot) {
-                let signature = build_signature(snapshot, mode);
-                if program_config.enable_filing == Some(true) {
-                    stats.issues_send_count.add(1);
-                    if let Err(e) =
-                        snapshot_service.request_snapshot(SnapshotRequest::new(signature))
-                    {
-                        stats.issues_send_errors.add(1);
-                        error!("Snapshot request failed: {}", e);
+            let diagnostics = self.diagnostic_source.get_diagnostics().await;
+            let diagnostics = match diagnostics {
+                Ok(diagnostics) => diagnostics,
+                Err(e) => {
+                    // This happens when the integration tester runs out of Inspect data.
+                    if self.mode != Mode::IntegrationTest {
+                        error!("Fetching diagnostics failed: {}", e);
                     }
-                } else {
-                    warn!("Detect would have filed {}", signature);
+                    return;
+                }
+            };
+
+            let (snapshot_requests, warnings) = self.triage_engine.evaluate(diagnostics);
+
+            if opts.cpu_test {
+                return;
+            }
+            self.stats().triage_warnings.add(warnings.len() as u64);
+            for snapshot in snapshot_requests {
+                self.handle_snapshot(snapshot);
+            }
+        }
+    }
+}
+
+impl DetectionRunner {
+    fn handle_snapshot(&mut self, snapshot: SnapshotTrigger) {
+        self.stats().issues_detected.add(1);
+        if self.delay_tracker.ok_to_send(&snapshot) {
+            let signature = build_signature(snapshot, self.mode);
+            if self.program_config.enable_filing == Some(true) {
+                self.stats.issues_send_count.add(1);
+                if let Err(e) =
+                    self.snapshot_service.request_snapshot(SnapshotRequest::new(signature))
+                {
+                    self.stats.issues_send_errors.add(1);
+                    error!("Snapshot request failed: {}", e);
                 }
             } else {
-                stats.issues_throttled.add(1);
+                warn!("Detect would have filed {}", signature);
             }
+        } else {
+            self.stats().issues_throttled.add(1);
         }
     }
 }
@@ -308,23 +376,35 @@ mod test {
         let long_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS + 1);
         let long_time_result = zx::Duration::from_nanos(MINIMUM_CHECK_TIME_NANOS + 1);
 
-        assert!(appropriate_check_interval(&error_a, &Mode::Test).is_err());
-        assert!(appropriate_check_interval(&error_empty, &Mode::Test).is_err());
-        assert_eq!(appropriate_check_interval(&raw_1, &Mode::Test)?, raw_1_result);
-        assert_eq!(appropriate_check_interval(&short_time, &Mode::Test)?, short_time_result);
-        assert_eq!(appropriate_check_interval(&minimum_time, &Mode::Test)?, minimum_time_result);
-        assert_eq!(appropriate_check_interval(&long_time, &Mode::Test)?, long_time_result);
-
-        assert!(appropriate_check_interval(&error_a, &Mode::Production).is_err());
-        assert!(appropriate_check_interval(&error_empty, &Mode::Production).is_err());
-        assert!(appropriate_check_interval(&raw_1, &Mode::Production).is_err());
-        assert!(appropriate_check_interval(&short_time, &Mode::Production).is_err());
+        assert!(appropriate_check_interval(&error_a, Mode::IntegrationTest).is_err());
+        assert!(appropriate_check_interval(&error_empty, Mode::IntegrationTest).is_err());
+        assert_eq!(appropriate_check_interval(&raw_1, Mode::IntegrationTest)?, raw_1_result);
         assert_eq!(
-            appropriate_check_interval(&minimum_time, &Mode::Production)?,
+            appropriate_check_interval(&short_time, Mode::IntegrationTest)?,
+            short_time_result
+        );
+        assert_eq!(
+            appropriate_check_interval(&minimum_time, Mode::IntegrationTest)?,
             minimum_time_result
         );
-        assert_eq!(appropriate_check_interval(&long_time, &Mode::Test)?, long_time_result);
-        assert_eq!(appropriate_check_interval(&long_time, &Mode::Production)?, long_time_result);
+        assert_eq!(
+            appropriate_check_interval(&long_time, Mode::IntegrationTest)?,
+            long_time_result
+        );
+
+        assert!(appropriate_check_interval(&error_a, Mode::Production).is_err());
+        assert!(appropriate_check_interval(&error_empty, Mode::Production).is_err());
+        assert!(appropriate_check_interval(&raw_1, Mode::Production).is_err());
+        assert!(appropriate_check_interval(&short_time, Mode::Production).is_err());
+        assert_eq!(
+            appropriate_check_interval(&minimum_time, Mode::Production)?,
+            minimum_time_result
+        );
+        assert_eq!(
+            appropriate_check_interval(&long_time, Mode::IntegrationTest)?,
+            long_time_result
+        );
+        assert_eq!(appropriate_check_interval(&long_time, Mode::Production)?, long_time_result);
         Ok(())
     }
 
