@@ -17,9 +17,6 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
         config: &ForensicsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if config.feedback.low_memory {
-            builder.platform_bundle("feedback_low_memory_product_config");
-        }
         if config.feedback.large_disk {
             builder.platform_bundle("feedback_large_disk");
         }

@@ -1633,11 +1633,6 @@ assembly_input_bundle("radar_proxy_without_injector") {
   ]
 }
 
-assembly_input_bundle("feedback_low_memory_product_config") {
-  config_data_labels =
-      [ "//src/developer/forensics:feedback_low_memory_product_config" ]
-}
-
 assembly_input_bundle("feedback_remote_device_id_provider") {
   config_data_labels = [
     "//src/developer/forensics:feedback_remote_device_id_provider_for_assembly",
