@@ -295,6 +295,14 @@ std::string RandomHexString(size_t length) {
   return value;
 }
 
+bool HasCapability(uint32_t cap) {
+  struct __user_cap_header_struct header = {_LINUX_CAPABILITY_VERSION_3, 0};
+  struct __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {};
+  syscall(__NR_capget, &header, &caps);
+
+  return (caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap)) != 0;
+}
+
 bool HasSysAdmin() { return HasCapability(CAP_SYS_ADMIN); }
 
 bool IsStarnix() {
@@ -376,6 +384,33 @@ void WaitUntilBlocked(pid_t target, bool ignore_tracer) {
       FAIL() << "Failed to wait for pid " << target
              << " to block. resulting status: " << buffer.str();
   }
+}
+
+void UnsetCapability(int cap) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
+  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
+  caps[CAP_TO_INDEX(cap)].effective &= ~CAP_TO_MASK(cap);
+  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
+}
+
+void DropAllCapabilities(void) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {{0}};
+  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
+}
+
+bool HasCapability(int cap) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
+  SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
+  return caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap);
 }
 
 // This variable is accessed from within a signal handler and thus must be declared volatile.
