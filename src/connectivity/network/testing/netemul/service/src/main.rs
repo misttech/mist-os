@@ -1054,13 +1054,27 @@ mod tests {
         }
 
         fn connect_to_protocol<S: DiscoverableProtocolMarker>(&self) -> S::Proxy {
+            self._connect_to_protocol::<S>(None)
+        }
+
+        fn connect_to_protocol_from_child<S: DiscoverableProtocolMarker>(
+            &self,
+            child: &str,
+        ) -> S::Proxy {
+            self._connect_to_protocol::<S>(Some(child))
+        }
+
+        fn _connect_to_protocol<S: DiscoverableProtocolMarker>(
+            &self,
+            child: Option<&str>,
+        ) -> S::Proxy {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
                 .context(S::DEBUG_NAME)
                 .expect("failed to create proxy");
             let () = self
                 .realm
-                .connect_to_protocol(S::PROTOCOL_NAME, None, server_end.into_channel())
-                .context(S::DEBUG_NAME)
+                .connect_to_protocol(S::PROTOCOL_NAME, child, server_end.into_channel())
+                .with_context(|| format!("{} from child {child:?}", S::DEBUG_NAME))
                 .expect("failed to connect");
             proxy
         }
@@ -1228,6 +1242,80 @@ mod tests {
             counter2.increment().await.expect("failed to increment counter"),
             STARTING_VALUE + 1,
         );
+    }
+
+    #[fixture(with_sandbox)]
+    #[fuchsia::test]
+    async fn use_protocol_from_specified_child(sandbox: fnetemul::SandboxProxy) {
+        // The starting value for the child that can specify program args.
+        const STARTING_VALUE: u32 = 9000;
+
+        let realm = TestRealm::new(
+            &sandbox,
+            fnetemul::RealmOptions {
+                children: Some(vec![
+                    // `counter_alternative` has a starting value of 0.
+                    fnetemul::ChildDef {
+                        source: Some(fnetemul::ChildSource::Component(
+                            COUNTER_ALTERNATIVE_URL.to_string(),
+                        )),
+                        name: Some(COUNTER_ALTERNATIVE_COMPONENT_NAME.to_string()),
+                        exposes: Some(vec![CounterMarker::PROTOCOL_NAME.to_string()]),
+                        ..Default::default()
+                    },
+                    // `counter_with_args` has a starting value of 9000.
+                    fnetemul::ChildDef {
+                        program_args: Some(vec![
+                            "--starting-value".to_string(),
+                            STARTING_VALUE.to_string(),
+                        ]),
+                        ..counter_component()
+                    },
+                ]),
+                ..Default::default()
+            },
+        );
+
+        // Ensure that when we specify the child that exposes the protocol,
+        // we're communicating with the correct one.
+        let counter_alternative = realm
+            .connect_to_protocol_from_child::<CounterMarker>(COUNTER_ALTERNATIVE_COMPONENT_NAME);
+        assert_eq!(counter_alternative.increment().await.expect("failed to increment counter"), 1);
+
+        let counter_with_args =
+            realm.connect_to_protocol_from_child::<CounterMarker>(COUNTER_COMPONENT_NAME);
+        assert_eq!(
+            counter_with_args.increment().await.expect("failed to increment counter"),
+            STARTING_VALUE + 1,
+        );
+    }
+
+    #[fixture(with_sandbox)]
+    #[fuchsia::test]
+    async fn use_protocol_from_nonexistent_child(sandbox: fnetemul::SandboxProxy) {
+        let realm = TestRealm::new(
+            &sandbox,
+            fnetemul::RealmOptions {
+                children: Some(vec![counter_component()]),
+                ..Default::default()
+            },
+        );
+
+        let counter = realm
+            .connect_to_protocol_from_child::<CounterMarker>(COUNTER_ALTERNATIVE_COMPONENT_NAME);
+        // Calling `increment()` on the proxy should fail because this protocol
+        // only exists in `COUNTER_COMPONENT_NAME`.
+        match counter.increment().await {
+            Err(fidl::Error::ClientChannelClosed {
+                status,
+                protocol_name: <CounterMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+            }) if status == zx::Status::NOT_FOUND => (),
+            event => panic!(
+                "expected channel close with epitaph NOT_FOUND, got \
+                 unexpected event on realm channel: {:?}",
+                event
+            ),
+        }
     }
 
     #[fixture(with_sandbox)]
