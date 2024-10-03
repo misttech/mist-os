@@ -660,6 +660,9 @@ where
             .add_route(
                 Route::new()
                     .capability(Capability::configuration("fuchsia.pkgcache.AllPackagesExecutable"))
+                    .capability(Capability::configuration(
+                        "fuchsia.pkgcache.EnableUpgradablePackages",
+                    ))
                     .from(&pkg_cache_config)
                     .to(&pkg_cache),
             )

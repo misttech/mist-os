@@ -167,17 +167,8 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         }
         // Inform pkg-cache when fxfs_blob should be used.
         builder.set_config_capability(
-            "fuchsia.pkgcache.AllPackagesExecutable",
-            Config::new(ConfigValueType::Bool, (context.build_type == &BuildType::Eng).into()),
-        )?;
-
-        builder.set_config_capability(
             "fuchsia.pkgcache.UseFxblob",
             Config::new(ConfigValueType::Bool, fxfs_blob.into()),
-        )?;
-        builder.set_config_capability(
-            "fuchsia.pkgcache.UseSystemImage",
-            Config::new(ConfigValueType::Bool, true.into()),
         )?;
 
         let disable_automount = match storage_config.disable_automount {

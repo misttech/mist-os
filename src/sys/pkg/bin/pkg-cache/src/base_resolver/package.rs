@@ -4,8 +4,10 @@
 
 use super::context_authenticator::ContextAuthenticator;
 use super::ResolverError;
+use crate::upgradable_packages::UpgradablePackages;
 use anyhow::Context as _;
 use fidl::endpoints::ServerEnd;
+use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use futures::stream::TryStreamExt as _;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,6 +21,7 @@ pub(crate) async fn serve_request_stream(
     authenticator: ContextAuthenticator,
     open_packages: crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: Option<Arc<UpgradablePackages>>,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
@@ -32,6 +35,7 @@ pub(crate) async fn serve_request_stream(
                     authenticator.clone(),
                     &open_packages,
                     scope.clone(),
+                    &upgradable_packages,
                 )
                 .await
                 {
@@ -62,6 +66,7 @@ pub(crate) async fn serve_request_stream(
                     authenticator.clone(),
                     &open_packages,
                     scope.clone(),
+                    &upgradable_packages,
                 )
                 .await
                 {
@@ -100,6 +105,7 @@ async fn resolve_with_context(
     authenticator: ContextAuthenticator,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     resolve_with_context_impl(
         &fuchsia_url::PackageUrl::parse(package_url)?,
@@ -109,6 +115,7 @@ async fn resolve_with_context(
         authenticator,
         open_packages,
         scope,
+        upgradable_packages,
     )
     .await
 }
@@ -121,13 +128,23 @@ pub(super) async fn resolve_with_context_impl(
     authenticator: ContextAuthenticator,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     match package_url {
         fuchsia_url::PackageUrl::Absolute(url) => {
             if !context.bytes.is_empty() {
                 return Err(ResolverError::ContextWithAbsoluteUrl);
             }
-            resolve_impl(url, dir, base_packages, authenticator, open_packages, scope).await
+            resolve_impl(
+                url,
+                dir,
+                base_packages,
+                authenticator,
+                open_packages,
+                scope,
+                upgradable_packages,
+            )
+            .await
         }
         fuchsia_url::PackageUrl::Relative(url) => {
             resolve_subpackage(url, context, dir, authenticator, open_packages, scope).await
@@ -142,8 +159,18 @@ async fn resolve(
     authenticator: ContextAuthenticator,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
-    resolve_impl(&url.parse()?, dir, base_packages, authenticator, open_packages, scope).await
+    resolve_impl(
+        &url.parse()?,
+        dir,
+        base_packages,
+        authenticator,
+        open_packages,
+        scope,
+        upgradable_packages,
+    )
+    .await
 }
 
 pub(super) async fn resolve_impl(
@@ -153,6 +180,7 @@ pub(super) async fn resolve_impl(
     authenticator: ContextAuthenticator,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     let url = match url {
         fuchsia_url::AbsolutePackageUrl::Pinned(_) => {
@@ -160,16 +188,18 @@ pub(super) async fn resolve_impl(
         }
         fuchsia_url::AbsolutePackageUrl::Unpinned(url) => url,
     };
-    let hash = resolve_base_package(url, dir, base_packages, open_packages, scope).await?;
+    let hash =
+        resolve_package(url, dir, base_packages, open_packages, scope, upgradable_packages).await?;
     Ok(authenticator.create(&hash))
 }
 
-pub(crate) async fn resolve_base_package(
+pub(crate) async fn resolve_package(
     url: &fuchsia_url::UnpinnedAbsolutePackageUrl,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fuchsia_hash::Hash, ResolverError> {
     // TODO(https://fxbug.dev/335388895) Remove zero-variant fallback once variant concept is gone.
     // Base packages must have a variant of zero, and the variant is cleared before adding the URL
@@ -183,11 +213,11 @@ pub(crate) async fn resolve_base_package(
         },
         _ => url,
     };
-    let hash = base_packages
-        .get(url)
+    let hash = get_package_hash(url, base_packages, upgradable_packages)
+        .await
         .ok_or_else(|| ResolverError::PackageNotInBase(url.clone().into()))?;
     let () = open_packages
-        .get_or_insert(*hash, None)
+        .get_or_insert(hash, None)
         .await
         .map_err(ResolverError::ServePackageDirectory)?
         .open(
@@ -196,7 +226,23 @@ pub(crate) async fn resolve_base_package(
             vfs::path::Path::dot(),
             dir.into_channel().into(),
         );
-    Ok(*hash)
+    Ok(hash)
+}
+
+async fn get_package_hash(
+    url: &UnpinnedAbsolutePackageUrl,
+    base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
+) -> Option<fuchsia_hash::Hash> {
+    if let Some(hash) = base_packages.get(url) {
+        return Some(*hash);
+    }
+    if let Some(upgradable_packages) = upgradable_packages {
+        if let Some(hash) = upgradable_packages.get_hash(url).await {
+            return Some(hash);
+        }
+    }
+    None
 }
 
 async fn resolve_subpackage(
@@ -250,7 +296,8 @@ mod tests {
                 )]),
                 ContextAuthenticator::new(),
                 &crate::root_dir::new_test(blobfs::Client::new_test().0).await.1,
-                vfs::execution_scope::ExecutionScope::new()
+                vfs::execution_scope::ExecutionScope::new(),
+                &None,
             )
             .await,
             Err(ResolverError::PackageHashNotSupported)
@@ -271,7 +318,8 @@ mod tests {
                 )]),
                 ContextAuthenticator::new(),
                 &crate::root_dir::new_test(blobfs::Client::new_test().0).await.1,
-                vfs::execution_scope::ExecutionScope::new()
+                vfs::execution_scope::ExecutionScope::new(),
+                &None,
             )
             .await,
             Err(ResolverError::PackageHashNotSupported)
@@ -296,6 +344,7 @@ mod tests {
             ContextAuthenticator::new(),
             &open_packages,
             vfs::execution_scope::ExecutionScope::new(),
+            &None,
         )
         .await
         .unwrap();
@@ -318,7 +367,8 @@ mod tests {
                 )]),
                 ContextAuthenticator::new(),
                 &crate::root_dir::new_test(blobfs::Client::new_test().0).await.1,
-                vfs::execution_scope::ExecutionScope::new()
+                vfs::execution_scope::ExecutionScope::new(),
+                &None,
             )
             .await,
             Err(ResolverError::PackageNotInBase(_))

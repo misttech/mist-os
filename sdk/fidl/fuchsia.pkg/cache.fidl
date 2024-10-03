@@ -84,8 +84,8 @@ open protocol PackageCache {
     /// If upgradable packages are enabled in pkg-cache, this method must be called once on start up
     /// to set the hashes for persisted upgradable packages. All such packages must not be base
     /// packages. If none of the upgradable packages are persisted, a call with an empty vector
-    /// still needs to be made. Package resolution and GC (and therefore OTA) will block until this
-    /// is done.
+    /// still needs to be made. Package resolution of non base packages and GC (and therefore OTA)
+    /// will block until this is done.
     ///
     /// Subsequent calls can be made to set new upgradable packages or change the hashes associated
     /// with upgradable packages.
@@ -123,11 +123,11 @@ type GetSubpackageError = strict enum {
 
 /// Error type for [`PackageCache.SetUpgradableUrls`].
 type SetUpgradableUrlsError = flexible enum {
-    /// One or more URLs are base packages which aren't upgradable.
+    /// One or more URLs are not set.
     ///
-    /// When this happens, the base packages are ignored, all the other packages are still set,
+    /// Invalid URLs or base packages are ignored, all the other packages are still set,
     /// package resolution and GC is unblocked.
-    UPGRADE_BASE = 1;
+    PARTIAL_SET = 1;
 
     /// An unspecified error occurred.
     INTERNAL = 2;

@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, bail, Context, Result};
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
@@ -113,6 +114,20 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
         if subsystem_config.include_configurator {
             builder.platform_bundle("system_update_configurator");
         }
+
+        builder.set_config_capability(
+            "fuchsia.pkgcache.AllPackagesExecutable",
+            Config::new(ConfigValueType::Bool, (context.build_type == &BuildType::Eng).into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.pkgcache.UseSystemImage",
+            Config::new(ConfigValueType::Bool, true.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.pkgcache.EnableUpgradablePackages",
+            Config::new(ConfigValueType::Bool, false.into()),
+        )?;
+
         Ok(())
     }
 }

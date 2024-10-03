@@ -123,6 +123,13 @@
             key: "use_system_image",
             type: "bool",
         },
+        {
+            // If true, upgradable packages can be set and upgraded (outside of OTA) and base
+            // resolver will resolve them.
+            config: "fuchsia.pkgcache.EnableUpgradablePackages",
+            key: "enable_upgradable_packages",
+            type: "bool",
+        },
     ],
     expose: [
         {
