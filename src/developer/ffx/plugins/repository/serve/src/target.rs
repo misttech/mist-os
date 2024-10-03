@@ -34,7 +34,7 @@ const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 async fn connect_to_target(
     target_spec: Option<String>,
     target_info: TargetInfo,
-    aliases: Option<Vec<String>>,
+    aliases: Vec<String>,
     storage_type: Option<RepositoryStorageType>,
     repo_server_listen_addr: std::net::SocketAddr,
     connect_timeout: std::time::Duration,
@@ -56,10 +56,15 @@ async fn connect_to_target(
             .with_context(|| format!("binding engine to stream on {:?}", target_spec))?;
 
     for (repo_name, repo) in repo_manager.repositories() {
+        let repo_spec = repo.read().await.spec();
         let repo_target = FfxCliRepositoryTarget {
             repo_name: Some(repo_name),
             target_identifier: target_spec.clone(),
-            aliases: aliases.clone(),
+            aliases: if aliases.is_empty() {
+                Some(repo_spec.aliases().iter().map(ToString::to_string).collect())
+            } else {
+                Some(aliases.clone())
+            },
             storage_type,
             ..Default::default()
         };
@@ -150,7 +155,7 @@ async fn inner_connect_loop(
     let connection = connect_to_target(
         target_spec_from_rcs_proxy.clone(),
         target_info,
-        Some(cmd.alias.clone()),
+        cmd.alias.clone(),
         cmd.storage_type,
         server_addr,
         connect_timeout,
