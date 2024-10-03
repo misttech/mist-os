@@ -127,19 +127,6 @@ template("sdk_static_library") {
   }
   sdk_id = "sdk://${sdk_root_path}"
 
-  if (!is_internal) {
-    # TODO(https://fxbug.dev/366221510): Move this to where it is used.
-    if (defined(invoker.api)) {
-      api_reference = invoker.api
-    } else {
-      api_reference = "${sdk_name}.api"
-    }
-  } else {
-    assert(
-        !defined(invoker.api),
-        "\"internal\" targets do not require/support modification acknowledgement.")
-  }
-
   main_target_name = target_name
   metadata_target_name = "${target_name}_sdk_metadata"
   manifest_target_name = "${target_name}_sdk_manifest"
@@ -417,8 +404,17 @@ template("sdk_static_library") {
                            ])
 
     id = sdk_id
-    if (defined(api_reference)) {
-      api = api_reference
+
+    if (is_internal) {
+      assert(
+          !defined(invoker.api),
+          "\"internal\" targets do not require/support modification acknowledgement.")
+    } else {
+      api = "${sdk_name}.api"
+      if (defined(invoker.api)) {
+        api = invoker.api
+      }
+
       api_contents = sdk_header_files
     }
 

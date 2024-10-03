@@ -6,7 +6,6 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.boot") {
   sdk_category = "internal"
-  api = "fuchsia.boot.api"
   sources = [
     "arguments.fidl",
     "factory-items.fidl",

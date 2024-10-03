@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.cobalt") {
   sdk_category = "internal"
   sdk_area = "Metrics"
-  api = "fuchsia.cobalt.api"
   fuzzers = [
     {
       protocol = "fuchsia.cobalt.AggregateAndUpload"

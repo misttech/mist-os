@@ -142,14 +142,6 @@ template("sdk_source_set") {
   }
   assert(!is_stable || invoker.category == "partner")
 
-  # Only stable library has API validation
-  if (is_stable) {
-    api_reference = "${sdk_name}.api"
-    if (defined(invoker.api)) {
-      api_reference = invoker.api
-    }
-  }
-
   # Create the native target (source_set or static_library) for the GN build
   main_target_name = target_name
   sdk_target_name = "${target_name}_sdk"
@@ -406,10 +398,18 @@ template("sdk_source_set") {
 
     id = sdk_id
 
-    if (defined(api_reference)) {
-      api = api_reference
+    if (is_stable) {
+      api = "${sdk_name}.api"
+      if (defined(invoker.api)) {
+        api = invoker.api
+      }
 
       api_contents = sdk_header_files
+    } else {
+      # TODO(https://fxbug.dev/366221510): Uncomment after addressing zx_library.
+      # assert(
+      #     !defined(invoker.api),
+      #     "Unstable targets do not require/support modification acknowledgement.")
     }
 
     meta = {
