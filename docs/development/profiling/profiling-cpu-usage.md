@@ -77,7 +77,7 @@ do the following:
 The easiest way to to get started is to attach to `koids`:
 
 ```posix-terminal
-ffx profiler attach --duration 5 --pids 123,1234,234 --tids 345,234 --job_ids 123
+ffx profiler attach --duration 5 --pids 123,1234,234 --tids 345,234 --job-ids 123
 ```
 
 This command attaches to all of the specified `pids`, `tids`, and `job_ids`.
