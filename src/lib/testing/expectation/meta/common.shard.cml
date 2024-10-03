@@ -9,11 +9,4 @@
             url: "#meta/expectation_comparer.cm",
         },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#expectation-comparer",
-        },
-    ],
 }

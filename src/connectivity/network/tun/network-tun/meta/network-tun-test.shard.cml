@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "syslog/client.shard.cml" ],
     children: [
         {
             name: "network-tun",
@@ -16,10 +17,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "parent",
             to: "#network-tun",
         },

@@ -50,10 +50,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "parent",
             to: [
                 "#client",
@@ -77,10 +74,10 @@
             to: "#expectation-comparer",
         },
         {
+            config: [ "fuchsia.network.PrimaryInterface" ],
             from: "void",
             to: "#device-name-provider",
             availability: "optional",
-            config: [ "fuchsia.network.PrimaryInterface" ],
         },
     ],
 }
