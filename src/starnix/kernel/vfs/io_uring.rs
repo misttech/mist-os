@@ -565,8 +565,9 @@ impl IoUringFileObject {
         let sq_entries = entries.next_power_of_two();
         let cq_entries = if params.flags & IORING_SETUP_CQSIZE != 0 {
             UserValue::from_raw(params.cq_entries)
-                .validate(1..IORING_MAX_CQ_ENTRIES)
+                .validate(sq_entries..IORING_MAX_CQ_ENTRIES)
                 .ok_or_else(|| errno!(EINVAL))?
+                .next_power_of_two()
         } else {
             // This operation cannot overflow because sq_entries is capped at IORING_MAX_ENTRIES,
             // which is only 15 bits.
