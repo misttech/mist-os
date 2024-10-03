@@ -41,7 +41,7 @@ struct Client {
 
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
-        let boot_id = zx::MonotonicTime::get().into_nanos() as u64;
+        let boot_id = zx::MonotonicInstant::get().into_nanos() as u64;
         Self::new_with_allocator(connector, Box::new(move || HostIdentifier::new(boot_id)))
     }
 

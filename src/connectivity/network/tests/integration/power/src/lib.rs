@@ -384,7 +384,7 @@ async fn rx_lease_drops(name: &str, netstack_suspend_enabled: bool) {
         // when netstack is not subscribed to it.
         assert_eq!(
             lease
-                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE)
+                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
                 .expect("wait closed"),
             zx::Signals::CHANNEL_PEER_CLOSED
         );

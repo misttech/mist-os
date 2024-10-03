@@ -326,7 +326,7 @@ fn remote_file_attrs_and_ops(
     if handle_type == zx::ObjectType::CHANNEL {
         let channel = zx::Channel::from(handle);
         let queryable = funknown::QueryableSynchronousProxy::new(channel);
-        if let Ok(name) = queryable.query(zx::MonotonicTime::INFINITE) {
+        if let Ok(name) = queryable.query(zx::MonotonicInstant::INFINITE) {
             if name == fbinder::UNIX_DOMAIN_SOCKET_PROTOCOL_NAME.as_bytes() {
                 let socket_ops = RemoteUnixDomainSocket::new(queryable.into_channel())?;
                 let socket = Socket::new_with_ops(Box::new(socket_ops))?;
