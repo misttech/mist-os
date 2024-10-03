@@ -17,7 +17,7 @@ use fuchsia_sync::Mutex;
 use std::sync::Arc;
 use strum_macros::{Display, EnumIter};
 use windowed_stats::experimental::clock::TimedSample;
-use windowed_stats::experimental::series::interpolation::Constant;
+use windowed_stats::experimental::series::interpolation::{Constant, LastSample};
 use windowed_stats::experimental::series::statistic::Union;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
 use windowed_stats::experimental::serve::{
@@ -224,10 +224,6 @@ impl ConnectDisconnectLogger {
         }
     }
 
-    pub fn handle_periodic_telemetry(&self) {
-        self.log_connection_state();
-    }
-
     pub async fn log_connect_attempt(
         &self,
         result: fidl_ieee80211::StatusCode,
@@ -327,9 +323,9 @@ impl ConnectDisconnectTimeSeries {
     pub fn new(manager: &TimeMatrixClient, inspect_metadata_path: &str) -> Self {
         let wlan_connectivity_states = manager.inspect_time_matrix_with_metadata(
             "wlan_connectivity_states",
-            TimeMatrix::<Union<u64>, Constant>::new(
+            TimeMatrix::<Union<u64>, LastSample>::new(
                 SamplingProfile::highly_granular(),
-                Constant::default(),
+                LastSample::or(0),
             ),
             InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
                 "{inspect_metadata_path}/{}",
