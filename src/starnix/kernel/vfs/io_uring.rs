@@ -654,10 +654,17 @@ impl IoUringFileObject {
         Ok(submitted)
     }
 
+    fn has_registered_buffers(&self) -> bool {
+        !self.registered_buffers.lock().is_empty()
+    }
+
     fn check_buffer(&self, entry: &SqEntry) -> Result<(), Errno> {
         let index = entry.buf_index();
         let buffers = self.registered_buffers.lock();
-        let buffer = buffers.get(index).ok_or_else(|| errno!(EFAULT))?;
+        if buffers.is_empty() {
+            return error!(EFAULT);
+        }
+        let buffer = buffers.get(index).ok_or_else(|| errno!(EINVAL))?;
         if !buffer.contains(entry.address(), entry.length()) {
             error!(EFAULT)
         } else {
@@ -673,29 +680,42 @@ impl IoUringFileObject {
     ) -> Result<SyscallResult, Errno> {
         match Op::from_code(entry.opcode as io_uring_op)? {
             Op::NOP => Ok(SUCCESS),
-            Op::ReadV => sys_preadv2(
-                locked,
-                current_task,
-                entry.fd(),
-                entry.iovec_addr(),
-                entry.iovec_count(),
-                entry.offset(),
-                SyscallArg::default(),
-                entry.op_flags,
-            )
-            .map(Into::into),
-            Op::WriteV => sys_pwritev2(
-                locked,
-                current_task,
-                entry.fd(),
-                entry.iovec_addr(),
-                entry.iovec_count(),
-                entry.offset(),
-                SyscallArg::default(),
-                entry.op_flags,
-            )
-            .map(Into::into),
+            Op::ReadV => {
+                if entry.ioprio != 0 || entry.buf_index() != 0 {
+                    return error!(EINVAL);
+                }
+                sys_preadv2(
+                    locked,
+                    current_task,
+                    entry.fd(),
+                    entry.iovec_addr(),
+                    entry.iovec_count(),
+                    entry.offset(),
+                    SyscallArg::default(),
+                    entry.op_flags,
+                )
+                .map(Into::into)
+            }
+            Op::WriteV => {
+                if entry.ioprio != 0 || entry.buf_index() != 0 {
+                    return error!(EINVAL);
+                }
+                sys_pwritev2(
+                    locked,
+                    current_task,
+                    entry.fd(),
+                    entry.iovec_addr(),
+                    entry.iovec_count(),
+                    entry.offset(),
+                    SyscallArg::default(),
+                    entry.op_flags,
+                )
+                .map(Into::into)
+            }
             Op::ReadFixed => {
+                if entry.ioprio != 0 {
+                    return error!(EINVAL);
+                }
                 // TODO(https://fxbug.dev/297431387): We're supposed to make a kernel mapping
                 // when the buffers are registered and we should be performing this operation using
                 // those kernel mappings rather than using the userspace mappings.
@@ -703,14 +723,27 @@ impl IoUringFileObject {
                 do_read(locked, current_task, entry)
             }
             Op::WriteFixed => {
+                if entry.ioprio != 0 {
+                    return error!(EINVAL);
+                }
                 // TODO(https://fxbug.dev/297431387): We're supposed to make a kernel mapping
                 // when the buffers are registered and we should be performing this operation using
                 // those kernel mappings rather than using the userspace mappings.
                 self.check_buffer(entry)?;
                 do_write(locked, current_task, entry)
             }
-            Op::Read => do_read(locked, current_task, entry),
-            Op::Write => do_write(locked, current_task, entry),
+            Op::Read => {
+                if self.has_registered_buffers() {
+                    return error!(EINVAL);
+                }
+                do_read(locked, current_task, entry)
+            }
+            Op::Write => {
+                if self.has_registered_buffers() {
+                    return error!(EINVAL);
+                }
+                do_write(locked, current_task, entry)
+            }
             Op::SendMsg => sys_sendmsg(
                 locked,
                 current_task,

@@ -385,7 +385,8 @@
 
                 // iouring_test
                 "IOUringTest.NonNullSigsetTest",
-                "IOUringTest.READVWithInvalidSqeFieldValue",
+
+                // Assumes the gVisor layout for the ring, which doesn't match Linux.
                 "IOUringTest.ReturnedParamsValues",
 
                 // iptables_test
