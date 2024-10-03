@@ -284,7 +284,7 @@ pub struct ReadWrite {
     // The time when guest TX must stop after VirtioVsockFlags::SHUTDOWN_SEND is seen. This allows
     // the device to ignore packets already placed on the TX queue by the guest when the guest
     // received a shutdown notice.
-    tx_shutdown_leeway: RefCell<fasync::Time>,
+    tx_shutdown_leeway: RefCell<fasync::MonotonicInstant>,
 
     key: VsockConnectionKey,
     control_packets: UnboundedSender<VirtioVsockHeader>,
@@ -313,7 +313,7 @@ impl ReadWrite {
             socket,
             credit: RefCell::new(initial_credit),
             conn_flags: RefCell::new(VirtioVsockFlags::default()),
-            tx_shutdown_leeway: RefCell::new(fasync::Time::now()),
+            tx_shutdown_leeway: RefCell::new(fasync::MonotonicInstant::now()),
             key,
             control_packets,
         }
@@ -503,7 +503,7 @@ impl ReadWrite {
                     // to be transmitted to the guest. Signal to the guest not to send any more data
                     // if not already done.
                     *self.tx_shutdown_leeway.borrow_mut() =
-                        fasync::Time::after(zx::Duration::from_seconds(1));
+                        fasync::MonotonicInstant::after(zx::Duration::from_seconds(1));
                     self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
                     self.send_half_shutdown_packet();
                 }
@@ -663,7 +663,7 @@ impl ReadWrite {
         }
 
         if self.conn_flags.borrow().contains(VirtioVsockFlags::SHUTDOWN_SEND) {
-            if *self.tx_shutdown_leeway.borrow() < fasync::Time::now() {
+            if *self.tx_shutdown_leeway.borrow() < fasync::MonotonicInstant::now() {
                 return Err(anyhow!("Guest sent TX when connection is in state SHUTDOWN_SEND"));
             } else {
                 // Don't complete the chain as it will have readable sections unwalked. The guest
@@ -707,7 +707,7 @@ impl ReadWrite {
                 }
                 Err(_) => {
                     *self.tx_shutdown_leeway.borrow_mut() =
-                        fasync::Time::after(zx::Duration::from_seconds(1));
+                        fasync::MonotonicInstant::after(zx::Duration::from_seconds(1));
                     self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
                     self.send_half_shutdown_packet();
                     return Ok(());
@@ -763,7 +763,7 @@ pub struct ClientInitiatedShutdown {
 
     // A client initiated shutdown will wait this long for a guest to reply with a reset
     // packet.
-    timeout: Cell<fasync::Time>,
+    timeout: Cell<fasync::MonotonicInstant>,
 
     key: VsockConnectionKey,
     control_packets: UnboundedSender<VirtioVsockHeader>,
@@ -773,7 +773,7 @@ impl ClientInitiatedShutdown {
     fn new(key: VsockConnectionKey, control_packets: UnboundedSender<VirtioVsockHeader>) -> Self {
         ClientInitiatedShutdown {
             sent_full_shutdown: Cell::new(false),
-            timeout: Cell::new(fasync::Time::INFINITE),
+            timeout: Cell::new(fasync::MonotonicInstant::INFINITE),
             key,
             control_packets,
         }
@@ -833,7 +833,7 @@ impl ClientInitiatedShutdown {
                 .expect("Control packet tx end should never be closed");
 
             self.sent_full_shutdown.set(true);
-            self.timeout.set(fasync::Time::after(zx::Duration::from_seconds(5)));
+            self.timeout.set(fasync::MonotonicInstant::after(zx::Duration::from_seconds(5)));
         }
 
         // Returns once the state has waited 5s from creation for a guest response.
@@ -2099,7 +2099,7 @@ mod tests {
     #[fuchsia::test]
     fn read_write_guest_send_packet_after_shutdown_send_leeway() {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::now());
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::now());
 
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
@@ -2162,7 +2162,7 @@ mod tests {
 
         // After 1s the TX queue for this connection should be empty, and the guest should have
         // refrained from adding any new chains.
-        executor.set_fake_time(fuchsia_async::Time::after(
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
             zx::Duration::from_seconds(1) + zx::Duration::from_nanos(1),
         ));
 
@@ -2314,7 +2314,7 @@ mod tests {
     #[fuchsia::test]
     fn client_initiated_shutdown_timeout_due_to_no_guest_reply() {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::now());
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::now());
 
         let key = VsockConnectionKey::new(HOST_CID, 5, DEFAULT_GUEST_CID, 10);
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
@@ -2336,7 +2336,8 @@ mod tests {
         assert_eq!(flags, VirtioVsockFlags::SHUTDOWN_BOTH);
         assert_eq!(OpType::try_from(header.op.get()).unwrap(), OpType::Shutdown);
 
-        executor.set_fake_time(fuchsia_async::Time::after(zx::Duration::from_seconds(5)));
+        executor
+            .set_fake_time(fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(5)));
         assert!(executor.wake_expired_timers());
 
         // 5 seconds have passed, so the connection is no longer willing to wait for a guest reply.

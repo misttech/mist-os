@@ -418,7 +418,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         if self.emu_config().host.networking == NetworkingMode::User {
             // Capture the port mappings for user mode networking.
-            let now = fuchsia_async::Time::now();
+            let now = fuchsia_async::MonotonicInstant::now();
             match self.read_port_mappings().await {
                 Ok(_) => (),
                 Err(e) => {

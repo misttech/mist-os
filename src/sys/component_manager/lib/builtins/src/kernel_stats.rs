@@ -151,11 +151,11 @@ impl KernelStats {
                     // second stats query completes. This ensures the "total time" (`end_time` -
                     // `start_time`) will never be less than the duration spanned by `start_stats`
                     // to `end_stats`, which would be invalid.
-                    let start_time = fuchsia_async::Time::now();
+                    let start_time = fuchsia_async::MonotonicInstant::now();
                     let start_stats = self.resource.cpu_stats()?;
                     fuchsia_async::Timer::new(zx::Duration::from_nanos(duration).after_now()).await;
                     let end_stats = self.resource.cpu_stats()?;
-                    let end_time = fuchsia_async::Time::now();
+                    let end_time = fuchsia_async::MonotonicInstant::now();
 
                     let loads = calculate_cpu_loads(start_time, start_stats, end_time, end_stats);
                     responder.send(&loads)?;
@@ -169,9 +169,9 @@ impl KernelStats {
 /// Uses start / end times and corresponding PerCpuStats to calculate and return a vector of per-CPU
 /// load values as floats in the range 0.0 - 100.0.
 fn calculate_cpu_loads(
-    start_time: fuchsia_async::Time,
+    start_time: fuchsia_async::MonotonicInstant,
     start_stats: Vec<zx::PerCpuStats>,
-    end_time: fuchsia_async::Time,
+    end_time: fuchsia_async::MonotonicInstant,
     end_stats: Vec<zx::PerCpuStats>,
 ) -> Vec<f32> {
     let elapsed_time = (end_time - start_time).into_nanos();
@@ -291,10 +291,14 @@ mod tests {
     // `calculate_cpu_loads` to result in those load calculations.
     fn parameters_for_expected_cpu_loads(
         cpu_loads: Vec<f32>,
-    ) -> (fuchsia_async::Time, Vec<zx::PerCpuStats>, fuchsia_async::Time, Vec<zx::PerCpuStats>)
-    {
-        let start_time = fuchsia_async::Time::from_nanos(0);
-        let end_time = fuchsia_async::Time::from_nanos(1000000000);
+    ) -> (
+        fuchsia_async::MonotonicInstant,
+        Vec<zx::PerCpuStats>,
+        fuchsia_async::MonotonicInstant,
+        Vec<zx::PerCpuStats>,
+    ) {
+        let start_time = fuchsia_async::MonotonicInstant::from_nanos(0);
+        let end_time = fuchsia_async::MonotonicInstant::from_nanos(1000000000);
 
         let (start_stats, end_stats) = std::iter::repeat(zx::PerCpuStats::default())
             .zip(cpu_loads.into_iter().map(|load| {

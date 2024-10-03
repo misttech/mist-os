@@ -567,7 +567,9 @@ async fn watcher_existing<
     while let Some(event) = event_stream
         .next()
         .on_timeout(
-            fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+            fuchsia_async::MonotonicInstant::after(
+                netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+            ),
             || None,
         )
         .await
@@ -764,7 +766,9 @@ async fn watcher_outlives_state<N: Netstack, I: fnet_routes_ext::FidlRouteIpExt>
         .next()
         .map(Err)
         .on_timeout(
-            fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+            fuchsia_async::MonotonicInstant::after(
+                netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+            ),
             || Ok(()),
         )
         .await
@@ -983,7 +987,7 @@ async fn route_watcher_in_specific_table<
         main_table_routes_stream
             .next()
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
                 ),
                 || None,

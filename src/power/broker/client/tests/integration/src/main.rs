@@ -211,7 +211,8 @@ mod tests {
         let helper = client_lib::LeaseHelper::new(&topology, "Lease", vec![dependency]).await?;
         let lease_future = helper.lease().fuse();
         let timer =
-            fasync::Timer::new(fasync::Time::after(fasync::Duration::from_seconds(1))).fuse();
+            fasync::Timer::new(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(1)))
+                .fuse();
         pin_mut!(lease_future, timer);
 
         // While we hold the provider lock, it can't reach its required level. The lease cannot be
@@ -250,7 +251,8 @@ mod tests {
             if client_lib::LeaseHelper::new(&topology, "Lease", vec![dependency]).await.is_err() {
                 break;
             }
-            fasync::Timer::new(fasync::Time::after(fasync::Duration::from_seconds(1))).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(1)))
+                .await;
         }
 
         Ok(())

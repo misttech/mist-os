@@ -159,7 +159,7 @@ mod test {
     #[fuchsia::test]
     fn test_dns_lookup_timed_out() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let server_stream = Arc::new(Mutex::new(None));
         let stream_ref = server_stream.clone();
@@ -178,7 +178,7 @@ mod test {
         let mut server_end_fut = locked.as_mut().unwrap().try_next();
         assert_matches!(exec.run_until_stalled(&mut server_end_fut), Poll::Ready { .. });
 
-        exec.set_fake_time(fasync::Time::after(DNS_FIDL_TIMEOUT));
+        exec.set_fake_time(fasync::MonotonicInstant::after(DNS_FIDL_TIMEOUT));
         assert!(exec.wake_expired_timers());
 
         assert_matches!(exec.run_until_stalled(&mut dns_lookup_fut), Poll::Ready(None));

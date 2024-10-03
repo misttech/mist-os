@@ -149,7 +149,7 @@ mod tests {
     #[fuchsia::test]
     fn test_connect_fails() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let mut event_sender = MockSendEvent::new();
         event_sender.expect_send().with(eq(Event::Error("".to_string()))).times(1).return_const(());
         let event_sender: Box<dyn SendEvent> = Box::new(event_sender);
@@ -162,7 +162,7 @@ mod tests {
         );
         // Make sure the task under test runs to its delay
         let _ = exec.run_until_stalled(&mut future::pending::<()>());
-        exec.set_fake_time(fasync::Time::after(Duration::from_seconds(3).into()));
+        exec.set_fake_time(fasync::MonotonicInstant::after(Duration::from_seconds(3).into()));
         exec.wake_expired_timers();
         // Make sure the task under test runs to its finish
         let _ = exec.run_until_stalled(&mut future::pending::<()>());

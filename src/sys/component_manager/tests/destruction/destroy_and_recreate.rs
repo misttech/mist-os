@@ -81,7 +81,7 @@ async fn main() {
 
     // Sleep so that it's more likely that, if the new component is destroyed incorrectly,
     // this test will fail.
-    fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(5))).await;
+    fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(5))).await;
 
     // Restart the child.
     info!("Restarting to child");

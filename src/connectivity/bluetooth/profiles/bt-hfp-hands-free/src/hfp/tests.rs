@@ -28,13 +28,13 @@ use crate::service_definition;
 
 const PEER_ID: PeerId = PeerId(1);
 
-const ZERO_TIME: fasync::Time = fasync::Time::from_nanos(0);
+const ZERO_TIME: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(0);
 
-const BEFORE_SEARCH_RESULT_CONNECT_DELAY_TIME: fasync::Time =
-    fasync::Time::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS / 2 * 1_000_000_000);
+const BEFORE_SEARCH_RESULT_CONNECT_DELAY_TIME: fasync::MonotonicInstant =
+    fasync::MonotonicInstant::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS / 2 * 1_000_000_000);
 
-const AFTER_SEARCH_RESULT_CONNECT_DELAY_TIME: fasync::Time =
-    fasync::Time::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS * 2 * 1_000_000_000);
+const AFTER_SEARCH_RESULT_CONNECT_DELAY_TIME: fasync::MonotonicInstant =
+    fasync::MonotonicInstant::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS * 2 * 1_000_000_000);
 
 type HfpRunFuture = Pin<Box<dyn Future<Output = Result<()>>>>;
 

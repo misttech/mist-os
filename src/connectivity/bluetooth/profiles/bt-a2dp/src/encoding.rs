@@ -201,7 +201,7 @@ impl SilenceStream {
     fn build(pcm_format: PcmFormat) -> Self {
         Self {
             pcm_format,
-            next_frame_timer: fasync::Timer::new(fasync::Time::INFINITE_PAST),
+            next_frame_timer: fasync::Timer::new(fasync::MonotonicInstant::INFINITE_PAST),
             last_frame_time: None,
         }
     }

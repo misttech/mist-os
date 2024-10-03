@@ -74,7 +74,7 @@ pub enum StartState {
 
 impl Default for StartState {
     fn default() -> Self {
-        Self::Stopped(fasync::Time::now().into())
+        Self::Stopped(fasync::MonotonicInstant::now().into())
     }
 }
 
@@ -200,7 +200,7 @@ impl SoftCodec {
         };
         let plug_state = fidl_fuchsia_hardware_audio::PlugState {
             plugged: Some(initially_plugged),
-            plug_state_time: Some(fuchsia_async::Time::now().into_nanos()),
+            plug_state_time: Some(fuchsia_async::MonotonicInstant::now().into_nanos()),
             ..Default::default()
         };
         let mut plug_state_server = hanging_server::HangingGet::<
@@ -235,7 +235,7 @@ impl SoftCodec {
     pub fn update_plug_state(&self, plugged: bool) -> Result<()> {
         self.plug_state_publisher.set(fidl_fuchsia_hardware_audio::PlugState {
             plugged: Some(plugged),
-            plug_state_time: Some(fasync::Time::now().into_nanos()),
+            plug_state_time: Some(fasync::MonotonicInstant::now().into_nanos()),
             ..Default::default()
         });
         Ok(())
@@ -539,7 +539,7 @@ pub(crate) mod tests {
 
         exec.run_until_stalled(&mut start_fut).expect_pending("should pend");
 
-        let started_time = fasync::Time::now();
+        let started_time = fasync::MonotonicInstant::now();
         responder(Ok(started_time.into()));
 
         let time = exec.run_until_stalled(&mut start_fut).expect("should be started").unwrap();
@@ -561,7 +561,9 @@ pub(crate) mod tests {
             exec.run_until_stalled(&mut watch_plug_state_fut).expect("should finish").expect("ok");
 
         assert_eq!(plug_state.plugged, Some(true));
-        assert!(plug_state.plug_state_time.unwrap() <= fasync::Time::now().into_nanos());
+        assert!(
+            plug_state.plug_state_time.unwrap() <= fasync::MonotonicInstant::now().into_nanos()
+        );
 
         // Second watch plug state should hang.
         let mut watch_plug_state_fut = proxy.watch_plug_state();
@@ -597,7 +599,7 @@ pub(crate) mod tests {
         };
         exec.run_until_stalled(&mut stop_fut).expect_pending("should pend");
 
-        let response_time = fasync::Time::now();
+        let response_time = fasync::MonotonicInstant::now();
         responder(Ok(response_time.into()));
 
         let Poll::Ready(Ok(received_time)) = exec.run_until_stalled(&mut stop_fut) else {
@@ -684,7 +686,7 @@ pub(crate) mod tests {
             panic!("Expected error from the first start on the proxy before a response: {start_response:?}");
         };
         // The responder should be ok to call even though it has no effect.
-        let response_time = fasync::Time::now();
+        let response_time = fasync::MonotonicInstant::now();
         responder(Ok(response_time.into()));
     }
 }

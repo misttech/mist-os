@@ -373,8 +373,10 @@ impl ArchiveReader {
                 .await;
 
             if self.retry_config.on_empty() && result.len() < self.minimum_schema_count {
-                fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(RETRY_DELAY_MS)))
-                    .await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
+                    RETRY_DELAY_MS,
+                )))
+                .await;
             } else {
                 return Ok(result);
             }

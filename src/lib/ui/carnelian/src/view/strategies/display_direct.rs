@@ -658,7 +658,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
 
     fn ownership_changed(&mut self, owned: bool) {
         if !owned {
-            let timer = fasync::Timer::new(fuchsia_async::Time::after(
+            let timer = fasync::Timer::new(fuchsia_async::MonotonicInstant::after(
                 self.display_resource_release_delay.into(),
             ));
             let timer_sender = self.app_sender.clone();

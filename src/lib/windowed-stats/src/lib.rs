@@ -97,15 +97,18 @@ impl WindowedStats<SumAndCount> {
 
 /// Given `timestamp`, return the start bound of its enclosing window with the specified
 /// `granularity`.
-fn get_start_bound(timestamp: fasync::Time, granularity: zx::Duration) -> fasync::Time {
+fn get_start_bound(
+    timestamp: fasync::MonotonicInstant,
+    granularity: zx::Duration,
+) -> fasync::MonotonicInstant {
     timestamp - zx::Duration::from_nanos(timestamp.into_nanos() % granularity.into_nanos())
 }
 
 /// Given the `prev` and `current` timestamps, return how many windows need to be slided
 /// for if each window has the specified `granularity`.
 fn get_num_slides_needed(
-    prev: fasync::Time,
-    current: fasync::Time,
+    prev: fasync::MonotonicInstant,
+    current: fasync::MonotonicInstant,
     granularity: zx::Duration,
 ) -> usize {
     let prev_start_bound = get_start_bound(prev, granularity);
@@ -124,9 +127,9 @@ pub struct TimeSeries<T> {
     fifteen_minutely: WindowedStats<T>,
     hourly: WindowedStats<T>,
     /// Time time when the `TimeSeries` was first created
-    created_timestamp: fasync::Time,
+    created_timestamp: fasync::MonotonicInstant,
     /// The time when data in the current `TimeSeries` was last updated
-    last_timestamp: fasync::Time,
+    last_timestamp: fasync::MonotonicInstant,
 }
 
 impl<T: Debug> Debug for TimeSeries<T> {
@@ -157,7 +160,7 @@ impl<T: Default> TimeSeries<T> {
         hourly_windows: HourlyWindows,
         create_aggregation_fn: impl Fn() -> Box<dyn Fn(&T, &T) -> T + Send>,
     ) -> Self {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         Self {
             minutely: WindowedStats::new(minutely_windows.0, create_aggregation_fn()),
             fifteen_minutely: WindowedStats::new(
@@ -173,7 +176,7 @@ impl<T: Default> TimeSeries<T> {
     /// Check whether the current time has exceeded the bound of the existing windows. If yes
     /// then slide windows as many times as required until the window encompasses the current time.
     pub fn update_windows(&mut self) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_minutes(1))
         {
             self.minutely.slide_window();
@@ -401,7 +404,7 @@ mod tests {
     #[test]
     fn time_series_window_transition() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3599_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3599_000_000_000));
         let inspector = Inspector::default();
 
         let mut time_series = TimeSeries::<u32>::new(create_saturating_add_fn);
@@ -409,7 +412,7 @@ mod tests {
 
         // This should create a new windows for all of `1m`, `15m`, `1h` because we
         // just crossed the 3600th second mark.
-        exec.set_fake_time(fasync::Time::from_nanos(3600_000_000_001));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3600_000_000_001));
         time_series.log_value(&2u32);
 
         time_series.log_inspect_uint_array(inspector.root(), "stats");
@@ -425,7 +428,7 @@ mod tests {
             }
         });
 
-        exec.set_fake_time(fasync::Time::from_nanos(3659_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3659_000_000_000));
         time_series.log_value(&3u32);
         time_series.log_inspect_uint_array(inspector.root(), "stats2");
 
@@ -442,7 +445,7 @@ mod tests {
             }
         });
 
-        exec.set_fake_time(fasync::Time::from_nanos(3660_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3660_000_000_000));
         time_series.log_value(&4u32);
         time_series.log_inspect_uint_array(inspector.root(), "stats3");
 
@@ -460,7 +463,7 @@ mod tests {
             }
         });
 
-        exec.set_fake_time(fasync::Time::from_nanos(4500_000_000_001));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(4500_000_000_001));
         time_series.log_value(&5u32);
         time_series.log_inspect_uint_array(inspector.root(), "stats4");
 
@@ -483,10 +486,10 @@ mod tests {
     #[test]
     fn time_series_minutely_iter() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(59_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(59_000_000_000));
         let mut time_series = TimeSeries::<u32>::new(create_saturating_add_fn);
         time_series.log_value(&1u32);
-        exec.set_fake_time(fasync::Time::from_nanos(60_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(60_000_000_000));
         time_series.log_value(&2u32);
         let minutely_data: Vec<_> = time_series.minutely_iter().map(|v| *v).collect();
         assert_eq!(minutely_data, [1, 2]);
@@ -495,10 +498,10 @@ mod tests {
     #[test]
     fn time_series_get_aggregated_value() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3599_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3599_000_000_000));
         let mut time_series = TimeSeries::<u32>::new(create_saturating_add_fn);
         time_series.log_value(&1u32);
-        exec.set_fake_time(fasync::Time::from_nanos(3600_000_000_001));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3600_000_000_001));
         time_series.log_value(&2u32);
         assert_eq!(time_series.get_aggregated_value(), 3);
     }
@@ -506,7 +509,7 @@ mod tests {
     #[test]
     fn time_series_log_inspect_uint_array() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(961_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
         let mut time_series = TimeSeries::<u32>::new(create_saturating_add_fn);
@@ -530,13 +533,13 @@ mod tests {
     #[test]
     fn time_series_log_inspect_uint_array_automatically_update_windows() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(961_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
         let mut time_series = TimeSeries::<u32>::new(create_saturating_add_fn);
         time_series.log_value(&1u32);
 
-        exec.set_fake_time(fasync::Time::from_nanos(1021_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1021_000_000_000));
         time_series.log_inspect_uint_array(inspector.root(), "stats");
 
         assert_data_tree!(inspector, root: {
@@ -555,7 +558,7 @@ mod tests {
     #[test]
     fn time_series_stats_log_inspect_int_array() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(961_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
         let mut time_series = TimeSeries::<i32>::new(create_saturating_add_fn);
@@ -579,13 +582,13 @@ mod tests {
     #[test]
     fn time_series_log_inspect_int_array_automatically_update_windows() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(961_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
         let mut time_series = TimeSeries::<i32>::new(create_saturating_add_fn);
         time_series.log_value(&1i32);
 
-        exec.set_fake_time(fasync::Time::from_nanos(1021_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1021_000_000_000));
         time_series.log_inspect_int_array(inspector.root(), "stats");
 
         assert_data_tree!(inspector, root: {
@@ -604,7 +607,7 @@ mod tests {
     #[test]
     fn time_series_sum_and_count_log_avg_inspect_double_array() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(961_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
         let mut time_series = TimeSeries::<SumAndCount>::new(create_saturating_add_fn);
         time_series.log_value(&SumAndCount { sum: 1u32, count: 1 });
@@ -628,13 +631,13 @@ mod tests {
     #[test]
     fn time_series_sum_and_count_log_avg_inspect_double_array_automatically_update_windows() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(961_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
         let mut time_series = TimeSeries::<SumAndCount>::new(create_saturating_add_fn);
         time_series.log_value(&SumAndCount { sum: 1u32, count: 1 });
         time_series.log_value(&SumAndCount { sum: 2u32, count: 1 });
 
-        exec.set_fake_time(fasync::Time::from_nanos(1021_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1021_000_000_000));
         time_series.log_avg_inspect_double_array(inspector.root(), "stats");
 
         assert_data_tree!(inspector, root: {

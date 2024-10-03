@@ -522,7 +522,8 @@ impl MockController {
                             let close_channel = self.stop_resp.close_channel;
                             let control = control.clone();
                             fasync::Task::spawn(async move {
-                                fasync::Timer::new(fasync::Time::after(delay_copy)).await;
+                                fasync::Timer::new(fasync::MonotonicInstant::after(delay_copy))
+                                    .await;
                                 if close_channel {
                                     let _ = control.send_on_stop(Self::ok_on_stop_info());
                                 }
@@ -544,7 +545,8 @@ impl MockController {
                             let delay_copy = delay.clone();
                             let close_channel = self.kill_resp.close_channel;
                             fasync::Task::spawn(async move {
-                                fasync::Timer::new(fasync::Time::after(delay_copy)).await;
+                                fasync::Timer::new(fasync::MonotonicInstant::after(delay_copy))
+                                    .await;
                                 if close_channel {
                                     let _ = control.send_on_stop(Self::ok_on_stop_info());
                                 }

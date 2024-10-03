@@ -261,7 +261,7 @@ impl FlatlandViewStrategy {
             allocator,
             view_key: key,
             app_sender: app_sender.clone(),
-            last_presentation_time: fasync::Time::now().into_nanos(),
+            last_presentation_time: fasync::MonotonicInstant::now().into_nanos(),
             future_presentation_times: Vec::new(),
             custom_render_offset: None,
             present_interval: DEFAULT_PRESENT_INTERVAL,
@@ -541,7 +541,7 @@ impl FlatlandViewStrategy {
     }
 
     fn next_presentation_time(&self) -> PresentationTime {
-        let now = fasync::Time::now().into_nanos();
+        let now = fasync::MonotonicInstant::now().into_nanos();
         let legal_next = PresentationTime {
             presentation_time: self.last_presentation_time + self.present_interval,
             latch_point: now,
@@ -568,7 +568,8 @@ impl FlatlandViewStrategy {
                 .custom_render_offset
                 .unwrap_or_else(|| self.present_interval - DEFAULT_RENDER_OFFSET_DELTA);
             let render_time = presentation_time.latch_point - render_offset;
-            let timer = fasync::Timer::new(fuchsia_async::Time::from_nanos(render_time));
+            let timer =
+                fasync::Timer::new(fuchsia_async::MonotonicInstant::from_nanos(render_time));
             let timer_sender = self.app_sender.clone();
             let key = self.view_key;
             fasync::Task::local(async move {

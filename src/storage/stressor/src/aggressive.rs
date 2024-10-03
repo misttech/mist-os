@@ -8,7 +8,7 @@
 //! This version also silently ignores errors such as out of space.
 
 use fidl_fuchsia_io as fio;
-use fuchsia_async::Time;
+use fuchsia_async::MonotonicInstant;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use std::fs::File;
@@ -107,7 +107,7 @@ impl Stressor {
                 )
                 .into(),
             );
-            let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
+            let info = dir.query_filesystem(MonotonicInstant::INFINITE.into()).unwrap().1.unwrap();
 
             tracing::info!(
                 "Aggressive stressor mode targetting {} free bytes on a {} byte volume.",
@@ -144,7 +144,8 @@ impl Stressor {
         loop {
             std::thread::sleep(std::time::Duration::from_secs(10));
             if let Some(dir) = &self.dir {
-                let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
+                let info =
+                    dir.query_filesystem(MonotonicInstant::INFINITE.into()).unwrap().1.unwrap();
                 self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
             }
             tracing::info!(
@@ -214,7 +215,7 @@ impl Stressor {
                                 // internal tally.
                                 if let Some(dir) = &self.dir {
                                     let info = dir
-                                        .query_filesystem(Time::INFINITE.into())
+                                        .query_filesystem(MonotonicInstant::INFINITE.into())
                                         .unwrap()
                                         .1
                                         .unwrap();

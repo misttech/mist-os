@@ -5,7 +5,7 @@
 use component_events::events::{DebugStarted, EventStream, Stopped};
 use component_events::matcher::EventMatcher;
 use fidl_fuchsia_io as fio;
-use fuchsia_async::{Duration, Task, Time, Timer};
+use fuchsia_async::{Duration, MonotonicInstant, Task, Timer};
 use fuchsia_component_test::ScopedInstance;
 use fuchsia_fs::directory::open_file_no_describe_deprecated;
 use std::mem;
@@ -27,7 +27,7 @@ async fn test_debug_started() {
     // connect_to_binder starts the component. Otherwise the component is only declared.
     instance.connect_to_binder().unwrap();
 
-    let start = Time::now();
+    let start = MonotonicInstant::now();
 
     let moniker = format!("./{}:{}", collection_name, instance.child_name());
 
@@ -76,7 +76,7 @@ async fn test_debug_started() {
         .await
         .expect("failed to observe events");
 
-    let elapsed = (Time::now() - start).into_millis();
+    let elapsed = (MonotonicInstant::now() - start).into_millis();
     // around 29 ms, but could be arbitrarily large so we don't check the upper limit of it.
     println!("elapsed: {}", elapsed);
     assert!(elapsed >= 20);

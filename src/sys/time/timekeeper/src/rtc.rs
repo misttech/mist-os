@@ -224,7 +224,7 @@ impl Rtc for RtcImpl {
         } else {
             // ...otherwise, wait until the top of the current second than set the RTC using the
             // following second.
-            fasync::Timer::new(fasync::Time::after(
+            fasync::Timer::new(fasync::MonotonicInstant::after(
                 zx::Duration::from_seconds(1) - fractional_second,
             ))
             .await;

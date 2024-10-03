@@ -55,7 +55,7 @@ macro_rules! block_until_inspect_matches {
                     }
                 }
             }
-            fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(RESTART_DELAY)).await;
         }
     }};
 }

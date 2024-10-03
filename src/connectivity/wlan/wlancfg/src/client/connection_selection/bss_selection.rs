@@ -143,7 +143,7 @@ mod test {
     fn connect_failure_with_bssid(bssid: types::Bssid) -> ConnectFailure {
         ConnectFailure {
             reason: FailureReason::GeneralFailure,
-            time: fasync::Time::INFINITE,
+            time: fasync::MonotonicInstant::INFINITE,
             bssid,
         }
     }

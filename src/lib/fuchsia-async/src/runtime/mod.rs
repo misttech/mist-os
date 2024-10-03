@@ -18,7 +18,9 @@ mod stub;
 use self::stub as implementation;
 
 // Exports common to all target os.
-pub use implementation::executor::{Duration, LocalExecutor, SendExecutor, TestExecutor, Time};
+pub use implementation::executor::{
+    Duration, LocalExecutor, MonotonicInstant, SendExecutor, TestExecutor,
+};
 pub use implementation::task::{unblock, Task};
 pub use implementation::timer::Timer;
 
@@ -43,6 +45,10 @@ pub mod scope {
     pub use super::implementation::scope::Join;
 }
 
+// TODO(https://fxbug.dex/328306129): Remove after whole repo rename
+#[allow(missing_docs)]
+pub type Time = MonotonicInstant;
+
 pub use scope::Scope;
 
 use futures::prelude::*;
@@ -52,36 +58,36 @@ use std::task::{Context, Poll};
 
 /// An extension trait to provide `after_now` on `zx::Duration`.
 pub trait DurationExt {
-    /// Return a `Time` which is a `Duration` after the current time.
-    /// `duration.after_now()` is equivalent to `Time::after(duration)`.
+    /// Return a `MonotonicInstant` which is a `Duration` after the current time.
+    /// `duration.after_now()` is equivalent to `MonotonicInstant::after(duration)`.
     ///
     /// This method requires that an executor has been set up.
-    fn after_now(self) -> Time;
+    fn after_now(self) -> MonotonicInstant;
 }
 
 /// The time when a Timer should wakeup.
 pub trait WakeupTime {
-    /// Convert this time into a fuchsia_async::Time.
+    /// Convert this time into a fuchsia_async::MonotonicInstant.
     /// This is allowed to be inaccurate, but the inaccuracy must make the wakeup time later,
     /// never earlier.
-    fn into_time(self) -> Time;
+    fn into_time(self) -> MonotonicInstant;
 }
 
 impl WakeupTime for std::time::Duration {
-    fn into_time(self) -> Time {
-        Time::now() + self.into()
+    fn into_time(self) -> MonotonicInstant {
+        MonotonicInstant::now() + self.into()
     }
 }
 
 #[cfg(target_os = "fuchsia")]
 impl WakeupTime for Duration {
-    fn into_time(self) -> Time {
-        Time::after(self)
+    fn into_time(self) -> MonotonicInstant {
+        MonotonicInstant::after(self)
     }
 }
 
 impl DurationExt for std::time::Duration {
-    fn after_now(self) -> Time {
+    fn after_now(self) -> MonotonicInstant {
         self.into_time()
     }
 }

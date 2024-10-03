@@ -96,7 +96,7 @@ impl Snooper {
         let vendor_sync = client_end_vendor.into_sync_proxy();
 
         let snoop_client = vendor_sync
-            .open_snoop(fasync::Time::after(zx::Duration::from_seconds(3)).into())?
+            .open_snoop(fasync::MonotonicInstant::after(zx::Duration::from_seconds(3)).into())?
             .map_err(|e| format_err!("Failed opening Snoop with {e:?}"))?;
 
         Ok(Snooper::from_client(snoop_client, path))

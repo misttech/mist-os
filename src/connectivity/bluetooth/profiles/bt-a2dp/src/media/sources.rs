@@ -83,7 +83,7 @@ impl SawWaveStream {
                 0.0, 329.63, 415.30, 369.99, 246.94, 329.63, 369.99, 415.30, 329.63, 415.30,
                 329.63, 369.99, 246.94, 246.94, 369.99, 415.30, 329.63,
             ],
-            next_frame_timer: fasync::Timer::new(fasync::Time::INFINITE_PAST),
+            next_frame_timer: fasync::Timer::new(fasync::MonotonicInstant::INFINITE_PAST),
             last_frame_time: None,
             inspect_node: Default::default(),
         }

@@ -31,9 +31,9 @@ impl OtaReinstallAction {
 async fn run_ota(mut event_sender: Box<dyn SendEvent>, ota_manager: Arc<dyn OtaManager>) {
     event_sender.send(Event::Reinstall); // Might need to document this or fix naming to be explicit
     event_sender.send_recovery_stage_event(metrics::RecoveryEventMetricDimensionResult::OtaStarted);
-    let start_time = fasync::Time::now();
+    let start_time = fasync::MonotonicInstant::now();
     let res = ota_manager.start_and_wait_for_result().await;
-    let end_time = fasync::Time::now();
+    let end_time = fasync::MonotonicInstant::now();
     let elapsed_time = (end_time - start_time).into_seconds();
 
     let event = match res {

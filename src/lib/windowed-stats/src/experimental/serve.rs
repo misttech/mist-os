@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn test_serve_time_matrix_inspection_interpolate_data_periodically() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let inspector = Inspector::default();
         let (client, test_fut) =
@@ -217,7 +217,7 @@ mod tests {
         };
         assert_eq!(&time_matrix.drain_calls()[..], &[]);
 
-        exec.set_fake_time(fasync::Time::from_nanos(300_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(300_000_000_000));
         let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
             panic!("test_fut has terminated");
         };

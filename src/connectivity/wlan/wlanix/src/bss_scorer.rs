@@ -24,7 +24,7 @@ const SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED: i16 = 30;
 
 #[derive(Debug)]
 struct RecentConnectFailure {
-    timestamp: fasync::Time,
+    timestamp: fasync::MonotonicInstant,
     is_credential_rejected: bool,
 }
 
@@ -61,7 +61,7 @@ impl BssScorerInner {
         bssid: Bssid,
         connect_result: &fidl_sme::ConnectResult,
     ) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let failure = RecentConnectFailure {
             timestamp: now,
             is_credential_rejected: connect_result.is_credential_rejected,
@@ -80,7 +80,7 @@ impl BssScorerInner {
     fn compute_connect_failure_penalty(&mut self, bssid: Bssid) -> i16 {
         let mut penalty: i16 = 0;
         if let Some(recent_connect_failures) = self.recent_connect_failures.get_mut(&bssid) {
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             // Remove connect failures that are no longer recent
             while let Some(failure) = recent_connect_failures.front() {
                 if failure.timestamp >= now - RECENT_CONNECT_FAILURE_WINDOW {
@@ -176,13 +176,13 @@ mod tests {
         // Two connect failures at the 0th second mark.
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(300)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(300)));
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -60);
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
         // At 300th second mark, three connect failures are considered as recent.
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -65);
 
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
         // At 301th second mark, the two connect failures from the 0th second mark are
         // evicted, leaving one recent connect failure.
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -55);

@@ -26,7 +26,7 @@ pub fn make_async_timed_event_stream<E>(
 ) -> impl Stream<Item = Event<E>> {
     time_stream
         .map(|(deadline, timed_event)| {
-            fasync::Timer::new(fasync::Time::from_zx(deadline)).map(|_| timed_event)
+            fasync::Timer::new(fasync::MonotonicInstant::from_zx(deadline)).map(|_| timed_event)
         })
         .buffer_unordered(usize::max_value())
 }
@@ -61,7 +61,7 @@ impl<E> Timer<E> {
     /// This function will panic if it's called when no executor is set up.
     pub fn now(&self) -> zx::MonotonicInstant {
         // We use fasync to support time manipulation in tests.
-        fasync::Time::now().into_zx()
+        fasync::MonotonicInstant::now().into_zx()
     }
 
     pub fn schedule_at(&mut self, deadline: zx::MonotonicInstant, event: E) -> EventId {
@@ -72,7 +72,7 @@ impl<E> Timer<E> {
     }
 
     pub fn schedule_after(&mut self, duration: zx::Duration, event: E) -> EventId {
-        self.schedule_at(fasync::Time::after(duration).into_zx(), event)
+        self.schedule_at(fasync::MonotonicInstant::after(duration).into_zx(), event)
     }
 
     pub fn schedule<EV>(&mut self, event: EV) -> EventId

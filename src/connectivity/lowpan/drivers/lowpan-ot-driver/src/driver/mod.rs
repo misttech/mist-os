@@ -122,7 +122,7 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
         future
             .inspect_err(|e| error!("apply_standard_combinators: error is \"{:?}\"", e))
             .map_err(|e| ZxStatus::from(ErrorAdapter(e)))
-            .on_timeout(fasync::Time::after(DEFAULT_TIMEOUT), || {
+            .on_timeout(fasync::MonotonicInstant::after(DEFAULT_TIMEOUT), || {
                 error!("Timeout");
                 Err(ZxStatus::TIMED_OUT)
             })

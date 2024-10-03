@@ -1064,7 +1064,7 @@ mod tests {
     fn test_set_brightness_slowly_send_value() {
         // Need to use a TestExecutor with fake time to run past the timeouts without delay
         let mut exec = TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let control = block_on(generate_control_struct(400.0, 0.5));
         let (channel_sender, mut channel_receiver) = futures::channel::mpsc::unbounded::<f32>();
@@ -1112,7 +1112,7 @@ mod tests {
     fn test_set_brightness_slowly_long_timeout() {
         // Need to use a TestExecutor with fake time to run past the timeouts without delay
         let mut exec = TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let control = block_on(generate_control_struct(400.0, 0.5));
         let (channel_sender, mut channel_receiver) = futures::channel::mpsc::unbounded::<f32>();

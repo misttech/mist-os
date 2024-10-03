@@ -381,7 +381,7 @@ impl ConnectedPeers {
             let start_stream_task = fuchsia_async::Task::local(async move {
                 let delay_sec = delay.into_millis() as f64 / 1000.0;
                 info!(id = %peer.key(), "dwelling {delay_sec}s for peer initiation");
-                fasync::Timer::new(fasync::Time::after(delay)).await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(delay)).await;
 
                 if let Err(e) = ConnectedPeers::start_streaming(&peer, negotiation).await {
                     info!(id = %peer.key(), ?e, "Peer start streaming failed");
@@ -687,7 +687,7 @@ mod tests {
         ServiceCapability,
     ) {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000));
         let (proxy, stream) =
             create_proxy_and_stream::<ProfileMarker>().expect("Profile proxy should be created");
 
@@ -749,7 +749,7 @@ mod tests {
         // The remote peer doesn't need to actually open, Set Configuration is enough of a signal.
         // wait for the delay to expire now.
 
-        exec.set_fake_time(fasync::Time::after(delay) + zx::Duration::from_micros(1));
+        exec.set_fake_time(fasync::MonotonicInstant::after(delay) + zx::Duration::from_micros(1));
         let _ = exec.wake_expired_timers();
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
@@ -823,7 +823,7 @@ mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // The delay expires, and the discovery is start!
-        exec.set_fake_time(fasync::Time::after(delay) + zx::Duration::from_micros(1));
+        exec.set_fake_time(fasync::MonotonicInstant::after(delay) + zx::Duration::from_micros(1));
         let _ = exec.wake_expired_timers();
         expect_peer_discovery(
             &mut exec,
@@ -892,7 +892,7 @@ mod tests {
         // Should wait for the specified amount of time.
         assert!(exec.run_until_stalled(&mut remote_requests.next()).is_pending());
 
-        exec.set_fake_time(fasync::Time::after(delay + zx::Duration::from_micros(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(delay + zx::Duration::from_micros(1)));
         let _ = exec.wake_expired_timers();
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
@@ -980,7 +980,7 @@ mod tests {
         let mut remote_requests = remote.take_request_stream();
         // Should wait for the specified amount of time.
         assert!(exec.run_until_stalled(&mut remote_requests.next()).is_pending());
-        exec.set_fake_time(fasync::Time::after(delay + zx::Duration::from_micros(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(delay + zx::Duration::from_micros(1)));
         let _ = exec.wake_expired_timers();
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
@@ -1051,7 +1051,7 @@ mod tests {
         // Should wait for the specified amount of time.
         assert!(exec.run_until_stalled(&mut remote_requests.next()).is_pending());
 
-        exec.set_fake_time(fasync::Time::after(delay + zx::Duration::from_micros(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(delay + zx::Duration::from_micros(1)));
         let _ = exec.wake_expired_timers();
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());

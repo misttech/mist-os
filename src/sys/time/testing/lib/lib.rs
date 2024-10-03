@@ -779,7 +779,7 @@ macro_rules! poll_until_some_async {
             if result.is_some() {
                 break;
             }
-            fasync::Timer::new(fasync::Time::after($crate::RETRY_WAIT_DURATION)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after($crate::RETRY_WAIT_DURATION)).await;
         }
         tracing::info!("=> poll_until_some_async() done for {}", &loc);
         result.expect("we loop around while result is None")
@@ -810,7 +810,7 @@ macro_rules! poll_until_async_2 {
             if result {
                 break;
             }
-            fasync::Timer::new(fasync::Time::after($crate::RETRY_WAIT_DURATION)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after($crate::RETRY_WAIT_DURATION)).await;
         }
         tracing::info!("=> poll_until_async_2() done for {}", &loc);
         result
@@ -861,7 +861,7 @@ where
                 tracing::info!("<= poll_until_some() for {}", loc);
                 return value;
             }
-            None => fasync::Timer::new(fasync::Time::after(RETRY_WAIT_DURATION)).await,
+            None => fasync::Timer::new(fasync::MonotonicInstant::after(RETRY_WAIT_DURATION)).await,
         }
     }
 }
@@ -874,7 +874,7 @@ where
 {
     tracing::info!("=> poll_until_async() for {}", loc);
     while !poll_fn().await {
-        fasync::Timer::new(fasync::Time::after(RETRY_WAIT_DURATION)).await
+        fasync::Timer::new(fasync::MonotonicInstant::after(RETRY_WAIT_DURATION)).await
     }
     tracing::info!("<= poll_until_async() for {}", loc);
 }
@@ -883,7 +883,7 @@ where
 pub async fn poll_until_impl<F: Fn() -> bool>(poll_fn: F, loc: &SourceLocation) {
     tracing::info!("=> poll_until() for {}", loc);
     while !poll_fn() {
-        fasync::Timer::new(fasync::Time::after(RETRY_WAIT_DURATION)).await
+        fasync::Timer::new(fasync::MonotonicInstant::after(RETRY_WAIT_DURATION)).await
     }
     tracing::info!("<= poll_until() for {}", loc);
 }

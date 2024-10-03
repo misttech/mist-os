@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, format_err, Context as _, Error};
-use fasync::Time;
+use fasync::MonotonicInstant;
 use fidl_fuchsia_lowpan::DeviceWatcherMarker;
 use fuchsia_async as fasync;
 use fuchsia_async::TimeoutExt;
@@ -213,7 +213,7 @@ pub async fn test_lowpanctl_command(args: Vec<String>) -> Result<(), Error> {
     let (added, removed) = lookup
         .watch_devices()
         .err_into::<Error>()
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
             Err(format_err!("Timeout waiting for lookup.watch_devices()"))
         })
         .await
@@ -234,7 +234,7 @@ pub async fn test_lowpanctl_command(args: Vec<String>) -> Result<(), Error> {
     let (added, removed) = lookup
         .watch_devices()
         .err_into::<Error>()
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
             Err(format_err!("Timeout waiting for lookup.watch_devices()"))
         })
         .await
@@ -262,7 +262,7 @@ pub async fn test_lowpanctl_command(args: Vec<String>) -> Result<(), Error> {
     let (added, removed) = lookup
         .watch_devices()
         .err_into::<Error>()
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
             Err(format_err!("Timeout waiting for lookup.watch_devices()"))
         })
         .await

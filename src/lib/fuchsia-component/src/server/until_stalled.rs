@@ -286,8 +286,8 @@ mod tests {
     /// Initializes fake time; creates VFS with a single mock server, and returns them.
     async fn setup_test(
         server_end: ServerEnd<fio::DirectoryMarker>,
-    ) -> (fasync::Time, MockServer, impl FusedFuture<Output = ()>) {
-        let initial = fasync::Time::from_nanos(0);
+    ) -> (fasync::MonotonicInstant, MockServer, impl FusedFuture<Output = ()>) {
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
 
@@ -524,7 +524,7 @@ mod tests {
     /// dropped, and the fs should stall a bunch of times.
     #[fuchsia::test(allow_stalls = false)]
     async fn end_to_end() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
 
         let mock_server = MockServer::new();

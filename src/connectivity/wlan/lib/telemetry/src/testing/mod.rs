@@ -223,7 +223,7 @@ impl TestHelper {
 
 pub fn setup_test() -> TestHelper {
     let exec = fasync::TestExecutor::new_with_fake_time();
-    exec.set_fake_time(fasync::Time::from_nanos(0));
+    exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
     let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
         create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()

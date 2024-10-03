@@ -5,7 +5,7 @@
 use crate::context::LowpanCtlContext;
 use crate::invocation::CommandEnum;
 use crate::prelude::*;
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use zx::Duration;
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -46,7 +46,7 @@ impl RepeatCommand {
 
             if self.wait > 0.0 {
                 // Wait a little bit until we execute the command again.
-                Timer::new(Time::after(wait_duration)).await;
+                Timer::new(MonotonicInstant::after(wait_duration)).await;
             }
         }
     }

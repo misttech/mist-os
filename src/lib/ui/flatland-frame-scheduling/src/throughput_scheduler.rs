@@ -6,7 +6,7 @@ use crate::{
     PresentParameters, PresentationInfo, SchedulingFuture, SchedulingFutureState, SchedulingLib,
 };
 use async_trait::async_trait;
-use fuchsia_async::Time as fasync_time;
+use fuchsia_async::MonotonicInstant as fasync_time;
 use std::cell::{Cell, RefCell};
 use std::task::Waker;
 use {fuchsia_trace as trace, zx};

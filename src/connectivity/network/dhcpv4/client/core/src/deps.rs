@@ -117,7 +117,7 @@ pub trait Instant: Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync {
     fn average(&self, other: Self) -> Self;
 }
 
-impl Instant for fasync::Time {
+impl Instant for fasync::MonotonicInstant {
     fn add(&self, duration: std::time::Duration) -> Self {
         // On host builds, fasync::Duration is simply an alias for
         // std::time::Duration, making the `duration.into()` appear useless.

@@ -497,7 +497,7 @@ impl types::ScannedCandidate {
         self.saved_network_info
             .past_connections
             .get_list_for_bss(&self.bss.bssid)
-            .get_recent(fasync::Time::now() - RECENT_DISCONNECT_WINDOW)
+            .get_recent(fasync::MonotonicInstant::now() - RECENT_DISCONNECT_WINDOW)
             .iter()
             .filter(|d| d.connection_uptime < SHORT_CONNECT_DURATION)
             .collect::<Vec<_>>()
@@ -638,10 +638,9 @@ fn merge_config_and_scan_data(
             network_has_multiple_bss: multiple_bss_candidates,
             saved_network_info: InternalSavedNetworkData {
                 has_ever_connected: network_config.has_ever_connected,
-                recent_failures: network_config
-                    .perf_stats
-                    .connect_failures
-                    .get_recent_for_network(fasync::Time::now() - RECENT_FAILURE_WINDOW),
+                recent_failures: network_config.perf_stats.connect_failures.get_recent_for_network(
+                    fasync::MonotonicInstant::now() - RECENT_FAILURE_WINDOW,
+                ),
                 past_connections: network_config.perf_stats.past_connections.clone(),
             },
             bss: bss.clone(),
@@ -686,7 +685,9 @@ async fn merge_saved_networks_and_scan_data(
                         recent_failures: saved_config
                             .perf_stats
                             .connect_failures
-                            .get_recent_for_network(fasync::Time::now() - RECENT_FAILURE_WINDOW),
+                            .get_recent_for_network(
+                                fasync::MonotonicInstant::now() - RECENT_FAILURE_WINDOW,
+                            ),
                         past_connections: saved_config.perf_stats.past_connections.clone(),
                     },
                     bss,
@@ -921,7 +922,7 @@ mod tests {
             .expect("failed to get config")
             .perf_stats
             .connect_failures
-            .get_recent_for_network(fasync::Time::now() - RECENT_FAILURE_WINDOW)
+            .get_recent_for_network(fasync::MonotonicInstant::now() - RECENT_FAILURE_WINDOW)
             .get(0)
             .expect("failed to get recent failure")
             .time;

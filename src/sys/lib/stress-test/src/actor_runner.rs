@@ -4,7 +4,7 @@
 
 use crate::actor::{Actor, ActorError};
 use crate::counter::CounterTx;
-use fuchsia_async::{Task, Time, Timer};
+use fuchsia_async::{MonotonicInstant, Task, Timer};
 use futures::future::{AbortHandle, Abortable, Aborted};
 use futures::lock::Mutex;
 use std::sync::Arc;
@@ -56,7 +56,7 @@ impl ActorRunner {
                         sleep_duration = ?delay,
                         "Sleeping"
                     );
-                    Timer::new(Time::after(delay.into())).await;
+                    Timer::new(MonotonicInstant::after(delay.into())).await;
                 }
 
                 debug!(%generation, name = %self.name, %local_count, "Performing...");

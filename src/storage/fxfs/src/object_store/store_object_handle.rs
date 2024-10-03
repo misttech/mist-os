@@ -178,13 +178,13 @@ impl Watchdog {
             _task: fasync::Task::spawn(async move {
                 let increment = increment_seconds.try_into().unwrap();
                 let mut fired_counter = 0;
-                let mut next_wake = fasync::Time::now();
+                let mut next_wake = fasync::MonotonicInstant::now();
                 loop {
                     next_wake += std::time::Duration::from_secs(increment).into();
                     // If this isn't being scheduled this will purposely result in fast looping when
                     // it does. This will be insightful about the state of the thread and task
                     // scheduling.
-                    if fasync::Time::now() < next_wake {
+                    if fasync::MonotonicInstant::now() < next_wake {
                         fasync::Timer::new(next_wake).await;
                     }
                     fired_counter += 1;
@@ -2460,14 +2460,14 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_watchdog() {
         use super::Watchdog;
-        use fuchsia_async::{Duration, TestExecutor, Time};
+        use fuchsia_async::{Duration, MonotonicInstant, TestExecutor};
         use std::sync::mpsc::channel;
 
         TestExecutor::advance_to(make_time(0)).await;
         let (sender, receiver) = channel();
 
-        fn make_time(time_secs: i64) -> Time {
-            Time::from_nanos(0) + Duration::from_seconds(time_secs)
+        fn make_time(time_secs: i64) -> MonotonicInstant {
+            MonotonicInstant::from_nanos(0) + Duration::from_seconds(time_secs)
         }
 
         {

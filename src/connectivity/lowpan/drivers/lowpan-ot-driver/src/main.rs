@@ -350,11 +350,11 @@ async fn main() -> Result<(), Error> {
             .context("main:prepare_to_run")?
             .boxed();
 
-        let start_timestamp = fasync::Time::now();
+        let start_timestamp = fasync::MonotonicInstant::now();
 
         let ret = driver_future.await.context("main:driver_task");
 
-        if (fasync::Time::now() - start_timestamp).into_minutes()
+        if (fasync::MonotonicInstant::now() - start_timestamp).into_minutes()
             >= RESET_EXPONENTIAL_BACKOFF_TIMER_MIN
         {
             // If the past run has been running for `RESET_EXPONENTIAL_BACKOFF_TIMER_MIN`
@@ -381,7 +381,8 @@ async fn main() -> Result<(), Error> {
             error!("Unexpected shutdown: {:?}", ret);
             warn!("Will attempt to restart in {} seconds.", delay);
 
-            fasync::Timer::new(fasync::Time::after(fz::Duration::from_seconds(delay))).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(fz::Duration::from_seconds(delay)))
+                .await;
 
             attempt_count += 1;
 

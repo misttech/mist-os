@@ -196,7 +196,7 @@ struct Loader {
     url: hyper::Uri,
     headers: hyper::HeaderMap,
     body: Vec<u8>,
-    deadline: fasync::Time,
+    deadline: fasync::MonotonicInstant,
     scope: vfs::execution_scope::ExecutionScope,
 }
 
@@ -240,8 +240,8 @@ impl Loader {
             };
 
             let deadline = deadline
-                .map(|deadline| fasync::Time::from_nanos(deadline))
-                .unwrap_or_else(|| fasync::Time::after(DEFAULT_DEADLINE_DURATION));
+                .map(|deadline| fasync::MonotonicInstant::from_nanos(deadline))
+                .unwrap_or_else(|| fasync::MonotonicInstant::after(DEFAULT_DEADLINE_DURATION));
 
             trace!("Starting request {} {}", method, url);
 
@@ -321,7 +321,7 @@ impl Loader {
         mut self,
     ) -> Result<(hyper::Response<hyper::Body>, hyper::Uri, hyper::Method), net_http::Error> {
         let deadline = self.deadline;
-        if deadline < fasync::Time::now() {
+        if deadline < fasync::MonotonicInstant::now() {
             return Err(net_http::Error::DeadlineExceeded);
         }
         let client = fhyper::new_https_client_from_tcp_options(tcp_options());

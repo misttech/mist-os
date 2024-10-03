@@ -793,12 +793,15 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
         fnet_routes_ext::wait_for_routes(ipv6_route_stream, &mut routes, |accumulated_routes| {
             want_routes.iter().all(|route| accumulated_routes.contains(route))
         })
-        .on_timeout(fuchsia_async::Time::after(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT), || {
-            panic!(
-                "timed out on waiting for a route table entry after {} seconds",
-                ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds()
-            )
-        })
+        .on_timeout(
+            fuchsia_async::MonotonicInstant::after(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT),
+            || {
+                panic!(
+                    "timed out on waiting for a route table entry after {} seconds",
+                    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds()
+                )
+            },
+        )
         .await
         .expect("error while waiting for routes to satisfy predicate");
     }

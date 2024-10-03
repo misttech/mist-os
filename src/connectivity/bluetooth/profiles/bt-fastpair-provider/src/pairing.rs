@@ -251,7 +251,7 @@ pub const MAX_SAVED_PROCEDURES: usize = 5;
 /// An inspect node tracking a Fast Pair procedure that is in progress.
 struct ActiveProcedureInspect {
     /// The time the procedure was started at.
-    start_time: fasync::Time,
+    start_time: fasync::MonotonicInstant,
     inspect_node: inspect::Node,
 }
 
@@ -299,13 +299,16 @@ impl PairingManagerInspect {
         let procedure_node = ProcedureInspect::new(&id, node.clone_weak());
         let _ = self.active_procedures.insert(
             id,
-            ActiveProcedureInspect { start_time: fasync::Time::now(), inspect_node: node },
+            ActiveProcedureInspect {
+                start_time: fasync::MonotonicInstant::now(),
+                inspect_node: node,
+            },
         );
         procedure_node
     }
 
     /// Saves the active pairing procedure to the inspect hierarchy.
-    pub fn record_finished_procedure(&mut self, id: PeerId, at: fasync::Time) {
+    pub fn record_finished_procedure(&mut self, id: PeerId, at: fasync::MonotonicInstant) {
         let Some(bounded_list_node) = self.finished_procedures.as_mut() else { return };
         let Some(ActiveProcedureInspect { start_time, inspect_node }) =
             self.active_procedures.remove(&id)
@@ -597,7 +600,7 @@ impl PairingManager {
 
         // Procedure is in the correct (finished) state and we can clean up and try to give the
         // delegate back to the upstream client. The inspect data is saved.
-        self.inspect_node.record_finished_procedure(le_id, fasync::Time::now());
+        self.inspect_node.record_finished_procedure(le_id, fasync::MonotonicInstant::now());
         self.cancel_pairing_procedure(&le_id)
     }
 
@@ -777,7 +780,7 @@ impl PairingManager {
             // Deadline was reached (e.g no updates within the expected time). Procedure is no
             // longer active. In most cases, this signifies an end to the "mandatory" part of the
             // Fast Pair flow. As such, the inspect data is saved.
-            self.inspect_node.record_finished_procedure(id, fasync::Time::now());
+            self.inspect_node.record_finished_procedure(id, fasync::MonotonicInstant::now());
             let _ = self.cancel_pairing_procedure(&id);
         }
     }
@@ -1440,7 +1443,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn procedure_terminates_after_timer_completes() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
         let id = PeerId(123);
         let procedure = Procedure::new(id, keys::tests::example_aes_key());
@@ -1449,7 +1452,7 @@ pub(crate) mod tests {
 
         // Advancing time by less than the deadline means the Procedure Future isn't done.
         let half_dur = Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION / 2;
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
         assert!(!exec.wake_expired_timers());
         let _ = exec.run_until_stalled(&mut procedure).expect_pending("deadline not reached");
 
@@ -1459,12 +1462,12 @@ pub(crate) mod tests {
 
         // Even though the original deadline was met, the procedure should still be active since it
         // has a new deadline.
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
         assert!(!exec.wake_expired_timers());
         let _ = exec.run_until_stalled(&mut procedure).expect_pending("deadline not reached");
 
         // Deadline reached - procedure should resolve.
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
         assert!(exec.wake_expired_timers());
         let finished_id = exec.run_until_stalled(&mut procedure).expect("deadline reached");
         assert_eq!(finished_id, id);
@@ -1473,7 +1476,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn procedure_evicted_after_deadline() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
         let setup_fut = MockPairing::new_with_manager();
         let mut setup_fut = pin!(setup_fut);
@@ -1496,7 +1499,7 @@ pub(crate) mod tests {
 
         // Deadline not reached yet - procedure is still in progress.
         let half_dur = Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION / 2;
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
         assert!(!exec.wake_expired_timers());
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         assert_matches!(manager.key_for_procedure(&id), Some(_));
@@ -1510,7 +1513,9 @@ pub(crate) mod tests {
 
         // Advancing time to the deadline should evict the procedure - shared secret no longer
         // available.
-        exec.set_fake_time(fasync::Time::after(Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION,
+        ));
         assert!(exec.wake_expired_timers());
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         assert_matches!(manager.key_for_procedure(&id), None);
@@ -1587,7 +1592,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn procedure_without_name_write_evicted_after_deadline() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
         let setup_fut = MockPairing::new_with_manager();
         let mut setup_fut = pin!(setup_fut);
@@ -1609,7 +1614,7 @@ pub(crate) mod tests {
 
         // Deadline not reached yet - procedure is still in progress.
         let half_dur = Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION / 2;
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
         assert!(!exec.wake_expired_timers());
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         assert_matches!(manager.key_for_procedure(&id), Some(_));
@@ -1641,7 +1646,9 @@ pub(crate) mod tests {
 
         // The peer doesn't optionally set the device name. After the deadline, the procedure should
         // be completed and cleaned up.
-        exec.set_fake_time(fasync::Time::after(Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            Procedure::DEFAULT_PROCEDURE_TIMEOUT_DURATION,
+        ));
         assert!(exec.wake_expired_timers());
         let _ = exec.run_until_stalled(&mut manager.next()).expect_pending("no stream item");
         assert_matches!(manager.key_for_procedure(&id), None);
@@ -1721,7 +1728,7 @@ pub(crate) mod tests {
     #[test]
     fn pairing_manager_inspect_tree() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000_000_000));
         let inspect = inspect::Inspector::default();
         let mut pairing_inspect =
             PairingManagerInspect::default().with_inspect(inspect.root(), "pairing").unwrap();
@@ -1752,8 +1759,8 @@ pub(crate) mod tests {
         });
 
         // Procedure finishes some time later.
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
-        pairing_inspect.record_finished_procedure(id, fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
+        pairing_inspect.record_finished_procedure(id, fasync::MonotonicInstant::now());
         assert_data_tree!(inspect, root: {
             pairing: {
                 owner: "Upstream",

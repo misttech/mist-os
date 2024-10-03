@@ -148,7 +148,7 @@ impl<T, I: ImmutableDataInspect<T>> InspectData<T> for I {
 /// The values associated with a data transfer.
 struct DataTransferStats {
     /// The time at which the data transfer was recorded.
-    time: fasync::Time,
+    time: fasync::MonotonicInstant,
     /// The elapsed amount of time (nanos) the data transfer took place over.
     elapsed: std::num::NonZeroU64,
     /// The bytes transferred.
@@ -180,7 +180,7 @@ pub struct DataStreamInspect {
     start_time_prop: Option<fuchsia_inspect_contrib::nodes::TimeProperty>,
     /// Time that we were last started.  Used to calculate seconds running.
     #[inspect(skip)]
-    started: Option<fasync::Time>,
+    started: Option<fasync::MonotonicInstant>,
     /// Seconds that this stream has been active, measured from the start time to the last
     /// recorded transfer.
     streaming_secs: inspect::UintProperty,
@@ -192,7 +192,7 @@ pub struct DataStreamInspect {
 
 impl DataStreamInspect {
     pub fn start(&mut self) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         if let Some(prop) = &self.start_time_prop {
             prop.set_at(now.into());
         } else {
@@ -211,7 +211,7 @@ impl DataStreamInspect {
     /// has never been called.
     /// Does nothing if this stream has never been started or if the provided `at` time
     /// is in the past relative to the `last_update` time.
-    pub fn record_transferred(&mut self, bytes: usize, at: fasync::Time) {
+    pub fn record_transferred(&mut self, bytes: usize, at: fasync::MonotonicInstant) {
         let (elapsed, current_bytes) = match self.last_update {
             Some(DataTransferStats { time: last, .. }) if at > last => {
                 // A new data transfer - calculate the new elapsed time interval.
@@ -298,7 +298,7 @@ mod tests {
         curr_time: i64,
     ) -> (fasync::TestExecutor, fuchsia_inspect::Inspector, DataStreamInspect) {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(curr_time));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(curr_time));
         let inspector = fuchsia_inspect::Inspector::default();
         let d = DataStreamInspect::default()
             .with_inspect(inspector.root(), "data_stream")
@@ -321,7 +321,7 @@ mod tests {
         });
 
         // Recording a data transfer before start() has no effect.
-        d.record_transferred(1, fasync::Time::now());
+        d.record_transferred(1, fasync::MonotonicInstant::now());
         assert_data_tree!(inspector, root: {
             data_stream: {
                 total_bytes: 0 as u64,
@@ -348,7 +348,7 @@ mod tests {
 
         // Recording a data transfer with an older time has no effect.
         let time_from_past = curr_time - 10;
-        d.record_transferred(1, fasync::Time::from_nanos(time_from_past));
+        d.record_transferred(1, fasync::MonotonicInstant::from_nanos(time_from_past));
         assert_data_tree!(inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
@@ -376,7 +376,7 @@ mod tests {
 
         // Although unlikely, recording a data transfer at the same instantaneous moment as starting
         // is OK.
-        d.record_transferred(5, fasync::Time::from_nanos(curr_time));
+        d.record_transferred(5, fasync::MonotonicInstant::from_nanos(curr_time));
         assert_data_tree!(inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
@@ -406,7 +406,7 @@ mod tests {
         exec.set_fake_time(zx::Duration::from_millis(500).after_now());
 
         // If we transferred 500 bytes then, we should have 1000 bytes per second.
-        d.record_transferred(500, fasync::Time::now());
+        d.record_transferred(500, fasync::MonotonicInstant::now());
         assert_data_tree!(inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
@@ -418,7 +418,7 @@ mod tests {
 
         // In 5 seconds, we transfer 500 more bytes which is much slower.
         exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
-        d.record_transferred(500, fasync::Time::now());
+        d.record_transferred(500, fasync::MonotonicInstant::now());
         assert_data_tree!(inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
@@ -429,7 +429,7 @@ mod tests {
         });
 
         // Receiving another update at the same time is OK.
-        d.record_transferred(900, fasync::Time::now());
+        d.record_transferred(900, fasync::MonotonicInstant::now());
         assert_data_tree!(inspector, root: {
             data_stream: {
                 start_time: 5_678900000i64,
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_calculate_throughput() {
-        let time = fasync::Time::from_nanos(1_000_000_000);
+        let time = fasync::MonotonicInstant::from_nanos(1_000_000_000);
         // No throughput.
         let bytes = 0;
         let elapsed = std::num::NonZeroU64::new(1_000_000).unwrap();

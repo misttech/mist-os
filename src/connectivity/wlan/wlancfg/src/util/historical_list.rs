@@ -8,7 +8,7 @@ use tracing::warn;
 
 /// Trait for time function, for use in HistoricalList functions
 pub trait Timestamped {
-    fn time(&self) -> fasync::Time;
+    fn time(&self) -> fasync::MonotonicInstant;
 }
 
 /// Struct for list that stores historical data in a VecDeque, up to the some number of most
@@ -41,21 +41,25 @@ where
 
     /// Retrieve list of entries with a time more recent than earliest_time, sorted from oldest to
     /// newest. May be empty.
-    pub fn get_recent(&self, earliest_time: fasync::Time) -> Vec<T> {
+    pub fn get_recent(&self, earliest_time: fasync::MonotonicInstant) -> Vec<T> {
         let i = self.0.partition_point(|data| data.time() < earliest_time);
         return self.0.iter().skip(i).cloned().collect();
     }
 
     /// Retrieve list of entries with a time before than latest_time, sorted from oldest to
     /// newest. May be empty.
-    pub fn get_before(&self, latest_time: fasync::Time) -> Vec<T> {
+    pub fn get_before(&self, latest_time: fasync::MonotonicInstant) -> Vec<T> {
         let i = self.0.partition_point(|data| data.time() <= latest_time);
         return self.0.iter().take(i).cloned().collect();
     }
 
     /// Retrieve list of entries inclusively between latest_time and earliest_time, sorted from
     /// oldest to newest. May be empty.
-    pub fn get_between(&self, earliest_time: fasync::Time, latest_time: fasync::Time) -> Vec<T> {
+    pub fn get_between(
+        &self,
+        earliest_time: fasync::MonotonicInstant,
+        latest_time: fasync::MonotonicInstant,
+    ) -> Vec<T> {
         let i = self.0.partition_point(|data| data.time() < earliest_time);
         let j = self.0.partition_point(|data| data.time() <= latest_time);
         match j.checked_sub(i) {
@@ -76,14 +80,17 @@ mod tests {
     use super::*;
     use zx::Duration;
 
-    impl Timestamped for fasync::Time {
-        fn time(&self) -> fasync::Time {
+    impl Timestamped for fasync::MonotonicInstant {
+        fn time(&self) -> fasync::MonotonicInstant {
             *self
         }
     }
 
-    const EARLIEST_TIME: fasync::Time = fasync::Time::from_nanos(1_000_000_000);
-    fn create_test_list(earlist_time: fasync::Time) -> HistoricalList<fasync::Time> {
+    const EARLIEST_TIME: fasync::MonotonicInstant =
+        fasync::MonotonicInstant::from_nanos(1_000_000_000);
+    fn create_test_list(
+        earlist_time: fasync::MonotonicInstant,
+    ) -> HistoricalList<fasync::MonotonicInstant> {
         HistoricalList(VecDeque::from_iter([
             earlist_time,
             earlist_time + Duration::from_seconds(1),

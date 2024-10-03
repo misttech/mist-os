@@ -246,7 +246,8 @@ async fn handle_passthrough_command<'a>(
     pressed: bool,
 ) -> Result<(), Error> {
     // Passthrough commands need to be handled in 100ms
-    let timer = fasync::Timer::new(fasync::Time::after(Duration::from_millis(100))).fuse();
+    let timer =
+        fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))).fuse();
 
     // As per Table 9.27 in AV/C 4.0, send back the state_flag, operation_id, and operation_data.
     let buf: Vec<u8> = command.body().to_vec();
@@ -383,7 +384,7 @@ async fn handle_notify_command(
     let notification_fut = delegate.send_get_notification(notify_command.event_id().into()).fuse();
     let mut notification_fut = pin!(notification_fut);
 
-    let interim_timer = fasync::Timer::new(fasync::Time::after(T_MTP)).fuse();
+    let interim_timer = fasync::Timer::new(fasync::MonotonicInstant::after(T_MTP)).fuse();
     let mut interim_timer = pin!(interim_timer);
 
     let notification: Notification = futures::select! {
@@ -685,7 +686,8 @@ async fn handle_status_command(
     let status_fut = status_fut.fuse();
     let mut status_fut = pin!(status_fut);
 
-    let interim_timer = fasync::Timer::new(fasync::Time::after(Duration::from_millis(100))).fuse();
+    let interim_timer =
+        fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))).fuse();
     let mut interim_timer = pin!(interim_timer);
 
     loop {
@@ -845,7 +847,8 @@ async fn handle_control_command(
     let control_fut = control_fut.fuse();
     let mut control_fut = pin!(control_fut);
 
-    let interim_timer = fasync::Timer::new(fasync::Time::after(Duration::from_millis(100))).fuse();
+    let interim_timer =
+        fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))).fuse();
     let mut interim_timer = pin!(interim_timer);
 
     loop {
@@ -1027,7 +1030,10 @@ mod test {
         fasync::Task::spawn(async move {
             while let Some(Ok(event)) = target_stream.next().await {
                 if stall_responses {
-                    fasync::Timer::new(fasync::Time::after(Duration::from_millis(2000000))).await;
+                    fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(
+                        2000000,
+                    )))
+                    .await;
                 }
 
                 let _result = match event {

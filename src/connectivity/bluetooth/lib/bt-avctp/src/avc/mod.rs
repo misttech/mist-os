@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async::{Time, TimeoutExt};
+use fuchsia_async::{MonotonicInstant, TimeoutExt};
 use fuchsia_bluetooth::types::Channel;
 use futures::future::Ready;
 use futures::stream::FilterMap;
@@ -248,7 +248,7 @@ impl Peer {
 
         let mut response_stream = self.inner.send_command(buf.as_slice())?;
 
-        let timeout = Time::after(Peer::passthrough_command_timeout());
+        let timeout = MonotonicInstant::after(Peer::passthrough_command_timeout());
         loop {
             if let Some(resp) = response_stream
                 .next()

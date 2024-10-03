@@ -585,7 +585,10 @@ pub(crate) mod test {
         println!("starting pong!");
         while let Some(next) = rx.next().await {
             println!("pong! {next}");
-            fuchsia_async::Timer::new(fuchsia_async::Time::after(Duration::from_seconds(1))).await;
+            fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
+                Duration::from_seconds(1),
+            ))
+            .await;
             if next > 10 {
                 println!("bye!");
                 break;

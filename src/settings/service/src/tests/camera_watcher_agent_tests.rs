@@ -12,7 +12,7 @@ use crate::service_context::ServiceContext;
 use crate::tests::fakes::camera3_service::Camera3Service;
 use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::tests::helpers::{move_executor_forward, move_executor_forward_and_get};
-use fuchsia_async::{TestExecutor, Time};
+use fuchsia_async::{MonotonicInstant, TestExecutor};
 use futures::lock::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -113,7 +113,7 @@ fn test_camera_devices_watcher_timeout() {
     // Custom executor for this test so that we can advance the clock arbitrarily and verify the
     // state of the executor at any given point.
     let mut executor = TestExecutor::new_with_fake_time();
-    executor.set_fake_time(Time::from_nanos(0));
+    executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
     let service_hub = service::MessageHub::create_hub();
 
@@ -172,7 +172,7 @@ fn test_camera_devices_watcher_timeout() {
         .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature));
 
     // Advance time past the timeout.
-    executor.set_fake_time(Time::from_nanos(CAMERA_WATCHER_TIMEOUT * 10_i64.pow(6)));
+    executor.set_fake_time(MonotonicInstant::from_nanos(CAMERA_WATCHER_TIMEOUT * 10_i64.pow(6)));
 
     let completion_future = reply_receptor.next_of::<Payload>();
     let completion =

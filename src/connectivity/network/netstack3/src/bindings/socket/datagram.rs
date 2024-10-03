@@ -630,7 +630,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             source_port: src_port.map_or(0, NonZeroU16::get),
             destination_addr: dst_ip,
             destination_port: dst_port.get(),
-            timestamp: fasync::Time::now(),
+            timestamp: fasync::MonotonicInstant::now(),
             data: body.as_ref().to_vec(),
             dscp_and_ecn: meta.dscp_and_ecn,
         };
@@ -1059,7 +1059,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             interface_id: device.bindings_id().id,
             destination_addr: dst_ip,
             destination_port: id,
-            timestamp: fasync::Time::now(),
+            timestamp: fasync::MonotonicInstant::now(),
             data: data.as_ref().to_vec(),
             dscp_and_ecn: DscpAndEcn::default(),
         };
@@ -1075,7 +1075,7 @@ struct AvailableMessage<I: Ip> {
     source_port: u16,
     destination_addr: I::Addr,
     destination_port: u16,
-    timestamp: fasync::Time,
+    timestamp: fasync::MonotonicInstant,
     data: Vec<u8>,
     dscp_and_ecn: DscpAndEcn,
 }

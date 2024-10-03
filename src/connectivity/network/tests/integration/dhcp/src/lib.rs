@@ -242,7 +242,7 @@ async fn assert_interface_assigned_addr(
         // loses the race here and only starts after the first request from the DHCP
         // client, which results in a 3 second toll. This test typically takes ~4.5
         // seconds; we apply a large multiple to be safe.
-        fuchsia_async::Time::after(zx::Duration::from_seconds(30)),
+        fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(30)),
         || Err(anyhow::anyhow!("timed out")),
     )
     .await

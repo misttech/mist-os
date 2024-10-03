@@ -2315,7 +2315,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             .and_then(|f| {
                 futures::future::ready(f.context("frame stream ended unexpectedly").map(Some))
             })
-            .on_timeout(fasync::Time::after(zx::Duration::from_millis(50)), || Ok(None))
+            .on_timeout(fasync::MonotonicInstant::after(zx::Duration::from_millis(50)), || Ok(None))
             .await
             .context("failed to read frame")?)
     }

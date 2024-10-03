@@ -33,7 +33,7 @@ async fn handle_requests_for_stream(stream: ExampleRequestStream) -> Result<(), 
                     responder.send(zx::MonotonicInstant::get().into_nanos())
                 }
                 ExampleRequest::WaitUntil { timeout, responder } => {
-                    let () = fasync::Timer::new(fasync::Time::from_zx(
+                    let () = fasync::Timer::new(fasync::MonotonicInstant::from_zx(
                         zx::MonotonicInstant::from_nanos(timeout),
                     ))
                     .await;

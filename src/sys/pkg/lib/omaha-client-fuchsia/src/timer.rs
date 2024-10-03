@@ -55,7 +55,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_timer() {
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
 
         let mut timer = FuchsiaTimer;
         let mut future = timer.wait_for(Duration::from_secs(1234));

@@ -7,7 +7,7 @@
 //! This module contains the `Timer` type which is a future that will resolve
 //! at a particular point in the future.
 
-use crate::runtime::{EHandle, Time, WakeupTime};
+use crate::runtime::{EHandle, MonotonicInstant, WakeupTime};
 use crate::PacketReceiver;
 use fuchsia_sync::Mutex;
 
@@ -32,7 +32,7 @@ pub trait TimeInterface:
     fn now() -> Self;
 }
 
-impl TimeInterface for Time {
+impl TimeInterface for MonotonicInstant {
     type Timeline = zx::MonotonicTimeline;
 
     fn into_zx(self) -> zx::MonotonicInstant {
@@ -45,21 +45,21 @@ impl TimeInterface for Time {
 }
 
 impl WakeupTime for std::time::Instant {
-    fn into_time(self) -> Time {
+    fn into_time(self) -> MonotonicInstant {
         let now_as_instant = std::time::Instant::now();
-        let now_as_time = Time::now();
+        let now_as_time = MonotonicInstant::now();
         now_as_time + self.saturating_duration_since(now_as_instant).into()
     }
 }
 
-impl WakeupTime for Time {
-    fn into_time(self) -> Time {
+impl WakeupTime for MonotonicInstant {
+    fn into_time(self) -> MonotonicInstant {
         self
     }
 }
 
 impl WakeupTime for zx::MonotonicInstant {
-    fn into_time(self) -> Time {
+    fn into_time(self) -> MonotonicInstant {
         self.into()
     }
 }
@@ -91,7 +91,7 @@ impl Timer {
 
     /// Reset the `Timer` to a fire at a new time.
     /// The `Timer` must have already fired since last being reset.
-    pub fn reset(&mut self, time: Time) {
+    pub fn reset(&mut self, time: MonotonicInstant) {
         assert!(self.did_fire());
         self.waker_and_bool.1.store(false, Ordering::SeqCst);
         EHandle::local().register_timer(time, self.handle());
@@ -151,14 +151,14 @@ impl TimerHandle {
 #[must_use = "streams do nothing unless polled"]
 pub struct Interval {
     timer: Timer,
-    next: Time,
+    next: MonotonicInstant,
     duration: zx::Duration,
 }
 
 impl Interval {
     /// Create a new `Interval` which yields every `duration`.
     pub fn new(duration: zx::Duration) -> Self {
-        let next = Time::after(duration);
+        let next = MonotonicInstant::after(duration);
         Interval { timer: Timer::new(next), next, duration }
     }
 }
@@ -237,7 +237,7 @@ impl<T: TimeInterface> Inner<T> {
     }
 }
 
-impl TimerHeap<Time> {
+impl TimerHeap<MonotonicInstant> {
     pub fn new(port_key: u64, fake: bool) -> Self {
         Self {
             inner: Mutex::new(Inner {
@@ -403,8 +403,8 @@ mod test {
     #[test]
     fn shorter_fires_first() {
         let mut exec = LocalExecutor::new();
-        let shorter = Timer::new(Time::after(Duration::from_millis(100)));
-        let longer = Timer::new(Time::after(Duration::from_seconds(1)));
+        let shorter = Timer::new(MonotonicInstant::after(Duration::from_millis(100)));
+        let longer = Timer::new(MonotonicInstant::after(Duration::from_seconds(1)));
         match exec.run_singlethreaded(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -414,8 +414,8 @@ mod test {
     #[test]
     fn shorter_fires_first_multithreaded() {
         let mut exec = SendExecutor::new(4);
-        let shorter = Timer::new(Time::after(Duration::from_millis(100)));
-        let longer = Timer::new(Time::after(Duration::from_seconds(1)));
+        let shorter = Timer::new(MonotonicInstant::after(Duration::from_millis(100)));
+        let longer = Timer::new(MonotonicInstant::after(Duration::from_seconds(1)));
         match exec.run(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -425,8 +425,8 @@ mod test {
     #[test]
     fn fires_after_timeout() {
         let mut exec = TestExecutor::new_with_fake_time();
-        exec.set_fake_time(Time::from_nanos(0));
-        let deadline = Time::after(Duration::from_seconds(5));
+        exec.set_fake_time(MonotonicInstant::from_nanos(0));
+        let deadline = MonotonicInstant::after(Duration::from_seconds(5));
         let mut future = Timer::new(deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         exec.set_fake_time(deadline);
@@ -436,7 +436,7 @@ mod test {
     #[test]
     fn timer_before_now_fires_immediately() {
         let mut exec = TestExecutor::new();
-        let now = Time::now();
+        let now = MonotonicInstant::now();
         let before = Timer::new(now - Duration::from_nanos(1));
         let after = Timer::new(now + Duration::from_nanos(1));
         assert_matches!(
@@ -449,7 +449,7 @@ mod test {
     #[test]
     fn interval() {
         let mut exec = TestExecutor::new_with_fake_time();
-        let start = Time::from_nanos(0);
+        let start = MonotonicInstant::from_nanos(0);
         exec.set_fake_time(start);
 
         let counter = Arc::new(::std::sync::atomic::AtomicUsize::new(0));
@@ -489,12 +489,12 @@ mod test {
     #[test]
     fn timer_fake_time() {
         let mut exec = TestExecutor::new_with_fake_time();
-        exec.set_fake_time(Time::from_nanos(0));
+        exec.set_fake_time(MonotonicInstant::from_nanos(0));
 
-        let mut timer = Timer::new(Time::after(Duration::from_seconds(1)));
+        let mut timer = Timer::new(MonotonicInstant::after(Duration::from_seconds(1)));
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut timer));
 
-        exec.set_fake_time(Time::after(Duration::from_seconds(1)));
+        exec.set_fake_time(MonotonicInstant::after(Duration::from_seconds(1)));
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut timer));
     }
 }

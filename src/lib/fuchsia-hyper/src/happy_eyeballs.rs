@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::connect_and_bind_device;
-use fuchsia_async::{net, Time, Timer};
+use fuchsia_async::{net, MonotonicInstant, Timer};
 
 use futures::future::{Fuse, Future, FutureExt};
 use futures::stream::{FuturesUnordered, Stream};
@@ -147,8 +147,8 @@ where
     timer: Fuse<Timer>,
     min_conn_att_delay: zx::Duration,
     conn_att_delay: zx::Duration,
-    last_wake: Time,
-    next_wake: Time,
+    last_wake: MonotonicInstant,
+    next_wake: MonotonicInstant,
     err: Option<io::Error>,
     bind_device: Option<String>,
 }
@@ -161,9 +161,10 @@ impl<C: SocketConnector> Inner<C> {
         conn_att_delay: zx::Duration,
         bind_device: Option<&str>,
     ) -> Self {
-        let last_wake = Time::now();
-        let first_deadline =
-            Time::from_nanos(last_wake.into_nanos().saturating_add(conn_att_delay.into_nanos()));
+        let last_wake = MonotonicInstant::now();
+        let first_deadline = MonotonicInstant::from_nanos(
+            last_wake.into_nanos().saturating_add(conn_att_delay.into_nanos()),
+        );
 
         let mut inner = Inner {
             addrs,
@@ -250,7 +251,7 @@ impl<C: SocketConnector> Inner<C> {
                             // optimization, we try to initiate the next connection at the
                             // earliest allowable moment by constraining our timer to fire
                             // after the minimum interval past its last fire time.
-                            let next_deadline = Time::from_nanos(
+                            let next_deadline = MonotonicInstant::from_nanos(
                                 self.last_wake
                                     .into_nanos()
                                     .saturating_add(self.min_conn_att_delay.into_nanos()),
@@ -307,8 +308,8 @@ impl<C: SocketConnector> Future for Inner<C> {
 
                         // Only re-arm the timer if we have another address to try.
                         if self.addrs.peek().is_some() {
-                            self.last_wake = Time::now();
-                            let next_deadline = Time::from_nanos(
+                            self.last_wake = MonotonicInstant::now();
+                            let next_deadline = MonotonicInstant::from_nanos(
                                 self.last_wake
                                     .into_nanos()
                                     .saturating_add(self.conn_att_delay.into_nanos()),
@@ -428,7 +429,7 @@ mod test {
                         .take()
                         .expect("that the pseudo-connection wasn't already acquired")),
                     Class::DelayedConnectable { delay } => {
-                        let () = Timer::new(Time::after(delay)).await;
+                        let () = Timer::new(MonotonicInstant::after(delay)).await;
 
                         inner.lock().events.push(Event::DelayFinished { addr });
 
@@ -889,7 +890,7 @@ mod test {
         let bh_v6 = (Ipv6Addr::LOCALHOST, 8004).into();
 
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let () = executor.set_fake_time(Time::from_nanos(0));
+        let () = executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let mut connector = TestEnvConnector::new(Some(server_addr))
             .add_classified_addrs(Class::Connectable, vec![server_addr])
@@ -1050,7 +1051,7 @@ mod test {
         };
 
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let () = executor.set_fake_time(Time::from_nanos(0));
+        let () = executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         // First, test that we'll try to connect to IPv4 first if it's first in the list.
         let mut connector = TestEnvConnector::new(Some(server_addr))
@@ -1097,7 +1098,7 @@ mod test {
         let bh_addr = (Ipv4Addr::LOCALHOST, 8001).into();
 
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let () = executor.set_fake_time(Time::from_nanos(0));
+        let () = executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let delay = RECOMMENDED_CONN_ATT_DELAY + zx::Duration::from_millis(5);
 
@@ -1158,7 +1159,7 @@ mod test {
         let bh_addr = (Ipv4Addr::LOCALHOST, 8002).into();
 
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let () = executor.set_fake_time(Time::from_nanos(0));
+        let () = executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let mut connector = TestEnvConnector::new(Some(server_addr))
             .add_classified_addrs(Class::NotListening, vec![nl_addr])
@@ -1216,7 +1217,7 @@ mod test {
                 }),
             ),
         ] {
-            let () = executor.set_fake_time(Time::from_nanos(abstime.into_nanos()));
+            let () = executor.set_fake_time(MonotonicInstant::from_nanos(abstime.into_nanos()));
 
             assert_eq!(executor.wake_expired_timers(), woke);
 

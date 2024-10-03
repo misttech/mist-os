@@ -525,7 +525,7 @@ mod tests {
     }
 
     /// Set the time to `time`, and then wake any expired timers and run until the main loop stalls.
-    fn forward_time_to(exec: &mut fasync::TestExecutor, time: fasync::Time) {
+    fn forward_time_to(exec: &mut fasync::TestExecutor, time: fasync::MonotonicInstant) {
         exec.set_fake_time(time);
         let _ = exec.wake_expired_timers();
         run_to_stalled(exec);
@@ -538,7 +538,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (peers, mut prof_stream) = setup_connected_peers();
         // Initialize context to a fixed point in time.
-        exec.set_fake_time(fasync::Time::from_nanos(1000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1000000000));
         let peer_id = PeerId(1);
 
         // Simulate getting the service found event.
@@ -574,7 +574,7 @@ mod tests {
 
         // Fast forward time by 5 seconds. In this time, the remote peer has not
         // connected.
-        forward_time_to(&mut exec, fasync::Time::after(zx::Duration::from_seconds(5)));
+        forward_time_to(&mut exec, fasync::MonotonicInstant::after(zx::Duration::from_seconds(5)));
 
         // After fast forwarding time, expect and handle the `connect` request
         // because A2DP-sink should be initiating.
@@ -614,7 +614,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let (peers, mut prof_stream) = setup_connected_peers();
         // Initialize context to a fixed point in time.
-        exec.set_fake_time(fasync::Time::from_nanos(1000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1000000000));
         let peer_id = PeerId(1);
 
         // Simulate getting the service found event.
@@ -644,7 +644,7 @@ mod tests {
 
         // Fast forward time by .5 seconds. The threshold is 1 second, so the timer
         // to initiate connections has not been triggered.
-        forward_time_to(&mut exec, fasync::Time::after(zx::Duration::from_millis(500)));
+        forward_time_to(&mut exec, fasync::MonotonicInstant::after(zx::Duration::from_millis(500)));
 
         // A peer connects before the timeout.
         let (_remote, signaling) = Channel::create();
@@ -658,7 +658,10 @@ mod tests {
 
         // Fast forward time by 4.5 seconds. Ensure no outbound connection is initiated
         // by us, since the remote peer has assumed the INT role.
-        forward_time_to(&mut exec, fasync::Time::after(zx::Duration::from_millis(4500)));
+        forward_time_to(
+            &mut exec,
+            fasync::MonotonicInstant::after(zx::Duration::from_millis(4500)),
+        );
 
         let request = exec.run_until_stalled(&mut prof_stream.next());
         match request {

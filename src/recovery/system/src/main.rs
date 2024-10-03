@@ -983,7 +983,7 @@ impl RecoveryViewAssistant {
                                 metrics::RecoveryEventMetricDimensionResult::OtaStarted
                             );
 
-                            let start_time = fasync::Time::now();
+                            let start_time = fasync::MonotonicInstant::now();
 
                             // Even if stop fails, try to update anyway.
                             println!("Stopping running OTAs...");
@@ -994,7 +994,7 @@ impl RecoveryViewAssistant {
                             println!("Starting OTA process and waiting...");
                             let res = ota_manager.start_and_wait_for_result().await;
 
-                            let end_time = fasync::Time::now();
+                            let end_time = fasync::MonotonicInstant::now();
                             let elapsed_time = (end_time - start_time).into_seconds();
 
                             match res {

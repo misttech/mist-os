@@ -31,7 +31,7 @@ const DELAY: zx::Duration = zx::Duration::from_seconds(5);
 // bug is fixed.  It can't work in 100% of the cases, and it can't work 100%
 // reliably regardless of the value of DELAY.
 async fn wait_for_editor_binding() {
-    fasync::Timer::new(fasync::Time::after(DELAY)).await;
+    fasync::Timer::new(fasync::MonotonicInstant::after(DELAY)).await;
 }
 
 #[fasync::run_singlethreaded(test)]

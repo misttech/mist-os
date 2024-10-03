@@ -263,11 +263,11 @@ struct RemotePeer {
 
     /// The timestamp of the last known control connection. Used to resolve simultaneous control
     /// channel connections.
-    last_control_connected_time: Option<fasync::Time>,
+    last_control_connected_time: Option<fasync::MonotonicInstant>,
 
     /// The timestamp of the last known browse connection. Used to resolve simultaneous browse
     /// channel connections.
-    last_browse_connected_time: Option<fasync::Time>,
+    last_browse_connected_time: Option<fasync::MonotonicInstant>,
 
     /// Most recent notification values from the peer. Used to notify new controller listeners to
     /// the current state of the peer.
@@ -493,7 +493,7 @@ impl RemotePeer {
     }
 
     fn set_control_connection(&mut self, peer: AvcPeer) {
-        let current_time = fasync::Time::now();
+        let current_time = fasync::MonotonicInstant::now();
         trace!("Set control connection for {} at: {}", self.peer_id, current_time.into_nanos());
 
         // If the current connection establishment is within a threshold amount of time from the
@@ -550,7 +550,7 @@ impl RemotePeer {
     }
 
     fn set_browse_connection(&mut self, peer: AvctpPeer) {
-        let current_time = fasync::Time::now();
+        let current_time = fasync::MonotonicInstant::now();
         trace!("Set browse connection for {} at: {}", self.peer_id, current_time.into_nanos());
 
         // If the current connection establishment is within a threshold amount of time from the
@@ -988,7 +988,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn trigger_connection_test() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(1);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1051,7 +1051,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn trigger_connections_test() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(1);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1132,7 +1132,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn test_peer_reconnection() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(123);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1202,7 +1202,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn test_simultaneous_control_connections() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(123);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1284,7 +1284,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn test_connection_no_retries() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(123);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1392,7 +1392,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn test_simultaneous_browse_connections() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(123);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1499,7 +1499,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn incoming_channel_resets_connections() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(1);
         let (peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -1586,7 +1586,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn incoming_browse_channel_dropped() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(1);
         let (peer_handle, _target_delegate, mut _profile_requests) = setup_remote_peer(id);
@@ -1616,7 +1616,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn test_incoming_connections() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(123);
         let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);
@@ -1699,7 +1699,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn outgoing_connection_error_updates_inspect() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(30789);
         let (mut peer_handle, _target_delegate, mut profile_requests) = setup_remote_peer(id);
@@ -2038,7 +2038,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn incoming_control_command_loop_exits_gracefully() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(842);
         let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);
@@ -2083,7 +2083,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn incoming_browse_command_loop_exits_gracefully() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000000000));
 
         let id = PeerId(842);
         let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);

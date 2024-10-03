@@ -8,7 +8,7 @@ use crate::UpdateState;
 use anyhow::{bail, format_err, Context, Error};
 use fidl::{persist, unpersist, Persistable, Status};
 use fidl_fuchsia_io::DirectoryProxy;
-use fuchsia_async::{Task, Time, Timer};
+use fuchsia_async::{MonotonicInstant, Task, Timer};
 use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
 use fuchsia_fs::OpenFlags;
@@ -198,7 +198,7 @@ impl FidlStorage {
         // The time of the last flush. Initialized to MIN_FLUSH_INTERVAL_MS before the
         // current time so that the first flush always goes through, no matter the
         // timing.
-        let mut last_flush: Time = Time::now() - MIN_FLUSH_DURATION;
+        let mut last_flush: MonotonicInstant = MonotonicInstant::now() - MIN_FLUSH_DURATION;
 
         // Timer for flush cooldown. OptionFuture allows us to wait on the future even
         // if it's None.
@@ -220,7 +220,7 @@ impl FidlStorage {
                     }
 
                     // Received a request to do a flush.
-                    let now = Time::now();
+                    let now = MonotonicInstant::now();
                     let next_flush_time = if now - last_flush > MIN_FLUSH_DURATION {
                         // Last flush happened more than MIN_FLUSH_INTERVAL_MS ago,
                         // flush immediately in next iteration of loop.
@@ -251,7 +251,7 @@ impl FidlStorage {
                                     .saturating_mul(MIN_FLUSH_INTERVAL_MS)
                                     .min(MAX_FLUSH_INTERVAL_MS)
                             );
-                            let next_flush_time = Time::now() + flush_duration;
+                            let next_flush_time = MonotonicInstant::now() + flush_duration;
                             tracing::error!(
                                 "Failed to sync write to disk for {:?}, delaying by {:?}, \
                                     caused by: {:?}",
@@ -266,7 +266,7 @@ impl FidlStorage {
                             retries += 1;
                             continue;
                         }
-                        last_flush = Time::now();
+                        last_flush = MonotonicInstant::now();
                         has_pending_flush = false;
                         retrying = false;
                         retries = 0;
@@ -710,7 +710,7 @@ mod tests {
     fn test_first_write_syncs_immediately() {
         let written_value = VALUE1;
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(Time::from_nanos(0));
+        executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let storage_dir = open_tempdir(&tempdir);
@@ -762,7 +762,7 @@ mod tests {
         let written_value = VALUE1;
         let second_value = VALUE2;
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(Time::from_nanos(0));
+        executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let storage_dir = open_tempdir(&tempdir);
@@ -828,11 +828,11 @@ mod tests {
         );
 
         // Move executor to just before sync interval.
-        executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
+        executor.set_fake_time(MonotonicInstant::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
         assert!(!executor.wake_expired_timers());
 
         // Move executor to just after sync interval. It should run now.
-        executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
+        executor.set_fake_time(MonotonicInstant::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
         run_until_ready(&mut executor, &mut sync_receiver.next()).expect("directory never synced");
 
         // Validate that the file has been synced.
@@ -897,7 +897,7 @@ mod tests {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(Time::from_nanos(0));
+        executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let storage_dir = open_tempdir(&tempdir);
@@ -975,7 +975,7 @@ mod tests {
         );
 
         // Move clock to just before sync interval.
-        executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
+        executor.set_fake_time(MonotonicInstant::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
         assert!(!executor.wake_expired_timers());
 
         // And validate that the data has still not been synced to disk.
@@ -987,7 +987,7 @@ mod tests {
         );
 
         // Move executor to just after sync interval.
-        executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
+        executor.set_fake_time(MonotonicInstant::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
         run_until_ready(&mut executor, sync_receiver.next()).expect("directory never synced");
 
         // Validate that the file has finally been synced.
@@ -1018,7 +1018,7 @@ mod tests {
     #[test_case(14, 1_800_000)]
     fn test_exponential_backoff(retry_count: usize, max_wait_time: usize) {
         let mut executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(Time::from_nanos(0));
+        executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let storage_dir = open_tempdir(&tempdir);
@@ -1052,7 +1052,7 @@ mod tests {
         ));
         futures::pin_mut!(task);
 
-        executor.set_fake_time(Time::from_nanos(0));
+        executor.set_fake_time(MonotonicInstant::from_nanos(0));
         sender.unbounded_send(()).expect("can send flush signal");
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
@@ -1063,7 +1063,7 @@ mod tests {
             (2_i64.pow(i as u32) * MIN_FLUSH_INTERVAL_MS).min(max_wait_time as i64) * 1_000_000
                 - (i == retry_count - 1) as i64
         }) {
-            executor.set_fake_time(Time::from_nanos(clock_nanos));
+            executor.set_fake_time(MonotonicInstant::from_nanos(clock_nanos));
             // Task should not complete while retrying.
             assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
@@ -1074,7 +1074,7 @@ mod tests {
             clock_nanos += new_duration;
         }
 
-        executor.set_fake_time(Time::from_nanos(clock_nanos));
+        executor.set_fake_time(MonotonicInstant::from_nanos(clock_nanos));
         // At this point the clock should be 1ns before the timer, so it shouldn't wake.
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
@@ -1084,7 +1084,7 @@ mod tests {
 
         // Now pass the timer where we can read the result.
         clock_nanos += 1;
-        executor.set_fake_time(Time::from_nanos(clock_nanos));
+        executor.set_fake_time(MonotonicInstant::from_nanos(clock_nanos));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
         run_until_ready(&mut executor, sync_receiver.next()).expect("directory never synced");
 

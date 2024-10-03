@@ -11,7 +11,7 @@ use bitfield::bitfield;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_fido_report::{CtapHidCommand, SecurityKeyDeviceMarker};
-use fuchsia_async::{Time, TimeoutExt};
+use fuchsia_async::{MonotonicInstant, TimeoutExt};
 use futures::lock::Mutex;
 use futures::TryFutureExt;
 use lazy_static::lazy_static;
@@ -168,7 +168,7 @@ impl<C: Connection, R: Rng> Device<C, R> {
 
         let message_response = connection
             .read_message(init_channel)
-            .on_timeout(Time::after(*TRANSACTION_TIMEOUT), || {
+            .on_timeout(MonotonicInstant::after(*TRANSACTION_TIMEOUT), || {
                 Err(format_err!("Timed out waiting for valid init response"))
             })
             .await?;
@@ -259,7 +259,7 @@ impl<C: Connection, R: Rng> Device<C, R> {
         let receive_result = self
             .receive_message()
             .map_ok(|message| Some(message))
-            .on_timeout(Time::after(*TRANSACTION_TIMEOUT), || Ok(None))
+            .on_timeout(MonotonicInstant::after(*TRANSACTION_TIMEOUT), || Ok(None))
             .await;
         match receive_result {
             Err(err) => {

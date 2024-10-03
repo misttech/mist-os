@@ -619,12 +619,12 @@ async fn connected_state(
     mut options: ConnectedOptions,
 ) -> Result<State, ExitReason> {
     debug!("Entering connected state");
-    let mut connect_start_time = fasync::Time::now();
+    let mut connect_start_time = fasync::MonotonicInstant::now();
 
     // Tracked signals
     let mut past_signals = HistoricalList::new(NUM_PAST_SCORES);
     past_signals.add(types::TimestampedSignal {
-        time: fasync::Time::now(),
+        time: fasync::MonotonicInstant::now(),
         signal: options.ap_state.tracked.signal,
     });
 
@@ -668,7 +668,7 @@ async fn connected_state(
                                 // This OnConnectResult should be for reconnecting to the same AP,
                                 // so keep the same SignalData but reset the connect start time
                                 // to track as a new connection.
-                                connect_start_time = fasync::Time::now();
+                                connect_start_time = fasync::MonotonicInstant::now();
                             }
 
                             notify_when_reconnect_detected(&common_options, &options, result);
@@ -682,7 +682,7 @@ async fn connected_state(
                             if roam_succeeded {
                                 // Successful roam indicates connection to a different AP, so reset the connect
                                 // start time to track as a new connection.
-                                connect_start_time = fasync::Time::now();
+                                connect_start_time = fasync::MonotonicInstant::now();
 
                                 let bss_description = match result.bss_description {
                                     Some(ref bss_description) => bss_description,
@@ -716,7 +716,7 @@ async fn connected_state(
                             if !connected {
                                 warn!("Roam attempt failed, original association not maintained, disconnecting");
 
-                                let now = fasync::Time::now();
+                                let now = fasync::MonotonicInstant::now();
                                 let disconnect_source = match result.disconnect_info {
                                     Some(info) => info.disconnect_source,
                                     // RoamResult should always have a source if roam failed, but
@@ -744,7 +744,7 @@ async fn connected_state(
 
                             // Update list of signals
                             past_signals.add(types::TimestampedSignal {
-                                time: fasync::Time::now(),
+                                time: fasync::MonotonicInstant::now(),
                                 signal: ind.into(),
                             });
 
@@ -863,7 +863,7 @@ async fn connected_state(
             () = connect_duration_metric_timer => {
                 // Log the average connection score metric for a long duration connection.
                 common_options.telemetry_sender.send(TelemetryEvent::LongDurationSignals{
-                    signals: past_signals.get_before(fasync::Time::now())
+                    signals: past_signals.get_before(fasync::MonotonicInstant::now())
                 });
             }
             roam_request = roam_receiver.select_next_some() => {
@@ -881,12 +881,12 @@ async fn connected_state(
 async fn notify_when_disconnect_detected(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::Time,
+    connect_start_time: fasync::MonotonicInstant,
     fidl_info: fidl_sme::DisconnectInfo,
     past_signals: HistoricalList<types::TimestampedSignal>,
 ) {
     // Log a disconnect in Cobalt
-    let now = fasync::Time::now();
+    let now = fasync::MonotonicInstant::now();
     let info = DisconnectInfo {
         connected_duration: now - connect_start_time,
         is_sme_reconnecting: fidl_info.is_sme_reconnecting,
@@ -914,11 +914,11 @@ async fn notify_when_disconnect_detected(
 async fn record_disconnect(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::Time,
+    connect_start_time: fasync::MonotonicInstant,
     reason: types::DisconnectReason,
     signal: types::Signal,
 ) {
-    let curr_time = fasync::Time::now();
+    let curr_time = fasync::MonotonicInstant::now();
     let uptime = curr_time - connect_start_time;
     let data = PastConnectionData::new(
         options.ap_state.original().bssid,
@@ -986,11 +986,11 @@ fn notify_on_channel_switch(
 async fn notify_on_manual_disconnect(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::Time,
+    connect_start_time: fasync::MonotonicInstant,
     past_signals: HistoricalList<types::TimestampedSignal>,
     reason: types::DisconnectReason,
 ) {
-    let now = fasync::Time::now();
+    let now = fasync::MonotonicInstant::now();
 
     record_disconnect(
         common_options,
@@ -1019,11 +1019,11 @@ async fn notify_on_manual_disconnect(
 async fn notify_on_manual_connect(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::Time,
+    connect_start_time: fasync::MonotonicInstant,
     past_signals: HistoricalList<types::TimestampedSignal>,
     reason: types::DisconnectReason,
 ) {
-    let now = fasync::Time::now();
+    let now = fasync::MonotonicInstant::now();
 
     record_disconnect(
         common_options,
@@ -1390,7 +1390,7 @@ mod tests {
     #[fuchsia::test]
     fn connecting_state_successfully_scans_and_connects() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(123));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(123));
         let mut test_values = test_setup();
 
         let connect_selection = generate_connect_selection();
@@ -1427,7 +1427,7 @@ mod tests {
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
                 assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 // Send connection response.
-                exec.set_fake_time(fasync::Time::after(time_to_connect));
+                exec.set_fake_time(fasync::MonotonicInstant::after(time_to_connect));
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
                 ctrl
@@ -1527,7 +1527,7 @@ mod tests {
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: types::Bssid::from(bss_description.bssid),
-                disconnect_time: fasync::Time::now(),
+                disconnect_time: fasync::MonotonicInstant::now(),
                 connection_uptime: zx::Duration::from_minutes(0),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
                 signal_at_disconnect: types::Signal {
@@ -1999,7 +1999,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_gets_disconnect_request() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2027,7 +2027,7 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        let disconnect_time = fasync::Time::after(zx::Duration::from_hours(12));
+        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2041,7 +2041,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Run forward to get post connection signals metrics
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::Duration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2050,7 +2050,7 @@ mod tests {
         });
 
         // Run forward to get long duration signals metrics
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2138,7 +2138,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_records_unexpected_disconnect() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2185,7 +2185,7 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        let disconnect_time = fasync::Time::after(zx::Duration::from_hours(12));
+        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
         exec.set_fake_time(disconnect_time);
 
         // SME notifies Policy of disconnection
@@ -2234,7 +2234,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_reconnect_resets_connected_duration() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2262,7 +2262,7 @@ mod tests {
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
 
-        let disconnect_time = fasync::Time::after(zx::Duration::from_hours(12));
+        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2276,7 +2276,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Run forward to get post connection score metrics
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::Duration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2285,7 +2285,7 @@ mod tests {
         });
 
         // Run forward to get long duration signals metrics
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2313,7 +2313,7 @@ mod tests {
         });
 
         // SME notifies Policy of reconnection successful
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
         let connect_result =
             fidl_sme::ConnectResult { is_reconnect: true, ..fake_successful_connect_result() };
         connect_txn_handle
@@ -2327,7 +2327,7 @@ mod tests {
         );
 
         // SME notifies Policy of another disconnection
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_hours(2)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_hours(2)));
         let is_sme_reconnecting = false;
         let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
@@ -2346,7 +2346,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_records_unexpected_disconnect_unspecified_bss() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let connection_attempt_time = fasync::Time::from_nanos(0);
+        let connection_attempt_time = fasync::MonotonicInstant::from_nanos(0);
         exec.set_fake_time(connection_attempt_time);
         let mut test_values = test_setup();
 
@@ -2378,7 +2378,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         let time_to_connect = zx::Duration::from_seconds(10);
-        exec.set_fake_time(fasync::Time::after(time_to_connect));
+        exec.set_fake_time(fasync::MonotonicInstant::after(time_to_connect));
 
         // Process connect request sent to SME
         let connect_txn_handle = assert_variant!(
@@ -2396,7 +2396,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         // SME notifies Policy of disconnection.
-        let disconnect_time = fasync::Time::after(zx::Duration::from_hours(5));
+        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(5));
         exec.set_fake_time(disconnect_time);
         let is_sme_reconnecting = false;
         connect_txn_handle
@@ -2434,7 +2434,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_gets_duplicate_connect_selection() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
@@ -2479,7 +2479,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_gets_different_connect_selection() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -2512,7 +2512,7 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        let disconnect_time = fasync::Time::after(zx::Duration::from_hours(12));
+        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2526,7 +2526,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Run forward to get post connection signals metrics
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::Duration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2535,7 +2535,7 @@ mod tests {
         });
 
         // Run forward to get long duration signals metrics
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2804,7 +2804,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         // Set the start time of the connection
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         exec.set_fake_time(start_time);
 
         let (connect_txn_proxy, connect_txn_stream) =
@@ -2892,7 +2892,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_on_signal_report() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
 
@@ -3013,7 +3013,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_on_channel_switched() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -3096,7 +3096,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_on_roam_result_success() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -3165,7 +3165,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_on_roam_result_failed_original_association_maintained() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -3229,7 +3229,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_on_roam_result_failed_and_disconnected() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
@@ -3719,7 +3719,7 @@ mod tests {
     #[fuchsia::test]
     fn connecting_sets_status() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let connection_attempt_time = fasync::Time::from_nanos(0);
+        let connection_attempt_time = fasync::MonotonicInstant::from_nanos(0);
         exec.set_fake_time(connection_attempt_time);
         let test_values = test_setup();
 

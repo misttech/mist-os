@@ -431,7 +431,7 @@ pub(crate) mod tests {
     /// 4) Tests neither PlayerStatus and Metadata -> No updates
     fn test_update_session_info() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
         let mut media_state = MediaState::new(session_proxy);
@@ -452,7 +452,7 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().media_info, expected_media_info);
 
         // 2. Only PlayerStatus
-        exec.set_fake_time(fasync::Time::from_nanos(654321000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(654321000));
         let mut info = fidl_media::SessionInfoDelta::default();
         info.metadata = None;
         info.player_status = Some(create_player_status());
@@ -473,7 +473,7 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().media_info, expected_media_info);
 
         // 3. Both
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
@@ -520,7 +520,7 @@ pub(crate) mod tests {
     /// 4) Normal view of the world, ask for unsupported settings.
     fn test_get_player_application_settings() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
         let mut media_state = MediaState::new(session_proxy);
@@ -536,7 +536,7 @@ pub(crate) mod tests {
         );
         assert_eq!(settings.expect("Should work"), expected_settings);
 
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
@@ -577,13 +577,13 @@ pub(crate) mod tests {
     /// returns as expected after time passes.
     fn test_get_play_status() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
         let (session_proxy, _) = create_proxy::<SessionControlMarker>().expect("Should work");
         let mut media_state = MediaState::new(session_proxy);
 
         // Add the media session status.
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
@@ -597,7 +597,7 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().get_play_status(), expected_play_status);
 
         // Fast forward time by a little bit.
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_seconds(7)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(7)));
 
         let expected_play_status =
             ValidPlayStatus::new(Some(123), Some(7055), Some(fidl_avrcp::PlaybackStatus::Playing));
@@ -610,7 +610,7 @@ pub(crate) mod tests {
             duration: Some(123456789),
             timeline_function: Some(fidl_fuchsia_media::TimelineFunction {
                 subject_time: 0,
-                reference_time: fasync::Time::now().into_nanos(),
+                reference_time: fasync::MonotonicInstant::now().into_nanos(),
                 subject_delta: 0,
                 reference_delta: 1,
             }),
@@ -630,7 +630,7 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().get_play_status(), expected_play_status);
 
         // After a couple seocnds, it should still be paused.
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_seconds(7)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(7)));
 
         assert_eq!(media_state.session_info().get_play_status(), expected_play_status);
     }
@@ -642,7 +642,7 @@ pub(crate) mod tests {
     /// 3) Query with all supported Event IDs.
     fn test_get_notification_value() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
         let (session_proxy, _) =
             create_proxy::<SessionControlMarker>().expect("Couldn't create fidl proxy.");
         let mut media_state = MediaState::new(session_proxy);
@@ -660,7 +660,7 @@ pub(crate) mod tests {
         assert_eq!(res.status, Some(fidl_avrcp::PlaybackStatus::Stopped));
 
         // 3. All supported notification events.
-        exec.set_fake_time(fasync::Time::from_nanos(555555555));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
         let info = fidl_media::SessionInfoDelta {
             metadata: Some(create_metadata()),
             player_status: Some(create_player_status()),
@@ -707,7 +707,7 @@ pub(crate) mod tests {
         }
 
         // As time passes, the position notification will change too.
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_seconds(7)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(7)));
 
         let updated_pos: fidl_avrcp::Notification = media_state
             .session_info()

@@ -100,7 +100,7 @@ fn vmo_to_topology(vmo: zx::Vmo, length: u32) -> Result<Vec<Cluster>> {
 }
 
 struct CpuLoadSample {
-    time_stamp: fasync::Time,
+    time_stamp: fasync::MonotonicInstant,
     cpu_stats: fkernel::CpuStats,
 }
 
@@ -138,11 +138,11 @@ pub struct CpuLoadLogger {
 
     /// Start time for the logger; used to calculate elapsed time.
     /// This is an exclusive start.
-    start_time: fasync::Time,
+    start_time: fasync::MonotonicInstant,
 
     /// Time at which the logger will stop.
     /// This is an exclusive end.
-    end_time: fasync::Time,
+    end_time: fasync::MonotonicInstant,
 }
 
 impl CpuLoadLogger {
@@ -161,9 +161,9 @@ impl CpuLoadLogger {
             return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
 
-        let start_time = fasync::Time::now();
-        let end_time = duration_ms.map_or(fasync::Time::INFINITE, |ms| {
-            fasync::Time::now() + zx::Duration::from_millis(ms as i64)
+        let start_time = fasync::MonotonicInstant::now();
+        let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |ms| {
+            fasync::MonotonicInstant::now() + zx::Duration::from_millis(ms as i64)
         });
         let inspect = InspectData::new(client_inspect, cpu_stats_driver.topology.clone());
 
@@ -182,10 +182,10 @@ impl CpuLoadLogger {
     pub async fn log_cpu_usages(mut self) {
         let mut interval = fasync::Interval::new(self.interval);
         // Start polling stats proxy. Logging will start at the next interval.
-        self.log_cpu_usage(fasync::Time::now()).await;
+        self.log_cpu_usage(fasync::MonotonicInstant::now()).await;
 
         while let Some(()) = interval.next().await {
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             if now >= self.end_time {
                 break;
             }
@@ -193,7 +193,7 @@ impl CpuLoadLogger {
         }
     }
 
-    async fn log_cpu_usage(&mut self, now: fasync::Time) {
+    async fn log_cpu_usage(&mut self, now: fasync::MonotonicInstant) {
         let mut hasher = DefaultHasher::new();
         self.client_id.hash(&mut hasher);
         let trace_counter_id = hasher.finish();
@@ -481,7 +481,7 @@ pub mod tests {
     impl Runner {
         fn new() -> Self {
             let executor = fasync::TestExecutor::new_with_fake_time();
-            executor.set_fake_time(fasync::Time::from_nanos(0));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
             let inspector = inspect::Inspector::default();
             let inspect_root = inspector.root().create_child("MetricsLogger");

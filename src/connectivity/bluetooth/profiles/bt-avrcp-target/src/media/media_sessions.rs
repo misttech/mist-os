@@ -332,7 +332,7 @@ impl MediaSessionsInner {
         current: Notification,
         pos_change_interval: u32,
         responder: fidl_avrcp::TargetHandlerWatchNotificationResponder,
-    ) -> Result<Option<fasync::Time>, fidl::Error> {
+    ) -> Result<Option<fasync::MonotonicInstant>, fidl::Error> {
         // If the `event_id` is not supported, reject the registration.
         if !self.get_supported_notification_events().contains(&event_id) {
             responder.send(Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter))?;
@@ -387,7 +387,7 @@ impl MediaSessionsInner {
 
         // Given the response timeout (nanos), the deadline is the `response_timeout`
         // amount of time after now.
-        let response_deadline = response_timeout.map(|t| fasync::Time::after(t));
+        let response_deadline = response_timeout.map(|t| fasync::MonotonicInstant::after(t));
 
         let data = NotificationData::new(
             event_id,

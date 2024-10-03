@@ -161,7 +161,7 @@ impl CtapAgent {
 
             match msg.event {
                 WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
-                    let curr_timestamp = fasync::Time::now().into_nanos();
+                    let curr_timestamp = fasync::MonotonicInstant::now().into_nanos();
                     self.metrics.devices_count.add(1);
                     self.metrics.time_device_seen.set(curr_timestamp);
 

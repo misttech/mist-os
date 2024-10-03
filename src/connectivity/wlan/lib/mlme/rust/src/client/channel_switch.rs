@@ -63,7 +63,7 @@ pub struct ChannelState {
     main_channel: Option<fidl_common::WlanChannel>,
     pending_channel_switch: Option<(ChannelSwitch, EventId)>,
     beacon_interval: Option<TimeUnit>,
-    last_beacon_timestamp: Option<fasync::Time>,
+    last_beacon_timestamp: Option<fasync::MonotonicInstant>,
 }
 
 pub struct BoundChannelState<'a, T> {
@@ -94,13 +94,14 @@ impl ChannelState {
         BoundChannelState { channel_state: self, actions }
     }
 
-    fn channel_switch_time_from_count(&self, channel_switch_count: u8) -> fasync::Time {
+    fn channel_switch_time_from_count(&self, channel_switch_count: u8) -> fasync::MonotonicInstant {
         let beacon_interval =
             self.beacon_interval.clone().unwrap_or(TimeUnit::DEFAULT_BEACON_INTERVAL);
         let beacon_duration = fasync::Duration::from(beacon_interval);
         let duration = beacon_duration * channel_switch_count;
-        let now = fasync::Time::now();
-        let mut last_beacon = self.last_beacon_timestamp.unwrap_or_else(|| fasync::Time::now());
+        let now = fasync::MonotonicInstant::now();
+        let mut last_beacon =
+            self.last_beacon_timestamp.unwrap_or_else(|| fasync::MonotonicInstant::now());
         // Calculate the theoretical latest beacon timestamp before now.
         // Note this may be larger than last_beacon_timestamp if a beacon frame was missed.
         while now - last_beacon > beacon_duration {
@@ -153,7 +154,7 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         header: &BeaconHdr,
         elements: &[u8],
     ) -> Result<(), anyhow::Error> {
-        self.channel_state.last_beacon_timestamp.replace(fasync::Time::now());
+        self.channel_state.last_beacon_timestamp.replace(fasync::MonotonicInstant::now());
         self.channel_state.beacon_interval.replace(header.beacon_interval);
         self.handle_channel_switch_elements_if_present(elements, false).await
     }
@@ -660,7 +661,7 @@ mod tests {
     #[derive(Debug, Copy, Clone)]
     enum ChannelAction {
         SwitchChannel(fidl_common::WlanChannel),
-        Timeout(EventId, fasync::Time),
+        Timeout(EventId, fasync::MonotonicInstant),
         DisableScanning,
         EnableScanning,
         DisableTx,
@@ -739,7 +740,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(10), CapabilityInfo(0));
-        let mut time = fasync::Time::from_nanos(0);
+        let mut time = fasync::MonotonicInstant::from_nanos(0);
         exec.set_fake_time(time);
         let mut actions = MockChannelActions::default();
 
@@ -875,9 +876,9 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(100), CapabilityInfo(0));
-        let bcn_time: fasync::Time =
-            fasync::Time::from_nanos(0) + bcn_header.beacon_interval.into();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        let bcn_time: fasync::MonotonicInstant =
+            fasync::MonotonicInstant::from_nanos(0) + bcn_header.beacon_interval.into();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let mut actions = MockChannelActions::default();
 
         // Empty beacon frame to configure beacon parameters.
@@ -939,7 +940,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut channel_state = ChannelState::default();
         let bcn_header = BeaconHdr::new(TimeUnit(100), CapabilityInfo(0));
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let mut actions = MockChannelActions::default();
 
         // Empty beacon frame to configure beacon parameters.
@@ -958,7 +959,7 @@ mod tests {
 
         // Advance time by a bit more than one beacon, simulating a missed frame.
         exec.set_fake_time(
-            fasync::Time::from_nanos(0)
+            fasync::MonotonicInstant::from_nanos(0)
                 + bcn_header.beacon_interval.into()
                 + fasync::Duration::from_micros(500),
         );
@@ -982,7 +983,7 @@ mod tests {
         // The CSA should be timed based on our best estimate of the missed beacon.
         assert_eq!(
             event_time,
-            fasync::Time::from_nanos(0) + (bcn_header.beacon_interval * 2u16).into()
+            fasync::MonotonicInstant::from_nanos(0) + (bcn_header.beacon_interval * 2u16).into()
         );
     }
 }

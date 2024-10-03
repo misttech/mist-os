@@ -568,7 +568,10 @@ mod test {
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         fasync::Task::spawn(async move {
             while stream.next().await.is_some() {
-                fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(100000))).await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
+                    100000,
+                )))
+                .await;
             }
         })
         .detach();

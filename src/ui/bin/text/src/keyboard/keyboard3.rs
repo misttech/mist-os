@@ -390,10 +390,13 @@ impl KeyListenerStore {
                     let handled = subscriber
                         .listener
                         .on_key_event(&forwarded_event)
-                        .on_timeout(fasync::Time::after(DEFAULT_LISTENER_TIMEOUT), || {
-                            tracing::info!("Key listener timeout! {:?}", subscriber.view_ref);
-                            Ok(ui_input3::KeyEventStatus::NotHandled)
-                        })
+                        .on_timeout(
+                            fasync::MonotonicInstant::after(DEFAULT_LISTENER_TIMEOUT),
+                            || {
+                                tracing::info!("Key listener timeout! {:?}", subscriber.view_ref);
+                                Ok(ui_input3::KeyEventStatus::NotHandled)
+                            },
+                        )
                         .await
                         .unwrap_or_else(|e| {
                             tracing::info!("key listener handle error: {:?}", e);
@@ -752,7 +755,7 @@ mod tests {
         assert!(matches!(exec.run_until_stalled(&mut handle_fut), Poll::Pending));
 
         // Roll time forward past the listener timeout.
-        let new_time = fasync::Time::from_nanos(
+        let new_time = fasync::MonotonicInstant::from_nanos(
             exec.now().into_nanos() + DEFAULT_LISTENER_TIMEOUT.into_nanos(),
         );
         exec.set_fake_time(new_time);

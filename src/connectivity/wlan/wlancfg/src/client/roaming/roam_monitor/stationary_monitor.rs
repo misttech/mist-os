@@ -103,7 +103,7 @@ impl StationaryMonitor {
             self.connection_data.ap_state.tracked.channel,
         ));
 
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         if roam_reasons.is_empty()
             || now
                 < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
@@ -135,7 +135,8 @@ impl StationaryMonitor {
             }
 
             // Updated fields for tracking roam scan decisions and initiated roam search.
-            self.connection_data.previous_roam_scan_data.time_prev_roam_scan = fasync::Time::now();
+            self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
+                fasync::MonotonicInstant::now();
             self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
             return RoamTriggerDataOutcome::RoamSearch(
@@ -325,7 +326,7 @@ mod test {
     #[fuchsia::test(add_test_attr = false)]
     fn test_handle_signal_report_trigger_data(test_case: HandleSignalReportTriggerDataTestCase) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         // Generate initial connection data based on test case.
         let (rssi, snr) = match test_case {
@@ -341,7 +342,7 @@ mod test {
         let mut test_values = setup_test_with_data(connection_data);
 
         // Advance the time so that we allow roam scanning,
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_hours(1)));
 
         // Generate trigger data that won't change the above values, and send to handle_roam_trigger_data
         // method.
@@ -364,7 +365,7 @@ mod test {
     #[fuchsia::test]
     fn test_minimum_time_between_roam_scans() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         // Setup monitor with connection data that would trigger a roam scan due to SNR below
         // threshold. Set the EWMA weights to 1 so the values can be easily changed later in tests.
@@ -385,7 +386,7 @@ mod test {
             });
 
         // Advance the time so that we allow roam scanning
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_hours(1)));
 
         // Send trigger data, and verify that we are told to roam search.
         assert_variant!(
@@ -394,7 +395,7 @@ mod test {
         );
 
         // Advance the time less than the minimum between roam scans.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             MIN_TIME_BETWEEN_ROAM_SCANS - fasync::Duration::from_seconds(1),
         ));
 
@@ -413,7 +414,7 @@ mod test {
         );
 
         // Advance the time past the minimum time.
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_seconds(2)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(2)));
 
         // Verify that we now are told to roam scan search.
         assert_variant!(
@@ -425,7 +426,7 @@ mod test {
     #[fuchsia::test]
     fn test_check_scan_age_rssi_change_and_new_reasons() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         // Setup monitor with connection data that would trigger a roam scan due to SNR and RSSI
         // below thresholds.
@@ -446,7 +447,7 @@ mod test {
             });
 
         // Advance the time so that we allow roam scanning.
-        let initial_time = fasync::Time::after(fasync::Duration::from_hours(1));
+        let initial_time = fasync::MonotonicInstant::after(fasync::Duration::from_hours(1));
         exec.set_fake_time(initial_time);
 
         // Send trigger data, and verify that we would be told to roam scan.
@@ -472,7 +473,7 @@ mod test {
     #[fuchsia::test]
     fn test_is_scan_old() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         // Setup monitor with connection data that would trigger a roam scan due to RSSI and SNR below
         // threshold.
@@ -499,7 +500,7 @@ mod test {
         );
 
         // Advance the time so that we allow roam scanning.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::Duration::from_seconds(1),
         ));
 
@@ -511,7 +512,7 @@ mod test {
 
         // If the time is only advanced by the minimum wait time, nothing should happen since a roam
         // scan has already happened this connection and the time between scans should be a backoff.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::Duration::from_seconds(1),
         ));
         assert_variant!(
@@ -520,7 +521,7 @@ mod test {
         );
 
         // Advance the time so its past the time between roam scans, even if no change.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             TIME_BETWEEN_ROAM_SCANS_BACKOFF + fasync::Duration::from_seconds(1),
         ));
 
@@ -535,7 +536,7 @@ mod test {
     #[fuchsia::test]
     fn test_roam_reason_change_resets_backoff() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         // Setup monitor with connection data that would trigger a roam scan due to RSSI below
         // threshold.
@@ -566,7 +567,7 @@ mod test {
         );
 
         // Advance the time so that we allow roam scanning.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::Duration::from_seconds(1),
         ));
 
@@ -578,7 +579,7 @@ mod test {
 
         // If the time is only advanced by the minimum wait time, nothing should happen since a roam
         // scan has already happened this connection and the time between scans should be a backoff.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::Duration::from_seconds(1),
         ));
         assert_variant!(
@@ -603,7 +604,7 @@ mod test {
 
         // The scan backoff should be reset, so another scan could happen after the starting amount
         // of time without a change in roam reason.
-        exec.set_fake_time(fasync::Time::after(
+        exec.set_fake_time(fasync::MonotonicInstant::after(
             TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN + fasync::Duration::from_seconds(1),
         ));
 
@@ -616,7 +617,7 @@ mod test {
     #[fuchsia::test]
     fn test_roam_reasons_have_changed() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         // Setup monitor with connection data that would trigger a roam scan due to RSSI. Set an
         // ewma weight of 1, so its easy to change.
@@ -636,7 +637,7 @@ mod test {
             });
 
         // Advance the time so that we allow roam scanning.
-        let initial_time = fasync::Time::after(fasync::Duration::from_hours(1));
+        let initial_time = fasync::MonotonicInstant::after(fasync::Duration::from_hours(1));
         exec.set_fake_time(initial_time);
 
         // Send trigger data, and verify that we would be told to roam scan.
@@ -746,7 +747,7 @@ mod test {
     #[fuchsia::test]
     fn test_send_signal_velocity_metric_event() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         let connection_data = RoamingConnectionData {
             signal_data: EwmaSignalData::new(-40, 50, 1),
@@ -772,7 +773,7 @@ mod test {
     #[fuchsia::test]
     fn test_should_not_roam_scan_single_bss() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
+        exec.set_fake_time(fasync::MonotonicInstant::now());
 
         let rssi = -80;
         let snr = 10;
@@ -786,7 +787,7 @@ mod test {
         test_values.saved_networks.set_is_single_bss_response(true);
 
         // Advance the time so that we allow roam scanning,
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_hours(1)));
 
         let trigger_data =
             RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {

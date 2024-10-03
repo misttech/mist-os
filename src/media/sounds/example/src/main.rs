@@ -7,7 +7,7 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_media_sounds::*;
-use fuchsia_async::{self as fasync, Time, Timer};
+use fuchsia_async::{self as fasync, MonotonicInstant, Timer};
 use futures::{join, FutureExt};
 use std::fs::*;
 use zerocopy::IntoBytes;
@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
     );
 
     // Play only 250ms of a sound by stopping it after a timer elapses.
-    let timer = Timer::new(Time::after(zx::Duration::from_millis(250)))
+    let timer = Timer::new(MonotonicInstant::after(zx::Duration::from_millis(250)))
         .map(|_| player_proxy.stop_playing_sound(1));
 
     join!(player_proxy.play_sound(1, AudioRenderUsage::Media).map(|_| ()), timer.map(|_| ()));

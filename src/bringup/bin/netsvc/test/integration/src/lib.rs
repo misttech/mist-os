@@ -1097,7 +1097,7 @@ async fn pave(image_name: &str, sock: fuchsia_async::net::UdpSocket, scope_id: u
             tftp::TftpPacket::Error(e) => {
                 assert_eq!(e.error(), tftp::TftpError::Busy, "unexpected error {:?}", e);
                 println!("paver is busy...");
-                let () = fuchsia_async::Timer::new(fuchsia_async::Time::after(
+                let () = fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
                     zx::Duration::from_millis(10),
                 ))
                 .await;

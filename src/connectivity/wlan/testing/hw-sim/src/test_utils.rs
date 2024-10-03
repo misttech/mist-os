@@ -5,7 +5,7 @@ use crate::event::{self, Handler};
 use crate::netdevice_helper;
 use crate::wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder};
 use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
-use fuchsia_async::{DurationExt, Time, TimeoutExt, Timer};
+use fuchsia_async::{DurationExt, MonotonicInstant, TimeoutExt, Timer};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
 use zx::prelude::*;
 
@@ -422,7 +422,7 @@ impl Drop for TestHelper {
 }
 
 pub struct RetryWithBackoff {
-    deadline: Time,
+    deadline: MonotonicInstant,
     prev_delay: zx::Duration,
     next_delay: zx::Duration,
     max_delay: zx::Duration,
@@ -430,14 +430,18 @@ pub struct RetryWithBackoff {
 impl RetryWithBackoff {
     pub fn new(timeout: zx::Duration) -> Self {
         RetryWithBackoff {
-            deadline: Time::after(timeout),
+            deadline: MonotonicInstant::after(timeout),
             prev_delay: zx::Duration::from_millis(0),
             next_delay: zx::Duration::from_millis(1),
             max_delay: zx::Duration::INFINITE,
         }
     }
     pub fn infinite_with_max_interval(max_delay: zx::Duration) -> Self {
-        Self { deadline: Time::INFINITE, max_delay, ..Self::new(zx::Duration::from_nanos(0)) }
+        Self {
+            deadline: MonotonicInstant::INFINITE,
+            max_delay,
+            ..Self::new(zx::Duration::from_nanos(0))
+        }
     }
 
     /// Return Err if the deadline was exceeded when this function was called.
@@ -454,14 +458,15 @@ impl RetryWithBackoff {
         // prevents misusing them after the sleep since they are all
         // no longer correct after the clock moves.
         {
-            if Time::after(zx::Duration::from_millis(0)) > self.deadline {
+            if MonotonicInstant::after(zx::Duration::from_millis(0)) > self.deadline {
                 if verbose {
                     info!("Skipping sleep. Deadline exceeded.");
                 }
-                return Err(self.deadline - Time::now());
+                return Err(self.deadline - MonotonicInstant::now());
             }
 
-            let sleep_deadline = std::cmp::min(Time::after(self.next_delay), self.deadline);
+            let sleep_deadline =
+                std::cmp::min(MonotonicInstant::after(self.next_delay), self.deadline);
             if verbose {
                 let micros = sleep_deadline.into_nanos() / 1_000;
                 info!("Sleeping until {}.{} 😴", micros / 1_000_000, micros % 1_000_000);
@@ -483,7 +488,7 @@ impl RetryWithBackoff {
             self.next_delay = next_delay;
         }
 
-        Ok(self.deadline - Time::now())
+        Ok(self.deadline - MonotonicInstant::now())
     }
 
     pub async fn sleep_unless_after_deadline(&mut self) -> Result<zx::Duration, zx::Duration> {

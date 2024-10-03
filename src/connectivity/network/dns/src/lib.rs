@@ -59,7 +59,7 @@ impl Time for FuchsiaTime {
 
         future
             .map(|output| Ok(output))
-            .on_timeout(fasync::Time::after(zx_duration), || {
+            .on_timeout(fasync::MonotonicInstant::after(zx_duration), || {
                 Err(io::Error::new(io::ErrorKind::TimedOut, "future timed out"))
             })
             .await
@@ -68,6 +68,6 @@ impl Time for FuchsiaTime {
     async fn delay_for(duration: Duration) -> () {
         let nanos = i64::try_from(duration.as_nanos()).expect("failed to cast the input into i64");
         let zx_duration = zx::Duration::from_nanos(nanos);
-        fasync::Timer::new(fasync::Time::after(zx_duration)).await
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx_duration)).await
     }
 }

@@ -1051,7 +1051,8 @@ mod tests {
         // get false-positives from is_connected.
         while block_client.is_connected() {
             // Sleep for a bit to minimise lock contention.
-            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(500))).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(500)))
+                .await;
         }
 
         // But once is_connected goes negative, it should stay negative.

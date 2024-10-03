@@ -219,8 +219,9 @@ mod tests {
         };
 
         // Set the time so that the verify timeout expires.
-        executor
-            .set_fake_time(fasync::Time::after((VERIFY_TIMEOUT + Duration::from_secs(1)).into()));
+        executor.set_fake_time(fasync::MonotonicInstant::after(
+            (VERIFY_TIMEOUT + Duration::from_secs(1)).into(),
+        ));
         assert!(executor.wake_expired_timers());
 
         // Verify we get the Timeout error.

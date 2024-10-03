@@ -738,7 +738,7 @@ mod tests {
     use crate::render::{Context as RenderContext, ContextInner};
     use euclid::approxeq::ApproxEq;
     use euclid::{size2, vec2};
-    use fuchsia_async::{self as fasync, Time, TimeoutExt};
+    use fuchsia_async::{self as fasync, MonotonicInstant, TimeoutExt};
     use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
     use fuchsia_framebuffer::FrameUsage;
     use once_cell::sync::Lazy;
@@ -766,7 +766,7 @@ mod tests {
         .expect("BufferCollectionAllocator::new");
         let context_token = buffer_allocator
             .duplicate_token()
-            .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+            .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
                 panic!("Timed out while waiting for duplicate_token")
             })
             .await
@@ -774,7 +774,7 @@ mod tests {
         let forma_context = generic::Forma::new_context(context_token, size, DisplayRotation::Deg0);
         let _buffers_result = buffer_allocator
             .allocate_buffers(true)
-            .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+            .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
                 panic!("Timed out while waiting for sysmem bufers")
             })
             .await;

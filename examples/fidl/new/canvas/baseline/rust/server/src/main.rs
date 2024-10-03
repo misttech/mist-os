@@ -5,7 +5,7 @@
 use anyhow::{Context as _, Error};
 use fidl::endpoints::RequestStream as _;
 use fidl_examples_canvas_baseline::{BoundingBox, InstanceRequest, InstanceRequestStream, Point};
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use fuchsia_component::server::ServiceFs;
 
 use futures::future::join;
@@ -68,7 +68,7 @@ async fn run_server(stream: InstanceRequestStream) -> Result<(), Error> {
     let update_sender = || async move {
         loop {
             // Our server sends one update per second.
-            Timer::new(Time::after(zx::Duration::from_seconds(1))).await;
+            Timer::new(MonotonicInstant::after(zx::Duration::from_seconds(1))).await;
             let mut state = state_ref.lock().unwrap();
             if !state.changed {
                 continue;

@@ -65,15 +65,15 @@ pub const EWMA_SMOOTHING_FACTOR_FOR_METRICS: usize = 10;
 // Connection score and the time at which it was calculated.
 pub struct TimestampedConnectionScore {
     pub score: u8,
-    pub time: fasync::Time,
+    pub time: fasync::MonotonicInstant,
 }
 impl TimestampedConnectionScore {
-    pub fn new(score: u8, time: fasync::Time) -> Self {
+    pub fn new(score: u8, time: fasync::MonotonicInstant) -> Self {
         Self { score, time }
     }
 }
 impl Timestamped for TimestampedConnectionScore {
-    fn time(&self) -> fasync::Time {
+    fn time(&self) -> fasync::MonotonicInstant {
         self.time
     }
 }
@@ -311,7 +311,7 @@ pub enum TelemetryEvent {
         saved_network_count_found_by_active_scan: usize,
     },
     PostConnectionSignals {
-        connect_time: fasync::Time,
+        connect_time: fasync::MonotonicInstant,
         signal_at_connect: client::types::Signal,
         signals: HistoricalList<client::types::TimestampedSignal>,
     },
@@ -563,7 +563,7 @@ enum ConnectionState {
 
 #[derive(Debug)]
 struct IdleState {
-    connect_start_time: Option<fasync::Time>,
+    connect_start_time: Option<fasync::MonotonicInstant>,
 }
 
 #[derive(Debug)]
@@ -571,13 +571,13 @@ struct ConnectedState {
     iface_id: u16,
     /// Time when the user manually initiates connecting to another network via the
     /// Policy ClientController::Connect FIDL call.
-    new_connect_start_time: Option<fasync::Time>,
+    new_connect_start_time: Option<fasync::MonotonicInstant>,
     prev_counters: Option<fidl_fuchsia_wlan_stats::IfaceCounterStats>,
     multiple_bss_candidates: bool,
     ap_state: client::types::ApState,
     network_is_likely_hidden: bool,
 
-    last_signal_report: fasync::Time,
+    last_signal_report: fasync::MonotonicInstant,
     num_consecutive_get_counter_stats_failures: InspectableU64,
     is_driver_unresponsive: InspectableBool,
 
@@ -586,13 +586,13 @@ struct ConnectedState {
 
 #[derive(Debug)]
 pub struct DisconnectedState {
-    disconnected_since: fasync::Time,
+    disconnected_since: fasync::MonotonicInstant,
     disconnect_info: DisconnectInfo,
-    connect_start_time: Option<fasync::Time>,
+    connect_start_time: Option<fasync::MonotonicInstant>,
     /// The latest time when the device's no saved neighbor duration was accounted.
     /// If this has a value, then conceptually we say that "no saved neighbor" flag
     /// is set.
-    latest_no_saved_neighbor_time: Option<fasync::Time>,
+    latest_no_saved_neighbor_time: Option<fasync::MonotonicInstant>,
     accounted_no_saved_neighbor_duration: zx::Duration,
 }
 
@@ -892,7 +892,7 @@ pub struct Telemetry {
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
     connection_state: ConnectionState,
-    last_checked_connection_state: fasync::Time,
+    last_checked_connection_state: fasync::MonotonicInstant,
     stats_logger: StatsLogger,
 
     // Inspect properties/nodes that telemetry hangs onto
@@ -911,12 +911,12 @@ pub struct Telemetry {
 
     // For keeping track of how long client connections were enabled when turning client
     // connections on and off.
-    last_enabled_client_connections: Option<fasync::Time>,
+    last_enabled_client_connections: Option<fasync::MonotonicInstant>,
 
     // For keeping track of how long client connections were disabled when turning client
     // connections off and on again. None if a command to turn off client connections has never
     // been sent or if client connections are on.
-    last_disabled_client_connections: Option<fasync::Time>,
+    last_disabled_client_connections: Option<fasync::MonotonicInstant>,
 }
 
 impl Telemetry {
@@ -941,7 +941,7 @@ impl Telemetry {
             monitor_svc_proxy,
             new_cobalt_1dot1_proxy,
             connection_state: ConnectionState::Idle(IdleState { connect_start_time: None }),
-            last_checked_connection_state: fasync::Time::now(),
+            last_checked_connection_state: fasync::MonotonicInstant::now(),
             stats_logger,
             inspect_node,
             get_iface_stats_fail_count,
@@ -973,7 +973,7 @@ impl Telemetry {
     }
 
     pub async fn handle_periodic_telemetry(&mut self) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let duration = now - self.last_checked_connection_state;
 
         self.stats_logger.log_stat(StatOp::AddTotalDuration(duration)).await;
@@ -1049,7 +1049,7 @@ impl Telemetry {
     }
 
     pub async fn handle_telemetry_event(&mut self, event: TelemetryEvent) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         match event {
             TelemetryEvent::QueryStatus { sender } => {
                 let info = match &self.connection_state {
@@ -1411,7 +1411,7 @@ impl Telemetry {
                     .await;
             }
             TelemetryEvent::StartClientConnectionsRequest => {
-                let now = fasync::Time::now();
+                let now = fasync::MonotonicInstant::now();
                 if self.last_enabled_client_connections.is_none() {
                     self.last_enabled_client_connections = Some(now);
                 }
@@ -1422,11 +1422,11 @@ impl Telemetry {
                 self.last_disabled_client_connections = None;
             }
             TelemetryEvent::StopClientConnectionsRequest => {
-                let now = fasync::Time::now();
+                let now = fasync::MonotonicInstant::now();
                 // Do not change the time if the request to turn off connections comes in when
                 // client connections are already stopped.
                 if self.last_disabled_client_connections.is_none() {
-                    self.last_disabled_client_connections = Some(fasync::Time::now());
+                    self.last_disabled_client_connections = Some(fasync::MonotonicInstant::now());
                 }
                 if let Some(enabled_time) = self.last_enabled_client_connections {
                     let enabled_duration = now - enabled_time;
@@ -1907,7 +1907,7 @@ impl StatsLogger {
         code: fidl_ieee80211::StatusCode,
         multiple_bss_candidates: bool,
         ap_state: &client::types::ApState,
-        connect_start_time: Option<fasync::Time>,
+        connect_start_time: Option<fasync::MonotonicInstant>,
     ) {
         self.log_establish_connection_cobalt_metrics(
             policy_connect_reason,
@@ -2364,7 +2364,7 @@ impl StatsLogger {
 
         let device_uptime_dim = {
             use metrics::DisconnectBreakdownByDeviceUptimeMetricDimensionDeviceUptime::*;
-            match fasync::Time::now() - fasync::Time::from_nanos(0) {
+            match fasync::MonotonicInstant::now() - fasync::MonotonicInstant::from_nanos(0) {
                 x if x < zx::Duration::from_hours(1) => LessThan1Hour,
                 x if x < zx::Duration::from_hours(3) => LessThan3Hours,
                 x if x < zx::Duration::from_hours(12) => LessThan12Hours,
@@ -2667,7 +2667,7 @@ impl StatsLogger {
         code: fidl_ieee80211::StatusCode,
         multiple_bss_candidates: bool,
         ap_state: &client::types::ApState,
-        connect_start_time: Option<fasync::Time>,
+        connect_start_time: Option<fasync::MonotonicInstant>,
     ) {
         let metric_events = self.build_establish_connection_cobalt_metrics(
             policy_connect_reason,
@@ -2689,7 +2689,7 @@ impl StatsLogger {
         code: fidl_ieee80211::StatusCode,
         multiple_bss_candidates: bool,
         ap_state: &client::types::ApState,
-        connect_start_time: Option<fasync::Time>,
+        connect_start_time: Option<fasync::MonotonicInstant>,
     ) -> Vec<MetricEvent> {
         let mut metric_events = vec![];
         if let Some(policy_connect_reason) = policy_connect_reason {
@@ -2729,7 +2729,7 @@ impl StatsLogger {
 
         match connect_start_time {
             Some(start_time) => {
-                let user_wait_time = fasync::Time::now() - start_time;
+                let user_wait_time = fasync::MonotonicInstant::now() - start_time;
                 let user_wait_time_dim = convert::convert_user_wait_time(user_wait_time);
                 metric_events.push(MetricEvent {
                     metric_id: metrics::SUCCESSFUL_CONNECT_BREAKDOWN_BY_USER_WAIT_TIME_METRIC_ID,
@@ -3367,7 +3367,7 @@ impl StatsLogger {
 
     async fn log_post_connection_score_deltas_by_signal(
         &mut self,
-        connect_time: fasync::Time,
+        connect_time: fasync::MonotonicInstant,
         signal_at_connect: client::types::Signal,
         signals: HistoricalList<client::types::TimestampedSignal>,
     ) {
@@ -3461,7 +3461,7 @@ impl StatsLogger {
 
     async fn log_post_connection_rssi_deltas(
         &mut self,
-        connect_time: fasync::Time,
+        connect_time: fasync::MonotonicInstant,
         signal_at_connect: client::types::Signal,
         signals: HistoricalList<client::types::TimestampedSignal>,
     ) {
@@ -3575,12 +3575,12 @@ impl StatsLogger {
     ) {
         self.log_connection_score_average_by_signal(
             metrics::ConnectionScoreAverageMetricDimensionDuration::ShortDuration as u32,
-            signals.get_before(fasync::Time::now()),
+            signals.get_before(fasync::MonotonicInstant::now()),
         )
         .await;
         self.log_connection_rssi_average(
             metrics::ConnectionRssiAverageMetricDimensionDuration::ShortDuration as u32,
-            signals.get_before(fasync::Time::now()),
+            signals.get_before(fasync::MonotonicInstant::now()),
         )
         .await;
         // Logs user requested connection during short duration connection, which indicates that we
@@ -3620,7 +3620,7 @@ impl StatsLogger {
         num_candidates: Result<usize, ()>,
         selected_count: usize,
     ) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let mut metric_events = vec![];
         metric_events.push(MetricEvent {
             metric_id: metrics::NETWORK_SELECTION_COUNT_METRIC_ID,
@@ -3896,7 +3896,7 @@ impl StatsLogger {
         }
 
         if outcome == RecoveryOutcome::Success {
-            self.last_successful_recovery.set(fasync::Time::now().into_nanos() as u64);
+            self.last_successful_recovery.set(fasync::MonotonicInstant::now().into_nanos() as u64);
             let _ = self.successful_recoveries.add(1);
         }
 
@@ -3973,7 +3973,7 @@ impl StatsLogger {
 // potentially noisy logs are reported.  Duplicate error messages are aggregated periodically
 // reported.
 struct ThrottledErrorLogger {
-    time_of_last_log: fasync::Time,
+    time_of_last_log: fasync::MonotonicInstant,
     suppressed_errors: HashMap<String, usize>,
     minutes_between_reports: i64,
 }
@@ -3981,7 +3981,7 @@ struct ThrottledErrorLogger {
 impl ThrottledErrorLogger {
     fn new(minutes_between_reports: i64) -> Self {
         Self {
-            time_of_last_log: fasync::Time::from_nanos(0),
+            time_of_last_log: fasync::MonotonicInstant::from_nanos(0),
             suppressed_errors: HashMap::new(),
             minutes_between_reports,
         }
@@ -3991,7 +3991,7 @@ impl ThrottledErrorLogger {
         if let Err(e) = result {
             // If sufficient time has passed since the last time a cobalt error was logged, report
             // the number of cobalt errors that have been encountered.
-            let curr_time = fasync::Time::now();
+            let curr_time = fasync::MonotonicInstant::now();
             let time_since_last_log = curr_time - self.time_of_last_log;
             if time_since_last_log.into_minutes() > self.minutes_between_reports {
                 warn!("{}", e.to_string());
@@ -4862,18 +4862,18 @@ mod tests {
         });
 
         // At next telemetry checkpoint, `test_fut` updates the connected and downtime durations.
-        let downtime_start = fasync::Time::now();
+        let downtime_start = fasync::MonotonicInstant::now();
         test_helper.advance_to_next_telemetry_checkpoint(test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
                     connected_duration: zx::Duration::from_seconds(5).into_nanos(),
-                    downtime_duration: (fasync::Time::now() - downtime_start).into_nanos(),
+                    downtime_duration: (fasync::MonotonicInstant::now() - downtime_start).into_nanos(),
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
                 "7d_counters": contains {
                     connected_duration: zx::Duration::from_seconds(5).into_nanos(),
-                    downtime_duration: (fasync::Time::now() - downtime_start).into_nanos(),
+                    downtime_duration: (fasync::MonotonicInstant::now() - downtime_start).into_nanos(),
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
             }
@@ -5259,7 +5259,7 @@ mod tests {
     fn test_tx_high_packet_drop_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 tx_total: 10 * seed,
                 tx_drop: 3 * seed,
@@ -5298,7 +5298,7 @@ mod tests {
     fn test_rx_high_packet_drop_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 rx_unicast_total: 10 * seed,
                 rx_unicast_drop: 3 * seed,
@@ -5337,7 +5337,7 @@ mod tests {
     fn test_rx_tx_high_but_not_very_high_packet_drop_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 // 3% drop rate would be high, but not very high
                 rx_unicast_total: 100 * seed,
@@ -5380,7 +5380,9 @@ mod tests {
     fn test_rx_tx_packet_time_series() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = (fasync::Time::now() - fasync::Time::from_nanos(0i64)).into_seconds() as u64;
+            let seed = (fasync::MonotonicInstant::now()
+                - fasync::MonotonicInstant::from_nanos(0i64))
+            .into_seconds() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 rx_unicast_total: 100 * seed,
                 rx_unicast_drop: 3 * seed,
@@ -5420,7 +5422,7 @@ mod tests {
     fn test_no_rx_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 rx_unicast_total: 10,
                 ..fake_iface_counter_stats(seed)
@@ -5458,7 +5460,7 @@ mod tests {
     fn test_no_rx_duration_time_series() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 rx_unicast_total: 10,
                 ..fake_iface_counter_stats(seed)
@@ -5731,7 +5733,7 @@ mod tests {
     fn test_log_daily_rx_tx_ratio_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64 / 1_000_000_000;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 tx_total: 10 * seed,
                 // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
@@ -5929,7 +5931,7 @@ mod tests {
     fn test_log_hourly_fleetwide_rx_tx_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64 / 1_000_000_000;
+            let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 tx_total: 10 * seed,
                 // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
@@ -6177,7 +6179,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_short_duration_connection_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -8323,7 +8325,7 @@ mod tests {
         dimensions: Vec<u32>,
     ) {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.exec.set_fake_time(fasync::Time::from_nanos(1));
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1));
 
         // Send the recovery event metric
         test_helper.telemetry_sender.send(recovery_event);
@@ -8744,7 +8746,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_post_connection_score_deltas_by_signal_and_post_connection_rssi_deltas() {
         let (mut test_helper, mut test_fut) = setup_test();
-        let connect_time = fasync::Time::from_nanos(31_000_000_000);
+        let connect_time = fasync::MonotonicInstant::from_nanos(31_000_000_000);
 
         let signals_deque: VecDeque<client::types::TimestampedSignal> = VecDeque::from_iter([
             client::types::TimestampedSignal {
@@ -8845,7 +8847,7 @@ mod tests {
     fn test_log_pre_disconnect_score_deltas_by_signal_and_pre_disconnect_rssi_deltas() {
         let (mut test_helper, mut test_fut) = setup_test();
         // 31 seconds
-        let final_score_time = fasync::Time::from_nanos(31_000_000_000);
+        let final_score_time = fasync::MonotonicInstant::from_nanos(31_000_000_000);
 
         let signals_deque: VecDeque<client::types::TimestampedSignal> = VecDeque::from_iter([
             client::types::TimestampedSignal {
@@ -9201,7 +9203,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_connection_score_average_long_duration() {
         let (mut test_helper, mut test_fut) = setup_test();
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let signals = vec![
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -60, snr_db: 30 },
@@ -9245,7 +9247,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_connection_rssi_average_long_duration() {
         let (mut test_helper, mut test_fut) = setup_test();
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let signals = vec![
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -60, snr_db: 30 },
@@ -9356,7 +9358,7 @@ mod tests {
             );
 
             for _i in 0..(duration.into_nanos() / STEP_INCREMENT.into_nanos()) {
-                self.exec.set_fake_time(fasync::Time::after(STEP_INCREMENT));
+                self.exec.set_fake_time(fasync::MonotonicInstant::after(STEP_INCREMENT));
                 let _ = self.exec.wake_expired_timers();
                 assert_eq!(self.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -9396,7 +9398,7 @@ mod tests {
             &mut self,
             test_fut: Pin<&mut impl Future<Output = ()>>,
         ) {
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             let remaining_interval = TELEMETRY_QUERY_INTERVAL.into_nanos()
                 - (now.into_nanos() % TELEMETRY_QUERY_INTERVAL.into_nanos());
             self.advance_by(zx::Duration::from_nanos(remaining_interval), test_fut)
@@ -9481,7 +9483,7 @@ mod tests {
                     let resp = match &counter_stats_resp {
                         Some(get_resp) => get_resp(),
                         None => {
-                            let seed = fasync::Time::now().into_nanos() as u64;
+                            let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
                             Ok(fake_iface_counter_stats(seed))
                         }
                     };
@@ -9620,7 +9622,7 @@ mod tests {
 
     fn setup_test() -> (TestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (monitor_svc_proxy, monitor_svc_stream) =
             create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
@@ -9775,11 +9777,11 @@ mod tests {
     #[fuchsia::test]
     fn test_error_throttling() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let mut error_logger = ThrottledErrorLogger::new(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS);
 
         // Set the fake time to 61 minutes past 0 time to ensure that messages will be logged.
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_minutes(
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_minutes(
             MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1,
         )));
 
@@ -9794,7 +9796,7 @@ mod tests {
 
         // Advance time again and log another error to verify that the counter resets (ie: log was
         // emitted).
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_minutes(
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_minutes(
             MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1,
         )));
         error_logger.throttle_error(Err(format_err!("")));

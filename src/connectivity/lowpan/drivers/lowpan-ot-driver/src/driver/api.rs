@@ -19,7 +19,7 @@ impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
         &'a self,
         init_task: FInit,
         stream: SStream,
-        timeout: fasync::Time,
+        timeout: fasync::MonotonicInstant,
     ) -> BoxStream<'a, ZxResult<R>>
     where
         R: Send + 'a,
@@ -35,7 +35,9 @@ impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
 
         let init_task = init_task
             .map_err(|e| ZxStatus::from(ErrorAdapter(e)))
-            .on_timeout(fasync::Time::after(DEFAULT_TIMEOUT), || Err(ZxStatus::TIMED_OUT));
+            .on_timeout(fasync::MonotonicInstant::after(DEFAULT_TIMEOUT), || {
+                Err(ZxStatus::TIMED_OUT)
+            });
 
         let stream = stream.map_err(|e| ZxStatus::from(ErrorAdapter(e)));
 
@@ -369,7 +371,7 @@ where
 
         let dwell_time = std::time::Duration::from_millis(dwell_time_ms);
 
-        let timeout = fasync::Time::after(
+        let timeout = fasync::MonotonicInstant::after(
             Duration::from_millis((dwell_time_ms * all_channels.len() as u64).try_into().unwrap())
                 + SCAN_EXTRA_TIMEOUT,
         );
@@ -440,7 +442,7 @@ where
 
         let dwell_time = std::time::Duration::from_millis(dwell_time_ms);
 
-        let timeout = fasync::Time::after(
+        let timeout = fasync::MonotonicInstant::after(
             Duration::from_millis((dwell_time_ms * all_channels.len() as u64).try_into().unwrap())
                 + SCAN_EXTRA_TIMEOUT,
         );
@@ -563,7 +565,7 @@ where
             Ok(())
         };
 
-        fut.on_timeout(fasync::Time::after(WAIT_FOR_RESPONSE_TIMEOUT), || {
+        fut.on_timeout(fasync::MonotonicInstant::after(WAIT_FOR_RESPONSE_TIMEOUT), || {
             error!(tag = "api", "Timeout");
             Err(ZxStatus::TIMED_OUT)
         })
@@ -861,7 +863,7 @@ where
                     Err(ZxStatus::from(ErrorAdapter(e)))
                 }
             })
-            .on_timeout(fasync::Time::after(DEFAULT_TIMEOUT), || {
+            .on_timeout(fasync::MonotonicInstant::after(DEFAULT_TIMEOUT), || {
                 error!(tag = "api", "attach_all_nodes_to: Timeout");
                 Err(ZxStatus::TIMED_OUT)
             })

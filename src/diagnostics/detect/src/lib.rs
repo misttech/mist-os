@@ -244,20 +244,20 @@ pub async fn main() -> Result<(), Error> {
 
 async fn main_loop(detection_runner: Arc<Mutex<impl RunsDetection>>, check_every: zx::Duration) {
     // Start the first scan as soon as the program starts, via the "missed deadline" logic below.
-    let mut next_check_time = fasync::Time::INFINITE_PAST;
+    let mut next_check_time = fasync::MonotonicInstant::INFINITE_PAST;
     loop {
-        if next_check_time < fasync::Time::now() {
+        if next_check_time < fasync::MonotonicInstant::now() {
             // We missed a deadline, so don't wait at all; start the check. But first
             // schedule the next check time at now() + check_every.
-            if next_check_time != fasync::Time::INFINITE_PAST {
+            if next_check_time != fasync::MonotonicInstant::INFINITE_PAST {
                 (*detection_runner.lock().await).stats().missed_deadlines.add(1);
                 warn!(
                     "Missed diagnostic check deadline {:?} by {:?} nanos",
                     next_check_time,
-                    fasync::Time::now() - next_check_time
+                    fasync::MonotonicInstant::now() - next_check_time
                 );
             }
-            next_check_time = fasync::Time::now() + check_every;
+            next_check_time = fasync::MonotonicInstant::now() + check_every;
         } else {
             // Wait until time for the next check.
             fasync::Timer::new(next_check_time).await;

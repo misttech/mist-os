@@ -93,7 +93,7 @@ async fn repeat_with_delay(
 ) -> Result<(), Error> {
     for i in 0..times {
         f1(i, device)?;
-        fasync::Timer::new(fasync::Time::after(delay.into())).await;
+        fasync::Timer::new(fasync::MonotonicInstant::after(delay.into())).await;
         f2(i, device)?;
     }
 
@@ -288,7 +288,10 @@ impl<'a> Replayer<'a> {
             let processed_at = Duration::from_nanos(monotonic_nanos()? - started_at);
             let desired_at = &key_event.duration_since_start;
             if processed_at < *desired_at {
-                fasync::Timer::new(fasync::Time::after((*desired_at - processed_at).into())).await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    (*desired_at - processed_at).into(),
+                ))
+                .await;
             }
             input_device.key_press_raw(self.make_input_report(), monotonic_nanos()?)?;
         }

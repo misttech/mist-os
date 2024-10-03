@@ -167,11 +167,11 @@ pub mod executor {
 
     pub use std::time::Duration;
     /// A time relative to the executor's clock.
-    pub use std::time::Instant as Time;
+    pub use std::time::Instant as MonotonicInstant;
     use tokio::task::LocalSet;
 
-    impl WakeupTime for Time {
-        fn into_time(self) -> Time {
+    impl WakeupTime for MonotonicInstant {
+        fn into_time(self) -> MonotonicInstant {
             self
         }
     }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context as _, Error};
-use fasync::Time;
+use fasync::MonotonicInstant;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_lowpan::DeviceWatcherMarker;
 use fidl_fuchsia_lowpan_device::{
@@ -29,7 +29,7 @@ async fn test_service_driver_interaction() -> Result<(), Error> {
     let (added, removed) = lookup
         .watch_devices()
         .err_into::<Error>()
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
             Err(format_err!("Timeout waiting for lookup.watch_devices()"))
         })
         .await
@@ -48,7 +48,7 @@ async fn test_service_driver_interaction() -> Result<(), Error> {
     let (added, removed) = lookup
         .watch_devices()
         .err_into::<Error>()
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
             Err(format_err!("Timeout waiting for lookup.watch_devices()"))
         })
         .await
@@ -82,7 +82,7 @@ async fn test_service_driver_interaction() -> Result<(), Error> {
     let ncp_version = device_test
         .get_ncp_version()
         .map_err(|e| format_err!("Err: {:?}", e))
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || Err(format_err!("Timeout")))
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || Err(format_err!("Timeout")))
         .await
         .context("Call to get_ncp_version failed")?;
 
@@ -100,7 +100,7 @@ async fn test_service_driver_interaction() -> Result<(), Error> {
     let (added, removed) = lookup
         .watch_devices()
         .err_into::<Error>()
-        .on_timeout(Time::after(DEFAULT_TIMEOUT), || {
+        .on_timeout(MonotonicInstant::after(DEFAULT_TIMEOUT), || {
             Err(format_err!("Timeout waiting for lookup.get_devices()"))
         })
         .await

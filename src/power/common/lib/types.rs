@@ -179,14 +179,14 @@ impl From<Seconds> for zx::Duration {
     }
 }
 
-impl From<Seconds> for fuchsia_async::Time {
-    fn from(seconds: Seconds) -> fuchsia_async::Time {
-        fuchsia_async::Time::from_nanos(Nanoseconds::from(seconds).0)
+impl From<Seconds> for fuchsia_async::MonotonicInstant {
+    fn from(seconds: Seconds) -> fuchsia_async::MonotonicInstant {
+        fuchsia_async::MonotonicInstant::from_nanos(Nanoseconds::from(seconds).0)
     }
 }
 
-impl From<fuchsia_async::Time> for Nanoseconds {
-    fn from(time: fuchsia_async::Time) -> Nanoseconds {
+impl From<fuchsia_async::MonotonicInstant> for Nanoseconds {
+    fn from(time: fuchsia_async::MonotonicInstant) -> Nanoseconds {
         Nanoseconds(time.into_nanos())
     }
 }

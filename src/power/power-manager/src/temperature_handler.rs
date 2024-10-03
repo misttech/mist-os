@@ -107,7 +107,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
 
         let mutable_inner = MutableInner {
             last_temperature: Celsius(std::f64::NAN),
-            last_poll_time: fasync::Time::INFINITE_PAST,
+            last_poll_time: fasync::MonotonicInstant::INFINITE_PAST,
             driver_proxy: self.driver_proxy,
             debug_temperature_override: None,
         };
@@ -178,7 +178,7 @@ impl TemperatureHandler {
         // If the last temperature value is sufficiently fresh, return it instead of polling.
         // Note that if the previous poll generated an error, `last_poll_time` was not updated,
         // and (barring clock glitches) a new poll will occur.
-        if fasync::Time::now() <= last_poll_time + self.cache_duration {
+        if fasync::MonotonicInstant::now() <= last_poll_time + self.cache_duration {
             return Ok(MessageReturn::ReadTemperature(last_temperature));
         }
 
@@ -199,7 +199,7 @@ impl TemperatureHandler {
             Ok(temperature) => {
                 let mut inner = self.mutable_inner.borrow_mut();
                 inner.last_temperature = temperature;
-                inner.last_poll_time = fasync::Time::now();
+                inner.last_poll_time = fasync::MonotonicInstant::now();
                 self.inspect.log_temperature_reading(temperature);
                 Ok(MessageReturn::ReadTemperature(temperature))
             }
@@ -288,7 +288,7 @@ struct MutableInner {
     last_temperature: Celsius,
 
     /// Time of the last temperature poll, for determining cache freshness.
-    last_poll_time: fasync::Time,
+    last_poll_time: fasync::MonotonicInstant,
 
     /// Proxy to the temperature driver. Populated during `init()` unless previously supplied (in a
     /// test).

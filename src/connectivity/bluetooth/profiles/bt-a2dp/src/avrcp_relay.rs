@@ -70,7 +70,7 @@ impl ValidPlayerStatus {
         };
         self.timeline_function = Some(media::TimelineFunction {
             subject_time: zx::Duration::from_millis(position_millis).into_nanos(),
-            reference_time: fasync::Time::now().into_nanos(),
+            reference_time: fasync::MonotonicInstant::now().into_nanos(),
             subject_delta,
             reference_delta: 1,
         });
@@ -645,7 +645,7 @@ mod tests {
     #[fuchsia::test]
     fn test_finish_relay_setup_hanging_avrcp_requests() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -794,7 +794,7 @@ mod tests {
     #[fuchsia::test]
     fn test_relay_sends_correct_media_info() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -837,7 +837,7 @@ mod tests {
     #[fuchsia::test]
     fn test_relay_new_avrcp_track_info() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -976,7 +976,7 @@ mod tests {
     #[fuchsia::test]
     fn test_relay_updates_position() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -1003,7 +1003,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
         assert!(exec.run_until_stalled(&mut watch_info_fut).is_pending());
 
-        exec.set_fake_time(fasync::Time::from_nanos(9000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(9000));
 
         // When a play status change notification happens, we get new requests.
         controller_requests
@@ -1196,7 +1196,7 @@ mod tests {
     #[fuchsia::test]
     fn test_relay_avrcp_available_players_changed() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7000));
 
         let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
 
@@ -1280,7 +1280,7 @@ mod tests {
     #[fuchsia::test]
     fn avrcp_relay_inspect() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7000));
         let inspector = fuchsia_inspect::Inspector::default();
 
         let (player_client, player_requests) =

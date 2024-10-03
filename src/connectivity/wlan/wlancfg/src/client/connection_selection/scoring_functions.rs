@@ -184,7 +184,7 @@ mod test {
     fn connect_failure_with_bssid(bssid: types::Bssid) -> ConnectFailure {
         ConnectFailure {
             reason: FailureReason::GeneralFailure,
-            time: fasync::Time::INFINITE,
+            time: fasync::MonotonicInstant::INFINITE,
             bssid,
         }
     }
@@ -196,7 +196,7 @@ mod test {
         PastConnectionData {
             bssid,
             connection_uptime: uptime,
-            disconnect_time: fasync::Time::INFINITE, // disconnect will always be considered recent
+            disconnect_time: fasync::MonotonicInstant::INFINITE, // disconnect will always be considered recent
             ..random_connection_data()
         }
     }
@@ -314,7 +314,7 @@ mod test {
         let mut failures = vec![connect_failure_with_bssid(bss_better.bssid); 4];
         failures.push(ConnectFailure {
             bssid: bss_worse.bssid,
-            time: fasync::Time::now(),
+            time: fasync::MonotonicInstant::now(),
             reason: FailureReason::CredentialRejected,
         });
         internal_data.recent_failures = failures;
@@ -342,7 +342,7 @@ mod test {
         for _ in 0..1200 {
             internal_data.recent_failures.push(ConnectFailure {
                 bssid: bss.bssid,
-                time: fasync::Time::now(),
+                time: fasync::MonotonicInstant::now(),
                 reason: FailureReason::CredentialRejected,
             });
         }

@@ -19,7 +19,7 @@ use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
     TargetState,
 };
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -188,7 +188,7 @@ async fn flash_plugin_impl<W: Write>(
                 .to_std()
                 .user_message("Error converting 1 seconds to Duration")?;
             let once = Once::new();
-            let start = Time::now();
+            let start = MonotonicInstant::now();
             loop {
                 // Get the info again since the target changed state
                 info = target_proxy
@@ -201,7 +201,9 @@ async fn flash_plugin_impl<W: Write>(
                 }
 
                 // Warn the user
-                if Time::now() - start > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS) {
+                if MonotonicInstant::now() - start
+                    > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS)
+                {
                     once.call_once(|| {
                         let _ = writeln!(
                             writer,

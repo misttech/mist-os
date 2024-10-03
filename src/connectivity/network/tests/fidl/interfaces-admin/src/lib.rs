@@ -1256,7 +1256,7 @@ async fn add_address_and_detach<N: Netstack>(
         },
     )
     .map_ok(|()| panic!("address deleted after detaching and closing channel"))
-    .on_timeout(fuchsia_async::Time::after(zx::Duration::from_millis(100)), || Ok(()))
+    .on_timeout(fuchsia_async::MonotonicInstant::after(zx::Duration::from_millis(100)), || Ok(()))
     .await
     .expect("wait for address to not be removed");
 
@@ -1610,7 +1610,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
 
         let ((), (), ()) = futures::future::join3(watcher_fut, ports_fut, control_closed_fut)
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
                 ),
                 || ((), (), ()),
@@ -2347,7 +2347,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
                 }
             })
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
                 ),
                 || (),
@@ -2773,7 +2773,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
 
         let ((), ()) = futures::future::join(watcher_fut, root_control_fut)
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
                 ),
                 || ((), ()),

@@ -8,7 +8,7 @@ use anyhow::{format_err, Error};
 use euclid::default::Transform2D;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_report as hid_input_report;
-use fuchsia_async::{self as fasync, Time, TimeoutExt};
+use fuchsia_async::{self as fasync, MonotonicInstant, TimeoutExt};
 use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
 use futures::{TryFutureExt, TryStreamExt};
 use keymaps::usages::input3_key_to_hid_usage;
@@ -406,7 +406,7 @@ async fn listen_to_path(device_path: &Path, internal_sender: &InternalSender) ->
     let descriptor = device
         .get_descriptor()
         .map_err(|err| format_err!("FIDL error on get_descriptor: {:?}", err))
-        .on_timeout(Time::after(Duration::from_millis(200)), || {
+        .on_timeout(MonotonicInstant::after(Duration::from_millis(200)), || {
             Err(format_err!("FIDL timeout on get_descriptor"))
         })
         .await?;

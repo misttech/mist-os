@@ -210,10 +210,10 @@ impl Slew {
     /// Returns a vector of (async::Time, UtcClockUpdate, ClockUpdateReason) tuples describing the
     /// updates to make to a clock during the slew. The first update is guaranteed to be requested
     /// immediately.
-    fn clock_updates(&self) -> Vec<(fasync::Time, UtcClockUpdate, ClockUpdateReason)> {
+    fn clock_updates(&self) -> Vec<(fasync::MonotonicInstant, UtcClockUpdate, ClockUpdateReason)> {
         // Note: fuchsia_async time can be mocked independently so can't assume its equivalent to
         // the supplied monotonic time.
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         let finish_time = start_time + self.duration;
 
         // For large slews we expect the reduction in error bound while applying the correction to
@@ -368,7 +368,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         if first_delay != zx::Duration::ZERO {
             // This should be an uncommon setting, so log it.
             info!("delaying first time source sample by: {:?}", first_delay);
-            _ = fasync::Timer::new(fasync::Time::after(first_delay)).await;
+            _ = fasync::Timer::new(fasync::MonotonicInstant::after(first_delay)).await;
             debug!("delay done");
         }
 
@@ -455,7 +455,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 },
 
                 // If no command, then wait.
-                _ = fasync::Timer::new(fasync::Time::after(delay)).fuse() => {
+                _ = fasync::Timer::new(fasync::MonotonicInstant::after(delay)).fuse() => {
                     debug!("no commands received: tick");
                 },
             }
@@ -564,7 +564,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     /// transform.
     fn set_delayed_update_task(
         &mut self,
-        scheduled_updates: Vec<(fasync::Time, UtcClockUpdate, ClockUpdateReason)>,
+        scheduled_updates: Vec<(fasync::MonotonicInstant, UtcClockUpdate, ClockUpdateReason)>,
         estimate_transform: &UtcTransform,
     ) {
         let clock = Arc::clone(&self.clock);
@@ -572,7 +572,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         let track = self.track;
         let transform = estimate_transform.clone();
 
-        let async_now = fasync::Time::now();
+        let async_now = fasync::MonotonicInstant::now();
         // The first periodic step in error bound occurs a fixed duration after the last
         // scheduled update or after current time if no scheduled updates were supplied.
         let mut step_async_time =
@@ -852,7 +852,7 @@ mod tests {
     #[fuchsia::test]
     fn slew_clock_updates_fn() {
         let executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fasync::Time::from_nanos(0));
+        executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Simple constructor lambdas to improve readability of the test logic.
         let full_update = |rate: i32, error_bound: u64| -> UtcClockUpdate {
@@ -861,8 +861,9 @@ mod tests {
         let error_update = |error_bound: u64| -> UtcClockUpdate {
             UtcClockUpdate::builder().error_bounds(error_bound).build()
         };
-        let time_seconds =
-            |seconds: i64| -> fasync::Time { fasync::Time::from_nanos(seconds * NANOS_PER_SECOND) };
+        let time_seconds = |seconds: i64| -> fasync::MonotonicInstant {
+            fasync::MonotonicInstant::from_nanos(seconds * NANOS_PER_SECOND)
+        };
 
         // A short slew should contain no error bound updates.
         let slew = Slew {
@@ -908,12 +909,12 @@ mod tests {
                     ClockUpdateReason::BeginSlew
                 ),
                 (
-                    fasync::Time::from_nanos(update_interval_nanos),
+                    fasync::MonotonicInstant::from_nanos(update_interval_nanos),
                     error_update(slew.start_error_bound - ERROR_BOUND_UPDATE),
                     ClockUpdateReason::ReduceError,
                 ),
                 (
-                    fasync::Time::from_nanos(2 * update_interval_nanos),
+                    fasync::MonotonicInstant::from_nanos(2 * update_interval_nanos),
                     error_update(slew.start_error_bound - 2 * ERROR_BOUND_UPDATE),
                     ClockUpdateReason::ReduceError,
                 ),

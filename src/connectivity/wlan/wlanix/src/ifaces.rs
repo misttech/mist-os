@@ -702,7 +702,7 @@ mod tests {
         DeviceMonitorIfaceManager,
     ) {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (monitor_svc, monitor_stream) =
             create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
@@ -1191,7 +1191,7 @@ mod tests {
         let (_req, _connect_txn) = assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
-        exec.set_fake_time(fasync::Time::from_nanos(40_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(40_000_000_000));
 
         let connect_result =
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);

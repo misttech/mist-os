@@ -241,7 +241,7 @@ impl Backlight {
     }
 
     fn make_scheduled_updates_task(&self, delay: zx::Duration) -> fasync::Task<()> {
-        let time = fasync::Time::after(delay);
+        let time = fasync::MonotonicInstant::after(delay);
         tracing::trace!("Setting timer for {:?}", &time);
         let timer = fasync::Timer::new(time);
         let self_ = self.clone();

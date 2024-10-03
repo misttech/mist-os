@@ -24,7 +24,7 @@ use crate::keyboard_binding::KeyboardEvent;
 use crate::metrics;
 use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
-use fuchsia_async::{Task, Time, Timer};
+use fuchsia_async::{MonotonicInstant, Task, Timer};
 use fuchsia_inspect::health::Reporter;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
@@ -175,7 +175,7 @@ fn new_autorepeat_timer(
     metrics_logger: metrics::MetricsLogger,
 ) -> Rc<Task<()>> {
     let task = Task::local(async move {
-        Timer::new(Time::after(delay)).await;
+        Timer::new(MonotonicInstant::after(delay)).await;
         tracing::debug!("autorepeat timeout");
         unbounded_send_logged(&sink, AnyEvent::Timeout).unwrap_or_else(|e| {
             metrics_logger.log_error(
@@ -523,7 +523,7 @@ mod tests {
     }
 
     async fn wait_for_duration(duration: Duration) {
-        fuchsia_async::Timer::new(Time::after(duration)).await;
+        fuchsia_async::Timer::new(MonotonicInstant::after(duration)).await;
     }
 
     // Strip event time for these events, for comparison.  The event times are
@@ -601,7 +601,7 @@ mod tests {
         // Running the future after it returns Poll::Ready is not allowed, so
         // we must exit the loop then.
         while current < total_duration && poll_status == Poll::Pending {
-            executor.set_fake_time(Time::after(INCREMENT));
+            executor.set_fake_time(MonotonicInstant::after(INCREMENT));
             executor.wake_expired_timers();
             poll_status = executor.run_until_stalled(main_fut);
             current = current + INCREMENT;

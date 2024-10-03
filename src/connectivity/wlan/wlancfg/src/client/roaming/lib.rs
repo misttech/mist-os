@@ -84,7 +84,7 @@ impl RoamingConnectionData {
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct PreviousRoamScanData {
-    pub(crate) time_prev_roam_scan: fasync::Time,
+    pub(crate) time_prev_roam_scan: fasync::MonotonicInstant,
     pub roam_reasons_prev_scan: Vec<RoamReason>,
     /// This is the EWMA value, hence why it is an f64
     pub rssi_prev_roam_scan: f64,
@@ -92,7 +92,7 @@ pub struct PreviousRoamScanData {
 impl PreviousRoamScanData {
     pub fn new(rssi: impl Into<f64>) -> Self {
         Self {
-            time_prev_roam_scan: fasync::Time::now(),
+            time_prev_roam_scan: fasync::MonotonicInstant::now(),
             roam_reasons_prev_scan: vec![],
             rssi_prev_roam_scan: rssi.into(),
         }

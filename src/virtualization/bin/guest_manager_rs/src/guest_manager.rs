@@ -307,7 +307,7 @@ impl GuestManager {
 
     fn handle_guest_stopped(&mut self, reason: Result<(), GuestError>) {
         self.status = GuestStatus::Stopped;
-        self.stop_time = fasync::Time::now().into();
+        self.stop_time = fasync::MonotonicInstant::now().into();
         if let Err(e) = reason {
             self.last_error = Some(e);
         }
@@ -315,7 +315,7 @@ impl GuestManager {
 
     fn handle_guest_started(&mut self, config: &GuestConfig) {
         self.status = GuestStatus::Starting;
-        self.start_time = fasync::Time::now().into();
+        self.start_time = fasync::MonotonicInstant::now().into();
         self.guest_descriptor = GuestManager::snapshot_config(config);
         self.last_error = None;
     }
@@ -370,7 +370,9 @@ impl GuestManager {
 
         match self.status {
             _ if self.is_guest_started() => {
-                info.uptime = Some((fasync::Time::now().into_zx() - self.start_time).into_nanos());
+                info.uptime = Some(
+                    (fasync::MonotonicInstant::now().into_zx() - self.start_time).into_nanos(),
+                );
                 info.guest_descriptor = Some(self.guest_descriptor.clone());
             }
             GuestStatus::Stopped => {

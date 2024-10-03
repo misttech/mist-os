@@ -2540,7 +2540,7 @@ mod tests {
     #[fuchsia::test]
     fn peer_starts_waiting_streams() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(5_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000_000_000));
 
         let mut streams = Streams::default();
         let mut test_builder = TestMediaTaskBuilder::new();

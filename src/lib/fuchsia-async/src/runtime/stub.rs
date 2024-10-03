@@ -108,7 +108,7 @@ pub mod executor {
         }
     }
 
-    pub use std::time::{Duration, Instant as Time};
+    pub use std::time::{Duration, Instant as MonotonicInstant};
 }
 
 pub mod timer {

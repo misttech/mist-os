@@ -188,7 +188,7 @@ async fn process_audio_requests(
                     responder.drop_without_shutdown();
                     continue;
                 }
-                let time = fasync::Time::now();
+                let time = fasync::MonotonicInstant::now();
                 let plug_state = PlugState {
                     plugged: Some(true),
                     plug_state_time: Some(time.into_nanos() as i64),

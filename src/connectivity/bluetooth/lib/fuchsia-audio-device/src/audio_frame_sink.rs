@@ -244,7 +244,7 @@ mod tests {
             bytes_per_two_seconds <= audio_vmo.get_size().expect("should always exist after getbuffer") as usize
         );
 
-        exec.set_fake_time(fasync::Time::from_nanos(42));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(42));
         let _ = exec.wake_expired_timers();
         let start_time = exec.run_until_stalled(&mut ring_buffer.start());
         if let Poll::Ready(s) = start_time {
@@ -272,7 +272,7 @@ mod tests {
         exec.run_until_stalled(&mut write_fut).expect_pending("buffer is full");
 
         // Run the ring buffer for a bit over half a second.
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(500)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(500)));
         let _ = exec.wake_expired_timers();
 
         // Should be able to write again now.

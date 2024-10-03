@@ -260,7 +260,10 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
         assert_eq!(
             sag_state
                 .next()
-                .on_timeout(fasync::Time::after(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT), || None)
+                .on_timeout(
+                    fasync::MonotonicInstant::after(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+                    || None
+                )
                 .await,
             None
         );
@@ -295,7 +298,10 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
         assert_eq!(
             udp_frame_stream
                 .next()
-                .on_timeout(fasync::Time::after(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT), || None)
+                .on_timeout(
+                    fasync::MonotonicInstant::after(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+                    || None
+                )
                 .await,
             None,
         );

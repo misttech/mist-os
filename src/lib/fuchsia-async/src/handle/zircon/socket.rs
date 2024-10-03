@@ -255,7 +255,7 @@ impl Stream for DatagramStream<&Socket> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{TestExecutor, Time, TimeoutExt, Timer};
+    use crate::{MonotonicInstant, TestExecutor, TimeoutExt, Timer};
 
     use futures::future::{self, join};
     use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
@@ -283,11 +283,13 @@ mod tests {
         // faster feedback. This is set to 10s rather than something shorter to avoid triggering
         // flakes if things happen to be slow.
         let receiver = receive_future
-            .on_timeout(Time::after(zx::Duration::from_seconds(10)), || panic!("timeout"));
+            .on_timeout(MonotonicInstant::after(zx::Duration::from_seconds(10)), || {
+                panic!("timeout")
+            });
 
         // Sends a message after the timeout has passed
         let sender = async move {
-            Timer::new(Time::after(zx::Duration::from_millis(100))).await;
+            Timer::new(MonotonicInstant::after(zx::Duration::from_millis(100))).await;
             tx.write_all(bytes).await.expect("writing into socket");
             // close socket to signal no more bytes will be written
             drop(tx);

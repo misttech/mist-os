@@ -39,7 +39,7 @@ impl HideScrollThumbTimer {
             let app_sender = app_sender.clone();
             let view_id = self.view_id;
             let task = fasync::Task::local(async move {
-                fasync::Timer::new(fasync::Time::after(delay.into())).await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(delay.into())).await;
                 app_sender.queue_message(
                     MessageTarget::View(view_id),
                     make_message(TerminalMessages::SetScrollThumbFadeOutMessage(Some((
@@ -48,7 +48,7 @@ impl HideScrollThumbTimer {
                     )))),
                 );
                 app_sender.request_render(view_id);
-                fasync::Timer::new(fasync::Time::after(delay.into())).await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(delay.into())).await;
                 app_sender.queue_message(
                     MessageTarget::View(view_id),
                     make_message(TerminalMessages::SetScrollThumbMessage(None)),

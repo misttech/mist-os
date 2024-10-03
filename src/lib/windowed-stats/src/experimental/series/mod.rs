@@ -687,7 +687,7 @@ mod tests {
     #[test]
     fn time_matrix_with_uncompressed_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<ArithmeticMean<f32>, Constant>::new(
             SamplingProfile::highly_granular(),
             Constant::default(),
@@ -710,7 +710,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(f32::from_bits(42u32))).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -733,7 +733,7 @@ mod tests {
     #[test]
     fn time_matrix_with_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<Max<u64>, Constant>::new(
             SamplingProfile::highly_granular(),
             Constant::default(),
@@ -760,7 +760,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(42)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -788,7 +788,7 @@ mod tests {
     #[test]
     fn time_matrix_with_zigzag_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<Max<i64>, Constant>::new(
             SamplingProfile::highly_granular(),
             Constant::default(),
@@ -815,7 +815,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(-2)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -843,7 +843,7 @@ mod tests {
     #[test]
     fn time_matrix_with_delta_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
             SamplingProfile::highly_granular(),
             LastAggregation::or(0),
@@ -870,7 +870,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(42)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -894,7 +894,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(50)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(20_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -923,7 +923,7 @@ mod tests {
     #[test]
     fn time_matrix_with_delta_zigzag_simple8b_rle_buffer_i64() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<Max<i64>, LastSample>::new(
             SamplingProfile::highly_granular(),
             LastSample::or(0),
@@ -950,7 +950,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(42)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -974,7 +974,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(40)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(20_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -1003,7 +1003,7 @@ mod tests {
     #[test]
     fn time_matrix_with_delta_zigzag_simple8b_rle_buffer_u64() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<Max<u64>, LastSample>::new(
             SamplingProfile::highly_granular(),
             LastSample::or(0),
@@ -1030,7 +1030,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(1)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,
@@ -1054,7 +1054,7 @@ mod tests {
         );
 
         time_matrix.fold(TimedSample::now(u64::MAX)).unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(20_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
             buffer.data,

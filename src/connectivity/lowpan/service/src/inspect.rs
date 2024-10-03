@@ -1276,7 +1276,7 @@ mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async as fasync;
-    use fuchsia_async::{Time, TimeoutExt};
+    use fuchsia_async::{MonotonicInstant, TimeoutExt};
     use fuchsia_component_test::ScopedInstanceFactory;
 
     #[fasync::run(4, test)]
@@ -1300,7 +1300,7 @@ mod tests {
         dummy_driver.connect_to_binder().unwrap();
 
         let _res = watch_device_changes(inspect_tree.clone(), look_up.clone())
-            .on_timeout(Time::after(zx::Duration::from_seconds(5)), || {
+            .on_timeout(MonotonicInstant::after(zx::Duration::from_seconds(5)), || {
                 info!("test_watch_device_changes: watch_device_changes timed out");
             })
             .await;

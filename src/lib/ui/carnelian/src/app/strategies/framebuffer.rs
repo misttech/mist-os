@@ -85,7 +85,8 @@ impl AutoRepeatContext {
     }
 
     fn schedule(&mut self, device_id: &DeviceId) {
-        let timer = fasync::Timer::new(fuchsia_async::Time::after(self.repeat_interval.into()));
+        let timer =
+            fasync::Timer::new(fuchsia_async::MonotonicInstant::after(self.repeat_interval.into()));
         let app_sender = self.app_sender.clone();
         let device_id = device_id.clone();
         let task = fasync::Task::local(async move {

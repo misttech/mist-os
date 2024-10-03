@@ -257,8 +257,10 @@ impl ActivityManager {
                     // Note: We use the global executor to get the current time instead
                     // of the kernel so that we do not unnecessarily clamp
                     // test-injected times.
-                    let event_time = zx::MonotonicInstant::from_nanos(event_time)
-                        .clamp(zx::MonotonicInstant::ZERO, fuchsia_async::Time::now().into_zx());
+                    let event_time = zx::MonotonicInstant::from_nanos(event_time).clamp(
+                        zx::MonotonicInstant::ZERO,
+                        fuchsia_async::MonotonicInstant::now().into_zx(),
+                    );
 
                     self.state_transitioner.transition_to_idle_after_new_time(event_time).await;
 
@@ -266,7 +268,7 @@ impl ActivityManager {
                 }
                 Ok(AggregatorRequest::HandoffWake { responder }) => {
                     if self.suspend_enabled {
-                        let event_time = fuchsia_async::Time::now().into_zx();
+                        let event_time = fuchsia_async::MonotonicInstant::now().into_zx();
                         self.state_transitioner.transition_to_idle_after_new_time(event_time).await;
 
                         if let Err(e) = responder.send(Ok(())) {
@@ -487,7 +489,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT));
 
         // State transitions to Idle.
         let idle_state_fut = watch_state_stream.next();
@@ -527,7 +529,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT));
 
         // State transitions to Idle.
         let idle_state_fut = watch_state_stream.next();
@@ -576,7 +578,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), true);
 
         // Skip ahead by the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT));
 
         // State transitions to Idle.
         let idle_state_fut = watch_state_stream.next();
@@ -626,7 +628,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), false);
 
         // Skip ahead by the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT));
 
         // State transitions to Idle.
         let idle_state_fut = watch_state_stream.next();
@@ -695,7 +697,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT / 2));
 
         // Send an activity, replacing the initial idleness timer.
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
@@ -704,7 +706,7 @@ mod tests {
         assert!(executor.run_until_stalled(&mut report_fut).is_ready());
 
         // Skip ahead by half the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT / 2));
 
         // Initial state does not change.
         let watch_state_fut = watch_state_stream.next();
@@ -714,7 +716,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT / 2));
 
         // Activity state does change.
         let watch_state_res = executor.run_until_stalled(&mut watch_state_fut);
@@ -749,7 +751,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT / 2));
 
         // Send an activity, replacing the initial idleness timer.
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
@@ -758,7 +760,7 @@ mod tests {
         assert!(executor.run_until_stalled(&mut report_fut).is_ready());
 
         // Skip ahead by half the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT / 2));
 
         // Send an activity with an earlier event time.
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
@@ -775,7 +777,7 @@ mod tests {
         assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
-        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(ACTIVITY_TIMEOUT / 2));
 
         // Activity state does change.
         let watch_state_res = executor.run_until_stalled(&mut watch_state_fut);

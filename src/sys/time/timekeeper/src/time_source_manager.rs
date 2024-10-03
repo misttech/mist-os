@@ -112,7 +112,8 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
                         debug!("Sampling will be reattempted until success.");
                         self.record_time_source_failure(TimeSourceError::LaunchFailed);
                         if self.delays_enabled {
-                            fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
+                            fasync::Timer::new(fasync::MonotonicInstant::after(RESTART_DELAY))
+                                .await;
                         }
                         continue;
                     }
@@ -130,7 +131,7 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
                     self.record_time_source_failure(failure);
                     self.last_status = None;
                     if self.delays_enabled {
-                        fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
+                        fasync::Timer::new(fasync::MonotonicInstant::after(RESTART_DELAY)).await;
                     }
                 }
             }
@@ -403,7 +404,7 @@ impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
                                 info!("Time sample delay: {:?}", delay);
                                 self.time_sample_delay_logged_count += 1;
                             }
-                            fasync::Timer::new(fasync::Time::after(delay)).await;
+                            fasync::Timer::new(fasync::MonotonicInstant::after(delay)).await;
                         }
                         continue;
                     }

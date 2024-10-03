@@ -341,7 +341,7 @@ mod tests {
     use super::{KeyManager, PURGE_TIMEOUT};
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
-    use fuchsia_async::{self as fasync, TestExecutor, Time};
+    use fuchsia_async::{self as fasync, MonotonicInstant, TestExecutor};
 
     use futures::channel::oneshot;
     use futures::join;
@@ -425,7 +425,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_get_or_insert() {
-        TestExecutor::advance_to(Time::from_nanos(0)).await;
+        TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let crypt = TestCrypt::new(0);
         let manager1 = Arc::new(KeyManager::new());
@@ -468,7 +468,7 @@ mod tests {
             assert_eq!(&buf, PLAIN_TEXT);
         });
 
-        TestExecutor::advance_to(Time::after(zx::Duration::from_millis(1500))).await;
+        TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_millis(1500))).await;
 
         task1.await;
         task2.await;
@@ -495,22 +495,22 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_purge() {
-        TestExecutor::advance_to(Time::from_nanos(0)).await;
+        TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let manager = Arc::new(KeyManager::new());
         manager.insert(1, &vec![(0, unwrapped_key(0))], false);
 
-        TestExecutor::advance_to(Time::after(PURGE_TIMEOUT.into())).await;
+        TestExecutor::advance_to(MonotonicInstant::after(PURGE_TIMEOUT.into())).await;
 
         // After 1 period, the key should still be present.
         manager.get(1).await.expect("get failed").expect("missing key");
 
-        TestExecutor::advance_to(Time::after(PURGE_TIMEOUT.into())).await;
+        TestExecutor::advance_to(MonotonicInstant::after(PURGE_TIMEOUT.into())).await;
 
         // The last access should have reset the timer and it should still be present.
         manager.get(1).await.expect("get failed").expect("missing key");
 
-        TestExecutor::advance_to(Time::after((2 * PURGE_TIMEOUT).into())).await;
+        TestExecutor::advance_to(MonotonicInstant::after((2 * PURGE_TIMEOUT).into())).await;
 
         // The key should have been evicted since two periods passed.
         assert!(manager.get(1).await.expect("get failed").is_none());
@@ -518,14 +518,14 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_permanent() {
-        TestExecutor::advance_to(Time::from_nanos(0)).await;
+        TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let manager = Arc::new(KeyManager::new());
         manager.insert(1, &vec![(0, unwrapped_key(0))], true);
         manager.insert(2, &vec![(0, unwrapped_key(0))], false);
 
         // Skip forward two periods which should cause 2 to be purged but not 1.
-        TestExecutor::advance_to(Time::after((2 * PURGE_TIMEOUT).into())).await;
+        TestExecutor::advance_to(MonotonicInstant::after((2 * PURGE_TIMEOUT).into())).await;
 
         assert!(manager.get(1).await.expect("get failed").is_some());
         assert!(manager.get(2).await.expect("get failed").is_none());
@@ -533,7 +533,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_clear() {
-        TestExecutor::advance_to(Time::from_nanos(0)).await;
+        TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let manager = Arc::new(KeyManager::new());
         manager.insert(1, &vec![(0, unwrapped_key(0))], true);
@@ -541,7 +541,7 @@ mod tests {
         manager.insert(3, &vec![(0, unwrapped_key(0))], false);
 
         // Skip forward 1 period which should make keys 2 and 3 pending deletion.
-        TestExecutor::advance_to(Time::after(PURGE_TIMEOUT.into())).await;
+        TestExecutor::advance_to(MonotonicInstant::after(PURGE_TIMEOUT.into())).await;
 
         // Touch the the second key which should promote it to the active list.
         assert!(manager.get(2).await.expect("get failed").is_some());
@@ -556,7 +556,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_error() {
-        TestExecutor::advance_to(Time::from_nanos(0)).await;
+        TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let crypt = TestCrypt::new(ERROR_COUNTER);
         let manager1 = Arc::new(KeyManager::new());
@@ -577,7 +577,7 @@ mod tests {
                 .is_err());
         });
 
-        TestExecutor::advance_to(Time::after(zx::Duration::from_seconds(1))).await;
+        TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_seconds(1))).await;
 
         task1.await;
         task2.await;

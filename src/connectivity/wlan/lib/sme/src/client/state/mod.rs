@@ -2700,7 +2700,7 @@ mod tests {
     fn expect_next_event_at_deadline<E: std::fmt::Debug>(
         executor: &mut fuchsia_async::TestExecutor,
         mut timed_event_stream: impl Stream<Item = timer::Event<E>> + std::marker::Unpin,
-        deadline: fuchsia_async::Time,
+        deadline: fuchsia_async::MonotonicInstant,
     ) -> timer::Event<E> {
         assert_variant!(executor.run_until_stalled(&mut timed_event_stream.next()), Poll::Pending);
         assert_eq!(deadline, executor.wake_next_timer().expect("expected pending timer"));
@@ -2714,7 +2714,7 @@ mod tests {
     #[test]
     fn simple_rsna_response_timeout_with_unresponsive_ap() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
         let bss = command.bss.clone();
@@ -2791,7 +2791,7 @@ mod tests {
     #[test]
     fn simple_retransmission_timeout_with_responsive_ap() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, _connect_txn_stream) = connect_command_wpa2(supplicant);
@@ -2906,7 +2906,7 @@ mod tests {
     #[test]
     fn retransmission_timeouts_do_not_extend_response_timeout() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
@@ -3059,7 +3059,7 @@ mod tests {
     #[test]
     fn simple_completion_timeout_with_responsive_ap() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
@@ -3093,7 +3093,7 @@ mod tests {
 
         // Send an initial EAPOL frame to SME. Advance the time to prevent scheduling
         // simultaneous response timeouts for simplicity.
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(100));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(100));
         let eapol_ind = fidl_mlme::EapolIndication {
             src_addr: bss.bssid.to_array(),
             dst_addr: fake_device_info().sta_addr,

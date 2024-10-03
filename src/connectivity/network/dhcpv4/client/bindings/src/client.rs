@@ -123,10 +123,10 @@ pub(crate) async fn serve_client(
 struct Clock;
 
 impl dhcp_client_core::deps::Clock for Clock {
-    type Instant = fasync::Time;
+    type Instant = fasync::MonotonicInstant;
 
     fn now(&self) -> Self::Instant {
-        fasync::Time::now()
+        fasync::MonotonicInstant::now()
     }
 
     async fn wait_until(&self, time: Self::Instant) {
@@ -137,7 +137,7 @@ impl dhcp_client_core::deps::Clock for Clock {
 /// Encapsulates all DHCP client state.
 struct Client {
     config: dhcp_client_core::client::ClientConfig,
-    core: dhcp_client_core::client::State<fasync::Time>,
+    core: dhcp_client_core::client::State<fasync::MonotonicInstant>,
     rng: rand::rngs::StdRng,
     stop_receiver: mpsc::UnboundedReceiver<()>,
     current_lease: Option<Lease>,
@@ -235,7 +235,7 @@ impl Client {
             start_time,
             lease_time,
             parameters,
-        }: dhcp_client_core::client::NewlyAcquiredLease<fasync::Time>,
+        }: dhcp_client_core::client::NewlyAcquiredLease<fasync::MonotonicInstant>,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let Self {
             core: _,
@@ -329,7 +329,7 @@ impl Client {
             start_time,
             lease_time,
             parameters,
-        }: dhcp_client_core::client::LeaseRenewal<fasync::Time>,
+        }: dhcp_client_core::client::LeaseRenewal<fasync::MonotonicInstant>,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let Self {
             core: _,
@@ -602,7 +602,7 @@ enum WatchConfigurationStep {
     CurrentLeaseAddressRemoved(
         (Option<fnet_interfaces_admin::AddressRemovalReason>, SpecifiedAddr<Ipv4Addr>),
     ),
-    CoreStep(Result<dhcp_client_core::client::Step<fasync::Time>, Error>),
+    CoreStep(Result<dhcp_client_core::client::Step<fasync::MonotonicInstant>, Error>),
 }
 
 fn into_fidl_list(list: Vec<std::net::Ipv4Addr>) -> Vec<fidl_fuchsia_net::Ipv4Address> {
