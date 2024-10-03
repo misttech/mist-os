@@ -195,25 +195,23 @@ size_t crashlog_to_string(ktl::span<char> target, zircon_crash_reason_t reason) 
   }
 
   if (static_cast<bool>(regions & RenderRegion::Dlog)) {
+    // Finally, if we have been configured to do so, render as much of the
+    // recent debug log as we can fit into the crashlog memory.
     constexpr ktl::string_view kHeader{"\n--- BEGIN DLOG DUMP ---\n"};
     constexpr ktl::string_view kFooter{"\n--- END DLOG DUMP ---\n"};
 
-    // Finally, if we have been configured to do so, render as much of the
-    // recent debug log as we can fit into the crashlog memory.
     outfile.Write(kHeader);
-
-    const ktl::span<char> available_region = outfile.available_region();
-    const ktl::span<char> payload_region =
-        available_region.size() > kFooter.size()
-            ? available_region.subspan(0, available_region.size() - kFooter.size())
-            : ktl::span<char>{};
-
     if (gBootOptions->render_dlog_to_crashlog) {
+      const ktl::span<char> available_region = outfile.available_region();
+      const ktl::span<char> payload_region =
+          available_region.size() > kFooter.size()
+              ? available_region.subspan(0, available_region.size() - kFooter.size())
+              : ktl::span<char>{};
+
       outfile.Skip(dlog_render_to_crashlog(payload_region));
     } else {
-      StringFile{payload_region}.Write("DLOG -> Crashlog disabled");
+      fprintf(&outfile, "DLOG -> Crashlog disabled\n");
     }
-
     outfile.Write(kFooter);
   }
 
