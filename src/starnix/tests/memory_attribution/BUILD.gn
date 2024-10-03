@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//src/starnix/build/starnix_linux_executable.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 group("tests") {
   testonly = true
@@ -92,7 +93,8 @@ fuchsia_test_package("starnix_memory_attribution_test") {
   subpackages = [
     ":mmap_anonymous_then_sleep_package",
     ":thread_group_leader_killed_package",
-    "//src/starnix/runner:starnix_package",
     "//src/starnix/containers/debian:debian_package",
   ]
+
+  subpackages += starnix_test_subpackages
 }

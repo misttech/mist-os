@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/power/system-activity-governor/meta/use-suspender-for-test-sag.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
         "syslog/offer.shard.cml",
@@ -16,6 +17,18 @@
             name: "debian_container",
             url: "debian#meta/debian_container.cm",
             environment: "#starnix_runner_env",
+        },
+        {
+            name: "power-broker",
+            url: "power-broker#meta/power-broker.cm",
+        },
+        {
+            name: "test-system-activity-governor",
+            url: "system-activity-governor#meta/system-activity-governor.cm",
+        },
+        {
+            name: "fake-hrtimer",
+            url: "fake-hrtimer#meta/fake-hrtimer.cm",
         },
     ],
     collections: [
@@ -47,9 +60,31 @@
             to: [ "#starnix_runner" ],
         },
         {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
             from: "self",
             to: "#starnix_runner",
-            config: "fuchsia.starnix.runner.EnableDataCollection",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: [
+                "#fake-hrtimer",
+                "#starnix_runner",
+                "#test-system-activity-governor",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "#test-system-activity-governor",
+            to: [ "#starnix_runner" ],
+        },
+        {
+            service: [ "fuchsia.hardware.suspend.SuspendService" ],
+            from: "parent",
+            to: [ "#test-system-activity-governor" ],
         },
     ],
     expose: [
