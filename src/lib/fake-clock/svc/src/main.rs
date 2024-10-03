@@ -16,6 +16,8 @@ use tracing::{debug, error, trace, warn};
 use zx::{self as zx, AsHandleRef, Peered};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use std::sync::{Arc, Mutex};
 
 const DEFAULT_INCREMENTS_MS: i64 = 10;
@@ -103,13 +105,24 @@ impl Ord for PendingDeadlineExpireEvent {
     }
 }
 
+struct TaskWithId {
+    _task: fasync::Task<()>,
+    id: usize,
+}
+
+impl Drop for TaskWithId {
+    fn drop(&mut self) {
+        trace!("dropping task: id={}", self.id);
+    }
+}
+
 /// The fake clock implementation.
 /// Type parameter `T` is used to observe events during testing.
 /// The empty tuple `()` implements `FakeClockObserver` and is meant to be used
 /// for production instances.
 struct FakeClock<T> {
     time: zx::MonotonicInstant,
-    free_running: Option<fasync::Task<()>>,
+    free_running: Option<TaskWithId>,
     pending_events: BinaryHeap<PendingEvent>,
     registered_events: HashMap<zx::Koid, RegisteredEvent>,
     pending_named_deadlines: BinaryHeap<PendingDeadlineExpireEvent>,
@@ -298,6 +311,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
         stop_point: StopPoint,
         eventpair: zx::EventPair,
     ) -> Result<(), zx::Status> {
+        trace!("setting stop point: {:?}", &stop_point);
         match self.registered_stop_points.entry(stop_point) {
             hash_map::Entry::Occupied(mut occupied) => {
                 match occupied
@@ -327,10 +341,12 @@ impl<T: FakeClockObserver> FakeClock<T> {
     }
 
     fn add_named_deadline(&mut self, pending_deadline: PendingDeadlineExpireEvent) {
+        trace!("adding pending deadline: {:?}", pending_deadline);
         let () = self.pending_named_deadlines.push(pending_deadline);
     }
 
     fn add_ignored_deadline(&mut self, ignored_deadline: DeadlineId) {
+        trace!("adding ignored deadline: {:?}", ignored_deadline);
         let _ = self.ignored_deadline_ids.insert(ignored_deadline);
     }
 
@@ -349,8 +365,8 @@ impl<T: FakeClockObserver> FakeClock<T> {
                 }
             }
         });
-        trace!("incrementing mock clock {:?} => {:?}", increment, dur);
         self.time += dur;
+        trace!("incrementing mock clock {:?} => {:?}; time now: {:?}", increment, dur, self.time);
         let () = self.check_events();
         if self.check_stop_points() {
             let () = self.stop_free_running();
@@ -358,31 +374,55 @@ impl<T: FakeClockObserver> FakeClock<T> {
     }
 
     fn stop_free_running(&mut self) {
-        // Dropping the task stops it being polled.
-        drop(self.free_running.take());
+        // Does this get canceled then?
+        drop(self.free_running.take().map(|t| {
+            debug!("stop free running at: {:?}, no more ticks allowed. id={}", self.time, t.id);
+            t
+        }));
     }
 }
 
 type FakeClockHandle<T> = Arc<Mutex<FakeClock<T>>>;
 
+// Starts the free-running clock. If you intend to start fake clock multiple
+// times, make sure to have an intervening [stop_free_running] call between
+// each two successive calls.
 fn start_free_running<T: FakeClockObserver>(
     mock_clock: &FakeClockHandle<T>,
     real_increment: zx::Duration,
     increment: Increment,
 ) {
+    static INSTANCE_ID: AtomicUsize = AtomicUsize::new(0);
+
     let mock_clock_clone = Arc::clone(&mock_clock);
 
     debug!(
         "start free running mock clock: real_increment={:?} increment={:?}",
         real_increment, increment
     );
-    mock_clock.lock().unwrap().free_running = Some(fasync::Task::local(async move {
-        let mut itv = fasync::Interval::new(real_increment);
+    let fr = &mut mock_clock.lock().unwrap().free_running;
+    assert!(
+        fr.is_none(),
+        "start_free_running called again without an intervening stop_free_running"
+    );
+    INSTANCE_ID.fetch_add(1, Ordering::SeqCst);
+    let id = INSTANCE_ID.load(Ordering::SeqCst);
+
+    debug!("creating task: id={}", id);
+    let task = fasync::Task::local(async move {
+        debug!("started task: id={}", id);
         loop {
-            itv.next().await;
+            // This must produce at most one .await yield. This way, when
+            // the task gets canceled, we are sure not to increment the
+            // stopped counter anymore.  If we used streams from fasync::Interval,
+            // we could not make that guarantee.
+            // See: b/369671675 for details.
+            fasync::Timer::new(real_increment).await;
+            debug!("tick: id={}", id);
             mock_clock_clone.lock().unwrap().increment(&increment);
         }
-    }));
+    });
+    *fr = Some(TaskWithId { _task: task, id });
 }
 
 fn stop_free_running<T: FakeClockObserver>(mock_clock: &FakeClockHandle<T>) {
@@ -739,7 +779,6 @@ mod tests {
         assert!(check_signaled(&client));
     }
 
-    #[ignore = "TODO: https://fxbug.dev/369696252 - Deflake and re-enable"]
     #[fuchsia::test]
     async fn test_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
@@ -798,10 +837,10 @@ mod tests {
         assert_eq!(clock_handle.lock().unwrap().time, future_deadline_timeout);
     }
 
-    #[ignore = "TODO: https://fxbug.dev/369696252 - Deflake and re-enable"]
     #[fuchsia::test]
     async fn test_ignored_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
+        warn!("checkpoint 1: {:?}", clock_handle.lock().unwrap().time);
         let () = start_free_running(
             &clock_handle,
             zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
@@ -813,6 +852,7 @@ mod tests {
             event_type: DeadlineEventType::Set
         }));
         assert!(clock_handle.lock().unwrap().is_free_running());
+        warn!("checkpoint 2: {:?}", clock_handle.lock().unwrap().time);
 
         // Time is not stopped if the other end of a registered event pair is dropped.
         let (client_event, server_event) = zx::EventPair::create();
@@ -824,6 +864,9 @@ mod tests {
                 server_event,
             )
             .expect("set stop point failed");
+        warn!("checkpoint 3: {:?}", clock_handle.lock().unwrap().time);
+
+        stop_free_running(&clock_handle);
         let () = start_free_running(
             &clock_handle,
             zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
@@ -834,9 +877,11 @@ mod tests {
             deadline_id: DEADLINE_ID.into(),
             event_type: DeadlineEventType::Set
         }));
+        warn!("checkpoint 3: {:?}", clock_handle.lock().unwrap().time);
         assert!(clock_handle.lock().unwrap().is_free_running());
         let () = stop_free_running(&clock_handle);
 
+        warn!("checkpoint 4: {:?}", clock_handle.lock().unwrap().time);
         // If we set two EXPIRED points and drop the handle of the earlier one, time should stop
         // on the later stop point.
         let future_deadline_timeout_1 =
@@ -876,18 +921,29 @@ mod tests {
             )
             .expect("set stop point failed");
         drop(client_event_1);
+
+        warn!("checkpoint 5: {:?}", clock_handle.lock().unwrap().time);
+        let start_time = clock_handle.lock().unwrap().time;
+        warn!("about to start free running from: {:?}", start_time);
+
         let () = start_free_running(
             &clock_handle,
             zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
             Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
         );
+        warn!("before signal");
         assert_eq!(
             fasync::OnSignals::new(&client_event_2, zx::Signals::EVENTPAIR_SIGNALED).await.unwrap()
                 & !zx::Signals::EVENTPAIR_PEER_CLOSED,
             zx::Signals::EVENTPAIR_SIGNALED
         );
+        warn!("after_signal");
         assert!(!clock_handle.lock().unwrap().is_free_running());
-        assert_eq!(clock_handle.lock().unwrap().time, future_deadline_timeout_2);
+        assert_eq!(
+            clock_handle.lock().unwrap().time,
+            future_deadline_timeout_2,
+            "left: actual; right: expected"
+        );
     }
 
     #[fuchsia::test]
