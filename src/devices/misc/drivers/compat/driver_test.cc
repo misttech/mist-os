@@ -829,7 +829,7 @@ class GlobalLoggerListTest : public testing::Test {
     auto ns = fdf::Namespace::Create(entries);
     ZX_ASSERT(ZX_OK == ns.status_value());
 
-    auto logger = fdf::Logger::Create(*ns, dispatcher(), name, FUCHSIA_LOG_INFO, false);
+    auto logger = fdf::Logger::Create2(*ns, dispatcher(), name, FUCHSIA_LOG_INFO, false);
     return std::shared_ptr<fdf::Logger>(logger.release());
   }
   async_dispatcher_t* dispatcher() { return fdf::Dispatcher::GetCurrent()->async_dispatcher(); }
