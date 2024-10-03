@@ -12,8 +12,8 @@ use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_filter_ext::{
     Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine,
-    InterfaceMatcher, IpHook, Namespace, NamespaceId, NatHook, Resource, ResourceId, Routine,
-    RoutineId, RoutineType, Rule, RuleId,
+    InterfaceMatcher, IpHook, Matchers, Namespace, NamespaceId, NatHook, Resource, ResourceId,
+    Routine, RoutineId, RoutineType, Rule, RuleId, TransportProtocolMatcher,
 };
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use futures::future::LocalBoxFuture;
@@ -21,7 +21,7 @@ use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6};
-use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::SpecifiedAddr;
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
@@ -145,6 +145,8 @@ pub(crate) trait SocketType {
     type Client;
     type Server;
 
+    fn matcher<I: Ip>() -> Matchers;
+
     async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs);
 
     async fn run_test<I: ping::FuchsiaIpExt>(
@@ -176,6 +178,10 @@ pub(crate) struct IrrelevantToTest;
 impl SocketType for IrrelevantToTest {
     type Client = <UdpSocket as SocketType>::Client;
     type Server = <UdpSocket as SocketType>::Server;
+
+    fn matcher<I: Ip>() -> Matchers {
+        <UdpSocket as SocketType>::matcher::<I>()
+    }
 
     async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
         let (Sockets { client, server }, addrs) = UdpSocket::bind_sockets(realms, addrs).await;
@@ -211,6 +217,16 @@ impl SocketType for TcpSocket {
     // without connecting it to a remote.
     type Client = socket2::Socket;
     type Server = fasync::net::AcceptStream;
+
+    fn matcher<I: Ip>() -> Matchers {
+        Matchers {
+            transport_protocol: Some(TransportProtocolMatcher::Tcp {
+                src_port: None,
+                dst_port: None,
+            }),
+            ..Default::default()
+        }
+    }
 
     async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
         let Realms { client, server } = realms;
@@ -408,6 +424,16 @@ impl SocketType for UdpSocket {
     type Client = fasync::net::UdpSocket;
     type Server = fasync::net::UdpSocket;
 
+    fn matcher<I: Ip>() -> Matchers {
+        Matchers {
+            transport_protocol: Some(TransportProtocolMatcher::Udp {
+                src_port: None,
+                dst_port: None,
+            }),
+            ..Default::default()
+        }
+    }
+
     async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
         let Realms { client, server } = realms;
         let Addrs { client: client_addr, server: server_addr } = addrs;
@@ -549,6 +575,16 @@ impl SocketType for IcmpSocket {
     // there is no requirement to bind the sockets up front.
     type Client = ();
     type Server = ();
+
+    fn matcher<I: Ip>() -> Matchers {
+        Matchers {
+            transport_protocol: Some(match I::VERSION {
+                IpVersion::V4 => TransportProtocolMatcher::Icmp,
+                IpVersion::V6 => TransportProtocolMatcher::Icmpv6,
+            }),
+            ..Default::default()
+        }
+    }
 
     async fn bind_sockets(_realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
         let Addrs { client: client_addr, server: server_addr } = addrs;
@@ -915,14 +951,6 @@ impl<'a> TestRealm<'a> {
         }
     }
 
-    pub(crate) fn incoming_subnets<I: TestIpExt>(&self) -> Subnets {
-        Subnets { src: self.remote_subnet, dst: self.local_subnet, other: I::OTHER_SUBNET }
-    }
-
-    pub(crate) fn outgoing_subnets<I: TestIpExt>(&self) -> Subnets {
-        Subnets { src: self.local_subnet, dst: self.remote_subnet, other: I::OTHER_SUBNET }
-    }
-
     pub(crate) async fn install_rule<I: TestIpExt, M: Matcher>(
         controller: &mut Controller,
         rule_id: RuleId,
@@ -992,52 +1020,25 @@ impl<'a> TestRealm<'a> {
         .await;
     }
 
-    pub(crate) async fn install_nat_rule_for_incoming_traffic<I: TestIpExt, M: Matcher>(
+    pub(crate) async fn install_nat_rule<I: TestIpExt>(
         &mut self,
         index: u32,
-        matcher: &M,
-        subnets: Subnets,
-        ports: Ports,
+        matchers: Matchers,
         action: Action,
     ) {
-        let Self { controller, nat_routine, interface, .. } = self;
-        Self::install_rule::<I, M>(
-            controller,
-            RuleId {
-                routine: nat_routine.clone().expect("NAT routine should be installed"),
-                index,
-            },
-            matcher,
-            Interfaces { ingress: Some(&interface), egress: None },
-            subnets,
-            ports,
-            action,
-        )
-        .await;
-    }
-
-    pub(crate) async fn install_nat_rule_for_outgoing_traffic<I: TestIpExt, M: Matcher>(
-        &mut self,
-        index: u32,
-        matcher: &M,
-        subnets: Subnets,
-        ports: Ports,
-        action: Action,
-    ) {
-        let Self { controller, nat_routine, interface, .. } = self;
-        Self::install_rule::<I, M>(
-            controller,
-            RuleId {
-                routine: nat_routine.clone().expect("NAT routine should be installed"),
-                index,
-            },
-            matcher,
-            Interfaces { ingress: None, egress: Some(&interface) },
-            subnets,
-            ports,
-            action,
-        )
-        .await;
+        let Self { controller, nat_routine, .. } = self;
+        controller
+            .push_changes(vec![Change::Create(Resource::Rule(Rule {
+                id: RuleId {
+                    routine: nat_routine.clone().expect("NAT routine should be installed"),
+                    index,
+                },
+                matchers,
+                action,
+            }))])
+            .await
+            .expect("push changes");
+        controller.commit().await.expect("commit changes");
     }
 
     pub(crate) async fn clear_filter(&mut self) {
