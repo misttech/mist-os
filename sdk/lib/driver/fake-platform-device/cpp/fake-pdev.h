@@ -13,7 +13,7 @@
 
 #include <map>
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace fdf_fake_platform_device {
 
@@ -85,10 +85,8 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
                     GetSmcByNameCompleter::Sync& completer) override;
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override;
-#endif
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -100,6 +98,6 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
 
 }  // namespace fdf_fake_platform_device
 
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 #endif  // LIB_DRIVER_FAKE_PLATFORM_DEVICE_CPP_FAKE_PDEV_H_
