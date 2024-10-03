@@ -609,6 +609,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 IPv6: {
@@ -623,6 +624,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 Counters: {
@@ -665,6 +667,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 IPv6: {
@@ -681,6 +684,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 NetworkDevice: {
@@ -756,7 +760,19 @@ async fn inspect_counters(name: &str) {
     println!("Got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Counters": {
-            "Bindings": contains {},
+            "Bindings": {
+                "Power": {
+                    DroppedRxLeases: 0u64,
+                },
+                "MulticastAdmin": {
+                    "V4": {
+                        DroppedRoutingEvents: 0u64,
+                    },
+                    "V6": {
+                        DroppedRoutingEvents: 0u64,
+                    },
+                },
+            },
             "Device": {
                 "Rx": {
                     TotalFrames: 1u64,
@@ -883,6 +899,7 @@ async fn inspect_counters(name: &str) {
                     UnspecifiedDst: 0u64,
                     UnspecifiedSrc: 0u64,
                     Dropped: 0u64,
+                    MulticastNoInterest: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
@@ -918,6 +935,7 @@ async fn inspect_counters(name: &str) {
                     DroppedNonUnicastSrc: 0u64,
                     DroppedExtensionHeader: 0u64,
                     DroppedLoopedBackDadProbe: 0u64,
+                    MulticastNoInterest: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
@@ -932,6 +950,46 @@ async fn inspect_counters(name: &str) {
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+            },
+            "MulticastForwarding": {
+                "V4": {
+                    PacketsReceived: 0u64,
+                    PacketsForwarded: 0u64,
+                    "PacketsNotForwardedWithReason": {
+                        InvalidKey: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        ForwardingDisabledForStack: 0u64,
+                        WrongInputDevice: 0u64,
+                    },
+                    PendingPackets: 0u64,
+                    PendingPacketsForwarded: 0u64,
+                    "PendingPacketsNotForwardedWithReason": {
+                        QueueFull: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        WrongInputDevice: 0u64,
+                        GarbageCollected: 0u64,
+                    },
+                    PendingTableGcRuns: 0u64,
+                },
+                "V6": {
+                    PacketsReceived: 0u64,
+                    PacketsForwarded: 0u64,
+                    "PacketsNotForwardedWithReason": {
+                        InvalidKey: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        ForwardingDisabledForStack: 0u64,
+                        WrongInputDevice: 0u64,
+                    },
+                    PendingPackets: 0u64,
+                    PendingPacketsForwarded: 0u64,
+                    "PendingPacketsNotForwardedWithReason": {
+                        QueueFull: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        WrongInputDevice: 0u64,
+                        GarbageCollected: 0u64,
+                    },
+                    PendingTableGcRuns: 0u64,
                 },
             },
             "RawIpSockets": {

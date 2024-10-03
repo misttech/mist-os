@@ -8,8 +8,11 @@ use alloc::collections::BTreeMap;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::sync::{Mutex, RwLock};
-use netstack3_base::{AnyDevice, CoreTimerContext, DeviceIdContext, StrongDeviceIdentifier};
+use netstack3_base::{
+    AnyDevice, CoreTimerContext, CounterContext, DeviceIdContext, StrongDeviceIdentifier,
+};
 
+use crate::internal::multicast_forwarding::counters::MulticastForwardingCounters;
 use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
 use crate::internal::multicast_forwarding::route::{MulticastRouteEntry, MulticastRouteKey};
 use crate::internal::multicast_forwarding::{
@@ -129,7 +132,7 @@ pub trait MulticastForwardingStateContext<I: IpLayerIpExt, BT: MulticastForwardi
             BT,
             DeviceId = Self::DeviceId,
             WeakDeviceId = Self::WeakDeviceId,
-        >;
+        > + CounterContext<MulticastForwardingCounters<I>>;
     /// Provides immutable access to the state.
     fn with_state<
         O,
@@ -154,11 +157,11 @@ pub trait MulticastRouteTableContext<I: IpLayerIpExt, BT: MulticastForwardingBin
 {
     /// The context available after locking the multicast route table.
     type Ctx<'a>: MulticastForwardingPendingPacketsContext<
-        I,
-        BT,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+            I,
+            BT,
+            DeviceId = Self::DeviceId,
+            WeakDeviceId = Self::WeakDeviceId,
+        > + CounterContext<MulticastForwardingCounters<I>>;
     /// Provides immutable access to the route table.
     fn with_route_table<
         O,

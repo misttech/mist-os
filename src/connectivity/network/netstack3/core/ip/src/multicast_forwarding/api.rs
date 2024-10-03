@@ -11,11 +11,12 @@ use log::warn;
 use net_types::ip::{Ip, IpVersionMarker};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    AnyDevice, AtomicInstant, ContextPair, CoreTimerContext, DeviceIdContext, InstantBindingsTypes,
-    InstantContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
+    AnyDevice, AtomicInstant, ContextPair, CoreTimerContext, CounterContext, DeviceIdContext,
+    InstantBindingsTypes, InstantContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 
 use crate::internal::base::IpLayerForwardingContext;
+use crate::internal::multicast_forwarding::counters::MulticastForwardingCounters;
 use crate::internal::multicast_forwarding::packet_queue::{PacketQueue, QueuedPacket};
 use crate::internal::multicast_forwarding::route::{
     Action, MulticastRoute, MulticastRouteEntry, MulticastRouteKey, MulticastRouteStats,
@@ -75,6 +76,7 @@ where
     C::CoreContext: MulticastForwardingStateContext<I, C::BindingsContext>
         + MulticastForwardingDeviceContext<I>
         + IpLayerForwardingContext<I, C::BindingsContext>
+        + CounterContext<MulticastForwardingCounters<I>>
         + CoreTimerContext<MulticastForwardingTimerId<I>, C::BindingsContext>,
     C::BindingsContext:
         IpLayerBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
@@ -281,7 +283,9 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
     key: MulticastRouteKey<I>,
     route: MulticastRoute<CC::DeviceId>,
 ) where
-    CC: IpLayerForwardingContext<I, BC> + MulticastForwardingDeviceContext<I>,
+    CC: IpLayerForwardingContext<I, BC>
+        + MulticastForwardingDeviceContext<I>
+        + CounterContext<MulticastForwardingCounters<I>>,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
 {
     let MulticastRoute { input_interface, action } = route;
@@ -298,7 +302,9 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
             "Dropping pending packets for newly installed multicast route: {key:?}. \
             Multicast forwarding is disabled on input interface: {input_interface:?}"
         );
-        // TODO(https://fxbug.dev/352570820): Increment a counter.
+        core_ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+            &counters.pending_packet_drops_disabled_dev
+        });
         return;
     }
 
@@ -315,7 +321,9 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
         };
         // Short circuit if the queued packet arrived on the wrong device.
         if device != input_interface {
-            // TODO(https://fxbug.dev/352570820): Increment a counter.
+            core_ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+                &counters.pending_packet_drops_wrong_dev
+            });
             bindings_ctx.on_event(
                 MulticastForwardingEvent::WrongInputInterface {
                     key: key.clone(),
@@ -334,9 +342,11 @@ fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
         // lock to update it again here, as the change in time will be
         // negligible.
 
-        // TODO(https://fxbug.dev/352570820): Increment a counter.
         match &action {
             Action::Forward(targets) => {
+                core_ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+                    &counters.pending_packet_tx
+                });
                 let packet_iter = RepeatN::new(packet, targets.len());
                 for (mut packet, MulticastRouteTarget { output_interface, min_ttl }) in
                     packet_iter.zip(targets.iter())
@@ -555,8 +565,9 @@ mod tests {
             |pending_table| !pending_table.contains(&right_key)
         ));
 
+        let expect_sent_packet = forwarding_enabled_for_dev && right_dev;
         let mut expected_sent_packets = vec![];
-        if forwarding_enabled_for_dev && right_dev {
+        if expect_sent_packet {
             expected_sent_packets.push(SentPacket {
                 dst: MulticastAddr::new(right_key.dst_addr()).unwrap(),
                 device: OUTPUT_DEV,
@@ -564,6 +575,7 @@ mod tests {
         }
         assert_eq!(api.core_ctx().state.take_sent_packets(), expected_sent_packets);
 
+        // Verify that multicast routing events are generated.
         let mut expected_events = vec![];
         if !right_dev {
             expected_events.push(IpLayerEvent::MulticastForwarding(
@@ -577,6 +589,19 @@ mod tests {
 
         let (_core_ctx, bindings_ctx) = api.contexts();
         assert_eq!(bindings_ctx.take_events(), expected_events);
+
+        // Verify that counters are updated.
+        api.core_ctx().with_counters(|counters: &MulticastForwardingCounters<I>| {
+            assert_eq!(counters.pending_packet_tx.get(), if expect_sent_packet { 1 } else { 0 });
+            assert_eq!(
+                counters.pending_packet_drops_disabled_dev.get(),
+                if forwarding_enabled_for_dev { 0 } else { 1 }
+            );
+            assert_eq!(
+                counters.pending_packet_drops_wrong_dev.get(),
+                if right_dev { 0 } else { 1 }
+            );
+        });
     }
 
     #[ip_test(I)]

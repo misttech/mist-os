@@ -335,8 +335,12 @@ impl<I: IpExt + FidlMulticastAdminIpExt> MulticastRoutingEventsWatcher<I> {
             if stashed_events.len() < MAX_ROUTING_EVENTS.into() {
                 stashed_events.push_back(event)
             } else {
-                // TODO(https://fxbug.dev/352570820): Increment a counter.
-                *dropped_events += 1
+                *dropped_events += 1;
+                ctx.bindings_ctx()
+                    .counters
+                    .multicast_admin::<I>()
+                    .dropped_routing_events
+                    .increment();
             }
         }
         Ok(())

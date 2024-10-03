@@ -12,6 +12,7 @@ use netstack3_ip::icmp::{
     IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
     NdpRxCounters, NdpTxCounters,
 };
+use netstack3_ip::multicast_forwarding::MulticastForwardingCounters;
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{IpCounters, IpLayerIpExt};
@@ -32,6 +33,8 @@ where
     C: ContextPair,
     C::CoreContext: CounterContext<IpCounters<Ipv4>>
         + CounterContext<IpCounters<Ipv6>>
+        + CounterContext<MulticastForwardingCounters<Ipv4>>
+        + CounterContext<MulticastForwardingCounters<Ipv6>>
         + CounterContext<RawIpSocketCounters<Ipv4>>
         + CounterContext<RawIpSocketCounters<Ipv6>>
         + CounterContext<UdpCounters<Ipv4>>
@@ -113,6 +116,18 @@ where
         });
         inspector.record_child("IPv6", |inspector| {
             self.core_ctx().with_counters(|ip| inspect_ip_counters::<Ipv6>(inspector, ip))
+        });
+        inspector.record_child("MulticastForwarding", |inspector| {
+            inspector.record_child("V4", |inspector| {
+                self.core_ctx().with_counters(|counters: &MulticastForwardingCounters<Ipv4>| {
+                    inspector.delegate_inspectable(counters)
+                })
+            });
+            inspector.record_child("V6", |inspector| {
+                self.core_ctx().with_counters(|counters: &MulticastForwardingCounters<Ipv6>| {
+                    inspector.delegate_inspectable(counters)
+                })
+            });
         });
         inspector.record_child("RawIpSockets", |inspector| {
             inspector.record_child("V4", |inspector| {
@@ -268,6 +283,7 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         dropped,
         tx_illegal_loopback_address,
         version_rx,
+        multicast_no_interest,
     } = counters;
     inspector.record_child("PacketTx", |inspector| {
         inspector.record_counter("Sent", send_ip_packet);
@@ -281,6 +297,7 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         inspector.record_counter("UnspecifiedDst", unspecified_destination);
         inspector.record_counter("UnspecifiedSrc", unspecified_source);
         inspector.record_counter("Dropped", dropped);
+        inspector.record_counter("MulticastNoInterest", multicast_no_interest);
         inspector.record_counter("DeliveredUnicast", deliver_unicast);
         inspector.record_counter("DeliveredMulticast", deliver_multicast);
         inspector.delegate_inspectable(version_rx);
