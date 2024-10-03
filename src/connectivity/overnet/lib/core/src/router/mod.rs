@@ -91,7 +91,6 @@ impl CircuitState {
 #[derive(Debug)]
 struct PeerMaps {
     circuit_clients: BTreeMap<NodeId, CircuitState>,
-    servers: BTreeMap<NodeId, Vec<Arc<Peer>>>,
 }
 
 /// Wrapper to get the right list_peers behavior.
@@ -205,10 +204,7 @@ impl Router {
         let router = Arc::new(Router {
             node_id,
             service_map,
-            peers: Mutex::new(PeerMaps {
-                circuit_clients: BTreeMap::new(),
-                servers: BTreeMap::new(),
-            }),
+            peers: Mutex::new(PeerMaps { circuit_clients: BTreeMap::new() }),
             proxied_streams: Mutex::new(HashMap::new()),
             pending_transfers: Mutex::new(PendingTransferMap::new()),
             task: Mutex::new(None),
@@ -655,6 +651,10 @@ impl Router {
             }
         }
     }
+
+    pub(crate) async fn client_closed(&self, peer_node_id: NodeId) {
+        self.peers.lock().await.circuit_clients.remove(&peer_node_id);
+    }
 }
 
 /// Runs our `ConnectionNode` to set up circuit-based peers.
@@ -699,6 +699,7 @@ async fn run_circuits(
                         reader,
                         router.service_map.new_local_service_observer().await,
                         &router,
+                        peer_node_id_num,
                     )?;
 
                     if let Some(CircuitState::Waiters(waiters)) = peers
@@ -721,25 +722,14 @@ async fn run_circuits(
         }
     };
 
-    // Loops over incoming connections, wraps them in a server-side Peer object and stuffs them in
-    // the PeerMaps table.
+    // Loops over incoming connections and starts servers.
     let new_conn_fut = async move {
         let mut connections = pin!(connections);
         while let Some(conn) = connections.next().await {
             let peer_name = conn.from().to_owned();
             let res = async {
                 let router = router.upgrade().ok_or_else(|| format_err!("router gone"))?;
-                let peer_node_id = NodeId::from_circuit_string(conn.from())
-                    .map_err(|_| format_err!("Invalid node id"))?;
-                let peer = Peer::new_circuit_server(conn, &router).await?;
-                router
-                    .peers
-                    .lock()
-                    .await
-                    .servers
-                    .entry(peer_node_id)
-                    .or_insert_with(Vec::new)
-                    .push(peer.clone());
+                Peer::new_circuit_server(conn, &router).await?;
                 Result::<_, Error>::Ok(())
             }
             .await;
