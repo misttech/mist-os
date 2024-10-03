@@ -12,8 +12,6 @@
 #include <threads.h>
 #include <zircon/threads.h>
 
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
-
 ParentDeviceDFv2::ParentDeviceDFv2(
     std::shared_ptr<fdf::Namespace> incoming,
     fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev, config::Config config)
@@ -118,7 +116,7 @@ ParentDeviceDFv2::GetPowerConfiguration() {
   for (const auto& wire : result.value()->config) {
     fuchsia_hardware_power::PowerElementConfiguration natural = fidl::ToNatural(wire);
 
-    zx::result config = power::from_fidl::CreatePowerElementConfiguration(natural);
+    zx::result config = fdf_power::PowerElementConfiguration::FromFidl(natural);
     if (config.is_error()) {
       DMESSAGE("Failed to parse power configuration: %s", config.status_string());
       return config.take_error();

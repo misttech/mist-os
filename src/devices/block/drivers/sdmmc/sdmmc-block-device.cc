@@ -24,7 +24,6 @@
 #include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "src/devices/block/lib/common/include/common.h"
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 #include "tools/power_config/lib/cpp/power_config.h"
 
 namespace sdmmc {
@@ -293,7 +292,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     {
       const fuchsia_hardware_power::PowerElementConfiguration& config_fidl =
           power_configs->power_elements()[i];
-      zx::result result = power::from_fidl::CreatePowerElementConfiguration(config_fidl);
+      zx::result result = fdf_power::PowerElementConfiguration::FromFidl(config_fidl);
       if (result.is_error()) {
         FDF_SLOG(ERROR, "Failed to parse power element configuration.", KV("index", i),
                  KV("status", result.status_string()));

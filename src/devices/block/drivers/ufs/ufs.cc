@@ -19,8 +19,6 @@
 
 #include <safemath/safe_conversions.h>
 
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
-
 namespace ufs {
 namespace {
 
@@ -1296,7 +1294,7 @@ zx::result<> Ufs::ConfigurePowerManagement() {
     {
       fuchsia_hardware_power::PowerElementConfiguration natural_config =
           fidl::ToNatural(wire_config);
-      zx::result result = power::from_fidl::CreatePowerElementConfiguration(natural_config);
+      zx::result result = fdf_power::PowerElementConfiguration::FromFidl(natural_config);
       if (result.is_error()) {
         FDF_SLOG(ERROR, "Failed to convert power element config from fidl.",
                  KV("status", result.status_string()));

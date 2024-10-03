@@ -1,1 +1,0 @@
-The purpose of this library is to convert fuchsia.hardware.power FIDL types to their respective counterparts found within the //sdk/lib/driver/power/cpp library.
