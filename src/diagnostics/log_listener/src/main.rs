@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
         .await
         .unwrap();
     let boot_ts = Timestamp::from_nanos(
-        fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicInstant::get().into_nanos(),
+        fuchsia_runtime::utc_time().into_nanos() - zx::BootInstant::get().into_nanos(),
     );
     let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
         &cmd,
