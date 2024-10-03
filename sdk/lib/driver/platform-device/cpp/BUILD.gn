@@ -7,7 +7,8 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 sdk_source_set("cpp") {
-  category = "internal"
+  category = "partner"
+  stable = false
   sdk_name = "driver_platform_device_cpp"
   include_base = "//sdk"
 
@@ -15,8 +16,6 @@ sdk_source_set("cpp") {
     "pdev.cc",
     "pdev.h",
   ]
-
-  non_sdk_deps = [ "//src/devices/power/lib/from-fidl/cpp" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",

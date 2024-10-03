@@ -18,6 +18,8 @@
 #include <string>
 #include <type_traits>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 namespace fdf {
 
 // A helper class that wraps the `fuchsia.hardware.platform.device/Device` FIDL calls.
@@ -87,7 +89,6 @@ class PDev {
   };
   zx::result<BoardInfo> GetBoardInfo() const;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::result<std::vector<fdf_power::PowerElementConfiguration>> GetPowerConfiguration();
 
   /// Uses the provided namespace and platform device instance to get a power
@@ -99,7 +100,6 @@ class PDev {
   /// information.
   fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> GetAndApplyPowerConfiguration(
       const fdf::Namespace& ns);
-#endif
 
   bool is_valid() const { return pdev_.is_valid(); }
 
@@ -139,5 +139,7 @@ zx::result<fdf::MmioBuffer> PDevMakeMmioBufferWeak(PDev::MmioInfo& pdev_mmio,
                                                    uint32_t cache_policy);
 }  // namespace internal
 }  // namespace fdf
+
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 #endif  // LIB_DRIVER_PLATFORM_DEVICE_CPP_PDEV_H_

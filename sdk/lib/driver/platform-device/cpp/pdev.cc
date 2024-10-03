@@ -4,7 +4,7 @@
 
 #include <lib/driver/platform-device/cpp/pdev.h>
 
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace fdf {
 
@@ -20,7 +20,8 @@ zx::result<fdf::MmioBuffer> PDev::MapMmio(uint32_t index, uint32_t cache_policy)
 }
 
 zx::result<PDev::MmioInfo> PDev::GetMmio(uint32_t index) const {
-  fidl::WireResult result = pdev_->GetMmioById(index);
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMmioById> result =
+      pdev_->GetMmioById(index);
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
@@ -41,7 +42,8 @@ zx::result<PDev::MmioInfo> PDev::GetMmio(uint32_t index) const {
 }
 
 zx::result<zx::interrupt> PDev::GetInterrupt(uint32_t index, uint32_t flags) const {
-  fidl::WireResult result = pdev_->GetInterruptById(index, flags);
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptById> result =
+      pdev_->GetInterruptById(index, flags);
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
@@ -52,7 +54,8 @@ zx::result<zx::interrupt> PDev::GetInterrupt(uint32_t index, uint32_t flags) con
 }
 
 zx::result<zx::bti> PDev::GetBti(uint32_t index) const {
-  fidl::WireResult result = pdev_->GetBtiById(index);
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetBtiById> result =
+      pdev_->GetBtiById(index);
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
@@ -63,7 +66,8 @@ zx::result<zx::bti> PDev::GetBti(uint32_t index) const {
 }
 
 zx::result<zx::resource> PDev::GetSmc(uint32_t index) const {
-  fidl::WireResult result = pdev_->GetSmcById(index);
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetSmcById> result =
+      pdev_->GetSmcById(index);
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
@@ -74,7 +78,8 @@ zx::result<zx::resource> PDev::GetSmc(uint32_t index) const {
 }
 
 zx::result<PDev::DeviceInfo> PDev::GetDeviceInfo() const {
-  fidl::WireResult result = pdev_->GetNodeDeviceInfo();
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetNodeDeviceInfo> result =
+      pdev_->GetNodeDeviceInfo();
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
@@ -115,7 +120,8 @@ zx::result<PDev::DeviceInfo> PDev::GetDeviceInfo() const {
 }
 
 zx::result<PDev::BoardInfo> PDev::GetBoardInfo() const {
-  fidl::WireResult result = pdev_->GetBoardInfo();
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetBoardInfo> result =
+      pdev_->GetBoardInfo();
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
@@ -139,9 +145,9 @@ zx::result<PDev::BoardInfo> PDev::GetBoardInfo() const {
   return zx::ok(out_info);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx::result<std::vector<fdf_power::PowerElementConfiguration>> PDev::GetPowerConfiguration() {
-  fidl::WireResult result = pdev_->GetPowerConfiguration();
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration> result =
+      pdev_->GetPowerConfiguration();
   if (!result.ok()) {
     return zx::error(result.status());
   }
@@ -152,7 +158,7 @@ zx::result<std::vector<fdf_power::PowerElementConfiguration>> PDev::GetPowerConf
   std::vector<fdf_power::PowerElementConfiguration> configs;
   configs.reserve(result.value()->config.count());
   for (const auto& fidl_config : result.value()->config) {
-    zx::result config = power::from_fidl::CreatePowerElementConfiguration(fidl_config);
+    zx::result config = fdf_power::PowerElementConfiguration::FromFidl(fidl_config);
     if (config.is_error()) {
       return zx::error(config.status_value());
     }
@@ -174,7 +180,6 @@ PDev::GetAndApplyPowerConfiguration(const fdf::Namespace& ns) {
 
   return fdf_power::ApplyPowerConfiguration(ns, configs.value());
 }
-#endif
 
 namespace internal {
 // Regular implementation for drivers. Tests might override this.
@@ -186,3 +191,5 @@ namespace internal {
 }  // namespace internal
 
 }  // namespace fdf
+
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
