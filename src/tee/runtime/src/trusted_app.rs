@@ -11,6 +11,12 @@ use anyhow::Error;
 use fidl_fuchsia_tee::{OpResult, Parameter, ReturnOrigin};
 use tee_internal::binding::TEE_SUCCESS;
 
+// Reserve 0 as the canonically invalid session ID.
+//
+// TODO(https://fxbug.dev/371215993): Teach the client FIDL library about this value and add tests
+// around its return and use.
+const INVALID_SESSION_ID: u32 = 0;
+
 // This structure stores the entry points to the TA and application-specific
 // state like sessions.
 pub struct TrustedApp<T: TAInterface> {
@@ -25,7 +31,7 @@ impl<T: TAInterface> TrustedApp<T> {
         if result != TEE_SUCCESS {
             anyhow::bail!("Create callback failed: {result:?}");
         }
-        Ok(Self { interface, sessions: BTreeMap::new(), next_session_id: 1 })
+        Ok(Self { interface, sessions: BTreeMap::new(), next_session_id: INVALID_SESSION_ID + 1 })
     }
 
     fn allocate_session_id(&mut self) -> u32 {
@@ -49,9 +55,15 @@ impl<T: TAInterface> TrustedApp<T> {
             adapter.tee_params_mut().as_mut_ptr(),
             &mut session_context,
         );
+        let session_id = match ta_result {
+            TEE_SUCCESS => {
+                let session_id = self.allocate_session_id();
+                let _ = self.sessions.insert(session_id, session_context);
+                session_id
+            }
+            _ => INVALID_SESSION_ID,
+        };
         let return_params = adapter.export_to_fidl()?;
-        let session_id = self.allocate_session_id();
-        let _ = self.sessions.insert(session_id, session_context);
         let op_result = OpResult {
             return_code: Some(ta_result as u64),
             return_origin: Some(ReturnOrigin::TrustedApplication),
