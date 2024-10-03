@@ -113,8 +113,10 @@ struct ControlHeader {
     _padding: [u8; 16],
 }
 
+const RING_ALIGNMENT: usize = 64;
+
 // From params.cq_off.cqes reported by sys_io_uring_setup.
-static_assertions::const_assert_eq!(std::mem::size_of::<ControlHeader>(), 64);
+static_assertions::const_assert_eq!(std::mem::size_of::<ControlHeader>(), RING_ALIGNMENT);
 
 /// An entry in the submission queue.
 ///
@@ -260,6 +262,10 @@ static_assertions::const_assert_eq!(
 
 const CQES_OFFSET: usize = std::mem::size_of::<ControlHeader>();
 
+#[inline]
+fn align_ring_field(offset: usize) -> usize {
+    offset.next_multiple_of(RING_ALIGNMENT)
+}
 struct IoUringMetadata {
     /// The number of entries in the submission queue.
     sq_entries: u32,
@@ -284,7 +290,8 @@ impl IoUringMetadata {
 
     /// The offset of submission queue indirection array in the `ring_buffer` VMO.
     fn array_offset(&self) -> usize {
-        CQES_OFFSET + self.cq_entries as usize * std::mem::size_of::<io_uring_cqe>()
+        CQES_OFFSET
+            + align_ring_field(self.cq_entries as usize * std::mem::size_of::<io_uring_cqe>())
     }
 
     /// The offset of submission queue indirection array entry with the given index in the

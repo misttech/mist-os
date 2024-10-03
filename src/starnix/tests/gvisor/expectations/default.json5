@@ -387,7 +387,6 @@
                 "IOUringTest.NonNullSigsetTest",
                 "IOUringTest.READVWithInvalidSqeFieldValue",
                 "IOUringTest.ReturnedParamsValues",
-                "IOUringTest.SqeIndexArrayCacheAligned",
 
                 // iptables_test
                 "IPTablesBasic.GetRevision",
