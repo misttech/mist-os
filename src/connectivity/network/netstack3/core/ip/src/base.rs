@@ -39,8 +39,8 @@ use netstack3_base::{
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
     FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
-    ForwardedPacket, IngressVerdict, IpPacket, NatType, NestedWithInnerIpPacket,
-    TransportPacketSerializer, Tuple,
+    ForwardedPacket, IngressVerdict, IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
+    Tuple,
 };
 use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
@@ -468,8 +468,9 @@ impl<
         self.with_filter_state(|state| {
             let conn = state.conntrack.get_connection(&tuple)?;
 
-            // If NAT has not been configured for the connection, return None.
-            let _: NatType = conn.external_data().nat_type()?;
+            if !conn.destination_nat() {
+                return None;
+            }
 
             // The tuple marking the original direction of the connection is
             // never modified by NAT. This means it can be used to recover the
