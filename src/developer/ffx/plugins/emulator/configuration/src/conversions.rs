@@ -107,8 +107,7 @@ fn convert_v2_bundle_to_configs(
         audio: virtual_device.hardware.audio.clone(),
         cpu: VirtualCpu {
             architecture: virtual_device.hardware.cpu.arch.clone(),
-            // TODO(https://fxbug.dev/42170191): Add a count parameter to the virtual_device cpu field.
-            count: usize::default(),
+            count: virtual_device.hardware.cpu.count,
         },
         memory: virtual_device.hardware.memory.clone(),
         pointing_device: virtual_device.hardware.inputs.pointing_device.clone(),
@@ -219,7 +218,7 @@ mod tests {
             description: Some("A fake virtual device".to_string()),
             kind: ElementType::VirtualDevice,
             hardware: Hardware {
-                cpu: Cpu { arch: CpuArchitecture::X64 },
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
                 audio: AudioDevice { model: AudioModel::Hda },
                 storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
@@ -267,7 +266,7 @@ mod tests {
             },
         ]);
         device.hardware = Hardware {
-            cpu: Cpu { arch: CpuArchitecture::Arm64 },
+            cpu: Cpu { arch: CpuArchitecture::Arm64, count: 4 },
             audio: AudioDevice { model: AudioModel::None },
             storage: DataAmount { quantity: 8, units: DataUnits::Gigabytes },
             inputs: InputDevice { pointing_device: PointingDevice::Touch },
@@ -374,7 +373,7 @@ mod tests {
             description: Some("A fake virtual device".to_string()),
             kind: ElementType::VirtualDevice,
             hardware: Hardware {
-                cpu: Cpu { arch: CpuArchitecture::X64 },
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
                 audio: AudioDevice { model: AudioModel::Hda },
                 storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
@@ -430,7 +429,7 @@ mod tests {
             description: Some("A fake virtual device".to_string()),
             kind: ElementType::VirtualDevice,
             hardware: Hardware {
-                cpu: Cpu { arch: CpuArchitecture::X64 },
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
                 audio: AudioDevice { model: AudioModel::Hda },
                 storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },

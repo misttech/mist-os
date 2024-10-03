@@ -23,6 +23,7 @@ def _fuchsia_virtual_device_impl(ctx):
             "hardware": {
                 "cpu": {
                     "arch": ctx.attr.arch,
+                    "count": ctx.attr.cpu_count,
                 },
                 "audio": {
                     "model": "hda",
@@ -79,6 +80,10 @@ fuchsia_virtual_device = rule(
             doc = "The architecture of the cpu.",
             values = [ARCH.X64, ARCH.ARM64, ARCH.RISCV64],
             mandatory = True,
+        ),
+        "cpu_count": attr.int(
+            doc = "The number of CPUs",
+            default = 4,
         ),
         "window_width_px": attr.int(
             doc = "Width of the virtual device's screen, in pixels.",

@@ -64,7 +64,10 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) -> ShowDetail {
         )),
         kind: ElementType::VirtualDevice,
         hardware: Hardware {
-            cpu: Cpu { arch: emu_config.device.cpu.architecture.clone() },
+            cpu: Cpu {
+                arch: emu_config.device.cpu.architecture.clone(),
+                count: emu_config.device.cpu.count,
+            },
             audio: emu_config.device.audio.clone(),
             storage: emu_config.device.storage.clone(),
             inputs: InputDevice { pointing_device: emu_config.device.pointing_device.clone() },

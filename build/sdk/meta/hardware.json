@@ -10,10 +10,14 @@
                             "properties": {
                                 "arch": {
                                     "type": "string"
+                                },
+                                "count": {
+                                    "type": "integer"
                                 }
                             },
                             "required": [
-                                "arch"
+                                "arch",
+                                "count"
                             ],
                             "type": "object"
                         }

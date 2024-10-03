@@ -313,7 +313,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use emulator_instance::{GuestConfig, HostConfig, NetworkingMode};
+    use emulator_instance::{DeviceConfig, GuestConfig, HostConfig, NetworkingMode, VirtualCpu};
     use ffx_emulator_config::AudioModel;
     use serde::Serialize;
 
@@ -823,6 +823,10 @@ mod tests {
                 ..Default::default()
             },
             host: HostConfig { networking: NetworkingMode::None, ..Default::default() },
+            device: DeviceConfig {
+                cpu: VirtualCpu { architecture: sdk_metadata::CpuArchitecture::X64, count: 2 },
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -837,7 +841,7 @@ mod tests {
             "-m",
             "0",
             "-smp",
-            "4,threads=2",
+            "2,threads=2",
             "-qmp-pretty",
             "unix:/qmp,server,nowait",
             "-monitor",
@@ -880,6 +884,10 @@ mod tests {
                 ovmf_vars: "/some/ovmf_vars.fd".into(),
                 ..Default::default()
             },
+            device: DeviceConfig {
+                cpu: VirtualCpu { architecture: sdk_metadata::CpuArchitecture::X64, count: 2 },
+                ..Default::default()
+            },
             host: HostConfig { networking: NetworkingMode::None, ..Default::default() },
             ..Default::default()
         };
@@ -899,7 +907,7 @@ mod tests {
             "-m",
             "0",
             "-smp",
-            "4,threads=2",
+            "2,threads=2",
             "-qmp-pretty",
             "unix:/qmp,server,nowait",
             "-monitor",

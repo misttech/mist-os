@@ -16,6 +16,13 @@ use std::collections::HashMap;
 pub struct Cpu {
     /// Target CPU architecture.
     pub arch: CpuArchitecture,
+    /// Count of CPUs present. For backwards compatibility, defaults to 4 when deserializing old data.
+    #[serde(default = "default_cpu_count")]
+    pub count: usize,
+}
+
+fn default_cpu_count() -> usize {
+    4
 }
 
 /// Details of virtual input devices, such as mice.

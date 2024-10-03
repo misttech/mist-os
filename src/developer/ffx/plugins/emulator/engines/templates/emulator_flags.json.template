@@ -27,9 +27,9 @@
         "-smp",
         {{! These should probably be predicated on the host CPU. }}
         {{#if (eq device.cpu.architecture "x64")}}
-            "4,threads=2",
+            "{{device.cpu.count}},threads=2",
         {{else}}
-          "4",
+          "{{device.cpu.count}}",
         {{/if}}
         {{#if guest.disk_image}}
             {{#if (eq device.cpu.architecture "riscv64")}}
