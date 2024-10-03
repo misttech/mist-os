@@ -56,11 +56,13 @@ if (bump_api_level) {
     # the version_history file.
     deps = [ "//sdk:generate_compatibility_goldens($default_toolchain)" ]
 
+    # To enable rapid development of this script, comment out the deps above.
+    # Before each run, `git checkout` the first two files below.
     script = "//scripts/versioning/update_platform_version.py"
 
     _version_history_file = "//sdk/version_history.json"
-    _fidl_compatiblity_doc_path =
-        "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
+    _availability_levels_file_path =
+        "//zircon/system/public/zircon/availability_levels.inc"
     _stamp_file = "$target_out_dir/$target_name.status"
 
     # The next API level is the last frozen API level + 1.
@@ -86,14 +88,12 @@ if (bump_api_level) {
     _next_numbered_api_level = _max_frozen_api_level + 1
 
     args = [
-      "--stamp-file",
-      rebase_path(_stamp_file, root_build_dir),
       "--root-source-dir",
       rebase_path("//", root_build_dir),
-      "--sdk-version-history",
+      "--sdk-version-history-path",
       rebase_path(_version_history_file, root_build_dir),
-      "--fidl-compatibility-doc-path",
-      rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
+      "--availability-levels-file-path",
+      rebase_path(_availability_levels_file_path, root_build_dir),
       "--new-api-level",
       "$_next_numbered_api_level",
     ]
