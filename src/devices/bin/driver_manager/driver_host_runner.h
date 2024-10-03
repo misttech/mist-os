@@ -30,20 +30,16 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   class DriverHost : public fbl::DoublyLinkedListable<std::unique_ptr<DriverHost>> {
    public:
-    DriverHost(zx::process process, zx::thread thread, zx::vmar root_vmar)
-        : process_(std::move(process)),
-          thread_(std::move(thread)),
-          root_vmar_(std::move(root_vmar)) {}
+    DriverHost(zx::process process, zx::vmar root_vmar)
+        : process_(std::move(process)), root_vmar_(std::move(root_vmar)) {}
 
     // Returns duplicate handles that can be passed to the loader process.
-    zx_status_t GetDuplicateHandles(zx::process* out_process, zx::thread* out_thread,
-                                    zx::vmar* out_root_vmar);
+    zx_status_t GetDuplicateHandles(zx::process* out_process, zx::vmar* out_root_vmar);
 
     const zx::process& process() const { return process_; }
 
    private:
     zx::process process_;
-    zx::thread thread_;
     zx::vmar root_vmar_;
   };
 
@@ -82,8 +78,8 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
                       std::string_view name, zx::channel bootstrap_receiver,
                       StartDriverHostCallback callback);
 
-  // Creates the process and starting thread for a driver host.
-  zx::result<DriverHost*> CreateDriverHost(std::string_view name);
+  // Creates the process for a driver host.
+  zx::result<DriverHost*> CreateDriverHostProcess(std::string_view name);
 
   zx::result<> CallCallback(zx_koid_t koid, zx::result<StartedComponent> component);
 

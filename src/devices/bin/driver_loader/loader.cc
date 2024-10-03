@@ -58,7 +58,7 @@ std::unique_ptr<Loader> Loader::Create(async_dispatcher_t* dispatcher) {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
-    zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
+    zx::process process, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
     fidl::ClientEnd<fuchsia_io::Directory> lib_dir, zx::channel bootstrap_receiver) {
   auto diag = MakeDiagnostics();
 
@@ -146,6 +146,13 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
   // Commit the VMARs and mappings.
   linker.Commit();
 
+  constexpr std::string_view kThreadName = "driver-host-initial-thread";
+  zx::thread thread;
+  zx_status_t status =
+      zx::thread::create(process, kThreadName.data(), kThreadName.size(), 0, &thread);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
   auto preloaded_modules = linker.PreloadedImplicit(*init_result);
   // Start the process.
   auto process_state = ProcessState::Create(remote_abi_stub_, std::move(process), std::move(thread),
@@ -157,7 +164,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
   }
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
-  zx_status_t status = process_state->BindServer(dispatcher_, std::move(server_end));
+  status = process_state->BindServer(dispatcher_, std::move(server_end));
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to bind server endpoint to process state: %s",
          zx_status_get_string(status));

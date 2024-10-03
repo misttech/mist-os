@@ -30,9 +30,9 @@ class Loader {
  public:
   static std::unique_ptr<Loader> Create(async_dispatcher_t* dispatcher);
 
-  // Loads the executable |exec| with |vdso| into |process|, and begins the execution on |thread|.
+  // Launches the |exec| driver host binary into |process|.
   zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Start(
-      zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
+      zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
       fidl::ClientEnd<fuchsia_io::Directory> lib_dir, zx::channel bootstrap_receiver);
 
  private:
