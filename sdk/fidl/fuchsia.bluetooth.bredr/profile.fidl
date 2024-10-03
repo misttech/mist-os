@@ -268,19 +268,25 @@ open protocol Profile {
         1: services vector<ServiceDefinition>:MAX_SERVICES_PER_ADVERTISEMENT;
     }) error fuchsia.bluetooth.ErrorCode;
 
-    /// Register a search for services on newly connected peers.  The SearchResults protocol will be
-    /// used to report results for this search.  Any service result with a service matching
-    /// `service_uuid` will be returned with the additional attributes in `attr_ids`.  If `attr_ids`
-    /// is empty or omitted, all attributes will be requested.  The additional attribute
-    /// BLUETOOTH_PROTOCOL_DESCRIPTOR_LIST is always requested.  See the Bluetooth Spec v5.2, Vol 3,
-    /// Part B, Section 5) and relevant profile specification documents.
+    /// Register a search for services on newly connected peers. The SearchResults protocol will be
+    /// used to report results for this search.
+    /// Only one of `service_uuid` or `full_uuid` must be present. Any service result with a service
+    /// matching the specified UUID will be returned with the additional attributes in `attr_ids`.
+    /// If both `service_uuid` and `full_uuid` are present, then `ZX_ERR_INVALID_ARGS` will be
+    /// returned.
+    /// If `attr_ids` is empty or omitted, all attributes will be requested. The additional
+    /// attribute BLUETOOTH_PROTOCOL_DESCRIPTOR_LIST is always requested. See the Bluetooth
+    /// Spec v5.2, Vol 3, Part B, Section 5) and relevant profile specification documents.
     flexible Search(resource table {
-        /// Required.
+        /// Required - only one of `service_uuid` or `full_uuid` should be present.
         1: service_uuid ServiceClassProfileIdentifier;
         /// Optional.
         2: attr_ids vector<uint16>:MAX_ATTRIBUTES;
         /// Required.
         3: results client_end:SearchResults;
+        /// Required - only one of `full_uuid` or `service_uuid` should be present.
+        @available(added=NEXT)
+        4: full_uuid fuchsia.bluetooth.Uuid;
     });
 
     /// Connect an L2CAP or RFCOMM channel to the connected peer identified by `peer_id` using the
