@@ -278,22 +278,6 @@ impl<'a> TestRealm<'a> {
         .context(S::DEBUG_NAME)
     }
 
-    /// Connects to a protocol within the realm by path.
-    pub fn connect_to_protocol_at_path<S>(&self, protocol_path: &str) -> Result<S::Proxy>
-    where
-        S: fidl::endpoints::DiscoverableProtocolMarker,
-    {
-        (|| {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<S>().context("create proxy")?;
-            let () = self
-                .connect_to_protocol_at_path_with_server_end(protocol_path, server_end)
-                .context("connect to protocol name with server end")?;
-            Result::Ok(proxy)
-        })()
-        .with_context(|| format!("{} at {protocol_path}", S::DEBUG_NAME))
-    }
-
     /// Opens the diagnostics directory of a component.
     pub fn open_diagnostics_directory(&self, child_name: &str) -> Result<fio::DirectoryProxy> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -309,19 +293,8 @@ impl<'a> TestRealm<'a> {
         &self,
         server_end: fidl::endpoints::ServerEnd<S>,
     ) -> Result {
-        self.connect_to_protocol_at_path_with_server_end(S::PROTOCOL_NAME, server_end)
-    }
-
-    /// Connects to a protocol at a path within the realm.
-    pub fn connect_to_protocol_at_path_with_server_end<
-        S: fidl::endpoints::DiscoverableProtocolMarker,
-    >(
-        &self,
-        protocol_path: &str,
-        server_end: fidl::endpoints::ServerEnd<S>,
-    ) -> Result {
         self.realm
-            .connect_to_protocol(protocol_path, None, server_end.into_channel())
+            .connect_to_protocol(S::PROTOCOL_NAME, None, server_end.into_channel())
             .context("connect to protocol")
     }
 
