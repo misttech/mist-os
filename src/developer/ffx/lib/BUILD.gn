@@ -2,63 +2,74 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-assert(is_host)
+if (is_host) {
+  libs = [
+    # keep-sorted start
+    "addr",
+    "buildid",
+    "compat_info",
+    "daemonize",
+    "discovery",
+    "doctor_utils",
+    "emulator_instance",
+    "errors",
+    "fastboot",
+    "fastboot_file_discovery",
+    "fho",
+    "fidl-fuchsia-developer-ffx-ext",
+    "fuchsia-controller",
+    "isolate",
+    "manual_targets",
+    "mdns_discovery",
+    "metrics",
+    "netext",
+    "pbms",
+    "pkg",
+    "protocols",
+    "rcs",
+    "sdk",
+    "ssh",
+    "stream_util",
+    "symbol-index",
+    "symbolize",
+    "target",
+    "tasks",
+    "testing",
+    "timeout",
+    "usb_fastboot_discovery",
+    "version",
+    "writer",
 
-libs = [
-  "addr",
-  "buildid",
-  "compat_info",
-  "daemonize",
-  "discovery",
-  "doctor_utils",
-  "emulator_instance",
-  "errors",
-  "fastboot",
-  "fho",
-  "fidl-fuchsia-developer-ffx-ext",
-  "fuchsia-controller",
-  "isolate",
-  "manual_targets",
-  "metrics",
-  "mdns_discovery",
-  "netext",
-  "pbms",
-  "pkg",
-  "protocols",
-  "rcs",
-  "sdk",
-  "ssh",
-  "stream_util",
-  "symbol-index",
-  "tasks",
-  "testing",
-  "timeout",
-  "fastboot_file_discovery",
-  "usb_fastboot_discovery",
-  "version",
-  "writer",
-  "target",
-]
+    # keep-sorted end
+  ]
 
-group("tests") {
-  testonly = true
-
-  deps = []
-  foreach(lib, libs) {
-    deps += [ "${lib}:tests" ]
+  group("tests") {
+    testonly = true
+    deps = []
+    foreach(lib, libs) {
+      deps += [ "${lib}:tests" ]
+    }
   }
-}
 
-group("host_tests") {
-  testonly = true
-  deps = [ "e2e_emu:host_tests" ]
-}
+  group("host_tests") {
+    testonly = true
+    deps = [
+      "e2e_emu:host_tests",
+      "symbolize:host_tests",
+    ]
+  }
 
-group("lib") {
-  testonly = true
+  group("lib") {
+    testonly = true
 
-  deps = []
-  foreach(lib, libs) {
-    deps += [ lib ]
+    deps = []
+    foreach(lib, libs) {
+      deps += [ lib ]
+    }
+  }
+} else if (is_fuchsia) {
+  group("package_deps_for_host_tests") {
+    testonly = true
+    deps = [ "symbolize:package_deps_for_host_tests" ]
   }
 }

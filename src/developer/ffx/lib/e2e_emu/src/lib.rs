@@ -5,7 +5,7 @@
 use anyhow::{ensure, Context as _};
 use async_stream::stream;
 use diagnostics_data::LogsData;
-use ffx_config::TestEnv;
+use ffx_config::{EnvironmentContext, TestEnv};
 use ffx_isolate::Isolate;
 use fuchsia_async::TimeoutExt;
 use futures::channel::mpsc::TrySendError;
@@ -171,6 +171,10 @@ impl IsolatedEmulator {
         }
 
         Ok(this)
+    }
+
+    pub fn env_context(&self) -> &EnvironmentContext {
+        self.ffx_isolate.env_context()
     }
 
     fn make_args<'a>(&'a self, args: &[&'a str]) -> Vec<&str> {
