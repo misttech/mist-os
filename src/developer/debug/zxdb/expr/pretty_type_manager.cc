@@ -270,8 +270,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
       }
     }
   )";
-  GetterList tree_getter_list{{"size", "__tree_.__size_"},
-                              {"empty", "__tree_.__size_ == 0"}};
+  GetterList tree_getter_list{{"size", "__tree_.__size_"}, {"empty", "__tree_.__size_ == 0"}};
   cpp_.emplace_back(InternalGlob("std::__2::set<*>"),
                     std::make_unique<PrettyGenericContainer>(
                         tree_before_emit + "$zxdb::AppendNameValueRow(\"\", cur_node.__value_);\n" +
@@ -324,8 +323,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
       cur_node_ptr = cur_node.__next_;
     }
   )";
-  GetterList hash_table_getter_list{{"size", "__tree_.__size_"},
-                                    {"empty", "__tree_.__size_ == 0"}};
+  GetterList hash_table_getter_list{{"size", "__tree_.__size_"}, {"empty", "__tree_.__size_ == 0"}};
   cpp_.emplace_back(
       InternalGlob("std::__2::unordered_set<*>"),
       std::make_unique<PrettyGenericContainer>(
@@ -451,8 +449,7 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
                      std::make_unique<PrettyWrappedValue>("Mutex", "{", "}", "data.value"));
 
   // Rust's wrapper for zx_status_t
-  rust_.emplace_back(InternalGlob("fuchsia_zircon_status::Status"),
-                     std::make_unique<PrettyRustZirconStatus>());
+  rust_.emplace_back(InternalGlob("zx_status::Status"), std::make_unique<PrettyRustZirconStatus>());
 
   // Channels appear in many places and typically don't contain useful information.
   rust_.emplace_back(InternalGlob("fuchsia_async::handle::zircon::channel::Channel"),

@@ -142,7 +142,7 @@ fuchsia_test_component("terminal_tests_component") {
     ":font",
     ":italic_font",
     ":lib_test",
-    "//src/lib/zircon/rust:exit_with_code_util",
+    "//src/testing/zx-test-util:exit_with_code_util",
     "//zircon/third_party/uapp/dash",
   ]
   test_type = "system"

@@ -32,7 +32,7 @@
 
     This library contains helpers crates to handle things such as hanging gets.
 
-* [fuchsia_zircon](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_zircon/index.html)
+* [zx](https://fuchsia-docs.firebaseapp.com/rust/zx/index.html)
 
     Rust language bindings for Zircon kernel syscalls.
 

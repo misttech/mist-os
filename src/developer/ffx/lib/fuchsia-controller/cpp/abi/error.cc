@@ -183,7 +183,7 @@ PyMethodDef ZxStatus_raw_def = {
     nullptr,
 };
 
-// This was copied and macro'd from the rust fuchsia_zircon_status files.
+// This was copied and macro'd from the rust zx_status files.
 PyObject *ZxStatus_make_constants() {
   PyObject *dict = PyDict_New();
   if (dict == nullptr) {

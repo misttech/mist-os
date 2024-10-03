@@ -7,7 +7,7 @@
 use fdio::{SpawnAction, SpawnOptions};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, HandleBased as _, ProcessInfo};
+use zx::{HandleBased as _, ProcessInfo};
 use futures::future;
 use futures::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use futures::stream::StreamExt as _;

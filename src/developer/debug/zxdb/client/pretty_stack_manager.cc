@@ -85,7 +85,7 @@ void PrettyStackManager::LoadDefaultMatchers() {
       "Waiting for event in Executor::run_singlethreaded()",
       {PrettyFrameGlob::Wildcard(1, 1),  // syscalls file (name depends on platform).
        PrettyFrameGlob::Func("_zx_port_wait"),
-       PrettyFrameGlob::Func("fuchsia_zircon::port::Port::wait"),
+       PrettyFrameGlob::Func("zx::port::Port::wait"),
        PrettyFrameGlob::Wildcard(2, 2),  // Lambdas
        PrettyFrameGlob::Func("std::thread::local::LocalKey<*>::try_with<*>"),
        PrettyFrameGlob::Func("std::thread::local::LocalKey<*>::with<*>"),

@@ -38,8 +38,8 @@ if (is_host) {
       source_root,
     ]
     deps = [
+      "//sdk/rust/zx",
       "//src/lib/process_builder",
-      "//src/lib/zircon/rust:fuchsia-zircon",
       "//third_party/rust_crates:libc",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",

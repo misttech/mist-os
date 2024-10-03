@@ -125,7 +125,7 @@ TEST_F(PrettyRustTupleTest, TupleStruct) {
 }
 
 TEST_F(PrettyRustTupleTest, Status) {
-  const char kRustStatusName[] = "fuchsia_zircon_status::Status";
+  const char kRustStatusName[] = "zx_status::Status";
 
   // Encodes -6 as a 32-bit integer.
   uint8_t kMem[4] = {
