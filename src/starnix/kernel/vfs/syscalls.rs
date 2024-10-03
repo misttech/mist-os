@@ -74,7 +74,7 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 use std::usize;
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -3072,6 +3072,28 @@ pub fn sys_io_uring_setup(
     if !current_task.kernel().features.io_uring {
         return error!(ENOSYS);
     }
+
+    // Apply policy from /proc/sys/kernel/io_uring_disabled
+    let limits = &current_task.kernel().system_limits;
+    match limits.io_uring_disabled.load(atomic::Ordering::Relaxed) {
+        0 => (),
+        1 => {
+            if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+                let io_uring_group = limits
+                    .io_uring_group
+                    .load(atomic::Ordering::Relaxed)
+                    .try_into()
+                    .map_err(|_| errno!(EPERM))?;
+                if !current_task.creds().is_in_group(io_uring_group) {
+                    return error!(EPERM);
+                }
+            }
+        }
+        _ => {
+            return error!(EPERM);
+        }
+    }
+
     if entries == 0 {
         return error!(EINVAL);
     }

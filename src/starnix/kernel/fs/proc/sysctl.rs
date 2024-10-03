@@ -129,6 +129,18 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.entry(
             current_task,
+            "io_uring_disabled",
+            SystemLimitFile::<IoUringDisabled>::new_node(),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "io_uring_group",
+            SystemLimitFile::<IoUringGroup>::new_node(),
+            mode,
+        );
+        dir.entry(
+            current_task,
             "modprobe",
             StubSysctl::new_node(
                 "/proc/sys/kernel/modprobe",
@@ -496,7 +508,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
                 mode,
             );
         });
-        dir.entry(current_task, "pipe-max-size", PipeMaxSizeFile::new_node(), mode);
+        dir.entry(current_task, "pipe-max-size", SystemLimitFile::<PipeMaxSize>::new_node(), mode);
         dir.entry(
             current_task,
             "protected_hardlinks",
@@ -572,6 +584,21 @@ pub struct SystemLimits {
 
     /// The maximum size of pipes in the system.
     pub pipe_max_size: AtomicUsize,
+
+    /// Whether IoUring is disabled.
+    ///
+    ///  0 -> io_uring is enabled (default)
+    ///  1 -> io_uring is enabled for processes in the io_uring_group
+    ///  2 -> io_uring is disabled
+    ///
+    /// See https://docs.kernel.org/admin-guide/sysctl/kernel.html#io-uring-disabled
+    pub io_uring_disabled: AtomicI32,
+
+    /// If io_uring_disabled is 1, then io_uring is enabled only for processes with CAP_SYS_ADMIN
+    /// or that are members of this group.
+    ///
+    /// See https://docs.kernel.org/admin-guide/sysctl/kernel.html#io-uring-group
+    pub io_uring_group: AtomicI32,
 }
 
 impl Default for SystemLimits {
@@ -584,6 +611,8 @@ impl Default for SystemLimits {
             },
             socket: SocketLimits { max_connections: AtomicI32::new(4096) },
             pipe_max_size: AtomicUsize::new((*PAGE_SIZE * 256) as usize),
+            io_uring_disabled: AtomicI32::new(0),
+            io_uring_group: AtomicI32::new(-1),
         }
     }
 }
@@ -1011,7 +1040,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
-        dir.entry(current_task, "somaxconn", SoMaxConnFile::new_node(), file_mode);
+        dir.entry(current_task, "somaxconn", SystemLimitFile::<SoMaxConn>::new_node(), file_mode);
         dir.entry(
             current_task,
             "wmem_max",
@@ -1203,6 +1232,7 @@ where
     <T::ValueType as std::str::FromStr>::Err: std::fmt::Debug,
 {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        // Is CAP_SYS_RESOURCE the correct capability for all these files?
         if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
             return error!(EPERM);
         }
@@ -1216,8 +1246,8 @@ where
     }
 }
 
-struct PipeMaxSizeLimit;
-impl AtomicLimit for PipeMaxSizeLimit {
+struct PipeMaxSize;
+impl AtomicLimit for PipeMaxSize {
     type ValueType = usize;
 
     fn load(current_task: &CurrentTask) -> usize {
@@ -1227,10 +1257,9 @@ impl AtomicLimit for PipeMaxSizeLimit {
         current_task.kernel().system_limits.pipe_max_size.store(value, Ordering::Relaxed);
     }
 }
-type PipeMaxSizeFile = SystemLimitFile<PipeMaxSizeLimit>;
 
-struct SocketMaxConnectionsLimit;
-impl AtomicLimit for SocketMaxConnectionsLimit {
+struct SoMaxConn;
+impl AtomicLimit for SoMaxConn {
     type ValueType = i32;
 
     fn load(current_task: &CurrentTask) -> i32 {
@@ -1240,4 +1269,29 @@ impl AtomicLimit for SocketMaxConnectionsLimit {
         current_task.kernel().system_limits.socket.max_connections.store(value, Ordering::Relaxed);
     }
 }
-type SoMaxConnFile = SystemLimitFile<SocketMaxConnectionsLimit>;
+
+struct IoUringDisabled;
+impl AtomicLimit for IoUringDisabled {
+    type ValueType = i32;
+
+    fn load(current_task: &CurrentTask) -> i32 {
+        current_task.kernel().system_limits.io_uring_disabled.load(Ordering::Relaxed)
+    }
+    fn store(current_task: &CurrentTask, value: i32) {
+        if (0..=2).contains(&value) {
+            current_task.kernel().system_limits.io_uring_disabled.store(value, Ordering::Relaxed);
+        }
+    }
+}
+
+struct IoUringGroup;
+impl AtomicLimit for IoUringGroup {
+    type ValueType = i32;
+
+    fn load(current_task: &CurrentTask) -> i32 {
+        current_task.kernel().system_limits.io_uring_group.load(Ordering::Relaxed)
+    }
+    fn store(current_task: &CurrentTask, value: i32) {
+        current_task.kernel().system_limits.io_uring_group.store(value, Ordering::Relaxed);
+    }
+}
