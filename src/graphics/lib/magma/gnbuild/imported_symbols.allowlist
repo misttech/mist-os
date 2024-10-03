@@ -440,6 +440,7 @@ zx_channel_read
 zx_channel_read_etc
 zx_channel_write
 zx_channel_write_etc
+zx_clock_get_boot
 zx_clock_get_monotonic
 zx_cprng_draw
 zx_deadline_after

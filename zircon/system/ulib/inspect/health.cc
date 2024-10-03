@@ -12,7 +12,11 @@ NodeHealth::NodeHealth(Node* parent_node, const std::function<zx_time_t()>& cloc
       health_status_(health_node_.CreateString("status", kHealthStartingUp)),
       timestamp_nanos_(health_node_.CreateInt(kStartTimestamp, clock_fn())) {}
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+NodeHealth::NodeHealth(Node* parent_node) : NodeHealth(parent_node, zx_clock_get_boot) {}
+#else
 NodeHealth::NodeHealth(Node* parent_node) : NodeHealth(parent_node, zx_clock_get_monotonic) {}
+#endif
 
 void NodeHealth::Ok() {
   health_message_.reset();

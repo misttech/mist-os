@@ -342,7 +342,14 @@ class Encoder final {
   explicit Encoder(T& buffer) { buffer_ = &buffer; }
 
   // Begins the log record.
-  void Begin(RecordState& state, zx::time timestamp, FuchsiaLogSeverity severity) {
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void Begin(RecordState& state, zx::basic_time<ZX_CLOCK_BOOT> timestamp,
+             FuchsiaLogSeverity severity) {
+#else
+  void Begin(RecordState& state, zx::basic_time<ZX_CLOCK_MONOTONIC> timestamp,
+             FuchsiaLogSeverity severity) {
+#endif
     state.raw_severity = severity;
     state.header = buffer_->data();
     log_word_t empty_header = 0;
@@ -466,7 +473,13 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
                             cpp17::optional<cpp17::string_view> message, zx::unowned_socket socket,
                             uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
   // Initialize the encoder targeting the passed buffer, and begin the record.
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  auto time = zx::clock::get_boot();
+#else
   auto time = zx::clock::get_monotonic();
+#endif
+
   auto* state = RecordState::CreatePtr(&data_);
   RecordState& record = *state;
   // Invoke the constructor of RecordState to construct a valid RecordState
