@@ -3595,22 +3595,6 @@ assembly_input_bundle("media_sessions") {
   ]
 }
 
-assembly_input_bundle("live_usb") {
-  bootfs_packages = [ "//src/sys/live_usb:package" ]
-  compiled_packages = [
-    {
-      bootfs_package = true
-      name = "bootstrap"
-      components = [
-        {
-          component_name = "bootstrap"
-          shards = [ "//src/sys/live_usb/meta/live-usb.shard.cml" ]
-        },
-      ]
-    },
-  ]
-}
-
 # Session manager support
 #
 # feature_set_levels: minimal

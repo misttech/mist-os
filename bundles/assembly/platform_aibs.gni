@@ -40,9 +40,6 @@ bootstrap_user_platform_aib_names = [
   "kernel_contiguous_physical_pages",
   "kernel_logs_in_reboot_info",
 
-  # RCS live usb support
-  "live_usb",
-
   # Static resource files.
   "resources",
 

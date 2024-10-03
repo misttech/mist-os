@@ -22,7 +22,6 @@ group("tests") {
     "full-resolver:tests",
     "fuzzing:tests",
     "lib:tests",
-    "live_usb:tests",
     "pkg:tests",
     "process-resolver:tests",
     "run_test_suite:tests",

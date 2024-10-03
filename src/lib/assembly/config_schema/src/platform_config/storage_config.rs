@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 )]
 #[serde(deny_unknown_fields)]
 pub struct StorageConfig {
+    /// DEPRECATED.  To be removed.
     #[serde(default)]
     pub live_usb_enabled: bool,
 

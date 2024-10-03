@@ -20,10 +20,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         storage_config: &StorageConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if storage_config.live_usb_enabled {
-            builder.platform_bundle("live_usb");
-        }
-
         // Include legacy paver implementation in all feature sets above "embeddable" if the board
         // doesn't include it. Embeddable doesn't support paving.
         if *context.feature_set_level != FeatureSupportLevel::Embeddable

@@ -28,12 +28,6 @@ names.
 In order to specify options in the build, see
 [this guide](/docs/development/kernel/build.md#options).
 
-## boot.usb=\<bool\>
-
-If true, indicates that the boot storage medium is connected over a USB bus.
-This is used by the live_usb component in //src/sys/live_usb to determine
-whether or not it should run.
-
 ## bootsvc.next=\<bootfs path\>
 
 Controls what program is executed by bootsvc to continue the boot process. If
