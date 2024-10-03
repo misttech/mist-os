@@ -64,6 +64,8 @@ enum CreateRealmError {
     DevfsCapabilityNameNotProvided,
     #[error("invalid devfs subdirectory '{0}'")]
     InvalidDevfsSubdirectory(String),
+    #[error("duplicate protocol '{0}' exposed by component '{1}'")]
+    DuplicateProtocolExposed(String, String),
 }
 
 impl Into<zx::Status> for CreateRealmError {
@@ -77,7 +79,10 @@ impl Into<zx::Status> for CreateRealmError {
             | CreateRealmError::StorageCapabilityVariantNotProvided
             | CreateRealmError::StorageCapabilityPathNotProvided
             | CreateRealmError::DevfsCapabilityNameNotProvided
-            | CreateRealmError::InvalidDevfsSubdirectory(String { .. }) => zx::Status::INVALID_ARGS,
+            | CreateRealmError::InvalidDevfsSubdirectory(String { .. })
+            | CreateRealmError::DuplicateProtocolExposed(String { .. }, String { .. }) => {
+                zx::Status::INVALID_ARGS
+            }
             CreateRealmError::RealmBuilderError(error) => match error {
                 // The following types of errors from the realm builder library are likely due to
                 // client error (e.g. attempting to create a realm with an invalid configuration).
@@ -154,15 +159,17 @@ impl<'a> UniqueCapability<'a> {
     }
 }
 
+type ExposedProtocols = HashMap<String, Vec<String>>;
+
 async fn create_realm_instance(
     RealmOptions { name, children, .. }: RealmOptions,
     prefix: &str,
     devfs: Arc<SimpleImmutableDir>,
     devfs_proxy: fio::DirectoryProxy,
-) -> Result<RealmInstance, CreateRealmError> {
-    // Keep track of all the protocols exposed by components in the test realm, so that we can
-    // prevent two components from exposing the same protocol to the root of the realm.
-    let mut exposed_protocols = HashMap::new();
+) -> Result<(RealmInstance, ExposedProtocols), CreateRealmError> {
+    // Keep track of the protocols that exist in the realm along with the children that offer
+    // that protocol.
+    let mut capability_from_children: ExposedProtocols = HashMap::new();
     // Keep track of dependencies between child components in the test realm in order to create the
     // relevant routes at the end. RealmBuilder doesn't allow creating routes between components if
     // the components haven't both been created yet, so we wait until all components have been
@@ -253,32 +260,24 @@ async fn create_realm_instance(
         }
         if let Some(exposes) = exposes {
             for exposed in exposes {
-                // TODO(https://fxbug.dev/42151461): allow duplicate protocols.
-                //
-                // Protocol names will be aliased as `child_name/protocol_name`, and this panic will
-                // be replaced with an INVALID_ARGS epitaph sent on the `ManagedRealm` channel if a
-                // child component with a duplicate name is created, or if a child exposes two
-                // protocols of the same name.
-                match exposed_protocols.entry(exposed) {
-                    std::collections::hash_map::Entry::Occupied(entry) => {
-                        panic!(
-                            "duplicate protocol name '{}' exposed from component '{}'",
-                            entry.key(),
-                            entry.get(),
-                        );
-                    }
-                    std::collections::hash_map::Entry::Vacant(entry) => {
-                        let () = builder
-                            .add_route(
-                                Route::new()
-                                    .capability(Capability::protocol_by_name(entry.key()))
-                                    .from(&child_ref)
-                                    .to(Ref::parent()),
-                            )
-                            .await?;
-                        let _: &mut String = entry.insert(name.clone());
-                    }
+                let offering_children: &mut Vec<String> =
+                    capability_from_children.entry(exposed.clone()).or_default();
+                // Surface an error if two of the same child exists, or a child
+                // exposes more than one instance of the same protocol.
+                if offering_children.contains(&name) {
+                    return Err(CreateRealmError::DuplicateProtocolExposed(exposed.clone(), name));
                 }
+                // Add the protocol under the generated alias.
+                let aliased_protocol = generate_protocol_name_alias(&exposed, &name);
+                builder
+                    .add_route(
+                        Route::new()
+                            .capability(Capability::protocol_by_name(exposed).as_(aliased_protocol))
+                            .from(&child_ref)
+                            .to(Ref::parent()),
+                    )
+                    .await?;
+                offering_children.push(name.clone());
             }
         }
         // TODO(https://fxbug.dev/324494668): delete when Netstack2 is gone.
@@ -530,13 +529,22 @@ async fn create_realm_instance(
         .await?;
 
     info!("creating new ManagedRealm with name '{}'", name);
-    builder.build().await.map_err(Into::into)
+    builder.build().await.map(|realm| (realm, capability_from_children)).map_err(Into::into)
+}
+
+// Form the aliased protocol name using the name of the protocol and the name
+// of the component that exposes the protocol. Protocol names are aliased as
+// `{protocol_name}_{child_name}` to avoid naming collisions when the same
+// protocol is offered by multiple children.
+fn generate_protocol_name_alias(protocol_name: &str, component_source: &str) -> String {
+    format!("{protocol_name}_{component_source}")
 }
 
 struct ManagedRealm {
     server_end: ServerEnd<ManagedRealmMarker>,
     realm: RealmInstance,
     devfs: Arc<SimpleImmutableDir>,
+    capability_from_children: ExposedProtocols,
 }
 
 // This represents a device in devfs. It can serve both the device's FIDL protocol as well
@@ -590,7 +598,7 @@ impl vfs::directory::entry::GetEntryInfo for DevfsDevice {
 
 impl ManagedRealm {
     async fn run_service(self) -> Result {
-        let Self { server_end, realm, devfs } = self;
+        let Self { server_end, realm, devfs, capability_from_children } = self;
         let mut stream = server_end.into_stream().context("failed to acquire request stream")?;
         while let Some(request) = stream.try_next().await.context("FIDL error")? {
             match request {
@@ -604,23 +612,33 @@ impl ManagedRealm {
                     req,
                     control_handle: _,
                 } => {
-                    // TODO(https://fxbug.dev/42151461): allow `child_name` to be specified once we
-                    // prefix capabilities with the name of the component exposing them.
-                    //
-                    // Currently `child_name` isn't used to disambiguate duplicate protocols, so we
-                    // don't allow it to be specified.
-                    if let Some(_) = child_name {
-                        todo!("allow `child_name` to be specified in `ConnectToProtocol` request");
-                    }
-                    debug!(
-                        "connecting to protocol `{}` exposed by child `{:?}`",
-                        protocol_name, child_name
-                    );
+                    let protocol_path = match child_name {
+                        Some(child) => generate_protocol_name_alias(&protocol_name, &child),
+                        None => {
+                            // When `child_name` is not specified, use the first child that
+                            // specifies that capability.
+                            match capability_from_children
+                                .get(&protocol_name)
+                                .map(|children| children.first())
+                                .flatten()
+                            {
+                                Some(child) => generate_protocol_name_alias(&protocol_name, &child),
+                                None => {
+                                    // When the protocol cannot be found in the capability map,
+                                    // this likely means that the protocol is some higher-layer
+                                    // protocol exposed by the realm (or it doesn't exist and
+                                    // will result in a connection error). Don't generate an
+                                    // alias for these protocols.
+                                    format!("{}", protocol_name)
+                                }
+                            }
+                        }
+                    };
                     let () = realm
                         .root
-                        .connect_request_to_named_protocol_at_exposed_dir(&protocol_name, req)
+                        .connect_request_to_named_protocol_at_exposed_dir(&protocol_path, req)
                         .with_context(|| {
-                            format!("failed to open protocol {} in directory", protocol_name)
+                            format!("failed to open protocol {} in directory", protocol_path)
                         })?;
                 }
                 ManagedRealmRequest::GetDevfs { devfs: server_end, control_handle: _ } => {
@@ -920,8 +938,13 @@ async fn handle_sandbox(
                         let devfs = vfs::directory::immutable::simple::simple();
                         let proxy = vfs::directory::spawn_directory(devfs.clone());
                         match create_realm_instance(options, &prefix, devfs.clone(), proxy).await {
-                            Ok(realm) => tx
-                                .send(ManagedRealm { server_end, realm, devfs })
+                            Ok((realm, capability_from_children)) => tx
+                                .send(ManagedRealm {
+                                    server_end,
+                                    realm,
+                                    devfs,
+                                    capability_from_children,
+                                })
                                 .await
                                 .expect("receiver should not be closed"),
                             Err(e) => {
@@ -1044,7 +1067,9 @@ mod tests {
     }
 
     const COUNTER_COMPONENT_NAME: &str = "counter";
+    const COUNTER_ALTERNATIVE_COMPONENT_NAME: &str = "counter-alternative";
     const COUNTER_URL: &str = "#meta/counter.cm";
+    const COUNTER_ALTERNATIVE_URL: &str = "#meta/counter-alternative.cm";
     const COUNTER_WITHOUT_PROGRAM_URL: &str = "#meta/counter-without-program.cm";
     const COUNTER_CONFIGURATION_NAME: &str = "fuchsia.netemul.test.Config";
     const COUNTER_A_PROTOCOL_NAME: &str = "fuchsia.netemul.test.CounterA";
@@ -1134,6 +1159,74 @@ mod tests {
                 .await
                 .expect("fuchsia.netemul.test/Counter.increment call failed"),
             2,
+        );
+    }
+
+    #[fixture(with_sandbox)]
+    #[fuchsia::test]
+    async fn use_protocol_from_first_child(sandbox: fnetemul::SandboxProxy) {
+        // The starting value for the child that can specify program args.
+        const STARTING_VALUE: u32 = 9000;
+
+        // Instantiate `counter_alternative` first and the counter from
+        // `connect_to_protocol` should start at 0.
+        let realm = TestRealm::new(
+            &sandbox,
+            fnetemul::RealmOptions {
+                children: Some(vec![
+                    // `counter_alternative` has a starting value of 0.
+                    fnetemul::ChildDef {
+                        source: Some(fnetemul::ChildSource::Component(
+                            COUNTER_ALTERNATIVE_URL.to_string(),
+                        )),
+                        name: Some(COUNTER_ALTERNATIVE_COMPONENT_NAME.to_string()),
+                        exposes: Some(vec![CounterMarker::PROTOCOL_NAME.to_string()]),
+                        ..Default::default()
+                    },
+                    fnetemul::ChildDef {
+                        program_args: Some(vec![
+                            "--starting-value".to_string(),
+                            STARTING_VALUE.to_string(),
+                        ]),
+                        ..counter_component()
+                    },
+                ]),
+                ..Default::default()
+            },
+        );
+        let counter = realm.connect_to_protocol::<CounterMarker>();
+        assert_eq!(counter.increment().await.expect("failed to increment counter"), 1,);
+
+        // Instantiate `counter_with_args` first and the counter from
+        // `connect_to_protocol` should start at 9000.
+        let realm2 = TestRealm::new(
+            &sandbox,
+            fnetemul::RealmOptions {
+                children: Some(vec![
+                    // `counter_with_args` has a starting value of 9000.
+                    fnetemul::ChildDef {
+                        program_args: Some(vec![
+                            "--starting-value".to_string(),
+                            STARTING_VALUE.to_string(),
+                        ]),
+                        ..counter_component()
+                    },
+                    fnetemul::ChildDef {
+                        source: Some(fnetemul::ChildSource::Component(
+                            COUNTER_ALTERNATIVE_URL.to_string(),
+                        )),
+                        name: Some(COUNTER_ALTERNATIVE_COMPONENT_NAME.to_string()),
+                        exposes: Some(vec![CounterMarker::PROTOCOL_NAME.to_string()]),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
+        );
+        let counter2 = realm2.connect_to_protocol::<CounterMarker>();
+        assert_eq!(
+            counter2.increment().await.expect("failed to increment counter"),
+            STARTING_VALUE + 1,
         );
     }
 
@@ -1719,6 +1812,19 @@ mod tests {
                 epitaph: zx::Status::INVALID_ARGS,
             },
             TestCase {
+                name: "duplicate protocol from same component",
+                children: vec![fnetemul::ChildDef {
+                    name: Some(COUNTER_COMPONENT_NAME.to_string()),
+                    source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
+                    exposes: Some(vec![
+                        CounterMarker::PROTOCOL_NAME.to_string(),
+                        CounterMarker::PROTOCOL_NAME.to_string(),
+                    ]),
+                    ..Default::default()
+                }],
+                epitaph: zx::Status::INVALID_ARGS,
+            },
+            TestCase {
                 name: "storage capabilities use duplicate paths",
                 children: vec![fnetemul::ChildDef {
                     name: Some(COUNTER_COMPONENT_NAME.to_string()),
@@ -1816,8 +1922,6 @@ mod tests {
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
-            // TODO(https://fxbug.dev/42151461): once we allow duplicate protocols, verify that a child
-            // exposing duplicate protocols results in a ZX_ERR_INTERNAL epitaph.
         ];
         for TestCase { name, children, epitaph } in cases {
             let TestRealm { realm } = TestRealm::new(
