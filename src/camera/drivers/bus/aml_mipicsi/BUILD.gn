@@ -5,10 +5,14 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":aml_mipi_bind_test" ]
+  deps = [
+    ":aml_mipi_bind_test",
+    ":aml_mipi_test_package",
+  ]
 }
 
 driver_bind_rules("aml_mipi_bind") {
@@ -20,8 +24,7 @@ driver_bind_rules("aml_mipi_bind") {
   ]
 }
 
-fuchsia_driver("aml_mipicsi_driver-driver") {
-  output_name = "aml_mipicsi"
+source_set("aml_mipi_driver_source") {
   sources = [
     "aml_mipi.cc",
     "aml_mipi.h",
@@ -29,11 +32,10 @@ fuchsia_driver("aml_mipicsi_driver-driver") {
     "aml_mipi_debug.cc",
     "aml_mipi_regs.h",
   ]
-  deps = [
-    ":aml_mipi_bind",
+  deps = [ "//src/devices/lib/driver" ]
+  public_deps = [
     "//sdk/banjo/fuchsia.hardware.mipicsi:fuchsia.hardware.mipicsi_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
@@ -41,6 +43,14 @@ fuchsia_driver("aml_mipicsi_driver-driver") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
+  ]
+}
+
+fuchsia_driver("aml_mipicsi_driver-driver") {
+  output_name = "aml_mipicsi"
+  deps = [
+    ":aml_mipi_bind",
+    ":aml_mipi_driver_source",
   ]
 }
 
@@ -54,6 +64,25 @@ fuchsia_driver_component("aml_mipicsi_driver") {
 fuchsia_driver_package("driver_package") {
   package_name = "aml-mipicsi"
   driver_components = [ ":aml_mipicsi_driver" ]
+}
+
+test("aml_mipi_test") {
+  sources = [ "aml_mipi_test.cc" ]
+  deps = [
+    ":aml_mipi_driver_source",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("aml_mipi_test_package") {
+  deps = [ ":aml_mipi_test" ]
 }
 
 group("aml_mipicsi") {
