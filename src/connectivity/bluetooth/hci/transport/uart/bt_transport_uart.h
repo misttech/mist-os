@@ -138,8 +138,8 @@ class BtTransportUart
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Used by tests only.
-  fit::function<void(void)> WaitforSnoopCallback();
-  fit::function<void(void)> WaitforHciTransportCallback();
+  fit::function<void(void)> WaitForSnoopCallback();
+  fit::function<void(void)> WaitForScoConnectionCallback();
   uint64_t GetAckedSnoopSeq();
 
  private:
@@ -360,7 +360,7 @@ class BtTransportUart
   uint64_t acked_snoop_seq_ = 0;
   // Used for test only, to synchronize the snoop protocol setup.
   libsync::Completion snoop_setup_;
-  libsync::Completion hci_transport_setup_;
+  libsync::Completion sco_connection_setup_;
 
   ScoConnectionServer sco_connection_server_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::ScoConnection> sco_connection_binding_;
