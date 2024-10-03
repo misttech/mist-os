@@ -1260,7 +1260,7 @@ class CountingFuseServer : public FuseServer {
 };
 
 struct PermissionCheckTestCase {
-  std::optional<uint32_t> need_cap;
+  std::optional<int> need_cap;
   uint32_t want_init_flags;
   uint32_t file_type;
   std::function<void(const std::string&)> fn;
