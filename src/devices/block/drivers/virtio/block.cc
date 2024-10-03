@@ -625,7 +625,9 @@ void BlockDevice::WatchdogThread() {
         if (now - kWatchdogInterval >= start_time) {
           // Round down to the interval
           zx::duration latency = ((now - start_time) / kWatchdogInterval) * kWatchdogInterval;
+          // LINT.IfChange(watchdog_tefmo)
           zxlogf(WARNING, "txn %d has not completed after %" PRIu64 "s!", idx, latency.to_secs());
+          // LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:watchdog_tefmo)
         }
         idx += 1;
       }

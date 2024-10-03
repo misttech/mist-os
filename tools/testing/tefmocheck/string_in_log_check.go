@@ -420,6 +420,17 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				},
 			},
 		},
+		// For https://fxbug.dev/343550891.
+		&stringInLogCheck{
+			// LINT.IfChange(watchdog_tefmo)
+			String: "has not completed after 30s",
+			// LINT.ThenChange(/src/devices/block/drivers/virtio/block.cc:watchdog_tefmo)
+			Type:            swarmingOutputType,
+			SkipPassedTest:  true,
+			IgnoreFlakes:    true,
+			AttributeToTest: true,
+			AddTag:          true,
+		},
 	}
 
 	oopsExceptBlocks := []*logBlock{
