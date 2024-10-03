@@ -14,8 +14,8 @@ rustc_library("fdf_rust_lib") {
   deps = [
     "//sdk/lib/async",
     "//sdk/rust/zx",
-    "//sdk/rust/zx-types",
     "//src/devices/bin/driver_runtime",
+    "//src/devices/bin/driver_runtime/rust/fdf_sys",
     "//third_party/rust_crates:futures",
   ]
 
@@ -25,7 +25,6 @@ rustc_library("fdf_rust_lib") {
     "src/arena.rs",
     "src/channel.rs",
     "src/dispatcher.rs",
-    "src/fdf_sys.rs",
     "src/handle.rs",
     "src/lib.rs",
     "src/message.rs",
@@ -38,5 +37,9 @@ fuchsia_unittest_package("fdf_rust_tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":fdf_rust_tests" ]
+  deps = [
+    ":fdf_rust_tests",
+    "fdf_sys:tests",
+    "server:tests",
+  ]
 }

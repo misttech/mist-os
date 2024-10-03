@@ -34,7 +34,7 @@ pub use zx_types::*;
 "
 
 readonly FUCHSIA_API_LEVEL_HEAD=4292870144
-readonly RUST_FILE="src/fdf_sys.rs"
+readonly RUST_FILE="fdf_sys/src/bindings.rs"
 readonly ASYNC_INCLUDES_PATH="${FUCHSIA_DIR}"/sdk/lib/async/include
 readonly DRIVER_RUNTIME_INCLUDES_PATH="${FUCHSIA_DIR}"/sdk/lib/driver/runtime/include
 

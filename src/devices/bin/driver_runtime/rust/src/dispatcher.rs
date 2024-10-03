@@ -4,7 +4,7 @@
 
 //! Safe bindings for the driver runtime dispatcher stable ABI
 
-use crate::fdf_sys::*;
+use fdf_sys::*;
 
 use core::cell::UnsafeCell;
 use core::ffi;
@@ -20,7 +20,7 @@ use zx::Status;
 use futures::future::{BoxFuture, FutureExt};
 use futures::task::{waker_ref, ArcWake};
 
-pub use crate::fdf_sys::fdf_dispatcher_t;
+pub use fdf_sys::fdf_dispatcher_t;
 
 pub trait ShutdownObserverFn: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
 impl<T> ShutdownObserverFn for T where T: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
@@ -414,14 +414,10 @@ impl ShutdownObserver {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod test {
+pub mod test {
     use core::ffi::{c_char, c_void};
     use core::ptr::null_mut;
     use std::sync::{mpsc, Once};
-
-    use futures::channel::mpsc as async_mpsc;
-    use futures::{SinkExt, StreamExt};
 
     use super::*;
 
@@ -478,6 +474,17 @@ pub(crate) mod test {
 
         res
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test::*;
+    use super::*;
+
+    use std::sync::mpsc;
+
+    use futures::channel::mpsc as async_mpsc;
+    use futures::{SinkExt, StreamExt};
 
     #[test]
     fn start_test_dispatcher() {

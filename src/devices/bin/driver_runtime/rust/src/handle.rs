@@ -5,7 +5,7 @@
 //! Safe bindings for driver runtime handles and collections of mixed driver and zircon
 //! handles.
 
-use crate::fdf_sys::*;
+use fdf_sys::*;
 
 use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
@@ -15,7 +15,7 @@ use core::ops::Deref;
 use zx::HandleBased;
 pub use zx::{Handle as ZirconHandle, HandleRef as ZirconHandleRef};
 
-pub use crate::fdf_sys::fdf_handle_t;
+pub use fdf_sys::fdf_handle_t;
 
 /// A handle representing some resource managed by the driver runtime.
 #[repr(C)]

@@ -10,7 +10,7 @@ use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 
-use crate::fdf_sys::*;
+use fdf_sys::*;
 
 /// A struct that holds both an arena along with a data buffer that is allocated within that arena.
 #[derive(Debug)]

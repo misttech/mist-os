@@ -8,7 +8,6 @@
 mod arena;
 mod channel;
 mod dispatcher;
-mod fdf_sys;
 mod handle;
 mod message;
 

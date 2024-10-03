@@ -7,8 +7,8 @@
 use core::future::Future;
 use zx::Status;
 
-use crate::fdf_sys::*;
 use crate::{Arena, ArenaBox, DispatcherRef, DriverHandle, Message, MixedHandle};
+use fdf_sys::*;
 
 use core::marker::PhantomData;
 use core::mem::{size_of_val, MaybeUninit};
@@ -18,7 +18,7 @@ use core::ptr::{null_mut, NonNull};
 use core::task::{Context, Poll, Waker};
 use std::sync::{Arc, Mutex};
 
-pub use crate::fdf_sys::fdf_handle_t;
+pub use fdf_sys::fdf_handle_t;
 
 /// Implements a message channel through the Fuchsia Driver Runtime
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]

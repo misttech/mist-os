@@ -14,9 +14,9 @@ use std::sync::{Arc, Weak};
 
 use zx::Status;
 
-use crate::fdf_sys::*;
+use fdf_sys::*;
 
-pub use crate::fdf_sys::fdf_arena_t;
+pub use fdf_sys::fdf_arena_t;
 
 /// Implements a memory arena allocator to be used with the Fuchsia Driver
 /// Runtime when sending and receiving from channels.
