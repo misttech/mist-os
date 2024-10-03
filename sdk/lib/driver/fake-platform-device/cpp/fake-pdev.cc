@@ -7,6 +7,8 @@
 #include <lib/driver/fake-resource/cpp/fake-resource.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+
 namespace fdf_fake_platform_device {
 
 void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) {
@@ -143,6 +145,7 @@ void FakePDev::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
                              .Build());
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 void FakePDev::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) {
   static fidl::Arena arena;
   fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> value;
@@ -152,7 +155,6 @@ void FakePDev::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& compl
   }
   completer.ReplySuccess(value);
 }
-
 void FakePDev::GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) {
   auto metadata = metadata_.find(request->type);
   if (metadata == metadata_.end()) {
@@ -161,6 +163,7 @@ void FakePDev::GetMetadata(GetMetadataRequestView request, GetMetadataCompleter:
   }
   completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
 }
+#endif
 
 void FakePDev::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
@@ -178,3 +181,5 @@ zx::result<fdf::MmioBuffer> fdf::internal::PDevMakeMmioBufferWeak(fdf::PDev::Mmi
   auto* mmio_buffer = reinterpret_cast<MmioBuffer*>(pdev_mmio.offset);
   return zx::ok(std::move(*mmio_buffer));
 }
+
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
