@@ -9,6 +9,7 @@ use crate::mm::{
     read_to_object_as_bytes, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
 };
 use crate::task::CurrentTask;
+use crate::vfs::socket::syscalls::{sys_recvfrom, sys_recvmsg, sys_sendmsg, sys_sendto};
 use crate::vfs::syscalls::{
     sys_pread64, sys_preadv2, sys_pwrite64, sys_pwritev2, sys_read, sys_write,
 };
@@ -16,11 +17,12 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdNumber,
     FileHandle, FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
+use starnix_logging::set_zx_name;
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_buffer::UserBuffers;
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
@@ -36,7 +38,7 @@ use starnix_uapi::{
     io_uring_op_IORING_OP_STATX, io_uring_op_IORING_OP_SYNC_FILE_RANGE,
     io_uring_op_IORING_OP_TIMEOUT, io_uring_op_IORING_OP_TIMEOUT_REMOVE,
     io_uring_op_IORING_OP_WRITE, io_uring_op_IORING_OP_WRITEV, io_uring_op_IORING_OP_WRITE_FIXED,
-    io_uring_params, io_uring_sqe, off_t, IORING_FEAT_SINGLE_MMAP, IORING_OFF_CQ_RING,
+    io_uring_params, io_uring_sqe, off_t, socklen_t, IORING_FEAT_SINGLE_MMAP, IORING_OFF_CQ_RING,
     IORING_OFF_SQES, IORING_OFF_SQ_RING, IORING_SETUP_CQSIZE,
 };
 use std::sync::Arc;
@@ -312,6 +314,78 @@ impl IoUringMetadata {
     }
 }
 
+#[repr(u32)]
+enum Op {
+    Accept = io_uring_op_IORING_OP_ACCEPT,
+    AsyncCancel = io_uring_op_IORING_OP_ASYNC_CANCEL,
+    Close = io_uring_op_IORING_OP_CLOSE,
+    Connect = io_uring_op_IORING_OP_CONNECT,
+    EpollCtl = io_uring_op_IORING_OP_EPOLL_CTL,
+    FAdvise = io_uring_op_IORING_OP_FADVISE,
+    FAllocate = io_uring_op_IORING_OP_FALLOCATE,
+    FilesUpdate = io_uring_op_IORING_OP_FILES_UPDATE,
+    FSync = io_uring_op_IORING_OP_FSYNC,
+    LinkTimeout = io_uring_op_IORING_OP_LINK_TIMEOUT,
+    MAdvise = io_uring_op_IORING_OP_MADVISE,
+    NOP = io_uring_op_IORING_OP_NOP,
+    OpenAt = io_uring_op_IORING_OP_OPENAT,
+    OpenAt2 = io_uring_op_IORING_OP_OPENAT2,
+    PollAdd = io_uring_op_IORING_OP_POLL_ADD,
+    PollRemove = io_uring_op_IORING_OP_POLL_REMOVE,
+    Read = io_uring_op_IORING_OP_READ,
+    ReadV = io_uring_op_IORING_OP_READV,
+    ReadFixed = io_uring_op_IORING_OP_READ_FIXED,
+    Recv = io_uring_op_IORING_OP_RECV,
+    RecvMsg = io_uring_op_IORING_OP_RECVMSG,
+    Send = io_uring_op_IORING_OP_SEND,
+    SendMsg = io_uring_op_IORING_OP_SENDMSG,
+    StatX = io_uring_op_IORING_OP_STATX,
+    SyncFileRange = io_uring_op_IORING_OP_SYNC_FILE_RANGE,
+    Timeout = io_uring_op_IORING_OP_TIMEOUT,
+    TimeoutRemove = io_uring_op_IORING_OP_TIMEOUT_REMOVE,
+    Write = io_uring_op_IORING_OP_WRITE,
+    WriteV = io_uring_op_IORING_OP_WRITEV,
+    WriteFixed = io_uring_op_IORING_OP_WRITE_FIXED,
+}
+
+impl Op {
+    fn from_code(opcode: io_uring_op) -> Result<Op, Errno> {
+        match opcode {
+            io_uring_op_IORING_OP_ACCEPT => Ok(Self::Accept),
+            io_uring_op_IORING_OP_ASYNC_CANCEL => Ok(Self::AsyncCancel),
+            io_uring_op_IORING_OP_CLOSE => Ok(Self::Close),
+            io_uring_op_IORING_OP_CONNECT => Ok(Self::Connect),
+            io_uring_op_IORING_OP_EPOLL_CTL => Ok(Self::EpollCtl),
+            io_uring_op_IORING_OP_FADVISE => Ok(Self::FAdvise),
+            io_uring_op_IORING_OP_FALLOCATE => Ok(Self::FAllocate),
+            io_uring_op_IORING_OP_FILES_UPDATE => Ok(Self::FilesUpdate),
+            io_uring_op_IORING_OP_FSYNC => Ok(Self::FSync),
+            io_uring_op_IORING_OP_LINK_TIMEOUT => Ok(Self::LinkTimeout),
+            io_uring_op_IORING_OP_MADVISE => Ok(Self::MAdvise),
+            io_uring_op_IORING_OP_NOP => Ok(Self::NOP),
+            io_uring_op_IORING_OP_OPENAT => Ok(Self::OpenAt),
+            io_uring_op_IORING_OP_OPENAT2 => Ok(Self::OpenAt2),
+            io_uring_op_IORING_OP_POLL_ADD => Ok(Self::PollAdd),
+            io_uring_op_IORING_OP_POLL_REMOVE => Ok(Self::PollRemove),
+            io_uring_op_IORING_OP_READ => Ok(Self::Read),
+            io_uring_op_IORING_OP_READV => Ok(Self::ReadV),
+            io_uring_op_IORING_OP_READ_FIXED => Ok(Self::ReadFixed),
+            io_uring_op_IORING_OP_RECV => Ok(Self::Recv),
+            io_uring_op_IORING_OP_RECVMSG => Ok(Self::RecvMsg),
+            io_uring_op_IORING_OP_SEND => Ok(Self::Send),
+            io_uring_op_IORING_OP_SENDMSG => Ok(Self::SendMsg),
+            io_uring_op_IORING_OP_STATX => Ok(Self::StatX),
+            io_uring_op_IORING_OP_SYNC_FILE_RANGE => Ok(Self::SyncFileRange),
+            io_uring_op_IORING_OP_TIMEOUT => Ok(Self::Timeout),
+            io_uring_op_IORING_OP_TIMEOUT_REMOVE => Ok(Self::TimeoutRemove),
+            io_uring_op_IORING_OP_WRITE => Ok(Self::Write),
+            io_uring_op_IORING_OP_WRITEV => Ok(Self::WriteV),
+            io_uring_op_IORING_OP_WRITE_FIXED => Ok(Self::WriteFixed),
+            _ => error!(EINVAL),
+        }
+    }
+}
+
 // Currently, we read and write the memory shared with userspace via the VMOs. In the future, we
 // will likely want to map the memory for these VMOs into the kernel address space so that we can
 // access their contents more efficiently and so that we can perform the appropriate atomic
@@ -371,8 +445,10 @@ impl IoUringQueue {
     fn new(metadata: IoUringMetadata) -> Result<Self, Errno> {
         let ring_buffer =
             zx::Vmo::create(metadata.ring_buffer_size() as u64).map_err(|_| errno!(ENOMEM))?;
+        set_zx_name(&ring_buffer, b"io_uring:ring");
         let sq_entries =
             zx::Vmo::create(metadata.sq_entries_size() as u64).map_err(|_| errno!(ENOMEM))?;
+        set_zx_name(&sq_entries, b"io_uring:sqes");
 
         Ok(Self {
             metadata,
@@ -565,6 +641,7 @@ impl IoUringFileObject {
         let mut submitted = 0;
         while let Some(sq_entry) = self.queue.pop_sq_entry()? {
             submitted += 1;
+            // We currently act as if every SqEntry has IOSQE_IO_DRAIN.
             let result = self.execute(locked, current_task, &sq_entry);
             let cq_entry = sq_entry.complete(result);
             self.queue.push_cq_entry(&cq_entry)?;
@@ -592,9 +669,9 @@ impl IoUringFileObject {
         current_task: &CurrentTask,
         entry: &SqEntry,
     ) -> Result<SyscallResult, Errno> {
-        match entry.opcode as io_uring_op {
-            io_uring_op_IORING_OP_NOP => Ok(SUCCESS),
-            io_uring_op_IORING_OP_READV => sys_preadv2(
+        match Op::from_code(entry.opcode as io_uring_op)? {
+            Op::NOP => Ok(SUCCESS),
+            Op::ReadV => sys_preadv2(
                 locked,
                 current_task,
                 entry.fd(),
@@ -605,7 +682,7 @@ impl IoUringFileObject {
                 entry.op_flags,
             )
             .map(Into::into),
-            io_uring_op_IORING_OP_WRITEV => sys_pwritev2(
+            Op::WriteV => sys_pwritev2(
                 locked,
                 current_task,
                 entry.fd(),
@@ -616,46 +693,79 @@ impl IoUringFileObject {
                 entry.op_flags,
             )
             .map(Into::into),
-            io_uring_op_IORING_OP_READ_FIXED => {
+            Op::ReadFixed => {
                 // TODO(https://fxbug.dev/297431387): We're supposed to make a kernel mapping
                 // when the buffers are registered and we should be performing this operation using
                 // those kernel mappings rather than using the userspace mappings.
                 self.check_buffer(entry)?;
                 do_read(locked, current_task, entry)
             }
-            io_uring_op_IORING_OP_WRITE_FIXED => {
+            Op::WriteFixed => {
                 // TODO(https://fxbug.dev/297431387): We're supposed to make a kernel mapping
                 // when the buffers are registered and we should be performing this operation using
                 // those kernel mappings rather than using the userspace mappings.
                 self.check_buffer(entry)?;
                 do_write(locked, current_task, entry)
             }
-            io_uring_op_IORING_OP_READ => do_read(locked, current_task, entry),
-            io_uring_op_IORING_OP_WRITE => do_write(locked, current_task, entry),
-            io_uring_op_IORING_OP_FSYNC
-            | io_uring_op_IORING_OP_POLL_ADD
-            | io_uring_op_IORING_OP_POLL_REMOVE
-            | io_uring_op_IORING_OP_SYNC_FILE_RANGE
-            | io_uring_op_IORING_OP_SENDMSG
-            | io_uring_op_IORING_OP_RECVMSG
-            | io_uring_op_IORING_OP_TIMEOUT
-            | io_uring_op_IORING_OP_TIMEOUT_REMOVE
-            | io_uring_op_IORING_OP_ACCEPT
-            | io_uring_op_IORING_OP_ASYNC_CANCEL
-            | io_uring_op_IORING_OP_LINK_TIMEOUT
-            | io_uring_op_IORING_OP_CONNECT
-            | io_uring_op_IORING_OP_FALLOCATE
-            | io_uring_op_IORING_OP_OPENAT
-            | io_uring_op_IORING_OP_CLOSE
-            | io_uring_op_IORING_OP_FILES_UPDATE
-            | io_uring_op_IORING_OP_STATX
-            | io_uring_op_IORING_OP_FADVISE
-            | io_uring_op_IORING_OP_MADVISE
-            | io_uring_op_IORING_OP_SEND
-            | io_uring_op_IORING_OP_RECV
-            | io_uring_op_IORING_OP_OPENAT2
-            | io_uring_op_IORING_OP_EPOLL_CTL => error!(EOPNOTSUPP),
-            _ => error!(EINVAL),
+            Op::Read => do_read(locked, current_task, entry),
+            Op::Write => do_write(locked, current_task, entry),
+            Op::SendMsg => sys_sendmsg(
+                locked,
+                current_task,
+                entry.fd(),
+                entry.address().into(),
+                entry.op_flags,
+            )
+            .map(Into::into),
+            Op::RecvMsg => sys_recvmsg(
+                locked,
+                current_task,
+                entry.fd(),
+                entry.address().into(),
+                entry.op_flags,
+            )
+            .map(Into::into),
+            Op::Send => sys_sendto(
+                locked,
+                current_task,
+                entry.fd(),
+                entry.address(),
+                entry.length(),
+                entry.op_flags,
+                UserAddress::default(),
+                socklen_t::default(),
+            )
+            .map(Into::into),
+            Op::Recv => sys_recvfrom(
+                locked,
+                current_task,
+                entry.fd(),
+                entry.address(),
+                entry.length(),
+                entry.op_flags,
+                UserAddress::default(),
+                UserRef::default(),
+            )
+            .map(Into::into),
+            Op::FSync
+            | Op::PollAdd
+            | Op::PollRemove
+            | Op::SyncFileRange
+            | Op::Timeout
+            | Op::TimeoutRemove
+            | Op::Accept
+            | Op::AsyncCancel
+            | Op::LinkTimeout
+            | Op::Connect
+            | Op::FAllocate
+            | Op::OpenAt
+            | Op::Close
+            | Op::FilesUpdate
+            | Op::StatX
+            | Op::FAdvise
+            | Op::MAdvise
+            | Op::OpenAt2
+            | Op::EpollCtl => error!(EOPNOTSUPP),
         }
     }
 }
