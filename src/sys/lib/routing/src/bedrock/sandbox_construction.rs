@@ -8,8 +8,8 @@ use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, Stru
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
 use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
-use crate::error::RoutingError;
-use crate::{DictExt, LazyGet, WithAvailability, WithDefault};
+use crate::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
+use crate::{DictExt, LazyGet, WithAvailability, WithDefault, WithErrorReporter};
 use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
@@ -197,6 +197,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     framework_dict: Dict,
     capability_sourced_capabilities_dict: Dict,
     declared_dictionaries: Dict,
+    error_reporter: impl ErrorReporter,
 ) -> ComponentSandbox {
     let component_output_dict = Dict::new();
     let program_input = ProgramInput::default();
@@ -260,6 +261,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &framework_dict,
             &capability_sourced_capabilities_dict,
             use_,
+            error_reporter.clone(),
         );
     }
 
@@ -282,6 +284,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     source_name: runner_name.clone(),
                     source_dictionary: Default::default(),
                 }),
+                error_reporter.clone(),
             );
         }
     }
@@ -338,6 +341,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &capability_sourced_capabilities_dict,
             offer,
             &target_dict,
+            error_reporter.clone(),
         );
     }
 
@@ -350,6 +354,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &capability_sourced_capabilities_dict,
             expose,
             &component_output_dict,
+            error_reporter.clone(),
         );
     }
 
@@ -468,6 +473,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     target_input: &ComponentInput,
+    error_reporter: impl ErrorReporter,
 ) {
     for offer in dynamic_offers {
         extend_dict_with_offer(
@@ -479,6 +485,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
             capability_sourced_capabilities_dict,
             offer,
             &target_input.capabilities(),
+            error_reporter.clone(),
         );
     }
 }
@@ -500,6 +507,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     program_input_dict_additions: &Dict,
     program_output_router: &Router,
     config_use: &cm_rust::UseConfigurationDecl,
+    error_reporter: impl ErrorReporter,
 ) {
     let moniker = component.moniker();
     let source_path = config_use.source_path();
@@ -562,6 +570,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
         router
             .with_availability(moniker.clone(), *config_use.availability())
             .with_default(default_request)
+            .with_error_reporter(RouteRequestErrorInfo::from(config_use), error_reporter)
             .into(),
     ) {
         Ok(()) => (),
@@ -581,6 +590,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
+    error_reporter: impl ErrorReporter,
 ) {
     let moniker = component.moniker();
     if !is_supported_use(use_) {
@@ -595,6 +605,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             program_input_dict_additions,
             program_output_router,
             config,
+            error_reporter,
         );
     };
 
@@ -710,7 +721,9 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     let default_request = Request { metadata, target: component.as_weak().into() };
     let router = router
         .with_availability(moniker.clone(), *use_.availability())
-        .with_default(default_request);
+        .with_default(default_request)
+        .with_error_reporter(RouteRequestErrorInfo::from(use_), error_reporter);
+
     if let Some(target_path) = use_.path() {
         if let Err(e) = program_input.namespace().insert_capability(target_path, router.into()) {
             warn!("failed to insert {} in program input dict: {e:?}", target_path)
@@ -783,6 +796,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
     capability_sourced_capabilities_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &Dict,
+    error_reporter: impl ErrorReporter,
 ) {
     if !is_supported_offer(offer) {
         return;
@@ -904,6 +918,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
         router
             .with_availability(component.moniker().clone(), *offer.availability())
             .with_default(default_request)
+            .with_error_reporter(RouteRequestErrorInfo::from(offer), error_reporter)
             .into(),
     ) {
         Ok(()) => (),
@@ -930,6 +945,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
     capability_sourced_capabilities_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
+    error_reporter: impl ErrorReporter,
 ) {
     if !is_supported_expose(expose) {
         return;
@@ -1029,6 +1045,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
         router
             .with_availability(component.moniker().clone(), *expose.availability())
             .with_default(default_request)
+            .with_error_reporter(RouteRequestErrorInfo::from(expose), error_reporter)
             .into(),
     ) {
         Ok(()) => (),

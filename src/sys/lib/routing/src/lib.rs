@@ -57,6 +57,7 @@ pub use bedrock::lazy_get::LazyGet;
 pub use bedrock::weak_instance_token_ext::{test_invalid_instance_token, WeakInstanceTokenExt};
 pub use bedrock::with_availability::WithAvailability;
 pub use bedrock::with_default::WithDefault;
+pub use bedrock::with_error_reporter::WithErrorReporter;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

@@ -16,7 +16,7 @@ use crate::model::namespace::create_namespace;
 use crate::model::routing::legacy::RouteRequestExt;
 use crate::model::routing::router_ext::RouterExt;
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
-use crate::model::routing::{self, RoutingError};
+use crate::model::routing::{self, RoutingError, RoutingFailureErrorReporter};
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
 use crate::model::token::{InstanceToken, InstanceTokenState};
@@ -449,6 +449,7 @@ impl ResolvedInstanceState {
             build_framework_dictionary(component),
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
+            RoutingFailureErrorReporter::new(component.as_weak()),
         );
         state.sandbox = component_sandbox;
         state.populate_child_inputs(&state.sandbox.child_inputs).await;
@@ -779,6 +780,7 @@ impl ResolvedInstanceState {
                 &self.sandbox.framework_dict,
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
+                RoutingFailureErrorReporter::new(component.as_weak()),
             );
         }
 

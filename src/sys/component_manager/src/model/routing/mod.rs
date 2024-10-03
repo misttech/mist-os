@@ -15,6 +15,7 @@ use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::storage;
 use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::error::{ErrorReporter, RouteRequestErrorInfo};
 use ::routing::mapper::NoopRouteMapper;
 use ::routing::{RouteRequest, RouteSource};
 use async_trait::async_trait;
@@ -27,7 +28,7 @@ use moniker::Moniker;
 use router_error::RouterError;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -187,8 +188,35 @@ pub(super) async fn delete_storage(routed_storage: RoutedStorage) -> Result<(), 
         .await
 }
 
-/// Sets an epitaph on `server_end` for a capability routing failure, and logs the error. Logs a
-/// failure to route a capability.
+/// ErrorReporter that calls report_routing_failure.
+#[derive(Clone)]
+pub struct RoutingFailureErrorReporter {
+    target: WeakComponentInstance,
+}
+
+impl RoutingFailureErrorReporter {
+    pub fn new(target: WeakComponentInstance) -> Self {
+        Self { target }
+    }
+}
+
+#[async_trait]
+impl ErrorReporter for RoutingFailureErrorReporter {
+    async fn report(&self, request: &RouteRequestErrorInfo, err: &RouterError) {
+        match self.target.upgrade() {
+            Ok(target) => {
+                report_routing_failure(request, Some(request.availability()), &target, err).await;
+            }
+            Err(upgrade_err) => {
+                error!(%upgrade_err, %err,
+                    "Failed to upgrade WeakComponentInstance while reporting routing error.")
+            }
+        }
+    }
+}
+
+/// Logs a failure to route a capability. Formats `err` as a `String`, but
+/// elides the type if the error is a `RoutingError`, the common case.
 pub async fn report_routing_failure(
     capability_requested: impl std::fmt::Display,
     availability: Option<Availability>,
