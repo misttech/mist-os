@@ -280,14 +280,14 @@ fn configuration_with_ip_forwarding_set(
     match ip_version {
         fnet::IpVersion::V4 => finterfaces_admin::Configuration {
             ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                forwarding: Some(forwarding),
+                unicast_forwarding: Some(forwarding),
                 ..Default::default()
             }),
             ..Default::default()
         },
         fnet::IpVersion::V6 => finterfaces_admin::Configuration {
             ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                forwarding: Some(forwarding),
+                unicast_forwarding: Some(forwarding),
                 ..Default::default()
             }),
             ..Default::default()
@@ -303,14 +303,14 @@ fn extract_ip_forwarding(
 ) -> Result<bool, Error> {
     match ip_version {
         fnet::IpVersion::V4 => {
-            let finterfaces_admin::Ipv4Configuration { forwarding, .. } =
+            let finterfaces_admin::Ipv4Configuration { unicast_forwarding, .. } =
                 ipv4_config.context("get IPv4 configuration")?;
-            forwarding.context("get IPv4 forwarding configuration")
+            unicast_forwarding.context("get IPv4 forwarding configuration")
         }
         fnet::IpVersion::V6 => {
-            let finterfaces_admin::Ipv6Configuration { forwarding, .. } =
+            let finterfaces_admin::Ipv6Configuration { unicast_forwarding, .. } =
                 ipv6_config.context("get IPv6 configuration")?;
-            forwarding.context("get IPv6 forwarding configuration")
+            unicast_forwarding.context("get IPv6 forwarding configuration")
         }
     }
 }

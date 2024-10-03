@@ -2801,9 +2801,9 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
 
 #[derive(Default, Debug, PartialEq)]
 struct IpForwarding {
-    v4: Option<bool>,
+    v4_unicast: Option<bool>,
     v4_multicast: Option<bool>,
-    v6: Option<bool>,
+    v6_unicast: Option<bool>,
     v6_multicast: Option<bool>,
 }
 
@@ -2820,9 +2820,9 @@ impl IpForwarding {
             }
         }
         IpForwarding {
-            v4: false_if_none(self.v4),
+            v4_unicast: false_if_none(self.v4_unicast),
             v4_multicast: false_if_none(self.v4_multicast),
-            v6: false_if_none(self.v6),
+            v6_unicast: false_if_none(self.v6_unicast),
             v6_multicast: false_if_none(self.v6_multicast),
         }
     }
@@ -2834,23 +2834,23 @@ impl IpForwarding {
             val.and(Some(false))
         }
         IpForwarding {
-            v4: false_if_some(self.v4),
+            v4_unicast: false_if_some(self.v4_unicast),
             v4_multicast: false_if_some(self.v4_multicast),
-            v6: false_if_some(self.v6),
+            v6_unicast: false_if_some(self.v6_unicast),
             v6_multicast: false_if_some(self.v6_multicast),
         }
     }
 
     fn as_configuration(&self) -> finterfaces_admin::Configuration {
-        let IpForwarding { v4, v4_multicast, v6, v6_multicast } = *self;
+        let IpForwarding { v4_unicast, v4_multicast, v6_unicast, v6_multicast } = *self;
         finterfaces_admin::Configuration {
             ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                forwarding: v4,
+                unicast_forwarding: v4_unicast,
                 multicast_forwarding: v4_multicast,
                 ..Default::default()
             }),
             ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                forwarding: v6,
+                unicast_forwarding: v6_unicast,
                 multicast_forwarding: v6_multicast,
                 ..Default::default()
             }),
@@ -2867,67 +2867,67 @@ async fn get_ip_forwarding(iface: &fnet_interfaces_ext::admin::Control) -> IpFor
         .expect("error getting configuration");
 
     let finterfaces_admin::Ipv4Configuration {
-        forwarding: v4,
+        unicast_forwarding: v4_unicast,
         multicast_forwarding: v4_multicast,
         ..
     } = ipv4_config.expect("IPv4 configuration should be populated");
     let finterfaces_admin::Ipv6Configuration {
-        forwarding: v6,
+        unicast_forwarding: v6_unicast,
         multicast_forwarding: v6_multicast,
         ..
     } = ipv6_config.expect("IPv6 configuration should be populated");
 
-    IpForwarding { v4, v4_multicast, v6, v6_multicast }
+    IpForwarding { v4_unicast, v4_multicast, v6_unicast, v6_multicast }
 }
 
 #[netstack_test]
 #[variant(N, Netstack)]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None },
+    IpForwarding { v4_unicast: None, v4_multicast: None, v6_unicast: None, v6_multicast: None },
     None
 ; "set_none")]
 #[test_case(
-    IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None },
     None
 ; "set_ip_false")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ipv4_true")]
 #[test_case(
-    IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(true), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported)
 ; "set_ipv6_true")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(true), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ip_true")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(false) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(false) },
     None
 ; "set_multicast_ip_false")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(false) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(false) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
 ; "set_multicast_ipv4_true")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv6MulticastForwardingUnsupported)
 ; "set_multicast_ipv6_true")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
 ; "set_multicast_ip_true")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: Some(false), v6: Some(true), v6_multicast: Some(false) },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: Some(false), v6_unicast: Some(true), v6_multicast: Some(false) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ip_true_and_multicast_ip_false")]
 #[test_case(
-    IpForwarding { v4: Some(false), v4_multicast: Some(true), v6: Some(false), v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: Some(false), v4_multicast: Some(true), v6_unicast: Some(false), v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
 ; "set_ip_false_and_multicast_ip_true")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: Some(true), v6: Some(true), v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: Some(true), v6_unicast: Some(true), v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ip_and_multicast_ip_true")]
 async fn get_set_forwarding_loopback<N: Netstack>(
@@ -2974,18 +2974,18 @@ async fn get_set_forwarding_loopback<N: Netstack>(
 
 #[netstack_test]
 #[variant(N, Netstack)]
-#[test_case(IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None }; "set_none")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ip_false")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ipv4_true")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(true), v6_multicast: None }; "set_ipv6_true")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(true), v6_multicast: None }; "set_ip_true")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(false) }; "set_multicast_ip_false")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(false) }; "set_multicast_ipv4_true")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(true) }; "set_multicast_ipv6_true")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(true) }; "set_multicast_ip_true")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: Some(false), v6: Some(true), v6_multicast: Some(false) }; "set_ip_true_and_multicast_ip_false")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: Some(true), v6: Some(false), v6_multicast: Some(true) }; "set_ip_false_and_multicast_ip_true")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: Some(true), v6: Some(true), v6_multicast: Some(true) }; "set_ip_and_multicast_ip_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: None, v6_unicast: None, v6_multicast: None }; "set_none")]
+#[test_case(IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None }; "set_ip_false")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None }; "set_ipv4_true")]
+#[test_case(IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None }; "set_ipv6_true")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None }; "set_ip_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(false) }; "set_multicast_ip_false")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(false) }; "set_multicast_ipv4_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(true) }; "set_multicast_ipv6_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(true) }; "set_multicast_ip_true")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: Some(false), v6_unicast: Some(true), v6_multicast: Some(false) }; "set_ip_true_and_multicast_ip_false")]
+#[test_case(IpForwarding { v4_unicast: Some(false), v4_multicast: Some(true), v6_unicast: Some(false), v6_multicast: Some(true) }; "set_ip_false_and_multicast_ip_true")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: Some(true), v6_unicast: Some(true), v6_multicast: Some(true) }; "set_ip_and_multicast_ip_true")]
 async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwarding) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -3054,9 +3054,9 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     // interface/protocol.
     let reverse_if_some = |val: Option<bool>| val.map(bool::not);
     let reversed_forwarding_config = IpForwarding {
-        v4: reverse_if_some(forwarding_config.v4),
+        v4_unicast: reverse_if_some(forwarding_config.v4_unicast),
         v4_multicast: reverse_if_some(forwarding_config.v4_multicast),
-        v6: reverse_if_some(forwarding_config.v6),
+        v6_unicast: reverse_if_some(forwarding_config.v6_unicast),
         v6_multicast: reverse_if_some(forwarding_config.v6_multicast),
     };
     set_ip_forwarding(

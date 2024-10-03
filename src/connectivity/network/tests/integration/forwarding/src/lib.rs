@@ -68,7 +68,7 @@ impl SetupConfig {
         let disabled_config = || fnet_interfaces_admin::Configuration::default();
         let enabled_config = || fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()
@@ -94,7 +94,7 @@ impl SetupConfig {
         let disabled_config = || fnet_interfaces_admin::Configuration::default();
         let enabled_config = || fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()

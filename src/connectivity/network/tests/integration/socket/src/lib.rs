@@ -491,7 +491,7 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()
@@ -527,7 +527,7 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()

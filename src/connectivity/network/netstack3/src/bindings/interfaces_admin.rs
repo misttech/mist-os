@@ -862,15 +862,15 @@ fn set_configuration(
         Some(fnet_interfaces_admin::Ipv4Configuration {
             igmp,
             multicast_forwarding,
-            forwarding,
+            unicast_forwarding,
             arp,
             __source_breaking,
         }) => {
             if let Some(_) = igmp {
                 warn!("TODO(https://fxbug.dev/42071402): support IGMP configuration changes")
             }
-            if let Some(forwarding) = forwarding {
-                info!("updating IPv4 forwarding on {core_id:?} to enabled={forwarding}");
+            if let Some(forwarding) = unicast_forwarding {
+                info!("updating IPv4 unicast forwarding on {core_id:?} to enabled={forwarding}");
             }
             if let Some(forwarding) = multicast_forwarding {
                 info!("updating IPv4 multicast forwarding on {core_id:?} to enabled={forwarding}");
@@ -879,7 +879,7 @@ fn set_configuration(
             (
                 Some(Ipv4DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
-                        unicast_forwarding_enabled: forwarding,
+                        unicast_forwarding_enabled: unicast_forwarding,
                         multicast_forwarding_enabled: multicast_forwarding,
                         ..Default::default()
                     },
@@ -902,15 +902,15 @@ fn set_configuration(
         Some(fnet_interfaces_admin::Ipv6Configuration {
             mld,
             multicast_forwarding,
-            forwarding,
+            unicast_forwarding,
             ndp,
             __source_breaking,
         }) => {
             if let Some(_) = mld {
                 warn!("TODO(https://fxbug.dev/42071402): support MLD configuration changes")
             }
-            if let Some(forwarding) = forwarding {
-                info!("updating IPv6 forwarding on {core_id:?} to enabled={forwarding}");
+            if let Some(forwarding) = unicast_forwarding {
+                info!("updating IPv6 unicast forwarding on {core_id:?} to enabled={forwarding}");
             }
             if let Some(forwarding) = multicast_forwarding {
                 info!("updating IPv6 multicast forwarding on {core_id:?} to enabled={forwarding}");
@@ -927,7 +927,7 @@ fn set_configuration(
             (
                 Some(Ipv6DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
-                        unicast_forwarding_enabled: forwarding,
+                        unicast_forwarding_enabled: unicast_forwarding,
                         multicast_forwarding_enabled: multicast_forwarding,
                         ..Default::default()
                     },
@@ -1005,7 +1005,7 @@ fn set_configuration(
             gmp_enabled: _,
         } = ip_config;
         fnet_interfaces_admin::Ipv4Configuration {
-            forwarding: unicast_forwarding_enabled,
+            unicast_forwarding: unicast_forwarding_enabled,
             multicast_forwarding: multicast_forwarding_enabled,
             igmp: None,
             arp: arp.map(IntoFidl::into_fidl),
@@ -1040,7 +1040,7 @@ fn set_configuration(
             gmp_enabled: _,
         } = ip_config;
         fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: unicast_forwarding_enabled,
+            unicast_forwarding: unicast_forwarding_enabled,
             multicast_forwarding: multicast_forwarding_enabled,
             mld: None,
             ndp,
@@ -1070,7 +1070,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         gmp_enabled: _,
     } = ctx.api().device_ip::<Ipv4>().get_configuration(&core_id).config.ip_config;
     let ipv4 = Some(fnet_interfaces_admin::Ipv4Configuration {
-        forwarding: Some(unicast_forwarding_enabled),
+        unicast_forwarding: Some(unicast_forwarding_enabled),
         // TODO(https://fxbug.dev/42071402): Support IGMP configuration
         // changes.
         igmp: None,
@@ -1107,7 +1107,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
     });
 
     let ipv6 = Some(fnet_interfaces_admin::Ipv6Configuration {
-        forwarding: Some(unicast_forwarding_enabled),
+        unicast_forwarding: Some(unicast_forwarding_enabled),
         // TODO(https://fxbug.dev/42071402): Support MLD configuration
         // changes.
         mld: None,

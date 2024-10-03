@@ -188,7 +188,7 @@ async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
 async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
     let config_with_ipv6_forwarding_set = |forwarding| fnet_interfaces_admin::Configuration {
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: Some(forwarding),
+            unicast_forwarding: Some(forwarding),
             ..Default::default()
         }),
         ..Default::default()

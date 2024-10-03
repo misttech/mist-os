@@ -1777,32 +1777,34 @@ impl<'a> TestInterface<'a> {
 
         let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
         if let Some(fnet_interfaces_admin::Ipv4Configuration {
-            forwarding,
+            unicast_forwarding,
             multicast_forwarding,
             ..
         }) = ipv4
         {
             let fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: previous_forwarding,
+                unicast_forwarding: previous_unicast_forwarding,
                 multicast_forwarding: previous_multicast_forwarding,
                 ..
             } = previous_ipv4.ok_or_else(|| anyhow!("IPv4 configuration not supported"))?;
-            verify_config_changed(previous_forwarding, forwarding).context("IPv4 forwarding")?;
+            verify_config_changed(previous_unicast_forwarding, unicast_forwarding)
+                .context("IPv4 unicast forwarding")?;
             verify_config_changed(previous_multicast_forwarding, multicast_forwarding)
                 .context("IPv4 multicast forwarding")?;
         }
         if let Some(fnet_interfaces_admin::Ipv6Configuration {
-            forwarding,
+            unicast_forwarding,
             multicast_forwarding,
             ..
         }) = ipv6
         {
             let fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: previous_forwarding,
+                unicast_forwarding: previous_unicast_forwarding,
                 multicast_forwarding: previous_multicast_forwarding,
                 ..
             } = previous_ipv6.ok_or_else(|| anyhow!("IPv6 configuration not supported"))?;
-            verify_config_changed(previous_forwarding, forwarding).context("IPv6 forwarding")?;
+            verify_config_changed(previous_unicast_forwarding, unicast_forwarding)
+                .context("IPv6 unicast forwarding")?;
             verify_config_changed(previous_multicast_forwarding, multicast_forwarding)
                 .context("IPv6 multicast forwarding")?;
         }
@@ -1813,7 +1815,7 @@ impl<'a> TestInterface<'a> {
     pub async fn set_ipv6_forwarding_enabled(&self, enabled: bool) -> Result<()> {
         self.set_configuration(fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: Some(enabled),
+                unicast_forwarding: Some(enabled),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1825,7 +1827,7 @@ impl<'a> TestInterface<'a> {
     pub async fn set_ipv4_forwarding_enabled(&self, enabled: bool) -> Result<()> {
         self.set_configuration(fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: Some(enabled),
+                unicast_forwarding: Some(enabled),
                 ..Default::default()
             }),
             ..Default::default()

@@ -1393,11 +1393,11 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
                 .control()
                 .set_configuration(&fnet_interfaces_admin::Configuration {
                     ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                        forwarding: Some(true),
+                        unicast_forwarding: Some(true),
                         ..Default::default()
                     }),
                     ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                        forwarding: Some(true),
+                        unicast_forwarding: Some(true),
                         ..Default::default()
                     }),
                     ..Default::default()

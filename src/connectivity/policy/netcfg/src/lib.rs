@@ -2204,12 +2204,12 @@ impl<'a> NetCfg<'a> {
         let config: fnet_interfaces_admin::Configuration = control
             .set_configuration(&fnet_interfaces_admin::Configuration {
                 ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                    forwarding: Some(ipv6_forwarding),
+                    unicast_forwarding: Some(ipv6_forwarding),
                     multicast_forwarding: Some(ipv6_forwarding),
                     ..Default::default()
                 }),
                 ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                    forwarding: Some(ipv4_forwarding),
+                    unicast_forwarding: Some(ipv4_forwarding),
                     multicast_forwarding: Some(ipv4_forwarding),
                     ..Default::default()
                 }),
