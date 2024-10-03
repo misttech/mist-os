@@ -144,6 +144,14 @@ def main():
         err = update_golden(args)
     elif not os.path.exists(args.golden):
         # In all remaining cases, the golden must exist.
+        # The file may be empty if the library is not supported at this API
+        # level. This is consistent with FIDL libraries and generated C headers
+        # being present but empty when using the IDK. This also ensures that
+        # promoting a library to an SDK category that requires compatibility
+        # testing will require OWNERS approval for the new files in
+        # `//sdk/history` even if the library is unstable. This is especially
+        # important for SDK categories such as "partner_internal" that do not
+        # affect the IDK manifest.
         err = golden_not_found_error(args.golden)
     elif args.policy == Policy.no_breaking_changes:
         err = fail_on_breaking_changes(args)
