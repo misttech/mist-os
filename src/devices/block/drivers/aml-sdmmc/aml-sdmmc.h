@@ -321,7 +321,10 @@ class AmlSdmmc : public fdf::DriverBase,
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   trace_async_id_t trace_async_id_;
   std::vector<std::variant<SdmmcRequestInfo, SdmmcTaskInfo>> delayed_requests_;
+  // TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   uint32_t clk_div_saved_ = 0;
+#endif
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;

@@ -804,6 +804,8 @@ zx_status_t AmlSdmmc::SuspendPower() {
     return ZX_OK;
   }
 
+// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   // Disable the device clock.
   auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
   clk_div_saved_ = clk.cfg_div();
@@ -823,6 +825,7 @@ zx_status_t AmlSdmmc::SuspendPower() {
       return result->error_value();
     }
   }
+#endif
 
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("aml-sdmmc", "suspend", trace_async_id_);
@@ -837,6 +840,8 @@ zx_status_t AmlSdmmc::ResumePower() {
     return ZX_OK;
   }
 
+// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   // Ungate the core clock.
   if (clock_gate_.is_valid()) {
     const fidl::WireResult result = clock_gate_->Enable();
@@ -855,6 +860,7 @@ zx_status_t AmlSdmmc::ResumePower() {
   // Re-enable the device clock.
   auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
   clk.set_cfg_div(clk_div_saved_).WriteTo(&*mmio_);
+#endif
 
   TRACE_ASYNC_END("aml-sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;

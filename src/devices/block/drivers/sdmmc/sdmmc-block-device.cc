@@ -1070,6 +1070,8 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
+// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
              zx_status_get_string(status));
@@ -1080,6 +1082,7 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
     return status;
   }
+#endif
 
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("sdmmc", "suspend", trace_async_id_);
@@ -1094,6 +1097,8 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return ZX_OK;
   }
 
+// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
     return status;
@@ -1103,6 +1108,7 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s", zx_status_get_string(status));
     return status;
   }
+#endif
 
   TRACE_ASYNC_END("sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;
