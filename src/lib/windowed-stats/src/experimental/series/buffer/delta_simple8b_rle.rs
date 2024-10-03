@@ -15,7 +15,8 @@ pub enum Encoding {}
 impl<A> encoding::Encoding<A> for Encoding {
     type Compression = encoding::compression::DeltaSimple8bRle;
 
-    const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Unsigned;
+    const PAYLOAD: encoding::payload::DeltaSimple8bRle =
+        encoding::payload::DeltaSimple8bRle::Unsigned;
 }
 
 #[derive(Clone, Debug)]

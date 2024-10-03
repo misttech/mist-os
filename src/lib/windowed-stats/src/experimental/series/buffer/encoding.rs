@@ -68,7 +68,7 @@ pub mod compression {
     pub enum DeltaSimple8bRle {}
 
     impl Compression for DeltaSimple8bRle {
-        type Payload = payload::Simple8bRle;
+        type Payload = payload::DeltaSimple8bRle;
 
         const BUFFER_TYPE_DESCRIPTOR: u8 = 2;
     }
@@ -97,7 +97,7 @@ pub mod payload {
 
     /// Payload for compression based primarily on Simple8b and RLE.
     ///
-    /// This payload also describes compression using Zigzag, Delta, etc. encodings.
+    /// This payload also describes compression using Zigzag encodings.
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     #[repr(u8)]
     pub enum Simple8bRle {
@@ -116,6 +116,32 @@ pub mod payload {
     impl Payload for Simple8bRle {
         fn buffer_subtype_descriptor(self) -> u8 {
             <Simple8bRle>::buffer_subtype_descriptor(self)
+        }
+    }
+
+    /// Payload for compression based on the delta-variant of Simple8b RLE.
+    ///
+    /// This payload also describes compression using Zigzag encodings.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    #[repr(u8)]
+    pub enum DeltaSimple8bRle {
+        /// Unsigned integers.
+        Unsigned = 0,
+        /// Signed integers using Zigzag encoding.
+        Signed = 1,
+        /// Unsigned integers but the diffs are signed and Zigzag encoded.
+        UnsignedWithSignedDiff = 2,
+    }
+
+    impl DeltaSimple8bRle {
+        pub const fn buffer_subtype_descriptor(self) -> u8 {
+            self as u8
+        }
+    }
+
+    impl Payload for DeltaSimple8bRle {
+        fn buffer_subtype_descriptor(self) -> u8 {
+            <DeltaSimple8bRle>::buffer_subtype_descriptor(self)
         }
     }
 }

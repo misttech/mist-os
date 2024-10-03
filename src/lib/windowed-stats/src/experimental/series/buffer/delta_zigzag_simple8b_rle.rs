@@ -3,31 +3,77 @@
 // found in the LICENSE file.
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use std::convert::Infallible;
 use std::io;
+use std::marker::PhantomData;
 
 use crate::experimental::series::buffer::encoding;
 use crate::experimental::series::buffer::zigzag_simple8b_rle::ZigzagSimple8bRleRingBuffer;
 
 #[derive(Debug)]
-pub enum Encoding {}
-
-impl<A> encoding::Encoding<A> for Encoding {
+pub struct Encoding<A>(PhantomData<fn() -> A>, Infallible);
+impl encoding::Encoding<i64> for Encoding<i64> {
     type Compression = encoding::compression::DeltaSimple8bRle;
 
-    const PAYLOAD: encoding::payload::Simple8bRle = encoding::payload::Simple8bRle::Signed;
+    const PAYLOAD: encoding::payload::DeltaSimple8bRle =
+        encoding::payload::DeltaSimple8bRle::Signed;
 }
 
-pub struct DeltaZigzagSimple8bRleRingBuffer {
+impl encoding::Encoding<u64> for Encoding<u64> {
+    type Compression = encoding::compression::DeltaSimple8bRle;
+
+    const PAYLOAD: encoding::payload::DeltaSimple8bRle =
+        encoding::payload::DeltaSimple8bRle::UnsignedWithSignedDiff;
+}
+
+#[derive(Clone, Debug)]
+pub struct DeltaZigzagSimple8bRleRingBuffer<A> {
+    buffer: BaseDeltaZigzagSimple8bRleRingBuffer,
+    phantom: PhantomData<fn() -> A>,
+}
+
+impl<A> DeltaZigzagSimple8bRleRingBuffer<A> {
+    /// Create a new DeltaZigzagSimple8bRleRingBuffer that holds at least |min_samples|
+    /// (including the base value).
+    /// The buffer would continually grow and only evict data if it wouldn't
+    /// cause the number of samples to fall below |min_samples|.
+    pub const fn with_min_samples(min_samples: usize) -> Self {
+        Self {
+            buffer: BaseDeltaZigzagSimple8bRleRingBuffer::with_min_samples(min_samples),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Serialize the DeltaZigzagSimple8bRleRingBuffer data into a bytes buffer.
+    pub fn serialize(&self, buffer: &mut impl io::Write) -> io::Result<()> {
+        self.buffer.serialize(buffer)
+    }
+}
+
+impl DeltaZigzagSimple8bRleRingBuffer<i64> {
+    /// Push |value| onto the ring buffer. Oldest values might be evicted by this call.
+    /// Evicted values are applied to the base value.
+    pub fn push(&mut self, value: i64) {
+        self.buffer.push(value)
+    }
+}
+
+impl DeltaZigzagSimple8bRleRingBuffer<u64> {
+    /// Push |value| onto the ring buffer. Oldest values might be evicted by this call.
+    /// Evicted values are applied to the base value.
+    pub fn push(&mut self, value: u64) {
+        self.buffer.push(value as i64)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct BaseDeltaZigzagSimple8bRleRingBuffer {
     base: Option<i64>,
     last: Option<i64>,
     buffer: ZigzagSimple8bRleRingBuffer,
 }
 
-impl DeltaZigzagSimple8bRleRingBuffer {
-    /// Create a new DeltaZigzagSimple8bRleRingBuffer that holds at least |min_samples|
-    /// (including the base value).
-    /// The buffer would continually grow and only evict data if it wouldn't
-    /// cause the number of samples to fall below |min_samples|.
+impl BaseDeltaZigzagSimple8bRleRingBuffer {
     pub const fn with_min_samples(min_samples: usize) -> Self {
         Self {
             base: None,
@@ -36,8 +82,6 @@ impl DeltaZigzagSimple8bRleRingBuffer {
         }
     }
 
-    /// Push |value| onto the ring buffer. Oldest values might be evicted by this call.
-    /// Evicted values are applied to the base value.
     pub fn push(&mut self, value: i64) {
         let (base, last) = match (self.base.as_mut(), self.last.as_mut()) {
             (Some(base), Some(last)) => (base, last),
@@ -55,14 +99,13 @@ impl DeltaZigzagSimple8bRleRingBuffer {
         self.last = Some(value);
     }
 
-    /// Serialize the DeltaSimple8bRleRingBuffer data into a bytes buffer.
     pub fn serialize(&self, buffer: &mut impl io::Write) -> io::Result<()> {
         let metadata = self.buffer.metadata();
         // Add one count for the base value
-        let num_blocks = metadata
-            .num_blocks
-            .checked_add(1)
-            .ok_or(io::Error::new(io::ErrorKind::InvalidData, "Metadata num_blocks overflow"))?;
+        let num_blocks =
+            metadata.num_blocks.checked_add(if self.base.is_some() { 1 } else { 0 }).ok_or(
+                io::Error::new(io::ErrorKind::InvalidData, "Metadata num_blocks overflow"),
+            )?;
         buffer.write_u16::<LittleEndian>(num_blocks)?;
         buffer.write_u16::<LittleEndian>(metadata.selectors_head_index)?;
         buffer.write_u8(metadata.last_block_num_values)?;
@@ -82,7 +125,8 @@ mod tests {
 
     #[test]
     fn test_ring_buffer_has_base_value_only() {
-        let mut ring_buffer = DeltaZigzagSimple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+        let mut ring_buffer =
+            DeltaZigzagSimple8bRleRingBuffer::<i64>::with_min_samples(MIN_SAMPLES);
         ring_buffer.push(-42);
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -97,7 +141,8 @@ mod tests {
 
     #[test]
     fn test_ring_buffer_has_base_and_encoded_diff_value() {
-        let mut ring_buffer = DeltaZigzagSimple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+        let mut ring_buffer =
+            DeltaZigzagSimple8bRleRingBuffer::<i64>::with_min_samples(MIN_SAMPLES);
         ring_buffer.push(42);
         ring_buffer.push(0);
         let mut buffer = vec![];
@@ -116,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_evicted_values_are_added_to_base_value() {
-        let mut ring_buffer = DeltaZigzagSimple8bRleRingBuffer::with_min_samples(10);
+        let mut ring_buffer = DeltaZigzagSimple8bRleRingBuffer::<i64>::with_min_samples(10);
         let mut counter = 516i64;
         ring_buffer.push(counter);
         for _ in 0..8 {
@@ -155,6 +200,26 @@ mod tests {
             255, 0, 255, 0, 255, 0, 255, 0, // first block
             2, 0, 0, 0, 0, 0, // second block: value (1 is encoded as 2)
             1, 0, // second block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_u64_ring_buffer() {
+        let mut ring_buffer =
+            DeltaZigzagSimple8bRleRingBuffer::<u64>::with_min_samples(MIN_SAMPLES);
+        ring_buffer.push(1);
+        ring_buffer.push(u64::MAX);
+        ring_buffer.push(3);
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            2, 0, // length
+            0, 0, // selector head index
+            2, // last block's # of values
+            1, 0, 0, 0, 0, 0, 0, 0,    // base value
+            0x03, // 4-bit selector
+            0x83, 0, 0, 0, 0, 0, 0, 0, // first block values (-2 and 4 encoded as 3 and 8)
         ];
         assert_eq!(&buffer[..], expected_bytes);
     }

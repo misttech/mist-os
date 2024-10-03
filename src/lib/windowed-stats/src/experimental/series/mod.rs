@@ -148,11 +148,11 @@ impl BufferStrategy<i64, Constant> for Gauge {
 }
 
 impl BufferStrategy<i64, LastAggregation> for Gauge {
-    type Buffer = DeltaZigzagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle<i64>;
 }
 
 impl BufferStrategy<i64, LastSample> for Gauge {
-    type Buffer = DeltaZigzagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle<i64>;
 }
 
 impl BufferStrategy<u64, Constant> for Gauge {
@@ -160,11 +160,11 @@ impl BufferStrategy<u64, Constant> for Gauge {
 }
 
 impl BufferStrategy<u64, LastAggregation> for Gauge {
-    type Buffer = DeltaZigzagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle<u64>;
 }
 
 impl BufferStrategy<u64, LastSample> for Gauge {
-    type Buffer = DeltaZigzagSimple8bRle;
+    type Buffer = DeltaZigzagSimple8bRle<u64>;
 }
 
 impl DataSemantic for Gauge {
@@ -911,6 +911,166 @@ mod tests {
                 42, 0, 0, 0, 0, 0, 0, 0,    // base value
                 0x0f, // RLE selector
                 8, 0, 0, 0, 0, 0, 1, 0, // value 8 (delta) appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+    }
+
+    #[test]
+    fn time_matrix_with_delta_zigzag_simple8b_rle_buffer_i64() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<Max<i64>, LastSample>::new(
+            SamplingProfile::highly_granular(),
+            LastSample::or(0),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                2, 1, // type: delta simple8b RLE; subtype: signed
+                7, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(42)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                2, 1, // type: delta simple8b RLE; subtype: signed
+                15, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                42, 0, 0, 0, 0, 0, 0, 0, // base value
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(40)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(20_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                20, 0, 0, 0, // last timestamp
+                2, 1, // type: delta simple8b RLE; subtype: signed
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                2, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                1, // number of values in last block
+                42, 0, 0, 0, 0, 0, 0, 0,    // base value
+                0x0f, // RLE selector
+                3, 0, 0, 0, 0, 0, 1, 0, // value -2 (delta) encoded as 3, appearing 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+    }
+
+    #[test]
+    fn time_matrix_with_delta_zigzag_simple8b_rle_buffer_u64() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<Max<u64>, LastSample>::new(
+            SamplingProfile::highly_granular(),
+            LastSample::or(0),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                2, 2, // type: delta simple8b RLE; subtype: unsigned with signed diff
+                7, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(1)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                2, 2, // type: delta simple8b RLE; subtype: unsigned with signed diff
+                15, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                1, 0, 0, 0, 0, 0, 0, 0, // base value
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(u64::MAX)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(20_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                20, 0, 0, 0, // last timestamp
+                2, 2, // type: delta simple8b RLE; subtype: unsigned with signed diff
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                2, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                1, // number of values in last block
+                1, 0, 0, 0, 0, 0, 0, 0,    // base value
+                0x0f, // RLE selector
+                3, 0, 0, 0, 0, 0, 1, 0, // value -2 (delta) encoded as 3, appearing 1 time
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of base value + selector elements or value blocks

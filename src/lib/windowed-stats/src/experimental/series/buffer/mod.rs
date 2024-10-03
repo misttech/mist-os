@@ -71,44 +71,6 @@ pub trait RingBuffer<A> {
     // fn durability(&self) -> Duration;
 }
 
-// TODO(https://fxbug.dev/352614791): Remove this macro and any and all "null" implementations once
-//                                    buffers and implemented.
-/// Implements a "null" `RingBuffer`, which discards any and all data and writes a warning to the
-/// log when constructed.
-macro_rules! impl_null_buffer {
-    (
-        // Aggregation type and optional input type parameters.
-        $aggregation:ident $(for <$($ts:ident $(,)?)+>)?
-        // Optional bounds on aggregation type and input type parameters.
-        $(where $($bt:ident: $bb:ident $(<$($bbt:ident $(,)?)+>)? $(+ $bbs:ident $(<$($bbst:ident $(,)?)+>)?)* $(,)?)+)? =>
-        // Implementor type and optional application of input type parameters.
-        $implementor:ident $(<$($its:ident $(,)?)+>)?,
-        // `Encoding` type. Does **not** support input type parameters.
-        $encoding:ty $(,)?
-    ) => {
-        impl<$($($ts,)+)?> RingBuffer<$aggregation> for $implementor $(<$($its,)+>)?
-        $(
-        where
-            $($bt: $bb$(<$($bbt,)+>)? $(+ $bbs$(<$($bbst,)+>)?)*,)+
-        )?
-        {
-            type Encoding = $encoding;
-
-            fn with_capacity(_: Capacity) -> Self {
-                let buffer = Self::default();
-                warn!("`{:?}` buffer is unimplemented: no aggregation data will be stored", &buffer,);
-                buffer
-            }
-
-            fn push(&mut self, _: $aggregation) {}
-
-            fn serialize(&self, _: impl Write) -> io::Result<()> {
-                Ok(())
-            }
-        }
-    };
-}
-
 /// Capacity bounds of a [`RingBuffer`].
 ///
 /// Because buffers may be compressed, capacity is expressed in terms of bounds rather than exact
@@ -238,20 +200,56 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/352614791): Implement the `DeltaZigzagSimple8bRle` ring buffer.
-/// A ring buffer that encodes integer items using Delta, Zigzag, Simple8B, and RLE compression.
-#[derive(Clone, Debug, Default)]
-pub struct DeltaZigzagSimple8bRle;
-
-impl_null_buffer!(
-    i64 => DeltaZigzagSimple8bRle,
-    delta_zigzag_simple8b_rle::Encoding,
+#[derive(Clone, Debug)]
+pub struct DeltaZigzagSimple8bRle<A>(
+    delta_zigzag_simple8b_rle::DeltaZigzagSimple8bRleRingBuffer<A>,
 );
 
-impl_null_buffer!(
-    u64 => DeltaZigzagSimple8bRle,
-    delta_zigzag_simple8b_rle::Encoding,
-);
+impl RingBuffer<i64> for DeltaZigzagSimple8bRle<i64> {
+    type Encoding = delta_zigzag_simple8b_rle::Encoding<i64>;
+
+    fn with_capacity(capacity: Capacity) -> Self {
+        let ring_buffer = match capacity {
+            MinSamples(n) => {
+                delta_zigzag_simple8b_rle::DeltaZigzagSimple8bRleRingBuffer::with_min_samples(
+                    n.get(),
+                )
+            }
+        };
+        DeltaZigzagSimple8bRle(ring_buffer)
+    }
+
+    fn push(&mut self, item: i64) {
+        self.0.push(item)
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
+    }
+}
+
+impl RingBuffer<u64> for DeltaZigzagSimple8bRle<u64> {
+    type Encoding = delta_zigzag_simple8b_rle::Encoding<u64>;
+
+    fn with_capacity(capacity: Capacity) -> Self {
+        let ring_buffer = match capacity {
+            MinSamples(n) => {
+                delta_zigzag_simple8b_rle::DeltaZigzagSimple8bRleRingBuffer::with_min_samples(
+                    n.get(),
+                )
+            }
+        };
+        DeltaZigzagSimple8bRle(ring_buffer)
+    }
+
+    fn push(&mut self, item: u64) {
+        self.0.push(item)
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -286,6 +284,44 @@ mod tests {
         buffer.push(22i64);
         let mut data = vec![];
         let result = RingBuffer::<i64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn delta_simple8b_rle_buffer() {
+        let mut buffer =
+            <DeltaSimple8bRle as RingBuffer<u64>>::with_capacity(Capacity::from_min_samples(2));
+        buffer.push(22u64);
+        buffer.push(30u64);
+        let mut data = vec![];
+        let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn delta_zigzag_simple8b_rle_buffer_i64() {
+        let mut buffer = <DeltaZigzagSimple8bRle<i64> as RingBuffer<i64>>::with_capacity(
+            Capacity::from_min_samples(2),
+        );
+        buffer.push(22i64);
+        buffer.push(-1i64);
+        let mut data = vec![];
+        let result = RingBuffer::<i64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn delta_zigzag_simple8b_rle_buffer_u64() {
+        let mut buffer = <DeltaZigzagSimple8bRle<u64> as RingBuffer<u64>>::with_capacity(
+            Capacity::from_min_samples(2),
+        );
+        buffer.push(22u64);
+        buffer.push(u64::MAX);
+        let mut data = vec![];
+        let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
         assert!(result.is_ok());
         assert!(!data.is_empty());
     }
