@@ -140,34 +140,34 @@ pub trait BootTimeAccessor {
     fn get_boot_timestamp(&self) -> Timestamp;
 }
 
-/// Timestamp filter which is either either monotonic-based or UTC-based.
+/// Timestamp filter which is either either boot-based or UTC-based.
 #[derive(Clone, Debug)]
 pub struct DeviceOrLocalTimestamp {
-    /// Timestamp in monotonic time
+    /// Timestamp in boot time
     pub timestamp: Timestamp,
-    /// True if this filter should be applied to monotonic time,
+    /// True if this filter should be applied to boot time,
     /// false if UTC time.
-    pub is_monotonic: bool,
+    pub is_boot: bool,
 }
 
 impl DeviceOrLocalTimestamp {
     /// Creates a DeviceOrLocalTimestamp from a real-time date/time or
-    /// a monotonic date/time. Returns None if both rtc and monotonic are None.
+    /// a boot date/time. Returns None if both rtc and boot are None.
     /// Returns None if the timestamp is "now".
     pub fn new(
         rtc: Option<&DetailedDateTime>,
-        monotonic: Option<&Duration>,
+        boot: Option<&Duration>,
     ) -> Option<DeviceOrLocalTimestamp> {
         rtc.as_ref()
             .filter(|value| !value.is_now)
             .map(|value| DeviceOrLocalTimestamp {
                 timestamp: Timestamp::from_nanos(value.naive_utc().timestamp_nanos_opt().unwrap()),
-                is_monotonic: false,
+                is_boot: false,
             })
             .or_else(|| {
-                monotonic.map(|value| DeviceOrLocalTimestamp {
+                boot.map(|value| DeviceOrLocalTimestamp {
                     timestamp: Timestamp::from_nanos(value.as_nanos() as i64),
-                    is_monotonic: true,
+                    is_boot: true,
                 })
             })
     }
@@ -212,8 +212,8 @@ where
     boot_ts_nanos: Option<Timestamp>,
 }
 
-/// Converts from UTC time to monotonic time.
-fn utc_to_monotonic(boot_ts: Timestamp, utc: i64) -> Timestamp {
+/// Converts from UTC time to boot time.
+fn utc_to_boot(boot_ts: Timestamp, utc: i64) -> Timestamp {
     Timestamp::from_nanos(utc - boot_ts.into_nanos())
 }
 
@@ -319,7 +319,7 @@ where
                         },
                         show_metadata: cmd.show_metadata,
                         time_format: match cmd.clock {
-                            TimeFormat::Monotonic => LogTimeDisplayFormat::Original,
+                            TimeFormat::Boot => LogTimeDisplayFormat::Original,
                             TimeFormat::Local => LogTimeDisplayFormat::WallTime {
                                 tz: Timezone::Local,
                                 // This will receive a correct value when logging actually starts,
@@ -338,14 +338,8 @@ where
                         ..Default::default()
                     })
                 },
-                since: DeviceOrLocalTimestamp::new(
-                    cmd.since.as_ref(),
-                    cmd.since_monotonic.as_ref(),
-                ),
-                until: DeviceOrLocalTimestamp::new(
-                    cmd.until.as_ref(),
-                    cmd.until_monotonic.as_ref(),
-                ),
+                since: DeviceOrLocalTimestamp::new(cmd.since.as_ref(), cmd.since_boot.as_ref()),
+                until: DeviceOrLocalTimestamp::new(cmd.until.as_ref(), cmd.until_boot.as_ref()),
             },
         );
         formatter
@@ -360,9 +354,9 @@ where
         let Some(timestamp) = timestamp else {
             return false;
         };
-        if timestamp.is_monotonic {
+        if timestamp.is_boot {
             callback(
-                &utc_to_monotonic(self.get_boot_timestamp(), log_entry.timestamp.into_nanos()),
+                &utc_to_boot(self.get_boot_timestamp(), log_entry.timestamp.into_nanos()),
                 &timestamp.timestamp,
             )
         } else {
@@ -605,11 +599,11 @@ mod test {
             LogFormatterOptions {
                 since: Some(DeviceOrLocalTimestamp {
                     timestamp: Timestamp::from_nanos(1),
-                    is_monotonic: true,
+                    is_boot: true,
                 }),
                 until: Some(DeviceOrLocalTimestamp {
                     timestamp: Timestamp::from_nanos(3),
-                    is_monotonic: true,
+                    is_boot: true,
                 }),
                 ..Default::default()
             },
@@ -706,11 +700,11 @@ mod test {
             LogFormatterOptions {
                 since: Some(DeviceOrLocalTimestamp {
                     timestamp: Timestamp::from_nanos(1),
-                    is_monotonic: false,
+                    is_boot: false,
                 }),
                 until: Some(DeviceOrLocalTimestamp {
                     timestamp: Timestamp::from_nanos(3),
-                    is_monotonic: false,
+                    is_boot: false,
                 }),
                 display: Some(LogTextDisplayOptions {
                     time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 1 },
