@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/zircon/levels.gni")
 import("../libc.gni")
 
 if (zircon_toolchain != false) {
@@ -83,6 +84,6 @@ libc_test("unittests") {
 
   # This is hack!  Approximate guess for whether zxtest and libc will have been
   # compiled with frame pointers.
-  incomplete_fp = !is_debug
+  incomplete_fp = !is_debug || zx_assert_level == 0
   defines = [ "INCOMPLETE_FRAME_POINTERS=$incomplete_fp" ]
 }
