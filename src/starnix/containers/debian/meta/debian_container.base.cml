@@ -17,13 +17,17 @@
             "/tmp:tmpfs",
         ],
         features: [
+            // keep-sorted start
             "ashmem",
             "container",
             "custom_artifacts",
-            "framebuffer",
             "enable_suid",
+            "framebuffer",
+            "io_uring",
             "magma",
             "test_data",
+
+            // keep-sorted end
         ],
         rlimits: [ "RLIMIT_NOFILE=131072" ],
         name: "debian",

@@ -45,7 +45,7 @@ use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 // See https://github.com/google/gvisor/blob/master/pkg/abi/linux/iouring.go#L47
-const IORING_MAX_ENTRIES: u32 = 1 << 15; // 32768
+pub const IORING_MAX_ENTRIES: u32 = 1 << 15; // 32768
 const IORING_MAX_CQ_ENTRIES: u32 = 2 * IORING_MAX_ENTRIES;
 
 type RingIndex = u32;
@@ -562,17 +562,11 @@ impl IoUringFileObject {
         entries: u32,
         params: &mut io_uring_params,
     ) -> Result<FileHandle, Errno> {
-        if entries > IORING_MAX_ENTRIES {
-            return error!(EINVAL);
-        }
-
         let sq_entries = entries.next_power_of_two();
         let cq_entries = if params.flags & IORING_SETUP_CQSIZE != 0 {
-            let cq_entries = params.cq_entries;
-            if cq_entries > IORING_MAX_CQ_ENTRIES {
-                return error!(EINVAL);
-            }
-            cq_entries
+            UserValue::from_raw(params.cq_entries)
+                .validate(1..IORING_MAX_CQ_ENTRIES)
+                .ok_or_else(|| errno!(EINVAL))?
         } else {
             // This operation cannot overflow because sq_entries is capped at IORING_MAX_ENTRIES,
             // which is only 15 bits.

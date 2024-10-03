@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::ops::Range;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// A value Starnix has received from userspace.
@@ -11,7 +12,7 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 /// operation.
 #[derive(Clone, Copy, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(transparent)]
-pub struct UserValue<T: Copy + Eq + IntoBytes + FromBytes + Immutable>(T);
+pub struct UserValue<T>(T);
 
 impl<T: Copy + Eq + IntoBytes + FromBytes + Immutable> UserValue<T> {
     /// Create a UserValue from a raw value provided by userspace.
@@ -27,6 +28,17 @@ impl<T: Copy + Eq + IntoBytes + FromBytes + Immutable> UserValue<T> {
     /// Attempt to convert this value into another type.
     pub fn try_into<U: TryFrom<T>>(self) -> Result<U, <U as TryFrom<T>>::Error> {
         U::try_from(self.0)
+    }
+}
+
+impl<T: Copy + PartialOrd> UserValue<T> {
+    /// Returns the value that the user provided if the value is in the given range.
+    pub fn validate(&self, range: Range<T>) -> Option<T> {
+        if range.contains(&self.0) {
+            Some(self.0)
+        } else {
+            None
+        }
     }
 }
 

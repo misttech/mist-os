@@ -12,7 +12,7 @@ use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
-use crate::vfs::io_uring::IoUringFileObject;
+use crate::vfs::io_uring::{IoUringFileObject, IORING_MAX_ENTRIES};
 use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
@@ -3066,7 +3066,7 @@ pub fn sys_io_destroy(
 pub fn sys_io_uring_setup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    entries: u32,
+    user_entries: UserValue<u32>,
     user_params: UserRef<io_uring_params>,
 ) -> Result<FdNumber, Errno> {
     if !current_task.kernel().features.io_uring {
@@ -3094,9 +3094,7 @@ pub fn sys_io_uring_setup(
         }
     }
 
-    if entries == 0 {
-        return error!(EINVAL);
-    }
+    let entries = user_entries.validate(1..IORING_MAX_ENTRIES).ok_or_else(|| errno!(EINVAL))?;
 
     let mut params = current_task.read_object(user_params)?;
     for byte in params.resv {
