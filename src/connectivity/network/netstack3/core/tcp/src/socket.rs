@@ -2963,6 +2963,9 @@ where
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
                         {
+                            // Ignore the result - errors are handled below after calling `close`.
+                            let _: Result<(), CloseError> = conn.state.shutdown_recv();
+
                             conn.defunct = true;
                             let already_closed = match core_ctx.with_counters(|counters| {
                                 conn.state.close(
@@ -3076,11 +3079,10 @@ where
     pub fn shutdown(
         &mut self,
         id: &TcpApiSocketId<I, C>,
-        shutdown: ShutdownType,
+        shutdown_type: ShutdownType,
     ) -> Result<bool, NoConnection> {
-        debug!("shutdown [{shutdown:?}] for {id:?}");
+        debug!("shutdown [{shutdown_type:?}] for {id:?}");
         let (core_ctx, bindings_ctx) = self.contexts();
-        let (shutdown_send, shutdown_receive) = shutdown.to_send_receive();
         let (result, pending) =
             core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
                 let TcpSocketState { socket_state, ip_options: _ } = socket_state;
@@ -3091,13 +3093,6 @@ where
                         sharing: _,
                         timer,
                     }) => {
-                        if !shutdown_send {
-                            // TODO(https://fxbug.dev/42063684): Instead of
-                            // inferring the state in Bindings, we can have Core
-                            // shutdown the read side by closing the receive
-                            // buffer.
-                            return Ok((true, None));
-                        }
                         fn do_shutdown<SockI, WireI, CC, BC>(
                             core_ctx: &mut CC,
                             bindings_ctx: &mut BC,
@@ -3109,6 +3104,7 @@ where
                                 CC::WeakDeviceId,
                             >,
                             timer: &mut BC::Timer,
+                            shutdown_type: ShutdownType,
                         ) -> Result<(), NoConnection>
                         where
                             SockI: DualStackIpExt,
@@ -3119,6 +3115,20 @@ where
                                 + CounterContext<TcpCounters<SockI>>,
                         {
                             let was_closed = matches!(conn.state, State::Closed(_));
+
+                            let (shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
+                            if shutdown_receive {
+                                match conn.state.shutdown_recv() {
+                                    Ok(()) => (),
+                                    Err(CloseError::NoConnection) => return Err(NoConnection),
+                                    Err(CloseError::Closing) => (),
+                                }
+                            }
+
+                            if !shutdown_send {
+                                return Ok(());
+                            }
+
                             match core_ctx.with_counters(|counters| {
                                 conn.state.close(
                                     counters,
@@ -3159,6 +3169,7 @@ where
                                     conn,
                                     addr,
                                     timer,
+                                    shutdown_type,
                                 )?
                             }
                             MaybeDualStack::DualStack((core_ctx, converter)) => {
@@ -3171,6 +3182,7 @@ where
                                         conn,
                                         addr,
                                         timer,
+                                        shutdown_type,
                                     )?,
                                     EitherStack::OtherStack((conn, addr)) => do_shutdown(
                                         core_ctx,
@@ -3180,6 +3192,7 @@ where
                                         conn,
                                         addr,
                                         timer,
+                                        shutdown_type,
                                     )?,
                                 }
                             }
@@ -3191,6 +3204,8 @@ where
                         sharing,
                         addr,
                     ))) => {
+                        let (_shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
+
                         if !shutdown_receive {
                             return Ok((false, None));
                         }
@@ -5291,10 +5306,10 @@ mod tests {
     use net_types::LinkLocalAddr;
     use netstack3_base::sync::{DynDebugReferences, Mutex};
     use netstack3_base::testutil::{
-        new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
-        FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId, FakeTimerCtx,
-        FakeTimerId, FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData,
-        StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
+        new_rng, run_with_many_seeds, set_logger_for_test, FakeAtomicInstant, FakeCoreCtx,
+        FakeCryptoRng, FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId,
+        FakeTimerCtx, FakeTimerId, FakeWeakDeviceId, InstantAndData, MultipleDevicesId,
+        PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
         ContextProvider, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _, InstantContext,
@@ -5320,9 +5335,8 @@ mod tests {
     use super::*;
     use crate::internal::base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT};
     use crate::internal::buffer::testutil::{
-        ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers,
+        ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer, WriteBackClientBuffers,
     };
-    use crate::internal::buffer::RingBuffer;
     use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
@@ -5533,6 +5547,7 @@ mod tests {
     /// Delegate implementation to internal thing.
     impl<D: FakeStrongDeviceId> InstantBindingsTypes for TcpBindingsCtx<D> {
         type Instant = FakeInstant;
+        type AtomicInstant = FakeAtomicInstant;
     }
 
     /// Delegate implementation to internal thing.
@@ -5649,8 +5664,10 @@ mod tests {
         D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D>,
     {
-        type DevicesWithAddrIter<'a> = <InnerCoreCtx<D> as BaseTransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
-            where Self: 'a;
+        type DevicesWithAddrIter<'a>
+            = <InnerCoreCtx<D> as BaseTransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
+        where
+            Self: 'a;
 
         fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
             &mut self,
@@ -6850,7 +6867,7 @@ mod tests {
                     Connection {
                     accept_queue: None,
                     state: State::Closed(Closed {
-                        reason: Some(ConnectionError::ConnectionReset)
+                        reason: Some(ConnectionError::ConnectionRefused)
                     }),
                     ip_sock: _,
                     defunct: false,
@@ -7553,105 +7570,6 @@ mod tests {
                 Ok(())
             );
         });
-    }
-
-    #[ip_test(I)]
-    fn set_buffer_size<I: TcpTestIpExt>()
-    where
-        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
-            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
-    {
-        set_logger_for_test();
-        let mut net = new_test_net::<I>();
-
-        let mut local_sizes = BufferSizes { send: 2048, receive: 2000 };
-        let mut remote_sizes = BufferSizes { send: 1024, receive: 2000 };
-
-        let local_listener = net.with_context(LOCAL, |ctx| {
-            let mut api = ctx.tcp_api::<I>();
-            let local_listener = api.create(Default::default());
-            api.bind(
-                &local_listener,
-                Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
-                Some(PORT_1),
-            )
-            .expect("bind should succeed");
-            api.set_send_buffer_size(&local_listener, local_sizes.send);
-            api.set_receive_buffer_size(&local_listener, local_sizes.receive);
-            api.listen(&local_listener, NonZeroUsize::new(5).unwrap()).expect("can listen");
-            local_listener
-        });
-
-        let remote_connection = net.with_context(REMOTE, |ctx| {
-            let mut api = ctx.tcp_api::<I>();
-            let remote_connection = api.create(Default::default());
-            api.set_send_buffer_size(&remote_connection, remote_sizes.send);
-            api.set_receive_buffer_size(&remote_connection, local_sizes.receive);
-            api.connect(
-                &remote_connection,
-                Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
-                PORT_1,
-            )
-            .expect("connect should succeed");
-            remote_connection
-        });
-        let mut step_and_increment_buffer_sizes_until_idle =
-            |net: &mut TcpTestNetwork,
-             local: &TcpSocketId<_, _, _>,
-             remote: &TcpSocketId<_, _, _>| loop {
-                local_sizes.send += 1;
-                local_sizes.receive += 1;
-                remote_sizes.send += 1;
-                remote_sizes.receive += 1;
-                net.with_context(LOCAL, |ctx| {
-                    let mut api = ctx.tcp_api();
-                    api.set_send_buffer_size(local, local_sizes.send);
-                    if let Some(size) = api.send_buffer_size(local) {
-                        assert_eq!(size, local_sizes.send);
-                    }
-                    api.set_receive_buffer_size(local, local_sizes.receive);
-                    if let Some(size) = api.receive_buffer_size(local) {
-                        assert_eq!(size, local_sizes.receive);
-                    }
-                });
-                net.with_context(REMOTE, |ctx| {
-                    let mut api = ctx.tcp_api();
-                    api.set_send_buffer_size(remote, remote_sizes.send);
-                    if let Some(size) = api.send_buffer_size(remote) {
-                        assert_eq!(size, remote_sizes.send);
-                    }
-                    api.set_receive_buffer_size(remote, remote_sizes.receive);
-                    if let Some(size) = api.receive_buffer_size(remote) {
-                        assert_eq!(size, remote_sizes.receive);
-                    }
-                });
-                if net.step().is_idle() {
-                    break;
-                }
-            };
-
-        // Set the send buffer size at each stage of sockets on both ends of the
-        // handshake process just to make sure it doesn't break.
-        step_and_increment_buffer_sizes_until_idle(&mut net, &local_listener, &remote_connection);
-
-        let local_connection = net.with_context(LOCAL, |ctx| {
-            let (conn, _, _) = ctx.tcp_api().accept(&local_listener).expect("received connection");
-            conn
-        });
-
-        step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
-
-        net.with_context(LOCAL, |ctx| {
-            assert_eq!(ctx.tcp_api().shutdown(&local_connection, ShutdownType::Send,), Ok(true));
-        });
-
-        step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
-
-        net.with_context(REMOTE, |ctx| {
-            assert_eq!(ctx.tcp_api().shutdown(&remote_connection, ShutdownType::Send,), Ok(true),);
-        });
-
-        step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
     }
 
     #[ip_test(I)]

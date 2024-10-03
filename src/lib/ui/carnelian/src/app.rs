@@ -18,7 +18,7 @@ use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::{self as component};
 use fuchsia_trace::duration;
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::future::{Either, Future};
 use futures::StreamExt;

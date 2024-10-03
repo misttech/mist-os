@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 pub type Alias = String;
 
@@ -225,7 +222,7 @@ impl OtherProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<OtherProtocolEvent, fidl::Error> {
         OtherProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -496,7 +493,7 @@ impl ProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -836,7 +833,7 @@ impl fidl::endpoints::ServiceRequest for ServiceRequest {
     }
 }
 #[cfg(target_os = "fuchsia")]
-pub struct ServiceProxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct ServiceProxy(#[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for ServiceProxy {

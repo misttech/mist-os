@@ -25,10 +25,7 @@ use wlan_hw_sim::{
     test_utils, ApAdvertisement, Beacon, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
 use zerocopy::IntoBytes;
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap, zx};
 // Remedy for https://fxbug.dev/42162128 (https://fxbug.dev/42108316)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
 const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;

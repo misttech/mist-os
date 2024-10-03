@@ -90,8 +90,8 @@ class SystemStateTransitionServer final
 
  private:
   void Prepare() {
-    zx::result local =
-        connect_to_protocol_with_timeout<statecontrol_fidl::RebootMethodsWatcherRegister>();
+    zx::result local = component::Connect<statecontrol_fidl::RebootMethodsWatcherRegister>(
+        fidl::DiscoverableProtocolDefaultPath<statecontrol_fidl::RebootMethodsWatcherRegister>);
     if (local.is_ok()) {
       zx::result watcher_channels =
           fidl::CreateEndpoints<statecontrol_fidl::RebootMethodsWatcher>();

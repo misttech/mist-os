@@ -12,7 +12,7 @@ use fidl_fuchsia_time_external::{
     Properties, PushSourceRequest, PushSourceRequestStream, PushSourceWatchSampleResponder,
     PushSourceWatchStatusResponder, Status, TimeSample,
 };
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};

@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_assertions::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
+use diagnostics_assertions::{
+    tree_assertion, AnyProperty, AnyStringProperty, NonZeroUintProperty, TreeAssertion,
+};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
@@ -16,6 +17,7 @@ use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
@@ -340,6 +342,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -355,6 +360,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -396,6 +404,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -418,6 +429,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -444,6 +458,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -466,6 +483,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -507,6 +527,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -536,6 +559,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -602,6 +628,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 wake_handling: {
                     power_level: 1u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -624,6 +653,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -659,6 +691,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -688,6 +723,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -754,6 +792,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -776,6 +817,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -811,6 +855,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -840,6 +887,9 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -890,6 +940,9 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                     wake_handling: {
                         power_level: 0u64,
                     },
+                    cpu: {
+                        power_level: 1u64,
+                    },
                     execution_resume_latency: {
                         power_level: i as u64,
                         resume_latency: expected_latencies[i] as u64,
@@ -907,6 +960,9 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                 },
                 wake_leases: {},
                 ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+                config: {
+                    use_suspender: true,
+                },
                 "fuchsia.inspect.Health": contains {
                     status: "OK",
                 },
@@ -960,6 +1016,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -977,6 +1036,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1015,6 +1077,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1039,6 +1104,9 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1091,6 +1159,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1108,6 +1179,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1138,6 +1212,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1161,6 +1238,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1213,6 +1293,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1230,6 +1313,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1260,6 +1346,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: {
                     power_level: 1u64,
                     resume_latency: 320u64,
@@ -1283,6 +1372,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1321,6 +1413,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
                 execution_resume_latency: {
@@ -1460,6 +1555,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -1482,6 +1580,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1641,6 +1742,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -1663,6 +1767,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1704,6 +1811,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -1733,6 +1843,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1826,6 +1939,9 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -1847,6 +1963,9 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2014,6 +2133,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -2029,6 +2151,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2057,6 +2182,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 0u64,
+                },
                 execution_resume_latency: contains {
                     power_level: 0u64,
                 },
@@ -2075,6 +2203,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
             wake_leases: {},
             ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2121,6 +2252,22 @@ async fn test_element_info_provider() -> Result<()> {
 
     assert_eq!(
         [
+            fbroker::ElementPowerLevelNames {
+                identifier: Some("cpu".into()),
+                levels: Some(vec![
+                    fbroker::PowerLevelName {
+                        level: Some(0),
+                        name: Some("Inactive".into()),
+                        ..Default::default()
+                    },
+                    fbroker::PowerLevelName {
+                        level: Some(1),
+                        name: Some("Active".into()),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            },
             fbroker::ElementPowerLevelNames {
                 identifier: Some("execution_state".into()),
                 levels: Some(vec![
@@ -2228,7 +2375,7 @@ async fn test_element_info_provider() -> Result<()> {
                 ..Default::default()
             },
         ],
-        TryInto::<[fbroker::ElementPowerLevelNames; 6]>::try_into(
+        TryInto::<[fbroker::ElementPowerLevelNames; 7]>::try_into(
             element_info_provider.get_element_power_level_names().await?.unwrap()
         )
         .unwrap()
@@ -2417,6 +2564,7 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
                     created_at: NonZeroUintProperty,
                     client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
                     name: wake_lease_name,
+                    type: AnyStringProperty,
                 }
             },
         }
@@ -2424,6 +2572,84 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
 
     drop(wake_lease);
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+            config: {
+                use_suspender: true,
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_take_application_activity_lease() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .collect();
+
+    let aa_status = status_endpoints.get("application_activity").unwrap();
+    assert_eq!(
+        aa_status.watch_power_level().await?.unwrap(),
+        0 /* ApplicationActivityLevel::Inactive */
+    );
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let application_activity_lease_name = "application_activity_lease";
+    let application_activity_lease =
+        activity_governor.take_application_activity_lease(application_activity_lease_name).await?;
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    assert_eq!(
+        aa_status.watch_power_level().await?.unwrap(),
+        1 /* ApplicationActivityLevel::Active */
+    );
+
+    let server_token_koid =
+        &application_activity_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {
+                var server_token_koid: {
+                    created_at: NonZeroUintProperty,
+                    client_token_koid: application_activity_lease.get_koid().unwrap().raw_koid(),
+                    name: application_activity_lease_name,
+                    type: AnyStringProperty,
+                }
+            },
+        }
+    );
+
+    drop(application_activity_lease);
+    assert_eq!(aa_status.watch_power_level().await?.unwrap(), 0);
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -2458,6 +2684,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
         wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
         wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
+        wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
@@ -2491,6 +2718,9 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         activity_governor_moniker,
         root: contains {
             wake_leases: {},
+            config: {
+                use_suspender: true,
+            },
         }
     );
 

@@ -13,11 +13,11 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.deviceid:fuchsia.bluetooth.deviceid_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitfield",
     "//third_party/rust_crates:futures",

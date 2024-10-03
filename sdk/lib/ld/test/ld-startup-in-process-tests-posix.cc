@@ -4,24 +4,26 @@
 
 #include "ld-startup-in-process-tests-posix.h"
 
+#include <fcntl.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/ld/abi.h>
 #include <lib/stdcompat/span.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include <numeric>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #include "../posix.h"
 #include "ld-load-tests-base.h"
+#include "load-tests.h"
 #include "test-chdir-guard.h"
 
 namespace ld::testing {
 namespace {
-
-constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
 
 constexpr size_t kStackSize = 64 << 10;
 
@@ -88,8 +90,6 @@ __asm__(
 
 }  // namespace
 
-const std::string kLdStartupName = std::string(kLibprefix) + std::string(ld::abi::kInterp);
-
 struct LdStartupInProcessTests::AuxvBlock {
   ld::Auxv vdso = {
       static_cast<uintptr_t>(ld::AuxvTag::kSysinfoEhdr),
@@ -115,25 +115,58 @@ void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args,
   ASSERT_NO_FATAL_FAILURE(PopulateStack(args, env));
 }
 
-void LdStartupInProcessTests::Load(std::string_view executable_name) {
+void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
+  const std::string executable_name =
+      std::string(raw_executable_name) + std::string(kTestExecutableInProcessSuffix);
+
   ASSERT_TRUE(auxv_);  // Init must have been called already.
 
-  // First load the dynamic linker.
-  std::optional<LoadResult> result;
-  ASSERT_NO_FATAL_FAILURE(Load(kLdStartupName, result));
+  // Acquire the directory where the test ELF files reside.
+  ASSERT_NO_FATAL_FAILURE(LoadTestDir(executable_name));
 
-  // Stash the dynamic linker's entry point.
-  entry_ = result->entry + result->loader.load_bias();
+  // Verify it contains what it should.
+  ASSERT_NO_FATAL_FAILURE(CheckNeededLibs());
 
-  // Save the loader object so it gets destroyed when the test fixture is
-  // destroyed destroyed.  That will clean up the mappings it made.  (This
-  // doesn't do anything about any mappings that were made by the loaded code
-  // at Run(), but so it goes.)
-  loader_ = std::move(result->loader);
+  auto open_file = [this](const std::string& filename, fbl::unique_fd& fd) {
+    ASSERT_FALSE(fd);
+    fd.reset(openat(test_dir(), filename.c_str(), O_RDONLY | O_CLOEXEC));
+    ASSERT_TRUE(fd) << "cannot open " << test_dir_path() / filename.c_str() << ": "
+                    << strerror(errno);
+  };
+
+  // First load the dynamic linker.  The system program loader will use the
+  // PT_INTERP string to find the dynamic linker.  The string embedded at link
+  // time and the test_dir() layout will use a prefix for instrumented builds.
+  // So open the executable first to read its PT_INTERP rather than assuming
+  // it's just ld::abi::kInterp.
+
+  fbl::unique_fd executable_fd;
+  ASSERT_NO_FATAL_FAILURE(open_file(executable_name, executable_fd));
+
+  std::string interp;
+  ASSERT_NO_FATAL_FAILURE(interp = FindInterp<elfldltl::FdFile>(executable_fd.get()));
+  ASSERT_FALSE(interp.empty());
+
+  {
+    fbl::unique_fd ld_startup_fd;
+    ASSERT_NO_FATAL_FAILURE(open_file(interp, ld_startup_fd));
+
+    std::optional<LoadResult> result;
+    ASSERT_NO_FATAL_FAILURE(Load(ld_startup_fd, result));
+
+    // Stash the dynamic linker's entry point.
+    entry_ = result->entry + result->loader.load_bias();
+
+    // Save the loader object so it gets destroyed when the test fixture is
+    // destroyed.  That will clean up the mappings it made.  (This doesn't do
+    // anything about any mappings that were made by the loaded code at Run(),
+    // but so it goes.)
+    loader_ = std::move(result->loader);
+  }
 
   // Now load the executable.
-  ASSERT_NO_FATAL_FAILURE(
-      Load(std::string(executable_name) + std::string(kTestExecutableInProcessSuffix), result));
+  std::optional<LoadResult> result;
+  ASSERT_NO_FATAL_FAILURE(Load(std::exchange(executable_fd, {}), result));
 
   // Set AT_PHDR and AT_PHNUM for where the phdrs were loaded.
   cpp20::span phdrs = result->phdrs.get();
@@ -169,7 +202,7 @@ int64_t LdStartupInProcessTests::Run() {
   // Move into the directory where ld.so.1 and all the files are so that they
   // can be loaded by simple relative file names.  For now, the POSIX version
   // of the dynamic linker uses the plain SONAME as a relative filename.
-  TestChdirGuard in_test_lib_dir;
+  TestChdirGuard in_test_dir(test_dir());
   return CallOnStack(entry_, sp_);
 }
 

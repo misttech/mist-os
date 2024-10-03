@@ -29,7 +29,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::distributions::Uniform;
 use rand::Rng;
 
-use crate::internal::device::opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret};
+use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
 use crate::internal::device::state::{Lifetime, SlaacConfig, TemporarySlaacConfig};
 use crate::internal::device::{AddressRemovedReason, Ipv6DeviceAddr};
 
@@ -172,6 +172,8 @@ pub struct SlaacAddrsMutAndConfig<'a, BT: SlaacBindingsTypes, A: SlaacAddresses<
     pub retrans_timer: Duration,
     /// The device's interface identifier.
     pub interface_identifier: [u8; 8],
+    /// Secret key for generating temporary addresses.
+    pub temp_secret_key: IidSecret,
     #[allow(missing_docs)]
     pub _marker: PhantomData<BT>,
 }
@@ -206,6 +208,7 @@ pub trait SlaacContext<BC: SlaacBindingsContext>: DeviceIdContext<AnyDevice> {
                  dad_transmits: _,
                  retrans_timer: _,
                  interface_identifier: _,
+                 temp_secret_key: _,
                  _marker,
              },
              state| cb(addrs, state),
@@ -322,6 +325,7 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
                 dad_transmits,
                 retrans_timer,
                 interface_identifier: iid,
+                temp_secret_key,
                 _marker,
             } = addrs_config;
             // Apply the update to each existing address, static or temporary, for the
@@ -417,6 +421,7 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> SlaacHandler<BC> for CC {
                     dad_transmits,
                     retrans_timer,
                     iid,
+                    temp_secret_key,
                 );
             }
         });
@@ -515,6 +520,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
         dad_transmits,
         retrans_timer,
         interface_identifier: iid,
+        temp_secret_key,
         _marker,
     } = addrs_config;
     let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } = config;
@@ -566,6 +572,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
         dad_transmits,
         retrans_timer,
         iid,
+        temp_secret_key,
     )
 }
 
@@ -632,8 +639,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     // Since it's possible to change NDP configuration for a
                     // device during runtime, we can end up here, with a
                     // temporary address on an interface even though temporary
-                    // addressing is disabled. Setting its validity period to 0
-                    // will force it to be removed ASAP.
+                    // addressing is disabled. Don't update the valid lifetime
+                    // in this case.
                     None => {
                         (ValidLifetimeBound::FromMaxBound(Duration::ZERO), None, *entry_valid_until)
                     }
@@ -701,7 +708,6 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                          temp_idgen_retries,
                          temp_preferred_lifetime: _,
                          temp_valid_lifetime: _,
-                         secret_key: _,
                      }| {
                         let regen_advance = regen_advance(
                             temp_idgen_retries,
@@ -984,11 +990,6 @@ pub struct TemporarySlaacAddressConfiguration {
     /// detects a duplicate before stopping and giving up on temporary address
     /// generation for that prefix.
     pub temp_idgen_retries: u8,
-
-    /// The secret to use when generating new temporary addresses. This should
-    /// be initialized from a random number generator before generating any
-    /// temporary addresses.
-    pub secret_key: StableIidSecret,
 }
 
 impl TemporarySlaacAddressConfiguration {
@@ -1009,13 +1010,12 @@ impl TemporarySlaacAddressConfiguration {
     /// [RFC 8981 Section 3.8]: https://www.rfc-editor.org/rfc/rfc8981#section-3.8
     pub const DEFAULT_TEMP_IDGEN_RETRIES: u8 = 3;
 
-    /// Constructs a new instance with default values and the given secret key.
-    pub fn default_with_secret_key(secret_key: StableIidSecret) -> Self {
+    /// Constructs a new instance with default values.
+    pub fn rfc_default() -> Self {
         Self {
             temp_valid_lifetime: Self::DEFAULT_TEMP_VALID_LIFETIME,
             temp_preferred_lifetime: Self::DEFAULT_TEMP_PREFERRED_LIFETIME,
             temp_idgen_retries: Self::DEFAULT_TEMP_IDGEN_RETRIES,
-            secret_key,
         }
     }
 }
@@ -1149,6 +1149,7 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
         dad_transmits,
         retrans_timer,
         interface_identifier: iid,
+        temp_secret_key,
         _marker,
     } = addrs_config;
     let SlaacState { timers } = slaac_state;
@@ -1225,7 +1226,6 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
             temp_valid_lifetime,
             temp_preferred_lifetime: _,
             temp_idgen_retries: _,
-            secret_key: _,
         } = match temporary_address_configuration {
             Some(configuration) => configuration,
             None => return Action::SkipRegen,
@@ -1270,6 +1270,7 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
             dad_transmits,
             retrans_timer,
             iid,
+            temp_secret_key,
         ),
     }
 }
@@ -1350,7 +1351,7 @@ fn generate_global_static_address(
     address
 }
 
-/// Generate a temporary IPv6 Global Address as defined by RFC 8981 section 3.4.6
+/// Generate a temporary IPv6 Global Address.
 ///
 /// The generated address will be of the format:
 ///
@@ -1367,13 +1368,15 @@ fn generate_global_temporary_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8; 8],
     seed: u64,
-    secret_key: &StableIidSecret,
+    secret_key: &IidSecret,
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     let prefix_len = usize::from(prefix.prefix() / 8);
 
     assert_eq!(usize::from(Ipv6Addr::BYTES) - prefix_len, iid.len());
     let mut address = prefix.network().ipv6_bytes();
 
+    // TODO(https://fxbug.dev/368449998): Use the algorithm in RFC 8981
+    // instead of the one for stable SLAAc addresses as described in RFC 7217.
     let interface_identifier = OpaqueIid::new(
         /* prefix */ *prefix,
         /* net_iface */ iid,
@@ -1404,6 +1407,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     dad_transmits: Option<NonZeroU16>,
     retrans_timer: Duration,
     iid: [u8; 8],
+    temp_secret_key: IidSecret,
 ) {
     if subnet.prefix() != REQUIRED_PREFIX_BITS {
         // If the sum of the prefix length and interface identifier length does
@@ -1486,7 +1490,6 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 dad_transmits.map_or(0, NonZeroU16::get),
             );
 
-            let secret_key = temporary_address_config.secret_key;
             let mut seed = per_attempt_random_seed;
             let addresses = either::Either::Right(core::iter::repeat_with(move || {
                 // RFC 8981 Section 3.3.3 specifies that
@@ -1499,7 +1502,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 //   and the algorithm should be restarted from the first step.
                 loop {
                     let address =
-                        generate_global_temporary_address(&subnet, &iid, seed, &secret_key);
+                        generate_global_temporary_address(&subnet, &iid, seed, &temp_secret_key);
                     seed = seed.wrapping_add(1);
 
                     if has_iana_allowed_iid(address.addr().get()) {
@@ -1726,6 +1729,7 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
     use core::convert::TryFrom as _;
 
     use net_declare::net::ip_v6;
@@ -1869,6 +1873,7 @@ mod tests {
                     dad_transmits: *dad_transmits,
                     retrans_timer: *retrans_timer,
                     interface_identifier: *iid,
+                    temp_secret_key: SECRET_KEY,
                     _marker: PhantomData,
                 },
                 slaac_state,
@@ -2105,6 +2110,7 @@ mod tests {
     const ONE_HOUR_AS_SECS: u32 = 60 * 60;
     const TWO_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 2;
     const THREE_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 3;
+    const FOUR_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 4;
     const INFINITE_LIFETIME: u32 = u32::MAX;
     const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE_AS_SECS: u32 =
         MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE.get().as_secs() as u32;
@@ -2293,7 +2299,7 @@ mod tests {
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
     }
 
-    const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;
+    const SECRET_KEY: IidSecret = IidSecret::ALL_ONES;
 
     const ONE_HOUR: NonZeroDuration =
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));
@@ -2374,22 +2380,22 @@ mod tests {
         0 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER /* retrans_timer */,
         0 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with no DAD transmits")]
+    ); "preferred lifetime less than regen advance with no DAD transmits")]
     #[test_case(DontGenerateTemporaryAddressTest::with_pl_less_than_regen_advance(
         1 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER /* retrans_timer */,
         0 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with DAD transmits")]
+    ); "preferred lifetime less than regen advance with DAD transmits")]
     #[test_case(DontGenerateTemporaryAddressTest::with_pl_less_than_regen_advance(
         1 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER /* retrans_timer */,
         1 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with DAD transmits and retries")]
+    ); "preferred lifetime less than regen advance with DAD transmits and retries")]
     #[test_case(DontGenerateTemporaryAddressTest::with_pl_less_than_regen_advance(
         2 /* dad_transmits */,
         DEFAULT_RETRANS_TIMER + Duration::from_secs(1) /* retrans_timer */,
         3 /* temp_idgen_retries */,
-    ); "preferred lifetime less than than regen advance with multiple DAD transmits and multiple retries")]
+    ); "preferred lifetime less than regen advance with multiple DAD transmits and multiple retries")]
     #[test_case(DontGenerateTemporaryAddressTest {
         preferred_lifetime_config: SLAAC_MIN_REGEN_ADVANCE,
         preferred_lifetime_secs: ONE_HOUR_AS_SECS,
@@ -2414,13 +2420,9 @@ mod tests {
             SlaacConfiguration {
                 temporary_address_configuration: enable.then(|| {
                     TemporarySlaacAddressConfiguration {
-                        temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(
-                            ONE_HOUR_AS_SECS.into(),
-                        ))
-                        .unwrap(),
+                        temp_valid_lifetime: ONE_HOUR,
                         temp_preferred_lifetime: preferred_lifetime_config,
                         temp_idgen_retries,
-                        secret_key: SECRET_KEY,
                     }
                 }),
                 ..Default::default()
@@ -2555,7 +2557,6 @@ mod tests {
                     .unwrap(),
                     temp_preferred_lifetime: NonZeroDuration::new(pl_config).unwrap(),
                     temp_idgen_retries,
-                    secret_key: SECRET_KEY,
                 }),
                 ..Default::default()
             },
@@ -2727,5 +2728,52 @@ mod tests {
             (third_invalidate_timer_id, (), third_valid_until),
             (third_regenerate_timer_id, (), third_preferred_until - regen_advance.get()),
         ]);
+    }
+
+    #[test]
+    fn temporary_address_not_updated_while_disabled() {
+        let want_valid_until =
+            FakeInstant::default() + Duration::from_secs(THREE_HOURS_AS_SECS.into());
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
+            SlaacConfiguration {
+                enable_stable_addresses: false,
+                temporary_address_configuration: None,
+            },
+            FakeSlaacAddrs {
+                slaac_addrs: vec![SlaacAddressEntry {
+                    addr_sub: testutil::calculate_slaac_addr_sub(SUBNET, IID),
+                    deprecated: false,
+                    config: SlaacConfig::Temporary(TemporarySlaacConfig {
+                        valid_until: want_valid_until,
+                        desync_factor: Duration::default(),
+                        creation_time: FakeInstant::default(),
+                        dad_counter: 0,
+                    }),
+                }],
+                ..Default::default()
+            },
+            None, /* dad_transmits */
+            DEFAULT_RETRANS_TIMER,
+        );
+
+        SlaacHandler::apply_slaac_update(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            SUBNET,
+            NonZeroNdpLifetime::from_u32_with_infinite(FOUR_HOURS_AS_SECS),
+            NonZeroNdpLifetime::from_u32_with_infinite(FOUR_HOURS_AS_SECS),
+        );
+        let addrs = core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>();
+        assert_eq!(addrs.len(), 1);
+        assert_matches!(addrs[0], SlaacAddressEntry {
+            config: SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until,
+                ..
+            }),
+            ..
+        } => {
+            assert_eq!(valid_until, want_valid_until);
+        });
     }
 }

@@ -407,7 +407,7 @@ mod tests {
     use crate::model::testing::test_helpers::*;
     use assert_matches::assert_matches;
     use cm_rust::{Availability, UseSource};
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload};
     use sandbox::Message;
@@ -424,7 +424,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::MonotonicTime::get(),
+            timestamp: zx::MonotonicInstant::get(),
         };
         sender.send(Message { channel: capability_server_end }).unwrap();
         registry.dispatch(&event).await;
@@ -435,7 +435,7 @@ mod tests {
             target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
             component_url: "fuchsia-pkg://root".parse().unwrap(),
             payload: EventPayload::Unresolved,
-            timestamp: zx::MonotonicTime::get(),
+            timestamp: zx::MonotonicInstant::get(),
         };
         registry.dispatch(&event).await;
     }

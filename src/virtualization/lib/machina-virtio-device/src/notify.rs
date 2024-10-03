@@ -5,8 +5,8 @@
 use fidl_fuchsia_virtualization_hardware::{
     EVENT_SET_CONFIG, EVENT_SET_INTERRUPT, EVENT_SET_QUEUE,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use virtio_device::queue::DriverNotify;
+use zx::{self as zx, AsHandleRef};
 
 const USER_SIGNALS: [zx::Signals; 8] = [
     zx::Signals::USER_0,

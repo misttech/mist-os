@@ -8,12 +8,12 @@ use crate::task_metrics::runtime_stats_source::*;
 use crate::task_metrics::task_info::{TaskInfo, TaskState};
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon::{self as zx, sys as zx_sys, AsHandleRef};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use injectable_time::{IncrementingFakeTime, TimeSource};
 use std::collections::VecDeque;
 use std::sync::Arc;
+use zx::{self as zx, sys as zx_sys, AsHandleRef};
 
 /// Mock for a Task. Holds a queue of runtime infos (measurements) that will be fetched for test
 /// purposes.
@@ -120,8 +120,8 @@ impl ComponentStartedInfo<FakeDiagnosticsContainer, FakeTask> for FakeRuntime {
         }
     }
 
-    fn start_time(&self) -> zx::MonotonicTime {
-        zx::MonotonicTime::from_nanos(self.start_time.now())
+    fn start_time(&self) -> zx::MonotonicInstant {
+        zx::MonotonicInstant::from_nanos(self.start_time.now())
     }
 }
 

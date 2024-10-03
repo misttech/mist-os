@@ -69,6 +69,23 @@ closed protocol Session {
     /// either the rx or tx FIFOs) once the epitaph is received. Closing the rx
     /// or tx FIFO is equivalent to calling `Close`.
     strict Close();
+    /// Watchers for delegated receive wakeup leases.
+    ///
+    /// Calls block until a lease is delegated by the device. If a call to
+    /// `WatchDelegatedRxLease` is made while a previous call is blocking, the
+    /// session is closed with `ZX_ERR_BAD_STATE`. Will never yield any values
+    /// for sessions created without [`SessionFlags.RECEIVE_RX_POWER_LEASES`].
+    ///
+    /// Given a single lease is assumed sufficient to keep the system awake, the
+    /// server only keeps a single lease in its buffer. If a new delegated lease
+    /// becomes available and the client hasn't popped the previous one with a
+    /// call to `WatchDelegatedRxLease`, the server drops the previously pending
+    /// lease.
+    ///
+    /// See [`DelegatedRxLease`] for how to handle delegated leases.
+    strict WatchDelegatedRxLease() -> (resource struct {
+        lease DelegatedRxLease;
+    });
 };
 
 /// Additional session options.
@@ -103,6 +120,11 @@ type SessionFlags = strict bits : uint16 {
     /// Sessions NOT marked with `REPORT_INVALID_RX`, in contrast, will NEVER
     /// receive an rx frame with the `RX_VALIDATION_ERROR` flag set.
     REPORT_INVALID_RX = 0x0004;
+    /// Receive rx power leases.
+    ///
+    /// Sessions marked with `RECEIVE_RX_POWER_LEASES` receive
+    /// [`DelegatedRxLease`]s through [`Session.WatchDelegatedRxLease`] calls.
+    RECEIVE_RX_POWER_LEASES = 0x0008;
 };
 
 /// Data-plane FIFOs.
@@ -151,4 +173,36 @@ type SessionInfo = resource table {
     5: descriptor_count uint16;
     /// Extra options. Interpreted as empty bitmask if absent.
     6: options SessionFlags;
+};
+
+/// An aqcuired lease that is propagated up to applications.
+@available(added=HEAD)
+type DelegatedRxLease = resource table {
+    /// The frame after which the lease in `handle` can be released.
+    ///
+    /// Agents observing leases must keep track of received frames with an
+    /// increasing counter to be able to properly relinquish leases after the
+    /// frame `hold_until_frame` is fully processed.
+    ///
+    /// This value can be interpreted as either the 1-based index of a given
+    /// frame or as the total number of exchanged frames so far, which are
+    /// mathematically equivalent.
+    ///
+    /// This mechanism allows for wake lease handles from received frames to be
+    /// passed up and keep the system from suspension until the frame is fully
+    /// processed.
+    ///
+    /// Required.
+    1: hold_until_frame uint64;
+    /// A handle representing the held lease.
+    ///
+    /// Required.
+    // NOTE: Lease handles are flexible to accomodate for PF evolution on lease
+    // representations.
+    2: handle @generated_name("DelegatedRxLeaseHandle") flexible resource union {
+        /// An untyped channel representing a lease.
+        ///
+        /// Close the channel to release the lease.
+        1: channel zx.Handle:CHANNEL;
+    };
 };

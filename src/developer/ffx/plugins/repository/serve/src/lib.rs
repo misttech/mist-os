@@ -8,27 +8,17 @@ use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
-use ffx_target::{knock_target, TargetProxy};
+use ffx_target::TargetProxy;
 use fho::{bug, return_user_error, Connector, FfxMain, FfxTool, Result, SimpleWriter};
-use fidl_fuchsia_developer_ffx::{
-    RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
-};
-use fidl_fuchsia_developer_ffx_ext::{
-    RepositoryRegistrationAliasConflictMode as FfxRepositoryRegistrationAliasConflictMode,
-    RepositoryTarget as FfxDaemonRepositoryTarget,
-};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_pkg::RepositoryManagerMarker;
-use fidl_fuchsia_pkg_rewrite::EngineMarker;
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;
 use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repository::{PmRepository, RepoProvider};
 use fuchsia_repo::server::RepositoryServer;
 use futures::executor::block_on;
-use futures::{pin_mut, select, FutureExt, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use package_tool::{cmd_repo_publish, RepoPublishCommand};
-use pkg::repo::register_target_with_fidl_proxies;
 use pkg::{
     write_instance_info, PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode,
 };
@@ -37,8 +27,7 @@ use signal_hook::iterator::Signals;
 use std::fs;
 use std::io::Write;
 use std::sync::Arc;
-use std::time::Duration;
-use timeout::timeout;
+
 use tuf::metadata::RawSignedMetadata;
 
 // LINT.IfChange
@@ -49,12 +38,11 @@ use tuf::metadata::RawSignedMetadata;
 pub const DEFAULT_REPO_NAME: &str = "devhost";
 // LINT.ThenChange(args.rs)
 
+mod target;
+
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
-const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
-const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
-const ENGINE_MONIKER: &str = "/core/pkg-resolver";
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
 #[derive(FfxTool)]
@@ -88,58 +76,6 @@ fn start_signal_monitoring(
             }
         }
     });
-}
-
-async fn connect_to_target(
-    target_spec: Option<String>,
-    target_info: TargetInfo,
-    aliases: Option<Vec<String>>,
-    storage_type: Option<RepositoryStorageType>,
-    repo_server_listen_addr: std::net::SocketAddr,
-    connect_timeout: std::time::Duration,
-    repo_manager: Arc<RepositoryManager>,
-    rcs_proxy: &RemoteControlProxy,
-    alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
-) -> Result<(), anyhow::Error> {
-    let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
-        connect_timeout,
-        REPOSITORY_MANAGER_MONIKER,
-        &rcs_proxy,
-    )
-    .await
-    .with_context(|| format!("connecting to repository manager on {:?}", target_spec))?;
-
-    let engine_proxy =
-        rcs::connect_to_protocol::<EngineMarker>(connect_timeout, ENGINE_MONIKER, &rcs_proxy)
-            .await
-            .with_context(|| format!("binding engine to stream on {:?}", target_spec))?;
-
-    for (repo_name, repo) in repo_manager.repositories() {
-        let repo_target = FfxCliRepositoryTarget {
-            repo_name: Some(repo_name),
-            target_identifier: target_spec.clone(),
-            aliases: aliases.clone(),
-            storage_type,
-            ..Default::default()
-        };
-
-        // Construct RepositoryTarget from same args as `ffx target repository register`
-        let repo_target_info = FfxDaemonRepositoryTarget::try_from(repo_target)
-            .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
-
-        register_target_with_fidl_proxies(
-            repo_proxy.clone(),
-            engine_proxy.clone(),
-            &repo_target_info,
-            &target_info,
-            repo_server_listen_addr,
-            &repo,
-            alias_conflict_mode.clone(),
-        )
-        .await
-        .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
-    }
-    Ok(())
 }
 
 // Constructs a repo client with an explicitly passed trusted
@@ -196,185 +132,6 @@ async fn refresh_repository_metadata(path: &Utf8PathBuf) -> Result<()> {
     cmd_repo_publish(rf)
         .await
         .map_err(|e| fho::user_error!(format!("failed publishing to repo {}: {}", path, e)))
-}
-
-async fn inner_connect_loop(
-    cmd: &ServeCommand,
-    repo_path: &Utf8Path,
-    server_addr: core::net::SocketAddr,
-    connect_timeout: std::time::Duration,
-    repo_manager: &Arc<RepositoryManager>,
-    rcs_proxy: &Connector<RemoteControlProxy>,
-    target_proxy: &Connector<TargetProxy>,
-    writer: &mut impl Write,
-) -> Result<()> {
-    let mut target_spec_from_rcs_proxy: Option<String> = None;
-    let rcs_proxy = timeout(
-        connect_timeout,
-        rcs_proxy.try_connect(|target, _err| {
-            tracing::info!(
-                "RCS proxy: Waiting for target '{}' to return",
-                match target {
-                    Some(s) => s,
-                    _ => "None",
-                }
-            );
-            target_spec_from_rcs_proxy = target.clone();
-            Ok(())
-        }),
-    )
-    .await;
-    let rcs_proxy = match rcs_proxy {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) => {
-            return Err(e);
-        }
-        Err(e) => {
-            fho::return_user_error!("Timeout connecting to rcs: {}", e);
-        }
-    };
-    let mut target_spec_from_target_proxy: Option<String> = None;
-    let target_proxy = target_proxy
-        .try_connect(|target, _err| {
-            tracing::info!(
-                "Target proxy: Waiting for target '{}' to return",
-                match target {
-                    Some(s) => s,
-                    _ => "None",
-                }
-            );
-            target_spec_from_target_proxy = target.clone();
-            Ok(())
-        })
-        .await?;
-
-    // This catches an edge case where the environment is not populated consistently.
-    if target_spec_from_rcs_proxy != target_spec_from_target_proxy {
-        fho::return_user_error!(
-            "RCS and target proxies do not match: '{:?}', '{:?}'",
-            target_spec_from_rcs_proxy,
-            target_spec_from_target_proxy,
-        );
-    }
-
-    let target_info: TargetInfo = timeout(Duration::from_secs(2), target_proxy.identity())
-        .await
-        .context("Timed out getting target identity")?
-        .context("Failed to get target identity")?;
-
-    let connection = connect_to_target(
-        target_spec_from_rcs_proxy.clone(),
-        target_info,
-        Some(cmd.alias.clone()),
-        cmd.storage_type,
-        server_addr,
-        connect_timeout,
-        Arc::clone(&repo_manager),
-        &rcs_proxy,
-        cmd.alias_conflict_mode.into(),
-    )
-    .await;
-    match connection {
-        Ok(()) => {
-            let s = match target_spec_from_rcs_proxy {
-                Some(t) => format!(
-                    "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
-                    server_addr
-                ),
-                None => {
-                    format!("Serving repository '{repo_path}' over address '{server_addr}'.")
-                }
-            };
-            if let Err(e) = writeln!(writer, "{}", s) {
-                tracing::error!("Failed to write to output: {:?}", e);
-            }
-            tracing::info!("{}", s);
-            loop {
-                fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
-                match knock_target(&target_proxy).await {
-                    Ok(()) => {
-                        // Nothing to do, continue checking connection
-                    }
-                    Err(e) => {
-                        let s = format!("Connection to target lost, retrying. Error: {}", e);
-                        if let Err(e) = writeln!(writer, "{}", s) {
-                            tracing::error!("Failed to write to output: {:?}", e);
-                        }
-                        tracing::warn!(s);
-                        break;
-                    }
-                }
-            }
-        }
-        Err(e) => {
-            return Err(fho::Error::User(e));
-        }
-    };
-    Ok(())
-}
-
-async fn main_connect_loop(
-    cmd: &ServeCommand,
-    repo_path: &Utf8Path,
-    server_addr: core::net::SocketAddr,
-    connect_timeout: std::time::Duration,
-    repo_manager: Arc<RepositoryManager>,
-    mut loop_stop_rx: futures::channel::mpsc::Receiver<()>,
-    rcs_proxy: Connector<RemoteControlProxy>,
-    target_proxy: Connector<TargetProxy>,
-    writer: &mut (impl Write + 'static),
-) -> Result<()> {
-    // We try to reconnect unless MAX_CONSECUTIVE_CONNECT_ATTEMPTS reconnect
-    // attempts in immediate succession fail.
-    let mut attempts = 0;
-
-    // Outer connection loop, retries when disconnected.
-    loop {
-        if attempts >= MAX_CONSECUTIVE_CONNECT_ATTEMPTS {
-            return_user_error!(
-                "Stopping reconnecting after {attempts} consecutive failed attempts"
-            );
-        } else {
-            attempts += 1;
-        }
-
-        let cancel = async {
-            // Block until a loop stop request comes in
-            loop_stop_rx.next().await;
-        }
-        .fuse();
-
-        let connect = inner_connect_loop(
-            cmd,
-            repo_path,
-            server_addr,
-            connect_timeout,
-            &repo_manager,
-            &rcs_proxy,
-            &target_proxy,
-            writer,
-        )
-        .fuse();
-
-        pin_mut!(cancel, connect);
-
-        select! {
-            () = cancel => {
-                break Ok(());
-            },
-            r = connect => {
-                match r {
-                    // After successfully serving to the target, reset attempts counter before reconnect
-                    Ok(()) => {
-                        attempts = 0;
-                    }
-                    Err(e) => {
-                        tracing::info!("Attempt {attempts}: {}", e);
-                    }
-                }
-            },
-        };
-    }
 }
 
 #[async_trait(?Send)]
@@ -471,15 +228,39 @@ pub fn serve_impl_validate_args(
     let addr = cmd.address.clone();
     let duplicate = running_instances.iter().find(|instance| instance.address == addr);
     if let Some(duplicate) = duplicate {
-        if repo_name != duplicate.name {
-            return_user_error!("repository server is already running on {addr}: named \"{}\"  serving {repo_path:?}\n Use `ffx  repository server list` to list running servers", duplicate.name);
+        // if we're starting using a product bundle, the name will be different so compare the repo_path
+        // which is the path to the product bundle
+        if let Some(pb_path) = &cmd.product_bundle {
+            if pb_path.to_string() != duplicate.repo_path_display() {
+                return_user_error!("Repository address conflict. \
+                Cannot start a server named {repo_name} serving {repo_path:?}. \
+                Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\
+                Use `ffx  repository server list` to list running servers",
+                 duplicate.name, duplicate.repo_path_display());
+            }
+        } else {
+            if repo_name != duplicate.name {
+                return_user_error!("Repository address conflict. \
+                Cannot start a server named {repo_name} serving {repo_path:?}. \
+                Repository server  \"{}\" is already running on {addr} serving a different path: {}\n\
+                Use `ffx  repository server list` to list running servers",
+                 duplicate.name, duplicate.repo_path_display());
+            }
         }
         return Ok(Some(duplicate.clone()));
     }
     let duplicate = running_instances.iter().find(|instance| instance.name == repo_name);
     if let Some(duplicate) = duplicate {
         if addr != duplicate.address {
-            return_user_error!("repository server named \"{repo_name}\" is already running: {} serving {repo_path:?}\n Use `ffx  repository server list` to list running servers", duplicate.address);
+            return_user_error!(
+                "Repository name conflict. \
+            Cannot start a server named {repo_name} serving {repo_path:?}. \
+            Repository server  \"{dupe_name}\" is already running on {dupe_addr} serving a different path: {dupe_path}\n\
+            Use `ffx  repository server list` to list running servers",
+                dupe_name=duplicate.name,
+                dupe_addr=duplicate.address,
+                dupe_path=duplicate.repo_path_display()
+            );
         }
         return Ok(Some(duplicate.clone()));
     }
@@ -501,8 +282,10 @@ pub async fn serve_impl<W: Write + 'static>(
         // The server that matches the cmd is already running.
         writeln!(
             writer,
-            "A server named {} is serving on address {} the repo path: {}",
-            running.name, running.address, running.repo_path
+            "A server named {} is already serving on address {} the repo path: {}",
+            running.name,
+            running.address,
+            running.repo_path_display()
         )
         .map_err(|e| bug!(e))?;
         return Ok(());
@@ -533,48 +316,7 @@ pub async fn serve_impl<W: Write + 'static>(
                 let repo_client = RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
                     .await
                     .with_context(|| format!("Creating a repo client for {repo_name}"))?;
-
-                let mirror_url = format!("http://{addr}/{repo_name}", addr = cmd.address)
-                    .parse()
-                    .map_err(|e| bug!("{e}"))?;
-                let repo_url = fuchsia_url::RepositoryUrl::parse_host(repo_name.clone())
-                    .map_err(|e| bug!("{e}"))?;
-                let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> =
-                    match cmd.storage_type {
-                        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
-                            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
-                        }
-                        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
-                            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
-                        }
-                        None => None,
-                    };
-
-                let repo_config = repo_client
-                    .get_config(repo_url, mirror_url, storage_type.clone())
-                    .map_err(|e| bug!("{e}"))?;
                 repo_manager.add(&repo_name, repo_client);
-
-                if let Err(e) = write_instance_info(
-                    Some(context.clone()),
-                    mode.clone(),
-                    &repo_name,
-                    &cmd.address,
-                    product_bundle.as_std_path().into(),
-                    aliases.into_iter().collect(),
-                    storage_type.unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
-                    match cmd.alias_conflict_mode {
-                        fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
-                        fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace,
-                    },
-                    repo_config,
-                )
-                .await
-                {
-                    tracing::error!(
-                        "failed to write repo server instance information for {repo_name}: {e:?}"
-                    );
-                }
             }
 
             if cmd.refresh_metadata {
@@ -615,50 +357,10 @@ pub async fn serve_impl<W: Write + 'static>(
             repo_client.update().await.context("updating the repository metadata")?;
 
             let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
-            let repo_url =
-                fuchsia_url::RepositoryUrl::parse_host(repo_name.clone()).map_err(|e| bug!(e))?;
-            let mirror_url = format!("http://{addr}/{repo_name}", addr = cmd.address)
-                .parse()
-                .map_err(|e: http::uri::InvalidUri| bug!(e))?;
-            let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> =
-                match cmd.storage_type {
-                    Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
-                        Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
-                    }
-                    Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
-                        Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
-                    }
-                    None => None,
-                };
-
-            let repo_config = repo_client
-                .get_config(repo_url, mirror_url, storage_type.clone())
-                .map_err(|e| bug!("{e}"))?;
             repo_manager.add(&repo_name, repo_client);
 
             if cmd.refresh_metadata {
                 refresh_repository_metadata(&repo_path).await?;
-            }
-
-            if let Err(e) = write_instance_info(
-                Some(context),
-                mode.clone(),
-                &repo_name,
-                &cmd.address,
-                repo_path.as_std_path().into(),
-                cmd.alias.clone(),
-                storage_type.unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
-                match cmd.alias_conflict_mode {
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace,
-                },
-                repo_config,
-            )
-            .await
-            {
-                tracing::error!(
-                    "failed to write repo server instance information for {repo_name}: {e:?}"
-                );
             }
             repo_path
         }
@@ -679,6 +381,54 @@ pub async fn serve_impl<W: Write + 'static>(
     };
 
     let server_addr = server.local_addr().clone();
+    let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> = match cmd.storage_type {
+        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
+            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
+        }
+        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
+            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
+        }
+        None => None,
+    };
+
+    // Write out the instance data
+    for (name, repo_client) in repo_manager.repositories() {
+        let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
+        let repo_url =
+            fuchsia_url::RepositoryUrl::parse_host(repo_name.clone()).map_err(|e| bug!(e))?;
+        let mirror_url = format!("http://{server_addr}/{repo_name}")
+            .parse()
+            .map_err(|e: http::uri::InvalidUri| bug!(e))?;
+        let repo_config = repo_client
+            .read()
+            .await
+            .get_config(repo_url, mirror_url, storage_type.clone())
+            .map_err(|e| bug!("{e}"))?;
+        let repo_spec = repo_client.read().await.spec();
+        if let Err(e) = write_instance_info(
+            Some(context.clone()),
+            mode.clone(),
+            &name,
+            &server_addr,
+            repo_spec,
+            storage_type.clone().unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
+            match cmd.alias_conflict_mode {
+                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => {
+                    fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut
+                }
+                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => {
+                    fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace
+                }
+            },
+            repo_config,
+        )
+        .await
+        {
+            tracing::error!(
+                "failed to write repo server instance information for {repo_name}: {e:?}"
+            );
+        }
+    }
 
     let server_task = fasync::Task::local(server_fut);
     let (mut server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
@@ -730,7 +480,7 @@ pub async fn serve_impl<W: Write + 'static>(
         tracing::info!("{}", s);
         Ok(())
     } else {
-        let r = main_connect_loop(
+        let r = target::main_connect_loop(
             &cmd,
             &repo_path,
             server_addr,
@@ -767,17 +517,19 @@ mod test {
     use fho::{user_error, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
-        RemoteControlState, RepositoryRegistrationAliasConflictMode, SshHostAddrInfo,
-        TargetAddrInfo, TargetIpPort, TargetRequest, TargetState,
+        RemoteControlState, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+        SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort, TargetRequest, TargetState,
     };
     use fidl_fuchsia_developer_remotecontrol as frcs;
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
     use fidl_fuchsia_pkg::{
-        MirrorConfig, RepositoryConfig, RepositoryManagerRequest, RepositoryManagerRequestStream,
+        MirrorConfig, RepositoryConfig, RepositoryManagerMarker, RepositoryManagerRequest,
+        RepositoryManagerRequestStream,
     };
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use fidl_fuchsia_pkg_rewrite::{
-        EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorRequest,
+        EditTransactionRequest, EngineMarker, EngineRequest, EngineRequestStream,
+        RuleIteratorRequest,
     };
     use fidl_fuchsia_pkg_rewrite_ext::Rule;
     use frcs::RemoteControlMarker;
@@ -790,6 +542,7 @@ mod test {
     use std::collections::BTreeSet;
     use std::sync::Mutex;
     use std::time;
+    use timeout::timeout;
     use tuf::crypto::Ed25519PrivateKey;
     use tuf::metadata::Metadata;
     use url::Url;
@@ -1361,8 +1114,10 @@ mod test {
         let server_info = PkgServerInfo {
             name: instance_name.into(),
             address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-            repo_path: repo_path.as_path().into(),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::new(),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode:
                 fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
@@ -1390,7 +1145,11 @@ mod test {
             refresh_metadata: false,
             auto_publish: None,
         },
-            Err(user_error!("repository server is already running on 127.0.0.1:0: named \"{instance_name}\"  serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
+            Err(user_error!("Repository address conflict. \
+            Cannot start a server named another-name serving {repo_path:?}. \
+            Repository server  \"{name}\" is already running on {addr} serving a different path: {dupe_path}\n\
+            Use `ffx  repository server list` to list running servers",
+             addr=server_info.address, name=server_info.name, dupe_path=server_info.repo_path_display()))
     ),
     (
         ServeCommand {
@@ -1407,7 +1166,7 @@ mod test {
            refresh_metadata: false,
            auto_publish: None,
        },
-           Ok(Some(server_info))
+           Ok(Some(server_info.clone()))
    ),
    (
     ServeCommand {
@@ -1424,8 +1183,17 @@ mod test {
        refresh_metadata: false,
        auto_publish: None,
    },
-       Err(user_error!("repository server named \"devhost\" is already running: 127.0.0.1:0 serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
-)
+       Err(user_error!(
+        "Repository name conflict. \
+    Cannot start a server named {name} serving {repo_path:?}. \
+    Repository server  \"{dupe_name}\" is already running on {addr} serving a different path: {dupe_path}\n\
+    Use `ffx  repository server list` to list running servers",
+        name=instance_name,
+        dupe_name=instance_name,
+        addr=server_info.address,
+        dupe_path=server_info.repo_path_display()
+       ))
+   )
     ];
 
         for (cmd, expected) in test_cases {

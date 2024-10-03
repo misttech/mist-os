@@ -14,7 +14,7 @@ use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
-use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, zx};
 
 pub struct InspectSinkServer {
     /// Shared repository holding the Inspect handles.
@@ -191,12 +191,12 @@ mod tests {
     use fuchsia_async::Task;
     use fuchsia_inspect::reader::read;
     use fuchsia_inspect::Inspector;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::Future;
     use inspect_runtime::service::spawn_tree_server_with_stream;
     use inspect_runtime::TreeServerSendPreference;
     use selectors::VerboseError;
     use std::sync::Arc;
+    use zx::{self as zx, AsHandleRef};
 
     struct TestHarness {
         /// Associates a faux component via ComponentIdentity with an InspectSinkProxy
@@ -227,7 +227,7 @@ mod tests {
                     create_proxy_and_stream::<InspectSinkMarker>().unwrap();
 
                 Arc::clone(&server).handle(Event {
-                    timestamp: zx::MonotonicTime::get(),
+                    timestamp: zx::MonotonicInstant::get(),
                     payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                         component: Arc::clone(&id),
                         request_stream,

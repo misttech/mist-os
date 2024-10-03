@@ -146,8 +146,10 @@ zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
 // appropriate object to interact with the remote object.
 //
 // Otherwise, this function creates a generic "remote" object.
-zx::result<fdio_ptr> fdio_namespace::Open(fbl::RefPtr<LocalVnode> vn, std::string_view path,
-                                          fio::wire::OpenFlags flags) const {
+// TODO(https://fxbug.dev/324111518): Add a replacement for this which uses Open3.
+zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn,
+                                                      std::string_view path,
+                                                      fio::wire::OpenFlags flags) const {
   {
     fbl::AutoLock lock(&lock_);
     zx_status_t status = WalkLocked(&vn, &path);
@@ -210,8 +212,8 @@ zx::result<fdio_ptr> fdio_namespace::CreateConnection(fbl::RefPtr<LocalVnode> vn
   return fdio_internal::CreateLocalConnection(fbl::RefPtr(this), std::move(vn));
 }
 
-zx_status_t fdio_namespace::ConnectDeprecated(std::string_view path, fio::wire::OpenFlags flags,
-                                              fidl::ServerEnd<fio::Node> server_end) const {
+zx_status_t fdio_namespace::OpenRemoteDeprecated(std::string_view path, fio::wire::OpenFlags flags,
+                                                 fidl::ServerEnd<fio::Node> server_end) const {
   // Require that we start at /
   if (!cpp20::starts_with(path, '/')) {
     return ZX_ERR_NOT_FOUND;
@@ -252,8 +254,8 @@ zx_status_t fdio_namespace::ConnectDeprecated(std::string_view path, fio::wire::
                     vn->NodeType());
 }
 
-zx_status_t fdio_namespace::Connect(std::string_view path, fio::wire::Flags flags,
-                                    zx::channel object) const {
+zx_status_t fdio_namespace::OpenRemote(std::string_view path, fio::Flags flags,
+                                       zx::channel object) const {
   // Require that we start at /
   if (!cpp20::starts_with(path, '/')) {
     return ZX_ERR_NOT_FOUND;

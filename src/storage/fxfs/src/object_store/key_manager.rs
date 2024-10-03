@@ -342,7 +342,7 @@ mod tests {
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use fuchsia_async::{self as fasync, TestExecutor, Time};
-    use fuchsia_zircon as zx;
+
     use futures::channel::oneshot;
     use futures::join;
     use fxfs_crypto::{

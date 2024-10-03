@@ -10,7 +10,7 @@ import("//build/sdk/sdk_final_manifest_golden.gni")
 visibility = [ ":*" ]
 
 group("firmware") {
-  visibility += [ "//build/input:build_only" ]
+  visibility += [ "//:build_only" ]
   deps = [
     ":firmware.archive",
     ":firmware.exported",

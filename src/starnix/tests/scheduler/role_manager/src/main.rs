@@ -17,12 +17,12 @@ use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use tracing::info;
+use zx::{self as zx, AsHandleRef};
 
 #[fuchsia::main]
 async fn main() {

@@ -13,7 +13,7 @@ use aes::cipher::{BlockBackend, BlockClosure, BlockDecrypt, BlockEncrypt, BlockS
 use aes::Aes256;
 use anyhow::{ensure, Error};
 use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, WriteOptions};
-use fuchsia_zircon as zx;
+
 use futures::stream::{FuturesUnordered, TryStreamExt};
 use zerocopy::{little_endian, FromBytes, Immutable, IntoBytes, KnownLayout};
 

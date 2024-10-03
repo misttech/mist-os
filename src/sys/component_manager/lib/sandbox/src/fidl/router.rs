@@ -4,8 +4,8 @@
 use crate::{Capability, Request, Router};
 use fidl::handle::{AsHandleRef, EventPair};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon::Koid;
 use futures::TryStreamExt;
+use zx::Koid;
 
 impl From<Request> for fsandbox::RouteRequest {
     fn from(request: Request) -> Self {

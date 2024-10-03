@@ -16,7 +16,6 @@ use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use fidl_fuchsia_fxfs::{BlobWriterRequest, BlobWriterRequestStream};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
-use fuchsia_zircon::{self as zx, HandleBased as _, Status};
 use futures::{try_join, TryStreamExt as _};
 use fxfs::errors::FxfsError;
 use fxfs::object_handle::{ObjectHandle, WriteObjectHandle};
@@ -30,6 +29,7 @@ use fxfs::round::{round_down, round_up};
 use fxfs::serialized_types::BlobMetadata;
 use lazy_static::lazy_static;
 use std::sync::Arc;
+use zx::{self as zx, HandleBased as _, Status};
 
 lazy_static! {
     static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);

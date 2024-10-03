@@ -55,8 +55,11 @@ class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
  public:
   using OpenHandler = fit::function<void(fuchsia::io::OpenFlags flags, std::string path,
                                          fidl::InterfaceRequest<fuchsia::io::Node> object)>;
+  using Open3Handler =
+      fit::function<void(fuchsia::io::Flags flags, const std::string& path, zx::channel object)>;
 
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
+  void SetOpen3Handler(Open3Handler open3_handler) { open3_handler_ = std::move(open3_handler); }
 
  private:
   void Open(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string path,
@@ -64,11 +67,17 @@ class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
     open_handler_(flags, std::move(path), std::move(object));
   }
 
+  void Open3(std::string path, fuchsia::io::Flags flags, fuchsia::io::Options mode,
+             zx::channel object) override {
+    open3_handler_(flags, path, std::move(object));
+  }
+
   void NotImplemented_(const std::string& name) override {
     printf("Not implemented: Directory::%s\n", name.data());
   }
 
   OpenHandler open_handler_;
+  Open3Handler open3_handler_;
 };
 
 // Implementation of a /pkg directory that can be passed as a component namespace entry

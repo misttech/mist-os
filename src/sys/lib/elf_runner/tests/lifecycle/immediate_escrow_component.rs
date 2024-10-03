@@ -6,7 +6,7 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleOnEscrowRequest};
 use fuchsia_async as fasync;
 use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx};
+
 use std::process;
 use tracing::{error, info};
 

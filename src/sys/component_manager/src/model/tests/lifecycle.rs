@@ -45,7 +45,7 @@ use zx::AsHandleRef;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, fuchsia_sync as fsync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_sync as fsync, zx,
 };
 
 async fn new_model(

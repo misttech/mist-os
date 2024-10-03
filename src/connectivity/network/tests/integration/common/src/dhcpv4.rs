@@ -10,7 +10,7 @@
 use std::ops::Range;
 
 use dhcpv4::protocol::IntoFidlExt as _;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt as _;
 use net_declare::net::prefix_length_v4;
 use net_types::ip::{Ipv4, PrefixLength};

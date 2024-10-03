@@ -22,6 +22,7 @@
 #include <gtest/gtest.h>
 
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 #include "tun_ctl.h"
@@ -285,7 +286,8 @@ class SimpleClient {
     session_info.set_descriptor_length(
         static_cast<uint8_t>(sizeof(buffer_descriptor_t) / sizeof(uint64_t)));
     session_info.set_descriptor_count(descriptor_count_);
-    session_info.set_options(fuchsia_hardware_network::wire::SessionFlags::kPrimary);
+    session_info.set_options(fuchsia_hardware_network::wire::SessionFlags::kPrimary |
+                             fuchsia_hardware_network::wire::SessionFlags::kReceiveRxPowerLeases);
 
     zx::vmo data;
     if ((status = data_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &data)) != ZX_OK) {
@@ -1957,6 +1959,70 @@ TEST_F(TunTest, AddRemovePairPorts) {
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_error());
   ASSERT_EQ(result->error_value(), ZX_ERR_NOT_FOUND);
+}
+
+TEST_F(TunTest, DelegateRxLease) {
+  fuchsia_net_tun::wire::DeviceConfig device_config = DefaultDeviceConfig();
+  fuchsia_net_tun::wire::DevicePortConfig port_config = DefaultDevicePortConfig();
+  port_config.set_online(true);
+
+  zx::result device_and_port =
+      CreateDeviceAndPort(std::move(device_config), std::move(port_config));
+  ASSERT_OK(device_and_port.status_value());
+  auto [device_client_end, port_client_end] = std::move(device_and_port.value());
+
+  zx::result maybe_port_id = GetPortId(port_client_end);
+  ASSERT_OK(maybe_port_id.status_value());
+  const fuchsia_hardware_network::wire::PortId port_id = maybe_port_id.value();
+
+  fidl::WireSyncClient tun{std::move(device_client_end)};
+
+  zx::channel lease_self, lease_send;
+  ASSERT_OK(zx::channel::create(0, &lease_self, &lease_send));
+  {
+    fidl::Arena arena;
+    fuchsia_hardware_network::DelegatedRxLease delegate_lease;
+    delegate_lease.hold_until_frame(1);
+    delegate_lease.handle(
+        fuchsia_hardware_network::DelegatedRxLeaseHandle::WithChannel(std::move(lease_send)));
+    fidl::OneWayStatus status =
+        tun->DelegateRxLease(fidl::ToWire(arena, std::move(delegate_lease)));
+    ASSERT_OK(status.status());
+  }
+
+  SimpleClient client;
+  zx::result request = client.NewRequest();
+  ASSERT_OK(request.status_value());
+  ASSERT_OK(tun->GetDevice(std::move(request.value())).status());
+  ASSERT_OK(client.OpenSession());
+  ASSERT_OK(client.AttachPort(port_id));
+
+  ASSERT_OK(client.SendRx({0x02}, true));
+  {
+    fuchsia_net_tun::wire::Frame frame(alloc_);
+    frame.set_frame_type(fuchsia_hardware_network::wire::FrameType::kEthernet);
+    frame.set_port(kDefaultTestPort);
+    uint8_t data[] = {0xAA, 0xBB};
+    frame.set_data(alloc_, fidl::VectorView<uint8_t>::FromExternal(data));
+    fidl::WireResult write_frame_wire_result = tun->WriteFrame(std::move(frame));
+    ASSERT_OK(write_frame_wire_result.status());
+
+    const fit::result<int32_t>& write_frame_result = write_frame_wire_result.value();
+    if (write_frame_result.is_error()) {
+      GTEST_FAIL() << "WriteFrame failed: "
+                   << zx_status_get_string(write_frame_result.error_value());
+    }
+  }
+  fidl::WireResult watch_result = client.session()->WatchDelegatedRxLease();
+  ASSERT_OK(watch_result.status());
+  auto& received_lease = watch_result->lease;
+  ASSERT_TRUE(received_lease.has_hold_until_frame());
+  ASSERT_TRUE(received_lease.has_handle());
+  ASSERT_EQ(received_lease.handle().Which(),
+            fuchsia_hardware_network::wire::DelegatedRxLeaseHandle::Tag::kChannel);
+  ASSERT_EQ(received_lease.hold_until_frame(), 1u);
+  EXPECT_EQ(fsl::GetKoid(lease_self.get()),
+            fsl::GetRelatedKoid(received_lease.handle().channel().get()));
 }
 
 }  // namespace testing

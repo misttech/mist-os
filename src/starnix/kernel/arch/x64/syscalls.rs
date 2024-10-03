@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
 
 use crate::mm::MemoryAccessorExt;
@@ -332,7 +331,7 @@ pub fn sys_pause(
     let event = InterruptibleEvent::new();
     let guard = event.begin_wait();
     let result = current_task.run_in_state(RunState::Event(event.clone()), || {
-        match guard.block_until(zx::MonotonicTime::INFINITE) {
+        match guard.block_until(zx::MonotonicInstant::INFINITE) {
             Err(WakeReason::Interrupted) => error!(ERESTARTNOHAND),
             Err(WakeReason::DeadlineExpired) => panic!("blocking forever cannot time out"),
             Ok(()) => Ok(()),
@@ -356,7 +355,7 @@ pub fn sys_poll(
     num_fds: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {
-    let deadline = zx::MonotonicTime::after(duration_from_poll_timeout(timeout)?);
+    let deadline = zx::MonotonicInstant::after(duration_from_poll_timeout(timeout)?);
     poll(locked, current_task, user_fds, num_fds, None, deadline)
 }
 

@@ -31,7 +31,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::unimplemented;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -67,7 +67,7 @@ pub(crate) struct ApIfaceContainer {
     pub iface_id: u16,
     pub config: Option<ap_fsm::ApConfig>,
     pub ap_state_machine: Box<dyn AccessPointApi + Send + Sync>,
-    enabled_time: Option<zx::MonotonicTime>,
+    enabled_time: Option<zx::MonotonicInstant>,
     status: StateMachineStatusReader<ap_fsm::Status>,
 }
 
@@ -387,7 +387,10 @@ impl IfaceManagerService {
         reason: client_types::DisconnectReason,
     ) -> BoxFuture<'static, Result<(), Error>> {
         // Cancel any ongoing network selection, since a disconnect makes it invalid.
-        self.connection_selection_futures.clear();
+        if !self.connection_selection_futures.is_empty() {
+            info!("Disconnect requested, ignoring results from ongoing connection selections.");
+            self.connection_selection_futures.clear();
+        }
 
         // Find the client interface associated with the given network config and disconnect from
         // the network.
@@ -819,7 +822,7 @@ impl IfaceManagerService {
         match ap_iface_container.ap_state_machine.start(config, sender) {
             Ok(()) => {
                 if ap_iface_container.enabled_time.is_none() {
-                    ap_iface_container.enabled_time = Some(zx::MonotonicTime::get());
+                    ap_iface_container.enabled_time = Some(zx::MonotonicInstant::get());
                 }
 
                 self.aps.push(ap_iface_container)
@@ -849,7 +852,7 @@ impl IfaceManagerService {
             let mut ap_container = self.aps.remove(removal_index);
 
             if let Some(start_time) = ap_container.enabled_time.take() {
-                let enabled_duration = zx::MonotonicTime::get() - start_time;
+                let enabled_duration = zx::MonotonicInstant::get() - start_time;
                 self.telemetry_sender.send(TelemetryEvent::StopAp { enabled_duration });
             }
 
@@ -878,7 +881,7 @@ impl IfaceManagerService {
 
         for ap_container in aps.iter_mut() {
             if let Some(start_time) = ap_container.enabled_time.take() {
-                let enabled_duration = zx::MonotonicTime::get() - start_time;
+                let enabled_duration = zx::MonotonicInstant::get() - start_time;
                 self.telemetry_sender.send(TelemetryEvent::StopAp { enabled_duration });
             }
         }
@@ -972,8 +975,10 @@ async fn initiate_connection_selection_for_connect_request(
     };
 
     // Cancel any ongoing attempt to auto connect the previously idle iface.
-    iface_manager.connection_selection_futures.clear();
-
+    if !iface_manager.connection_selection_futures.is_empty() {
+        info!("Connect request received, ignoring results from ongoing connection selections.");
+        iface_manager.connection_selection_futures.clear();
+    }
     iface_manager.connection_selection_futures.push(fut.boxed());
     Ok(())
 }
@@ -1417,8 +1422,8 @@ async fn serve_iface_functionality(
                         iface_manager,
                     ).await;
                 }
-                Err(..) => {
-                    error!("Connection selector unexpectedly dropped response sender.")
+                Err(e) => {
+                    error!("Error received from connection selector: {:?}", e);
                 }
             }
         },
@@ -3284,7 +3289,7 @@ mod tests {
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
         let config = create_ap_config(&TEST_SSID, TEST_PASSWORD);
         iface_manager.aps[0].config = Some(config);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3307,7 +3312,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3333,7 +3338,7 @@ mod tests {
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
         let config = create_ap_config(&TEST_SSID, TEST_PASSWORD);
         iface_manager.aps[0].config = Some(config);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3360,7 +3365,7 @@ mod tests {
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
         let config = create_ap_config(&TEST_SSID, TEST_PASSWORD);
         iface_manager.aps[0].config = Some(config);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3416,7 +3421,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         // Insert a second iface and add it to the list of APs.
         let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
@@ -3428,7 +3433,7 @@ mod tests {
                 stop_succeeds: true,
                 exit_succeeds: true,
             }),
-            enabled_time: Some(zx::MonotonicTime::get()),
+            enabled_time: Some(zx::MonotonicInstant::get()),
             status,
         };
         iface_manager.aps.push(second_iface);
@@ -3458,7 +3463,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: false, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         // Insert a second iface and add it to the list of APs.
         let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
@@ -3470,7 +3475,7 @@ mod tests {
                 stop_succeeds: true,
                 exit_succeeds: true,
             }),
-            enabled_time: Some(zx::MonotonicTime::get()),
+            enabled_time: Some(zx::MonotonicInstant::get()),
             status,
         };
         iface_manager.aps.push(second_iface);
@@ -3500,7 +3505,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: false };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicInstant::get());
 
         // Insert a second iface and add it to the list of APs.
         let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
@@ -3512,7 +3517,7 @@ mod tests {
                 stop_succeeds: true,
                 exit_succeeds: true,
             }),
-            enabled_time: Some(zx::MonotonicTime::get()),
+            enabled_time: Some(zx::MonotonicInstant::get()),
             status,
         };
         iface_manager.aps.push(second_iface);
@@ -3741,7 +3746,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }))) => {
                     responder
-                        .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                        .send(Err(zx::sys::ZX_ERR_NOT_FOUND))
                         .expect("failed to send client SME response.");
                 }
             );
@@ -4086,7 +4091,7 @@ mod tests {
                     iface_id: TEST_AP_IFACE_ID, responder
                 }) => {
                     responder
-                        .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                        .send(Err(zx::sys::ZX_ERR_NOT_FOUND))
                         .expect("Sending iface response");
                 }
             );

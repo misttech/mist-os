@@ -7,11 +7,11 @@
 use fidl::endpoints::RequestStream as _;
 use fidl_fuchsia_io as fio;
 use fuchsia_hash::Hash;
-use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status};
 use futures::{Future, StreamExt as _, TryStreamExt as _};
 use std::cmp::min;
 use std::collections::HashSet;
 use std::convert::TryInto as _;
+use zx::{self as zx, AsHandleRef as _, HandleBased as _, Status};
 
 /// A testing server implementation of /blob.
 ///

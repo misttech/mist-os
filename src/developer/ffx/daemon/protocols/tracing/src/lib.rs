@@ -464,10 +464,11 @@ impl FidlProtocol for TracingProtocol {
                             .map_err(Into::into);
                     }
                 };
+                let output_file = task.output_file.clone();
                 let target_info = task.target_info.clone();
                 responder
                     .send(match task.shutdown().await {
-                        Ok(ref result) => Ok((&target_info, result)),
+                        Ok(ref result) => Ok((&target_info, &output_file, result)),
                         Err(e) => Err(e),
                     })
                     .map_err(Into::into)

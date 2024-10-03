@@ -77,7 +77,7 @@
 //! ```
 
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{Future, StreamExt};

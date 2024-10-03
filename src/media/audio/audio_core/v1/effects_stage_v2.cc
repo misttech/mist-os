@@ -26,22 +26,22 @@ static_assert(fuchsia_audio_effects::wire::kMaxProcessStageNameLength <=
 // See ProcessOptions.usage_mask_per_input in sdk/fidl/fuchsia.audio.effects/processor.fidl.
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND)}).mask() ==
               (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::BACKGROUND)));
-static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::MEDIA)));
-static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::INTERRUPTION)));
-static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::SYSTEM_AGENT)));
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION)}).mask() ==
               (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::COMMUNICATION)));
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}).mask() ==
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::INTERRUPTION)));
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA)}).mask() ==
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::MEDIA)));
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)}).mask() ==
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::SYSTEM_AGENT)));
 
 // Ignore internal usages, such as ULTRASOUND.
-static constexpr uint32_t kSupportedUsageMask =
+constexpr uint32_t kSupportedUsageMask =
     StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND),
-                     StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
+                     StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
                      StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
-                     StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT),
-                     StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION)})
+                     StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
+                     StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)})
         .mask();
 
 // Used to throttle log messages.

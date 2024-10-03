@@ -20,7 +20,7 @@ use wlan_common::{ie, tim, TimeUnit};
 use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, zx,
 };
 
 pub struct InfraBss {

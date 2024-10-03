@@ -12,9 +12,9 @@ rustc_library("fidl-fuchsia-component-abi-ext") {
   deps = [
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/rust/zx-status",
     "//src/lib/fuchsia-fs",
     "//src/lib/versioning/version-history/rust",
-    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//third_party/rust_crates:thiserror",
   ]
   test_deps = [

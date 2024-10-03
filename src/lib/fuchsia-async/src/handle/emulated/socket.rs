@@ -6,12 +6,12 @@
 
 // TODO(ctiller): merge this implementation with the implementation in zircon_handle?
 
-use fuchsia_zircon_status as zx_status;
 use futures::future::poll_fn;
 use futures::prelude::*;
 use futures::ready;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use zx_status;
 
 /// An I/O object representing a `Socket`.
 pub struct Socket {

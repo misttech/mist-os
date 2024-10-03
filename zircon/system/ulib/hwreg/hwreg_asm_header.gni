@@ -63,6 +63,10 @@ template("hwreg_asm_header") {
       # tool's binary location and name depends on the target cpu architecture
       # (e.g. host_x64/obj/zircon/kernel/lib/arch/arm64/_hwreg_header.tool.gen-arm64-system-asm).
       can_use_previously_built_tool = false
+
+      metadata = {
+        distribution_entries_barrier = []
+      }
     }
   } else {
     not_needed(invoker, [ "output_name" ])

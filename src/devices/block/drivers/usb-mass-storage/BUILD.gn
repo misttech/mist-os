@@ -23,7 +23,10 @@ fuchsia_driver("usb-mass-storage-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "usb-mass-storage.cc" ]
+  sources = [
+    "driver-export.cc",
+    "usb-mass-storage.cc",
+  ]
   deps = [
     ":usb_mass_storage_bind",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
@@ -107,12 +110,12 @@ test("ums-integration") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher",
     "//src/lib/ddk",
     "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/usb-virtual-bus-launcher",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

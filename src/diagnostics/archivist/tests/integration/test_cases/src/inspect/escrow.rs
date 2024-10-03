@@ -8,7 +8,7 @@ use diagnostics_data::{InspectData, InspectHandleName};
 use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use realm_proxy_client::RealmProxyClient;
-use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync, zx};
 
 const PUPPET_NAME: &str = "puppet";
 
@@ -78,7 +78,7 @@ async fn escrow_inspect_data() {
         if data.is_empty() {
             break;
         }
-        fasync::Timer::new(zx::MonotonicTime::after(zx::Duration::from_millis(100))).await;
+        fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(100))).await;
     }
 }
 

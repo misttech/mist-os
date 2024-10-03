@@ -6,13 +6,10 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
-#include <fuchsia/diagnostics/cpp/fidl.h>
-#include <fuchsia/driver/test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
@@ -38,9 +35,6 @@
 namespace usb_virtual_bus {
 namespace {
 
-using driver_integration_test::IsolatedDevmgr;
-using fuchsia::diagnostics::Severity;
-using fuchsia::driver::test::DriverLog;
 using usb_virtual::BusLauncher;
 
 constexpr const char kManufacturer[] = "Google";
@@ -243,20 +237,7 @@ class NetworkDeviceInterface {
 class UsbCdcEcmTest : public zxtest::Test {
  public:
   void SetUp() override {
-    IsolatedDevmgr::Args args = {
-        .log_level =
-            {
-                DriverLog{
-                    .name = "ethernet_usb_cdc_ecm",
-                    .log_level = Severity::DEBUG,
-                },
-                DriverLog{
-                    .name = "usb_cdc_acm_function",
-                    .log_level = Severity::DEBUG,
-                },
-            },
-    };
-    auto bus = BusLauncher::Create(std::move(args));
+    auto bus = BusLauncher::Create();
     ASSERT_OK(bus.status_value());
     bus_ = std::move(bus.value());
 

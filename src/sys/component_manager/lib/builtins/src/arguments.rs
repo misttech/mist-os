@@ -9,7 +9,6 @@ use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
 use fuchsia_fs::{file, OpenFlags};
 use fuchsia_zbi::{ZbiParser, ZbiResult, ZbiType};
-use fuchsia_zircon_status::Status;
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use std::collections::hash_map::Iter;
@@ -17,6 +16,7 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 use tracing::info;
+use zx_status::Status;
 use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio};
 
 lazy_static! {

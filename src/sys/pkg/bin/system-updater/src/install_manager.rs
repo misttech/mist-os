@@ -16,7 +16,7 @@ use futures::select;
 use futures::stream::FusedStream;
 use std::time::Duration;
 use tracing::{error, warn};
-use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect, zx};
 
 const INSPECT_STATUS_NODE_NAME: &str = "status";
 // Suspend is allowed at most 7 days, after that update will automatically resume.
@@ -95,7 +95,7 @@ async fn run<N, U, E>(
 
         // Set up inspect nodes.
         let mut status_node = node.create_child(INSPECT_STATUS_NODE_NAME);
-        let start_time = zx::MonotonicTime::get();
+        let start_time = zx::MonotonicInstant::get();
         let _time_property = node.create_int("start_timestamp_nanos", start_time.into_nanos());
 
         // Don't forget to add the first monitor to the queue and respond to StartUpdate :)
@@ -227,7 +227,7 @@ async fn handle_active_control_request<N>(
     update_url: &fuchsia_url::AbsolutePackageUrl,
     should_write_recovery: bool,
     suspend_state: &mut SuspendState,
-    suspend_deadline: zx::MonotonicTime,
+    suspend_deadline: zx::MonotonicInstant,
     cancel_sender: &mut Option<oneshot::Sender<()>>,
     num_cancel_requests: &mut usize,
 ) where
@@ -279,7 +279,7 @@ async fn handle_active_control_request<N>(
                 return;
             }
 
-            if zx::MonotonicTime::get() > suspend_deadline {
+            if zx::MonotonicInstant::get() > suspend_deadline {
                 let _ = responder.send(Err(SuspendError::SuspendLimitExceeded));
                 return;
             }

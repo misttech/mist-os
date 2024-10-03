@@ -20,6 +20,14 @@ declare_args() {
   #
   # These will be added to the build using the host toolchain.
   host_labels = []
+
+  # These labels are added as dependencies of '//:default' transitively via
+  # '//:build_only'.  These are used to add targets that need to be built
+  # but aren't part of any product, board, etc.
+  #
+  # These also serve as an alternative to '//:default' for sub-builds that
+  # only want to build and define a small subset of the tree.
+  build_only_labels = []
 }
 
 if (host_os == "mac") {
@@ -101,7 +109,7 @@ build_api_module("tests") {
 group("default") {
   testonly = true
   deps = [
-    #"//:build_only",
+    "//:build_only",
     "//:host",
     "//zircon/kernel:boot_tests",
 
@@ -131,6 +139,16 @@ group("default") {
     #"//build/images/mistos",
   ]
 }
+
+###
+# The build-only group.  These are additional targets to add to the build but
+# are not part of a product, board, or host tools.  This group also serves as
+# an alternative to '//:default' when performing sub-builds.
+group("build_only") {
+  testonly = true
+  deps = build_only_labels
+}
+
 
 # Host-only tests.  These cannot have any dependency on an assembled platform
 # image, or the compiled OS itself, not even for their host_test_data().

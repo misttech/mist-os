@@ -22,41 +22,48 @@ use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut 
 use crate::state::Hook;
 
 /// The NAT configuration for a given conntrack connection.
+///
+/// NAT is configured exactly once for a given connection, for the first packet
+/// encountered on that connection. This is not to say that all connections are
+/// NATed: the configuration can be either `true` (NAT the connection) or
+/// `false` (do not NAT), but the `OnceCell` containing the configuration
+/// should always be initialized by the time a connection is inserted in the
+/// conntrack table.
 #[derive(Default, Debug)]
 pub struct NatConfig {
-    /// NAT is configured exactly once for a given connection, for the first
-    /// packet encountered on that connection. This is not to say that all
-    /// connections are NATed: the configuration could be `None`, but this field
-    /// will always be initialized by the time a connection is inserted in the
-    /// conntrack table.
-    pub(crate) config: OnceCell<Option<NatType>>,
+    pub(crate) destination: OnceCell<bool>,
 }
 
-impl NatConfig {
-    /// The type of NAT configured, if any.
-    pub fn nat_type(&self) -> Option<NatType> {
-        self.config.get().cloned().flatten()
+impl<I: IpExt, BT: FilterBindingsTypes> Connection<I, BT, NatConfig> {
+    pub fn destination_nat(&self) -> bool {
+        self.external_data().destination.get().copied().unwrap_or(false)
     }
 }
 
 /// The type of NAT that is performed on a given conntrack connection.
-// TODO(https://fxbug.dev/341771631): perform SNAT.
-//
-// Once we support SNAT of any kind, we will also need to remap source ports for
-// all non-NATed traffic by default to prevent locally-generated and forwarded
-// traffic from stepping on each other's toes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NatType {
     /// Destination NAT is performed on this connection.
     Destination,
+    /// Source NAT is performed on this connection.
+    //
+    // TODO(https://fxbug.dev/341771631): support configuring SNAT for new
+    // connections.
+    //
+    // Once we support SNAT of any kind, we will also need to remap source ports for
+    // all non-NATed traffic by default to prevent locally-generated and forwarded
+    // traffic from stepping on each other's toes.
+    #[allow(dead_code)]
+    Source,
 }
 
 impl Inspectable for NatConfig {
     fn record<I: netstack3_base::Inspector>(&self, inspector: &mut I) {
-        let value = match self.config.get() {
+        let Self { destination } = self;
+        let value = match destination.get() {
             None => "Unconfigured",
-            Some(None) => "No-op",
-            Some(Some(NatType::Destination)) => "Destination",
+            Some(false) => "No-op",
+            Some(true) => "Destination",
         };
         inspector.record_str("NAT", value);
     }
@@ -77,7 +84,7 @@ pub(crate) trait NatHook<I: IpExt> {
         packet: &P,
         interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, Option<NatType>)>
+    ) -> ControlFlow<(Self::Verdict, bool)>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -98,6 +105,15 @@ pub(crate) trait FilterVerdict: From<Verdict> + Debug + PartialEq {
     fn behavior(&self) -> ControlFlow<()>;
 }
 
+impl FilterVerdict for Verdict {
+    fn behavior(&self) -> ControlFlow<()> {
+        match self {
+            Self::Accept => ControlFlow::Continue(()),
+            Self::Drop => ControlFlow::Break(()),
+        }
+    }
+}
+
 pub(crate) enum IngressHook {}
 
 impl<I: IpExt> NatHook<I> for IngressHook {
@@ -113,7 +129,7 @@ impl<I: IpExt> NatHook<I> for IngressHook {
         packet: &P,
         interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, Option<NatType>)>
+    ) -> ControlFlow<(Self::Verdict, bool)>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -121,9 +137,9 @@ impl<I: IpExt> NatHook<I> for IngressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break((Verdict::Drop.into(), None)),
+            RoutineResult::Drop => ControlFlow::Break((Verdict::Drop.into(), false)),
             RoutineResult::TransparentLocalDelivery { addr, port } => {
-                ControlFlow::Break((IngressVerdict::TransparentLocalDelivery { addr, port }, None))
+                ControlFlow::Break((IngressVerdict::TransparentLocalDelivery { addr, port }, false))
             }
             RoutineResult::Redirect { dst_port } => {
                 let (verdict, nat_type) = configure_redirect_nat::<Self, _, _, _, _>(
@@ -191,7 +207,7 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
         packet: &P,
         interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, Option<NatType>)>
+    ) -> ControlFlow<(Self::Verdict, bool)>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -199,7 +215,7 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break((Verdict::Drop.into(), None)),
+            RoutineResult::Drop => ControlFlow::Break((Verdict::Drop.into(), false)),
             result @ RoutineResult::TransparentLocalDelivery { .. } => {
                 unreachable!(
                     "transparent local delivery is only valid in INGRESS hook; got {result:?}"
@@ -232,12 +248,71 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
     }
 }
 
-impl FilterVerdict for Verdict {
-    fn behavior(&self) -> ControlFlow<()> {
-        match self {
-            Self::Accept => ControlFlow::Continue(()),
-            Self::Drop => ControlFlow::Break(()),
-        }
+pub(crate) enum LocalIngressHook {}
+
+impl<I: IpExt> NatHook<I> for LocalIngressHook {
+    type Verdict = Verdict;
+
+    const NAT_TYPE: NatType = NatType::Source;
+
+    fn evaluate_result<P, CC, BC>(
+        _core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        _table: &Table<I, BC, NatConfig>,
+        _reply_tuple: &mut Tuple<I>,
+        _packet: &P,
+        _interfaces: &Interfaces<'_, CC::DeviceId>,
+        result: RoutineResult<I>,
+    ) -> ControlFlow<(Self::Verdict, bool)>
+    where
+        P: IpPacket<I>,
+        CC: NatContext<I, BC>,
+        BC: FilterBindingsContext,
+    {
+        unreachable!("SNAT is not supported and should never be configured; got {result:?}")
+    }
+
+    fn redirect_addr<P, CC, BT>(_: &mut CC, _: &P, _: Option<&CC::DeviceId>) -> Option<I::Addr>
+    where
+        P: IpPacket<I>,
+        CC: NatContext<I, BT>,
+        BT: FilterBindingsTypes,
+    {
+        unreachable!("DNAT not supported in LOCAL_INGRESS; cannot perform redirect action")
+    }
+}
+
+pub(crate) enum EgressHook {}
+
+impl<I: IpExt> NatHook<I> for EgressHook {
+    type Verdict = Verdict;
+
+    const NAT_TYPE: NatType = NatType::Source;
+
+    fn evaluate_result<P, CC, BC>(
+        _core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        _table: &Table<I, BC, NatConfig>,
+        _reply_tuple: &mut Tuple<I>,
+        _packet: &P,
+        _interfaces: &Interfaces<'_, CC::DeviceId>,
+        result: RoutineResult<I>,
+    ) -> ControlFlow<(Self::Verdict, bool)>
+    where
+        P: IpPacket<I>,
+        CC: NatContext<I, BC>,
+        BC: FilterBindingsContext,
+    {
+        unreachable!("SNAT is not supported and should never be configured; got {result:?}")
+    }
+
+    fn redirect_addr<P, CC, BT>(_: &mut CC, _: &P, _: Option<&CC::DeviceId>) -> Option<I::Addr>
+    where
+        P: IpPacket<I>,
+        CC: NatContext<I, BT>,
+        BT: FilterBindingsTypes,
+    {
+        unreachable!("DNAT not supported in EGRESS; cannot perform redirect action")
     }
 }
 
@@ -262,9 +337,36 @@ where
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
 {
-    let NatConfig { config } = conn.external_data();
-    let conn_nat = if let Some(config) = config.get() {
-        *config
+    let Some(tuple) = Tuple::from_packet(packet) else {
+        return Verdict::Accept.into();
+    };
+    let Some(direction) = conn.direction(&tuple) else {
+        // If the packet does not match the connection, that likely means that it's been
+        // NATed already.
+        //
+        // TODO(https://fxbug.dev/371017876): retrieve the packet's tuple and/or
+        // direction from its IP layer metadata, once it is cached there, so that we can
+        // reliably tell the direction of a packet with respect to its flow even after
+        // it has had NAT performed on it.
+        return Verdict::Accept.into();
+    };
+
+    let NatConfig { destination } = conn.external_data();
+    let relevant_config = match (N::NAT_TYPE, direction) {
+        // If either this is a DNAT hook and we are looking at a packet in the
+        // "original" direction, or this is an SNAT hook and we are looking at a reply
+        // packet, then we want to decide whether to NAT based on whether the connection
+        // has DNAT configured.
+        (NatType::Destination, ConnectionDirection::Original)
+        | (NatType::Source, ConnectionDirection::Reply) => destination,
+        // TODO(https://fxbug.dev/341771631): when SNAT is supported, consult the SNAT
+        // configuration here.
+        (NatType::Source, ConnectionDirection::Original)
+        | (NatType::Destination, ConnectionDirection::Reply) => return Verdict::Accept.into(),
+    };
+
+    let should_nat_conn = if let Some(nat) = relevant_config.get() {
+        *nat
     } else {
         // NAT has not yet been configured for this connection; traverse the installed
         // NAT routines in order to configure NAT.
@@ -279,12 +381,42 @@ where
                 )
             }
         };
-        let (reply_tuple, external_data) = conn.reply_tuple_and_external_data_mut();
+        match N::NAT_TYPE {
+            NatType::Source => {
+                // TODO(https://fxbug.dev/341771631): support SNAT.
+                //
+                // The way this function is written, we should really not be ending up this
+                // branch, because:
+                //  (1) NAT has not yet been configured for this connection, so this should be
+                //      the first packet in the flow and therefore be in the original direction
+                //  (2) We bail early at the top of the function if this is an SNAT hook and the
+                //      packet is in the original direction.
+                //
+                // However, it is currently possible to end up in this branch when dealing with
+                // self- connected flows. Typically, the first packet in a flow will be in the
+                // original direction. However, when a connection's original tuple is the same
+                // as its reply tuple, every packet on the connection is considered to be in the
+                // reply direction, which is an implementation quirk that allows self-connected
+                // flows to be considered immediately "established".
+                //
+                // This means that when we see the first packet in a self-connected flow in an
+                // SNAT hook, no NAT will have been configured for it, and yet it would appear
+                // to be a reply packet, so we would attempt to traverse the NAT routines to
+                // configure SNAT, which is not yet supported. Instead, just configure the
+                // connection not to be NATed, and bail.
+                conn.external_data()
+                    .destination
+                    .set(false)
+                    .expect("DNAT should not have been configured yet");
+                return Verdict::Accept.into();
+            }
+            NatType::Destination => {}
+        }
         let (verdict, config) = configure_nat::<N, _, _, _, _>(
             core_ctx,
             bindings_ctx,
             table,
-            reply_tuple,
+            conn.reply_tuple_mut(),
             hook,
             packet,
             interfaces,
@@ -292,16 +424,17 @@ where
         if let ControlFlow::Break(()) = verdict.behavior() {
             return verdict;
         }
-        external_data.config.set(config).expect("NAT should not have been configured yet");
+        conn.external_data()
+            .destination
+            .set(config)
+            .expect("DNAT should not have been configured yet");
         config
     };
 
-    match (conn_nat, N::NAT_TYPE) {
-        (None, _) => Verdict::Accept.into(),
-        (Some(NatType::Destination), NatType::Destination) => {
-            rewrite_packet_dnat(conn, packet).into()
-        }
+    if !should_nat_conn {
+        return Verdict::Accept.into();
     }
+    rewrite_packet(conn, direction, N::NAT_TYPE, packet).into()
 }
 
 /// Configure NAT by rewriting the provided reply tuple of a connection.
@@ -318,7 +451,7 @@ fn configure_nat<N, I, P, CC, BC>(
     hook: &Hook<I, BC::DeviceClass, ()>,
     packet: &P,
     interfaces: Interfaces<'_, CC::DeviceId>,
-) -> (N::Verdict, Option<NatType>)
+) -> (N::Verdict, bool)
 where
     N: NatHook<I>,
     I: IpExt,
@@ -342,7 +475,7 @@ where
             ControlFlow::Continue(()) => {}
         }
     }
-    (Verdict::Accept.into(), None)
+    (Verdict::Accept.into(), false)
 }
 
 /// Configure Redirect NAT, a special case of DNAT that redirects the packet to
@@ -355,7 +488,7 @@ fn configure_redirect_nat<N, I, P, CC, BC>(
     packet: &P,
     interfaces: &Interfaces<'_, CC::DeviceId>,
     dst_port: Option<RangeInclusive<NonZeroU16>>,
-) -> (Verdict, Option<NatType>)
+) -> (Verdict, bool)
 where
     N: NatHook<I>,
     I: IpExt,
@@ -363,34 +496,30 @@ where
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
 {
-    // Choose an appropriate new destination address and, optionally, port. Then
-    // rewrite the source address/port of the reply tuple for the connection to use
-    // as the guide for future packet rewriting.
-
-    // TODO(https://fxbug.dev/341771631): when we support source NAT, we should
-    // panic if hook_type is Source; it would mean we've hit a DNAT action from an
-    // SNAT-only hook, which would indicate a validation error (to ensure no DNAT
-    // actions are reachable from SNAT hooks), or a caller error (to provide an
-    // SNAT hook with DNAT hook_type).
     match N::NAT_TYPE {
+        NatType::Source => panic!("DNAT action called from SNAT-only hook"),
         NatType::Destination => {}
     }
 
+    // Choose an appropriate new destination address and, optionally, port. Then
+    // rewrite the source address/port of the reply tuple for the connection to use
+    // as the guide for future packet rewriting.
+    //
     // If we are in INGRESS, use the primary address of the incoming interface; if
     // we are in LOCAL_EGRESS, use the loopback address.
-    let Some(new_src_addr) = N::redirect_addr(core_ctx, packet, interfaces.ingress) else {
-        return (Verdict::Drop, None);
+    let Some(new_dst_addr) = N::redirect_addr(core_ctx, packet, interfaces.ingress) else {
+        return (Verdict::Drop, false);
     };
-    reply_tuple.src_addr = new_src_addr;
+    reply_tuple.src_addr = new_dst_addr;
 
     let verdict = dst_port
         .map(|range| rewrite_tuple_src_port(bindings_ctx, table, reply_tuple, range))
         .unwrap_or(Verdict::Accept);
-    let nat_type = match verdict {
-        Verdict::Drop => None,
-        Verdict::Accept => Some(NatType::Destination),
+    let should_nat = match verdict {
+        Verdict::Drop => false,
+        Verdict::Accept => true,
     };
-    (verdict, nat_type)
+    (verdict, should_nat)
 }
 
 /// Attempt to rewrite the source port of the provided tuple such that it fits
@@ -436,29 +565,32 @@ fn rewrite_tuple_src_port<I: IpExt, BC: FilterBindingsContext>(
     Verdict::Drop
 }
 
-/// Perform Destination NAT (DNAT) on a packet, using its connection in the
-/// conntrack table as a guide.
-fn rewrite_packet_dnat<I, P, BT>(conn: &Connection<I, BT, NatConfig>, packet: &mut P) -> Verdict
+/// Perform NAT on a packet, using its connection in the conntrack table as a
+/// guide.
+fn rewrite_packet<I, P, BT>(
+    conn: &Connection<I, BT, NatConfig>,
+    direction: ConnectionDirection,
+    nat: NatType,
+    packet: &mut P,
+) -> Verdict
 where
     I: IpExt,
     P: IpPacket<I>,
     BT: FilterBindingsTypes,
 {
     // If this packet is in the "original" direction of the connection, rewrite its
-    // destination address and port using the source address and port from the
-    // connection's reply tuple. If this is a reply packet, rewrite the *source*
-    // using the original tuple's destination so the traffic is seen to come from
-    // the expected source.
+    // address and port from the connection's reply tuple. If this is a reply
+    // packet, rewrite it using the *original* tuple so the traffic is seen to
+    // originate from or be destined to the expected peer.
     //
     // The reply tuple functions both as a way to mark what we expect to see coming
     // in, *and* a way to stash what the NAT remapping should be.
-    let Some(tuple) = Tuple::from_packet(packet) else {
-        return Verdict::Accept;
+    let tuple = match direction {
+        ConnectionDirection::Original => conn.reply_tuple(),
+        ConnectionDirection::Reply => conn.original_tuple(),
     };
-    let direction = conn.direction(&tuple).expect("packet should match connection");
-    match direction {
-        ConnectionDirection::Original => {
-            let tuple = conn.reply_tuple();
+    match nat {
+        NatType::Destination => {
             let (new_dst_addr, new_dst_port) = (tuple.src_addr, tuple.src_port_or_id);
 
             packet.set_dst_addr(new_dst_addr);
@@ -475,8 +607,7 @@ where
             };
             transport.set_dst_port(new_dst_port);
         }
-        ConnectionDirection::Reply => {
-            let tuple = conn.original_tuple();
+        NatType::Source => {
             let (new_src_addr, new_src_port) = (tuple.dst_addr, tuple.dst_port_or_id);
 
             packet.set_src_addr(new_src_addr);
@@ -535,7 +666,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, None)
+            (Verdict::Accept, false)
         );
     }
 
@@ -561,7 +692,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, None)
+            (Verdict::Accept, false)
         );
     }
 
@@ -591,7 +722,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, None)
+            (Verdict::Accept, false)
         );
 
         // The first installed routine should terminate at its `Accept` result, but the
@@ -617,7 +748,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Drop, None)
+            (Verdict::Drop, false)
         );
     }
 
@@ -655,7 +786,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Drop, None)
+            (Verdict::Drop, false)
         );
     }
 
@@ -695,7 +826,7 @@ mod tests {
             ),
             (
                 IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: LOCAL_PORT },
-                None
+                false
             )
         );
     }
@@ -734,7 +865,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, Some(NatType::Destination))
+            (Verdict::Accept, true)
         );
     }
 
@@ -764,37 +895,27 @@ mod tests {
                 &packet,
                 Interfaces { ingress: Some(&ethernet_interface()), egress: None },
             ),
-            (Verdict::Drop.into(), None)
+            (Verdict::Drop.into(), false)
         );
     }
 
     trait NatHookExt<I: TestIpExt>: NatHook<I> {
-        type ReplyHook: NatHookExt<I>;
-
-        fn redirect_dst() -> I::Addr;
-
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId>;
     }
 
     impl<I: TestIpExt> NatHookExt<I> for IngressHook {
-        type ReplyHook = LocalEgressHook;
-
-        fn redirect_dst() -> I::Addr {
-            I::DST_IP_2
-        }
-
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId> {
             Interfaces { ingress: Some(interface), egress: None }
         }
     }
 
     impl<I: TestIpExt> NatHookExt<I> for LocalEgressHook {
-        type ReplyHook = IngressHook;
-
-        fn redirect_dst() -> I::Addr {
-            *I::LOOPBACK_ADDRESS
+        fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId> {
+            Interfaces { ingress: None, egress: Some(interface) }
         }
+    }
 
+    impl<I: TestIpExt> NatHookExt<I> for EgressHook {
         fn interfaces<'a>(interface: &'a FakeDeviceId) -> Interfaces<'a, FakeDeviceId> {
             Interfaces { ingress: None, egress: Some(interface) }
         }
@@ -803,12 +924,25 @@ mod tests {
     const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(55555));
 
     #[ip_test(I)]
-    #[test_case(PhantomData::<IngressHook>, None; "redirect INGRESS")]
-    #[test_case(PhantomData::<IngressHook>, Some(LOCAL_PORT); "redirect INGRESS to local port")]
-    #[test_case(PhantomData::<LocalEgressHook>, None; "redirect LOCAL_EGRESS")]
-    #[test_case(PhantomData::<LocalEgressHook>, Some(LOCAL_PORT); "redirect LOCAL_EGRESS to local port")]
-    fn redirect<I: TestIpExt, N: NatHookExt<I>>(
-        _hook: PhantomData<N>,
+    #[test_case(
+        PhantomData::<IngressHook>, PhantomData::<EgressHook>, None;
+        "redirect INGRESS"
+    )]
+    #[test_case(
+        PhantomData::<IngressHook>, PhantomData::<EgressHook>, Some(LOCAL_PORT);
+        "redirect INGRESS to local port"
+    )]
+    #[test_case(
+        PhantomData::<LocalEgressHook>, PhantomData::<EgressHook>, None;
+        "redirect LOCAL_EGRESS"
+    )]
+    #[test_case(
+        PhantomData::<LocalEgressHook>, PhantomData::<EgressHook>, Some(LOCAL_PORT);
+        "redirect LOCAL_EGRESS to local port"
+    )]
+    fn redirect<I: TestIpExt, Original: NatHookExt<I>, Reply: NatHookExt<I>>(
+        _original_nat_hook: PhantomData<Original>,
+        _reply_nat_hook: PhantomData<Reply>,
         dst_port: Option<NonZeroU16>,
     ) {
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
@@ -840,23 +974,29 @@ mod tests {
                 )],
             }],
         };
-        let verdict = perform_nat::<N, _, _, _, _>(
+        let verdict = perform_nat::<Original, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
             &conntrack,
             &mut conn,
             &nat_routines,
             &mut packet,
-            N::interfaces(&ethernet_interface()),
+            Original::interfaces(&ethernet_interface()),
         );
         assert_eq!(verdict, Verdict::Accept.into());
 
         // The packet's destination should be rewritten, and DNAT should be configured
         // for the packet; the reply tuple's source should be rewritten to match the new
         // destination.
+        let redirect_addr = Original::redirect_addr(
+            &mut core_ctx,
+            &packet,
+            Original::interfaces(&ethernet_interface()).ingress,
+        )
+        .expect("get redirect addr for NAT hook");
         let expected = FakeIpPacket::<_, FakeUdpPacket> {
             src_ip: packet.src_ip,
-            dst_ip: N::redirect_dst(),
+            dst_ip: redirect_addr,
             body: FakeUdpPacket {
                 src_port: packet.body.src_port,
                 dst_port: dst_port.map(NonZeroU16::get).unwrap_or(packet.body.dst_port),
@@ -864,11 +1004,11 @@ mod tests {
         };
         assert_eq!(packet, expected);
         assert_eq!(
-            conn.external_data().config.get().expect("NAT should be configured"),
-            &Some(NatType::Destination)
+            *conn.external_data().destination.get().expect("DNAT should be configured"),
+            true
         );
         assert_eq!(conn.original_tuple(), &original);
-        let mut reply = Tuple { src_addr: N::redirect_dst(), ..original.invert() };
+        let mut reply = Tuple { src_addr: redirect_addr, ..original.invert() };
         if let Some(port) = dst_port {
             reply.src_port_or_id = port.get();
         }
@@ -886,14 +1026,14 @@ mod tests {
                 rules: vec![Rule::new(PacketMatcher::default(), Action::Drop)],
             }],
         };
-        let verdict = perform_nat::<N::ReplyHook, _, _, _, _>(
+        let verdict = perform_nat::<Reply, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
             &conntrack,
             &mut conn,
             &nat_routines,
             &mut reply_packet,
-            N::interfaces(&ethernet_interface()),
+            Reply::interfaces(&ethernet_interface()),
         );
         assert_eq!(verdict, Verdict::Accept.into());
         assert_eq!(reply_packet, pre_nat_packet.reply());

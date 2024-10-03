@@ -78,6 +78,7 @@ func (n *NsJailCmdBuilder) AddDefaultMounts() {
 		// Some tests attempt to make https connections, which requires SSL
 		// certs.
 		{Src: "/etc/ssl/certs"},
+		{Src: "/usr/share/ca-certificates"},
 		// Network conformance tests use TCL.
 		{Src: "/usr/share/tcltk"},
 		// netstack_streamsocket_c_api_test requires the presence of

@@ -364,6 +364,18 @@ async def do_replay_log(
 
 
 class AsyncMain:
+    _ALL_PACKAGE_MANIFESTS_PATH = [
+        "all_package_manifests.list",
+    ]
+
+    _PACKAGE_MANIFESTS_FROM_METADATA_PATH = [
+        "gen",
+        "build",
+        "images",
+        "updates",
+        "package_manifests_from_metadata.list.package_metadata",
+    ]
+
     def __init__(
         self,
         flags: args.Flags,
@@ -475,14 +487,22 @@ class AsyncMain:
         self._exec_env = exec_env
         recorder.emit_process_env(exec_env)
 
+        flags.update_artifacts_directory_with_out_path(
+            os.path.abspath(exec_env.out_dir)
+        )
+
         recorder.emit_artifact_directory_path(
             os.path.abspath(flags.artifact_output_directory)
             if flags.artifact_output_directory
             else None
         )
 
-        if flags.artifact_output_directory and not set(sys.argv).intersection(
-            set(["--timestamp-artifacts", "--no-timestamp-artifacts"])
+        if (
+            flags.artifact_output_directory
+            and not flags.timestamp_artifacts
+            and not set(sys.argv).intersection(
+                set(["--timestamp-artifacts", "--no-timestamp-artifacts"])
+            )
         ):
             recorder.emit_warning_message(
                 "You have not specified --[no-]timestamp-artifacts.\nArtifact output will overwrite previous runs.\nThe default will soon change to support timestamped directories."
@@ -575,6 +595,7 @@ class AsyncMain:
                 "Use --no-updateifinbase to skip updating base packages."
             )
             build_return_code = await run_build_with_suspended_output(
+                exec_env,
                 ["build/images/updates"],
                 show_output=not exec_env.log_to_stdout(),
             )
@@ -587,9 +608,7 @@ class AsyncMain:
                 "\nRunning an OTA before executing tests"
             )
             ota_result = await execution.run_command(
-                "fx",
-                "ota",
-                "--no-build",
+                *exec_env.fx_cmd_line("ota", "--no-build"),
                 recorder=recorder,
                 print_verbatim=True,
             )
@@ -720,17 +739,18 @@ class AsyncMain:
         with tempfile.TemporaryDirectory() as td:
             out_path = os.path.join(td, "test-list.json")
             result = await execution.run_command(
-                "fx",
-                "test_list_tool",
-                "--build-dir",
-                exec_env.out_dir,
-                "--input",
-                exec_env.test_json_file,
-                "--output",
-                out_path,
-                "--test-components",
-                os.path.join(exec_env.out_dir, "test_components.json"),
-                "--ignore-device-test-errors",
+                *exec_env.fx_cmd_line(
+                    "test_list_tool",
+                    "--build-dir",
+                    exec_env.out_dir,
+                    "--input",
+                    exec_env.test_json_file,
+                    "--output",
+                    out_path,
+                    "--test-components",
+                    os.path.join(exec_env.out_dir, "test_components.json"),
+                    "--ignore-device-test-errors",
+                ),
                 recorder=recorder,
             )
             if result is None or result.return_code != 0:
@@ -784,6 +804,8 @@ class AsyncMain:
 
         recorder = self._recorder
         flags = self._flags
+        exec_env = self._exec_env
+        assert exec_env is not None
 
         missing_groups: list[selection_types.MatchGroup] = []
 
@@ -814,7 +836,6 @@ class AsyncMain:
                 def suggestion_args(
                     arg: str, threshold: float | None = None
                 ) -> list[str]:
-                    name = "fx"
                     suggestion_args = [
                         "search-tests",
                         f"--max-results={flags.suggestion_count}",
@@ -823,7 +844,7 @@ class AsyncMain:
                     ]
                     if threshold is not None:
                         suggestion_args += ["--threshold", str(threshold)]
-                    return [name] + suggestion_args
+                    return exec_env.fx_cmd_line(*suggestion_args)
 
                 arg_threshold_pairs = []
                 for group in missing_groups:
@@ -926,12 +947,11 @@ class AsyncMain:
 
         if tests.has_e2e_test() and allow_build_updates:
             build_command_line.extend(["--default", "updates"])
-
-        build_id = recorder.emit_build_start(targets=build_command_line)
-        if tests.has_e2e_test():
             recorder.emit_instruction_message(
                 "E2E test selected, building updates package"
             )
+
+        build_id = recorder.emit_build_start(targets=build_command_line)
         recorder.emit_instruction_message("Use --no-build to skip building")
 
         status_suffix = " Status output suspended." if termout.is_init() else ""
@@ -940,9 +960,9 @@ class AsyncMain:
         await asyncio.sleep(0.1)
 
         return_code = await run_build_with_suspended_output(
+            exec_env,
             build_command_line,
             show_output=not exec_env.log_to_stdout(),
-            out_dir=exec_env.out_dir,
         )
 
         error = None
@@ -953,11 +973,96 @@ class AsyncMain:
             return False
 
         if tests.has_device_test():
-            amber_directory = os.path.join(exec_env.out_dir, "amber-files")
-            delivery_blob_type = self._read_delivery_blob_type()
+            try:
+                await self._publish_packages(build_id)
+            except self._PublishException as e:
+                error = e.reason
+
+        if not error and not await self._post_build_checklist(tests, build_id):
+            error = "Post build checklist failed"
+
+        recorder.emit_end(error, id=build_id)
+
+        return error is None
+
+    @dataclass
+    class _PublishException(Exception):
+        """Exception that is raised if we fail to publish packages."""
+
+        reason: str
+
+    async def _publish_packages(self, build_id: event.Id) -> None:
+        """Publish packages that were just built.
+
+        Args:
+            build_id (event.Id): The event of the parent build to nest events under.
+
+        Raises:
+            self._PublishException: If publishing fails for any reason.
+        """
+        recorder = self._recorder
+        exec_env = self._exec_env
+        assert exec_env is not None
+
+        amber_directory = os.path.join(exec_env.out_dir, "amber-files")
+        delivery_blob_type = self._read_delivery_blob_type()
+
+        # This manifest file is updated only following the build
+        # process, which poses a problem when we want to use `fx add-test`
+        # and then expect the test to work without a full
+        # rebuild. To solve this problem, we actually synthesize a
+        # new package manifest consisting of the original
+        # all_package_manifests.list plus any new packages listed in
+        # the generated file "package_manifests_from_metadata.list.package_metadata".
+        # The new combined file will contain tests added using `fx add-test`.
+        all_package_manifests = os.path.join(
+            exec_env.out_dir,
+            *self._ALL_PACKAGE_MANIFESTS_PATH,
+        )
+
+        # Load the original package manifest list.
+        package_manifest: dict[str, typing.Any]
+        with open(all_package_manifests) as f:
+            package_manifest = json.load(f)
+
+        manifest_list: list[str]
+        try:
+            manifest_list = package_manifest["content"]["manifests"]
+        except KeyError:
+            raise self._PublishException(
+                "BUG: Failed to load manifest list from all_package_manifests.list\nPlease file a bug."
+            )
+
+        # Load the generated list file, which just has a package manifest path per line.
+        manifests_metadata_path = os.path.abspath(
+            os.path.join(
+                exec_env.out_dir,
+                *self._PACKAGE_MANIFESTS_FROM_METADATA_PATH,
+            )
+        )
+
+        # Read all lines from the generated file, merging them back into the package manifest.
+        if os.path.isfile(manifests_metadata_path):
+            lines: list[str]
+            with open(manifests_metadata_path) as f:
+                lines = [
+                    stripped_line
+                    for l in f.readlines()
+                    if (stripped_line := l.strip()) != ""
+                ]
+            manifest_list = list(set(manifest_list).union(lines))
+
+        package_manifest["content"]["manifests"] = manifest_list
+
+        with tempfile.TemporaryDirectory() as td:
+            # Generate a merged temporary manifest.
+            temp_manifest_path = os.path.join(td, "temp_manifest.list")
+            with open(temp_manifest_path, "w") as f:
+                json.dump(package_manifest, f)
+
+            # Publish the packages listed in the merged manifest.
             publish_args = (
-                [
-                    "fx",
+                exec_env.fx_cmd_line(
                     "ffx",
                     "repository",
                     "publish",
@@ -967,7 +1072,7 @@ class AsyncMain:
                     ),
                     "--ignore-missing-packages",
                     "--time-versioning",
-                ]
+                )
                 + (
                     ["--delivery-blob-type", str(delivery_blob_type)]
                     if delivery_blob_type is not None
@@ -975,11 +1080,7 @@ class AsyncMain:
                 )
                 + [
                     "--package-list",
-                    os.path.abspath(
-                        os.path.join(
-                            exec_env.out_dir, "all_package_manifests.list"
-                        )
-                    ),
+                    temp_manifest_path,
                     os.path.abspath(amber_directory),
                 ]
             )
@@ -992,18 +1093,11 @@ class AsyncMain:
                 env={"CWD": exec_env.out_dir},
             )
             if not output:
-                error = "Failure publishing packages."
+                raise self._PublishException("Failure publishing packages.")
             elif output.return_code != 0:
-                error = (
+                raise self._PublishException(
                     f"Publish returned non-zero exit code {output.return_code}"
                 )
-
-        if not error and not await self._post_build_checklist(tests, build_id):
-            error = "Post build checklist failed"
-
-        recorder.emit_end(error, id=build_id)
-
-        return error is None
 
     def _read_delivery_blob_type(
         self,
@@ -1108,7 +1202,7 @@ class AsyncMain:
         assert exec_env is not None
 
         if tests.has_device_test() and await has_device_connected(
-            recorder, parent=build_id, out_dir=exec_env.out_dir
+            exec_env, recorder, parent=build_id
         ):
             try:
                 if self._has_tests_in_base(tests):
@@ -1116,7 +1210,9 @@ class AsyncMain:
                         "Some selected test(s) are in the base package set. Running an OTA."
                     )
                     output = await execution.run_command(
-                        "fx", "ota", recorder=recorder, print_verbatim=True
+                        *exec_env.fx_cmd_line("ota"),
+                        recorder=recorder,
+                        print_verbatim=True,
                     )
                     if not output or output.return_code != 0:
                         recorder.emit_warning_message("OTA failed")
@@ -1145,7 +1241,8 @@ class AsyncMain:
 
         max_parallel = flags.parallel
         if tests.has_device_test() and not await has_device_connected(
-            recorder, out_dir=exec_env.out_dir
+            exec_env,
+            recorder,
         ):
             recorder.emit_warning_message(
                 "\nCould not find a running package server."
@@ -1465,9 +1562,9 @@ class AsyncMain:
 
 @functools.lru_cache
 async def has_device_connected(
+    exec_env: environment.ExecutionEnvironment,
     recorder: event.EventRecorder,
     parent: event.Id | None = None,
-    out_dir: str | None = None,
 ) -> bool:
     """Check if a device is connected for running target tests.
 
@@ -1478,11 +1575,10 @@ async def has_device_connected(
     Returns:
         bool: True only if a device is available to run target tests.
     """
-    extra_args = ["--dir", out_dir] if out_dir else []
     output = await execution.run_command(
-        "fx",
-        *extra_args,
-        "is-package-server-running",
+        *exec_env.fx_cmd_line(
+            "is-package-server-running",
+        ),
         recorder=recorder,
         parent=parent,
     )
@@ -1490,9 +1586,9 @@ async def has_device_connected(
 
 
 async def run_build_with_suspended_output(
+    exec_env: environment.ExecutionEnvironment,
     build_command_line: list[str],
     show_output: bool = True,
-    out_dir: str | None = None,
 ) -> int:
     # Allow display to update.
     await asyncio.sleep(0.1)
@@ -1504,10 +1600,8 @@ async def run_build_with_suspended_output(
     stdout = None if show_output else subprocess.DEVNULL
     stderr = None if show_output else subprocess.DEVNULL
 
-    out_args = ["--dir", out_dir] if out_dir else []
-
     return_code = subprocess.call(
-        ["fx"] + out_args + ["build"] + build_command_line,
+        exec_env.fx_cmd_line("build", *build_command_line),
         stdout=stdout,
         stderr=stderr,
     )

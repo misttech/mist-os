@@ -661,6 +661,8 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
             ip_config: _,
         } = *config;
 
+        let temp_secret_key =
+            core_ctx.unlocked_access::<crate::lock_ordering::SlaacTempSecretKey>();
         let mut core_ctx_and_resource =
             crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device_id);
         let (mut state, mut locked) = core_ctx_and_resource
@@ -677,6 +679,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 dad_transmits,
                 retrans_timer,
                 interface_identifier,
+                temp_secret_key: *temp_secret_key,
                 _marker: PhantomData,
             },
             &mut state,

@@ -8,17 +8,23 @@ interface in a Fuchsia user-space program called Starnix. Starnix then serves as
 a compatibility layer that translates requests (syscalls) from Linux programs to the
 appropriate Fuchsia subsystems.
 
-For more information on the design details of Starnix, see
-[RFC-0082: Running unmodified Linux programs on Fuchsia][starnix-rfc].
-
-For instructions on running Linux programs, tests, and interactive consoles,
-see Starnix's [`README`][starnix-readme] file.
-
 ## Table of contents
 
-- [Making Linux syscalls in Fuchsia][making-linux-syscalls]
-- [Starnix container][starnix-container]
-- [Architecture of the Starnix VFS][starnix-vfs]
+- [**Making Linux syscalls in Fuchsia**][making-linux-syscalls]: Describes how Starnix
+  handles Linux system calls in Fuchsia.
+- [**Starnix container**][starnix-container]: Explains how Starnix containers
+  enable Linux binaries to run in different Linux environments.
+- [**Architecture of the Starnix VFS**][starnix-vfs]: Explains the key concepts and
+  structure of Starnix's virtual file system (VFS).
+
+## Additional resources
+
+- For detailed information on Starnix's design, see
+  [RFC-0082: Running unmodified Linux programs on Fuchsia][starnix-rfc].
+- For instructions on running Linux programs, tests, and interactive consoles,
+  see Starnix's [`README.md`][starnix-readme] file.
+- For standard coding patterns and best practices, see the
+  [Starnix development][starnix-development] section.
 
 <!-- Reference links -->
 
@@ -28,3 +34,5 @@ see Starnix's [`README`][starnix-readme] file.
 [making-linux-syscalls]: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md
 [starnix-container]: /docs/concepts/starnix/starnix-container.md
 [starnix-vfs]: /docs/concepts/starnix/architecture-of-the-starnix-vfs.md
+[starnix-development]: /docs/development/starnix/common-coding-patterns-in-starnix.md
+

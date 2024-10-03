@@ -20,17 +20,16 @@ use crate::enums::{
     WriteRtcOutcome,
 };
 use fidl_fuchsia_time_external::Status;
-use fuchsia_runtime::UtcTime;
-use fuchsia_zircon as zx;
+use fuchsia_runtime::UtcInstant;
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
 pub const ANY_DURATION: zx::Duration = zx::Duration::from_nanos(i64::MIN);
 
-/// A special time that will match any value during an `eq_with_any` operation.
+/// A special instant that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
-pub const fn any_time<T: zx::Timeline>() -> zx::Time<T> {
-    zx::Time::from_nanos(i64::MIN)
+pub const fn any_time<T: zx::Timeline>() -> zx::Instant<T> {
+    zx::Instant::from_nanos(i64::MIN)
 }
 
 /// An event that is potentially worth recording in one or more diagnostics systems.
@@ -39,7 +38,7 @@ pub enum Event {
     /// Timekeeper has completed initialization.
     Initialized { clock_state: InitialClockState },
     /// An attempt was made to initialize and read from the real time clock.
-    InitializeRtc { outcome: InitializeRtcOutcome, time: Option<UtcTime> },
+    InitializeRtc { outcome: InitializeRtcOutcome, time: Option<UtcInstant> },
     /// A time source failed, relaunch will be attempted.
     TimeSourceFailed { role: Role, error: TimeSourceError },
     /// A time source changed its state.
@@ -51,9 +50,9 @@ pub enum Event {
         /// The `Track` of the estimate.
         track: Track,
         /// The monotonic time at which the state applies.
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         /// The estimated UTC corresponding to monotonic.
-        utc: UtcTime,
+        utc: UtcInstant,
         /// Square root of element [0,0] of the covariance matrix.
         sqrt_covariance: zx::Duration,
     },
@@ -64,7 +63,7 @@ pub enum Event {
         /// The `Track` of the estimate.
         track: Track,
         /// The monotonic time at which the state applies.
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         /// The estimated frequency as a PPM deviation from nominal. A positive number means UTC is
         /// running faster than monotonic, i.e. the oscillator is slow.
         rate_adjust_ppm: i32,

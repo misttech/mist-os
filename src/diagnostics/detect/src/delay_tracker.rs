@@ -9,22 +9,28 @@ use {
     fuchsia_triage::SnapshotTrigger,
     injectable_time::TimeSource,
     std::collections::HashMap,
+    std::sync::Arc,
     tracing::warn,
 };
 
-pub struct DelayTracker<'a> {
+pub struct DelayTracker {
     last_sent: HashMap<String, i64>,
-    time_source: &'a dyn TimeSource,
+    time_source: Arc<dyn TimeSource + Send + Sync>,
     program_mode: Mode,
 }
 
-impl<'a> DelayTracker<'a> {
-    pub(crate) fn new(time_source: &'a dyn TimeSource, program_mode: &Mode) -> DelayTracker<'a> {
-        DelayTracker { last_sent: HashMap::new(), time_source, program_mode: *program_mode }
+impl DelayTracker {
+    pub(crate) fn new(
+        time_source: Arc<dyn TimeSource + Send + Sync>,
+        program_mode: Mode,
+    ) -> DelayTracker {
+        DelayTracker { last_sent: HashMap::new(), time_source, program_mode }
     }
 
     fn appropriate_report_interval(&self, desired_interval: i64) -> i64 {
-        if self.program_mode == Mode::Test || desired_interval >= MINIMUM_SIGNATURE_INTERVAL_NANOS {
+        if self.program_mode == Mode::IntegrationTest
+            || desired_interval >= MINIMUM_SIGNATURE_INTERVAL_NANOS
+        {
             desired_interval
         } else {
             MINIMUM_SIGNATURE_INTERVAL_NANOS
@@ -62,8 +68,8 @@ mod test {
 
     #[fuchsia::test]
     fn verify_test_mode() {
-        let time = FakeTime::new();
-        let mut tracker = DelayTracker::new(&time, &Mode::Test);
+        let time = Arc::new(FakeTime::new());
+        let mut tracker = DelayTracker::new(time.clone(), Mode::IntegrationTest);
         time.set_ticks(1);
         let trigger_slow = SnapshotTrigger { signature: "slow".to_string(), interval: 10 };
         let trigger_fast = SnapshotTrigger { signature: "fast".to_string(), interval: 1 };
@@ -85,9 +91,9 @@ mod test {
     #[fuchsia::test]
     fn verify_appropriate_report_interval() {
         assert!(MINIMUM_SIGNATURE_INTERVAL_NANOS > 1);
-        let time = FakeTime::new();
-        let test_tracker = DelayTracker::new(&time, &Mode::Test);
-        let production_tracker = DelayTracker::new(&time, &Mode::Production);
+        let time = Arc::new(FakeTime::new());
+        let test_tracker = DelayTracker::new(time.clone(), Mode::IntegrationTest);
+        let production_tracker = DelayTracker::new(time, Mode::Production);
 
         assert_eq!(test_tracker.appropriate_report_interval(1), 1);
         assert_eq!(

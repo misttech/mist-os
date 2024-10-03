@@ -10,7 +10,7 @@ use fidl_fuchsia_pkg::{self as fpkg};
 use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 use futures::TryFutureExt;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn cached_packages_are_retained() {

@@ -37,8 +37,8 @@ zx::result<> PowerIntegrationBoard::Start() {
 
   {
     // Load our power config.
-    zx::result open_result = incoming()->Open<fuchsia_io::File>(
-        "/pkg/data/power_config.fidl", fuchsia_io::wire::OpenFlags::kRightReadable);
+    zx::result open_result = incoming()->Open<fuchsia_io::File>("/pkg/data/power_config.fidl",
+                                                                fuchsia_io::Flags::kPermRead);
     if (!open_result.is_ok() || !open_result->is_valid()) {
       return zx::error(ZX_ERR_INTERNAL);
     }

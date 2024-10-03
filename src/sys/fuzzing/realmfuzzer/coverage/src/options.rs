@@ -89,7 +89,7 @@ impl AsyncOptions {
 mod tests {
     use super::AsyncOptions;
     use futures::join;
-    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn test_async_options_set_all() {

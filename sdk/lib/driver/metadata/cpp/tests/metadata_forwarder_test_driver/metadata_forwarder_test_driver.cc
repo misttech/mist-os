@@ -46,8 +46,11 @@ zx_status_t MetadataForwarderTestDriver::InitMetadataRetrieverNode() {
                         bind_fuchsia_driver_metadata_test::PURPOSE_RETRIEVE_METADATA),
       fdf::MakeProperty(bind_fuchsia_driver_metadata_test::USES_METADATA_FIDL_SERVICE, true)};
 
-  zx::result result = AddChild(kMetadataRetrieverNodeName, kNodeProperties,
-                               std::vector{metadata_server_.MakeOffer()});
+  std::vector<fuchsia_driver_framework::Offer> offers;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  offers.emplace_back(metadata_server_.MakeOffer());
+#endif
+  zx::result result = AddChild(kMetadataRetrieverNodeName, kNodeProperties, std::move(offers));
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
     return result.status_value();
@@ -89,6 +92,7 @@ void MetadataForwarderTestDriver::Serve(
 }
 
 void MetadataForwarderTestDriver::ForwardMetadata(ForwardMetadataCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx_status_t status = metadata_server_.ForwardMetadata(incoming());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to forward metadata.", KV("status", zx_status_get_string(status)));
@@ -97,6 +101,10 @@ void MetadataForwarderTestDriver::ForwardMetadata(ForwardMetadataCompleter::Sync
   }
 
   completer.Reply(fit::ok());
+#else
+  FDF_SLOG(ERROR, "Forwarding metadata not supported at current Fuchsia API level.");
+  completer.Reply(fit::error(status));
+#endif
 }
 
 }  // namespace fdf_metadata::test

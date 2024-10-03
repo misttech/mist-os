@@ -14,7 +14,7 @@ use fidl_fuchsia_logger::{
     LogMarker,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::Duration;
+use zx::Duration;
 
 use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};

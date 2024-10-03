@@ -159,7 +159,7 @@ impl EventDispatcherScope {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use hooks::CapabilityReceiver;
     use moniker::Moniker;
@@ -205,7 +205,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::MonotonicTime::get(),
+            timestamp: zx::MonotonicInstant::get(),
         };
         sender.send(Message { channel: capability_server_end }).unwrap();
         dispatcher.dispatch(&event).await

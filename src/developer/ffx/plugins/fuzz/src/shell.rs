@@ -845,8 +845,8 @@ mod tests {
     use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
     use fuchsia_fuzzctl::{digest_path, Duration};
     use fuchsia_fuzzctl_test::{verify_saved, Test, TEST_URL};
-    use fuchsia_zircon_status as zx;
     use std::path::PathBuf;
+    use zx_status as zx;
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {

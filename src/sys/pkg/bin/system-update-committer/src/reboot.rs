@@ -7,8 +7,8 @@ use fidl_fuchsia_hardware_power_statecontrol::{
     AdminProxy as PowerStateControlProxy, RebootReason,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::Status;
 use tracing::error;
+use zx::Status;
 
 /// Waits for a timer to fire and then reboots the system, logging errors instead of failing.
 pub(super) async fn wait_and_reboot(timer: fasync::Timer, proxy: &PowerStateControlProxy) {

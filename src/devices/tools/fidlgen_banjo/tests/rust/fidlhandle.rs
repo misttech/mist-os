@@ -8,7 +8,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(unused_imports, non_camel_case_types)]
 
-use fuchsia_zircon_types as zircon_types;
+use zx_types as zircon_types;
 
 
 #[repr(C)]

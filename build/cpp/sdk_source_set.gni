@@ -83,7 +83,7 @@ template("sdk_source_set") {
   valid_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333125197): Disable once @internal_sdk
+    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
                  # is removed.
 
     # "cts" is only for ABI compatibility and thus not applicable.
@@ -195,14 +195,20 @@ template("sdk_source_set") {
       deps += invoker.non_sdk_local_deps
     }
 
-    # Ensure that stable 'sdk_source_set()' targets are included in the SDK
-    # source_sets allowlist. The allowlist target's `visibility`
-    # list ensures that the target using this template is in the allowlist.
+    # Ensure that 'sdk_source_set()' targets are included in the appropriate
+    # allowlist. The allowlist target's `visibility` list ensures that the
+    # target using this template is in the allowlist.
     if (is_stable) {
-      deps += [ "//build/sdk:sdk_source_sets_allowlist" ]
+      assert(
+          invoker.category == "partner",
+          "Create a separate allowlist when adding support for other categories.")
+      deps += [ "//build/sdk:partner_idk_source_sets_allowlist" ]
       not_needed([ "is_exempt_from_unstable_allowlist" ])
     } else if (!is_exempt_from_unstable_allowlist) {
-      deps += [ "//build/sdk:sdk_unstable_source_sets_allowlist" ]
+      assert(
+          invoker.category == "partner",
+          "Create a separate allowlist when adding support for other categories.")
+      deps += [ "//build/sdk:partner_idk_unstable_source_sets_allowlist" ]
     }
 
     # TODO(https://fxbug.dev/42079584): Fix failures and remove exception.

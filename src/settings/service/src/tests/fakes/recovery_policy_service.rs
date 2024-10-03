@@ -9,7 +9,7 @@ use fidl::prelude::*;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
 use std::sync::Arc;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[derive(Clone)]
 pub(crate) struct RecoveryPolicy {

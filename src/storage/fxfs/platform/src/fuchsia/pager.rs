@@ -9,8 +9,6 @@ use crate::fuchsia::profile::Recorder;
 use anyhow::Error;
 use bitflags::bitflags;
 use fuchsia_async as fasync;
-use fuchsia_zircon::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
-use fuchsia_zircon::{self as zx, AsHandleRef, PacketContents, PagerPacket, SignalPacket};
 use fxfs::log::*;
 use fxfs::range::RangeExt;
 use fxfs::round::{round_down, round_up};
@@ -22,6 +20,8 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use storage_device::buffer;
 use vfs::execution_scope::ExecutionScope;
+use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
+use zx::{self as zx, AsHandleRef, PacketContents, PagerPacket, SignalPacket};
 
 fn watch_for_zero_children(file: &impl PagerBacked) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
@@ -849,11 +849,7 @@ mod tests {
                 pager_requests: Default::default(),
             }
         }
-        fn new_with_size_and_type(
-            pager: Arc<Pager>,
-            size: u64,
-            vmo_type: fuchsia_zircon::VmoOptions,
-        ) -> Self {
+        fn new_with_size_and_type(pager: Arc<Pager>, size: u64, vmo_type: zx::VmoOptions) -> Self {
             let (vmo, pager_packet_receiver_registration) =
                 pager.create_vmo(size, vmo_type | zx::VmoOptions::TRAP_DIRTY).unwrap();
             Self {

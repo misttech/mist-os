@@ -17,10 +17,7 @@ use socket_parsing::{NewlineChunker, NewlineChunkerError};
 use std::sync::Arc;
 use tracing::{info, warn, Subscriber};
 use zx::HandleBased;
-use {
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fproc, fuchsia_async as fasync, zx};
 
 const STDOUT_FD: i32 = 1;
 const STDERR_FD: i32 = 2;
@@ -177,7 +174,7 @@ mod tests {
     use rand::distributions::{Alphanumeric, DistString as _};
     use rand::thread_rng;
     use std::sync::Mutex;
-    use {fidl_fuchsia_component_runner as fcrunner, fuchsia_zircon as zx};
+    use {fidl_fuchsia_component_runner as fcrunner, zx};
 
     #[async_trait]
     impl LogWriter for mpsc::Sender<String> {

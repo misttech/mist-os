@@ -12,7 +12,7 @@ use futures::stream::SelectAll;
 use futures::{Future, FutureExt as _, Stream, StreamExt};
 use log::{debug, error, info, warn};
 use netstack3_core::sync::DynDebugReferences;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// The interval at which [`ResourceRemovalWorker`] generates reports for each
 /// pending resource.
@@ -217,7 +217,7 @@ struct LoggingHandler {}
 
 impl ActionHandler for LoggingHandler {
     fn report_item(&self, state: State, info: &ResourceItemInfo) {
-        // Standard library duration prints prettier than fuchsia_zircon. Unwrap
+        // Standard library duration prints prettier than zx. Unwrap
         // shouldn't be hit because all the durations reported can't be
         // negative.
         let std_duration =

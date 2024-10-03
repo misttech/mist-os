@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use derivative::Derivative;
-use fuchsia_zircon::sys::zx_handle_t;
 use std::ffi::CStr;
 use std::mem::{self, MaybeUninit};
 use std::os::raw::c_char;
 use std::ptr;
 use vk_sys as vk;
+use zx::sys::zx_handle_t;
 
 macro_rules! ptrs {(
     $struct_name:ident,

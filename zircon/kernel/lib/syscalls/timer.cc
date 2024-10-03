@@ -22,7 +22,7 @@
 
 // zx_status_t zx_timer_create
 zx_status_t sys_timer_create(uint32_t options, zx_clock_t clock_id, zx_handle_t* out) {
-  if (clock_id != ZX_CLOCK_MONOTONIC)
+  if (clock_id != ZX_CLOCK_MONOTONIC && clock_id != ZX_CLOCK_BOOT)
     return ZX_ERR_INVALID_ARGS;
 
   auto up = ProcessDispatcher::GetCurrent();
@@ -33,7 +33,7 @@ zx_status_t sys_timer_create(uint32_t options, zx_clock_t clock_id, zx_handle_t*
   KernelHandle<TimerDispatcher> handle;
   zx_rights_t rights;
 
-  result = TimerDispatcher::Create(options, &handle, &rights);
+  result = TimerDispatcher::Create(options, clock_id, &handle, &rights);
 
   if (result == ZX_OK)
     result = up->MakeAndAddHandle(ktl::move(handle), rights, out);

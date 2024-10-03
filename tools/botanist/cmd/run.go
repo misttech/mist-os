@@ -158,6 +158,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.testrunnerOptions.SnapshotFile, "snapshot-output", "", "The output filename for the snapshot. This will be created in the output directory.")
 	f.BoolVar(&r.testrunnerOptions.PrefetchPackages, "prefetch-packages", false, "Prefetch any test packages in the background.")
 	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
+	f.StringVar(&r.testrunnerOptions.LLVMProfdataPath, "llvm-profdata", "", "Optional path to a llvm-profdata binary to use for merging profiles on the host in between tests.")
 }
 
 func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func(), error) {

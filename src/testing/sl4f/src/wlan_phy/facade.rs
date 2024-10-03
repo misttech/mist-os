@@ -5,7 +5,6 @@
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_wlan_device_service::{DeviceMonitorMarker, DeviceMonitorProxy};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 
 #[derive(Debug)]
 pub struct WlanPhyFacade {

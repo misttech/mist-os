@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn set_attr_file_with_sufficient_rights() {
@@ -346,6 +346,9 @@ async fn update_attributes_file_with_sufficient_rights() {
         gid: supported_attrs.contains(fio::NodeAttributesQuery::GID).then_some(555),
         rdev: supported_attrs.contains(fio::NodeAttributesQuery::RDEV).then_some(666),
         access_time: supported_attrs.contains(fio::NodeAttributesQuery::ACCESS_TIME).then_some(777),
+        selinux_context: supported_attrs
+            .contains(fio::NodeAttributesQuery::SELINUX_CONTEXT)
+            .then_some(fio::SelinuxContext::Data(vec![7u8; 10])),
         ..Default::default()
     };
 
@@ -501,6 +504,9 @@ async fn update_attributes_directory_with_sufficient_rights() {
         rdev: supported_attrs.contains(fio::NodeAttributesQuery::RDEV).then_some(666),
         access_time: supported_attrs.contains(fio::NodeAttributesQuery::ACCESS_TIME).then_some(777),
         casefold: supported_attrs.contains(fio::NodeAttributesQuery::CASEFOLD).then_some(false),
+        selinux_context: supported_attrs
+            .contains(fio::NodeAttributesQuery::SELINUX_CONTEXT)
+            .then_some(fio::SelinuxContext::Data(vec![7u8; 10])),
         ..Default::default()
     };
 

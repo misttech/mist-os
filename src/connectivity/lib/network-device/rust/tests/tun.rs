@@ -4,45 +4,50 @@
 
 //! Fuchsia netdevice client tun test
 use assert_matches::assert_matches;
-use fidl::endpoints;
+use fidl::{endpoints, AsHandleRef};
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::{Future, FutureExt as _};
-use futures::stream::TryStreamExt as _;
-use netdevice_client::{Client, Port, Session};
+use futures::TryStreamExt as _;
+use netdevice_client::{Client, DerivableConfig, Port, Session};
 use std::convert::TryInto as _;
 use std::io::{Read as _, Write as _};
 use std::pin::pin;
 use std::task::Poll;
 use {
     fidl_fuchsia_hardware_network as netdev, fidl_fuchsia_net_tun as tun, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 const DEFAULT_PORT_ID: u8 = 2;
 const DEFAULT_MTU: u32 = 1500;
 const DATA_BYTE: u8 = 42;
 const DATA_LEN: usize = 4;
-const SESSION_BUFFER_LEN: usize = 2048;
 
 #[fasync::run_singlethreaded(test)]
 async fn test_rx() {
     let (tun, _tun_port, port) = create_tun_device_and_port().await;
     let client = create_netdev_client(&tun);
-    let () = with_netdev_session(client, port, "test_rx", |session, _client| async move {
-        let frame = tun::Frame {
-            frame_type: Some(netdev::FrameType::Ethernet),
-            data: Some(vec![DATA_BYTE; DATA_LEN]),
-            port: Some(DEFAULT_PORT_ID),
-            ..Default::default()
-        };
-        let () = tun.write_frame(&frame).await.unwrap().expect("failed to write frame");
-        let buff = session.recv().await.expect("failed to recv buffer");
-        let mut bytes = [0u8; DATA_LEN];
-        buff.read_at(0, &mut bytes[..]).expect("failed to read from the buffer");
-        for i in bytes.iter() {
-            assert_eq!(*i, DATA_BYTE);
-        }
-    })
+    let () = with_netdev_session(
+        client,
+        DerivableConfig::default(),
+        port,
+        "test_rx",
+        |session, _client| async move {
+            let frame = tun::Frame {
+                frame_type: Some(netdev::FrameType::Ethernet),
+                data: Some(vec![DATA_BYTE; DATA_LEN]),
+                port: Some(DEFAULT_PORT_ID),
+                ..Default::default()
+            };
+            let () = tun.write_frame(&frame).await.unwrap().expect("failed to write frame");
+            let buff = session.recv().await.expect("failed to recv buffer");
+            let mut bytes = [0u8; DATA_LEN];
+            buff.read_at(0, &mut bytes[..]).expect("failed to read from the buffer");
+            for i in bytes.iter() {
+                assert_eq!(*i, DATA_BYTE);
+            }
+        },
+    )
     .await;
 }
 
@@ -50,26 +55,32 @@ async fn test_rx() {
 async fn test_tx() {
     let (tun, _tun_port, port) = create_tun_device_and_port().await;
     let client = create_netdev_client(&tun);
-    let () = with_netdev_session(client, port, "test_tx", |session, _client| async move {
-        let mut buffer =
-            session.alloc_tx_buffer(DATA_LEN).await.expect("failed to alloc tx buffer");
-        assert_eq!(
-            buffer.write(&[DATA_BYTE; DATA_LEN][..]).expect("failed to write into the buffer"),
-            DATA_LEN
-        );
-        buffer.set_port(port);
-        buffer.set_frame_type(netdev::FrameType::Ethernet);
-        session.send(buffer).expect("failed to send the buffer");
-        let frame = tun
-            .read_frame()
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)
-            .expect("failed to read frame from the tun device");
-        assert_eq!(frame.data, Some(vec![DATA_BYTE; DATA_LEN]));
-        assert_eq!(frame.frame_type, Some(netdev::FrameType::Ethernet));
-        assert_eq!(frame.port, Some(DEFAULT_PORT_ID));
-    })
+    let () = with_netdev_session(
+        client,
+        DerivableConfig::default(),
+        port,
+        "test_tx",
+        |session, _client| async move {
+            let mut buffer =
+                session.alloc_tx_buffer(DATA_LEN).await.expect("failed to alloc tx buffer");
+            assert_eq!(
+                buffer.write(&[DATA_BYTE; DATA_LEN][..]).expect("failed to write into the buffer"),
+                DATA_LEN
+            );
+            buffer.set_port(port);
+            buffer.set_frame_type(netdev::FrameType::Ethernet);
+            session.send(buffer).expect("failed to send the buffer");
+            let frame = tun
+                .read_frame()
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .expect("failed to read frame from the tun device");
+            assert_eq!(frame.data, Some(vec![DATA_BYTE; DATA_LEN]));
+            assert_eq!(frame.frame_type, Some(netdev::FrameType::Ethernet));
+            assert_eq!(frame.port, Some(DEFAULT_PORT_ID));
+        },
+    )
     .await;
 }
 
@@ -101,36 +112,42 @@ async fn test_echo_tun() {
     const FRAME_TOTAL_COUNT: u32 = 512;
     let (tun, _tun_port, port) = create_tun_device_and_port().await;
     let client = create_netdev_client(&tun);
-    with_netdev_session(client, port, "test_echo_tun", |session, _client| async {
-        let echo_fut = echo(session, port, FRAME_TOTAL_COUNT);
-        let main_fut = async move {
-            for i in 0..FRAME_TOTAL_COUNT {
-                let frame = tun::Frame {
-                    frame_type: Some(netdev::FrameType::Ethernet),
-                    data: Some(Vec::from(i.to_le_bytes())),
-                    port: Some(DEFAULT_PORT_ID),
-                    ..Default::default()
-                };
-                let () = tun
-                    .write_frame(&frame)
-                    .await
-                    .unwrap()
-                    .map_err(zx::Status::from_raw)
-                    .expect("cannot write frame");
-                let frame = tun
-                    .read_frame()
-                    .await
-                    .unwrap()
-                    .map_err(zx::Status::from_raw)
-                    .expect("failed to read frame");
-                let data = frame.data.unwrap();
-                assert_eq!(data.len(), DATA_LEN);
-                let bytes: [u8; DATA_LEN] = data.try_into().unwrap();
-                assert_eq!(u32::from_le_bytes(bytes), i);
-            }
-        };
-        let ((), ()) = futures::join!(echo_fut, main_fut);
-    })
+    with_netdev_session(
+        client,
+        DerivableConfig::default(),
+        port,
+        "test_echo_tun",
+        |session, _client| async {
+            let echo_fut = echo(session, port, FRAME_TOTAL_COUNT);
+            let main_fut = async move {
+                for i in 0..FRAME_TOTAL_COUNT {
+                    let frame = tun::Frame {
+                        frame_type: Some(netdev::FrameType::Ethernet),
+                        data: Some(Vec::from(i.to_le_bytes())),
+                        port: Some(DEFAULT_PORT_ID),
+                        ..Default::default()
+                    };
+                    let () = tun
+                        .write_frame(&frame)
+                        .await
+                        .unwrap()
+                        .map_err(zx::Status::from_raw)
+                        .expect("cannot write frame");
+                    let frame = tun
+                        .read_frame()
+                        .await
+                        .unwrap()
+                        .map_err(zx::Status::from_raw)
+                        .expect("failed to read frame");
+                    let data = frame.data.unwrap();
+                    assert_eq!(data.len(), DATA_LEN);
+                    let bytes: [u8; DATA_LEN] = data.try_into().unwrap();
+                    assert_eq!(u32::from_le_bytes(bytes), i);
+                }
+            };
+            let ((), ()) = futures::join!(echo_fut, main_fut);
+        },
+    )
     .await;
 }
 
@@ -139,10 +156,15 @@ async fn test_echo_pair() {
     const FRAME_TOTAL_COUNT: u32 = 512;
     let pair = create_tun_device_pair();
     let (client1, port1, client2, port2) = create_netdev_client_pair(&pair).await;
-    let () =
-        with_netdev_session(client1, port1, "test_echo_pair_1", |session1, client1| async move {
+    let () = with_netdev_session(
+        client1,
+        DerivableConfig::default(),
+        port1,
+        "test_echo_pair_1",
+        |session1, client1| async move {
             let () = with_netdev_session(
                 client2,
+                DerivableConfig::default(),
                 port2,
                 "test_echo_pair_2",
                 |session2, client2| async move {
@@ -192,8 +214,9 @@ async fn test_echo_pair() {
                 },
             )
             .await;
-        })
-        .await;
+        },
+    )
+    .await;
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -254,7 +277,7 @@ fn tx_wait_idle() {
 
     let session = executor.run_singlethreaded(async {
         let (session, task) = client
-            .primary_session("tx_wait_idle", SESSION_BUFFER_LEN)
+            .new_session_with_derivable_config("tx_wait_idle", DerivableConfig::default())
             .await
             .expect("failed to create session");
         session
@@ -320,6 +343,54 @@ fn tx_wait_idle() {
             .map_err(zx::Status::from_raw)
             .expect("failed to read frame from the tun device");
     }));
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn watch_rx_leases() {
+    let (tun, _tun_port, port) = create_tun_device_and_port().await;
+    let client = create_netdev_client(&tun);
+
+    with_netdev_session(
+        client,
+        DerivableConfig { watch_rx_leases: true, ..Default::default() },
+        port,
+        "watch_rx_leases",
+        |session, _client| async move {
+            let mut leases_stream = pin!(session.watch_rx_leases());
+            for frame_idx in 1..=2 {
+                let (lease, lease_send) = zx::Channel::create();
+                tun.delegate_rx_lease(netdev::DelegatedRxLease {
+                    hold_until_frame: Some(frame_idx),
+                    handle: Some(netdev::DelegatedRxLeaseHandle::Channel(lease_send)),
+                    __source_breaking: fidl::marker::SourceBreaking,
+                })
+                .expect("delegate lease");
+                let frame = tun::Frame {
+                    frame_type: Some(netdev::FrameType::Ethernet),
+                    data: Some(vec![1, 2, 3]),
+                    port: Some(DEFAULT_PORT_ID),
+                    ..Default::default()
+                };
+                tun.write_frame(&frame).await.expect("writing frame").expect("write frame error");
+                let frame = session.recv().await.expect("receive frame");
+                assert_matches!(leases_stream.try_next().now_or_never(), None);
+                drop(frame);
+                let yielded_lease = leases_stream
+                    .try_next()
+                    .await
+                    .expect("lease error")
+                    .expect("lease stream ended unexpectedly");
+                let yielded_lease = assert_matches!(yielded_lease.inner(),
+                 netdev::DelegatedRxLeaseHandle::Channel(c) => c);
+                // Prove we have the same lease.
+                assert_eq!(
+                    yielded_lease.get_koid().unwrap(),
+                    lease.basic_info().unwrap().related_koid
+                );
+            }
+        },
+    )
+    .await;
 }
 
 fn default_base_port_config() -> tun::BasePortConfig {
@@ -424,13 +495,20 @@ async fn create_netdev_client_pair(pair: &tun::DevicePairProxy) -> (Client, Port
     (Client::new(device_left), port_left, Client::new(device_right), port_right)
 }
 
-async fn with_netdev_session<F, Fut>(client: Client, port: Port, name: &str, f: F)
-where
+async fn with_netdev_session<F, Fut>(
+    client: Client,
+    config: DerivableConfig,
+    port: Port,
+    name: &str,
+    f: F,
+) where
     F: FnOnce(Session, Client) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let (session, task) =
-        client.primary_session(name, SESSION_BUFFER_LEN).await.expect("failed to create session");
+    let (session, task) = client
+        .new_session_with_derivable_config(name, config)
+        .await
+        .expect("failed to create session");
     let () = session
         .attach(port, &[netdev::FrameType::Ethernet])
         .await

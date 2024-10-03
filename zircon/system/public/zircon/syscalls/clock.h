@@ -26,8 +26,6 @@
 #define ZX_CLOCK_OPT_MONOTONIC  ((uint64_t)1u << 0)
 #define ZX_CLOCK_OPT_CONTINUOUS ((uint64_t)1u << 1)
 #define ZX_CLOCK_OPT_AUTO_START ((uint64_t)1u << 2)
-
-// Warning: this option is still in the "next" stage, and is subject to change at any time.
 #define ZX_CLOCK_OPT_BOOT       ((uint64_t)1u << 3)
 
 #define ZX_CLOCK_OPTS_ALL ( \
@@ -91,8 +89,8 @@ typedef struct zx_clock_transformation {
 typedef struct zx_clock_details_v1 {
   uint64_t options;
   zx_time_t backstop_time;
-  zx_clock_transformation_t ticks_to_synthetic;
-  zx_clock_transformation_t mono_to_synthetic;
+  zx_clock_transformation_t reference_ticks_to_synthetic;
+  zx_clock_transformation_t reference_to_synthetic;
   uint64_t error_bound;
   zx_ticks_t query_ticks;
   zx_ticks_t last_value_update_ticks;

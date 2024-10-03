@@ -43,7 +43,7 @@ use vfs::directory::immutable::simple::{
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Timeout for opening a service capability when aggregating.
 const OPEN_SERVICE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);

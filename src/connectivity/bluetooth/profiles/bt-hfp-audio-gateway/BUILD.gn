@@ -22,6 +22,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/async-helpers",
     "//src/connectivity/bluetooth/lib/battery-client",
     "//src/connectivity/bluetooth/lib/bt-a2dp",
@@ -44,7 +45,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",
@@ -201,13 +201,13 @@ rustc_test("bt_hfp_a2dp_controller_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]

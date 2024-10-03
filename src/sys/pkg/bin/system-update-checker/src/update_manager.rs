@@ -678,7 +678,7 @@ pub(crate) mod tests {
     use fidl_fuchsia_update_ext::AttemptOptions;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon as zx;
+
     use futures::channel::mpsc::{channel, Receiver, Sender};
     use futures::lock::Mutex as AsyncMutex;
     use std::sync::atomic::{AtomicU64, Ordering};

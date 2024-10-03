@@ -98,41 +98,6 @@ zx_status_t fdio_open_fd(const char* path, uint32_t flags, int* out_fd) ZX_AVAIL
 zx_status_t fdio_open_fd_at(int dir_fd, const char* path, uint32_t flags, int* out_fd)
     ZX_AVAILABLE_SINCE(1);
 
-// Clone the given `node` asynchronously.
-//
-// `node` must be a channel that implements the `fuchsia.io/Node` protocol.
-//
-// Upon success, returns a handle to a newly created channel whose remote endpoint has been sent to
-// `node` as a request for a clone.
-//
-// The `node` is cloned as readable and writable.
-//
-// Upon failure, returns `ZX_HANDLE_INVALID`.
-zx_handle_t fdio_service_clone(ZX_HANDLE_USE zx_handle_t node) ZX_DEPRECATED_SINCE(
-    1, 10,
-    "Incorrectly assumes all file descriptors are backed by fuchsia.io/Node. Use fdio_clone_fd instead.");
-
-// Requests that `request` be connected to a clone of the given `node` asynchronously.
-//
-// `node` must be a channel that implements the `fuchsia.io/Node` protocol.
-//
-// `request` must be a channel.
-//
-// Upon success, `request` has been sent to `node` as a request for a clone. The `node` is cloned as
-// readable and writable.
-//
-// # Errors
-//
-//   * `ZX_ERR_INVALID_ARGS`: `node` or `request` is invalid.
-//
-// Returns transport- and application-level errors associated with
-// `fuchsia.io/Node.Clone`.
-zx_status_t fdio_service_clone_to(ZX_HANDLE_USE zx_handle_t node,
-                                  ZX_HANDLE_RELEASE zx_handle_t request)
-    ZX_DEPRECATED_SINCE(
-        1, 10,
-        "Incorrectly assumes all file descriptors are backed by fuchsia.io/Node. Use fdio_clone_fd instead.");
-
 __END_CDECLS
 
 #endif  // LIB_FDIO_DIRECTORY_H_

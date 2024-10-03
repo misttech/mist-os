@@ -5,8 +5,8 @@
 //! Typesafe wrappers around verifying the board file.
 
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use thiserror::Error;
+use zx_status::Status;
 
 /// An error encountered while verifying the board.
 #[derive(Debug, Error)]

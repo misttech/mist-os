@@ -129,7 +129,7 @@ mod tests {
     use fidl_fuchsia_hardware_audio::*;
     use fixture::fixture;
     use futures::StreamExt;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     use crate::stream_config::tests::with_audio_frame_stream;
 

@@ -50,6 +50,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -82,8 +83,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
                 "inline_size": 8,
@@ -128,8 +131,10 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
                 "inline_size": 8,
@@ -173,10 +178,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -232,10 +240,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "array",
+              "kind_v2": "array",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -290,10 +301,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -349,10 +363,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "array",
+              "kind_v2": "array",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -407,8 +424,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
                 "inline_size": 8,
@@ -452,10 +471,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -510,10 +532,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -568,8 +593,10 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
                 "inline_size": 8,
@@ -613,10 +640,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "array",
+              "kind_v2": "array",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -671,10 +701,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "array",
+              "kind_v2": "array",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -729,9 +762,12 @@
         {
           "type": {
             "kind": "request",
-            "subtype": "test.experimentalmaybefromalias/MyProtocol",
+            "kind_v2": "endpoint",
+            "role": "server",
+            "protocol": "test.experimentalmaybefromalias/MyProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "subtype": "test.experimentalmaybefromalias/MyProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -763,11 +799,15 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "request",
-              "subtype": "test.experimentalmaybefromalias/MyProtocol",
+              "kind_v2": "endpoint",
+              "role": "server",
+              "protocol": "test.experimentalmaybefromalias/MyProtocol",
               "nullable": true,
               "protocol_transport": "Channel",
+              "subtype": "test.experimentalmaybefromalias/MyProtocol",
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -810,11 +850,15 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "request",
-              "subtype": "test.experimentalmaybefromalias/MyProtocol",
+              "kind_v2": "endpoint",
+              "role": "server",
+              "protocol": "test.experimentalmaybefromalias/MyProtocol",
               "nullable": true,
               "protocol_transport": "Channel",
+              "subtype": "test.experimentalmaybefromalias/MyProtocol",
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -857,8 +901,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
                 "inline_size": 1,
@@ -902,10 +948,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint8",
                 "type_shape_v2": {
                   "inline_size": 1,
@@ -960,10 +1009,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint8",
                 "type_shape_v2": {
                   "inline_size": 1,
@@ -1018,6 +1070,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -1050,8 +1103,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
                 "inline_size": 16,
@@ -1095,8 +1150,10 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
                 "inline_size": 16,
@@ -1140,8 +1197,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
                 "inline_size": 8,
@@ -1191,10 +1250,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -1256,10 +1318,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "vector",
+              "kind_v2": "vector",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -1320,8 +1385,10 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
                 "inline_size": 8,
@@ -1370,10 +1437,13 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "array",
+              "kind_v2": "array",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -1434,10 +1504,13 @@
         {
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "array",
+              "kind_v2": "array",
               "element_type": {
                 "kind": "primitive",
+                "kind_v2": "primitive",
                 "subtype": "uint64",
                 "type_shape_v2": {
                   "inline_size": 8,
@@ -1544,8 +1617,10 @@
       },
       "type": {
         "kind": "array",
+        "kind_v2": "array",
         "element_type": {
           "kind": "primitive",
+          "kind_v2": "primitive",
           "subtype": "uint64",
           "type_shape_v2": {
             "inline_size": 8,
@@ -1601,8 +1676,10 @@
       },
       "type": {
         "kind": "array",
+        "kind_v2": "array",
         "element_type": {
           "kind": "primitive",
+          "kind_v2": "primitive",
           "subtype": "uint64",
           "type_shape_v2": {
             "inline_size": 8,
@@ -1653,8 +1730,10 @@
       },
       "type": {
         "kind": "vector",
+        "kind_v2": "vector",
         "element_type": {
           "kind": "primitive",
+          "kind_v2": "primitive",
           "subtype": "uint8",
           "type_shape_v2": {
             "inline_size": 1,
@@ -1700,9 +1779,12 @@
       },
       "type": {
         "kind": "request",
-        "subtype": "test.experimentalmaybefromalias/MyProtocol",
+        "kind_v2": "endpoint",
+        "role": "server",
+        "protocol": "test.experimentalmaybefromalias/MyProtocol",
         "nullable": true,
         "protocol_transport": "Channel",
+        "subtype": "test.experimentalmaybefromalias/MyProtocol",
         "type_shape_v2": {
           "inline_size": 4,
           "alignment": 4,
@@ -1730,6 +1812,7 @@
       },
       "type": {
         "kind": "string",
+        "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
           "inline_size": 16,
@@ -1774,8 +1857,10 @@
       },
       "type": {
         "kind": "vector",
+        "kind_v2": "vector",
         "element_type": {
           "kind": "primitive",
+          "kind_v2": "primitive",
           "subtype": "uint64",
           "type_shape_v2": {
             "inline_size": 8,
@@ -1821,6 +1906,7 @@
       },
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint64",
         "type_shape_v2": {
           "inline_size": 8,
@@ -1855,8 +1941,10 @@
       },
       "type": {
         "kind": "vector",
+        "kind_v2": "vector",
         "element_type": {
           "kind": "primitive",
+          "kind_v2": "primitive",
           "subtype": "uint64",
           "type_shape_v2": {
             "inline_size": 8,

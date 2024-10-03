@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use fuchsia_component::client::connect_to_protocol_sync;
-use {fidl_fuchsia_power_system as fsystem, fuchsia_zircon as zx};
+use {fidl_fuchsia_power_system as fsystem, zx};
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ fn black_box<T>(placeholder: T) -> T {
 
 fn work_func(sag: &fsystem::ActivityGovernorSynchronousProxy) -> Result<()> {
     let _event_pair = sag
-        .take_wake_lease("benchmark", zx::MonotonicTime::after(zx::Duration::from_seconds(5)))
+        .take_wake_lease("benchmark", zx::MonotonicInstant::after(zx::Duration::from_seconds(5)))
         .unwrap();
 
     Ok(())

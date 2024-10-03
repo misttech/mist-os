@@ -28,8 +28,6 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 pub struct TimeUnit(pub u16);
 
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
-
 #[cfg(target_os = "fuchsia")]
 impl From<TimeUnit> for zx::Duration {
     fn from(tu: TimeUnit) -> zx::Duration {
@@ -66,7 +64,6 @@ impl TimeUnit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{self as zx};
 
     #[fuchsia::test]
     fn one_time_unit_conversion_to_microseconds() {

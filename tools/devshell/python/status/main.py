@@ -59,7 +59,6 @@ async def async_main(args: Options) -> None:
 
 
 def print_text(output_data: data.Data) -> None:
-    print("fx status")
     for category, items in output_data.items.items():
         print(f"{category.pretty_str()}:")
 

@@ -55,6 +55,11 @@ class WlanFullmacImplIfcBridgeServer
     bridge_client_->ConnectConf(request).Then(
         ForwardResult<WlanFullmacImplIfc::ConnectConf>(completer.ToAsync()));
   }
+  void RoamConf(RoamConfRequest& request, RoamConfCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->RoamConf(request).Then(
+        ForwardResult<WlanFullmacImplIfc::RoamConf>(completer.ToAsync()));
+  }
   void RoamStartInd(RoamStartIndRequest& request, RoamStartIndCompleter::Sync& completer) override {
   }
   void RoamResultInd(RoamResultIndRequest& request,
@@ -248,6 +253,10 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
     WLAN_TRACE_DURATION();
     bridge_client_->Reconnect(request).Then(
         ForwardResult<WlanFullmacImpl::Reconnect>(completer.ToAsync()));
+  }
+  void Roam(RoamRequest& request, RoamCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->Roam(request).Then(ForwardResult<WlanFullmacImpl::Roam>(completer.ToAsync()));
   }
   void AuthResp(AuthRespRequest& request, AuthRespCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();

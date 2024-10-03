@@ -241,7 +241,7 @@ capabilities, pass in correct realm. See https://fuchsia.dev/go/components/non-h
     match outcome {
         run_test_suite_lib::Outcome::Passed => {}
         run_test_suite_lib::Outcome::Timedout => {
-            std::process::exit(-fuchsia_zircon::Status::TIMED_OUT.into_raw());
+            std::process::exit(-zx::Status::TIMED_OUT.into_raw());
         }
         run_test_suite_lib::Outcome::Failed
         | run_test_suite_lib::Outcome::Cancelled

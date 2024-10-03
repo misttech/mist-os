@@ -208,7 +208,7 @@ mod tests {
     use std::collections::HashSet;
     use std::ops::Add;
     use test_case::test_case;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     const COUNTS_PER_MM: f32 = 12.0;
     const DEVICE_DESCRIPTOR: input_device::InputDeviceDescriptor =
@@ -235,7 +235,7 @@ mod tests {
         input_device::UnhandledInputEvent {
             device_event: input_device::InputDeviceEvent::Mouse(mouse_event),
             device_descriptor: DEVICE_DESCRIPTOR.clone(),
-            event_time: zx::MonotonicTime::from_nanos(event_time),
+            event_time: zx::MonotonicInstant::from_nanos(event_time),
             trace_id: None,
         }
     }
@@ -475,7 +475,7 @@ mod tests {
             PointerDisplayScaleHandler::new(2.0, &test_node, metrics::MetricsLogger::default())
                 .expect("failed to make handler");
         let mut input_event = make_unhandled_input_event(event);
-        const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
+        const EVENT_TIME: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(42);
         input_event.event_time = EVENT_TIME;
 
         let events = handler.clone().handle_unhandled_input_event(input_event).await;
@@ -656,9 +656,9 @@ mod tests {
         )
         .expect("failed to make handler");
 
-        let event_time1 = zx::MonotonicTime::get();
-        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
-        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time1 = zx::MonotonicInstant::get();
+        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
+        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
 
         let input_events = vec![
             testing_utilities::create_mouse_event(

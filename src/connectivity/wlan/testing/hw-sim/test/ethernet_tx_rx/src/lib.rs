@@ -16,7 +16,7 @@ use wlan_hw_sim::{
     connect_or_timeout, default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper,
     rx_wlan_data_frame, test_utils, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
-use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 lazy_static! {
     static ref BSS: Bssid = [0x65, 0x74, 0x68, 0x6e, 0x65, 0x74].into();

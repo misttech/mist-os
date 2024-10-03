@@ -7,10 +7,10 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_pty::{DeviceMarker, DeviceProxy, WindowSize};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_trace as ftrace;
-use fuchsia_zircon::{self as zx, HandleBased as _, ProcessInfo, ProcessInfoFlags};
 use std::ffi::CStr;
 use std::fs::File;
 use std::os::fd::OwnedFd;
+use zx::{self as zx, HandleBased as _, ProcessInfo, ProcessInfoFlags};
 
 /// An object used for interacting with the shell.
 #[derive(Clone)]
@@ -250,7 +250,7 @@ mod tests {
             .process
             .wait_handle(
                 zx::Signals::PROCESS_TERMINATED,
-                zx::MonotonicTime::after(zx::Duration::from_seconds(60)),
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(60)),
             )
             .expect("shell process did not exit in time");
 
@@ -290,7 +290,7 @@ mod tests {
             .process
             .wait_handle(
                 zx::Signals::PROCESS_TERMINATED,
-                zx::MonotonicTime::after(zx::Duration::from_seconds(60)),
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(60)),
             )
             .expect("shell process did not exit in time");
 

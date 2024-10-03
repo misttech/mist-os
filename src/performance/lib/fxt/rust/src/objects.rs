@@ -43,7 +43,7 @@ pub(super) struct RawUserspaceObjRecord<'a> {
 }
 
 impl<'a> RawUserspaceObjRecord<'a> {
-    pub(super) fn parse(buf: &'a [u8]) -> ParseResult<'_, Self> {
+    pub(super) fn parse(buf: &'a [u8]) -> ParseResult<'a, Self> {
         let (buf, header) = UserspaceObjHeader::parse(buf)?;
         let (rem, payload) = header.take_payload(buf)?;
         let (payload, pointer) = le_u64(payload)?;
@@ -162,7 +162,7 @@ pub enum KernelObjType {
 
 impl From<u32> for KernelObjType {
     fn from(raw: u32) -> Self {
-        use fuchsia_zircon_types::*;
+        use zx_types::*;
         match raw {
             ZX_OBJ_TYPE_NONE => Self::None,
             ZX_OBJ_TYPE_PROCESS => Self::Process,
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn kernel_obj_no_args() {
         let mut header = KernelObjHeader::empty();
-        header.set_kernel_obj_type(fuchsia_zircon_types::ZX_OBJ_TYPE_CHANNEL);
+        header.set_kernel_obj_type(zx_types::ZX_OBJ_TYPE_CHANNEL);
         header.set_name_ref(19);
         header.set_num_args(0);
 
@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn kernel_obj_with_args() {
         let mut header = KernelObjHeader::empty();
-        header.set_kernel_obj_type(fuchsia_zircon_types::ZX_OBJ_TYPE_FIFO);
+        header.set_kernel_obj_type(zx_types::ZX_OBJ_TYPE_FIFO);
         header.set_name_ref(91);
         header.set_num_args(3);
 

@@ -26,7 +26,7 @@ use futures::stream::futures_unordered::FuturesUnordered;
 use futures::{select, stream, Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_name as fnet_name,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 use anyhow::{Context as _, Result};
@@ -42,18 +42,18 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tracing::{debug, error, warn};
 
-/// A thin wrapper around `zx::MonotonicTime` that implements `dhcpv6_core::Instant`.
+/// A thin wrapper around `zx::MonotonicInstant` that implements `dhcpv6_core::Instant`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
-pub(crate) struct MonotonicTime(zx::MonotonicTime);
+pub(crate) struct MonotonicInstant(zx::MonotonicInstant);
 
-impl MonotonicTime {
-    fn now() -> MonotonicTime {
-        MonotonicTime(zx::MonotonicTime::get())
+impl MonotonicInstant {
+    fn now() -> MonotonicInstant {
+        MonotonicInstant(zx::MonotonicInstant::get())
     }
 }
 
-impl dhcpv6_core::Instant for MonotonicTime {
-    fn duration_since(&self, MonotonicTime(earlier): MonotonicTime) -> Duration {
+impl dhcpv6_core::Instant for MonotonicInstant {
+    fn duration_since(&self, MonotonicInstant(earlier): MonotonicInstant) -> Duration {
         let Self(this) = *self;
 
         let diff: zx::Duration = this - earlier;
@@ -66,17 +66,17 @@ impl dhcpv6_core::Instant for MonotonicTime {
         }))
     }
 
-    fn checked_add(&self, duration: Duration) -> Option<MonotonicTime> {
+    fn checked_add(&self, duration: Duration) -> Option<MonotonicInstant> {
         Some(self.add(duration))
     }
 }
 
-impl Add<Duration> for MonotonicTime {
-    type Output = MonotonicTime;
+impl Add<Duration> for MonotonicInstant {
+    type Output = MonotonicInstant;
 
-    fn add(self, duration: Duration) -> MonotonicTime {
-        let MonotonicTime(this) = self;
-        MonotonicTime(this + duration.into())
+    fn add(self, duration: Duration) -> MonotonicInstant {
+        let MonotonicInstant(this) = self;
+        MonotonicInstant(this + duration.into())
     }
 }
 
@@ -123,7 +123,7 @@ pub(crate) struct Client<S: for<'a> AsyncSocket<'a>> {
     /// Stores a responder to send acquired prefixes.
     prefixes_responder: Option<ClientWatchPrefixesResponder>,
     /// Maintains the state for the client.
-    state_machine: dhcpv6_core::client::ClientStateMachine<MonotonicTime, StdRng>,
+    state_machine: dhcpv6_core::client::ClientStateMachine<MonotonicInstant, StdRng>,
     /// The socket used to communicate with DHCPv6 servers.
     socket: S,
     /// The address to send outgoing messages to.
@@ -202,8 +202,8 @@ fn create_state_machine(
     }: ClientConfig,
 ) -> Result<
     (
-        dhcpv6_core::client::ClientStateMachine<MonotonicTime, StdRng>,
-        dhcpv6_core::client::Actions<MonotonicTime>,
+        dhcpv6_core::client::ClientStateMachine<MonotonicInstant, StdRng>,
+        dhcpv6_core::client::Actions<MonotonicInstant>,
     ),
     ClientError,
 > {
@@ -244,7 +244,7 @@ fn create_state_machine(
         })
         .transpose()?;
 
-    let now = MonotonicTime::now();
+    let now = MonotonicInstant::now();
     match (
         information_option_codes.is_empty(),
         configured_non_temporary_addresses.is_empty(),
@@ -335,7 +335,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
     /// Runs a list of actions sequentially.
     async fn run_actions(
         &mut self,
-        actions: dhcpv6_core::client::Actions<MonotonicTime>,
+        actions: dhcpv6_core::client::Actions<MonotonicInstant>,
     ) -> Result<(), ClientError> {
         stream::iter(actions)
             .map(Ok)
@@ -377,12 +377,12 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
 
                         let Self { prefixes, prefixes_changed, .. } = client;
 
-                        let now = zx::MonotonicTime::get();
+                        let now = zx::MonotonicInstant::get();
                         let nonzero_timevalue_to_zx_time = |tv| match tv {
                             v6::NonZeroTimeValue::Finite(tv) => {
                                 now + zx::Duration::from_seconds(tv.get().into())
                             }
-                            v6::NonZeroTimeValue::Infinity => zx::MonotonicTime::INFINITE,
+                            v6::NonZeroTimeValue::Infinity => zx::MonotonicInstant::INFINITE,
                         };
 
                         let calculate_lifetimes = |dhcpv6_core::client::Lifetimes {
@@ -391,7 +391,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                         }| {
                             Lifetimes {
                                 preferred_until: match preferred_lifetime {
-                                    v6::TimeValue::Zero => zx::MonotonicTime::ZERO,
+                                    v6::TimeValue::Zero => zx::MonotonicInstant::ZERO,
                                     v6::TimeValue::NonZero(preferred_lifetime) => {
                                         nonzero_timevalue_to_zx_time(preferred_lifetime)
                                     },
@@ -534,7 +534,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
     fn schedule_timer(
         &mut self,
         timer_type: dhcpv6_core::client::ClientTimerType,
-        MonotonicTime(instant): MonotonicTime,
+        MonotonicInstant(instant): MonotonicInstant,
     ) {
         let (handle, reg) = AbortHandle::new_pair();
         match self.timer_abort_handles.insert(timer_type, handle) {
@@ -568,7 +568,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
         // This timer just fired.
         self.cancel_timer(timer_type);
 
-        let actions = self.state_machine.handle_timeout(timer_type, MonotonicTime::now());
+        let actions = self.state_machine.handle_timeout(timer_type, MonotonicInstant::now());
         self.run_actions(actions).await
     }
 
@@ -584,7 +584,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                 return Ok(());
             }
         };
-        let actions = self.state_machine.handle_message_receive(msg, MonotonicTime::now());
+        let actions = self.state_machine.handle_message_receive(msg, MonotonicInstant::now());
         self.run_actions(actions).await
     }
 
@@ -1723,9 +1723,9 @@ mod tests {
                             },
                         },
                     ] => {
-                        let now = zx::MonotonicTime::get();
-                        let preferred_until = zx::MonotonicTime::from_nanos(preferred_until1);
-                        let valid_until = zx::MonotonicTime::from_nanos(valid_until1);
+                        let now = zx::MonotonicInstant::get();
+                        let preferred_until = zx::MonotonicInstant::from_nanos(preferred_until1);
+                        let valid_until = zx::MonotonicInstant::from_nanos(valid_until1);
 
                         let preferred_for = zx::Duration::from_seconds(
                             preferred_lifetime_secs.into(),
@@ -1754,7 +1754,7 @@ mod tests {
             // that the client has not yet handled the Reply message.
             let mut watch_prefixes = client_proxy.watch_prefixes().fuse();
             assert_matches!(poll!(&mut watch_prefixes), Poll::Pending);
-            let before_handling_reply = zx::MonotonicTime::get();
+            let before_handling_reply = zx::MonotonicInstant::get();
             select! {
                 () = client_fut => panic!("should never return"),
                 res = watch_prefixes => check_watch_prefixes_result(
@@ -1823,7 +1823,7 @@ mod tests {
             .await
             .expect("failed to send reply message");
 
-            let before_handling_reply = zx::MonotonicTime::get();
+            let before_handling_reply = zx::MonotonicInstant::get();
             select! {
                 () = client_fut => panic!("should never return"),
                 res = client_proxy.watch_prefixes().fuse() => check_watch_prefixes_result(
@@ -1871,7 +1871,7 @@ mod tests {
             Vec::<&dhcpv6_core::client::ClientTimerType>::new()
         );
 
-        let now = MonotonicTime::now();
+        let now = MonotonicInstant::now();
         let () = client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Refresh,
             now + Duration::from_nanos(1),
@@ -1891,7 +1891,7 @@ mod tests {
         );
 
         // We are allowed to reschedule a timer to fire at a new time.
-        let now = MonotonicTime::now();
+        let now = MonotonicInstant::now();
         client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Refresh,
             now + Duration::from_nanos(1),
@@ -2020,7 +2020,7 @@ mod tests {
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
         client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Refresh,
-            MonotonicTime::now() + Duration::from_nanos(1),
+            MonotonicInstant::now() + Duration::from_nanos(1),
         );
 
         // Trigger a refresh.
@@ -2144,7 +2144,7 @@ mod tests {
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
         let () = client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Retransmission,
-            MonotonicTime::now() + Duration::from_secs(1_000_000),
+            MonotonicInstant::now() + Duration::from_secs(1_000_000),
         );
         assert_eq!(
             client.timer_abort_handles.keys().collect::<Vec<_>>(),
@@ -2174,7 +2174,7 @@ mod tests {
         // Inserts a refresh timer that precedes the retransmission.
         let () = client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Refresh,
-            MonotonicTime::now() + Duration::from_nanos(1),
+            MonotonicInstant::now() + Duration::from_nanos(1),
         );
         // This timer is scheduled.
         assert_eq!(

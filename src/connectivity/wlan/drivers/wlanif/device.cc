@@ -16,9 +16,8 @@ Device::Device(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("wlanif", std::move(start_args), std::move(driver_dispatcher)),
       rust_mlme_(nullptr, delete_fullmac_mlme_handle) {
-  zx::result logger = fdf::Logger::Create(*incoming(), dispatcher(), "wlanif", FUCHSIA_LOG_INFO);
-  ZX_ASSERT_MSG(logger.is_ok(), "%s", logger.status_string());
-  logger_ = std::move(logger.value());
+  auto logger = fdf::Logger::Create(*incoming(), dispatcher(), "wlanif", FUCHSIA_LOG_INFO);
+  logger_ = std::move(logger);
   ltrace_fn(*logger_);
 }
 

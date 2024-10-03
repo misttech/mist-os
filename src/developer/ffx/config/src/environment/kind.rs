@@ -21,8 +21,7 @@ pub enum EnvironmentKind {
     /// a.) Be readonly.
     /// b.) Return an error if any config values are not able to be found.
     /// c.) No shell env substitution occurs (things like $FUCHSIA_DIR are not allowed).
-    CoreContext,
-    /// Any other context with no specific information, using the user directory for
+    StrictContext,
     /// all (non-global/default) configuration.
     NoContext,
 }
@@ -76,7 +75,7 @@ impl std::fmt::Display for EnvironmentKind {
                 "Isolated environment with an isolated root of {root}",
                 root = isolate_root.display()
             ),
-            CoreContext => write!(f, "ffx-core Env Context"),
+            StrictContext => write!(f, "ffx-core Env Context"),
             NoContext => write!(f, "Global user context"),
         }
     }

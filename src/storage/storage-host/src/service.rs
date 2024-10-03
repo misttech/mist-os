@@ -16,7 +16,7 @@ use vfs::path::Path;
 use {
     fidl_fuchsia_device as fdevice, fidl_fuchsia_io as fio,
     fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_storagehost as fstoragehost,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 pub struct StorageHostService {
@@ -179,7 +179,7 @@ mod tests {
     use {
         fidl_fuchsia_device as fdevice, fidl_fuchsia_hardware_block_volume as fvolume,
         fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
+        zx,
     };
 
     #[fuchsia::test]

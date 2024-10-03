@@ -612,7 +612,7 @@ impl FusedFuture for TimerWaiter {
 /// A separate module for [`ScheduledInstant`] so it can't be constructed
 /// violating its invariants.
 mod scheduled_instant {
-    use crate::bindings::StackTime;
+    use crate::bindings::time::StackTime;
 
     use super::{fasync, UNSCHEDULED_SENTINEL};
 
@@ -646,7 +646,7 @@ mod scheduled_instant {
 
     impl From<ScheduledInstant> for StackTime {
         fn from(value: ScheduledInstant) -> Self {
-            Self(value.into())
+            StackTime::new(value.into())
         }
     }
 }
@@ -657,7 +657,6 @@ mod tests {
 
     use crate::bindings::integration_tests::set_logger_for_test;
 
-    use fuchsia_zircon as zx;
     use futures::channel::mpsc;
     use test_case::test_case;
 

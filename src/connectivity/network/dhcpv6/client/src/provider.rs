@@ -5,7 +5,7 @@
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_net_dhcpv6::{ClientMarker, ClientProviderRequest, ClientProviderRequestStream};
 use fidl_fuchsia_net_dhcpv6_ext::NewClientParams;
-use fuchsia_zircon as zx;
+
 use futures::{Future, StreamExt as _};
 
 use anyhow::Result;

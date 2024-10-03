@@ -18,7 +18,7 @@ use fidl_fuchsia_paver::{
 };
 use fidl_fuchsia_sysinfo::SysInfoMarker;
 use fuchsia_component::client;
-use fuchsia_zircon as zx;
+
 use partition::Partition;
 use recovery_util_block::BlockDevice;
 use std::sync::Mutex;

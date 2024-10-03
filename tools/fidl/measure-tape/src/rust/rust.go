@@ -292,7 +292,7 @@ use {
 {{- range .Uses }}
   {{ . }},
 {{- end }}
-  fuchsia_zircon_types as zx,
+  zx_types as zx,
 };
 
 pub struct SizeAgg {

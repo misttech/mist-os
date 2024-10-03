@@ -15,10 +15,7 @@ use wlan_common::mac::{Aid, CapabilityInfo};
 use wlan_common::timer::EventId;
 use wlan_rsn::key::exchange::Key;
 use wlan_rsn::key::Tk;
-use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme, zx};
 
 pub struct RemoteClient {
     pub addr: MacAddr,
@@ -200,7 +197,7 @@ impl RemoteClient {
     pub fn schedule_at(
         &mut self,
         ctx: &mut Context,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
         event: ClientEvent,
     ) -> EventId {
         ctx.timer.schedule_at(deadline, Event::Client { addr: self.addr.clone(), event })
@@ -475,7 +472,7 @@ mod tests {
         let (mut ctx, _, mut time_stream) = make_env();
         let timeout_event_id = r_sta.schedule_at(
             &mut ctx,
-            zx::MonotonicTime::after(zx::Duration::from_seconds(2)),
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(2)),
             ClientEvent::AssociationTimeout,
         );
         let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");

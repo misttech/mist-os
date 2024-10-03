@@ -17,7 +17,7 @@ use virtgralloc::{
     virtgralloc_SetVulkanModeResult, virtgralloc_VulkanMode, virtgralloc_set_vulkan_mode,
     VIRTGRALLOC_IOCTL_SET_VULKAN_MODE, VIRTGRALLOC_SET_VULKAN_MODE_RESULT_SUCCESS,
 };
-use {fidl_fuchsia_starnix_gralloc as fgralloc, fuchsia_zircon as zx};
+use {fidl_fuchsia_starnix_gralloc as fgralloc, zx};
 
 pub struct GrallocFile {
     mode_setter: fgralloc::VulkanModeSetterSynchronousProxy,
@@ -61,7 +61,7 @@ impl GrallocFile {
                     vulkan_mode: Some(vulkan_mode),
                     ..Default::default()
                 },
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .expect("gralloc feature requires working VulkanModeSetter")
             .expect("gralloc feature requires VulkanModeSetter to set mode");

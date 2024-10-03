@@ -20,7 +20,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Poll, Waker};
 use tracing::{trace, warn};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_zircon as zx};
+use {fidl_fuchsia_bluetooth_bredr as bredr, zx};
 
 use crate::message_access_service::MasInstance;
 use crate::message_notification_service::Session;

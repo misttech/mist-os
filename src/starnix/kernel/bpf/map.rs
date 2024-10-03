@@ -10,7 +10,7 @@ use crate::mm::{MemoryAccessor, ProtectionFlags, PAGE_SIZE};
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use dense_map::DenseMap;
 use ebpf::MapSchema;
-use fuchsia_zircon as zx;
+
 use starnix_lifecycle::AtomicU32Counter;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};

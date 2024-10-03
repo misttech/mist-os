@@ -5,10 +5,10 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_inspect::{TreeMarker, TreeNameIteratorMarker, TreeProxy};
-use fuchsia_zircon::Vmo;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use zx::Vmo;
 
 /// A tree representation of an Inspect-formatted VMO.
 /// It contains the root VMO and all loaded child VMOs.
@@ -96,10 +96,10 @@ mod tests {
     };
     use fidl_fuchsia_mem::Buffer;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, HandleBased};
     use futures::{TryFutureExt, TryStreamExt};
     use std::sync::Arc;
     use tracing::error;
+    use zx::{self as zx, HandleBased};
 
     const MAX_TREE_NAME_LIST_SIZE: usize = 1;
     const SHARED_VMO: &str = "SHARED";

@@ -176,6 +176,30 @@ template("fidl_library") {
   # the build targets are created, the resulting API summery file will be empty.
   assert(!is_stable || requires_compatibility_tests)
 
+  # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
+  _unstable_partner_internal_libraries = [
+    "fuchsia.audio",
+    "fuchsia.audio.controller",
+    "fuchsia.audio.device",
+    "fuchsia.bluetooth.pandora",
+    "fuchsia.drm",
+    "fuchsia.media2",
+    "fuchsia.memory.attribution.plugin",
+    "fuchsia.session.power",
+    "fuchsia.starnix.runner",
+  ]
+  _is_unstable_partner_internal =
+      _unstable_partner_internal_libraries + [ library_name ] -
+      [ library_name ] != _unstable_partner_internal_libraries
+  assert(!_is_unstable_partner_internal ||
+             (invoker.sdk_category == "partner_internal" && is_stable == false),
+         "Do you need to remove this library from the allowlist?")
+  assert(
+      is_stable || !defined(invoker.sdk_category) ||
+          invoker.sdk_category == "internal" ||
+          invoker.sdk_category == "partner" || _is_unstable_partner_internal,
+      "Libraries in category '${sdk_category_string_for_assert}' must specify `stable=true`.")
+
   # Make sure  the same variables are forwarded to both fidl_ir() instances.
   invoker_variables_to_forward_to_fidl_ir = [
     "applicable_licenses",
@@ -284,16 +308,6 @@ template("fidl_library") {
   # for illustrative purposes, and it does not make sense to change them.
   _is_documentation_example = library_name == "fuchsia.examples.docs"
 
-  # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
-  _is_unstable_partner_internal =
-      library_name == "fuchsia.audio" ||
-      library_name == "fuchsia.audio.controller" ||
-      library_name == "fuchsia.audio.device" ||
-      library_name == "fuchsia.bluetooth.pandora" ||
-      library_name == "fuchsia.drm" || library_name == "fuchsia.media2" ||
-      library_name == "fuchsia.session.power" ||
-      library_name == "fuchsia.starnix.runner"
-
   # TODO(https://fxbug.dev/365602428): Determine an appropriate state for these libraries.
   _is_test_versioned_in_fuchsia = library_name == "fuchsia.element.test" ||
                                   library_name == "fuchsia.intl.test" ||
@@ -308,7 +322,6 @@ template("fidl_library") {
                "_is_internal_zx_library",
                "_is_banjo_sysmem",
                "_is_documentation_example",
-               "_is_unstable_partner_internal",
                "_is_test_versioned_in_fuchsia",
                "_is_test_example_library",
              ])
@@ -324,9 +337,7 @@ template("fidl_library") {
                (requires_compatibility_tests == defined(invoker.sdk_category) ||
                     (defined(invoker.sdk_category) &&
                          invoker.sdk_category == "internal" &&
-                         !requires_compatibility_tests) ||
-                    (_is_unstable_partner_internal &&
-                         invoker.sdk_category == "partner_internal"))) ||
+                         !requires_compatibility_tests))) ||
           (fidlc_versioned_arg == "unversioned" &&
                _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
           (fidlc_versioned_arg == "unversioned" && !is_stable &&

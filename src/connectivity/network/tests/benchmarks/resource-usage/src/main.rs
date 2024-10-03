@@ -5,8 +5,6 @@
 use argh::FromArgs;
 use async_trait::async_trait;
 use const_unwrap::const_unwrap_option;
-use futures::channel::oneshot;
-use futures::FutureExt as _;
 use humansize::FileSize as _;
 use netstack_testing_common::realms::{
     KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
@@ -16,7 +14,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use {
     fidl_fuchsia_net_debug as fnet_debug, fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx,
 };
 
 mod interfaces;
@@ -134,9 +132,10 @@ async fn run_benchmark<W: Workload, N: Netstack>(
     // Record baseline resource (memory + handle) usage.
     let baseline = ResourceUsage::record(&process);
 
-    let (done, rx) = oneshot::channel();
+    let (done, rx) = std::sync::mpsc::channel();
     let process_clone = process.clone();
-    let measure_peak = fuchsia_async::Task::spawn(measure_peak_usage(rx, process_clone));
+    let measure_peak = std::thread::spawn(move || measure_peak_usage(rx, process_clone));
+
     let start_time = std::time::Instant::now();
 
     W::run(&netstack, perftest_mode).await;
@@ -148,7 +147,7 @@ async fn run_benchmark<W: Workload, N: Netstack>(
 
     let runtime = start_time.elapsed();
     done.send(()).expect("peak usage task should be running");
-    let peak = measure_peak.await;
+    let peak = measure_peak.join().expect("should successfully join peak usage thread");
 
     // Record the increase in resource usage after we are done exercising the
     // netstack.
@@ -369,12 +368,11 @@ impl std::fmt::Display for ResourceUsage {
     }
 }
 
-async fn measure_peak_usage(
-    done: oneshot::Receiver<()>,
+fn measure_peak_usage(
+    done: std::sync::mpsc::Receiver<()>,
     process: Arc<zx::Process>,
 ) -> ResourceUsage {
     let mut max = ResourceUsage::default();
-    let mut done = done.fuse();
     loop {
         let current = ResourceUsage::record(&process);
         max.handles.total = usize::max(max.handles.total, current.handles.total);
@@ -384,13 +382,12 @@ async fn measure_peak_usage(
         max.memory.private_bytes =
             usize::max(max.memory.private_bytes, current.memory.private_bytes);
         max.memory.shared_bytes = usize::max(max.memory.shared_bytes, current.memory.shared_bytes);
-
-        futures::select! {
-            result = done => {
-                result.expect("should receive message when benchmark is complete");
-                break;
-            },
-            () = fuchsia_async::Timer::new(zx::Duration::from_millis(10)).fuse() => {},
+        match done.recv_timeout(std::time::Duration::from_millis(10)) {
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                panic!("should receive message when benchmark is complete")
+            }
+            Ok(()) => break,
         }
     }
     max

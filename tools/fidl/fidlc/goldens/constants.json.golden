@@ -28,6 +28,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -78,6 +79,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -158,6 +160,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "bool",
         "type_shape_v2": {
           "inline_size": 1,
@@ -191,6 +194,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "float32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -224,6 +228,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "float64",
         "type_shape_v2": {
           "inline_size": 8,
@@ -257,6 +262,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "int16",
         "type_shape_v2": {
           "inline_size": 2,
@@ -290,6 +296,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "int32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -323,6 +330,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "int64",
         "type_shape_v2": {
           "inline_size": 8,
@@ -356,6 +364,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "int8",
         "type_shape_v2": {
           "inline_size": 1,
@@ -389,6 +398,7 @@
       "deprecated": false,
       "type": {
         "kind": "string",
+        "kind_v2": "string",
         "nullable": false,
         "type_shape_v2": {
           "inline_size": 16,
@@ -422,6 +432,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint16",
         "type_shape_v2": {
           "inline_size": 2,
@@ -455,6 +466,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -488,6 +500,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint64",
         "type_shape_v2": {
           "inline_size": 8,
@@ -521,6 +534,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint8",
         "type_shape_v2": {
           "inline_size": 1,
@@ -554,6 +568,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -583,6 +598,7 @@
       "deprecated": false,
       "type": {
         "kind": "identifier",
+        "kind_v2": "identifier",
         "identifier": "test.constants/BitsType",
         "nullable": false,
         "type_shape_v2": {
@@ -613,6 +629,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "int32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -642,6 +659,7 @@
       "deprecated": false,
       "type": {
         "kind": "identifier",
+        "kind_v2": "identifier",
         "identifier": "test.constants/EnumType",
         "nullable": false,
         "type_shape_v2": {
@@ -672,6 +690,7 @@
       "deprecated": false,
       "type": {
         "kind": "identifier",
+        "kind_v2": "identifier",
         "identifier": "test.constants/BitsType",
         "nullable": false,
         "type_shape_v2": {
@@ -701,6 +720,7 @@
       "deprecated": false,
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -826,6 +846,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -875,6 +896,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -924,6 +946,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -973,6 +996,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.constants/Enum",
             "nullable": false,
             "type_shape_v2": {
@@ -1019,6 +1043,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.constants/Bits",
             "nullable": false,
             "type_shape_v2": {

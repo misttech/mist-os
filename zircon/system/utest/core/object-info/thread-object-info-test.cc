@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zx/clock.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
+#include <lib/zx/time.h>
 #include <zircon/syscalls/exception.h>
 #include <zircon/syscalls/object.h>
+
+#include <thread>
 
 #include <zxtest/zxtest.h>
 
@@ -236,6 +240,39 @@ TEST(ThreadGetInfoTest, InfoThreadStatsProcessHandleIsBadHandle) {
 TEST(ThreadGetInfoTest, InfoThreadExceptionReportInvalidHandleFails) {
   ASSERT_NO_FATAL_FAILURE(CheckInvalidHandleFails<zx_exception_report_t>(
       ZX_INFO_THREAD_EXCEPTION_REPORT, 32, []() { return zx::handle(); }));
+}
+
+TEST(ThreadGetInfoTest, InfoThreadStatsRuntime) {
+  // Spawn a thread to test runtime stats early in a thread's lifetime.
+  std::thread test_thread{[&] {
+    const zx::time begin_mono = zx::clock::get_monotonic();
+
+    zx_info_thread_stats_t begin_thread;
+    ASSERT_OK(zx::thread::self()->get_info(ZX_INFO_THREAD_STATS, &begin_thread,
+                                           sizeof(begin_thread), nullptr, nullptr));
+
+    ASSERT_OK(zx::nanosleep(zx::deadline_after(zx::msec(10))));
+
+    zx_info_thread_stats_t end_thread;
+    ASSERT_OK(zx::thread::self()->get_info(ZX_INFO_THREAD_STATS, &end_thread, sizeof(end_thread),
+                                           nullptr, nullptr));
+
+    const zx::time end_mono = zx::clock::get_monotonic();
+
+    const zx::duration delta_mono = end_mono - begin_mono;
+    const zx::duration delta_thread =
+        zx::time{end_thread.total_runtime} - zx::time{begin_thread.total_runtime};
+
+    EXPECT_GE(begin_mono.get(), 0);
+    EXPECT_GE(end_mono.get(), 0);
+    EXPECT_GE(begin_thread.total_runtime, 0);
+    EXPECT_GE(end_thread.total_runtime, 0);
+    EXPECT_GE(delta_mono.get(), 0);
+    EXPECT_GE(delta_thread.get(), 0);
+    EXPECT_GE((delta_mono - delta_thread).get(), 0);
+  }};
+
+  test_thread.join();
 }
 
 }  // namespace

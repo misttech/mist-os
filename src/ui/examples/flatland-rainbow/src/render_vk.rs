@@ -13,8 +13,8 @@ use fuchsia_scenic::{
     duplicate_buffer_collection_import_token, duplicate_buffer_collection_token,
     BufferCollectionTokenPair,
 };
-use fuchsia_zircon::{AsHandleRef, HandleBased};
 use std::ffi::{c_char, c_void, CString};
+use zx::{AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
     fidl_fuchsia_ui_composition as fland,

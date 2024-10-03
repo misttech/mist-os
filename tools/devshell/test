@@ -80,5 +80,8 @@ if is_feature_enabled "legacy_fxtest"; then
   run-dart-tool fxtest "${args[@]}" "$@"
 else
   fx-command-run host-tool --print symbolizer > /dev/null
+  if [[ ! $host_tests_only ]]; then
+    fx-command-run host-tool --print ffx > /dev/null
+  fi
   fx-command-run host-tool test2 "${args[@]}" "$@"
 fi

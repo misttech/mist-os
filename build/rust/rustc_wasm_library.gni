@@ -128,7 +128,7 @@ template("rustc_wasm_library") {
   rustc_artifact(target_name) {
     target_type = "shared_library"
     crate_root = source_root
-    clippy_crate_type = "cdylib"
+    rust_crate_type = "cdylib"
     crate_name = crate_name
     original_target_name = _original_target_name
     pass_through = {

@@ -4,7 +4,7 @@
 
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use futures::ready;
 use futures::stream::{FusedStream, Stream};
 use futures::task::{Context, Poll, Waker};

@@ -96,11 +96,6 @@ TestProcessArgs& TestProcessArgs::AddExecutableVmo(zx::vmo vmo) {
   return AddHandle(PA_VMO_EXECUTABLE, std::move(vmo));
 }
 
-TestProcessArgs& TestProcessArgs::AddExecutableVmo(std::string_view executable_name) {
-  const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
-  return AddExecutableVmo(elfldltl::testing::GetTestLibVmo(executable_path));
-}
-
 TestProcessArgs& TestProcessArgs::AddStackVmo(zx::vmo vmo) {
   return AddHandle(PA_VMO_STACK, std::move(vmo));
 }

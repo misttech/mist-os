@@ -8,9 +8,9 @@ use crate::directory::entry::DirectoryEntry;
 use crate::test_utils::run::{self, AsyncServerClientTestParams};
 
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::Future;
 use std::sync::Arc;
+use zx_status::Status;
 
 pub use run::{run_client, test_client};
 

@@ -8,10 +8,10 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
 fidl_rust_deps = [
+  "//sdk/rust/zx-status",
+  "//sdk/rust/zx-types",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-sync",
-  "//src/lib/zircon/rust/fuchsia-zircon-status",
-  "//src/lib/zircon/rust/fuchsia-zircon-types",
   "//third_party/rust_crates:bitflags",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:slab",
@@ -21,7 +21,7 @@ fidl_rust_deps = [
 ]
 
 if (is_fuchsia || is_mistos) {
-  fidl_rust_deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+  fidl_rust_deps += [ "//sdk/rust/zx" ]
 }
 
 fidl_rust_sources = [
@@ -37,6 +37,7 @@ fidl_rust_sources = [
   "src/persistence.rs",
   "src/prelude.rs",
   "src/server.rs",
+  "src/time.rs",
 ]
 
 rustc_library("fidl") {

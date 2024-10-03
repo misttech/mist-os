@@ -20,7 +20,7 @@ use crate::vfs::{
     StubEmptyFile, SymlinkTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
@@ -631,7 +631,7 @@ impl SysInfo {
 
     fn fetch() -> Result<SysInfo, anyhow::Error> {
         let sysinfo = connect_to_protocol_sync::<fidl_fuchsia_sysinfo::SysInfoMarker>()?;
-        let board_name = match sysinfo.get_board_name(zx::MonotonicTime::INFINITE)? {
+        let board_name = match sysinfo.get_board_name(zx::MonotonicInstant::INFINITE)? {
             (zx::sys::ZX_OK, Some(name)) => name,
             (_, _) => "Unknown".to_string(),
         };
@@ -657,7 +657,7 @@ impl DynamicFileSource for CpuinfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let is_qemu = SYSINFO.is_qemu();
 
-        for i in 0..fuchsia_zircon::system_get_num_cpus() {
+        for i in 0..zx::system_get_num_cpus() {
             writeln!(sink, "processor\t: {}", i)?;
 
             // Report emulated CPU as "QEMU Virtual CPU". Some LTP tests rely on this to detect
@@ -725,12 +725,12 @@ impl DynamicFileSource for MeminfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let stats = self.kernel_stats.get();
         let memory_stats =
-            stats.get_memory_stats_extended(zx::MonotonicTime::INFINITE).map_err(|e| {
+            stats.get_memory_stats_extended(zx::MonotonicInstant::INFINITE).map_err(|e| {
                 log_error!("FIDL error getting memory stats: {e}");
                 errno!(EIO)
             })?;
         let compression_stats =
-            stats.get_memory_stats_compression(zx::MonotonicTime::INFINITE).map_err(|e| {
+            stats.get_memory_stats_compression(zx::MonotonicInstant::INFINITE).map_err(|e| {
                 log_error!("FIDL error getting memory compression stats: {e}");
                 errno!(EIO)
             })?;
@@ -769,13 +769,13 @@ impl UptimeFile {
 
 impl DynamicFileSource for UptimeFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = (zx::MonotonicTime::get() - zx::MonotonicTime::ZERO).into_seconds_f64();
+        let uptime = (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_seconds_f64();
 
         // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
         let cpu_stats = self
             .kernel_stats
             .get()
-            .get_cpu_stats(zx::MonotonicTime::INFINITE)
+            .get_cpu_stats(zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(EIO))?;
         let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
         let idle_time = per_cpu_stats.iter().map(|s| s.idle_time.unwrap_or(0)).sum();
@@ -803,7 +803,7 @@ impl DynamicFileSource for ZoneInfoFile {
         let mem_stats = self
             .kernel_stats
             .get()
-            .get_memory_stats_extended(zx::MonotonicTime::INFINITE)
+            .get_memory_stats_extended(zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
                 log_error!("FIDL error getting memory stats: {e}");
                 errno!(EIO)
@@ -860,7 +860,7 @@ impl DynamicFileSource for VmStatFile {
         let mem_stats = self
             .kernel_stats
             .get()
-            .get_memory_stats_extended(zx::MonotonicTime::INFINITE)
+            .get_memory_stats_extended(zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
                 log_error!("FIDL error getting memory stats: {e}");
                 errno!(EIO)
@@ -894,10 +894,10 @@ impl StatFile {
 }
 impl DynamicFileSource for StatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = zx::MonotonicTime::get() - zx::MonotonicTime::ZERO;
+        let uptime = zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO;
 
         let cpu_stats =
-            self.kernel_stats.get().get_cpu_stats(zx::MonotonicTime::INFINITE).map_err(|e| {
+            self.kernel_stats.get().get_cpu_stats(zx::MonotonicInstant::INFINITE).map_err(|e| {
                 log_error!("FIDL error getting cpu stats: {e}");
                 errno!(EIO)
             })?;

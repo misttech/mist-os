@@ -61,8 +61,8 @@ impl ErrorResponder for IntlSetResponder {
     }
 }
 
-impl watch::Responder<IntlSettings, fuchsia_zircon::Status> for IntlWatchResponder {
-    fn respond(self, response: Result<IntlSettings, fuchsia_zircon::Status>) {
+impl watch::Responder<IntlSettings, zx::Status> for IntlWatchResponder {
+    fn respond(self, response: Result<IntlSettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings).ok();

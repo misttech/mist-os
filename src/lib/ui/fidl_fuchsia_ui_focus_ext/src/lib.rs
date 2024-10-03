@@ -7,7 +7,7 @@
 use fidl_fuchsia_ui_focus::{FocusChain, FocusKoidChain};
 use fidl_fuchsia_ui_views_ext::ViewRefExt;
 use fuchsia_scenic as scenic;
-use fuchsia_zircon::{Koid, Status};
+use zx::{Koid, Status};
 
 /// Extension trait for [`fidl_fuchsia_ui_focus::FocusChain`] and
 /// [`fidl_fuchsia_ui_focus::FocusKoidChain`].

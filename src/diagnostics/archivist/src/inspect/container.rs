@@ -13,7 +13,6 @@ use fidl::endpoints::Proxy;
 use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use selectors::SelectorExt;
@@ -21,6 +20,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_inspect as finspect,
     fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect,
@@ -250,7 +250,7 @@ pub struct SnapshotData {
     /// Optional name of the file or InspectSink proxy that created this snapshot.
     pub name: Option<InspectHandleName>,
     /// Timestamp at which this snapshot resolved or failed.
-    pub timestamp: zx::BootTime,
+    pub timestamp: zx::BootInstant,
     /// Errors encountered when processing this snapshot.
     pub errors: Vec<schema::InspectError>,
     /// Optional snapshot of the inspect hierarchy, in case reading fails
@@ -345,7 +345,7 @@ impl SnapshotData {
     ) -> SnapshotData {
         SnapshotData {
             name,
-            timestamp: zx::BootTime::get(),
+            timestamp: zx::BootInstant::get(),
             errors: Vec::new(),
             snapshot: Some(snapshot),
             escrowed,
@@ -360,7 +360,7 @@ impl SnapshotData {
     ) -> SnapshotData {
         SnapshotData {
             name,
-            timestamp: zx::BootTime::get(),
+            timestamp: zx::BootInstant::get(),
             errors: vec![error],
             snapshot: None,
             escrowed,
@@ -401,26 +401,26 @@ impl State {
     fn into_pending(
         self,
         pending: collector::InspectHandleDeque,
-        start_time: zx::MonotonicTime,
+        start_time: zx::MonotonicInstant,
     ) -> Self {
         Self {
             unpopulated: self.unpopulated,
             status: Status::Pending(pending),
             batch_timeout: self.batch_timeout,
             global_stats: self.global_stats,
-            elapsed_time: self.elapsed_time + (zx::MonotonicTime::get() - start_time),
+            elapsed_time: self.elapsed_time + (zx::MonotonicInstant::get() - start_time),
             trace_guard: self.trace_guard,
             trace_id: self.trace_id,
         }
     }
 
-    fn add_elapsed_time(&mut self, start_time: zx::MonotonicTime) {
-        self.elapsed_time += zx::MonotonicTime::get() - start_time
+    fn add_elapsed_time(&mut self, start_time: zx::MonotonicInstant) {
+        self.elapsed_time += zx::MonotonicInstant::get() - start_time
     }
 
     async fn iterate(
         mut self,
-        start_time: zx::MonotonicTime,
+        start_time: zx::MonotonicInstant,
     ) -> Option<(PopulatedInspectDataContainer, State)> {
         loop {
             match &mut self.status {
@@ -433,7 +433,7 @@ impl State {
                     None => {
                         self.global_stats.record_component_duration(
                             self.unpopulated.identity.moniker.to_string(),
-                            self.elapsed_time + (zx::MonotonicTime::get() - start_time),
+                            self.elapsed_time + (zx::MonotonicInstant::get() - start_time),
                         );
                         return None;
                     }
@@ -510,7 +510,7 @@ impl UnpopulatedInspectDataContainer {
             let timeout = state.batch_timeout;
             let elapsed_time = state.elapsed_time;
             let global_stats = Arc::clone(&state.global_stats);
-            let start_time = zx::MonotonicTime::get();
+            let start_time = zx::MonotonicInstant::get();
             let trace_guard = Arc::clone(&state.trace_guard);
             let trace_id = state.trace_id;
 
@@ -535,7 +535,7 @@ impl UnpopulatedInspectDataContainer {
                             unpopulated: unpopulated_for_timeout,
                             batch_timeout: timeout,
                             global_stats,
-                            elapsed_time: elapsed_time + (zx::MonotonicTime::get() - start_time),
+                            elapsed_time: elapsed_time + (zx::MonotonicInstant::get() - start_time),
                             trace_guard,
                             trace_id,
                         },
@@ -550,7 +550,7 @@ impl UnpopulatedInspectDataContainer {
 mod test {
     use super::*;
     use fuchsia_inspect::Node;
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use std::sync::LazyLock;
 

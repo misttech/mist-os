@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use zx::{AsHandleRef, HandleBased, Peered};
-use {fidl_fuchsia_fdomain as proto, fuchsia_zircon as zx};
+use {fidl_fuchsia_fdomain as proto, zx};
 
 /// Amount of buffer space we allocate for reading from handles in order to
 /// serve read requests.

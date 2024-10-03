@@ -7,8 +7,8 @@ use anyhow::{bail, Error};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_paver::{PaverMarker, PaverProxy};
-use fuchsia_zircon::Status;
 use serde::{Deserialize, Serialize};
+use zx::Status;
 
 use super::types::{Asset, Configuration, ConfigurationStatus};
 
@@ -312,7 +312,7 @@ mod tests {
             response: &'static [u8],
         ) -> Self {
             let buf = fidl_fuchsia_mem::Buffer {
-                vmo: fuchsia_zircon::Vmo::create(response.len() as u64).unwrap(),
+                vmo: zx::Vmo::create(response.len() as u64).unwrap(),
                 size: response.len() as u64,
             };
             buf.vmo.write(response, 0).unwrap();

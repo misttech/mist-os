@@ -22,7 +22,6 @@ mod tests {
     use diagnostics_hierarchy::DiagnosticsHierarchy;
     use fidl::endpoints::ServerEnd;
     use fuchsia_inspect::DiagnosticsHierarchyGetter;
-    use fuchsia_zircon::AsHandleRef;
     use futures::channel::mpsc;
     use futures::StreamExt;
     use hooks::EventType;
@@ -30,9 +29,10 @@ mod tests {
     use moniker::Moniker;
     use std::future;
     use std::sync::Arc;
+    use zx::AsHandleRef;
     use {
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_inspect as inspect, fuchsia_sync as fsync, fuchsia_zircon as zx,
+        fuchsia_inspect as inspect, fuchsia_sync as fsync, zx,
     };
 
     fn get_data(
@@ -325,7 +325,7 @@ mod tests {
     async fn start_and_get_timestamp(
         root_component: &Arc<ComponentInstance>,
         moniker: &Moniker,
-    ) -> zx::MonotonicTime {
+    ) -> zx::MonotonicInstant {
         let component = root_component
             .start_instance(moniker, &StartReason::Root)
             .await

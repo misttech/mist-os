@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use static_assertions::const_assert;
 use std::collections::HashSet;
 use std::mem::{align_of, size_of};

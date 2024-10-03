@@ -24,20 +24,20 @@ constexpr int64_t kMaxFramesPerFrameBuffer = 1024;
 // are defined as 1u << static_cast<uint32_t>(RenderUsage).
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND)}).mask() ==
               FUCHSIA_AUDIO_EFFECTS_USAGE_BACKGROUND);
-static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA)}).mask() ==
-              FUCHSIA_AUDIO_EFFECTS_USAGE_MEDIA);
-static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}).mask() ==
-              FUCHSIA_AUDIO_EFFECTS_USAGE_INTERRUPTION);
-static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)}).mask() ==
-              FUCHSIA_AUDIO_EFFECTS_USAGE_SYSTEM_AGENT);
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION)}).mask() ==
               FUCHSIA_AUDIO_EFFECTS_USAGE_COMMUNICATION);
-static constexpr uint32_t kSupportedUsageMask =
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}).mask() ==
+              FUCHSIA_AUDIO_EFFECTS_USAGE_INTERRUPTION);
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA)}).mask() ==
+              FUCHSIA_AUDIO_EFFECTS_USAGE_MEDIA);
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)}).mask() ==
+              FUCHSIA_AUDIO_EFFECTS_USAGE_SYSTEM_AGENT);
+constexpr uint32_t kSupportedUsageMask =
     StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND),
-                     StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
+                     StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
                      StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
-                     StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT),
-                     StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION)})
+                     StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
+                     StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)})
         .mask();
 
 class MultiLibEffectsLoader {

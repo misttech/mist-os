@@ -68,6 +68,17 @@ impl UserBuffer {
     pub fn is_empty(&self) -> bool {
         self.length == 0
     }
+
+    /// Whether the given address and length is contained within this buffer.
+    pub fn contains(&self, address: UserAddress, length: usize) -> bool {
+        if let (Some(limit), Some(self_limit)) =
+            (address.checked_add(length), self.address.checked_add(self.length))
+        {
+            address >= self.address && limit <= self_limit
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]

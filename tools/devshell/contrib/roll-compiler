@@ -214,6 +214,8 @@ before commands are run for any package.
     cmd = [JIRI, "edit"]
     for package in packages:
         cmd += ["-package", "%s/${platform}=%s" % (package, tag)]
+    if "clang" in args.package:
+        cmd += ["-package", "fuchsia/third_party/clang/linux-arm64=%s" % tag]
     cmd += GetRustToolchainCommands(rust_toolchain_packages, tag)
 
     cmd.append(args.manifest)

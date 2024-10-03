@@ -10,7 +10,6 @@ use fidl_fuchsia_settings::{
     AudioMarker, AudioRequest, AudioSetResponder, AudioSetResult, AudioSettings,
     AudioStreamSettingSource, AudioStreamSettings, AudioWatchResponder, Volume,
 };
-use fuchsia_zircon as zx;
 
 use fidl_fuchsia_media::AudioRenderUsage;
 use fuchsia_trace as ftrace;
@@ -162,10 +161,10 @@ impl From<AudioRenderUsage> for AudioStreamType {
     fn from(usage: AudioRenderUsage) -> Self {
         match usage {
             AudioRenderUsage::Background => AudioStreamType::Background,
-            AudioRenderUsage::Media => AudioStreamType::Media,
-            AudioRenderUsage::Interruption => AudioStreamType::Interruption,
-            AudioRenderUsage::SystemAgent => AudioStreamType::SystemAgent,
             AudioRenderUsage::Communication => AudioStreamType::Communication,
+            AudioRenderUsage::Interruption => AudioStreamType::Interruption,
+            AudioRenderUsage::Media => AudioStreamType::Media,
+            AudioRenderUsage::SystemAgent => AudioStreamType::SystemAgent,
         }
     }
 }
@@ -174,10 +173,10 @@ impl From<AudioStreamType> for AudioRenderUsage {
     fn from(usage: AudioStreamType) -> Self {
         match usage {
             AudioStreamType::Background => AudioRenderUsage::Background,
-            AudioStreamType::Media => AudioRenderUsage::Media,
-            AudioStreamType::Interruption => AudioRenderUsage::Interruption,
-            AudioStreamType::SystemAgent => AudioRenderUsage::SystemAgent,
             AudioStreamType::Communication => AudioRenderUsage::Communication,
+            AudioStreamType::Interruption => AudioRenderUsage::Interruption,
+            AudioStreamType::Media => AudioRenderUsage::Media,
+            AudioStreamType::SystemAgent => AudioRenderUsage::SystemAgent,
         }
     }
 }

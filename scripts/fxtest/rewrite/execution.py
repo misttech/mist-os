@@ -112,6 +112,7 @@ class TestExecution:
             assert self._test.build.test.new_path is not None
             return [os.path.join(self._test.build.test.new_path)]
         elif self._test.info.execution is not None:
+            exec_env = self._exec_env
             execution = self._test.info.execution
 
             component_url = self._get_component_url()
@@ -165,7 +166,7 @@ class TestExecution:
             )
 
             return (
-                ["fx", "ffx", "test", "run"]
+                exec_env.fx_cmd_line("ffx", "test", "run")
                 + extra_args
                 + [component_url]
                 + suffix_args
@@ -189,6 +190,8 @@ class TestExecution:
         """
 
         execution = self._test.info.execution
+        exec_env = self._exec_env
+
         try:
             component_url = self._get_component_url()
         except TestCouldNotRun:
@@ -201,7 +204,9 @@ class TestExecution:
             extra_args += ["--realm", execution.realm]
 
         return (
-            ["fx", "ffx", "test", "list-cases"] + extra_args + [component_url]
+            exec_env.fx_cmd_line("ffx", "test", "list-cases")
+            + extra_args
+            + [component_url]
         )
 
     def environment(self) -> dict[str, str] | None:
@@ -299,8 +304,11 @@ class TestExecution:
             raise TestSkipped(
                 "Skipping optional end to end test. Pass --e2e to execute this test."
             )
+        exec_env = self._exec_env
 
-        symbolize = self.should_symbolize()
+        symbolizer_args = None
+        if self.should_symbolize():
+            symbolizer_args = exec_env.fx_cmd_line("ffx", "debug", "symbolize")
         command = self.command_line()
         env = self.environment() or {}
 
@@ -320,7 +328,7 @@ class TestExecution:
             recorder=recorder,
             parent=parent,
             print_verbatim=flags.output,
-            symbolize=symbolize,
+            symbolizer_args=symbolizer_args,
             env=env,
             timeout=timeout,
             abort_signal=abort_signal,
@@ -455,7 +463,8 @@ async def get_device_environment_from_exec_env(
     recorder: event.EventRecorder | None = None,
 ) -> environment.DeviceEnvironment:
     ssh_output = await run_command(
-        "fx", "ffx", "target", "get-ssh-address", recorder=recorder
+        *exec_env.fx_cmd_line("ffx", "target", "get-ssh-address"),
+        recorder=recorder,
     )
     if not ssh_output or ssh_output.return_code != 0:
         raise DeviceConfigError("Failed to get the ssh address of the target")
@@ -467,7 +476,8 @@ async def get_device_environment_from_exec_env(
     port = ssh_output.stdout[last_colon_index + 1 :].strip()
 
     target_output = await run_command(
-        "fx", "ffx", "target", "default", "get", recorder=recorder
+        *exec_env.fx_cmd_line("ffx", "target", "default", "get"),
+        recorder=recorder,
     )
     if not target_output or target_output.return_code != 0:
         raise DeviceConfigError("Failed to get the target name")
@@ -476,13 +486,14 @@ async def get_device_environment_from_exec_env(
     # get the configured private key. Ideally, the private key usage
     # should be an implementation detail internal to ffx commands.
     ssh_key_output = await run_command(
-        "fx",
-        "ffx",
-        "config",
-        "get",
-        "--process",
-        "file",
-        "ssh.priv",
+        *exec_env.fx_cmd_line(
+            "ffx",
+            "config",
+            "get",
+            "--process",
+            "file",
+            "ssh.priv",
+        ),
         recorder=recorder,
     )
     if not ssh_key_output or ssh_key_output.return_code != 0:
@@ -505,7 +516,7 @@ async def run_command(
     recorder: event.EventRecorder | None = None,
     parent: event.Id | None = None,
     print_verbatim: bool = False,
-    symbolize: bool = False,
+    symbolizer_args: list[str] | None = None,
     env: dict[str, str] | None = None,
     timeout: float | None = None,
     abort_signal: asyncio.Event | None = None,
@@ -541,9 +552,6 @@ async def run_command(
             name, list(args), env, parent=parent
         )
     try:
-        symbolizer_args = (
-            None if not symbolize else ["fx", "ffx", "debug", "symbolize"]
-        )
         started = await command.AsyncCommand.create(
             name,
             *args,

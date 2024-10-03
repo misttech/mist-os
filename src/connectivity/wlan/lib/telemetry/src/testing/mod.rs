@@ -12,7 +12,9 @@ use fuchsia_inspect::reader::{
     DiagnosticsHierarchy, {self as reader},
 };
 use fuchsia_inspect::{Inspector, Node as InspectNode};
+use futures::stream::FusedStream;
 use futures::task::Poll;
+use futures::TryStreamExt;
 use std::pin::pin;
 
 trait CobaltExt {
@@ -81,6 +83,10 @@ pub struct TestHelper {
     /// their payloads are drained to this HashMap
     cobalt_events: Vec<MetricEvent>,
 
+    pub monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
+    monitor_svc_stream: fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
+    pub telemetry_svc_stream: Option<fidl_fuchsia_wlan_sme::TelemetryRequestStream>,
+
     pub persistence_sender: mpsc::Sender<String>,
     persistence_stream: mpsc::Receiver<String>,
 
@@ -89,6 +95,34 @@ pub struct TestHelper {
 }
 
 impl TestHelper {
+    /// Execute the future and respond to GetSmeTelemetry request from DeviceMonitor
+    pub fn run_and_handle_get_sme_telemetry<T>(
+        &mut self,
+        test_fut: &mut (impl Future<Output = T> + Unpin),
+    ) -> Poll<T> {
+        let result = self.exec.run_until_stalled(test_fut);
+        if let Poll::Ready(Some(Ok(req))) =
+            self.exec.run_until_stalled(&mut self.monitor_svc_stream.next())
+        {
+            match req {
+                fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetSmeTelemetry {
+                    telemetry_server,
+                    responder,
+                    ..
+                } => {
+                    let telemetry_stream =
+                        telemetry_server.into_stream().expect("Failed to create telemetry stream");
+                    responder.send(Ok(())).expect("Failed to respond to telemetry request");
+                    self.telemetry_svc_stream = Some(telemetry_stream);
+                    self.exec.run_until_stalled(test_fut)
+                }
+                _ => panic!("Unexpected device monitor request: {:?}", req),
+            }
+        } else {
+            result
+        }
+    }
+
     /// Continually execute the future and respond to any incoming Cobalt request with Ok.
     /// Append each metric request payload into `self.cobalt_events`.
     pub fn run_until_stalled_drain_cobalt_events<F>(&mut self, test_fut: &mut F) -> Poll<F::Output>
@@ -108,6 +142,38 @@ impl TestHelper {
             }
         }
         result
+    }
+
+    pub fn run_and_respond_iface_counter_stats_req<T>(
+        &mut self,
+        test_fut: &mut (impl Future<Output = T> + Unpin),
+        counter_stats_resp: Result<&fidl_fuchsia_wlan_stats::IfaceCounterStats, i32>,
+    ) -> Poll<T> {
+        let result = self.exec.run_until_stalled(test_fut);
+        let telemetry_svc_stream = match &mut self.telemetry_svc_stream {
+            Some(telemetry_svc_stream) if !telemetry_svc_stream.is_terminated() => {
+                telemetry_svc_stream
+            }
+            _ => return result,
+        };
+
+        let mut telemetry_svc_req_fut = pin!(telemetry_svc_stream.try_next());
+        let request = match self.exec.run_until_stalled(&mut telemetry_svc_req_fut) {
+            Poll::Ready(Ok(Some(request))) => request,
+            _ => return result,
+        };
+
+        match request {
+            fidl_fuchsia_wlan_sme::TelemetryRequest::GetCounterStats { responder } => {
+                responder
+                    .send(counter_stats_resp)
+                    .expect("expect sending GetCounterStats response to succeed");
+            }
+            _ => {
+                panic!("unexpected request: {:?}", request);
+            }
+        }
+        self.exec.run_until_stalled(test_fut)
     }
 
     pub fn get_logged_metrics(&self, metric_id: u32) -> Vec<MetricEvent> {
@@ -163,6 +229,10 @@ pub fn setup_test() -> TestHelper {
         create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
             .expect("failed to create MetricsEventLogger proxy");
 
+    let (monitor_svc_proxy, monitor_svc_stream) =
+        create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
+            .expect("failed to create DeviceMonitor proxy");
+
     let inspector = Inspector::default();
     let inspect_node = inspector.root().create_child("test_stats");
     let inspect_metadata_node = inspect_node.create_child("metadata");
@@ -179,6 +249,9 @@ pub fn setup_test() -> TestHelper {
         cobalt_1dot1_stream,
         cobalt_1dot1_proxy,
         cobalt_events: vec![],
+        monitor_svc_proxy,
+        monitor_svc_stream,
+        telemetry_svc_stream: None,
         persistence_sender,
         persistence_stream,
         exec,

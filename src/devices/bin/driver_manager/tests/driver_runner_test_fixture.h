@@ -127,6 +127,8 @@ class TestDirectory final : public fidl::testing::TestBase<fio::Directory> {
 
   void Open(OpenRequest& request, OpenCompleter::Sync& completer) override;
 
+  void Open3(Open3Request& request, Open3Completer::Sync& completer) override;
+
   void handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
                              fidl::UnknownMethodCompleter::Sync&) override;
 
@@ -319,7 +321,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   TestDirectory driver_dir_{dispatcher()};
   TestDriverHost driver_host_;
   fidl::ServerBindingGroup<fuchsia_component::Realm> realm_bindings_;
-  std::optional<fidl::ServerBinding<fdh::DriverHost>> driver_host_binding_;
+  fidl::ServerBindingGroup<fdh::DriverHost> driver_host_bindings_;
 
   std::optional<Devfs> devfs_;
   InspectManager inspect_{dispatcher()};

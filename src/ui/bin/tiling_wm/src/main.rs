@@ -15,7 +15,7 @@ use tracing::{error, info, warn};
 use {
     fidl_fuchsia_element as element, fidl_fuchsia_session_scene as scene,
     fidl_fuchsia_ui_composition as ui_comp, fidl_fuchsia_ui_views as ui_views,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 // The maximum number of concurrent services to serve.

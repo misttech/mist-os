@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::Status;
 use std::time::Duration;
 use thiserror::Error;
+use zx::Status;
 use {fidl_fuchsia_paver as paver, fidl_fuchsia_update_verify as verify};
 
 /// Error condition that may be returned by a boot manager client.

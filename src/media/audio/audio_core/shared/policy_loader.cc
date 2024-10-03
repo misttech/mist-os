@@ -26,12 +26,12 @@
 namespace media::audio {
 
 namespace {
-static constexpr size_t kMaxSettingFileSize = (64 << 10);
-static const std::string kPolicyPath = "/config/data/audio_policy.json";
+constexpr size_t kMaxSettingFileSize = (64 << 10);
+const std::string kPolicyPath = "/config/data/audio_policy.json";
 
-static const std::string kIdleCountdownMsKey = "idle_countdown_milliseconds";
-static const std::string kStartupCountdownMsKey = "startup_idle_countdown_milliseconds";
-static const std::string kUltrasonicChannelsKey = "use_all_ultrasonic_channels";
+const std::string kIdleCountdownMsKey = "idle_countdown_milliseconds";
+const std::string kStartupCountdownMsKey = "startup_idle_countdown_milliseconds";
+const std::string kUltrasonicChannelsKey = "use_all_ultrasonic_channels";
 
 std::optional<fuchsia::media::AudioRenderUsage> JsonToRenderUsage(const rapidjson::Value& usage) {
   static_assert(fuchsia::media::RENDER_USAGE_COUNT == 5,
@@ -41,17 +41,20 @@ std::optional<fuchsia::media::AudioRenderUsage> JsonToRenderUsage(const rapidjso
 
   if (!strcmp(rule_str, "BACKGROUND")) {
     return fuchsia::media::AudioRenderUsage::BACKGROUND;
-  } else if (!strcmp(rule_str, "MEDIA")) {
-    return fuchsia::media::AudioRenderUsage::MEDIA;
-  } else if (!strcmp(rule_str, "INTERRUPTION")) {
-    return fuchsia::media::AudioRenderUsage::INTERRUPTION;
-  } else if (!strcmp(rule_str, "SYSTEM_AGENT")) {
-    return fuchsia::media::AudioRenderUsage::SYSTEM_AGENT;
-  } else if (!strcmp(rule_str, "COMMUNICATION")) {
-    return fuchsia::media::AudioRenderUsage::COMMUNICATION;
-  } else {
-    FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioRenderUsage.";
   }
+  if (!strcmp(rule_str, "COMMUNICATION")) {
+    return fuchsia::media::AudioRenderUsage::COMMUNICATION;
+  }
+  if (!strcmp(rule_str, "INTERRUPTION")) {
+    return fuchsia::media::AudioRenderUsage::INTERRUPTION;
+  }
+  if (!strcmp(rule_str, "MEDIA")) {
+    return fuchsia::media::AudioRenderUsage::MEDIA;
+  }
+  if (!strcmp(rule_str, "SYSTEM_AGENT")) {
+    return fuchsia::media::AudioRenderUsage::SYSTEM_AGENT;
+  }
+  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioRenderUsage.";
 
   return std::nullopt;
 }
@@ -64,15 +67,17 @@ std::optional<fuchsia::media::AudioCaptureUsage> JsonToCaptureUsage(const rapidj
 
   if (!strcmp(rule_str, "BACKGROUND")) {
     return fuchsia::media::AudioCaptureUsage::BACKGROUND;
-  } else if (!strcmp(rule_str, "FOREGROUND")) {
-    return fuchsia::media::AudioCaptureUsage::FOREGROUND;
-  } else if (!strcmp(rule_str, "SYSTEM_AGENT")) {
-    return fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT;
-  } else if (!strcmp(rule_str, "COMMUNICATION")) {
-    return fuchsia::media::AudioCaptureUsage::COMMUNICATION;
-  } else {
-    FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioCaptureUsage.";
   }
+  if (!strcmp(rule_str, "COMMUNICATION")) {
+    return fuchsia::media::AudioCaptureUsage::COMMUNICATION;
+  }
+  if (!strcmp(rule_str, "FOREGROUND")) {
+    return fuchsia::media::AudioCaptureUsage::FOREGROUND;
+  }
+  if (!strcmp(rule_str, "SYSTEM_AGENT")) {
+    return fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT;
+  }
+  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioCaptureUsage.";
 
   return std::nullopt;
 }
@@ -82,18 +87,19 @@ std::optional<fuchsia::media::Behavior> JsonToBehavior(const rapidjson::Value& b
 
   if (!strcmp(behavior_str, "NONE")) {
     return fuchsia::media::Behavior::NONE;
-  } else if (!strcmp(behavior_str, "DUCK")) {
-    return fuchsia::media::Behavior::DUCK;
-  } else if (!strcmp(behavior_str, "MUTE")) {
-    return fuchsia::media::Behavior::MUTE;
-  } else {
-    FX_LOGS(ERROR) << behavior_str << " not a valid Behavior.";
   }
+  if (!strcmp(behavior_str, "DUCK")) {
+    return fuchsia::media::Behavior::DUCK;
+  }
+  if (!strcmp(behavior_str, "MUTE")) {
+    return fuchsia::media::Behavior::MUTE;
+  }
+  FX_LOGS(ERROR) << behavior_str << " not a valid Behavior.";
 
   return std::nullopt;
 }
 
-static std::optional<fuchsia::media::Usage> JsonToUsage(const rapidjson::Value& usage) {
+std::optional<fuchsia::media::Usage> JsonToUsage(const rapidjson::Value& usage) {
   fuchsia::media::Usage ret;
   if (usage.HasMember("render_usage")) {
     auto u = JsonToRenderUsage(usage["render_usage"]);

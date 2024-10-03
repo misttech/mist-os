@@ -20,11 +20,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#fxfs-crypt",
-        },
-        {
             protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
             to: [ "#fxfs-crypt" ],

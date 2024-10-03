@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_tpm::{DeprovisionRequest, TpmDeviceProxy};
-use fuchsia_zircon as zx;
+
 use futures::lock::MutexGuard;
 
 pub async fn handle_deprovision_request(

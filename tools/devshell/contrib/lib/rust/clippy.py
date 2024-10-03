@@ -14,56 +14,83 @@ import sys
 import time
 from pathlib import Path
 
-import rust
-from rust import FUCHSIA_BUILD_DIR, HOST_PLATFORM, PREBUILT_THIRD_PARTY_DIR
+from rust import (
+    FUCHSIA_BUILD_DIR,
+    HOST_PLATFORM,
+    PREBUILT_THIRD_PARTY_DIR,
+    GnTarget,
+)
+
+
+def possible_labels(t: dict[str, any], fuchsia_dir: str) -> set[str]:
+    """all labels the user could have meant"""
+    return [
+        str(GnTarget(t["clippy_label"], fuchsia_dir)),
+        str(GnTarget(t["original_label"], fuchsia_dir)),
+        str(GnTarget(t["actual_label"], fuchsia_dir)),
+    ]
 
 
 def main():
     args = parse_args()
-    build_dir = Path(args.out_dir) if args.out_dir else FUCHSIA_BUILD_DIR
-    generated_file = build_dir / "clippy_target_mapping.json"
 
-    if args.all:
-        clippy_targets = get_targets(
-            generated_file, set(), build_dir, get_all=True
-        )
-    elif args.files:
-        input_files = {os.path.relpath(f, build_dir) for f in args.input}
-        clippy_targets = get_targets(generated_file, input_files, build_dir)
-        if args.verbose and not args.get_outputs:
-            print("Found the following targets for those source files:")
-            print(*(t.gn_target for t in clippy_targets), sep="\n")
-    else:
-        clippy_targets = []
-        for target in args.input:
-            if target.endswith(".rs"):
+    build_dir = Path(args.out_dir) if args.out_dir else FUCHSIA_BUILD_DIR
+
+    rust_target_mapping = Path(
+        build_dir, "rust_target_mapping.json"
+    ).read_bytes()
+    rust_target_mapping = json.loads(rust_target_mapping)
+    rust_target_mapping = [
+        t for t in rust_target_mapping if not t["disable_clippy"]
+    ]
+    if not args.all:
+        # filter rust target mapping
+        if args.files:
+            input_files = {os.path.relpath(f, build_dir) for f in args.input}
+            rust_target_mapping = [
+                t
+                for t in rust_target_mapping
+                for s in t["src"]
+                if s in input_files
+            ]
+        else:  # they are labels
+            targets_look_like_sources = [
+                t for t in args.input if t.endswith(".rs")
+            ]
+            if targets_look_like_sources:
                 print(
-                    f"Warning: {target} looks like a source file rather than a target, "
+                    f"Warning: {targets_look_like_sources} looks like a source file rather than a target, "
                     "maybe you meant to use --files ?"
                 )
-            gn_target = rust.GnTarget(target, args.fuchsia_dir)
-            gn_target.label_name += ".clippy"
-            clippy_targets.append(gn_target)
+            rust_target_mapping = [
+                t
+                for t in rust_target_mapping
+                for l in args.input
+                if str(GnTarget(l, args.fuchsia_dir))
+                in possible_labels(t, build_dir)
+            ]
 
-    output_files = [
-        os.path.relpath(t.gen_dir(build_dir).joinpath(t.label_name), build_dir)
-        for t in clippy_targets
-    ]
+    clippy_outputs = list(
+        set(str(Path(t["clippy_output"])) for t in rust_target_mapping)
+    )
+
     if args.get_outputs:
-        print(*output_files, sep="\n")
+        print(*clippy_outputs, sep="\n")
         return 0
-    if not output_files:
+
+    if not clippy_outputs:
         print("Error: Couldn't find any clippy outputs for those inputs")
         return 1
+
     if args.no_build:
         run_time = 0
         returncode = 0
     else:
         run_time = time.time()
-        returncode = build_targets(output_files, build_dir, args).returncode
+        returncode = build_targets(clippy_outputs, build_dir, args).returncode
 
     lints = {}
-    for clippy_output in output_files:
+    for clippy_output in clippy_outputs:
         clippy_output = build_dir / clippy_output
         # If we failed to build all targets we can keep going and print any
         # lints that were collected.
@@ -128,7 +155,7 @@ def fix_paths(lint):
     return lint
 
 
-def build_targets(output_files, build_dir, args):
+def build_targets(clippy_outputs, build_dir, args):
     prebuilt = PREBUILT_THIRD_PARTY_DIR
     if args.fuchsia_dir:
         prebuilt = Path(args.fuchsia_dir) / "prebuilt" / "third_party"
@@ -143,24 +170,13 @@ def build_targets(output_files, build_dir, args):
         ninja += ["--verbose"]
     if args.quiet:
         ninja += ["--quiet"]
-    ninja += output_files
+    ninja += clippy_outputs
     output = sys.stderr if args.raw else None
     env = os.environ
     env.setdefault("NINJA_PERSISTENT_MODE", "1")
     if args.verbose:
         print(" ".join([str(arg) for arg in ninja]))
     return subprocess.run(ninja, stdout=output, env=env)
-
-
-def get_targets(source_map, input_files, build_dir, get_all=False):
-    targets = set()
-    with open(source_map) as f:
-        raw = json.load(f)
-    for target in raw:
-        clippy_target = rust.GnTarget(target["clippy"], build_dir)
-        if get_all or any(f in input_files for f in target["src"]):
-            targets.add(clippy_target)
-    return targets
 
 
 def parse_args():

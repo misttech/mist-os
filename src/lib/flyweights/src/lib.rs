@@ -7,12 +7,12 @@
 
 #![warn(missing_docs)]
 
+use ahash::AHashSet;
 use once_cell::sync::Lazy;
 use serde::de::{Deserializer, Visitor};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::mem::{size_of, ManuallyDrop};
@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// If a live `FlyStr` contains an `Arc<Box<str>>`, the `Arc<Box<str>>` must also be in this cache
 /// and it must have a refcount of >= 2.
-static CACHE: Lazy<Mutex<HashSet<Storage>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static CACHE: Lazy<Mutex<AHashSet<Storage>>> = Lazy::new(|| Mutex::new(AHashSet::new()));
 
 /// Wrapper type for stored `Arc`s that lets us query the cache without an owned value. Implementing
 /// `Borrow<str> for Arc<Box<str>>` upstream *might* be possible with specialization but this is
@@ -33,6 +33,7 @@ static CACHE: Lazy<Mutex<HashSet<Storage>>> = Lazy::new(|| Mutex::new(HashSet::n
 struct Storage(Arc<Box<str>>);
 
 impl Borrow<str> for Storage {
+    #[inline]
     fn borrow(&self) -> &str {
         self.0.as_ref()
     }
@@ -83,54 +84,63 @@ impl FlyStr {
     }
 
     /// Returns the underlying string slice.
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
 }
 
 impl Default for FlyStr {
+    #[inline]
     fn default() -> Self {
         Self::new("")
     }
 }
 
 impl From<&'_ str> for FlyStr {
+    #[inline]
     fn from(s: &str) -> Self {
         Self::new(s)
     }
 }
 
 impl From<&'_ String> for FlyStr {
+    #[inline]
     fn from(s: &String) -> Self {
         Self::new(&**s)
     }
 }
 
 impl From<String> for FlyStr {
+    #[inline]
     fn from(s: String) -> Self {
         Self::new(s)
     }
 }
 
 impl From<Box<str>> for FlyStr {
+    #[inline]
     fn from(s: Box<str>) -> Self {
         Self::new(s)
     }
 }
 
 impl From<&Box<str>> for FlyStr {
+    #[inline]
     fn from(s: &Box<str>) -> Self {
         Self::new(&**s)
     }
 }
 
 impl Into<String> for FlyStr {
+    #[inline]
     fn into(self) -> String {
         self.as_str().to_owned()
     }
 }
 
 impl Into<String> for &'_ FlyStr {
+    #[inline]
     fn into(self) -> String {
         self.as_str().to_owned()
     }
@@ -138,47 +148,56 @@ impl Into<String> for &'_ FlyStr {
 
 impl Deref for FlyStr {
     type Target = str;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_str()
     }
 }
 
 impl AsRef<str> for FlyStr {
+    #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
 impl PartialOrd for FlyStr {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 impl Ord for FlyStr {
+    #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.as_str().cmp(other.as_str())
     }
 }
 
 impl PartialEq<str> for FlyStr {
+    #[inline]
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
 impl PartialEq<&'_ str> for FlyStr {
+    #[inline]
     fn eq(&self, other: &&str) -> bool {
         self.as_str() == *other
     }
 }
 
 impl PartialEq<String> for FlyStr {
+    #[inline]
     fn eq(&self, other: &String) -> bool {
         self.as_str() == &**other
     }
 }
 
 impl PartialOrd<str> for FlyStr {
+    #[inline]
     fn partial_cmp(&self, other: &str) -> Option<std::cmp::Ordering> {
         self.as_str().partial_cmp(other)
     }
@@ -299,12 +318,14 @@ impl RawRepr {
         }
     }
 
+    #[inline]
     fn is_inline(&self) -> bool {
         // SAFETY: it is always OK to interpret a pointer as byte array as long as we don't expect
         // to retain provenance.
         (unsafe { self.inline.masked_len } & 1) == 1
     }
 
+    #[inline]
     fn project(&self) -> SafeRepr<'_> {
         if self.is_inline() {
             // SAFETY: Just checked that this is the inline variant.
@@ -315,6 +336,7 @@ impl RawRepr {
         }
     }
 
+    #[inline]
     fn as_str(&self) -> &str {
         match self.project() {
             // SAFETY: FlyStr owns the `Arc` stored as a NonNull, it is live as long as `FlyStr`.
@@ -325,25 +347,25 @@ impl RawRepr {
 }
 
 impl PartialEq for RawRepr {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
-        match (self.project(), other.project()) {
-            (SafeRepr::Inline(i), SafeRepr::Inline(oi)) => i.eq(oi),
-            // Use pointer value equality since there's only ever one pointer to a given string.
-            (SafeRepr::Heap(ptr), SafeRepr::Heap(other_ptr)) => ptr.eq(&other_ptr),
-            _ => false,
-        }
+        // SAFETY: it is always OK to interpret a pointer as a byte array as long as we don't expect
+        // to retain provenance.
+        let lhs = unsafe { &self.inline };
+        // SAFETY: it is always OK to interpret a pointer as a byte array as long as we don't expect
+        // to retain provenance.
+        let rhs = unsafe { &other.inline };
+        lhs.eq(rhs)
     }
 }
 impl Eq for RawRepr {}
 
 impl Hash for RawRepr {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        match self.project() {
-            // Hash the value of the pointer rather than the pointed-to string since there's
-            // only one copy of the string allocated ever.
-            SafeRepr::Heap(ptr) => ptr.hash(h),
-            SafeRepr::Inline(i) => i.hash(h),
-        }
+        // SAFETY: it is always OK to interpret a pointer as a byte array as long as we don't expect
+        // to retain provenance.
+        let this = unsafe { &self.inline };
+        this.hash(h);
     }
 }
 
@@ -387,6 +409,7 @@ impl Drop for RawRepr {
     }
 }
 
+#[inline]
 fn nonnull_from_arc(a: Arc<Box<str>>) -> NonNull<Box<str>> {
     let raw: *const Box<str> = Arc::into_raw(a);
     // SAFETY: Arcs can't be null.
@@ -414,6 +437,7 @@ const MAX_INLINE_SIZE: usize = size_of::<NonNull<Box<str>>>() - 1;
 static_assertions::const_assert!((std::u8::MAX >> 1) as usize >= MAX_INLINE_SIZE);
 
 impl InlineRepr {
+    #[inline]
     fn new(s: &str) -> Self {
         assert!(s.len() <= MAX_INLINE_SIZE);
 
@@ -426,6 +450,7 @@ impl InlineRepr {
         Self { masked_len, contents }
     }
 
+    #[inline]
     fn as_str(&self) -> &str {
         // SAFETY: inline storage is only ever constructed from valid UTF-8 strings.
         let len = self.masked_len >> 1;
@@ -450,8 +475,8 @@ mod tests {
     fn reset_global_cache() {
         // We still want subsequent tests to be able to run if one in the same process panics.
         match CACHE.lock() {
-            Ok(mut c) => *c = HashSet::new(),
-            Err(e) => *e.into_inner() = HashSet::new(),
+            Ok(mut c) => *c = AHashSet::new(),
+            Err(e) => *e.into_inner() = AHashSet::new(),
         }
     }
     fn num_strings_in_global_cache() -> usize {
@@ -603,7 +628,7 @@ mod tests {
         let first = FlyStr::new(first);
         let second = FlyStr::new(second);
 
-        let mut set = HashSet::new();
+        let mut set = AHashSet::new();
         set.insert(first.clone());
         assert!(set.contains(&first));
         assert!(!set.contains(&second));

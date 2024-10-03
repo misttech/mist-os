@@ -6,9 +6,9 @@ use anyhow::{Context as _, Result};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::process_self;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Peered};
 use futures::{try_join, StreamExt, TryFutureExt, TryStreamExt};
 use tracing::warn;
+use zx::{self as zx, AsHandleRef, HandleBased, Peered};
 use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 
 struct Instrumentation {

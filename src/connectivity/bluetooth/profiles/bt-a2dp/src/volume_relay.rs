@@ -14,7 +14,7 @@ use std::pin::pin;
 use tracing::{info, trace, warn};
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
-    fidl_fuchsia_settings as settings, fuchsia_zircon as zx,
+    fidl_fuchsia_settings as settings, zx,
 };
 
 /// Represents set volume request.
@@ -321,7 +321,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_utils::PollExt;
-    use fuchsia_zircon as zx;
+
     use std::pin::Pin;
 
     const INITIAL_MEDIA_VOLUME: f32 = 0.8;

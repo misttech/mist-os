@@ -8,9 +8,9 @@ use crate::node::Node;
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::StreamExt as _;
 use std::sync::Arc;
+use zx_status::Status;
 
 pub use vfs_macros::attribute_query;
 

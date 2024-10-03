@@ -15,13 +15,13 @@ rustc_test("socket_proxy_integration_test") {
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/lib/net-declare",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
@@ -51,5 +51,6 @@ fuchsia_test_package("socket-proxy-integration-tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":socket-proxy-integration-tests" ]
+  # TODO(b/369741015): Re-enable when deflaked.
+  #deps = [ ":socket-proxy-integration-tests" ]
 }

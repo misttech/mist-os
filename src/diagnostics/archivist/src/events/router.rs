@@ -378,11 +378,11 @@ mod tests {
     use fidl_fuchsia_inspect::InspectSinkMarker;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::AsHandleRef;
     use futures::FutureExt;
     use moniker::ExtendedMoniker;
     use std::sync::LazyLock;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::AsHandleRef;
+    use {fuchsia_async as fasync, zx};
 
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;
@@ -402,7 +402,7 @@ mod tests {
                     let (_, request_stream) =
                         fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
                     Event {
-                        timestamp: zx::MonotonicTime::from_nanos(FAKE_TIMESTAMP),
+                        timestamp: zx::MonotonicInstant::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                             component: identity,
                             request_stream,
@@ -413,7 +413,7 @@ mod tests {
                     let (_, request_stream) =
                         fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
                     Event {
-                        timestamp: zx::MonotonicTime::from_nanos(FAKE_TIMESTAMP),
+                        timestamp: zx::MonotonicInstant::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                             component: identity,
                             request_stream,
@@ -524,7 +524,7 @@ mod tests {
         let request_stream = LogSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(
             server_end.into_channel(),
         ));
-        let timestamp = zx::MonotonicTime::get();
+        let timestamp = zx::MonotonicInstant::get();
         producer
             .dispatcher
             .emit(Event {
@@ -587,7 +587,7 @@ mod tests {
         producer
             .dispatcher
             .emit(Event {
-                timestamp: zx::MonotonicTime::get(),
+                timestamp: zx::MonotonicInstant::get(),
                 payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: IDENTITY.clone(),
                     request_stream,
@@ -607,7 +607,7 @@ mod tests {
         producer
             .dispatcher
             .emit(Event {
-                timestamp: zx::MonotonicTime::get(),
+                timestamp: zx::MonotonicInstant::get(),
                 payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: IDENTITY.clone(),
                     request_stream,
@@ -775,7 +775,7 @@ mod tests {
         let (_proxy, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
         Event {
-            timestamp: zx::MonotonicTime::from_nanos(FAKE_TIMESTAMP),
+            timestamp: zx::MonotonicInstant::from_nanos(FAKE_TIMESTAMP),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component: identity,
                 request_stream,

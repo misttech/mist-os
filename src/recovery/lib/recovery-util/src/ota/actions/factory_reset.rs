@@ -7,8 +7,8 @@ use crate::ota::state_machine::Event;
 use fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy};
 use fuchsia_async::{self as fasync};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::sys::ZX_OK;
-use fuchsia_zircon_status::{self as zx_status};
+use zx::sys::ZX_OK;
+use zx_status::{self as zx_status};
 
 /// Asynchronously performs a factory reset.
 /// It reboots almost instantly
@@ -51,10 +51,10 @@ mod test {
     use fuchsia_async::{
         TimeoutExt, {self as fasync},
     };
-    use fuchsia_zircon::Duration;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
     use mockall::predicate::{self, eq};
+    use zx::Duration;
 
     const RESET_CALLED: i32 = 123456;
 

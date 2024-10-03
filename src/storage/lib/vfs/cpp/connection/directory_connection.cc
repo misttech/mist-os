@@ -38,6 +38,10 @@ constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights
       !(parent_rights & fio::Rights::kModifyDirectory)) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
+  // If the request attempts to truncate a file, it must also request write permissions.
+  if ((flags & fio::Flags::kFileTruncate) && !(flags & fio::Flags::kPermWrite)) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
   fio::Rights requested_rights = internal::FlagsToRights(flags);
   // If the requested rights exceed those of the parent connection, reject the request.
   if (requested_rights - parent_rights) {
@@ -218,7 +222,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
                                      std::move(request->object));
             return ZX_OK;
           } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Ok>) {
-            return fs->Serve(result.vnode, request->object.TakeChannel(), result.options);
+            return fs->ServeDeprecated(result.vnode, request->object.TakeChannel(), result.options);
           }
         });
   }();
@@ -282,16 +286,17 @@ void DirectoryConnection::Open3(fuchsia_io::wire::Directory2Open3Request* reques
       rights |= optional_rights;
     }
     // Serve a new connection to the vnode.
-    return fs->Serve3(*std::move(open_result), rights, request->object, request->flags,
-                      request->options);
+    return fs->ServeResult(*std::move(open_result), rights, request->object, request->flags,
+                           request->options);
   }();
 
   // On any errors above, the object request channel should remain usable, so that we can close it
   // with the corresponding error epitaph.
   if (handled.is_error()) {
     FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open3] Error: ", handled.status_string());
-    ZX_ASSERT(request->object.is_valid());
-    fidl::ServerEnd<fio::Node>{std::move(request->object)}.Close(handled.error_value());
+    if (request->object.is_valid()) {
+      fidl::ServerEnd<fio::Node>{std::move(request->object)}.Close(handled.error_value());
+    }
     return;
   }
 }

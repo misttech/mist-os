@@ -12,7 +12,7 @@ use chrono::{DateTime, TimeZone as _, Timelike as _, Utc};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use tracing::{info, warn};
-use {fuchsia_async as fasync, fuchsia_runtime as runtime, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, fuchsia_runtime as runtime, zx};
 
 /// Delay between polls of system and userspace clocks.
 const POLL_DELAY: zx::Duration = zx::Duration::from_seconds(2);
@@ -33,8 +33,8 @@ async fn main() {
     future::join_all(futures).await;
 }
 
-/// Returns a standard format timestamp for a zx::MonotonicTime.
-fn zx_timestamp(time: &zx::MonotonicTime) -> String {
+/// Returns a standard format timestamp for a zx::MonotonicInstant.
+fn zx_timestamp(time: &zx::MonotonicInstant) -> String {
     chrono_timestamp(&Utc.timestamp_nanos(time.into_nanos()))
 }
 

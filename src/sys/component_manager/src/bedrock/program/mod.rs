@@ -17,8 +17,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, zx,
 };
 
 mod component_controller;
@@ -377,12 +376,11 @@ pub mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::ControlHandle;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, Koid};
     use futures::lock::Mutex;
     use std::collections::HashMap;
     use std::sync::Arc;
     use std::task::Poll;
-    use zx::AsHandleRef;
+    use zx::{self as zx, AsHandleRef, Koid};
 
     #[fuchsia::test]
     /// Test scenario where we tell the controller to stop the component and

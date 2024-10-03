@@ -71,6 +71,9 @@ struct ClientSettings {
     static const char* kSourceMap;
     static const char* kSourceMapDescription;
 
+    static const char* kIntegerFormat;  // Possible values are the kIntegerFormat*.
+    static const char* kIntegerFormatDescription;
+
     static const char* kVectorFormat;  // Possible values are the kVectorRegisterFormatStr_*.
     static const char* kVectorFormatDescription;  // Help for kBuildDirs.
 

@@ -15,8 +15,8 @@ rustc_binary("bin") {
   # [START deps]
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_rust",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 

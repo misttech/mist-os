@@ -13,7 +13,7 @@ use futures::{Stream, StreamExt};
 use tracing::{info, warn};
 use {
     fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync,
-    fuchsia_syslog_listener as syslog_listener, fuchsia_zircon as zx,
+    fuchsia_syslog_listener as syslog_listener, zx,
 };
 
 fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {

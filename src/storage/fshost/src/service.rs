@@ -28,8 +28,6 @@ use fuchsia_fs::directory::{
 };
 use fuchsia_fs::file::write;
 use fuchsia_runtime::HandleType;
-use fuchsia_zircon::sys::{zx_handle_t, zx_status_t};
-use fuchsia_zircon::{self as zx, AsHandleRef, Duration};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
@@ -37,6 +35,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 use vfs::service;
+use zx::sys::{zx_handle_t, zx_status_t};
+use zx::{self as zx, AsHandleRef, Duration};
 use {fidl_fuchsia_fshost as fshost, fuchsia_async as fasync};
 
 pub enum FshostShutdownResponder {

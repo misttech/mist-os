@@ -4,9 +4,9 @@
 use anyhow::{anyhow, Result};
 use fidl::endpoints::create_proxy;
 use fuchsia_inspect::Property;
-use fuchsia_zircon::{HandleBased, Rights};
 use futures::future::{FutureExt, LocalBoxFuture};
 use std::sync::Arc;
+use zx::{HandleBased, Rights};
 use {fidl_fuchsia_power_broker as fbroker, fuchsia_async as fasync};
 
 /// A well-known set of PowerLevels to be specified as the valid_levels for a

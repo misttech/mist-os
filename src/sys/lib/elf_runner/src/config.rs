@@ -5,7 +5,7 @@
 use crate::error::ProgramError;
 use ::routing::policy::ScopedPolicyChecker;
 use runner::StartInfoProgramError;
-use {fidl_fuchsia_data as fdata, fuchsia_zircon as zx};
+use {fidl_fuchsia_data as fdata, zx};
 
 const CREATE_RAW_PROCESSES_KEY: &str = "job_policy_create_raw_processes";
 const SHARED_PROCESS_KEY: &str = "is_shared_process";

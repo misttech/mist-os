@@ -191,11 +191,6 @@ enum brcmf_netif_stop_reason {
   BRCMF_NETIF_STOP_REASON_DISCONNECTED = BIT(2)
 };
 
-// Holds information used during an in-progress reassociation.
-using reassoc_context_t = struct {
-  wlan::common::MacAddr bssid;
-};
-
 constexpr size_t kConnectReqBufferSize =
     fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest,
                            fidl::MessageDirection::kSending>();
@@ -215,8 +210,6 @@ constexpr size_t kConnectReqBufferSize =
  *  (replaced by irq_callback_lock)
  * @roam_req: request for a roam attempt, populated if a roam is requested from
  *   above the driver.
- * @roam_req_lock: guards roam_req.
- * @reassoc_context: holds info used during an in-progress reassociation (roam).
  * @bss: information on current bss.
  * @pend_8021x_cnt: tracks outstanding number of 802.1x frames.
  * @pend_8021x_wait: used for signalling change in count.
@@ -235,9 +228,10 @@ struct brcmf_if {
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
   fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest connect_req;
+  // Request for a roam attempt, populated if a roam is requested from above the driver.
+  std::optional<fuchsia_wlan_fullmac::WlanFullmacImplRoamRequest> roam_req;
   // SSID of Successfully started SoftAP.
   fuchsia_wlan_ieee80211::wire::CSsid saved_softap_ssid;
-  reassoc_context_t reassoc_context;
   std::atomic<int> pend_8021x_cnt;
   sync_completion_t pend_8021x_wait;
   sync_completion_t disconnect_done;

@@ -111,7 +111,7 @@ template("rustc_dylib") {
       if (defined(invoker.name)) {
         name = invoker.name + "_dylib_test"
       }
-      original_target_name = _original_target_name
+      original_target_name = target_name
       forward_variables_from(invoker, "*", [ "name" ])
     }
   }
@@ -132,7 +132,7 @@ template("rustc_dylib") {
   rustc_artifact(target_name) {
     target_type = "shared_library"
     crate_root = source_root
-    clippy_crate_type = "dylib"
+    rust_crate_type = "dylib"
     crate_name = _crate_name
     original_target_name = _original_target_name
     pass_through = {

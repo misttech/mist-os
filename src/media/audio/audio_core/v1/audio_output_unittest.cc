@@ -538,10 +538,10 @@ TEST_F(AudioOutputTest, UpdateOutputPipeline) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {

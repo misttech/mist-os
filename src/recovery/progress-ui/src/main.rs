@@ -24,7 +24,6 @@ use fidl_fuchsia_recovery_ui::{
     ProgressRendererMarker, ProgressRendererRequest, ProgressRendererRequestStream, Status,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::{Duration, Event};
 use futures::prelude::*;
 #[cfg(feature = "debug_touch_to_update")]
 use rand;
@@ -37,6 +36,7 @@ use rive_rs::File;
 #[cfg(feature = "debug_touch_to_update")]
 use std::time::Instant;
 use tracing::{error, info};
+use zx::{Duration, Event};
 
 const LOGO_IMAGE_PATH: &str = "/pkg/data/logo.riv";
 const BG_COLOR: Color = Color::white();

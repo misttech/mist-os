@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use heapdump_vmo::stack_trace_compression;
 use std::ffi::c_void;
 
@@ -21,10 +20,10 @@ extern "C" {
 // Note: This is function is `inline(always)` so that it doesn't appear in the stack trace.
 #[inline(always)]
 fn with_profiler_and_call_site(
-    f: impl FnOnce(&Profiler, &mut PerThreadData, zx::MonotonicTime, &[u8]),
+    f: impl FnOnce(&Profiler, &mut PerThreadData, zx::MonotonicInstant, &[u8]),
 ) {
     // Collect the timestamp as early as possible.
-    let timestamp = zx::MonotonicTime::get();
+    let timestamp = zx::MonotonicInstant::get();
 
     // Collect stack trace outside of the recursion guard to avoid including it in the stack trace.
     let mut stack_buf = [0; STACK_TRACE_MAXIMUM_DEPTH];

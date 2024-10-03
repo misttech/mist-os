@@ -6,7 +6,7 @@ use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use std::io::{Read, Seek};
-use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fuchsia_trace as ftrace, zx};
 
 pub struct QcowBackend {
     file: std::cell::RefCell<std::fs::File>,

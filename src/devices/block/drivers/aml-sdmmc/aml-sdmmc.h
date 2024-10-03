@@ -48,8 +48,8 @@ class AmlSdmmc : public fdf::DriverBase,
   static constexpr size_t kMaxDmaDescriptors = 512;
 
   static constexpr char kHardwarePowerElementName[] = "aml-sdmmc-hardware";
-  static constexpr char kSystemWakeOnRequestPowerElementName[] = "aml-sdmmc-system-wake-on-request";
-  // Common to hardware power and wake-on-request power elements.
+
+  // Levels for hardware power element.
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
 
@@ -200,8 +200,6 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty longest_window_adj_delay;
     inspect::UintProperty distance_to_failing_point;
     inspect::BoolProperty power_suspended;
-    inspect::UintProperty wake_on_request_count;
-    inspect::ExponentialUintHistogram wake_on_request_latency_us;
 
     void Init(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info,
               inspect::Node& parent, bool is_power_suspended);
@@ -307,16 +305,6 @@ class AmlSdmmc : public fdf::DriverBase,
   // transitions to the Power Broker.
   void WatchHardwareRequiredLevel();
 
-  // Watches the required wake-on-request power level and replies to the Power Broker accordingly.
-  // Does not directly effect any real power level change of storage hardware. (That happens in
-  // WatchHardwareRequiredLevel().)
-  void WatchWakeOnRequestRequiredLevel();
-
-  // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution State,
-  // satisfying the hardware power element's lease status (which is opportunistically dependent on
-  // SAG's Execution State), and thus resuming power.
-  zx_status_t ActivateWakeOnRequest() TA_REQ(lock_);
-
   // Serves requests that were delayed because they were received during suspended state.
   void ServeDelayedRequests() TA_REQ(tuning_lock_, lock_);
 
@@ -341,15 +329,7 @@ class AmlSdmmc : public fdf::DriverBase,
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
   zx::event hardware_power_assertive_token_;
 
-  fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
-      wake_on_request_element_control_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
-
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
-  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> wake_on_request_lease_control_client_end_
-      TA_GUARDED(lock_);
 
   bool shutdown_ TA_GUARDED(lock_) = false;
   std::array<SdmmcVmoStore, fuchsia_hardware_sdmmc::wire::kSdmmcMaxClientId + 1> registered_vmos_

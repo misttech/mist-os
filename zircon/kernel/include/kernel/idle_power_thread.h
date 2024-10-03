@@ -99,7 +99,7 @@ class IdlePowerThread final {
   //  - ZX_OK if active CPU suspend succeeded and then resumed.
   //  - ZX_ERR_TIMED_OUT when resume_at is in the past before transitioning to suspend.
   //  - ZX_ERR_BAD_STATE if there is a pending wake event when attempting to transition to suspend.
-  static zx_status_t TransitionAllActiveToSuspend(zx_boot_time_t resume_at = ZX_TIME_INFINITE)
+  static zx_status_t TransitionAllActiveToSuspend(zx_instant_boot_t resume_at = ZX_TIME_INFINITE)
       TA_EXCL(TransitionLock::Get());
 
   // Implements the run loop executed by the CPU's idle/power thread.
@@ -194,8 +194,7 @@ class IdlePowerThread final {
 
   // A timer on the boot timeline used to resume the system at the given boot time if no other wake
   // events occur by then.
-  inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){
-      Timer::ReferenceTimeline::kBoot};
+  inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){ZX_CLOCK_BOOT};
 
   // A bespoke wake vector used by the resume timer handler to wake the system when the resume boot
   // time is reached.

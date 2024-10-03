@@ -70,9 +70,9 @@ rustc_library("wake_lease_rust") {
     "//third_party/rust_crates:anyhow",
   ]
   test_deps = [
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
   ]
 }
@@ -115,6 +115,9 @@ fuchsia_test_package("tests") {
   deps = [
     # Other components that we are injecting into integration tests.
     "//src/power/broker:component",
-    "//src/power/system-activity-governor:component",
+  ]
+  subpackages = [
+    "//src/power/system-activity-governor:package",
+    "//src/power/system-activity-governor:config-no-suspender",
   ]
 }

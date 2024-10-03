@@ -158,6 +158,9 @@ func (c *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 // Clippy target, returns false.
 func (c *clippyReporter) clippyTargetForFile(buildRelPath string) (target build.ClippyTarget, ok bool) {
 	for _, target := range c.clippyTargets {
+		if target.DisableClippy {
+			continue
+		}
 		for _, source := range target.Sources {
 			// Assumes each file only feeds into a single clippy target.
 			if source == buildRelPath {

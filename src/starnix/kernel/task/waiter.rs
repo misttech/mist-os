@@ -7,7 +7,7 @@ use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
 use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon as zx;
+
 use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_sync::{
     EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,
@@ -421,7 +421,7 @@ impl PortWaiter {
     }
 
     /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
-    fn wait_internal(&self, deadline: zx::MonotonicTime) -> Result<(), Errno> {
+    fn wait_internal(&self, deadline: zx::MonotonicInstant) -> Result<(), Errno> {
         // This method can block arbitrarily long, possibly waiting for another process. The
         // current thread should not own any local ref that might delay the release of a resource
         // while doing so.
@@ -453,7 +453,7 @@ impl PortWaiter {
     fn wait_until(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         profile_duration!("WaiterWaitUntil");
         let is_waiting = deadline.into_nanos() > 0;
@@ -620,7 +620,7 @@ impl Waiter {
     ///
     /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
     pub fn wait(&self, current_task: &CurrentTask) -> Result<(), Errno> {
-        self.inner.wait_until(current_task, zx::MonotonicTime::INFINITE)
+        self.inner.wait_until(current_task, zx::MonotonicInstant::INFINITE)
     }
 
     /// Wait until the given deadline has passed or the waiter is woken up.
@@ -648,7 +648,7 @@ impl Waiter {
     pub fn wait_until(
         &self,
         current_task: &CurrentTask,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         self.inner.wait_until(current_task, deadline)
     }
@@ -1155,7 +1155,7 @@ mod tests {
                 std::mem::size_of::<u64>()
             );
 
-            let wait_result = waiter.wait_until(&current_task, zx::MonotonicTime::ZERO);
+            let wait_result = waiter.wait_until(&current_task, zx::MonotonicInstant::ZERO);
             let final_count = queue.lock().len();
             if do_cancel {
                 assert_eq!(wait_result, error!(ETIMEDOUT));
@@ -1176,7 +1176,7 @@ mod tests {
         let _wk2 = wait_queue.wait_async(&waiter);
         wk1.cancel();
         wait_queue.notify_all();
-        assert!(waiter.wait_until(&current_task, zx::MonotonicTime::ZERO).is_ok());
+        assert!(waiter.wait_until(&current_task, zx::MonotonicInstant::ZERO).is_ok());
     }
 
     #[::fuchsia::test]
@@ -1189,8 +1189,8 @@ mod tests {
         let _wk2 = wait_queue.wait_async(&waiter2);
         wk1.cancel();
         wait_queue.notify_all();
-        assert!(waiter1.wait_until(&current_task, zx::MonotonicTime::ZERO).is_err());
-        assert!(waiter2.wait_until(&current_task, zx::MonotonicTime::ZERO).is_ok());
+        assert!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO).is_err());
+        assert!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO).is_ok());
     }
 
     #[::fuchsia::test]
@@ -1206,7 +1206,7 @@ mod tests {
         let woken = || {
             waiters
                 .iter()
-                .filter(|w| w.wait_until(&current_task, zx::MonotonicTime::ZERO).is_ok())
+                .filter(|w| w.wait_until(&current_task, zx::MonotonicInstant::ZERO).is_ok())
                 .count()
         };
 

@@ -17,9 +17,7 @@ use fuchsia_component::client as fclient;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
-use {
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio, zx};
 
 pub static SCHEME: &str = "realm-builder";
 pub static RUNNER_NAME: &str = "realm_builder";

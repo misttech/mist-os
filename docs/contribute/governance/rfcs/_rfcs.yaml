@@ -3400,3 +3400,29 @@
   reviewers: ['adamperry@google.com', 'andresoportus@google.com', 'fmil@google.com', 'gkalsi@google.com', 'harshanv@google.com', 'johngro@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'miguelfrde@google.com', 'tgales@google.com', 'tmandry@google.com']
   submitted: '2024-06-14'
   reviewed: '2024-09-25'
+
+- name: 'RFC-0261'
+  title: 'Fast and efficient user space kernel emulation'
+  short_description: 'Enable Fuchsia programs to act as secure, efficient supervisors of untrusted guest code.'
+  authors: ['maniscalco@google.com', 'travisg@google.com']
+  file: '0261_fast_and_efficient_user_space_kernel_emulation.md'
+  area: ['Kernel']
+  issue: ['42181309']
+  gerrit_change_id: ['688090']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'adanis@google.com', 'cpu@google.com', 'jamesr@google.com', 'lindkvist@google.com', 'mvanotti@google.com']
+  submitted: '2022-06-07'
+  reviewed: '2024-10-01'
+
+- name: 'RFC-0262'
+  title: 'Expand KMEM_STATS'
+  short_description: 'Expand the fields and descriptions in ZX_INFO_KMEM_STATS and deprecate ZX_INFO_KMEM_STATS_EXTENDED.'
+  authors: ['adanis@google.com']
+  file: '0262_expand_kmem_stats.md'
+  area: ['Kernel']
+  issue: ['42147338']
+  gerrit_change_id: ['1108953']
+  status: 'Accepted'
+  reviewers: ['maniscalco@google.com', 'mcgrathr@google.com']
+  submitted: '2024-08-28'
+  reviewed: '2024-10-02'

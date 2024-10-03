@@ -25,9 +25,7 @@ use std::cell::RefCell;
 use std::fs::{self, File};
 use std::path::Path;
 use std::rc::Rc;
-use {
-    fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio, zx};
 
 /// FactoryResetState tracks the state of the device through the factory reset
 /// process.
@@ -543,7 +541,7 @@ mod tests {
         input_device::UnhandledInputEvent {
             device_event,
             device_descriptor: create_input_device_descriptor(),
-            event_time: zx::MonotonicTime::get(),
+            event_time: zx::MonotonicInstant::get(),
             trace_id: None,
         }
     }
@@ -556,7 +554,7 @@ mod tests {
         input_device::UnhandledInputEvent {
             device_event,
             device_descriptor: create_input_device_descriptor(),
-            event_time: zx::MonotonicTime::get(),
+            event_time: zx::MonotonicInstant::get(),
             trace_id: None,
         }
     }

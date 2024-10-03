@@ -11,7 +11,6 @@ use bstr::BString;
 use fidl::encoding::const_assert_eq;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::mem::{size_of, size_of_val};
@@ -19,6 +18,7 @@ use std::num::TryFromIntError;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::pin::Pin;
 use zerocopy::{FromBytes, IntoBytes};
+use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
     zxio_seek_origin_t, zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
@@ -1378,7 +1378,7 @@ fn directory_open(
     directory: &fio::DirectorySynchronousProxy,
     path: &str,
     flags: fio::OpenFlags,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 ) -> Result<DescribedNode, zx::Status> {
     let flags = flags | fio::OpenFlags::DESCRIBE;
 
@@ -1411,7 +1411,7 @@ pub fn directory_open_vmo(
     directory: &fio::DirectorySynchronousProxy,
     path: &str,
     vmo_flags: fio::VmoFlags,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 ) -> Result<zx::Vmo, zx::Status> {
     let mut open_flags = fio::OpenFlags::empty();
     if vmo_flags.contains(fio::VmoFlags::WRITE) {
@@ -1444,7 +1444,7 @@ pub fn directory_open_vmo(
 pub fn directory_read_file(
     directory: &fio::DirectorySynchronousProxy,
     path: &str,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 ) -> Result<Vec<u8>, zx::Status> {
     let description = directory_open(directory, path, fio::OpenFlags::RIGHT_READABLE, deadline)?;
     let file = match description.kind {
@@ -1561,7 +1561,7 @@ mod test {
             &pkg,
             "bin/syncio_lib_test",
             fio::OpenFlags::RIGHT_READABLE,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         )?;
         assert!(match description.kind {
             NodeKind::File => true,
@@ -1577,7 +1577,7 @@ mod test {
             &pkg,
             "bin/syncio_lib_test",
             fio::VmoFlags::READ | fio::VmoFlags::EXECUTE,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         )?;
         assert!(!vmo.is_invalid_handle());
 
@@ -1590,7 +1590,8 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_directory_read_file() -> Result<(), Error> {
         let pkg = open_pkg();
-        let data = directory_read_file(&pkg, "bin/syncio_lib_test", zx::MonotonicTime::INFINITE)?;
+        let data =
+            directory_read_file(&pkg, "bin/syncio_lib_test", zx::MonotonicInstant::INFINITE)?;
 
         assert!(!data.is_empty());
         Ok(())
@@ -1608,7 +1609,7 @@ mod test {
             &bin,
             "syncio_lib_test",
             fio::VmoFlags::READ | fio::VmoFlags::EXECUTE,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         )?;
         assert!(!vmo.is_invalid_handle());
 

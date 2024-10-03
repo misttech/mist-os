@@ -5,7 +5,7 @@
 use crate::prf;
 use bytes::{BufMut, BytesMut};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use ieee80211::MacAddr;
 use num::bigint::BigUint;
 use rand::rngs::OsRng;
@@ -31,7 +31,7 @@ impl NonceReader {
         // Fuchsia has no support for NTP yet; instead use a regular timestamp.
         // TODO(https://fxbug.dev/42124853): Use time in NTP format once Fuchsia added support.
         let mut buf = BytesMut::with_capacity(14);
-        let epoch_nanos = zx::MonotonicTime::get().into_nanos();
+        let epoch_nanos = zx::MonotonicInstant::get().into_nanos();
         buf.put_i64_le(epoch_nanos);
         buf.put_slice(sta_addr.as_slice());
         let k = OsRng.gen::<[u8; 32]>();

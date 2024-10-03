@@ -9,12 +9,12 @@ use crate::relative_pointer::RelativePointer;
 use anyhow::{Error, Result};
 use fidl_fuchsia_ui_input3::{KeyEvent, KeyEventType};
 use fidl_fuchsia_ui_pointer::EventPhase;
-use fuchsia_zircon::{self as zx, HandleBased};
 use std::collections::{BTreeSet, HashSet};
 use wayland_server_protocol::{
     wl_keyboard, wl_pointer, wl_seat, wl_touch, WlKeyboard, WlKeyboardEvent, WlKeyboardRequest,
     WlPointer, WlPointerRequest, WlSeat, WlSeatEvent, WlSeatRequest, WlTouch, WlTouchRequest,
 };
+use zx::{self as zx, HandleBased};
 use {fuchsia_trace as ftrace, fuchsia_wayland_core as wl};
 
 pub fn usb_to_linux_keycode(usb_keycode: u32) -> u16 {

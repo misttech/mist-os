@@ -6,15 +6,11 @@
 //! in this module provide a common interface for platform-specific buffers
 //! used by TCP.
 
-use netstack3_base::{FragmentedPayload, Payload, SeqNum, WindowSize};
+use netstack3_base::{Payload, SeqNum};
 
-use alloc::vec;
 use alloc::vec::Vec;
-use core::cmp;
 use core::fmt::Debug;
-use core::num::NonZeroUsize;
 use core::ops::Range;
-use either::Either;
 use packet::InnerPacketBuilder;
 
 use crate::internal::base::BufferSizes;
@@ -104,322 +100,6 @@ pub struct BufferLimits {
 
     /// The number of readable bytes that the buffer currently holds.
     pub len: usize,
-}
-
-/// A circular buffer implementation.
-///
-/// A [`RingBuffer`] holds a logically contiguous ring of memory in three
-/// regions:
-///
-/// - *readable*: memory is available for reading and not for writing,
-/// - *writable*: memory that is available for writing and not for reading,
-/// - *reserved*: memory that was read from and is no longer available
-///   for reading or for writing.
-///
-/// Zero or more of these regions can be empty, and a region of memory can
-/// transition from one to another in a few different ways:
-///
-/// *Readable* memory, once read, becomes writable unless a shrink operation is
-/// in progress, in which case it becomes reserved.
-///
-/// *Writable* memory, once marked as such, becomes readable.
-///
-/// *Reserved* memory will never become readable or writable, and is non-empty
-/// only while a shrink is in progress. Once the reserved segment is large
-/// enough it will be removed to complete the shrinking.
-#[cfg_attr(any(test, feature = "testutils"), derive(Clone, PartialEq, Eq))]
-pub struct RingBuffer {
-    storage: Vec<u8>,
-    /// The index where the reader starts to read.
-    ///
-    /// Maintains the invariant that `head < storage.len()` by wrapping
-    /// around to 0 as needed.
-    head: usize,
-    /// The amount of readable data in `storage`.
-    ///
-    /// Anything between [head, head+len) is readable. This will never exceed
-    /// `storage.len()`.
-    len: usize,
-    /// The shrink operation currently in progress. If `Some`, this holds the
-    /// target number of bytes to be trimmed and the current size of the
-    /// reserved region.
-    shrink: Option<PendingShrink>,
-}
-
-impl Debug for RingBuffer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let Self { storage, head, len, shrink } = self;
-        f.debug_struct("RingBuffer")
-            .field("storage (len, cap)", &(storage.len(), storage.capacity()))
-            .field("head", head)
-            .field("len", len)
-            .field("shrink", shrink)
-            .finish()
-    }
-}
-
-#[derive(Debug)]
-#[cfg_attr(any(test, feature = "testutils"), derive(Copy, Clone, Eq, PartialEq))]
-struct PendingShrink {
-    /// The target number of reserved bytes.
-    target: NonZeroUsize,
-    /// The current number of bytes held in the reserved region. This will
-    /// always be at most equal to `target`.
-    current: usize,
-}
-
-impl Default for RingBuffer {
-    fn default() -> Self {
-        Self::new(WindowSize::DEFAULT.into())
-    }
-}
-
-impl RingBuffer {
-    /// Creates a new `RingBuffer`.
-    pub fn new(capacity: usize) -> Self {
-        Self { storage: vec![0; capacity], head: 0, len: 0, shrink: None }
-    }
-
-    /// Calls `f` on the contiguous sequences from `start` up to `len` bytes.
-    fn with_readable<'a, F, R>(storage: &'a Vec<u8>, start: usize, len: usize, f: F) -> R
-    where
-        F: for<'b> FnOnce(&'b [&'a [u8]]) -> R,
-    {
-        // Don't read past the end of storage.
-        let end = start + len;
-        if end > storage.len() {
-            let first_part = &storage[start..storage.len()];
-            let second_part = &storage[0..len - first_part.len()];
-            f(&[first_part, second_part][..])
-        } else {
-            let all_bytes = &storage[start..end];
-            f(&[all_bytes][..])
-        }
-    }
-
-    /// Shrinks `self.storage` if it is larger than the current requested
-    /// capacity.
-    ///
-    /// Tries to shrink `self.storage` if it is larger than `self.capacity` by
-    /// removing values at the end of the writable region. The number of bytes
-    /// removed will be no more than the provided `max_shrink_by` value.
-    ///
-    /// If `self.storage.len() == self.capacity`, this is a no-op.
-    fn maybe_shrink(&mut self, max_shrink_by: usize) {
-        let Self { storage, head, len: _, shrink } = self;
-        let PendingShrink { target, current } = match shrink {
-            Some(x) => x,
-            None => return,
-        };
-        let target = target.get();
-
-        // Grab as many bytes as possible, up to the requested limit.
-        *current = core::cmp::min(target, *current + max_shrink_by);
-
-        if target == *current {
-            // The reserved region is big enough, now finish the shrink.
-
-            // Allocate an entirely new buffer instead of slicing in place since
-            // we don't want the buffer to hold on to a bunch of extra memory
-            // "just in case" for later allocations.
-            let mut new_storage = Vec::new();
-            new_storage.reserve_exact(storage.len() - target);
-
-            if let Some(writable_end) = (*head).checked_sub(target) {
-                // The reserved region is in the middle somewhere; slice it out.
-                new_storage.extend_from_slice(&storage[..writable_end]);
-                new_storage.extend_from_slice(&storage[(*head)..]);
-                *head = writable_end;
-            } else {
-                // The reserved region wraps around the end; just copy from the
-                // middle.
-                let unreserved_len = storage.len() - target;
-                new_storage.extend_from_slice(&storage[*head..(*head + unreserved_len)]);
-                *head = 0;
-            }
-            *storage = new_storage;
-            *shrink = None;
-            return;
-        }
-    }
-
-    /// Calls `f` with contiguous sequences of readable bytes in the buffer and
-    /// discards the amount of bytes returned by `f`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the closure wants to discard more bytes than possible, i.e.,
-    /// the value returned by `f` is greater than `self.len()`.
-    pub fn read_with<F>(&mut self, f: F) -> usize
-    where
-        F: for<'a, 'b> FnOnce(&'b [&'a [u8]]) -> usize,
-    {
-        let Self { storage, head, len, shrink: _ } = self;
-        if storage.len() == 0 {
-            return f(&[&[]]);
-        }
-        let nread = RingBuffer::with_readable(storage, *head, *len, f);
-        assert!(nread <= *len);
-        *len -= nread;
-        *head = (*head + nread) % storage.len();
-        self.maybe_shrink(nread);
-        nread
-    }
-
-    /// Returns the writable regions of the [`RingBuffer`].
-    pub fn writable_regions(&mut self) -> impl IntoIterator<Item = &mut [u8]> {
-        let BufferLimits { capacity, len } = self.limits();
-        let available = capacity - len;
-        let Self { storage, head, len, shrink: _ } = self;
-
-        let mut write_start = *head + *len;
-        if write_start >= storage.len() {
-            write_start -= storage.len()
-        }
-        let write_end = write_start + available;
-        if write_end <= storage.len() {
-            Either::Left([&mut self.storage[write_start..write_end]].into_iter())
-        } else {
-            let (b1, b2) = self.storage[..].split_at_mut(write_start);
-            let b2_len = b2.len();
-            Either::Right([b2, &mut b1[..(available - b2_len)]].into_iter())
-        }
-    }
-
-    /// Sets the target size for the [`RingBuffer`].
-    ///
-    /// Calling this must not cause the buffer to drop any data. If the new
-    /// size can be accommodated immediately, it will be applied. Otherwise the
-    /// buffer will be resized opportunistically during future operatins.
-    pub fn set_target_size(&mut self, new_capacity: usize) {
-        let Self { ref mut shrink, head, len: _, storage } = self;
-
-        if let Some(extend_by) = new_capacity.checked_sub(storage.len()) {
-            // This is a grow operation. Make sure to take into account any
-            // shrink previously in progress.
-            let old_shrink = shrink.take();
-            if extend_by != 0 {
-                let reserved_len = old_shrink.map_or(0, |r| r.current);
-                // This is going to require resizing the storage so just
-                // do that explicitly instead of trying to be clever with
-                // methods on Vec.
-                let mut new_storage = Vec::new();
-                new_storage.reserve_exact(new_capacity);
-
-                if *head <= reserved_len {
-                    new_storage
-                        .extend_from_slice(&storage[*head..][..(storage.len() - reserved_len)])
-                } else {
-                    new_storage.extend_from_slice(&storage[*head..]);
-                    new_storage.extend_from_slice(&storage[..(*head - reserved_len)]);
-                }
-                new_storage.resize(new_capacity, 0);
-                *storage = new_storage;
-                *head = 0;
-            }
-        } else {
-            // Start a shrink operation.
-
-            // Unwrapping here is safe because `new_capacity <= preserve_len` is
-            // not 0, or we'd be in the branch above.
-            let target = NonZeroUsize::new(storage.len() - new_capacity).unwrap();
-            match shrink.take() {
-                None => *shrink = Some(PendingShrink { target, current: 0 }),
-                Some(PendingShrink { target: _, current }) => {
-                    // The old target doesn't matter, but the number of reserved
-                    // bytes does. Keep that, and check to see whether it's
-                    // sufficient to finish the requested shrink immediately.
-                    let current = core::cmp::min(current, target.get());
-                    *shrink = Some(PendingShrink { target, current });
-                    self.maybe_shrink(0)
-                }
-            }
-        }
-    }
-}
-
-impl Buffer for RingBuffer {
-    fn capacity_range() -> (usize, usize) {
-        // Arbitrarily chosen to satisfy tests so we have some semblance of
-        // clamping capacity in tests.
-        (16, 16 << 20)
-    }
-
-    fn limits(&self) -> BufferLimits {
-        let Self { storage, shrink, len, head: _ } = self;
-        let capacity = storage.len() - shrink.as_ref().map_or(0, |r| r.current);
-        BufferLimits { len: *len, capacity }
-    }
-
-    fn target_capacity(&self) -> usize {
-        let Self { storage, shrink, len: _, head: _ } = self;
-        storage.len() - shrink.as_ref().map_or(0, |r| r.target.get())
-    }
-
-    fn request_capacity(&mut self, size: usize) {
-        self.set_target_size(size)
-    }
-}
-
-impl ReceiveBuffer for RingBuffer {
-    fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
-        let BufferLimits { capacity, len } = self.limits();
-        let available = capacity - len;
-        let Self { storage, head, len, shrink: _ } = self;
-        if storage.len() == 0 {
-            return 0;
-        }
-
-        if offset > available {
-            return 0;
-        }
-        let start_at = (*head + *len + offset) % storage.len();
-        let to_write = cmp::min(data.len(), available);
-        // Write the first part of the payload.
-        let first_len = cmp::min(to_write, storage.len() - start_at);
-        data.partial_copy(0, &mut storage[start_at..start_at + first_len]);
-        // If we have more to write, wrap around and start from the beginning
-        // of the storage.
-        if to_write > first_len {
-            data.partial_copy(first_len, &mut storage[0..to_write - first_len]);
-        }
-        to_write
-    }
-
-    fn make_readable(&mut self, count: usize, _has_outstanding: bool) {
-        let BufferLimits { capacity, len } = self.limits();
-        debug_assert!(count <= capacity - len);
-        self.len += count;
-    }
-}
-
-impl SendBuffer for RingBuffer {
-    type Payload<'a> = FragmentedPayload<'a, 2>;
-
-    fn mark_read(&mut self, count: usize) {
-        let Self { storage, head, len, shrink: _ } = self;
-        assert!(count <= *len);
-        *len -= count;
-        *head = (*head + count) % storage.len();
-        self.maybe_shrink(count);
-    }
-
-    fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
-    where
-        F: FnOnce(Self::Payload<'a>) -> R,
-    {
-        let Self { storage, head, len, shrink: _ } = self;
-        if storage.len() == 0 {
-            return f(FragmentedPayload::new_empty());
-        }
-        assert!(offset <= *len);
-        RingBuffer::with_readable(
-            storage,
-            (*head + offset) % storage.len(),
-            *len - offset,
-            |readable| f(readable.into_iter().map(|x| *x).collect()),
-        )
-    }
 }
 
 /// Assembler for out-of-order segment data.
@@ -587,10 +267,211 @@ pub(crate) mod testutil {
     use super::*;
 
     use alloc::sync::Arc;
+    use alloc::vec;
+    use core::cmp;
 
+    use either::Either;
     use netstack3_base::sync::Mutex;
+    use netstack3_base::{FragmentedPayload, WindowSize};
 
     use crate::internal::socket::accept_queue::ListenerNotifier;
+
+    /// A circular buffer implementation.
+    ///
+    /// A [`RingBuffer`] holds a logically contiguous ring of memory in three
+    /// regions:
+    ///
+    /// - *readable*: memory is available for reading and not for writing,
+    /// - *writable*: memory that is available for writing and not for reading,
+    /// - *reserved*: memory that was read from and is no longer available
+    ///   for reading or for writing.
+    ///
+    /// Zero or more of these regions can be empty, and a region of memory can
+    /// transition from one to another in a few different ways:
+    ///
+    /// *Readable* memory, once read, becomes writable.
+    ///
+    /// *Writable* memory, once marked as such, becomes readable.
+    #[cfg_attr(any(test, feature = "testutils"), derive(Clone, PartialEq, Eq))]
+    pub struct RingBuffer {
+        pub(super) storage: Vec<u8>,
+        /// The index where the reader starts to read.
+        ///
+        /// Maintains the invariant that `head < storage.len()` by wrapping
+        /// around to 0 as needed.
+        pub(super) head: usize,
+        /// The amount of readable data in `storage`.
+        ///
+        /// Anything between [head, head+len) is readable. This will never exceed
+        /// `storage.len()`.
+        pub(super) len: usize,
+    }
+
+    impl Debug for RingBuffer {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            let Self { storage, head, len } = self;
+            f.debug_struct("RingBuffer")
+                .field("storage (len, cap)", &(storage.len(), storage.capacity()))
+                .field("head", head)
+                .field("len", len)
+                .finish()
+        }
+    }
+
+    impl Default for RingBuffer {
+        fn default() -> Self {
+            Self::new(WindowSize::DEFAULT.into())
+        }
+    }
+
+    impl RingBuffer {
+        /// Creates a new `RingBuffer`.
+        pub fn new(capacity: usize) -> Self {
+            Self { storage: vec![0; capacity], head: 0, len: 0 }
+        }
+
+        /// Calls `f` on the contiguous sequences from `start` up to `len` bytes.
+        fn with_readable<'a, F, R>(storage: &'a Vec<u8>, start: usize, len: usize, f: F) -> R
+        where
+            F: for<'b> FnOnce(&'b [&'a [u8]]) -> R,
+        {
+            // Don't read past the end of storage.
+            let end = start + len;
+            if end > storage.len() {
+                let first_part = &storage[start..storage.len()];
+                let second_part = &storage[0..len - first_part.len()];
+                f(&[first_part, second_part][..])
+            } else {
+                let all_bytes = &storage[start..end];
+                f(&[all_bytes][..])
+            }
+        }
+
+        /// Calls `f` with contiguous sequences of readable bytes in the buffer and
+        /// discards the amount of bytes returned by `f`.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the closure wants to discard more bytes than possible, i.e.,
+        /// the value returned by `f` is greater than `self.len()`.
+        pub fn read_with<F>(&mut self, f: F) -> usize
+        where
+            F: for<'a, 'b> FnOnce(&'b [&'a [u8]]) -> usize,
+        {
+            let Self { storage, head, len } = self;
+            if storage.len() == 0 {
+                return f(&[&[]]);
+            }
+            let nread = RingBuffer::with_readable(storage, *head, *len, f);
+            assert!(nread <= *len);
+            *len -= nread;
+            *head = (*head + nread) % storage.len();
+            nread
+        }
+
+        /// Returns the writable regions of the [`RingBuffer`].
+        pub fn writable_regions(&mut self) -> impl IntoIterator<Item = &mut [u8]> {
+            let BufferLimits { capacity, len } = self.limits();
+            let available = capacity - len;
+            let Self { storage, head, len } = self;
+
+            let mut write_start = *head + *len;
+            if write_start >= storage.len() {
+                write_start -= storage.len()
+            }
+            let write_end = write_start + available;
+            if write_end <= storage.len() {
+                Either::Left([&mut self.storage[write_start..write_end]].into_iter())
+            } else {
+                let (b1, b2) = self.storage[..].split_at_mut(write_start);
+                let b2_len = b2.len();
+                Either::Right([b2, &mut b1[..(available - b2_len)]].into_iter())
+            }
+        }
+    }
+
+    impl Buffer for RingBuffer {
+        fn capacity_range() -> (usize, usize) {
+            // Arbitrarily chosen to satisfy tests so we have some semblance of
+            // clamping capacity in tests.
+            (16, 16 << 20)
+        }
+
+        fn limits(&self) -> BufferLimits {
+            let Self { storage, len, head: _ } = self;
+            let capacity = storage.len();
+            BufferLimits { len: *len, capacity }
+        }
+
+        fn target_capacity(&self) -> usize {
+            let Self { storage, len: _, head: _ } = self;
+            storage.len()
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            unimplemented!("capacity request for {size} not supported")
+        }
+    }
+
+    impl ReceiveBuffer for RingBuffer {
+        fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
+            let BufferLimits { capacity, len } = self.limits();
+            let available = capacity - len;
+            let Self { storage, head, len } = self;
+            if storage.len() == 0 {
+                return 0;
+            }
+
+            if offset > available {
+                return 0;
+            }
+            let start_at = (*head + *len + offset) % storage.len();
+            let to_write = cmp::min(data.len(), available);
+            // Write the first part of the payload.
+            let first_len = cmp::min(to_write, storage.len() - start_at);
+            data.partial_copy(0, &mut storage[start_at..start_at + first_len]);
+            // If we have more to write, wrap around and start from the beginning
+            // of the storage.
+            if to_write > first_len {
+                data.partial_copy(first_len, &mut storage[0..to_write - first_len]);
+            }
+            to_write
+        }
+
+        fn make_readable(&mut self, count: usize, _has_outstanding: bool) {
+            let BufferLimits { capacity, len } = self.limits();
+            debug_assert!(count <= capacity - len);
+            self.len += count;
+        }
+    }
+
+    impl SendBuffer for RingBuffer {
+        type Payload<'a> = FragmentedPayload<'a, 2>;
+
+        fn mark_read(&mut self, count: usize) {
+            let Self { storage, head, len } = self;
+            assert!(count <= *len);
+            *len -= count;
+            *head = (*head + count) % storage.len();
+        }
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(Self::Payload<'a>) -> R,
+        {
+            let Self { storage, head, len } = self;
+            if storage.len() == 0 {
+                return f(FragmentedPayload::new_empty());
+            }
+            assert!(offset <= *len);
+            RingBuffer::with_readable(
+                storage,
+                (*head + offset) % storage.len(),
+                *len - offset,
+                |readable| f(readable.into_iter().map(|x| *x).collect()),
+            )
+        }
+    }
 
     impl RingBuffer {
         /// Enqueues as much of `data` as possible to the end of the buffer.
@@ -617,7 +498,7 @@ pub(crate) mod testutil {
         }
 
         fn request_capacity(&mut self, size: usize) {
-            self.lock().set_target_size(size)
+            self.lock().request_capacity(size)
         }
     }
 
@@ -668,7 +549,7 @@ pub(crate) mod testutil {
 
         fn request_capacity(&mut self, size: usize) {
             let Self { fake_stream: _, ring } = self;
-            ring.set_target_size(size)
+            ring.request_capacity(size)
         }
     }
 
@@ -810,17 +691,17 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod test {
-    use alloc::format;
+    use alloc::{format, vec};
 
-    use netstack3_base::WindowSize;
+    use netstack3_base::{FragmentedPayload, WindowSize};
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
     use proptest::{prop_assert, prop_assert_eq, proptest};
     use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
+    use testutil::RingBuffer;
 
     use super::*;
-
     proptest! {
         #![proptest_config(Config {
             // Add all failed seeds here.
@@ -867,14 +748,12 @@ mod test {
             let old_storage = rb.storage.clone();
             let old_head = rb.head;
             let old_len = rb.limits().len;
-            let old_shrink = rb.shrink;
             rb.make_readable(avail, false);
             // Assert that length is updated but everything else is unchanged.
-            let RingBuffer { storage, head, len, shrink } = rb;
+            let RingBuffer { storage, head, len } = rb;
             prop_assert_eq!(len, old_len + avail);
             prop_assert_eq!(head, old_head);
             prop_assert_eq!(storage, old_storage);
-            prop_assert_eq!(shrink, old_shrink);
         }
 
         #[test]
@@ -917,12 +796,8 @@ mod test {
             let old_storage = rb.storage.clone();
             let old_head = rb.head;
             let old_len = rb.limits().len;
-            let old_shrink = rb.shrink;
 
             rb.mark_read(readable);
-            // Depending on whether a shrink was performed, a bunch of things
-            // might have changed. Either way, the length should always be
-            // reduced, and the written bytes should be preserved.
             let new_writable = rb.writable_regions().into_iter().fold(Vec::new(), |mut acc, slice| {
                 acc.extend_from_slice(slice);
                 acc
@@ -932,14 +807,10 @@ mod test {
             }
             prop_assert!(new_writable.len() >= written);
 
-            let RingBuffer { storage, head, len, shrink } = rb;
+            let RingBuffer { storage, head, len } = rb;
             prop_assert_eq!(len, old_len - readable);
-            let shrank = old_shrink.is_some() && shrink.is_none();
-            if !shrank {
-                prop_assert_eq!(head, (old_head + readable) % old_storage.len());
-                prop_assert_eq!(storage, old_storage);
-            }
-
+            prop_assert_eq!(head, (old_head + readable) % old_storage.len());
+            prop_assert_eq!(storage, old_storage);
         }
 
         #[test]
@@ -969,31 +840,6 @@ mod test {
                 };
                 let idx = (rb.head + i) % rb.storage.len();
                 prop_assert_eq!(rb.storage[idx], expected);
-            }
-        }
-
-        #[test]
-        fn set_target_size((mut rb, new_cap) in ring_buffer::with_new_target_size()) {
-            const BYTE_TO_WRITE: u8 = 0x42;
-            let written = rb.writable_regions().into_iter().fold(0, |acc, slice| {
-                slice.fill(BYTE_TO_WRITE);
-                acc + slice.len()
-            });
-
-            let old_len = rb.limits().len;
-            rb.set_target_size(new_cap);
-
-            prop_assert_eq!(rb.limits().len, old_len);
-            let new_writable = rb.writable_regions().into_iter().fold(Vec::new(), |mut acc, slice| {
-                acc.extend_from_slice(slice);
-                acc
-            });
-            let BufferLimits {len, capacity} = rb.limits();
-            prop_assert_eq!(new_writable.len() + len, capacity);
-            prop_assert!(new_writable.len() >= written);
-            for (i, x) in new_writable.iter().enumerate() {
-                let expected = (i < written).then_some(BYTE_TO_WRITE).unwrap_or(0);
-                prop_assert_eq!(*x, expected, "i={}, rb={:?}", i, rb);
             }
         }
     }
@@ -1130,61 +976,48 @@ mod test {
         // wrapping around logic.
         const MAX_CAP: usize = 32;
 
-        fn arb_ring_buffer_args(
-        ) -> impl Strategy<Value = (usize, usize, usize, Option<PendingShrink>)> {
-            fn arb_shrink_args(cap: usize) -> impl Strategy<Value = Option<PendingShrink>> {
-                (0..=cap).prop_flat_map(|target| match NonZeroUsize::new(target) {
-                    Some(target) => (Just(target), (0..=target.get()))
-                        .prop_map(|(target, current)| Some(PendingShrink { target, current }))
-                        .boxed(),
-                    None => Just(None).boxed(),
-                })
-            }
-
+        fn arb_ring_buffer_args() -> impl Strategy<Value = (usize, usize, usize)> {
             // Use a small capacity so that we have a higher chance to exercise
             // wrapping around logic.
             (1..=MAX_CAP).prop_flat_map(|cap| {
-                arb_shrink_args(cap).prop_flat_map(move |shrink| {
-                    let max_len = cap - shrink.as_ref().map_or(0, |r| r.current);
-                    //  cap      head     len
-                    (Just(cap), 0..cap, 0..=max_len, Just(shrink))
-                })
+                let max_len = cap;
+                //  cap      head     len
+                (Just(cap), 0..cap, 0..=max_len)
             })
         }
 
         pub(super) fn arb_ring_buffer() -> impl Strategy<Value = RingBuffer> {
-            arb_ring_buffer_args().prop_map(|(cap, head, len, shrink)| RingBuffer {
+            arb_ring_buffer_args().prop_map(|(cap, head, len)| RingBuffer {
                 storage: vec![0; cap],
                 head,
                 len,
-                shrink,
             })
         }
 
         /// A strategy for a [`RingBuffer`] and a valid length to mark read.
         pub(super) fn with_readable() -> impl Strategy<Value = (RingBuffer, usize)> {
-            arb_ring_buffer_args().prop_flat_map(|(cap, head, len, shrink)| {
-                (Just(RingBuffer { storage: vec![0; cap], head, len, shrink }), 0..=len)
+            arb_ring_buffer_args().prop_flat_map(|(cap, head, len)| {
+                (Just(RingBuffer { storage: vec![0; cap], head, len }), 0..=len)
             })
         }
 
         /// A strategy for a [`RingBuffer`] and a valid length to make readable.
         pub(super) fn with_written() -> impl Strategy<Value = (RingBuffer, usize)> {
-            arb_ring_buffer_args().prop_flat_map(|(cap, head, len, shrink)| {
-                let rb = RingBuffer { storage: vec![0; cap], head, len, shrink };
-                let max_written = cap - len - shrink.map_or(0, |r| r.current);
+            arb_ring_buffer_args().prop_flat_map(|(cap, head, len)| {
+                let rb = RingBuffer { storage: vec![0; cap], head, len };
+                let max_written = cap - len;
                 (Just(rb), 0..=max_written)
             })
         }
 
         /// A strategy for a [`RingBuffer`], a valid offset and data to write.
         pub(super) fn with_offset_data() -> impl Strategy<Value = (RingBuffer, usize, Vec<u8>)> {
-            arb_ring_buffer_args().prop_flat_map(|(cap, head, len, shrink)| {
-                let writable_len = cap - len - shrink.map_or(0, |r| r.current);
+            arb_ring_buffer_args().prop_flat_map(|(cap, head, len)| {
+                let writable_len = cap - len;
                 (0..=writable_len).prop_flat_map(move |offset| {
                     (0..=writable_len - offset).prop_flat_map(move |data_len| {
                         (
-                            Just(RingBuffer { storage: vec![0; cap], head, len, shrink }),
+                            Just(RingBuffer { storage: vec![0; cap], head, len }),
                             Just(offset),
                             proptest::collection::vec(1..=u8::MAX, data_len),
                         )
@@ -1196,22 +1029,13 @@ mod test {
         /// A strategy for a [`RingBuffer`], its readable data, and how many
         /// bytes to consume.
         pub(super) fn with_read_data() -> impl Strategy<Value = (RingBuffer, Vec<u8>, usize)> {
-            arb_ring_buffer_args().prop_flat_map(|(cap, head, len, shrink)| {
+            arb_ring_buffer_args().prop_flat_map(|(cap, head, len)| {
                 proptest::collection::vec(1..=u8::MAX, len).prop_flat_map(move |data| {
                     // Fill the RingBuffer with the data.
-                    let mut rb = RingBuffer { storage: vec![0; cap], head, len: 0, shrink };
+                    let mut rb = RingBuffer { storage: vec![0; cap], head, len: 0 };
                     assert_eq!(rb.write_at(0, &&data[..]), len);
                     rb.make_readable(len, false);
                     (Just(rb), Just(data), 0..=len)
-                })
-            })
-        }
-
-        pub(super) fn with_new_target_size() -> impl Strategy<Value = (RingBuffer, usize)> {
-            arb_ring_buffer_args().prop_flat_map(|(cap, head, len, shrink)| {
-                (0..MAX_CAP * 2).prop_map(move |target_size| {
-                    let rb = RingBuffer { storage: vec![0; cap], head, len, shrink };
-                    (rb, target_size)
                 })
             })
         }

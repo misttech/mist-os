@@ -87,7 +87,7 @@ use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
-use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_zircon as zx};
+use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, zx};
 
 // The name used to track the duration of a local binder ioctl.
 const NAME_BINDER_IOCTL: &'static CStr = c"binder_ioctl";
@@ -2815,7 +2815,7 @@ impl RemoteResourceAccessor {
     ) -> Result<fbinder::FileResponse, Errno> {
         let result = self
             .process_accessor
-            .file_request(request, zx::MonotonicTime::INFINITE)
+            .file_request(request, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(ENOENT))?;
         result.map_err(|e| errno_from_code!(e.into_primitive() as i16))
     }
@@ -2896,7 +2896,7 @@ impl MemoryAccessor for RemoteResourceAccessor {
         vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
         vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
         self.process_accessor
-            .write_memory(addr.ptr() as u64, vmo, zx::MonotonicTime::INFINITE)
+            .write_memory(addr.ptr() as u64, vmo, zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(ENOENT))?
             .map_err(Self::map_fidl_posix_errno)?;
         Ok(bytes.len())
@@ -2934,13 +2934,17 @@ impl ResourceAccessor for RemoteResourceAccessor {
             // Validate that the server returned a single response, as a single fd was sent.
             if files.len() == 1 {
                 let file = files.pop().unwrap();
+                let Some(flags) = file.flags else {
+                    log_warn!("Incorrect response to file request. Missing flags.");
+                    return error!(ENOENT);
+                };
                 if let Some(handle) = file.file {
                     return Ok((
-                        new_remote_file(current_task, handle, file.flags.into())?,
+                        new_remote_file(current_task, handle, flags.into())?,
                         FdFlags::empty(),
                     ));
                 } else {
-                    return Ok((new_null_file(current_task, file.flags.into()), FdFlags::empty()));
+                    return Ok((new_null_file(current_task, flags.into()), FdFlags::empty()));
                 }
             }
         }
@@ -2967,16 +2971,20 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_file_with_flags(
         &self,
-        locked: &mut Locked<'_, ResourceAccessorAddFile>,
+        _locked: &mut Locked<'_, ResourceAccessorAddFile>,
         current_task: &CurrentTask,
         file: FileHandle,
         _flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(locked, current_task)?;
+        let handle = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
-            add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
+            add_requests2: Some(vec![fbinder::FileHandle {
+                file: handle,
+                flags: Some(flags),
+                ..fbinder::FileHandle::default()
+            }]),
             ..Default::default()
         })?;
         if let Some(fds) = response.add_responses {
@@ -3862,7 +3870,7 @@ impl BinderDriver {
             }
 
             // Put this thread to sleep.
-            current_task.block_until(guard, zx::MonotonicTime::INFINITE)?;
+            current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
         }
     }
 
@@ -8100,15 +8108,7 @@ pub mod tests {
         let _d2 = open_binder_fd(&mut locked, &task, &driver);
     }
 
-    fn to_file_handle2(fh: fbinder::FileHandle) -> fbinder::FileHandle2 {
-        fbinder::FileHandle2 {
-            file: fh.file,
-            flags: Some(fh.flags),
-            ..fbinder::FileHandle2::default()
-        }
-    }
-
-    pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle2>;
+    pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;
     /// Run a test implementation of the ProcessAccessor protocol.
     /// The test implementation starts with an empty fd table, and updates it depending on the
     /// client calls. The future will resolve when the client is disconnected and return the
@@ -8152,7 +8152,7 @@ pub mod tests {
                     for file in payload.add_requests.unwrap_or(vec![]) {
                         let fd = next_fd;
                         next_fd += 1;
-                        fds.insert(fd, to_file_handle2(file));
+                        fds.insert(fd, file);
                         response.add_responses.get_or_insert_with(Vec::new).push(fd);
                     }
                     for file in payload.add_requests2.unwrap_or(vec![]) {

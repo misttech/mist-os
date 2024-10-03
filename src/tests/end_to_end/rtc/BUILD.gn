@@ -19,7 +19,7 @@ python_mobly_test("rtc_conformance_test") {
   ]
 
   transport = "fuchsia-controller"
-
+  enable_hermetic_exe = true
   environments = [ vim3_env ]
 
   # This test changes the time on device to future and resets it back to present.
@@ -32,5 +32,4 @@ sdk_python_mobly_test("rtc_conformance_test_sdk") {
   sdk_name = "rtc_conformance_test"
   test_label = ":rtc_conformance_test"
   category = "partner"
-  min_python_version = "3.11"
 }

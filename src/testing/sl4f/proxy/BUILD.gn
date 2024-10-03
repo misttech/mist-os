@@ -22,8 +22,8 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-hyper",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:hyper",
   ]
 

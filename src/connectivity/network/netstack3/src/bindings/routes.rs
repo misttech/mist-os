@@ -31,7 +31,7 @@ use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6, S
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
 use zx::AsHandleRef as _;
-use {fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_zircon as zx};
+use {fidl_fuchsia_net_routes_admin as fnet_routes_admin, zx};
 
 use crate::bindings::util::{
     EntryAndTableId, RemoveResourceResultExt as _, TryIntoFidlWithContext,

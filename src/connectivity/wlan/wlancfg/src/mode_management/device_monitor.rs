@@ -11,7 +11,7 @@ use fidl_fuchsia_wlan_device_service::{DeviceMonitorProxy, DeviceWatcherEvent};
 use futures::lock::Mutex;
 use std::sync::Arc;
 use tracing::{error, info};
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_common as fidl_common, zx};
 
 pub struct Listener {
     proxy: DeviceMonitorProxy,
@@ -85,7 +85,7 @@ async fn on_phy_added(listener: &Listener, phy_id: u16) {
 async fn on_iface_added_legacy(listener: &Listener, iface_id: u16) -> Result<(), anyhow::Error> {
     let response = match listener.proxy.query_iface(iface_id).await? {
         Ok(response) => response,
-        Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND) => {
+        Err(zx::sys::ZX_ERR_NOT_FOUND) => {
             return Err(format_err!("Could not find iface: {}", iface_id));
         }
         Err(status) => return Err(format_err!("Could not query iface information: {}", status)),

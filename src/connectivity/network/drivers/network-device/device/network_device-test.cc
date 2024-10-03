@@ -20,6 +20,7 @@
 #include "network_device_shim.h"
 #include "session.h"
 #include "src/connectivity/network/drivers/network-device/mac/test_util.h"
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 #include "test_session.h"
 #include "test_util.h"
@@ -3379,6 +3380,180 @@ TEST_F(NetworkDeviceTest, QueueRxSpaceBatches) {
   }
   ASSERT_EQ(impl_.queue_rx_space_called(), MAX_RX_SPACE_BUFFERS);
   ASSERT_EQ(impl_.queue_rx_space_called(), 1u);
+}
+
+// Tests that leases are never given to sessions that don't have the lease
+// delegation flag.
+TEST_F(NetworkDeviceTest, SessionLeasesRequiresFlag) {
+  fdf::Arena arena('NETD');
+  ASSERT_OK(CreateDeviceWithPort13());
+
+  TestSession session;
+  ASSERT_OK(OpenSession(&session, netdev::wire::SessionFlags::kPrimary));
+  ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(WaitStart());
+  // A lease with frame 0 should always be fulfilled, but we're _not_ going to
+  // observe it in a session without the flag. Instead the lease is dropped
+  // internally.
+  auto [lease, chan] = CreateDelegatedLease(0);
+  fidl::OneWayStatus status =
+      impl_.client().buffer(arena)->DelegateRxLease(fidl::ToWire(arena, std::move(lease)));
+  ASSERT_OK(status.status());
+  zx_signals_t observed;
+  ASSERT_OK(chan.wait_one(ZX_CHANNEL_PEER_CLOSED, TEST_DEADLINE, &observed));
+  ASSERT_EQ(observed, ZX_CHANNEL_PEER_CLOSED);
+}
+
+// Tests that calling watch when a lease is ready to be consumed returns
+// immediately.
+TEST_F(NetworkDeviceTest, SessionLeaseImmediateReturn) {
+  fdf::Arena arena('NETD');
+  ASSERT_OK(CreateDeviceWithPort13());
+
+  TestSession session;
+  ASSERT_OK(OpenSession(&session, netdev::wire::SessionFlags::kPrimary |
+                                      netdev::wire::SessionFlags::kReceiveRxPowerLeases));
+  ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(WaitStart());
+  // A lease with frame 0 should always be fulfilled.
+  auto [lease, chan] = CreateDelegatedLease(0);
+  fidl::OneWayStatus status =
+      impl_.client().buffer(arena)->DelegateRxLease(fidl::ToWire(arena, std::move(lease)));
+  ASSERT_OK(status.status());
+  fidl::WireResult result = session.session()->WatchDelegatedRxLease();
+  ASSERT_OK(result.status());
+  netdev::wire::DelegatedRxLease& received_lease = result.value().lease;
+  ASSERT_TRUE(received_lease.has_hold_until_frame());
+  EXPECT_EQ(received_lease.hold_until_frame(), 0u);
+  ASSERT_TRUE(received_lease.has_handle());
+  ASSERT_EQ(received_lease.handle().Which(), netdev::wire::DelegatedRxLeaseHandle::Tag::kChannel);
+  EXPECT_EQ(fsl::GetKoid(received_lease.handle().channel().get()), fsl::GetRelatedKoid(chan.get()));
+}
+
+// Tests that leases are never given to sessions that don't have the lease
+// delegation flag.
+TEST_F(NetworkDeviceTest, SessionLeaseDelegation) {
+  ASSERT_OK(CreateDeviceWithPort13());
+  static constexpr uint8_t kPort5 = 5;
+  FakeNetworkPortImpl port5;
+  ASSERT_OK(port5.AddPort(kPort5, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
+  auto cleanup = fit::defer([&port5]() { port5.RemoveSync(); });
+
+  TestSession session;
+  ASSERT_OK(OpenSession(&session, netdev::wire::SessionFlags::kPrimary |
+                                      netdev::wire::SessionFlags::kReceiveRxPowerLeases));
+  ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(WaitStart());
+  constexpr uint16_t kBufferCount = 3;
+  uint16_t desc_buff[kBufferCount];
+  for (uint16_t i = 0; i < kBufferCount; i++) {
+    session.ResetDescriptor(i);
+    desc_buff[i] = i;
+  }
+  ASSERT_OK(session.SendRx(desc_buff, kBufferCount, nullptr));
+  ASSERT_OK(WaitRxAvailable());
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::WireClient<netdev::Session> session_cli(session.session().TakeClientEnd(),
+                                                loop.dispatcher());
+  std::optional<zx::result<netdev::DelegatedRxLease>> watch_result;
+  session_cli->WatchDelegatedRxLease().Then([&watch_result](auto& result) {
+    if (!result.ok()) {
+      watch_result = zx::error_result(result.status());
+      return;
+    }
+    watch_result = fit::ok(fidl::ToNatural(result->lease));
+  });
+
+  ASSERT_OK(loop.RunUntilIdle());
+  ASSERT_FALSE(watch_result.has_value());
+
+  // Create a lease that will fulfill on the second frame.
+  fdf::Arena arena('NETD');
+  auto [lease, chan] = CreateDelegatedLease(2);
+  fidl::OneWayStatus status =
+      impl_.client().buffer(arena)->DelegateRxLease(fidl::ToWire(arena, std::move(lease)));
+  ASSERT_OK(status.status());
+
+  constexpr uint16_t kDataLen = 10;
+  RxFidlReturnTransaction return_session(&impl_);
+  // Send 3 buffers, only one of them should make it to the session.
+  // One buffer with zero bytes written.
+  {
+    std::unique_ptr buff = impl_.PopRxBuffer();
+    ASSERT_TRUE(buff);
+    return_session.Enqueue(std::move(buff), kPort13);
+  }
+  // One buffer with bytes written.
+  {
+    std::unique_ptr buff = impl_.PopRxBuffer();
+    ASSERT_TRUE(buff);
+    std::vector<uint8_t> data(kDataLen, static_cast<uint8_t>(0xAA));
+    ASSERT_OK(buff->WriteData(data, impl_.VmoGetter()));
+    return_session.Enqueue(std::move(buff), kPort13);
+  }
+  // Another buffer with bytes written but to a port the session is not
+  // interested in.
+  {
+    std::unique_ptr buff = impl_.PopRxBuffer();
+    ASSERT_TRUE(buff);
+    std::vector<uint8_t> data(kDataLen, static_cast<uint8_t>(0xAA));
+    ASSERT_OK(buff->WriteData(data, impl_.VmoGetter()));
+    return_session.Enqueue(std::move(buff), kPort5);
+  }
+
+  return_session.Commit();
+
+  ASSERT_OK(loop.Run(TEST_DEADLINE, true));
+  ASSERT_TRUE(watch_result.has_value());
+  ASSERT_OK(watch_result.value().status_value());
+  netdev::DelegatedRxLease& received_lease = watch_result.value().value();
+  ASSERT_TRUE(received_lease.hold_until_frame().has_value());
+  // Session observes a single frame so this is what the delegated lease should
+  // show.
+  EXPECT_EQ(received_lease.hold_until_frame().value(), 1u);
+  ASSERT_TRUE(received_lease.handle().has_value());
+  ASSERT_EQ(received_lease.handle().value().Which(), netdev::DelegatedRxLeaseHandle::Tag::kChannel);
+  EXPECT_EQ(fsl::GetKoid(chan.get()),
+            fsl::GetRelatedKoid(received_lease.handle().value().channel().value().get()));
+}
+
+// Tests that the session channel is closed if two pending rx lease watches are
+// created.
+TEST_F(NetworkDeviceTest, SessionNoDualLeaseWatch) {
+  ASSERT_OK(CreateDeviceWithPort13());
+  TestSession session;
+  ASSERT_OK(OpenSession(&session, netdev::wire::SessionFlags::kPrimary));
+  ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(WaitStart());
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::WireClient<netdev::Session> session_cli(session.session().TakeClientEnd(),
+                                                loop.dispatcher());
+  std::array<std::optional<zx::result<netdev::DelegatedRxLease>>, 2> results;
+  for (auto& r : results) {
+    session_cli->WatchDelegatedRxLease().Then([r = &r](auto& result) {
+      if (!result.ok()) {
+        *r = zx::error_result(result.status());
+        return;
+      }
+      *r = fit::ok(fidl::ToNatural(result->lease));
+    });
+  }
+
+  ASSERT_OK(loop.Run(TEST_DEADLINE, true));
+
+  for (size_t i = 0; i < results.size(); i++) {
+    SCOPED_TRACE(i);
+    auto& r = results[i];
+    ASSERT_TRUE(r.has_value());
+    // We should observe the epitaph error on both results.
+    EXPECT_EQ(r.value().status_value(), ZX_ERR_BAD_STATE);
+  }
 }
 
 class NetworkDeviceShimTest : public ::testing::Test {

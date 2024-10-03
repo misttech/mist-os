@@ -8,11 +8,11 @@ use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_bluetooth::profile::{l2cap_connect_parameters, ProtocolDescriptor, Psm};
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_component_test::{Capability, RealmInstance};
-use fuchsia_zircon::Duration;
 use futures::stream::StreamExt;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::pin::pin;
+use zx::Duration;
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 /// RFCOMM component URL.

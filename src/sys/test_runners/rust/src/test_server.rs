@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use ftest::{Invocation, RunListenerProxy};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::future::{abortable, join3, AbortHandle, FutureExt as _};
 use futures::lock::Mutex;
 use futures::prelude::*;
@@ -22,7 +21,7 @@ use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::{LogStreamReader, LoggerStream, SocketLogWriter};
 use tracing::{debug, error};
-use zx::Task;
+use zx::{self as zx, HandleBased, Task};
 use {
     fidl_fuchsia_process as fproc, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
     fuchsia_runtime as runtime,

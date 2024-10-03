@@ -37,7 +37,7 @@ mod tests {
     use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
     use vfs::remote::remote_dir;
-    use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
+    use {fuchsia_async as fasync, zx_status};
 
     #[fasync::run_singlethreaded(test)]
     async fn open_and_read_file_test() {

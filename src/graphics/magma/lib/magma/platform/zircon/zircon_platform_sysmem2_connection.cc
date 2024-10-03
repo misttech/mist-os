@@ -559,9 +559,12 @@ class ZirconPlatformSysmem2BufferCollection : public PlatformBufferCollection {
       }
     }
     auto buffer_collection_info = std::move(*result->buffer_collection_info());
+    result->buffer_collection_info().reset();
 
     auto description = std::make_unique<ZirconPlatformSysmem2BufferDescription>(
         buffer_collection_info.buffers()->size(), std::move(*buffer_collection_info.settings()));
+    buffer_collection_info.settings().reset();
+
     if (!description->IsValid()) {
       return DRET(MAGMA_STATUS_INTERNAL_ERROR);
     }
@@ -604,8 +607,8 @@ class ZirconPlatformSysmem2Connection : public PlatformSysmemConnection {
     std::string debug_name =
         std::string("(2) magma[") + magma::PlatformProcessHelper::GetCurrentProcessName() + "]";
     fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
-    set_debug_request.name() = debug_name;
-    set_debug_request.id() = magma::PlatformProcessHelper::GetCurrentProcessId();
+    set_debug_request.name().emplace(debug_name);
+    set_debug_request.id().emplace(magma::PlatformProcessHelper::GetCurrentProcessId());
     [[maybe_unused]] auto result =
         sysmem_allocator_->SetDebugClientInfo(std::move(set_debug_request));
   }

@@ -26,7 +26,7 @@ rustc_library("fidl-fuchsia-update-ext") {
 
   if (is_fuchsia) {
     deps += [
-      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//sdk/rust/zx",
       "//third_party/rust_crates:anyhow",
     ]
     sources += [ "src/commit.rs" ]

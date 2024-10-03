@@ -31,6 +31,7 @@ const NODENAME: &str = "Rust";
 pub struct TestEnvironmentConfig {
     pub messages: Vec<LogsData>,
     pub boot_timestamp: u64,
+    pub boot_id: Option<u64>,
     pub instances: Vec<Moniker>,
     pub send_connected_event: bool,
 }
@@ -102,6 +103,7 @@ impl Default for TestEnvironmentConfig {
             boot_timestamp: 1,
             instances: Vec::new(),
             send_connected_event: false,
+            boot_id: Some(1),
         }
     }
 }
@@ -148,8 +150,8 @@ impl TestEnvironment {
     }
 
     /// Simulates a target reboot.
-    pub fn reboot_target(&mut self, new_boot_time: u64) {
-        self.state.mutable.borrow_mut().boot_timestamp = new_boot_time;
+    pub fn reboot_target(&mut self, new_boot_id: Option<u64>) {
+        self.state.mutable.borrow_mut().boot_id = new_boot_id;
         self.disconnect_target();
     }
 
@@ -185,6 +187,7 @@ impl State {
             event_snd: snd,
             mutable: RefCell::new(MutableState {
                 boot_timestamp: config.boot_timestamp,
+                boot_id: config.boot_id,
                 disconnect_rcv: Some(disconnect_rcv),
             }),
         }
@@ -193,6 +196,7 @@ impl State {
 
 struct MutableState {
     boot_timestamp: u64,
+    boot_id: Option<u64>,
     disconnect_rcv: Option<oneshot::Receiver<()>>,
 }
 
@@ -283,6 +287,7 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                         .send(Ok(&IdentifyHostResponse {
                             nodename: Some(NODENAME.into()),
                             boot_timestamp_nanos: Some(state.mutable.borrow().boot_timestamp),
+                            boot_id: state.mutable.borrow().boot_id,
                             ..Default::default()
                         }))
                         .unwrap();

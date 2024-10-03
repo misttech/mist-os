@@ -67,7 +67,7 @@ pub struct RegisteredServiceId {
 impl RegisteredServiceId {
     pub fn new(id: PeerId, handle: ServiceHandle) -> Self {
         let mut salt = [0; 4];
-        fuchsia_zircon::cprng_draw(&mut salt[..]);
+        zx::cprng_draw(&mut salt[..]);
         Self { id, handle, salt }
     }
 

@@ -8,8 +8,6 @@ use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_partition::PartitionProxy;
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
-use fuchsia_zircon::sys::zx_handle_t;
-use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use lazy_static::lazy_static;
@@ -22,6 +20,8 @@ use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use storage_trace::{self as trace, TraceFutureExt};
+use zx::sys::zx_handle_t;
+use zx::{self as zx, HandleBased as _};
 use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver};
 
 pub use cache::Cache;
@@ -711,20 +711,20 @@ impl RemoteBlockClientSync {
     ) -> Result<Self, zx::Status> {
         let remote = block::BlockSynchronousProxy::new(client_end.into_channel());
         let info = remote
-            .get_info(zx::MonotonicTime::INFINITE)
+            .get_info(zx::MonotonicInstant::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         let (client, server) = fidl::endpoints::create_endpoints();
         let () = remote.open_session(server).map_err(fidl_to_status)?;
         let session = block::SessionSynchronousProxy::new(client.into_channel());
         let fifo = session
-            .get_fifo(zx::MonotonicTime::INFINITE)
+            .get_fifo(zx::MonotonicInstant::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         let temp_vmo = zx::Vmo::create(TEMP_VMO_SIZE as u64)?;
         let dup = temp_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let vmo_id = session
-            .attach_vmo(dup, zx::MonotonicTime::INFINITE)
+            .attach_vmo(dup, zx::MonotonicInstant::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         let vmo_id = VmoId::new(vmo_id.id);
@@ -747,7 +747,7 @@ impl RemoteBlockClientSync {
         let dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let vmo_id = self
             .session
-            .attach_vmo(dup, zx::MonotonicTime::INFINITE)
+            .attach_vmo(dup, zx::MonotonicInstant::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         Ok(VmoId::new(vmo_id.id))
@@ -780,7 +780,7 @@ impl RemoteBlockClientSync {
     pub fn close(&self) -> Result<(), zx::Status> {
         let () = self
             .session
-            .close(zx::MonotonicTime::INFINITE)
+            .close(zx::MonotonicInstant::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         Ok(())
@@ -865,7 +865,7 @@ mod tests {
     use ramdevice_client::RamdiskClient;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use {fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx};
+    use {fidl_fuchsia_hardware_block as block, zx};
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1024;

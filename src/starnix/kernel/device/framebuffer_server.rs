@@ -38,7 +38,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_images2 as fimages2, fidl_fuchsia_math as fmath,
     fidl_fuchsia_sysmem2 as fsysmem2, fidl_fuchsia_ui_composition as fuicomposition,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, zx,
 };
 
 /// The offset at which the framebuffer will be placed.
@@ -210,7 +210,7 @@ fn init_fb_scene(
     };
 
     allocator
-        .register_buffer_collection(args, zx::MonotonicTime::INFINITE)
+        .register_buffer_collection(args, zx::MonotonicInstant::INFINITE)
         .map_err(|_| anyhow!("FIDL error registering buffer collection"))?
         .map_err(|_| anyhow!("Error registering buffer collection"))?;
 
@@ -416,8 +416,8 @@ pub fn start_presentation_loop(
                                     .iter()
                                     .map(
                                     |x| PresentationInfo{
-                                        latch_point: zx::MonotonicTime::from_nanos(x.latch_point.unwrap()),
-                                        presentation_time: zx::MonotonicTime::from_nanos(
+                                        latch_point: zx::MonotonicInstant::from_nanos(x.latch_point.unwrap()),
+                                        presentation_time: zx::MonotonicInstant::from_nanos(
                                                             x.presentation_time.unwrap())
                                     })
                                     .collect();
@@ -432,7 +432,7 @@ pub fn start_presentation_loop(
                             }
                             Some(Ok(fuicomposition::FlatlandEvent::OnFramePresented{ frame_presented_info })) => {
                                 let actual_presentation_time =
-                                    zx::MonotonicTime::from_nanos(frame_presented_info.actual_presentation_time);
+                                    zx::MonotonicInstant::from_nanos(frame_presented_info.actual_presentation_time);
                                 let presented_infos: Vec<PresentedInfo> =
                                     frame_presented_info.presentation_infos
                                     .into_iter()

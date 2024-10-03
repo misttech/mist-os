@@ -25,7 +25,7 @@ use netstack3_core::types::WorkQueueReport;
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
-    fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, zx,
 };
 
 use crate::bindings::power::TransmitSuspensionHandler;
@@ -291,6 +291,18 @@ pub(crate) async fn tx_task(
     let mut yield_fut = futures::future::OptionFuture::default();
     let mut task_state = TxTaskState::default();
     let mut suspension_handler = TransmitSuspensionHandler::new(&ctx, device_id.clone()).await;
+
+    // This control loop selects an action which may be:
+    //   - suspension:
+    //       * enter suspension handling, which allows the system to suspend and
+    //         only finishes when the system resumes
+    //   - send packets
+    //       * determine packet batch size
+    //       * enqueue packets and send them, waiting for the send result
+    //       * if the send result is an error, yield and continue sending
+    //         on the next iteration
+    //   - continue sending packets after yielding in a previous batch.
+    // The loop continues until `watcher` closes or the `device_id` is invalid.
     loop {
         enum Action<S> {
             TxAvailable,
@@ -317,6 +329,8 @@ pub(crate) async fn tx_task(
                 None => break Ok(()),
             },
             Action::Suspension(s) => {
+                // Suspension requested, finish up in-progress work and block
+                // until we are allowed to resume.
                 match futures::future::ready(s).and_then(|s| s.handle_suspension()).await {
                     Ok(()) => {}
                     Err(e) => {

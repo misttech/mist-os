@@ -74,7 +74,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::Duration;
+    use zx::Duration;
 
     impl Timestamped for fasync::Time {
         fn time(&self) -> fasync::Time {

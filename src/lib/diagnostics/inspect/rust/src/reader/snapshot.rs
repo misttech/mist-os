@@ -367,10 +367,10 @@ impl TryFrom<&Inspector> for Snapshot {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl TryFrom<&fuchsia_zircon::Vmo> for Snapshot {
+impl TryFrom<&zx::Vmo> for Snapshot {
     type Error = ReaderError;
 
-    fn try_from(vmo: &fuchsia_zircon::Vmo) -> Result<Self, Self::Error> {
+    fn try_from(vmo: &zx::Vmo) -> Result<Self, Self::Error> {
         Snapshot::try_from_with_callback(vmo, || {})
     }
 }
@@ -424,9 +424,9 @@ pub enum BackingBuffer {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl TryFrom<&fuchsia_zircon::Vmo> for BackingBuffer {
+impl TryFrom<&zx::Vmo> for BackingBuffer {
     type Error = ReaderError;
-    fn try_from(source: &fuchsia_zircon::Vmo) -> Result<Self, Self::Error> {
+    fn try_from(source: &zx::Vmo) -> Result<Self, Self::Error> {
         let container = Container::read_only(source).map_err(ReaderError::Vmo)?;
         Ok(BackingBuffer::Container(container))
     }

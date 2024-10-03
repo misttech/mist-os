@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
-use fuchsia_zircon as zx;
 
 /// This structure represents the SRP Server Lease Info.
 ///

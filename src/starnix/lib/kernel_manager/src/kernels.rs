@@ -18,7 +18,7 @@ use vfs::execution_scope::ExecutionScope;
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx,
+    fidl_fuchsia_memory_attribution as fattribution, zx,
 };
 
 /// The component URL of the Starnix kernel.
@@ -116,7 +116,7 @@ impl Kernels {
         if let Some(kernel) = self.kernels.lock().get(&job_koid) {
             let activity_governor = connect_to_protocol::<fpower::ActivityGovernorMarker>()?;
             *kernel.wake_lease.lock() =
-                Some(activity_governor.take_wake_lease(&kernel.name).await?);
+                Some(activity_governor.take_application_activity_lease(&kernel.name).await?);
             tracing::info!("Acquired wake lease for {:?}", container_job);
         }
         Ok(())

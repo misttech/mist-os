@@ -6,9 +6,10 @@
 #define LIB_DRIVER_METADATA_CPP_TESTS_FUCHSIA_HARDWARE_TEST_METADATA_H_
 
 #include <fidl/fuchsia.hardware.test/cpp/fidl.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/driver/metadata/cpp/metadata_server.h>
 
-#include "lib/driver/metadata/cpp/metadata.h"
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace fdf_metadata {
 
@@ -24,5 +25,7 @@ namespace fuchsia_hardware_test {
 using MetadataServer = fdf_metadata::MetadataServer<Metadata>;
 
 }  // namespace fuchsia_hardware_test
+
+#endif
 
 #endif  // LIB_DRIVER_METADATA_CPP_TESTS_FUCHSIA_HARDWARE_TEST_METADATA_H_

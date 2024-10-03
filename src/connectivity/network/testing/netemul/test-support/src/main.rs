@@ -60,11 +60,11 @@ async fn handle_counter(
                             let status = match e.kind() {
                                 std::io::ErrorKind::NotFound | std::io::ErrorKind::BrokenPipe => {
                                     info!("failed to open directory at '{}': {}", path, e);
-                                    fuchsia_zircon::Status::NOT_FOUND
+                                    zx::Status::NOT_FOUND
                                 }
                                 _ => {
                                     error!("failed to open directory at '{}': {}", path, e);
-                                    fuchsia_zircon::Status::IO
+                                    zx::Status::IO
                                 }
                             };
                             let () = responder

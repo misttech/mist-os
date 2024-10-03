@@ -18,11 +18,6 @@ group("remote-control") {
   ]
 }
 
-resource("moniker-map") {
-  sources = [ "data/moniker-map.json" ]
-  outputs = [ "data/moniker-map.json" ]
-}
-
 group("tests") {
   testonly = true
 
@@ -47,18 +42,17 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
+    "//sdk/rust/zx",
     "//src/developer/remote-control/fidl:fuchsia.developer.remotecontrol.connector_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/component_debug",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -91,13 +85,11 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 
   sources = [
-    "src/args.rs",
     "src/main.rs",
     "src/usb.rs",
   ]
@@ -136,7 +128,6 @@ fuchsia_component("remote-control-component") {
 fuchsia_package("remote-control-package") {
   package_name = "remote-control"
   deps = [
-    ":moniker-map",
     ":remote-control-component",
     "//src/developer/remote-control/runner:bin",
   ]

@@ -12,8 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tracing::warn;
 use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync, zx,
 };
 
 /// maps vmo key with vmo result.

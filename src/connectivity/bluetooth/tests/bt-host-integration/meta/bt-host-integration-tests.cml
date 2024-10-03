@@ -15,11 +15,24 @@
             url: "bt-host#meta/bt-host.cm",
         },
     ],
+    use: [
+        { protocol: "fuchsia.component.resolution.Resolver-hermetic" },
+    ],
     offer: [
         {
             storage: "tmp",
             from: "parent",
             to: [ "#realm_builder" ],
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
         },
     ],
 }

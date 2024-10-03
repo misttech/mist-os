@@ -9,10 +9,7 @@ use futures::stream::TryStreamExt;
 use ieee80211::MacAddrBytes;
 use measure_tape_for_scan_result::Measurable as _;
 use tracing::{debug, info};
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme, zx};
 
 // TODO(https://fxbug.dev/42160765): Remove this.
 // Size of FIDL message header and FIDL error-wrapped vector header
@@ -173,7 +170,7 @@ mod tests {
     use wlan_common::scan::Compatibility;
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::{assert_variant, random_fidl_bss_description};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     fn generate_test_fidl_data() -> Vec<fidl_policy::ScanResult> {
         const CENTER_FREQ_CHAN_1: u32 = 2412;
@@ -190,14 +187,14 @@ mod tests {
                         bssid: Some([0, 0, 0, 0, 0, 0]),
                         rssi: Some(0),
                         frequency: Some(CENTER_FREQ_CHAN_1),
-                        timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
+                        timestamp_nanos: Some(zx::MonotonicInstant::get().into_nanos()),
                         ..Default::default()
                     },
                     fidl_policy::Bss {
                         bssid: Some([7, 8, 9, 10, 11, 12]),
                         rssi: Some(13),
                         frequency: Some(CENTER_FREQ_CHAN_11),
-                        timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
+                        timestamp_nanos: Some(zx::MonotonicInstant::get().into_nanos()),
                         ..Default::default()
                     },
                 ]),
@@ -213,7 +210,7 @@ mod tests {
                     bssid: Some([1, 2, 3, 4, 5, 6]),
                     rssi: Some(7),
                     frequency: Some(CENTER_FREQ_CHAN_8),
-                    timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
+                    timestamp_nanos: Some(zx::MonotonicInstant::get().into_nanos()),
                     ..Default::default()
                 }]),
                 compatibility: Some(fidl_policy::Compatibility::Supported),
@@ -332,7 +329,7 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
                         signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
-                        timestamp: zx::MonotonicTime::from_nanos(
+                        timestamp: zx::MonotonicInstant::from_nanos(
                             fidl_aps[0].entries.as_ref().unwrap()[0].timestamp_nanos.unwrap(),
                         ),
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
@@ -353,7 +350,7 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid::from([7, 8, 9, 10, 11, 12]),
                         signal: types::Signal { rssi_dbm: 13, snr_db: 3 },
-                        timestamp: zx::MonotonicTime::from_nanos(
+                        timestamp: zx::MonotonicInstant::from_nanos(
                             fidl_aps[0].entries.as_ref().unwrap()[1].timestamp_nanos.unwrap(),
                         ),
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
@@ -378,7 +375,7 @@ mod tests {
                 entries: vec![types::Bss {
                     bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
                     signal: types::Signal { rssi_dbm: 7, snr_db: 2 },
-                    timestamp: zx::MonotonicTime::from_nanos(
+                    timestamp: zx::MonotonicInstant::from_nanos(
                         fidl_aps[1].entries.as_ref().unwrap()[0].timestamp_nanos.unwrap(),
                     ),
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),

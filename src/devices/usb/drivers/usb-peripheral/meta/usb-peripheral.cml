@@ -21,8 +21,8 @@
     use: [
         { service: "fuchsia.hardware.usb.dci.UsbDciService" },
         {
-            availability: "transitional",
             config: "fuchsia.usb.PeripheralConfig.Functions",
+            availability: "optional",
             key: "functions",
             type: "vector",
             max_count: 8,
@@ -30,6 +30,7 @@
                 type: "string",
                 max_size: 32,
             },
+            default: [],
         },
     ],
     expose: [
@@ -38,14 +39,4 @@
             from: "self",
         },
     ],
-    config: {
-        functions: {
-            type: "vector",
-            max_count: 8,
-            element: {
-                type: "string",
-                max_size: 32,
-            },
-        },
-    },
 }

@@ -8,7 +8,7 @@ use crate::task::{
 };
 use crate::vfs::timer::TimerOps;
 use fuchsia_async::Duration;
-use fuchsia_zircon as zx;
+
 use futures::stream::AbortHandle;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
@@ -129,7 +129,7 @@ impl IntervalTimer {
                 // that the target time can be updated.
                 let target_time = { self.state.lock().target_time };
                 let target_monotonic = target_time.estimate_monotonic();
-                let now = zx::MonotonicTime::get();
+                let now = zx::MonotonicInstant::get();
                 if now >= target_monotonic {
                     break now - target_monotonic;
                 }

@@ -23,7 +23,7 @@ use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::error;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 // Local shorthand type aliases
 type HangingGetNotifyFn =

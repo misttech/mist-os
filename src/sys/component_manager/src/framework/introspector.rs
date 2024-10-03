@@ -19,7 +19,7 @@ use routing::error::RoutingError;
 use routing::policy::PolicyError;
 use tracing::warn;
 use vfs::directory::entry::OpenRequest;
-use {fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx};
+use {fidl_fuchsia_component as fcomponent, zx};
 
 use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
 use crate::model::component::WeakComponentInstance;
@@ -178,7 +178,8 @@ impl CapabilityProvider for AccessDeniedCapabilityProvider {
             target_moniker: self.target.moniker.clone(),
         });
         if let Ok(target) = self.target.upgrade() {
-            report_routing_failure(&DEBUG_REQUEST, &target, &err).await;
+            report_routing_failure(&*DEBUG_REQUEST, DEBUG_REQUEST.availability(), &target, &err)
+                .await;
         }
         Err(err.into())
     }

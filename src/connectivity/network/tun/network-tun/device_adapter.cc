@@ -436,5 +436,22 @@ zx_status_t DeviceAdapter::AddPort(PortAdapter& port) {
 
 void DeviceAdapter::RemovePort(uint8_t port_id) { device_iface_.RemovePort(port_id); }
 
+zx_status_t DeviceAdapter::DelegateRxLease(
+    fuchsia_hardware_network::wire::DelegatedRxLease& lease) {
+  // NB: Banjo bindings only support channel leases.
+  if (!(lease.has_handle() && lease.has_hold_until_frame() && lease.handle().is_channel())) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  delegated_rx_lease_t delegated = {
+      .hold_until_frame = lease.hold_until_frame(),
+      .handle =
+          {
+              .channel = lease.handle().channel().release(),
+          },
+  };
+  device_iface_.DelegateRxLease(&delegated);
+  return ZX_OK;
+}
+
 }  // namespace tun
 }  // namespace network

@@ -4,7 +4,7 @@
 
 use crate::gestures::gesture_arena;
 use crate::{input_device, mouse_binding, touch_binding, Position};
-use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
+use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
 /// Takes a sequence of InputEvents and return a sequence of InputEvents the
 /// gesture_arena converted to.
@@ -64,7 +64,7 @@ pub(super) fn make_touchpad_event(
     input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Touchpad(touchpad_event),
         device_descriptor: make_touchpad_descriptor(),
-        event_time: zx::MonotonicTime::ZERO,
+        event_time: zx::MonotonicInstant::ZERO,
         trace_id: None,
         handled: input_device::Handled::No,
     }

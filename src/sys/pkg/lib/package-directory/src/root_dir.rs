@@ -21,7 +21,7 @@ use vfs::path::Path as VfsPath;
 use vfs::{
     immutable_attributes, CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]

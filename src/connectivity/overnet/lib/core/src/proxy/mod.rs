@@ -15,11 +15,11 @@ use anyhow::{format_err, Error};
 use fidl_fuchsia_overnet_protocol::{
     SignalUpdate, StreamId, StreamRef, TransferInitiator, TransferWaiter,
 };
-use fuchsia_zircon_status as zx_status;
 use futures::prelude::*;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
+use zx_status;
 
 pub(crate) use self::handle::{IntoProxied, Proxyable, ProxyableRW};
 pub(crate) use self::run::spawn::{recv as spawn_recv, send as spawn_send};

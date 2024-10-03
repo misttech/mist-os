@@ -25,8 +25,7 @@ use {
     fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6, fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
-    fidl_fuchsia_net_test_realm as fntr, fidl_fuchsia_posix_socket as fposix_socket,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_test_realm as fntr, fidl_fuchsia_posix_socket as fposix_socket, zx,
 };
 
 const INTERFACE1_MAC_ADDRESS: fnet::MacAddress = fidl_mac!("02:03:04:05:06:07");

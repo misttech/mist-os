@@ -6,9 +6,9 @@ use super::ReadValue;
 use fidl::{HandleRef, Signals};
 use fidl_fuchsia_overnet_protocol::{SignalUpdate, Signals as WireSignals};
 use fuchsia_async::OnSignalsRef;
-use fuchsia_zircon_status as zx_status;
 use futures::FutureExt;
 use std::task::{Context, Poll};
+use zx_status;
 
 const POLLED_SIGNALS: Signals = Signals::from_bits_truncate(
     Signals::USER_0.bits()

@@ -42,7 +42,10 @@
             from: "framework",
         },
         {
-            protocol: "fuchsia.settings.Privacy",
+            protocol: [
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.settings.Privacy",
+            ],
             availability: "optional",
         },
         {

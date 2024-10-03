@@ -18,8 +18,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_wlan_security,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 /// Many tests will want to start from a connected state, so this will create and start the test
@@ -122,13 +121,13 @@ async fn test_scan_request_success() {
         let scan_result_list = vec![
             fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest {
                 txn_id: Some(txn_id),
-                timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
+                timestamp_nanos: Some(zx::MonotonicInstant::get().into_nanos()),
                 bss: Some(random_fidl_bss_description!()),
                 ..Default::default()
             },
             fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest {
                 txn_id: Some(txn_id),
-                timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos() + 1),
+                timestamp_nanos: Some(zx::MonotonicInstant::get().into_nanos() + 1),
                 bss: Some(random_fidl_bss_description!()),
                 ..Default::default()
             },

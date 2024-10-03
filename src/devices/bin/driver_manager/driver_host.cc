@@ -242,28 +242,20 @@ zx::result<> DriverHostComponent::InstallLoader(
 }
 
 DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
+    fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
     fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
     zx::channel bootstrap_sender, std::unique_ptr<driver_loader::Loader> loader,
     fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts)
-    : dispatcher_(dispatcher),
+    : driver_host_(std::move(driver_host), dispatcher,
+                   fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })),
       driver_host_loader_(std::move(client), dispatcher),
       bootstrap_sender_(std::move(bootstrap_sender)),
-      loader_(std::move(loader)),
-      bootstrap_close_listener_(bootstrap_sender_.get(), ZX_CHANNEL_PEER_CLOSED) {
-  bootstrap_close_listener_.set_handler(
-      [this, driver_hosts](async_dispatcher_t* dispatcher, async::Wait* wait, zx_status_t status,
-                           const zx_packet_signal_t* signal) { driver_hosts->erase(*this); });
-}
+      loader_(std::move(loader)) {}
 
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
-    DriverLoadArgs load_args, fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end,
-    StartCallback cb) {
-  // TODO(https://fxbug.dev/357854682): pass this to the started driver host once
-  // fuchsia_driver_host.DriverHost is implemented. Store it here for now so the node doesn't think
-  // the driver host has died prematurely.
-  endpoints_for_driver_hosts_.push_back(std::move(driver_host_server_end));
-
+    DriverLoadArgs load_args, DriverStartArgs start_args,
+    fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
   fidl::Arena arena;
   auto args = fuchsia_driver_loader::wire::DriverHostLoadDriverRequest::Builder(arena)
                   .driver_soname(fidl::StringView::FromExternal(load_args.driver_soname))
@@ -273,8 +265,8 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
 
   std::string driver_name = std::string(load_args.driver_soname);
   driver_host_loader_->LoadDriver(args).ThenExactlyOnce(
-      [this, node = std::move(node), node_name, load_args = std::move(load_args), driver_name,
-       cb = std::move(cb)](auto& result) mutable {
+      [this, driver = std::move(driver), node = std::move(node), node_name,
+       start_args = std::move(start_args), driver_name, cb = std::move(cb)](auto& result) mutable {
         if (!result.ok()) {
           LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
                result.FormatDescription().c_str());
@@ -299,8 +291,8 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
           return;
         }
 
-        // TODO(https://fxbug.dev/355233670): send node client and load args as part of
-        // |fuchsia_driver_host::DriverHost::Start|.
+        // TODO(https://fxbug.dev/355233670): send node client, driver client, and start args as
+        // part of |fuchsia_driver_host::DriverHost::Start|.
 
         cb(zx::ok());
       });

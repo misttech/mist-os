@@ -10,11 +10,11 @@ rust_wlan_integration_test("autoconnect_idle_iface") {
   binary_deps = [
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fuchsia",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:tracing",
   ]
 

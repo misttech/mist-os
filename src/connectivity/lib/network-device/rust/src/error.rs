@@ -4,8 +4,6 @@
 
 //! Definition of possible errors in this crate.
 
-use fuchsia_zircon as zx;
-
 /// Possible errors in the crate.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
@@ -48,6 +46,8 @@ pub enum Error {
     InvalidPortId(u8),
     #[error("buffer is too small: {size} < {offset} + {length}")]
     TooSmall { size: usize, offset: usize, length: usize },
+    #[error("received an invalid lease")]
+    InvalidLease,
 }
 
 /// Common result type for methods in this crate.

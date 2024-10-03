@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <format>
 #include <thread>
 
 #include <gmock/gmock.h>
@@ -59,6 +60,23 @@ using ::testing::MatchesRegex;
 
 template <class Fixture>
 using DlTests = Fixture;
+
+// The helper function returns a MatchesRegex object that matches the format of the error messages
+// for dlopen() and dlsym() when a symbol is undefined. It is intended to be used with EXPECT_THAT()
+// test macros. Example:
+//    EXPECT_THAT(msg, IsUndefinedSymbolErrMsg(name, module));
+auto IsUndefinedSymbolErrMsg(std::string_view symbol_name, std::string_view module_name) {
+  return MatchesRegex(std::format(
+      // Emitted by Fuchsia-musl when dlsym fails to locate the symbol.
+      "Symbol not found: {}"
+
+      // Emitted by Fuchsia-musl when relocation fails to resolve the symbol.
+      "|.*Error relocating {}: {}: symbol not found"
+
+      // Emitted by Linux-glibc.
+      "|.*{}: undefined symbol: {}",
+      symbol_name, module_name, symbol_name, module_name, symbol_name));
+}
 
 // This lists the test fixture classes to run DlTests tests against. The
 // DlImplTests fixture is a framework for testing the implementation in
@@ -280,18 +298,8 @@ TYPED_TEST(DlTests, MissingSymbol) {
 
   auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
-  if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(),
-              "missing-sym.MissingSymbol.module.so: undefined symbol: missing_sym_MissingSymbol");
-  } else {
-    EXPECT_THAT(
-        result.error_value().take_str(),
-        MatchesRegex(
-            // emitted by Fuchsia-musl
-            "Error relocating missing-sym.MissingSymbol.module.so: missing_sym_MissingSymbol: symbol not found"
-            // emitted by Linux-glibc
-            "|.*missing-sym.MissingSymbol.module.so: undefined symbol: missing_sym_MissingSymbol"));
-  }
+  EXPECT_THAT(result.error_value().take_str(),
+              IsUndefinedSymbolErrMsg(TestSym("missing_sym"), kFile));
 }
 
 // TODO(https://fxbug.dev/3313662773): Test simple case of transitive missing
@@ -472,19 +480,17 @@ TYPED_TEST(DlTests, OpenDepDirectly) {
 
   // Test that dlsym will resolve the same symbol pointer from the shared
   // dependency between kFile (res1) and kDepFile (res2).
-  if constexpr (TestFixture::kDepModuleHasDepTree) {
-    auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-    ASSERT_TRUE(sym1.value());
+  auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
 
-    auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-    ASSERT_TRUE(sym2.value());
+  auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
 
-    EXPECT_EQ(sym1.value(), sym2.value());
+  EXPECT_EQ(sym1.value(), sym2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
-  }
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
@@ -858,43 +864,40 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
   // Test that when we dlopen the dep directly, foo is resolved to the
   // transitive dependency, while bar_v1/bar_v2 continue to use the root
   // module's foo symbol.
-  if constexpr (TestFixture::kDepModuleHasDepTree) {
-    auto dep1 = this->DlOpen(kDepFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(dep1.is_ok()) << dep1.error_value();
-    EXPECT_TRUE(dep1.value());
+  auto dep1 = this->DlOpen(kDepFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(dep1.is_ok()) << dep1.error_value();
+  EXPECT_TRUE(dep1.value());
 
-    auto foo1 = this->DlSym(dep1.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(foo1.is_ok()) << foo1.error_value();
-    ASSERT_TRUE(foo1.value());
+  auto foo1 = this->DlSym(dep1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(foo1.is_ok()) << foo1.error_value();
+  ASSERT_TRUE(foo1.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(foo1.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(foo1.value()), kReturnValueFromFooV1);
 
-    auto dep_bar1 = this->DlSym(dep1.value(), TestSym("bar_v1").c_str());
-    ASSERT_TRUE(dep_bar1.is_ok()) << dep_bar1.error_value();
-    ASSERT_TRUE(dep_bar1.value());
+  auto dep_bar1 = this->DlSym(dep1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(dep_bar1.is_ok()) << dep_bar1.error_value();
+  ASSERT_TRUE(dep_bar1.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(dep_bar1.value()), kReturnValueFromRootModule);
+  EXPECT_EQ(RunFunction<int64_t>(dep_bar1.value()), kReturnValueFromRootModule);
 
-    auto dep2 = this->DlOpen(kDepFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
-    ASSERT_TRUE(dep2.is_ok()) << dep2.error_value();
-    EXPECT_TRUE(dep2.value());
+  auto dep2 = this->DlOpen(kDepFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(dep2.is_ok()) << dep2.error_value();
+  EXPECT_TRUE(dep2.value());
 
-    auto foo2 = this->DlSym(dep2.value(), TestSym("foo").c_str());
-    ASSERT_TRUE(foo2.is_ok()) << foo2.error_value();
-    ASSERT_TRUE(foo2.value());
+  auto foo2 = this->DlSym(dep2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(foo2.is_ok()) << foo2.error_value();
+  ASSERT_TRUE(foo2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(foo2.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(foo2.value()), kReturnValueFromFooV2);
 
-    auto dep_bar2 = this->DlSym(dep2.value(), TestSym("bar_v2").c_str());
-    ASSERT_TRUE(dep_bar2.is_ok()) << dep_bar2.error_value();
-    ASSERT_TRUE(dep_bar2.value());
+  auto dep_bar2 = this->DlSym(dep2.value(), TestSym("bar_v2").c_str());
+  ASSERT_TRUE(dep_bar2.is_ok()) << dep_bar2.error_value();
+  ASSERT_TRUE(dep_bar2.value());
 
-    EXPECT_EQ(RunFunction<int64_t>(dep_bar2.value()), kReturnValueFromRootModule);
+  EXPECT_EQ(RunFunction<int64_t>(dep_bar2.value()), kReturnValueFromRootModule);
 
-    ASSERT_TRUE(this->DlClose(dep1.value()).is_ok());
-    ASSERT_TRUE(this->DlClose(dep2.value()).is_ok());
-  }
-
+  ASSERT_TRUE(this->DlClose(dep1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(dep2.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
 }
 
@@ -1095,20 +1098,12 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
 
   EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValue);
 
+  const std::string symbol_name = TestSym("missing-sym");
+
   // dlsym will not be able to find the global symbol from the local scope
-  auto sym3 = this->DlSym(res2.value(), TestSym("missing_sym").c_str());
+  auto sym3 = this->DlSym(res2.value(), symbol_name.c_str());
   ASSERT_TRUE(sym3.is_error()) << sym3.error_value();
-  if constexpr (TestFixture::kCanMatchExactError || TestFixture::kEmitsSymbolNotFound) {
-    EXPECT_EQ(sym3.error_value().take_str(),
-              "Symbol not found: missing_sym_GlobalSatisfiesMissingSymbol");
-  } else {
-    // emitted by Linux-glibc
-    EXPECT_THAT(
-        sym3.error_value().take_str(),
-        // only the module name is captured from the full test path
-        MatchesRegex(
-            ".*missing-sym.GlobalSatisfiesMissingSymbol.module.so: undefined symbol: missing_sym_GlobalSatisfiesMissingSymbol"));
-  }
+  EXPECT_THAT(sym3.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol_name, kFile2));
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
@@ -1145,18 +1140,26 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
 // thread to use the slow path to call __tls_get_new. However, this test should
 // only be relied upon for testing the fast path, because that is the only thing
 // we can guarantee for all implementations.
-template <class TestFixture, class Test>
-void BasicGlobalDynamicTls(Test& self, const char* module_name) {
+template <class TestFixture, bool UseTlsDesc, class Test>
+void BasicGlobalDynamicTls(Test& self) {
   if constexpr (!TestFixture::kSupportsTls) {
     GTEST_SKIP() << "test requires TLS";
   }
 
-  constexpr const char* kGetTlsDescDepDataPtr = "get_tls_dep_data";
+  constexpr const char* kTlsModuleName =
+      UseTlsDesc ? "tls-desc-dep-module.so" : "tls-dep-module.so";
+  constexpr const char* kGetTlsDepDataPtr = "get_tls_dep_data";
   constexpr const char* kGetTlsDescDepBss1 = "get_tls_dep_bss1";
   constexpr const char* kGetTlsDescDepWeak = "get_tls_dep_weak";
 
+  // Initial values for TLS variables in the test module.
+  constexpr int kTlsDataInitialVal = 42;
+  constexpr char kBss1InitialVal = 0;
+
+  self.ExpectRootModule(kTlsModuleName);
+
   // The module should exist for both tls-dep and tls-desc-dep targets.
-  auto result = self.DlOpen(module_name, RTLD_NOW | RTLD_LOCAL);
+  auto result = self.DlOpen(kTlsModuleName, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -1164,10 +1167,10 @@ void BasicGlobalDynamicTls(Test& self, const char* module_name) {
   // it wasn't compiled to have the right type of TLS relocations, then the
   // symbols won't exist in the module, and we should skip the rest of the
   // test.
-  auto get_dep_data = self.DlSym(result.value(), kGetTlsDescDepDataPtr);
+  auto get_dep_data = self.DlSym(result.value(), kGetTlsDepDataPtr);
   if (get_dep_data.is_error()) {
-    ASSERT_THAT(get_dep_data.error_value().take_str(),
-                ::testing::EndsWith(std::string("undefined symbol: ") + kGetTlsDescDepDataPtr));
+    EXPECT_THAT(get_dep_data.error_value().take_str(),
+                IsUndefinedSymbolErrMsg(kGetTlsDepDataPtr, kTlsModuleName));
     auto close_result = self.DlClose(result.value());
     ASSERT_TRUE(close_result.is_ok()) << close_result.error_value();
     GTEST_SKIP() << "Test module disabled at compile time.";
@@ -1181,18 +1184,14 @@ void BasicGlobalDynamicTls(Test& self, const char* module_name) {
   int* data_ptr2 = RunFunction<int*>(get_dep_data.value());
   ASSERT_TRUE(data_ptr2);
 
-  constexpr int kTlsDataInitialVal = 42;
-  constexpr char kBss1InitialVal = 0;
-
-  EXPECT_EQ(*data_ptr1, kTlsDataInitialVal);
-  EXPECT_EQ(*data_ptr1, *data_ptr2);
-
   // data_ptr1 and data_ptr2 should alias, since `get_tls_dep_data` returns a
   // pointer to the thread local. This can fail if DTP_OFFSET is non-zero and
   // the arithmetic using it does not get applied uniformly, causing the
   // returned pointer to be different than the one stored in the GOT for the
   // TLSDESC fast path.
-  EXPECT_EQ(data_ptr1, data_ptr2);  // Fails on RISC-V, data_ptr2 == data_ptr1 + kRISCVDtpOffset
+  EXPECT_EQ(data_ptr1, data_ptr2);
+  EXPECT_EQ(*data_ptr1, kTlsDataInitialVal);
+  EXPECT_EQ(*data_ptr1, *data_ptr2);
 
   // Modifying the thread local value should not impact other threads. We test
   // this in the loop below.
@@ -1213,12 +1212,12 @@ void BasicGlobalDynamicTls(Test& self, const char* module_name) {
   auto get_dep_weak = self.DlSym(result.value(), kGetTlsDescDepWeak);
   ASSERT_TRUE(get_dep_weak.is_ok()) << get_dep_weak.error_value();
   ASSERT_TRUE(get_dep_weak.value());
-#if HAVE_TLSDESC
-  // We can only be sure the returned value will be nullptr w/ TLSDESC.
-  // __tls_get_addr may just return whatever happens to be in the GOT.
-  int* weak_ptr = RunFunction<int*>(get_dep_weak.value());
-  EXPECT_EQ(weak_ptr, nullptr);
-#endif
+  if constexpr (UseTlsDesc) {
+    // We can only be sure the returned value will be nullptr w/ TLSDESC.
+    // __tls_get_addr may just return whatever happens to be in the GOT.
+    int* weak_ptr = RunFunction<int*>(get_dep_weak.value());
+    EXPECT_EQ(weak_ptr, nullptr);
+  }
 
   // The value of another threads TLS variable should be unaffected by this
   // thread.
@@ -1238,12 +1237,10 @@ void BasicGlobalDynamicTls(Test& self, const char* module_name) {
   ASSERT_TRUE(self.DlClose(result.value()).is_ok());
 }
 
-TYPED_TEST(DlTests, BasicGlobalDynamicTlsDesc) {
-  BasicGlobalDynamicTls<TestFixture>(*this, "tls-desc-dep-module.so");
-}
+TYPED_TEST(DlTests, BasicGlobalDynamicTlsDesc) { BasicGlobalDynamicTls<TestFixture, true>(*this); }
 
 TYPED_TEST(DlTests, BasicGlobalDynamicTlsGetAddr) {
-  BasicGlobalDynamicTls<TestFixture>(*this, "tls-dep-module.so");
+  BasicGlobalDynamicTls<TestFixture, false>(*this);
 }
 
 }  // namespace

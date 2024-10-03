@@ -4,6 +4,7 @@
 
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/test.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 group("tests") {
   testonly = true
@@ -45,12 +46,23 @@ test("dl-unittests") {
         "dl-load-zircon-tests-base.cc",
         "dl-load-zircon-tests-base.h",
       ]
+    } else {
+      # For the host test, this sets a DT_RUNPATH using $ORIGIN to find where
+      # the modules are copied into a subdirectory of $host_out_dir (where the
+      # test executable will be).
+      configs += [ "//sdk/lib/ld/test/modules:dl-test-data.config" ]
     }
-
-    # Plumb in the switch to set cflags, such as the libprefix for test files.
-    deps += [ "//sdk/lib/ld/test:ld-test-switches" ]
-    data_deps = [ "//sdk/lib/ld/test:load-test-data" ]
+    data_deps = [ ":test-data" ]
   }
+}
+
+# This collects all the test modules and their runtime deps.  On Fuchsia, they
+# just go into /pkg/lib with the link-time shared libraries.  For the host
+# test, they go where the DT_RUNPATH will find them relative to $host_out_dir.
+user_basic_redirect("test-data") {
+  visibility = [ ":*" ]
+  testonly = true
+  public_deps = [ "//sdk/lib/ld/test/modules:dl-test-data" ]
 }
 
 fuchsia_unittest_package("dl-tests") {

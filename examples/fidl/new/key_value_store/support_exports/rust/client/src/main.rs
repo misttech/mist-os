@@ -10,7 +10,7 @@ use std::{thread, time};
 // [START diff_1]
 use fidl::unpersist;
 use fidl_examples_keyvaluestore_supportexports::{Exportable, Item, StoreMarker};
-use fuchsia_zircon::Vmo;
+use zx::Vmo;
 // [END diff_1]
 
 #[fuchsia::main]

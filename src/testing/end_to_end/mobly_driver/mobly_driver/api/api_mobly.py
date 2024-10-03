@@ -16,7 +16,6 @@ LATEST_RES_SYMLINK_NAME: str = "latest"
 # Defined and used in
 # https://osscs.corp.google.com/fuchsia/fuchsia/+/main:src/testing/end_to_end/mobly_controller/fuchsia_device.py
 MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = "FuchsiaDevice"
-TRANSPORT_KEY: str = "transport"
 SSH_PATH_KEY: str = "ssh_binary_path"
 SSH_CONFIG_KEY: str = "ssh_config"
 SSH_HOST_KEY: str = "host"
@@ -85,7 +84,6 @@ def new_testbed_config(
     testbed_name: str,
     output_path: str,
     honeydew_config: dict[str, Any],
-    transport: str,
     mobly_controllers: list[dict[str, Any]],
     test_params_dict: MoblyConfigComponent,
     botanist_honeydew_map: dict[str, str],
@@ -132,7 +130,6 @@ def new_testbed_config(
                     "ipv4":"192.168.42.112",
                     "ipv6":"",
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
-                    "transport":"fuchsia-controller",
                     "config": {
                       "transports": {
                         "ffx": {
@@ -171,7 +168,6 @@ def new_testbed_config(
         testbed_name: Mobly testbed name to use.
         output_path: absolute path to Mobly's top-level output directory.
         honeydew_config: Honeydew configuration.
-        transport: host->device transport type to use.
         mobly_controllers: List of Mobly controller objects.
         test_params_dict: Mobly testbed params dictionary.
         botanist_honeydew_map: Dictionary that maps Botanist config names to
@@ -187,8 +183,6 @@ def new_testbed_config(
         if api_infra.FUCHSIA_DEVICE == controller_type:
             # Add the "honeydew_config" field for every Fuchsia device, if exists.
             controller[HONEYDEW_CONFIG_KEY] = honeydew_config
-            # Add the "transport" field for every Fuchsia device.
-            controller[TRANSPORT_KEY] = transport
             # Convert botanist key names to relative Honeydew key names for
             # fuchsia devices. This is done here so that Honeydew does not have
             # to do the conversions itself.
@@ -247,18 +241,6 @@ def get_config_with_test_params(
         return ret
     except (AttributeError, KeyError, TypeError) as e:
         raise ApiException("Unexpected Mobly config content: %s" % e)
-
-
-def set_transport(mobly_config: MoblyConfigComponent, transport: str) -> None:
-    """Updates all fuchsia device configs to use the specified transport.
-
-    Overwrites the existing value if the key already exists.
-
-    Args:
-      mobly_config: Mobly config object to update.
-      transport: Transport to set on fuchsia devices in the Mobly config.
-    """
-    _set_per_device_config(mobly_config, TRANSPORT_KEY, transport)
 
 
 def set_honeydew_config(

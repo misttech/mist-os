@@ -7,7 +7,7 @@ use fidl_fuchsia_time_external::PushSourceMarker;
 use fidl_test_time::TimeSourceControlMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 use tracing::info;
 

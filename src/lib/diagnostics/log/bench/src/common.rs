@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::LazyLock;
 use tracing::{Callsite, Metadata};
 use tracing_core::field;
 use tracing_core::subscriber::Interest;
+use zx::{self as zx, AsHandleRef};
 
 pub static PLACEHOLDER_TEXT: LazyLock<String> = LazyLock::new(|| "x".repeat(32000));
 pub static PROCESS_ID: LazyLock<zx::Koid> =

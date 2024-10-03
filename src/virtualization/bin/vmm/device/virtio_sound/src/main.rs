@@ -16,7 +16,7 @@ use crate::wire_convert::*;
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream};
-use fuchsia_zircon::{self as zx};
+
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use service::VirtSoundService;

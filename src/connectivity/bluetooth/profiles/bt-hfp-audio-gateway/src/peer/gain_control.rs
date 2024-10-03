@@ -11,7 +11,7 @@ use fidl_fuchsia_bluetooth_hfp::{
     HeadsetGainMarker, HeadsetGainRequest, HeadsetGainRequestStream,
     HeadsetGainWatchMicrophoneGainResponder, HeadsetGainWatchSpeakerGainResponder,
 };
-use fuchsia_zircon as zx;
+
 use futures::ready;
 use futures::stream::{FusedStream, Stream, StreamExt};
 use tracing::info;

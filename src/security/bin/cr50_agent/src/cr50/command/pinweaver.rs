@@ -7,7 +7,7 @@ use fidl_fuchsia_tpm_cr50::{
     DELAY_SCHEDULE_MAX_COUNT, HASH_SIZE, HE_SECRET_MAX_SIZE, LE_SECRET_MAX_SIZE, MAC_SIZE,
     MAX_LOG_ENTRIES,
 };
-use fuchsia_zircon as zx;
+
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::marker::PhantomData;

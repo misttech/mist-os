@@ -15,7 +15,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples_colocated as fcolocated, fidl_fuchsia_memory_attribution as fattribution,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 #[fuchsia::test]

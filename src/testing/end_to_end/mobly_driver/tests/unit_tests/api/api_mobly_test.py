@@ -93,7 +93,6 @@ class ApiMoblyTest(unittest.TestCase):
                                     {
                                         "honeydew_config": _HONEYDEW_CONFIG,
                                         "nodename": "fuchsia_abcd",
-                                        "transport": "transport",
                                     }
                                 ]
                             },
@@ -120,12 +119,10 @@ class ApiMoblyTest(unittest.TestCase):
                                     {
                                         "honeydew_config": _HONEYDEW_CONFIG,
                                         "nodename": "fuchsia_abcd",
-                                        "transport": "transport",
                                     },
                                     {
                                         "honeydew_config": _HONEYDEW_CONFIG,
                                         "nodename": "fuchsia_bcde",
-                                        "transport": "transport",
                                     },
                                 ]
                             },
@@ -168,7 +165,6 @@ class ApiMoblyTest(unittest.TestCase):
                                     {
                                         "honeydew_config": _HONEYDEW_CONFIG,
                                         "nodename": "fuchsia_abcd",
-                                        "transport": "transport",
                                     }
                                 ],
                             },
@@ -200,7 +196,6 @@ class ApiMoblyTest(unittest.TestCase):
                                     {
                                         "honeydew_config": _HONEYDEW_CONFIG,
                                         "name": "fuchsia_abcd",
-                                        "transport": "transport",
                                     }
                                 ]
                             },
@@ -258,7 +253,6 @@ class ApiMoblyTest(unittest.TestCase):
             testbed_name=override_args.get("testbed_name", "tb_name"),
             output_path=override_args.get("output_path", "output_path"),
             honeydew_config=_HONEYDEW_CONFIG,
-            transport=override_args.get("transport", "transport"),
             mobly_controllers=override_args.get("mobly_controllers", []),
             test_params_dict=override_args.get("test_params_dict", {}),
             botanist_honeydew_map=override_args.get(
@@ -273,169 +267,6 @@ class ApiMoblyTest(unittest.TestCase):
             config_fh.flush()
             # Assert that no exceptions are raised.
             config_parser.load_test_config_file(config_fh.name)
-
-    @parameterized.expand(
-        [
-            ("success_empty_config", {}, {}),
-            (
-                "success_empty_controllers",
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {},
-                        },
-                    ],
-                },
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {},
-                        },
-                    ]
-                },
-            ),
-            (
-                "success_valid_controllers",
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [{"nodename": "fuchsia_abcd"}]
-                            },
-                        }
-                    ]
-                },
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [
-                                    {
-                                        "nodename": "fuchsia_abcd",
-                                        "transport": "fuchsia-controller",
-                                    }
-                                ]
-                            },
-                        }
-                    ]
-                },
-            ),
-            (
-                "success_existing_value_is_overriden",
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [
-                                    {
-                                        "nodename": "fuchsia_abcd",
-                                        "transport": "foobar",
-                                    }
-                                ]
-                            },
-                        }
-                    ]
-                },
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [
-                                    {
-                                        "nodename": "fuchsia_abcd",
-                                        "transport": "fuchsia-controller",
-                                    }
-                                ]
-                            },
-                        }
-                    ]
-                },
-            ),
-            (
-                "success_multiple_controllers_same_type",
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [
-                                    {
-                                        "nodename": "fuchsia_abcd",
-                                    },
-                                    {"nodename": "fuchsia_bcde"},
-                                ]
-                            },
-                        }
-                    ]
-                },
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [
-                                    {
-                                        "nodename": "fuchsia_abcd",
-                                        "transport": "fuchsia-controller",
-                                    },
-                                    {
-                                        "nodename": "fuchsia_bcde",
-                                        "transport": "fuchsia-controller",
-                                    },
-                                ]
-                            },
-                        }
-                    ]
-                },
-            ),
-            (
-                "success_multiple_controllers_different_types",
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [{"nodename": "fuchsia_abcd"}],
-                                "AccessPoint": [{"ip_addr": "1.1.1.1"}],
-                            },
-                        }
-                    ]
-                },
-                {
-                    keys.Config.key_testbed.value: [
-                        {
-                            keys.Config.key_testbed_name.value: "testbed",
-                            keys.Config.key_testbed_controllers.value: {
-                                "FuchsiaDevice": [
-                                    {
-                                        "nodename": "fuchsia_abcd",
-                                        "transport": "fuchsia-controller",
-                                    }
-                                ],
-                                "AccessPoint": [{"ip_addr": "1.1.1.1"}],
-                            },
-                        }
-                    ]
-                },
-            ),
-        ]
-    )
-    def test_set_transport(
-        self,
-        unused_name: str,
-        config_obj: dict[str, Any],
-        transformed_config_obj: dict[str, Any],
-    ) -> None:
-        """Test case for mutating transports in config"""
-        new_config_obj = config_obj.copy()
-        api_mobly.set_transport(new_config_obj, "fuchsia-controller")
-        self.assertDictEqual(new_config_obj, transformed_config_obj)
 
     @parameterized.expand(
         [
@@ -593,7 +424,7 @@ class ApiMoblyTest(unittest.TestCase):
         config_obj: dict[str, Any],
         transformed_config_obj: dict[str, Any],
     ) -> None:
-        """Test case for mutating transports in config"""
+        """Test case for mutating honeydew_config in FuchsiaDevice config"""
         new_config_obj = config_obj.copy()
         api_mobly.set_honeydew_config(new_config_obj, _HONEYDEW_CONFIG)
         self.assertDictEqual(new_config_obj, transformed_config_obj)

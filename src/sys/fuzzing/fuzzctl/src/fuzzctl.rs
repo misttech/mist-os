@@ -461,7 +461,7 @@ mod tests {
     use fuchsia_fuzzctl_test::{create_task, serve_manager, BufferSink, Test, TEST_URL};
     use std::path::PathBuf;
     use url::Url;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     // Test fixtures.
 

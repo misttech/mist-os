@@ -77,13 +77,13 @@ impl<T: AsRef<FakeDiagnostics> + Send + Sync> Diagnostics for T {
 mod test {
     use super::*;
     use crate::datatypes::Poll;
-    use fuchsia_zircon as zx;
+
     use lazy_static::lazy_static;
 
     lazy_static! {
         static ref TEST_SAMPLE: HttpsSample = HttpsSample {
-            utc: zx::MonotonicTime::from_nanos(111_111_111),
-            monotonic: zx::MonotonicTime::from_nanos(222_222_222),
+            utc: zx::MonotonicInstant::from_nanos(111_111_111),
+            monotonic: zx::MonotonicInstant::from_nanos(222_222_222),
             standard_deviation: zx::Duration::from_millis(235),
             final_bound_size: zx::Duration::from_millis(100),
             polls: vec![Poll { round_trip_time: zx::Duration::from_nanos(23) }],

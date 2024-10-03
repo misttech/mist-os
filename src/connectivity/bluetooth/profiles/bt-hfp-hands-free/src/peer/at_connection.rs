@@ -17,7 +17,7 @@ use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tracing::warn;
-use {at_commands as at, fuchsia_zircon as zx};
+use {at_commands as at, zx};
 
 pub struct AtConnection {
     peer_id: PeerId,

@@ -22,7 +22,7 @@ use vfs::directory::entry_container::MutableDirectory;
 use vfs::name::Name;
 use vfs::node::Node;
 use vfs::symlink::Symlink;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[derive(ToWeakNode)]
 pub struct FxSymlink {
@@ -130,6 +130,11 @@ impl Node for FxSymlink {
                 uid: props.posix_attributes.map(|a| a.uid),
                 gid: props.posix_attributes.map(|a| a.gid),
                 rdev: props.posix_attributes.map(|a| a.rdev),
+                selinux_context: self
+                    .handle
+                    .get_inline_selinux_context()
+                    .await
+                    .map_err(map_to_status)?,
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::SYMLINK,

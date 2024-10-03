@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.ax88179/cpp/wire.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>

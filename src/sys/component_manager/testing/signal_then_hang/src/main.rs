@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon as zx;
+
 use zx::Peered;
 
 /// Signals USER0 on the peer of the USER0 handle, then sleep forever.

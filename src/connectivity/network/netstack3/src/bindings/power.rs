@@ -122,6 +122,7 @@ impl From<fpower_broker::LeaseError> for FatalTransmitSuspensionError {
     fn from(value: fpower_broker::LeaseError) -> Self {
         match &value {
             fpower_broker::LeaseError::Internal
+            | fpower_broker::LeaseError::InvalidLevel
             | fpower_broker::LeaseError::NotAuthorized
             | fpower_broker::LeaseError::__SourceBreaking { .. } => Self::Lease(value),
         }
@@ -274,6 +275,13 @@ impl EnabledTransmitSuspensionHandler {
 pub(crate) struct TransmitSuspensionRequest<'a>(&'a mut EnabledTransmitSuspensionHandler);
 
 impl TransmitSuspensionRequest<'_> {
+    /// Handles a suspension request, blocking until the system resumes.
+    ///
+    /// Waits for the transmtting device to finish its work and then signals
+    /// back to power framework that our power element's level is lowered. Then
+    /// it waits for the level of our power element to rise before returning.
+    /// The rise in power level indicates that it is okay for us to resume
+    /// normal operation.
     pub(crate) async fn handle_suspension(self) -> Result<(), FatalTransmitSuspensionError> {
         let Self(EnabledTransmitSuspensionHandler {
             _lease: _,

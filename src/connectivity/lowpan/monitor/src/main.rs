@@ -45,7 +45,7 @@ async fn main() -> Result<(), Error> {
 
         tracing::info!("lowpan-monitor detects the termination of lowpan-ot-driver (failed {} times), restarting in {} sec", retry_counter, retry_delay_backoff_sec);
 
-        fasync::Timer::new(fasync::Time::after(fuchsia_zircon::Duration::from_seconds(
+        fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(
             retry_delay_backoff_sec,
         )))
         .await;

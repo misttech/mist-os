@@ -66,10 +66,10 @@ class UltrasoundTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
-                  "render:media",
-                  "render:interruption",
                   "render:background",
-                  "render:communications",
+                  "render:communication",
+                  "render:interruption",
+                  "render:media",
                   "render:system_agent",
                   "render:ultrasound",
                   "capture:loopback"
@@ -85,10 +85,10 @@ class UltrasoundTest : public HermeticAudioTest {
                     {
                       "name": "mix",
                       "streams": [
-                        "render:media",
-                        "render:interruption",
                         "render:background",
-                        "render:communications",
+                        "render:communication",
+                        "render:interruption",
+                        "render:media",
                         "render:system_agent"
                       ],
                       "output_rate": 96000,
@@ -101,9 +101,9 @@ class UltrasoundTest : public HermeticAudioTest {
                 "device_id": "*",
                 "supported_stream_types": [
                   "capture:background",
+                  "capture:communication",
                   "capture:foreground",
                   "capture:system_agent",
-                  "capture:communications",
                   "capture:ultrasound"
                 ],
                 "rate": 96000

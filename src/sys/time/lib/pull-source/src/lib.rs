@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_time_external::{
     self as ftexternal, Properties, PullSourceRequest, PullSourceRequestStream, TimeSample, Urgency,
 };
-use fuchsia_zircon as zx;
+
 use futures::lock::Mutex;
 use futures::TryStreamExt;
 use tracing::warn;
@@ -25,7 +25,7 @@ pub trait UpdateAlgorithm {
     async fn sample(&self, urgency: Urgency) -> Result<TimeSample, SampleError>;
 
     /// Returns the monotonic time at which the next sample may be produced.
-    async fn next_possible_sample_time(&self) -> zx::MonotonicTime;
+    async fn next_possible_sample_time(&self) -> zx::MonotonicInstant;
 }
 
 /// Reasons `sample()` may fail.
@@ -152,9 +152,9 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
         }
     }
 
-    async fn next_possible_sample_time(&self) -> zx::MonotonicTime {
+    async fn next_possible_sample_time(&self) -> zx::MonotonicInstant {
         // TODO(https://fxbug.dev/42065019): Implement rate limiting.
-        zx::MonotonicTime::get()
+        zx::MonotonicInstant::get()
     }
 }
 

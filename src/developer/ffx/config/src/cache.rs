@@ -4,8 +4,6 @@
 
 use crate::storage::{AssertNoEnv, AssertNoEnvError};
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
@@ -25,7 +23,7 @@ impl<T> CacheItem<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Cache<T>(RwLock<HashMap<Option<PathBuf>, CacheItem<T>>>);
+pub(crate) struct Cache<T>(RwLock<Option<CacheItem<T>>>);
 
 impl<T> Default for Cache<T> {
     fn default() -> Self {
@@ -39,10 +37,10 @@ impl<T: AssertNoEnv + Default> AssertNoEnv for Cache<T> {
         preamble: Option<String>,
         ctx: &crate::EnvironmentContext,
     ) -> Result<(), AssertNoEnvError> {
-        load_config(self, None, || Ok(T::default()))
+        load_config(self, || Ok(T::default()))
             .map_err(|e| AssertNoEnvError::Unexpected(e.into()))?;
         let config = self.0.read().expect("cache read mutex poisoned");
-        let defaults = config.get(&None).expect("config did not load");
+        let defaults = config.as_ref().expect("config did not load");
         let default_config = defaults.config.read().expect("config read mutex poisoned");
         default_config.assert_no_env(preamble, ctx)
     }
@@ -52,9 +50,9 @@ impl Cache<crate::storage::Config> {
     /// Overwrites the default config with a specific `ConfigMap`. This is intended for use-cases
     /// in which the config needs flattening.
     pub(crate) fn overwrite_default(&self, overwrite: &crate::storage::ConfigMap) -> Result<()> {
-        load_config(self, None, || Ok(crate::storage::Config::default()))?;
+        load_config(self, || Ok(crate::storage::Config::default()))?;
         let config = self.0.read().expect("cache read mutex poisoned");
-        let defaults = config.get(&None).expect("config did not load");
+        let defaults = config.as_ref().expect("config did not load");
         let mut defaults_config = defaults.config.write().expect("config write mutex poisoned");
         crate::api::value::merge_map(&mut defaults_config.default, overwrite);
 
@@ -65,38 +63,31 @@ impl Cache<crate::storage::Config> {
 /// Invalidate the cache. Call this if you do anything that might make a cached config go stale
 /// in a critical way, like changing the environment.
 pub(crate) async fn invalidate<T>(cache: &Cache<T>) {
-    cache.0.write().expect("config write guard").clear();
+    *cache.0.write().expect("config write guard") = None;
 }
 
 fn read_cache<T>(
-    guard: &impl std::ops::Deref<Target = HashMap<Option<PathBuf>, CacheItem<T>>>,
-    build_dir: Option<&Path>,
+    guard: &impl std::ops::Deref<Target = Option<CacheItem<T>>>,
     now: Instant,
 ) -> Option<Arc<RwLock<T>>> {
-    guard
-        .get(&build_dir.map(Path::to_owned)) // TODO(mgnb): get rid of this allocation when we can
-        .filter(|item| !item.is_cache_item_expired(now))
-        .map(|item| item.config.clone())
+    guard.as_ref().filter(|item| !item.is_cache_item_expired(now)).map(|item| item.config.clone())
 }
 
 pub(crate) fn load_config<T>(
     cache: &Cache<T>,
-    build_dir: Option<&Path>,
     new_config: impl FnOnce() -> Result<T>,
 ) -> Result<Arc<RwLock<T>>> {
-    load_config_with_instant(build_dir, Instant::now(), cache, new_config)
+    load_config_with_instant(Instant::now(), cache, new_config)
 }
 
 fn load_config_with_instant<T>(
-    build_dir: Option<&Path>,
     now: Instant,
     cache: &Cache<T>,
     new_config: impl FnOnce() -> Result<T>,
 ) -> Result<Arc<RwLock<T>>> {
     let cache_hit = {
         let guard = cache.0.read().map_err(|_| anyhow!("config read guard"))?;
-        //let build_dir = env.override_build_dir(build_dir);
-        read_cache(&guard, build_dir, now)
+        read_cache(&guard, now)
     };
     match cache_hit {
         Some(h) => Ok(h),
@@ -104,10 +95,7 @@ fn load_config_with_instant<T>(
             let mut guard = cache.0.write().map_err(|_| anyhow!("config write guard"))?;
             let config = Arc::new(RwLock::new(new_config()?));
 
-            guard.insert(
-                build_dir.map(Path::to_owned), // TODO(mgnb): get rid of this allocation when we can,
-                CacheItem { created: now, config: config.clone() },
-            );
+            *guard = Some(CacheItem { created: now, config: config.clone() });
             Ok(config)
         }
     }
@@ -118,13 +106,12 @@ fn load_config_with_instant<T>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::future::join_all;
 
-    async fn load(now: Instant, key: Option<&Path>, cache: &Cache<usize>) {
+    async fn load(now: Instant, cache: &Cache<usize>) {
         let tests = 25;
         let mut result = Vec::new();
         for x in 0..tests {
-            result.push(load_config_with_instant(key, now, cache, move || Ok(x)));
+            result.push(load_config_with_instant(now, cache, move || Ok(x)));
         }
         assert_eq!(tests, result.len());
         result.iter().for_each(|x| {
@@ -134,66 +121,32 @@ mod test {
 
     async fn load_and_test(
         now: Instant,
-        expected_len_before: usize,
-        expected_len_after: usize,
-        key: Option<&Path>,
+        expected_before: bool,
+        expected_after: bool,
         cache: &Cache<usize>,
     ) {
         {
             let read_guard = cache.0.read().expect("config read guard");
-            assert_eq!(expected_len_before, (*read_guard).len());
+            assert_eq!(expected_before, (*read_guard).is_some());
         }
-        load(now, key, cache).await;
+        load(now, cache).await;
         {
             let read_guard = cache.0.read().expect("config read guard");
-            assert_eq!(expected_len_after, (*read_guard).len());
+            assert_eq!(expected_after, (*read_guard).is_some());
         }
-    }
-
-    fn setup_build_dirs(tests: usize) -> Vec<Option<PathBuf>> {
-        let mut build_dirs = Vec::new();
-        build_dirs.push(None);
-        for x in 0..tests - 1 {
-            build_dirs.push(Some(PathBuf::from(format!("test {}", x))));
-        }
-        build_dirs
-    }
-
-    fn setup(tests: usize) -> (Instant, Vec<Option<PathBuf>>, Cache<usize>) {
-        (Instant::now(), setup_build_dirs(tests), Cache::default())
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_config_one_at_a_time() {
-        let tests = 10;
-        let (now, build_dirs, cache) = setup(tests);
-        for x in 0..tests {
-            load_and_test(now, x, x + 1, build_dirs[x].as_deref(), &cache).await;
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_config_many_at_a_time() {
-        let tests = 25;
-        let (now, build_dirs, cache) = setup(tests);
-        let futures = build_dirs.iter().map(|x| load(now, x.as_deref(), &cache));
-        let result = join_all(futures).await;
-        assert_eq!(tests, result.len());
-        let read_guard = cache.0.read().expect("config read guard");
-        assert_eq!(tests, (*read_guard).len());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_config_timeout() {
-        let tests = 1;
-        let (now, build_dirs, cache) = setup(tests);
-        load_and_test(now, 0, 1, build_dirs[0].as_deref(), &cache).await;
+        let now = Instant::now();
+        let cache = Cache::default();
+        load_and_test(now, false, true, &cache).await;
         let timeout = now.checked_add(CONFIG_CACHE_TIMEOUT).expect("timeout should not overflow");
         let after_timeout = timeout
             .checked_add(Duration::from_millis(1))
             .expect("after timeout should not overflow");
-        load_and_test(timeout, 1, 1, build_dirs[0].as_deref(), &cache).await;
-        load_and_test(after_timeout, 1, 1, build_dirs[0].as_deref(), &cache).await;
+        load_and_test(timeout, true, true, &cache).await;
+        load_and_test(after_timeout, true, true, &cache).await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

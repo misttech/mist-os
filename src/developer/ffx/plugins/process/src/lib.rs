@@ -19,8 +19,6 @@ use fidl_fuchsia_process_explorer::{
     QueryProxy,
 };
 use fuchsia_map::json;
-use fuchsia_zircon_status::Status;
-use fuchsia_zircon_types::zx_koid_t;
 use futures::AsyncReadExt;
 use processes_data::{processed, raw};
 use std::collections::HashSet;
@@ -29,6 +27,8 @@ use std::process::{Command, Stdio};
 use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
+use zx_status::Status;
+use zx_types::zx_koid_t;
 
 const BARRIER: &str = "<ffx symbolizer>\n";
 

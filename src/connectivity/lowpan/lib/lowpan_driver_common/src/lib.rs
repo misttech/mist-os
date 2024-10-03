@@ -84,9 +84,9 @@ pub mod lowpan_fidl {
     pub use fidl_fuchsia_net::Ipv6AddressWithPrefix as Ipv6Subnet;
 }
 
-pub use fuchsia_zircon_status::Status as ZxStatus;
+pub use zx_status::Status as ZxStatus;
 
-/// A `Result` that uses `fuchsia_zircon::Status` for the error condition.
+/// A `Result` that uses `zx::Status` for the error condition.
 pub type ZxResult<T = ()> = Result<T, ZxStatus>;
 
 const MAX_CONCURRENT: usize = 100;

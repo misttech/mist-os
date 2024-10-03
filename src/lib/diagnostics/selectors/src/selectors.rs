@@ -702,6 +702,13 @@ pub trait SelectorExt {
         selectors: impl IntoIterator<Item = &'a Selector>,
     ) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>>;
 
+    /// Invalid selectors are filtered out.
+    fn match_against_selectors_and_tree_name<'a>(
+        &self,
+        tree_name: &str,
+        selectors: impl IntoIterator<Item = &'a Selector>,
+    ) -> impl Iterator<Item = &'a Selector>;
+
     fn match_against_component_selectors<'a, S>(
         &self,
         selectors: &'a [S],
@@ -736,6 +743,25 @@ impl SelectorExt for ExtendedMoniker {
         };
 
         match_component_moniker_against_selectors(s, selectors)
+    }
+
+    fn match_against_selectors_and_tree_name<'a>(
+        &self,
+        tree_name: &str,
+        selectors: impl IntoIterator<Item = &'a Selector>,
+    ) -> impl Iterator<Item = &'a Selector> {
+        let m = match self {
+            ExtendedMoniker::ComponentManager => {
+                vec![EXTENDED_MONIKER_COMPONENT_MANAGER_STR.to_string()]
+            }
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                SegmentIterator::from(moniker).collect::<Vec<_>>()
+            }
+        };
+
+        selectors
+            .into_iter()
+            .filter(move |s| match_component_and_tree_name(&m, tree_name, s).unwrap_or(false))
     }
 
     fn match_against_component_selectors<'a, S>(
@@ -815,6 +841,18 @@ impl SelectorExt for Moniker {
     ) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>> {
         let s = SegmentIterator::from(self).collect::<Vec<_>>();
         match_component_moniker_against_selectors(s, selectors)
+    }
+
+    fn match_against_selectors_and_tree_name<'a>(
+        &self,
+        tree_name: &str,
+        selectors: impl IntoIterator<Item = &'a Selector>,
+    ) -> impl Iterator<Item = &'a Selector> {
+        let m = SegmentIterator::from(self).collect::<Vec<_>>();
+
+        selectors
+            .into_iter()
+            .filter(move |s| match_component_and_tree_name(&m, tree_name, s).unwrap_or(false))
     }
 
     fn match_against_component_selectors<'a, S>(
@@ -1247,5 +1285,90 @@ a:b:c
                 target_properties: StringSelector::ExactMatch("prop".into())
             }),
         );
+    }
+
+    #[test]
+    fn test_monikers_against_selectors_and_tree_name() {
+        let selectors = &[
+            parse_selector::<VerboseError>("core/foo:root:prop").unwrap(),
+            parse_selector::<VerboseError>("core/*:[name=root]root:prop").unwrap(),
+            parse_selector::<VerboseError>("core/baz:[name=baz]root:prop").unwrap(),
+            parse_selector::<VerboseError>("core/baz:[name=root]root:prop").unwrap(),
+            parse_selector::<VerboseError>("core/*:[...]root:prop").unwrap(),
+            parse_selector::<VerboseError>("<component_manager>:root:prop").unwrap(),
+        ];
+
+        {
+            let foo = ExtendedMoniker::try_from("core/foo").unwrap();
+
+            let actual = foo
+                .match_against_selectors_and_tree_name("root", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[0], &selectors[1], &selectors[4]]);
+
+            let foo = Moniker::try_from("core/foo").unwrap();
+
+            let actual = foo
+                .match_against_selectors_and_tree_name("root", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[0], &selectors[1], &selectors[4]]);
+        }
+
+        {
+            let baz = ExtendedMoniker::try_from("core/baz").unwrap();
+
+            let actual = baz
+                .match_against_selectors_and_tree_name("root", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[1], &selectors[3], &selectors[4]]);
+
+            let baz = Moniker::try_from("core/baz").unwrap();
+
+            let actual = baz
+                .match_against_selectors_and_tree_name("root", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[1], &selectors[3], &selectors[4]]);
+        }
+
+        {
+            let baz = ExtendedMoniker::try_from("core/baz").unwrap();
+
+            let actual = baz
+                .match_against_selectors_and_tree_name("baz", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[2], &selectors[4]]);
+
+            let baz = Moniker::try_from("core/baz").unwrap();
+
+            let actual = baz
+                .match_against_selectors_and_tree_name("baz", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[2], &selectors[4]]);
+        }
+
+        {
+            let qux = ExtendedMoniker::try_from("core/qux").unwrap();
+
+            let actual = qux
+                .match_against_selectors_and_tree_name("qux", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[4]]);
+
+            let qux = Moniker::try_from("core/qux").unwrap();
+
+            let actual = qux
+                .match_against_selectors_and_tree_name("qux", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[4]]);
+        }
+
+        {
+            let cm = ExtendedMoniker::try_from(EXTENDED_MONIKER_COMPONENT_MANAGER_STR).unwrap();
+
+            let actual = cm
+                .match_against_selectors_and_tree_name("root", selectors.iter())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, vec![&selectors[5]]);
+        }
     }
 }

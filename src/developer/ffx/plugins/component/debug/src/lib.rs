@@ -12,7 +12,7 @@ use ffx_component_debug_args::ComponentDebugCommand;
 use ffx_zxdb::Debugger;
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
-use fuchsia_zircon_types::zx_koid_t;
+use zx_types::zx_koid_t;
 
 #[derive(FfxTool)]
 pub struct DebugTool {

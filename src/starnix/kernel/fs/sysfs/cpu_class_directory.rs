@@ -9,7 +9,7 @@ use crate::vfs::{
     fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
     FsNodeInfo, FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
 };
-use fuchsia_zircon as zx;
+
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::error;

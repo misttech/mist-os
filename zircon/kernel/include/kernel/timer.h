@@ -32,18 +32,11 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
  public:
   using Callback = void (*)(Timer*, zx_time_t now, void* arg);
 
-  // Keeps track of which timeline a Timer is operating on.
-  enum class ReferenceTimeline : uint8_t {
-    kMono,
-    kBoot,
-  };
-
   // Timers need a constexpr constructor, as it is valid to construct them in static storage.
-  // TODO(https://fxbug.dev/328306129): The default value for the timeline parameter should be
-  // removed, thus forcing users of the Timer class to explicitly declare the timeline they wish
+  // TODO(https://fxbug.dev/328306129): The default value for the clock_id parameter should be
+  // removed, thus forcing users of the Timer class to explicitly declare the clock they wish
   // to use.
-  constexpr explicit Timer(ReferenceTimeline timeline = ReferenceTimeline::kMono)
-      : timeline_(timeline) {}
+  constexpr explicit Timer(zx_clock_t clock_id = ZX_CLOCK_MONOTONIC) : clock_id_(clock_id) {}
 
   // We ensure that timers are not on a list or an active cpu when destroyed.
   ~Timer();
@@ -76,10 +69,10 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
   bool Cancel();
 
   // Equivalent to Set with no slack
-  // The deadline parameter should be interpreted differently depending on the timeline_ field.
-  // If timeline_ is set to kMono, deadline is a zx_time_t.
-  // If timeline_ is set to kBoot, deadline is a zx_boot_time_t.
-  void SetOneshot(int64_t deadline, Callback callback, void* arg) {
+  // The deadline parameter should be interpreted differently depending on the clock_id_ field.
+  // If clock_id_ is set to ZX_CLOCK_MONOTONIC, deadline is a zx_instant_mono_t.
+  // If clock_id_ is set to ZX_CLOCK_BOOT, deadline is a zx_instant_boot_t.
+  void SetOneshot(zx_time_t deadline, Callback callback, void* arg) {
     Set(Deadline::no_slack(deadline), callback, arg);
   }
 
@@ -93,10 +86,10 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
   // Private accessors for timer tests.
   zx_duration_t slack_for_test() const { return slack_; }
 
-  // This function returns a zx_time_t if the expected_timeline is kMono and a zx_boot_time_t if
-  // the expected_timeline is kBoot.
-  int64_t scheduled_time_for_test(ReferenceTimeline expected_timeline) const {
-    DEBUG_ASSERT(timeline_ == expected_timeline);
+  // This function returns a zx_instant_mono_t if the expected_clock_id is ZX_CLOCK_MONOTONIC and a
+  // zx_instant_boot_t if the expected_clock_id is ZX_CLOCK_BOOT.
+  zx_time_t scheduled_time_for_test(zx_clock_t expected_clock_id) const {
+    DEBUG_ASSERT(clock_id_ == expected_clock_id);
     return scheduled_time_;
   }
 
@@ -107,24 +100,24 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
   static constexpr uint32_t kMagic = fbl::magic("timr");
   uint32_t magic_ = kMagic;
 
-  // This field should be interpreted differently depending on the timeline_ field.
-  // If timeline_ is set to kMono, this is a zx_time_t.
-  // If timeline_ is set to kBoot, this is a zx_boot_time_t.
-  int64_t scheduled_time_ = 0;
+  // This field should be interpreted differently depending on the clock_id_ field.
+  // If clock_id_ is set to ZX_CLOCK_MONOTONIC, this is a zx_instant_mono_t.
+  // If clock_id_ is set to ZX_CLOCK_BOOT, this is a zx_instant_boot_t.
+  zx_time_t scheduled_time_ = 0;
 
   // Stores the applied slack adjustment from the ideal scheduled_time.
   zx_duration_t slack_ = 0;
   Callback callback_ = nullptr;
   void* arg_ = nullptr;
 
+  // The clock this timer is set on.
+  const zx_clock_t clock_id_;
+
   // INVALID_CPU, if inactive.
   ktl::atomic<cpu_num_t> active_cpu_{INVALID_CPU};
 
   // true if cancel is pending
   ktl::atomic<bool> cancel_{false};
-
-  // The timeline this timer is set on.
-  const ReferenceTimeline timeline_;
 
   // Note that we need to manually name the timer_lock because it is one of and
   // extremely small number of "wrapped" locks in the system, and cannot easily
@@ -220,7 +213,7 @@ class TimerQueue {
 
   // A helper function for PrintTimerQueues that prints all of the timers in the given timer_list
   // into the given buffer. Also takes in the current time, which is either a zx_time_t or a
-  // zx_boot_time_t depending on the timeline the timer_list is operating on.
+  // zx_instant_boot_t depending on the timeline the timer_list is operating on.
   template <typename TimestampType>
   static void PrintTimerList(TimestampType now, fbl::DoublyLinkedList<Timer*>& timer_list,
                              StringFile& buffer);
@@ -235,14 +228,14 @@ class TimerQueue {
   //
   // These can only be called when interrupts are disabled.
   void UpdatePlatformTimerMono(zx_time_t new_deadline);
-  void UpdatePlatformTimerBoot(zx_boot_time_t new_deadline);
+  void UpdatePlatformTimerBoot(zx_instant_boot_t new_deadline);
 
   // Converts the given monotonic timestamp to the raw ticks value it corresponds to.
   // Returns nullopt if the monotonic clock is paused.
   static ktl::optional<zx_ticks_t> ConvertMonotonicTimeToRawTicks(zx_time_t mono);
 
   // Converts the given boot timestamp to the raw ticks value it corresponds to.
-  static zx_ticks_t ConvertBootTimeToRawTicks(zx_boot_time_t boot);
+  static zx_ticks_t ConvertBootTimeToRawTicks(zx_instant_boot_t boot);
 
   // This is called by Tick(), and processes all timers with scheduled times less than now.
   // Once it's done, the scheduled time of the timer at the front of the queue is returned.

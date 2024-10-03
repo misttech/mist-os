@@ -16,7 +16,6 @@ use fuchsia_inspect::reader::DiagnosticsHierarchy;
 use fuchsia_merkle::Hash;
 use fuchsia_pkg_testing::{get_inspect_hierarchy, BlobContents, Package};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Status};
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use mock_boot_arguments::MockBootArgumentsService;
@@ -28,6 +27,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
+use zx::{self as zx, Status};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fcomponent_resolution,
     fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,

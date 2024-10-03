@@ -13,11 +13,10 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
 };
 use fidl::HandleBased;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef;
+
 use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, FileOpsToHandle, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -28,6 +27,7 @@ use starnix_uapi::{
 };
 use std::collections::HashSet;
 use std::sync::Arc;
+use zx::AsHandleRef;
 
 // Implementation of the sync framework described at:
 // https://source.android.com/docs/core/graphics/sync
@@ -89,7 +89,7 @@ impl SyncFile {
         let mut state: Vec<FenceState> = vec![];
 
         for sync_point in &self.fence.sync_points {
-            if sync_point.handle.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::ZERO)
+            if sync_point.handle.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                 == Err(zx::Status::TIMED_OUT)
             {
                 state.push(FenceState { status: Status::Active, timestamp_ns: 0 });
@@ -113,7 +113,6 @@ impl FileOps for SyncFile {
 
     fn to_handle(
         &self,
-        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -195,7 +194,7 @@ impl FileOps for SyncFile {
                 while i < fence.sync_points.len() {
                     if fence.sync_points[i]
                         .handle
-                        .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::ZERO)
+                        .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                         != Err(zx::Status::TIMED_OUT)
                     {
                         let mut vmo_bytes = vec![0; 8];
@@ -332,7 +331,7 @@ impl FileOps for SyncFile {
             // query_events() after this query_async() returns; however that works only if all
             // handles are signaled.  Here we perform the counting, and cancel waits, for any
             // handles currently signaled.
-            if sync_point.handle.wait_handle(Self::SIGNAL, zx::MonotonicTime::ZERO)
+            if sync_point.handle.wait_handle(Self::SIGNAL, zx::MonotonicInstant::ZERO)
                 == Err(zx::Status::TIMED_OUT)
             {
                 canceler = WaitCanceler::merge_unbounded(

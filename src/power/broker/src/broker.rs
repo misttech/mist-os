@@ -1839,9 +1839,9 @@ mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl_fuchsia_power_broker::{BinaryPowerLevel, DependencyToken};
-    use fuchsia_zircon::{self as zx, HandleBased};
     use lazy_static::lazy_static;
     use power_broker_client::BINARY_POWER_LEVELS;
+    use zx::{self as zx, HandleBased};
 
     lazy_static! {
         static ref TOPOLOGY_UNSATISFIABLE_MAX_LEVEL: String =

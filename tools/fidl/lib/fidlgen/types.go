@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -564,6 +565,13 @@ type Type struct {
 	ResourceIdentifier string
 	TypeShapeV2        TypeShape
 	PointeeType        *Type
+
+	// TODO(https://fxbug.dev/42149402): These are fields that will start being
+	// used in fidlgen soon. For now, we just pass them through without
+	// interpreting them.
+	KindV2   *json.RawMessage
+	Role     *json.RawMessage
+	Protocol *json.RawMessage
 }
 
 // UnmarshalJSON customizes the JSON unmarshalling for Type.
@@ -581,6 +589,25 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 	err = json.Unmarshal(*obj["type_shape_v2"], &t.TypeShapeV2)
 	if err != nil {
 		return err
+	}
+
+	if f := obj["kind_v2"]; f != nil {
+		err = json.Unmarshal(*f, &t.KindV2)
+		if err != nil {
+			return err
+		}
+	}
+	if f := obj["role"]; f != nil {
+		err = json.Unmarshal(*f, &t.Role)
+		if err != nil {
+			return err
+		}
+	}
+	if f := obj["protocol"]; f != nil {
+		err = json.Unmarshal(*f, &t.Protocol)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch t.Kind {
@@ -706,6 +733,17 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 		"kind":          t.Kind,
 		"type_shape_v2": t.TypeShapeV2,
 	}
+
+	if f := t.KindV2; f != nil {
+		obj["kind_v2"] = f
+	}
+	if f := t.Role; f != nil {
+		obj["role"] = f
+	}
+	if f := t.Protocol; f != nil {
+		obj["protocol"] = f
+	}
+
 	switch t.Kind {
 	case ArrayType:
 		obj["element_type"] = t.ElementType
@@ -738,7 +776,9 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 	case IdentifierType:
 		obj["identifier"] = t.Identifier
 		obj["nullable"] = t.Nullable
-		obj["protocol_transport"] = t.ProtocolTransport
+		if t.ProtocolTransport != "" {
+			obj["protocol_transport"] = t.ProtocolTransport
+		}
 	case InternalType:
 		obj["subtype"] = t.InternalSubtype
 	case ZxExperimentalPointerType:
@@ -1990,6 +2030,30 @@ func (r *Root) ForTransport(transport string) Root {
 		case *Service:
 			for _, member := range e.Members {
 				if member.Type.ProtocolTransport != transport {
+					return false
+				}
+			}
+		}
+		return true
+	})
+}
+
+// ForTransports filters out protocols and services (and any nested anonymous
+// layouts) that do not support the given transports. It returns a new Root and
+// does not modify r.
+func (r *Root) ForTransports(transports []string) Root {
+	return r.filter(func(e Element) bool {
+		switch e := e.(type) {
+		case *Protocol:
+			for _, transport := range transports {
+				if _, ok := e.Transports()[transport]; ok {
+					return true
+				}
+			}
+			return false
+		case *Service:
+			for _, member := range e.Members {
+				if !slices.Contains(transports, member.Type.ProtocolTransport) {
 					return false
 				}
 			}

@@ -35,7 +35,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 use tracing::{error, info, warn};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {

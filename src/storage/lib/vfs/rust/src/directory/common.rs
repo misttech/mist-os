@@ -9,10 +9,10 @@ use crate::directory::entry::EntryInfo;
 
 use byteorder::{LittleEndian, WriteBytesExt as _};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use static_assertions::assert_eq_size;
 use std::io::Write as _;
 use std::mem::size_of;
+use zx_status::Status;
 
 /// Directories need to make sure that connections to child entries do not receive more rights than
 /// the connection to the directory itself.  Plus there is special handling of the OPEN_FLAG_POSIX_*
@@ -113,7 +113,7 @@ mod tests {
     use crate::ProtocolsExt;
 
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon_status::Status;
+    use zx_status::Status;
 
     fn new_connection_validate_flags(flags: fio::OpenFlags) -> Result<fio::OpenFlags, Status> {
         flags

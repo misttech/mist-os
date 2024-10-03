@@ -8,7 +8,7 @@ use fuchsia_fs::directory::{
 };
 use fuchsia_fs::OpenFlags;
 use futures::StreamExt as _;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Pages in and retains all of the blobs in the pkg directory. This is done to avoid page faulting
 /// on a blob during a benchmark.

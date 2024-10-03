@@ -7,7 +7,7 @@ use fidl_fuchsia_virtualization::{
     ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerProxy,
 };
 use fuchsia_async::{Duration, Interval};
-use fuchsia_zircon as zx;
+
 use futures::future::ready;
 use futures::{select, stream, StreamExt};
 use std::io::Write;

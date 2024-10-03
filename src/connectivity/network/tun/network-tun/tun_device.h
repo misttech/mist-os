@@ -50,6 +50,8 @@ class TunDevice : public fbl::DoublyLinkedListable<std::unique_ptr<TunDevice>>,
   void GetSignals(GetSignalsCompleter::Sync& completer) override;
   void AddPort(AddPortRequestView request, AddPortCompleter::Sync& _completer) override;
   void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;
+  void DelegateRxLease(DelegateRxLeaseRequestView request,
+                       DelegateRxLeaseCompleter::Sync& _completer) override;
 
   // DeviceAdapterParent implementation:
   const BaseDeviceConfig& config() const override { return config_; }

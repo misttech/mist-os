@@ -22,7 +22,6 @@ class BaseDriver(ABC):
     def __init__(
         self,
         honeydew_config: dict[str, Any],
-        transport: str,
         output_path: Optional[str] = None,
         params_path: Optional[str] = None,
     ) -> None:
@@ -30,14 +29,12 @@ class BaseDriver(ABC):
 
         Args:
           honeydew_config: Honeydew configuration.
-          transport: host->target transport type to use.
           output_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
         Raises:
           KeyError if required environment variables not found.
         """
         self._honeydew_config = honeydew_config
-        self._transport = transport
         self._params_path = params_path
         self._output_path = (
             output_path
@@ -57,13 +54,9 @@ class BaseDriver(ABC):
           Controllers:
             FuchsiaDevice:
             - name: fuchsia-1234-5678-90ab
-            - transport: fuchsia-controller
           TestParams:
             param_1: "val_1"
             param_2: "val_2"
-
-        Args:
-          transport: host->device transport type to use.
 
         Returns:
           A YAML string that represents a Mobly test config.

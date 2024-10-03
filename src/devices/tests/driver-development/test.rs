@@ -10,7 +10,7 @@ use fuchsia_component_test::{RealmBuilder, RealmInstance};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use {
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_test as fdt, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_driver_test as fdt, zx_status,
 };
 
 const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample-driver.cm";

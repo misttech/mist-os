@@ -12,3 +12,13 @@ rustc_cdylib("crust-shared") {
   edition = "2021"
   public = [ "crust.h" ]
 }
+
+rustc_cdylib("crust-loadable") {
+  output_name = "crust_loadable_rust"
+
+  sources = [ "src/lib.rs" ]
+
+  is_loadable_module = true
+  edition = "2021"
+  public = [ "crust.h" ]
+}

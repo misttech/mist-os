@@ -17,9 +17,9 @@ use crate::object_request::ObjectRequest;
 use crate::path::Path;
 
 use fidl::endpoints::{create_proxy, ServerEnd};
-use fuchsia_zircon_status::Status;
 use futures::channel::oneshot;
 use std::sync::{Arc, Mutex};
+use zx_status::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 fn set_up_remote(scope: ExecutionScope) -> fio::DirectoryProxy {

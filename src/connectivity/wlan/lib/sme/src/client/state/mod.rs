@@ -34,7 +34,7 @@ use wlan_rsn::rsna::{AuthRejectedReason, AuthStatus, SecAssocUpdate, UpdateSink}
 use wlan_statemachine::*;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 /// Timeout for the MLME connect op, which consists of Join, Auth, and Assoc steps.
@@ -80,12 +80,12 @@ pub struct Associated {
     connect_txn_sink: ConnectTransactionSink,
     latest_ap_state: Box<BssDescription>,
     auth_method: Option<auth::MethodName>,
-    last_signal_report_time: zx::MonotonicTime,
+    last_signal_report_time: zx::MonotonicInstant,
     link_state: LinkState,
     protection_ie: Option<ProtectionIe>,
     // TODO(https://fxbug.dev/42163244): Remove `wmm_param` field when wlanstack telemetry is deprecated.
     wmm_param: Option<ie::WmmParam>,
-    last_channel_switch_time: Option<zx::MonotonicTime>,
+    last_channel_switch_time: Option<zx::MonotonicInstant>,
     reassociation_loop_count: u32,
     authentication: Authentication,
 }
@@ -1902,8 +1902,8 @@ fn send_deauthenticate_request(bssid: &Bssid, mlme_sink: &MlmeSink) {
     }));
 }
 
-fn now() -> zx::MonotonicTime {
-    zx::MonotonicTime::get()
+fn now() -> zx::MonotonicInstant {
+    zx::MonotonicInstant::get()
 }
 
 #[cfg(test)]
@@ -5107,7 +5107,7 @@ mod tests {
             latest_ap_state: cmd.bss,
             auth_method,
             connect_txn_sink: cmd.connect_txn_sink,
-            last_signal_report_time: zx::MonotonicTime::ZERO,
+            last_signal_report_time: zx::MonotonicInstant::ZERO,
             link_state,
             protection_ie: None,
             wmm_param: None,
@@ -5131,7 +5131,7 @@ mod tests {
             connect_txn_sink: cmd.connect_txn_sink,
             latest_ap_state: cmd.bss,
             auth_method,
-            last_signal_report_time: zx::MonotonicTime::ZERO,
+            last_signal_report_time: zx::MonotonicInstant::ZERO,
             link_state,
             protection_ie: None,
             wmm_param,

@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use from_enum::FromEnum;
-use fuchsia_zircon_status as zx_status;
 use router_error::Explain;
 use std::fmt::Debug;
 use thiserror::Error;
+use zx_status;
 
 #[derive(Error, Debug, Clone)]
 pub enum ConversionError {

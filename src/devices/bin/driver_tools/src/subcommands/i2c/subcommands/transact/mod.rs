@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use args::TransactCommand;
 use std::fmt::Display;
 use std::io::Write;
-use {fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, zx_status as zx};
 
 fn parse_transactions<T: AsRef<str> + Display>(
     src: impl IntoIterator<Item = T>,

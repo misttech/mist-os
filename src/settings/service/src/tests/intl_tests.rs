@@ -9,8 +9,8 @@ use crate::tests::test_failure_utils::create_test_env_with_failures;
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::*;
-use fuchsia_zircon::Status;
 use std::sync::Arc;
+use zx::Status;
 
 const ENV_NAME: &str = "settings_service_intl_test_environment";
 /// Creates an environment that will fail on a get request.

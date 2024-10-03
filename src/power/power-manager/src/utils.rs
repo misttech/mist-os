@@ -4,9 +4,9 @@
 
 use anyhow::Error;
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_zircon::Duration;
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use zx::Duration;
 use {fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_io as fio};
 
 /// Logs an error message if the provided `cond` evaluates to false. Also passes the same expression

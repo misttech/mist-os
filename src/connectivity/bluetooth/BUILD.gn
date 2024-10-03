@@ -28,7 +28,7 @@ group("drivers") {
     "hci/transport/usb:bt-transport-usb",
     "hci/vendor/broadcom:bt-hci-broadcom",
     "hci/vendor/intel:driver",
-    "hci/virtual:driver",
+    "hci/virtual",
   ]
 }
 

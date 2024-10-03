@@ -12,10 +12,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
-use fuchsia_zircon::{self as zx, Duration};
 use futures::stream::StreamExt;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::info;
+use zx::{self as zx, Duration};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
     fidl_fuchsia_component_test as ftest,

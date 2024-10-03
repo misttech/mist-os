@@ -6,6 +6,16 @@
 import enum
 
 
+class Implementation(enum.StrEnum):
+    """Different Bluetooth affordance implementations available."""
+
+    # Use Bluetooth affordances that is implemented using Fuchsia-Controller
+    FUCHSIA_CONTROLLER = "fuchsia-controller"
+
+    # Use Bluetooth affordances that is implemented using SL4F
+    SL4F = "sl4f"
+
+
 class BluetoothConnectionType(enum.Enum):
     """Transport type of Bluetooth pair and/or connections."""
 

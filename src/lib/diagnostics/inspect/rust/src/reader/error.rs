@@ -53,7 +53,7 @@ pub enum ReaderError {
 
     #[cfg(target_os = "fuchsia")]
     #[error("Failed to call vmo")]
-    Vmo(fuchsia_zircon::Status),
+    Vmo(zx::Status),
 
     #[error("Error creating node hierarchy")]
     Hierarchy(#[source] HierarchyError),

@@ -6,7 +6,7 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_examples::{EchoEvent, EchoMarker};
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 // [END imports]
 
 // [START main]
@@ -16,14 +16,14 @@ fn main() -> Result<(), Error> {
         connect_to_protocol_sync::<EchoMarker>().context("Failed to connect to echo service")?;
 
     // Make an EchoString request, with no timeout for receiving the response
-    let res = echo.echo_string("hello", zx::MonotonicTime::INFINITE)?;
+    let res = echo.echo_string("hello", zx::MonotonicInstant::INFINITE)?;
     println!("response: {:?}", res);
 
     // Make a SendString request
     echo.send_string("hi")?;
     // Wait for a single OnString event.
     let EchoEvent::OnString { response } =
-        echo.wait_for_event(zx::MonotonicTime::INFINITE).context("error receiving events")?;
+        echo.wait_for_event(zx::MonotonicInstant::INFINITE).context("error receiving events")?;
     println!("Received OnString event for string {:?}", response);
 
     Ok(())

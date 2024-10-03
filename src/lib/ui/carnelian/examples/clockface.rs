@@ -16,8 +16,8 @@ use carnelian::{
 };
 use chrono::{Local, Timelike};
 use euclid::{point2, size2, vec2, Angle, Transform2D};
-use fuchsia_zircon::Event;
 use std::f32;
+use zx::Event;
 
 const BACKGROUND_COLOR: Color = Color { r: 235, g: 213, b: 179, a: 255 };
 

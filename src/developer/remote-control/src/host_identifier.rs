@@ -8,8 +8,7 @@ use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo, zx,
 };
 
 pub struct HostIdentifier {
@@ -19,6 +18,7 @@ pub struct HostIdentifier {
     pub(crate) system_info_proxy: sysinfo::SysInfoProxy,
     pub(crate) build_info_proxy: buildinfo::ProviderProxy,
     pub(crate) boot_timestamp_nanos: u64,
+    pub(crate) boot_id: u64,
 }
 
 fn connect_to_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>() -> Result<P::Proxy> {
@@ -26,14 +26,14 @@ fn connect_to_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>() -> Resu
 }
 
 impl HostIdentifier {
-    pub fn new() -> Result<Self> {
+    pub fn new(boot_id: u64) -> Result<Self> {
         let interface_state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()?;
         let name_provider_proxy = connect_to_protocol::<fdevice::NameProviderMarker>()?;
         let device_info_proxy = connect_to_protocol::<hwinfo::DeviceMarker>()?;
         let system_info_proxy = connect_to_protocol::<sysinfo::SysInfoMarker>()?;
         let build_info_proxy = connect_to_protocol::<buildinfo::ProviderMarker>()?;
         let boot_timestamp_nanos = (fuchsia_runtime::utc_time().into_nanos()
-            - zx::MonotonicTime::get().into_nanos()) as u64;
+            - zx::MonotonicInstant::get().into_nanos()) as u64;
         return Ok(Self {
             interface_state_proxy,
             name_provider_proxy,
@@ -41,6 +41,7 @@ impl HostIdentifier {
             system_info_proxy,
             build_info_proxy,
             boot_timestamp_nanos,
+            boot_id,
         });
     }
 
@@ -124,6 +125,8 @@ impl HostIdentifier {
 
         let boot_timestamp_nanos = Some(self.boot_timestamp_nanos);
 
+        let boot_id = Some(self.boot_id);
+
         Ok(rcs::IdentifyHostResponse {
             nodename,
             addresses,
@@ -131,6 +134,7 @@ impl HostIdentifier {
             boot_timestamp_nanos,
             product_config,
             board_config,
+            boot_id,
             ..Default::default()
         })
     }

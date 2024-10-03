@@ -6,7 +6,6 @@
 
 #![deny(missing_docs)]
 
-use fuchsia_zircon_status::{self as zx, assoc_values};
 use futures::stream::{FusedStream, Stream};
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
@@ -14,10 +13,11 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use thiserror::Error;
+use zx_status::assoc_values;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::MessageBuf;
+use zx::MessageBuf;
 
 #[cfg(not(target_os = "fuchsia"))]
 use fasync::emulated_handle::MessageBuf;
@@ -29,17 +29,17 @@ pub enum WatcherCreateError {
     SendWatchRequest(#[source] fidl::Error),
 
     #[error("watch failed with status: {0}")]
-    WatchError(#[source] zx::Status),
+    WatchError(#[source] zx_status::Status),
 
     #[error("while converting client end to fasync channel: {0}")]
-    ChannelConversion(#[source] zx::Status),
+    ChannelConversion(#[source] zx_status::Status),
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
 #[allow(missing_docs)]
 pub enum WatcherStreamError {
     #[error("read from watch channel failed with status: {0}")]
-    ChannelRead(#[from] zx::Status),
+    ChannelRead(#[from] zx_status::Status),
 }
 
 /// Describes the type of event that occurred in the directory being watched.
@@ -102,7 +102,7 @@ impl Watcher {
             .watch(fio::WatchMask::all(), options, server_end)
             .await
             .map_err(WatcherCreateError::SendWatchRequest)?;
-        zx::Status::ok(status).map_err(WatcherCreateError::WatchError)?;
+        zx_status::Status::ok(status).map_err(WatcherCreateError::WatchError)?;
         let mut buf = MessageBuf::new();
         buf.ensure_capacity_bytes(fio::MAX_BUF as usize);
         Ok(Watcher {
@@ -239,7 +239,7 @@ mod tests {
     use crate::OpenFlags;
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_zircon as zx;
+
     use futures::prelude::*;
     use std::fmt::Debug;
     use std::fs::File;

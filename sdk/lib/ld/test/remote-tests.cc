@@ -28,6 +28,8 @@ TEST_F(LdRemoteTests, RemoteDynamicLinker) {
   // This is outside the scope of the ld::RemoteDynamicLinker API.
   ASSERT_NO_FATAL_FAILURE(Init());
 
+  LdsvcPathPrefix("many-deps");
+
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
   // Acquire the layout details from the stub.  The same ld::RemoteAbiStub
@@ -100,6 +102,7 @@ TEST_F(LdRemoteTests, RemoteDynamicLinker) {
       "libld-dep-d.so",
       "libld-dep-e.so",
   }));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
   // Init() decodes everything and loads all the dependencies.
   auto init_result = linker.Init(
@@ -245,6 +248,8 @@ TEST_F(LdRemoteTests, SecondSession) {
 
   ASSERT_NO_FATAL_FAILURE(Init());
 
+  LdsvcPathPrefix("second-session");
+
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
   // The ld::RemoteAbiStub only needs to be set up once for all sessions.
@@ -257,6 +262,7 @@ TEST_F(LdRemoteTests, SecondSession) {
       "libindirect-deps-b.so",
       "libindirect-deps-c.so",
   }));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
   constexpr std::string_view kMainSoname = "libsecond-session-test.so.1";
   Linker::InitModuleList initial_modules;
   std::string vdso_soname;
@@ -319,11 +325,13 @@ TEST_F(LdRemoteTests, SecondSession) {
     Linker second_linker;
     second_linker.set_abi_stub(abi_stub);
 
+    // Point GetLibVmo() to the different place for this module's deps.
+    LdsvcPathPrefix("second-session-module");
+
     // Acquire the VMO for the root module.
     constexpr Linker::Soname kRootModule{"second-session-module.so"};
     zx::vmo module_vmo;
-    ASSERT_NO_FATAL_FAILURE(
-        module_vmo = ld::testing::MockLoaderServiceForTest::GetRootModuleVmo(kRootModule.str()));
+    ASSERT_NO_FATAL_FAILURE(module_vmo = GetLibVmo(kRootModule.str()));
 
     // Decode the root module.
     Linker::Module::DecodedPtr decoded_module =
@@ -337,6 +345,7 @@ TEST_F(LdRemoteTests, SecondSession) {
     ASSERT_NO_FATAL_FAILURE(VerifyAndClearNeeded());
     constexpr std::string_view kDepModule = "libsecond-session-module-deps-a.so";
     ASSERT_NO_FATAL_FAILURE(Needed({kDepModule}));
+    ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
     // Now resolve dependencies, including the preloaded implicit modules as
     // well as that Needed list, modules newly opened via the get_dep callback.
@@ -403,6 +412,8 @@ TEST_F(LdRemoteTests, Zygote) {
   constexpr int64_t kSecondaryReturnValue = 23;
   constexpr int kZygoteCount = 10;
 
+  LdsvcPathPrefix("zygote");
+
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
   const ld::RemoteAbiStub<>::Ptr abi_stub =
@@ -433,6 +444,7 @@ TEST_F(LdRemoteTests, Zygote) {
   }};
   auto get_dep = GetDepFunction(diag);  // Needed primes this.
   ASSERT_NO_FATAL_FAILURE(Needed({"libzygote-dep.so"}));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
   auto init_result = linker.Init(diag, std::move(init_modules), get_dep);
   ASSERT_TRUE(init_result);
   VerifyAndClearNeeded();
@@ -514,6 +526,7 @@ TEST_F(LdRemoteTests, Zygote) {
   // Fetch the secondary domain's root module.  It's built and packaged as an
   // executable since it has an entry point that acts like one.
   constexpr ZygoteLinker::Soname kSecondaryName{"zygote-secondary"};
+  LdsvcPathPrefix(kSecondaryName.str());
   zx::vmo secondary_vmo;
   ASSERT_NO_FATAL_FAILURE(secondary_vmo = GetExecutableVmo(kSecondaryName.str()));
   EXPECT_TRUE(secondary_vmo);
@@ -526,6 +539,7 @@ TEST_F(LdRemoteTests, Zygote) {
   secondary_init_modules.emplace_back(
       ZygoteLinker::RootModule(std::move(secondary), kSecondaryName));
   ASSERT_NO_FATAL_FAILURE(Needed({"libzygote-dep.so"}));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
   auto secondary_init_result =
       secondary_linker.Init(diag, std::move(secondary_init_modules), get_dep);
   ASSERT_TRUE(secondary_init_result);
@@ -623,6 +637,8 @@ TEST_F(LdRemoteTests, LoadedBy) {
   linker.set_abi_stub(ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
   ASSERT_TRUE(linker.abi_stub());
 
+  LdsvcPathPrefix("many-deps");
+
   // Decode the main executable.
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo("many-deps"));
@@ -636,6 +652,7 @@ TEST_F(LdRemoteTests, LoadedBy) {
       "libld-dep-d.so",
       "libld-dep-e.so",
   }));
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
   Linker::InitModuleList initial_modules{{
       Linker::Executable(Linker::Module::Decoded::Create(diag, std::move(vmo), kPageSize)),

@@ -20,7 +20,7 @@ using ASF = fuchsia::media::AudioSampleFormat;
 namespace media::audio::test {
 
 // Only a few test cases are enabled currently, to keep CQ run-time under 5 mins.
-// TODO(https://fxbug.dev/42170563): Enable disabled cases in a long-running test environment, once available.
+// TODO(https://fxbug.dev/42170563): Enable the rest, when a long-running test env is available.
 
 // Pipeline width includes the required presentation delay, so even without effects this entails
 // more than just SincSampler filter width.
@@ -45,7 +45,7 @@ class AudioCoreFidelityTest : public HermeticFidelityTest {
                                                                     int32_t num_mix_stages = 1) {
     return {
         .ramp_in_width =
-            LeadTimeFramesFromSourceRate(source_rate) + kFilterWidthFrames * num_mix_stages,
+            LeadTimeFramesFromSourceRate(source_rate) + (kFilterWidthFrames * num_mix_stages),
         .stabilization_width = kFilterWidthFrames * num_mix_stages,
         .destabilization_width = kFilterWidthFrames * num_mix_stages,
         .decay_width = kFilterWidthFrames * num_mix_stages,
@@ -72,7 +72,7 @@ class AudioCore48kFidelityTest : public AudioCoreFidelityTest {
                 "device_id": "*",
                 "supported_stream_types": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent",
@@ -82,7 +82,7 @@ class AudioCore48kFidelityTest : public AudioCoreFidelityTest {
                     "name": "Single MixStage 48k",
                     "streams": [
                         "render:background",
-                        "render:communications",
+                        "render:communication",
                         "render:interruption",
                         "render:media",
                         "render:system_agent"
@@ -111,7 +111,7 @@ class AudioCore96kFidelityTest : public AudioCoreFidelityTest {
                 "device_id": "*",
                 "supported_stream_types": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent",
@@ -122,7 +122,7 @@ class AudioCore96kFidelityTest : public AudioCoreFidelityTest {
                     "name": "Single MixStage 96k",
                     "streams": [
                         "render:background",
-                        "render:communications",
+                        "render:communication",
                         "render:interruption",
                         "render:media",
                         "render:system_agent",
@@ -152,7 +152,7 @@ class AudioCore48k96kFidelityTest : public AudioCoreFidelityTest {
                 "device_id": "*",
                 "supported_stream_types": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent",
@@ -166,7 +166,7 @@ class AudioCore48k96kFidelityTest : public AudioCoreFidelityTest {
                             "name": "Initial MixStage 48k",
                             "streams": [
                                 "render:background",
-                                "render:communications",
+                                "render:communication",
                                 "render:interruption",
                                 "render:media",
                                 "render:system_agent"
@@ -202,7 +202,7 @@ class AudioCoreMaxGainTest : public AudioCoreFidelityTest {
                 "device_id": "*",
                 "supported_stream_types": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -212,7 +212,7 @@ class AudioCoreMaxGainTest : public AudioCoreFidelityTest {
                     "max_gain_db": 0,
                     "streams": [
                         "render:background",
-                        "render:communications",
+                        "render:communication",
                         "render:interruption",
                         "render:media",
                         "render:system_agent"
@@ -240,7 +240,7 @@ class AudioCoreMinGainTest : public AudioCoreFidelityTest {
                 "device_id": "*",
                 "supported_stream_types": [
                     "render:background",
-                    "render:communications",
+                    "render:communication",
                     "render:interruption",
                     "render:media",
                     "render:system_agent"
@@ -250,7 +250,7 @@ class AudioCoreMinGainTest : public AudioCoreFidelityTest {
                     "min_gain_db": 0,
                     "streams": [
                         "render:background",
-                        "render:communications",
+                        "render:communication",
                         "render:interruption",
                         "render:media",
                         "render:system_agent"
@@ -404,19 +404,19 @@ TEST_F(AudioCoreSourceFormatFidelityTest, DISABLED_Float32PassThru) {
 
 //
 // Assess frequency response and sinad for non-float32 destination sample_formats
-// TODO(https://fxbug.dev/42167297): Output format fidelity cases -- int24, int16, uint8, (float) for both
-//   full-scale and mute; all cases single-frequency, mono float32 96k source, mono 96k dest
+// TODO(https://fxbug.dev/42167297): Output format fidelity cases -- int24, int16, uint8, (float)
+//   for full-scale and mute; all cases single-frequency, mono float32 96k source, mono 96k dest.
 
 //
 // Assess single-mix-stage frequency response and sinad, across channelization changes
-// TODO(https://fxbug.dev/42167296): ChannelizationFidelity cases -- for both point and sinc samplers;
+// TODO(https://fxbug.dev/42167296): ChannelizationFidelity cases -- for point and sinc samplers;
 //   mono stream->stereo MixStage, mono MixStage->stereo MixStage, stereo stream->mono MixStage;
-//   all cases single-frequency, float32 96k source, float32 96k dest
+//   all cases single-frequency, float32 96k source, float32 96k dest.
 
 //
 // Assess single-mix-stage frequency response and sinad, across gain changes
-// TODO(https://fxbug.dev/42167298): Gain accuracy (FR) and dynamic range (SiNAD) at -30dB, -60dB, -90dB.
-//   all cases single-frequency, mono float32 96k source, mono float32 96k dest
+// TODO(https://fxbug.dev/42167298): Gain accuracy (FR) and dynamic range (SiNAD) at -30dB, -60dB,
+//   -90dB; all cases single-frequency, mono float32 96k source, mono float32 96k dest.
 
 //
 // Assess single-mix-stage frequency response and sinad, without frame-rate conversion
@@ -679,7 +679,7 @@ TEST_F(AudioCoreMaxGainTest, MaxGainTest) {
       .test_name = "audio_core_max_gain_float32_1chan_48k",
 
       .input_format = Format::Create<ASF::FLOAT>(1, kSourceRate).take_value(),
-      .path = RenderPath::Communications,
+      .path = RenderPath::Communication,
       .channels_to_play{0},
       .renderer_clock_mode = ClockMode::Flexible,
       .gain_db = +20.0f,  // This clips heavily (low SiNAD) without "max_gain=0" in static config.
@@ -708,7 +708,7 @@ TEST_F(AudioCoreMinGainTest, MinGainTest) {
       .test_name = "audio_core_min_gain_float32_1chan_48k",
 
       .input_format = Format::Create<ASF::FLOAT>(1, kSourceRate).take_value(),
-      .path = RenderPath::Communications,
+      .path = RenderPath::Communication,
       .channels_to_play{0},
       .renderer_clock_mode = ClockMode::Flexible,
       .gain_db = -20.0f,  // Without "min_gain=0" in static config, FR is -20dB (not unity 0dB).
@@ -737,7 +737,7 @@ TEST_F(AudioCoreMinGainTest, MinGainTestAtMutedGainDb) {
       .test_name = "audio_core_min_gain_float32_1chan_48k_minus_160db",
 
       .input_format = Format::Create<ASF::FLOAT>(1, kSourceRate).take_value(),
-      .path = RenderPath::Communications,
+      .path = RenderPath::Communication,
       .channels_to_play{0},
       .renderer_clock_mode = ClockMode::Flexible,
       .gain_db = fuchsia::media::audio::MUTED_GAIN_DB,

@@ -29,7 +29,7 @@ use futures::future::FutureExt as _;
 use futures::stream::{Stream, StreamExt as _, TryStreamExt as _};
 use futures::{select, Future};
 use std::pin::pin;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul, zx};
 
 use crate::realms::TestSandboxExt as _;
 
@@ -203,6 +203,26 @@ pub async fn get_inspect_data(
             }
         }
     }
+}
+
+/// Like [`get_inspect_data`] but returns a single property matched by
+/// `property_selector`.
+pub async fn get_inspect_property(
+    realm: &netemul::TestRealm<'_>,
+    component_moniker: impl Into<String>,
+    property_selector: impl Into<String>,
+    file_prefix: &str,
+) -> Result<diagnostics_hierarchy::Property> {
+    let property_selector = property_selector.into();
+    let hierarchy =
+        get_inspect_data(&realm, component_moniker, property_selector.clone(), file_prefix)
+            .await
+            .context("getting hierarchy")?;
+    let property_selector = property_selector.split(&['/', ':']).skip(1).collect::<Vec<_>>();
+    let property = hierarchy
+        .get_property_by_path(&property_selector)
+        .ok_or_else(|| anyhow::anyhow!("property not found in hierarchy: {hierarchy:?}"))?;
+    Ok(property.clone())
 }
 
 /// Read an Inspect hierarchy and filter it down to properties of interest from the diagnostics

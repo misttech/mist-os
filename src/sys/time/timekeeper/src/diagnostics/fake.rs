@@ -4,7 +4,6 @@
 
 use crate::diagnostics::{any_time, Diagnostics, Event, ANY_DURATION};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 
 /// A fake `Diagnostics` implementation useful for verifying unittest.
 pub struct FakeDiagnostics {
@@ -75,7 +74,7 @@ impl EqWithAny for zx::Duration {
     }
 }
 
-impl<T: zx::Timeline> EqWithAny for zx::Time<T> {
+impl<T: zx::Timeline> EqWithAny for zx::Instant<T> {
     fn eq_with_any(&self, other: &Self) -> bool {
         self == &any_time::<T>() || self == other
     }
@@ -146,7 +145,7 @@ impl EqWithAny for Event {
 mod test {
     use super::*;
     use crate::enums::{InitialClockState, StartClockSource, Track};
-    use fuchsia_runtime::UtcTime;
+    use fuchsia_runtime::UtcInstant;
 
     const INITIALIZATION_EVENT: Event =
         Event::Initialized { clock_state: InitialClockState::NotSet };
@@ -177,8 +176,8 @@ mod test {
         let diagnostics = FakeDiagnostics::new();
         let test_event = Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
-            utc: UtcTime::from_nanos(2345_000_000_000),
+            monotonic: zx::MonotonicInstant::from_nanos(1234_000_000_000),
+            utc: UtcInstant::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         };
 
@@ -188,21 +187,21 @@ mod test {
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: any_time(),
-            utc: UtcTime::from_nanos(2345_000_000_000),
+            utc: UtcInstant::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
+            monotonic: zx::MonotonicInstant::from_nanos(1234_000_000_000),
             utc: any_time(),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
-            utc: UtcTime::from_nanos(2345_000_000_000),
+            monotonic: zx::MonotonicInstant::from_nanos(1234_000_000_000),
+            utc: UtcInstant::from_nanos(2345_000_000_000),
             sqrt_covariance: ANY_DURATION,
         }]);
 

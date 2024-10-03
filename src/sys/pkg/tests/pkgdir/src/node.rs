@@ -6,7 +6,7 @@ use crate::{dirs_to_test, PackageSource};
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::Proxy as _;
 use fidl::AsHandleRef as _;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn get_attributes() {
@@ -295,7 +295,7 @@ async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Res
         // should be immediately readable here.
         if let Some(observer) = observer {
             let _: zx::Signals = observer
-                .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
                 .context("FILE_SIGNAL_READABLE not set")?;
         }
         // TODO(https://fxbug.dev/327633753): Check for stream support.

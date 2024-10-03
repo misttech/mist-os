@@ -15,16 +15,14 @@ use crate::vfs::buffers::{
 use crate::vfs::socket::SocketShutdownFlags;
 use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeInfo};
 use byteorder::{ByteOrder as _, NativeEndian};
-use fuchsia_zircon as zx;
+
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::address::{AddressAttribute, AddressMessage};
 use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{
-    FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked,
-};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::CAP_NET_RAW;
@@ -224,7 +222,6 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// If None is returned, the file will be proxied.
     fn to_handle(
         &self,
-        _locked: &mut Locked<'_, FileOpsToHandle>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -819,11 +816,10 @@ impl Socket {
 
     pub fn to_handle(
         &self,
-        locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        self.ops.to_handle(locked, self, current_task)
+        self.ops.to_handle(self, current_task)
     }
 }
 

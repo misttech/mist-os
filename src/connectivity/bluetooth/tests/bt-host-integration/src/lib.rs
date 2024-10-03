@@ -63,7 +63,8 @@ async fn wait_for_test_peer(
 /// Tests that creating and destroying a fake HCI device creates and destroys a bt-host component.
 #[test_harness::run_singlethreaded_test]
 async fn test_lifecycle(_: ()) {
-    let realm = Arc::new(HostRealm::create().await.unwrap());
+    let test_component = String::from("fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm");
+    let realm = Arc::new(HostRealm::create(test_component).await.unwrap());
 
     // Create and publish an HCI device after HostRealm::create
     let dev_dir = realm.dev().unwrap();
@@ -101,7 +102,9 @@ async fn test_lifecycle(_: ()) {
 }
 
 /// Tests that the bt-host component assigns the local name to "fuchsia" when initialized.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_default_local_name(harness: HostHarness) {
     const NAME: &str = "fuchsia";
 
@@ -115,7 +118,9 @@ async fn test_default_local_name(harness: HostHarness) {
 
 /// Tests that the local name assigned to a bt-host is reflected in `AdapterState` and propagated
 /// down to the controller.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_set_local_name(harness: HostHarness) {
     const NAME: &str = "test1234";
     let proxy = harness.aux().host.clone();
@@ -131,7 +136,9 @@ async fn test_set_local_name(harness: HostHarness) {
 }
 
 /// Tests that the device class assigned to a bt-host gets propagated down to the controller.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_set_device_class(harness: HostHarness) {
     let device_class = DeviceClass { value: MAJOR_DEVICE_CLASS_TOY + 4 };
     let proxy = harness.aux().host.clone();
@@ -145,7 +152,9 @@ async fn test_set_device_class(harness: HostHarness) {
 }
 
 /// Tests that Host state updates when discoverable mode is turned on.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_discoverable(harness: HostHarness) {
     let proxy = harness.aux().host.clone();
 
@@ -173,7 +182,9 @@ async fn test_discoverable(harness: HostHarness) {
 }
 
 /// Tests that Host state updates when discovery is started and stopped.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_discovery(harness: HostHarness) {
     let proxy = harness.aux().host.clone();
 
@@ -205,7 +216,9 @@ async fn test_discovery(harness: HostHarness) {
 }
 
 /// Tests that closing Host cancels all operations.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_close(harness: HostHarness) {
     // Enable all procedures.
     let proxy = harness.aux().host.clone();
@@ -230,7 +243,9 @@ async fn test_close(harness: HostHarness) {
 }
 
 /// Tests that bt-host discovers BR/EDR and LE peers.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_watch_peers(harness: HostHarness) {
     // `HostHarness` internally calls `Host.WatchPeers()` to monitor peers and satisfy peer
     // expectations. `harness.peers()` represents the local cache monitored using this method.
@@ -276,7 +291,9 @@ async fn test_watch_peers(harness: HostHarness) {
 }
 
 // Tests that bt-host discovers two LE peers. One connects successfully while the other fails.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_connect(harness: HostHarness) {
     let address1 = Address::Random([1, 0, 0, 0, 0, 0]);
     let address2 = Address::Random([2, 0, 0, 0, 0, 0]);
@@ -338,7 +355,9 @@ async fn test_connect(harness: HostHarness) {
 // outgoing, provided that we can provide a manner of doing so that will not flake.
 
 /// Disconnecting from an unknown device should succeed.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_disconnect_unknown_device(harness: HostHarness) {
     let unknown_id = PeerId(0).into();
     let fut = harness.aux().host.disconnect(&unknown_id);
@@ -347,7 +366,9 @@ async fn test_disconnect_unknown_device(harness: HostHarness) {
 }
 
 /// Disconnecting from a known, unconnected device should succeed.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_disconnect_unconnected_device(harness: HostHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let (id, _proxy) = wait_for_test_peer(harness.clone(), &address).await.unwrap();
@@ -358,7 +379,9 @@ async fn test_disconnect_unconnected_device(harness: HostHarness) {
 }
 
 /// Disconnecting from a connected device should succeed and result in the device being disconnected
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_disconnect_connected_device(harness: HostHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let (id, _proxy) = wait_for_test_peer(harness.clone(), &address).await.unwrap();
@@ -379,7 +402,9 @@ async fn test_disconnect_connected_device(harness: HostHarness) {
 }
 
 /// Forgetting a connected device should succeed and result in the device being removed.
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-host-integration-tests#meta/bt-host-integration-tests-component.cm"
+)]
 async fn test_forget(harness: HostHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let (id, _proxy) = wait_for_test_peer(harness.clone(), &address).await.unwrap();

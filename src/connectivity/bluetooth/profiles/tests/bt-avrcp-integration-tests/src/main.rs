@@ -18,7 +18,7 @@ use futures::{join, TryFutureExt};
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
-    fidl_fuchsia_bluetooth_bredr_test as bredr_test, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_bluetooth_bredr_test as bredr_test, fuchsia_async as fasync, zx,
 };
 
 /// AVRCP component URL.

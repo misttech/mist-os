@@ -13,7 +13,7 @@ use tracing::info;
 use wlan_ffi_transport::completers::Completer;
 use wlan_ffi_transport::{EthernetRx, FfiEthernetRx, FfiWlanTx, WlanTx};
 use wlan_mlme::device::Device;
-use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx, wlan_trace as wtrace};
+use {fidl_fuchsia_wlan_softmac as fidl_softmac, wlan_trace as wtrace, zx};
 
 use fdf::DispatcherBuilder;
 

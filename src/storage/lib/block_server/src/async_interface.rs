@@ -11,10 +11,7 @@ use futures::FutureExt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
-use {
-    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume, zx};
 
 pub trait Interface: Send + Sync + Unpin + 'static {
     /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.  Whilst

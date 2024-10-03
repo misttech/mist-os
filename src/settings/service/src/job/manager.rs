@@ -291,7 +291,7 @@ mod tests {
     use crate::tests::scaffold::workload::Workload;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
-    use fuchsia_zircon as zx;
+
     use futures::channel::mpsc;
     use futures::channel::oneshot::{self, Receiver, Sender};
     use futures::lock::Mutex;

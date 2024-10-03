@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::client::ScanError;
-use fuchsia_zircon as zx;
+
 use thiserror::Error;
 use wlan_common::append::BufferTooSmall;
 use wlan_common::error::{FrameParseError, FrameWriteError};

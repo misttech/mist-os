@@ -12,14 +12,14 @@ use wlan_common::mac::BeaconHdr;
 use wlan_common::timer::EventId;
 use wlan_common::{ie, TimeUnit};
 use zerocopy::SplitByteSlice;
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
 
 pub trait ChannelActions {
     fn switch_channel(
         &mut self,
         new_main_channel: fidl_common::WlanChannel,
     ) -> impl Future<Output = Result<(), zx::Status>>;
-    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicTime) -> EventId;
+    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventId;
     fn disable_scanning(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
     fn enable_scanning(&mut self);
     fn disable_tx(&mut self) -> Result<(), zx::Status>;
@@ -38,7 +38,7 @@ impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
     ) -> Result<(), zx::Status> {
         self.ctx.device.set_channel(new_main_channel).await
     }
-    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicTime) -> EventId {
+    fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventId {
         self.ctx.timer.schedule_at(time, TimedEvent::ChannelSwitch)
     }
     async fn disable_scanning(&mut self) -> Result<(), zx::Status> {
@@ -675,7 +675,7 @@ mod tests {
             self.actions.push(ChannelAction::SwitchChannel(new_main_channel));
             Ok(())
         }
-        fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicTime) -> EventId {
+        fn schedule_channel_switch_timeout(&mut self, time: zx::MonotonicInstant) -> EventId {
             self.event_id_ctr += 1;
             self.actions.push(ChannelAction::Timeout(self.event_id_ctr, time.into()));
             self.event_id_ctr

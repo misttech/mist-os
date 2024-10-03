@@ -334,7 +334,7 @@ pub struct LockedStateGuard<'a> {
 #[cfg(target_os = "fuchsia")]
 impl<'a> LockedStateGuard<'a> {
     /// Freezes the VMO, does a CoW duplication, thaws the parent, and returns the child.
-    pub fn frozen_vmo_copy(&mut self) -> Result<Option<fuchsia_zircon::Vmo>, Error> {
+    pub fn frozen_vmo_copy(&mut self) -> Result<Option<zx::Vmo>, Error> {
         self.inner_lock.frozen_vmo_copy()
     }
 }
@@ -558,7 +558,7 @@ struct InnerState {
 
 #[cfg(target_os = "fuchsia")]
 impl InnerState {
-    fn frozen_vmo_copy(&mut self) -> Result<Option<fuchsia_zircon::Vmo>, Error> {
+    fn frozen_vmo_copy(&mut self) -> Result<Option<zx::Vmo>, Error> {
         if self.transaction_count > 0 {
             return Ok(None);
         }
@@ -568,8 +568,7 @@ impl InnerState {
         let ret = self
             .storage
             .create_child(
-                fuchsia_zircon::VmoChildOptions::SNAPSHOT
-                    | fuchsia_zircon::VmoChildOptions::NO_WRITE,
+                zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::NO_WRITE,
                 0,
                 self.storage.get_size().map_err(|status| Error::VmoSize(status))?,
             )

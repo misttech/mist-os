@@ -93,7 +93,9 @@ async fn add_fake_peer(proxy: &EmulatorProxy, address: &Address) -> Result<PeerP
     Ok(local)
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_enable_advertising(harness: PeripheralHarness) {
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
@@ -105,7 +107,9 @@ async fn test_enable_advertising(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_enable_and_disable_advertising(harness: PeripheralHarness) {
     let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
@@ -123,7 +127,9 @@ async fn test_enable_and_disable_advertising(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_handle_closed_while_pending(harness: PeripheralHarness) {
     let (handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
 
@@ -143,7 +149,9 @@ async fn test_advertising_handle_closed_while_pending(harness: PeripheralHarness
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_data_too_long(harness: PeripheralHarness) {
     const LENGTH: usize = (MAX_LEGACY_ADVERTISING_DATA_LENGTH + 1) as usize;
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
@@ -158,7 +166,9 @@ async fn test_advertising_data_too_long(harness: PeripheralHarness) {
     assert_eq!(Err(PeripheralError::AdvertisingDataTooLong), result);
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_scan_response_data_too_long(harness: PeripheralHarness) {
     const LENGTH: usize = (MAX_LEGACY_ADVERTISING_DATA_LENGTH + 1) as usize;
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
@@ -173,7 +183,9 @@ async fn test_scan_response_data_too_long(harness: PeripheralHarness) {
     assert_eq!(Err(PeripheralError::ScanResponseDataTooLong), result);
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_update_advertising(harness: PeripheralHarness) {
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, default_parameters(), handle_remote).await.unwrap();
@@ -216,7 +228,9 @@ async fn test_update_advertising(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_type_adv_nonconn_ind(harness: PeripheralHarness) {
     // Non-connectable
     let params = AdvertisingParameters { connectable: Some(false), ..default_parameters() };
@@ -232,7 +246,9 @@ async fn test_advertising_type_adv_nonconn_ind(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_type_adv_ind_connectable(harness: PeripheralHarness) {
     // Connectable
     let params = AdvertisingParameters { connectable: Some(true), ..default_parameters() };
@@ -248,7 +264,9 @@ async fn test_advertising_type_adv_ind_connectable(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_type_adv_scan_ind(harness: PeripheralHarness) {
     // Scannable
     let params = AdvertisingParameters {
@@ -271,7 +289,9 @@ async fn test_advertising_type_adv_scan_ind(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_type_adv_ind_connectable_scannable(harness: PeripheralHarness) {
     // Connectable and scannable
     let params = AdvertisingParameters {
@@ -294,7 +314,9 @@ async fn test_advertising_type_adv_ind_connectable_scannable(harness: Peripheral
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_modes(harness: PeripheralHarness) {
     // Very fast advertising interval (<= 60 ms), only supported for connectable advertising.
     let params = AdvertisingParameters {
@@ -360,7 +382,9 @@ async fn test_advertising_modes(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_advertising_data(harness: PeripheralHarness) {
     // Test that encoding one field works. The serialization of other fields is unit tested elsewhere.
     let params = AdvertisingParameters {
@@ -402,7 +426,9 @@ async fn test_advertising_data(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_scan_response(harness: PeripheralHarness) {
     // Test that encoding one field works. The serialization of other fields is unit tested elsewhere.
     let params = AdvertisingParameters {
@@ -457,7 +483,9 @@ async fn test_scan_response(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_receive_connection(harness: PeripheralHarness) {
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
@@ -492,7 +520,9 @@ async fn test_receive_connection(harness: PeripheralHarness) {
     let _ = handle.on_closed().await.unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_connection_dropped_when_not_connectable(harness: PeripheralHarness) {
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
@@ -534,7 +564,9 @@ async fn test_connection_dropped_when_not_connectable(harness: PeripheralHarness
     assert!(harness.read().connections.is_empty());
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_drop_connection(harness: PeripheralHarness) {
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();
@@ -577,7 +609,9 @@ async fn test_drop_connection(harness: PeripheralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_connection_handle_closes_on_disconnect(harness: PeripheralHarness) {
     let emulator = harness.aux().as_ref().clone();
     let address = default_address();

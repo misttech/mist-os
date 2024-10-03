@@ -5,9 +5,9 @@
 use anyhow::Error;
 use async_trait::async_trait;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{Duration, Status as zx_status};
 #[cfg(test)]
 use mockall::automock;
+use zx::{Duration, Status as zx_status};
 use {fidl_fuchsia_hardware_power_statecontrol as powercontrol, fuchsia_async as fasync};
 
 #[cfg_attr(test, automock)]

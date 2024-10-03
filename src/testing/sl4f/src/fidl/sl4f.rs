@@ -204,7 +204,7 @@ mod tests {
     use std::collections::HashMap;
     use std::pin::pin;
     use std::task::Poll;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// TestFacade provides a trivial Facade implementation which supports commands to interact
     /// with the state.

@@ -15,13 +15,13 @@ use fidl::endpoints::{
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fnet_routes_ext::admin::{FidlRouteAdminIpExt, RouteSetRequest, RouteTableRequest};
 use fnet_routes_ext::{FidlRouteIpExt, Responder as _};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
 use futures::channel::{mpsc, oneshot};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, warn};
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_core::device::DeviceId;
 use netstack3_core::routes::AddableEntry;
+use zx::{self as zx, AsHandleRef, HandleBased as _};
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,

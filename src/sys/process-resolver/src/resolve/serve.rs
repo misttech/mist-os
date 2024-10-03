@@ -8,7 +8,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::prelude::*;
 use tracing::warn;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg, zx};
 
 pub async fn serve(mut stream: ResolverRequestStream) {
     let pkg_resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()

@@ -17,7 +17,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Weak;
 use std::task::{Context, Poll};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// The threads that the kernel runs internally.
 ///

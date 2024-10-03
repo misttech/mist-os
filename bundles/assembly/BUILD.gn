@@ -527,6 +527,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/sys/tools/package:bootfs",
     "//src/ui/backlight/bin/backlight:bootfs",
     "//src/ui/input/bin/hid:bootfs",
+    "//src/ui/tools/print-input-report:bootfs",
 
     # tests
     "//src/devices/block/bin/blktest:bootfs",
@@ -1273,10 +1274,6 @@ assembly_input_bundle("core_realm_eng") {
       components = [ "export-ffs" ]
     },
     {
-      package = "pm"
-      components = [ "pm" ]
-    },
-    {
       package = "activity-ctl"
       components = [ "activity_ctl" ]
     },
@@ -1650,6 +1647,10 @@ assembly_input_bundle("feedback_remote_device_id_provider") {
 assembly_input_bundle("feedback_large_disk") {
   config_data_labels =
       [ "//src/developer/forensics:feedback_large_disk_product_config" ]
+}
+
+assembly_input_bundle("feedback_upload_config") {
+  config_data_labels = [ "//src/developer/forensics:feedback_upload_config" ]
 }
 
 assembly_input_bundle("feedback_userdebug_config") {
@@ -3880,10 +3881,7 @@ assembly_input_bundle("brightness_manager") {
 # build-types: all
 #
 assembly_input_bundle("legacy_power_framework") {
-  bootfs_packages = [
-    "//src/power/power-manager:package",
-    "//src/power/cpu-manager:package",
-  ]
+  bootfs_packages = [ "//src/power/power-manager:package" ]
   compiled_packages = [
     {
       bootfs_package = true
@@ -3892,6 +3890,27 @@ assembly_input_bundle("legacy_power_framework") {
         {
           component_name = "bootstrap"
           shards = [ "//src/power/meta/power-framework.shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Power Framework CPU Manager.
+#
+# feature_set_levels: all
+# build-types: all
+#
+assembly_input_bundle("cpu_manager") {
+  bootfs_packages = [ "//src/power/cpu-manager:package" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/power/meta/cpu-manager.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -3951,9 +3970,17 @@ assembly_input_bundle("power_framework_testing_sag") {
 #
 assembly_input_bundle("power_framework") {
   bootfs_packages = [ "//src/power/broker:package" ]
+}
+
+# Power framework cli tools
+#
+# feature_set_levels: utility
+# build-types: eng, userdebug
+#
+assembly_input_bundle("power_framework_development_support") {
   base_packages = [ "//src/devices/hrtimer/bin:hrtimer-ctl" ]
 
-  # When power framework becomes available on user builds,
+  # When the power framework becomes available on user builds by default,
   # this tool should be moved to core_realm_development_access
   shell_commands = [
     {

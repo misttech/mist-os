@@ -12,7 +12,6 @@ use crate::encoding::{
 use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
 use crate::Error;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone};
 use futures::ready;
 use futures::stream::{FusedStream, Stream};
@@ -24,6 +23,7 @@ use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{RawWaker, RawWakerVTable};
+use zx_status;
 
 /// Decodes the body of `buf` as the FIDL type `T`.
 #[doc(hidden)] // only exported for use in macros or generated code
@@ -822,8 +822,8 @@ pub mod sync {
     //! Synchronous FIDL Client
 
     use super::*;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use std::mem::MaybeUninit;
+    use zx::{self as zx, AsHandleRef};
 
     /// A synchronous client for making FIDL calls.
     #[derive(Debug)]
@@ -881,7 +881,7 @@ pub mod sync {
             body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
-            deadline: zx::MonotonicTime,
+            deadline: zx::MonotonicInstant,
         ) -> Result<Response::Owned, Error>
         where
             Response::Owned: Decode<Response, DefaultFuchsiaResourceDialect>,
@@ -929,7 +929,10 @@ pub mod sync {
         }
 
         /// Wait for an event to arrive on the underlying channel.
-        pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<MessageBufEtc, Error> {
+        pub fn wait_for_event(
+            &self,
+            deadline: zx::MonotonicInstant,
+        ) -> Result<MessageBufEtc, Error> {
             let mut buf = zx::MessageBufEtc::new();
             buf.ensure_capacity_bytes(zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
             buf.ensure_capacity_handle_infos(zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
@@ -991,7 +994,6 @@ mod tests {
     use anyhow::{Context as _, Error};
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_zircon::AsHandleRef;
     use futures::channel::oneshot;
     use futures::stream::FuturesUnordered;
     use futures::task::{noop_waker, waker, ArcWake};
@@ -999,7 +1001,8 @@ mod tests {
     use futures_test::task::new_count_waker;
     use std::future::pending;
     use std::thread;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::AsHandleRef;
+    use {fuchsia_async as fasync, zx};
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
     const SEND_ORDINAL: u64 = 42 << 32;
@@ -1060,7 +1063,7 @@ mod tests {
             server_end
                 .wait_handle(
                     zx::Signals::CHANNEL_READABLE,
-                    zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                    zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
                 )
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
@@ -1077,7 +1080,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
@@ -1094,7 +1097,7 @@ mod tests {
             server_end
                 .wait_handle(
                     zx::Signals::CHANNEL_READABLE,
-                    zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                    zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
                 )
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
@@ -1119,13 +1122,13 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
 
         let event_buf = client
-            .wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)))
+            .wait_for_event(zx::MonotonicInstant::after(zx::Duration::from_seconds(5)))
             .context("waiting for event")?;
         let (bytes, _handles) = event_buf.split();
         let (header, _body) = decode_transaction_header(&bytes).expect("event decode");
@@ -1142,13 +1145,13 @@ mod tests {
 
         let thread1 = thread::spawn(move || {
             let result =
-                client1.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)));
+                client1.wait_for_event(zx::MonotonicInstant::after(zx::Duration::from_seconds(5)));
             assert!(result.is_ok());
         });
 
         let thread2 = thread::spawn(move || {
             let result =
-                client2.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)));
+                client2.wait_for_event(zx::MonotonicInstant::after(zx::Duration::from_seconds(5)));
             assert!(result.is_ok());
         });
 
@@ -1176,7 +1179,7 @@ mod tests {
             &server_end,
         );
         assert_matches!(
-            client.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5))),
+            client.wait_for_event(zx::MonotonicInstant::after(zx::Duration::from_seconds(5))),
             Err(crate::Error::UnexpectedSyncResponse)
         );
         Ok(())
@@ -1201,7 +1204,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(zx::Duration::from_seconds(5))
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(5))
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
@@ -1226,7 +1229,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(zx::Duration::from_seconds(5))
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(5))
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,

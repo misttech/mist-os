@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE,
     ASHMEM_IS_PINNED, ASHMEM_IS_UNPINNED, ASHMEM_NOT_PURGED, ASHMEM_PIN, ASHMEM_PURGE_ALL_CACHES,

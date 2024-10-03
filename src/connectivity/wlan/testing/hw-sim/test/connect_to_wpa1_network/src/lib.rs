@@ -5,7 +5,7 @@ use fidl_test_wlan_realm::WlanConfig;
 use ieee80211::Bssid;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 /// Test a client successfully connects to a network protected by WPA1-PSK.
 #[fuchsia::test]

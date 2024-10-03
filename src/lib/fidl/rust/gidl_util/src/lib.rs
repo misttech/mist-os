@@ -6,8 +6,8 @@
 
 use fidl::encoding::{Context, Decode, Decoder, DefaultFuchsiaResourceDialect, TypeMarker};
 use fidl::{AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights};
-use fuchsia_zircon_status::Status;
-use fuchsia_zircon_types as zx_types;
+use zx_status::Status;
+use zx_types;
 
 /// Handle subtypes that can be created via `create_handles`. Each subtype `X`
 /// corresponds to a `fidl::X` type that implements `HandleBased`.
@@ -154,7 +154,7 @@ pub fn to_zx_handle_disposition_t(
 /// https://fuchsia.dev/fuchsia-src/concepts/kernel/handles#invalid_handles_and_handle_reuse
 #[cfg(target_os = "fuchsia")]
 pub fn get_info_handle_valid(handle_info: &zx_types::zx_handle_info_t) -> Result<(), Status> {
-    use fuchsia_zircon::sys;
+    use zx::sys;
     Status::ok(unsafe {
         sys::zx_object_get_info(
             handle_info.handle,

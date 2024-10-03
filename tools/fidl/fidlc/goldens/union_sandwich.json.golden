@@ -36,6 +36,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -63,6 +64,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.unionsandwich/UnionSize12Alignment4",
             "nullable": false,
             "type_shape_v2": {
@@ -91,6 +93,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -144,6 +147,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -171,6 +175,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.unionsandwich/UnionSize24Alignment8",
             "nullable": false,
             "type_shape_v2": {
@@ -199,6 +204,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -252,6 +258,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -279,6 +286,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.unionsandwich/UnionSize36Alignment4",
             "nullable": false,
             "type_shape_v2": {
@@ -307,6 +315,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -360,6 +369,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -387,6 +397,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.unionsandwich/UnionSize8Alignment4",
             "nullable": false,
             "type_shape_v2": {
@@ -415,6 +426,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -468,6 +480,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -495,6 +508,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -554,8 +568,10 @@
           "name": "variant",
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
                 "inline_size": 1,
@@ -618,6 +634,7 @@
           "name": "variant",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.unionsandwich/StructSize16Alignment8",
             "nullable": false,
             "type_shape_v2": {
@@ -670,8 +687,10 @@
           "name": "variant",
           "type": {
             "kind": "array",
+            "kind_v2": "array",
             "element_type": {
               "kind": "primitive",
+              "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
                 "inline_size": 1,
@@ -734,6 +753,7 @@
           "name": "variant",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,

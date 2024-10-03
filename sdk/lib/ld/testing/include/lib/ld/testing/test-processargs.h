@@ -102,7 +102,6 @@ class TestProcessArgs {
 
   // Add the VMO for the executable.
   TestProcessArgs& AddExecutableVmo(zx::vmo vmo);
-  TestProcessArgs& AddExecutableVmo(std::string_view executable_name);
 
   // Add the VMO for the initial stack.
   TestProcessArgs& AddStackVmo(zx::vmo vmo);

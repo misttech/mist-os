@@ -7,7 +7,7 @@
 
 use crate::{ArgType, Header, StringRef};
 use fidl_fuchsia_diagnostics_stream::{Argument, RawSeverity, Record, Value};
-use fuchsia_zircon as zx;
+
 use nom::bytes::complete::take;
 use nom::multi::many0;
 use nom::number::complete::{le_f64, le_i64, le_u64};
@@ -20,13 +20,13 @@ use thiserror::Error;
 pub(crate) type ParseResult<'a, T> = IResult<&'a [u8], T, ParseError>;
 
 /// Extracts the basic information of a log message: timestamp and severity.
-pub fn basic_info(buf: &[u8]) -> Result<(zx::BootTime, RawSeverity), nom::Err<ParseError>> {
+pub fn basic_info(buf: &[u8]) -> Result<(zx::BootInstant, RawSeverity), nom::Err<ParseError>> {
     let (after_header, header) = parse_header(buf)?;
     if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
         return Err(nom::Err::Failure(ParseError::ValueOutOfValidRange));
     }
     let (_, timestamp) = le_i64(after_header)?;
-    Ok((zx::BootTime::from_nanos(timestamp), header.severity()))
+    Ok((zx::BootInstant::from_nanos(timestamp), header.severity()))
 }
 
 /// Attempt to parse a diagnostic record from the head of this buffer, returning the record and any
@@ -217,7 +217,7 @@ mod tests {
         let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
 
         let (timestamp, severity) = basic_info(encoded).unwrap();
-        assert_eq!(timestamp, zx::BootTime::from_nanos(expected_timestamp));
+        assert_eq!(timestamp, zx::BootInstant::from_nanos(expected_timestamp));
         assert_eq!(severity, Severity::Error.into_primitive());
     }
 }

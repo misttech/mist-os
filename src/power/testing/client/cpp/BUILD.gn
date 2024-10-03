@@ -14,7 +14,6 @@ source_set("cpp") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/power/broker:component",
-    "//src/power/system-activity-governor/fake:component",
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
     "//src/power/testing/client:client_includes",
     "//src/power/testing/client:realm_base_manifest",

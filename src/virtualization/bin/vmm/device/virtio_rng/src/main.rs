@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_virtualization_hardware::VirtioRngRequestStream;
 use fuchsia_component::server;
-use fuchsia_zircon::{self as zx};
+
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use machina_virtio_device::{config_builder_from_stream, from_start_info};
 use virtio_device::chain::WritableChain;

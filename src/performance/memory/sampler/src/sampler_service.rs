@@ -147,12 +147,12 @@ mod test {
         ExecutableSegment, ModuleMap, SamplerMarker, SamplerRequest, SamplerSetProcessInfoRequest,
         StackTrace,
     };
-    use fuchsia_zircon::Vmo;
     use futures::channel::mpsc;
     use futures::{join, StreamExt};
     use itertools::{assert_equal, sorted};
     use prost::Message;
     use std::time::Instant;
+    use zx::Vmo;
 
     use crate::crash_reporter::ProfileReport;
     use crate::pprof::pproto::{Location, Mapping, Profile};

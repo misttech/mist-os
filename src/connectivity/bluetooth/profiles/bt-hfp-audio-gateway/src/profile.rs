@@ -62,7 +62,7 @@ pub(crate) mod test_server {
         pub stream: bredr::ProfileRequestStream,
         pub receiver: Option<bredr::ConnectionReceiverProxy>,
         pub results: Option<bredr::SearchResultsProxy>,
-        pub connections: Vec<fuchsia_zircon::Socket>,
+        pub connections: Vec<zx::Socket>,
     }
 
     impl From<bredr::ProfileRequestStream> for LocalProfileTestServer {

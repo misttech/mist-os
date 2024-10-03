@@ -33,7 +33,7 @@ rustc_library("fidl_fuchsia_net_filter_ext") {
 
   if (is_fuchsia || is_mistos) {
     sources += [ "src/sync.rs" ]
-    deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+    deps += [ "//sdk/rust/zx" ]
     test_deps += [ "//src/lib/fuchsia" ]
   }
 }

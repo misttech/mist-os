@@ -11,7 +11,7 @@ use tracing::error;
 use vfs::directory::entry::{
     DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 pub struct RouteEntry {
     component: WeakComponentInstance,

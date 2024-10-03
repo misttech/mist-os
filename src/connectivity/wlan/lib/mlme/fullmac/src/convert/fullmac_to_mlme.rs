@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Error, Result};
 use tracing::warn;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
@@ -226,6 +226,40 @@ pub fn convert_connect_confirm(
         result_code: conf.result_code,
         association_id: conf.association_id,
         association_ies: conf.association_ies,
+    }
+}
+
+pub fn convert_roam_confirm(
+    conf: fidl_fullmac::WlanFullmacImplIfcRoamConfRequest,
+) -> Result<fidl_mlme::RoamConfirm> {
+    match conf.status_code {
+        Some(status_code) => match status_code {
+            fidl_ieee80211::StatusCode::Success => Ok(fidl_mlme::RoamConfirm {
+                selected_bssid: conf.selected_bssid.context("missing selected BSSID")?,
+                status_code,
+                original_association_maintained: conf
+                    .original_association_maintained
+                    .context("missing original_association_maintained")?,
+                target_bss_authenticated: conf
+                    .target_bss_authenticated
+                    .context("missing target_bss_authenticated")?,
+                association_id: conf.association_id.context("missing association_id")?,
+                association_ies: conf.association_ies.context("missing association_ies")?,
+            }),
+            _ => Ok(fidl_mlme::RoamConfirm {
+                selected_bssid: conf.selected_bssid.context("missing selected BSSID")?,
+                status_code,
+                original_association_maintained: conf
+                    .original_association_maintained
+                    .context("missing original_association_maintained")?,
+                target_bss_authenticated: conf
+                    .target_bss_authenticated
+                    .context("missing target_bss_authenticated")?,
+                association_id: 0,
+                association_ies: Vec::new(),
+            }),
+        },
+        None => Err(Error::msg("Fullmac RoamConf is missing status_code")),
     }
 }
 
@@ -497,7 +531,6 @@ fn convert_hist_scope_and_antenna_id(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon as zx;
 
     fn fake_set_key_descriptor() -> fidl_mlme::SetKeyDescriptor {
         fidl_mlme::SetKeyDescriptor {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use clonable_error::ClonableError;
-use fuchsia_zircon as zx;
+
 use thiserror::Error;
 use tracing::error;
 

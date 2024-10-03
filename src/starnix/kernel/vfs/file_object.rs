@@ -18,13 +18,12 @@ use crate::vfs::{
 };
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon as zx;
+
 use starnix_logging::{
     impossible_error, log_error, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{
-    BeforeFsNodeAppend, FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex,
-    Unlocked,
+    BeforeFsNodeAppend, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
@@ -371,11 +370,10 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// If None is returned, the file will act as if it was a fd to `/dev/null`.
     fn to_handle(
         &self,
-        locked: &mut Locked<'_, FileOpsToHandle>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        serve_file(locked, current_task, file).map(|c| Some(c.0.into_handle()))
+        serve_file(current_task, file).map(|c| Some(c.0.into_handle()))
     }
 
     /// Returns the associated pid_t.
@@ -547,11 +545,10 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn to_handle(
         &self,
-        locked: &mut Locked<'_, FileOpsToHandle>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        self.deref().to_handle(locked, file, current_task)
+        self.deref().to_handle(file, current_task)
     }
 
     fn as_pid(&self, file: &FileObject) -> Result<pid_t, Errno> {
@@ -1293,7 +1290,7 @@ impl FileObject {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         events: FdEvents,
-        deadline: Option<zx::MonotonicTime>,
+        deadline: Option<zx::MonotonicInstant>,
         mut op: Op,
     ) -> Result<T, Errno>
     where
@@ -1315,7 +1312,7 @@ impl FileObject {
                 result => return result,
             }
             waiter
-                .wait_until(current_task, deadline.unwrap_or(zx::MonotonicTime::INFINITE))
+                .wait_until(current_task, deadline.unwrap_or(zx::MonotonicInstant::INFINITE))
                 .map_err(|e| if e == ETIMEDOUT { errno!(EAGAIN) } else { e })?;
         }
     }
@@ -1687,16 +1684,8 @@ impl FileObject {
         Ok(())
     }
 
-    pub fn to_handle<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-    ) -> Result<Option<zx::Handle>, Errno>
-    where
-        L: LockBefore<FileOpsToHandle>,
-    {
-        let mut locked = locked.cast_locked::<FileOpsToHandle>();
-        self.ops().to_handle(&mut locked, self, current_task)
+    pub fn to_handle(&self, current_task: &CurrentTask) -> Result<Option<zx::Handle>, Errno> {
+        self.ops().to_handle(self, current_task)
     }
 
     pub fn as_pid(&self) -> Result<pid_t, Errno> {

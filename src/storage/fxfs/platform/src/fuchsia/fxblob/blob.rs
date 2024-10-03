@@ -15,7 +15,6 @@ use crate::fuchsia::volume::FxVolume;
 use anyhow::{anyhow, ensure, Context, Error};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{hash_block, MerkleTree};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Status};
 use futures::try_join;
 use fxfs::errors::FxfsError;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
@@ -26,6 +25,7 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use storage_device::buffer;
+use zx::{self as zx, AsHandleRef, HandleBased, Status};
 
 pub const BLOCK_SIZE: u64 = fuchsia_merkle::BLOCK_SIZE as u64;
 

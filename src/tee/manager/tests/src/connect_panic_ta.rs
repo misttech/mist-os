@@ -9,7 +9,7 @@ use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
 use fidl_fuchsia_tee::ReturnOrigin;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
-use fuchsia_zircon::{self as zx};
+
 use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
 use {fidl_fuchsia_io, fidl_fuchsia_tee, fuchsia_fs};
 

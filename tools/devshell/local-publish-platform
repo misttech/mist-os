@@ -102,8 +102,7 @@ main() {
         done
         echo "]"
     ) >> "${FUCHSIA_BUILD_DIR}/args.gn"
-    echo ${targets}
-    fx-command-run build final_fuchsia_sdk platform_artifacts ${targets}
+    fx-command-run build final_fuchsia_sdk platform_artifacts package_archives
 
     # Parse the package_archives.json
     local package_archives_path="${FUCHSIA_BUILD_DIR}/package_archives.json"

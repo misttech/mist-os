@@ -137,8 +137,8 @@ pub(crate) mod testing {
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async::TestExecutor;
-    use fuchsia_zircon::MonotonicTime;
     use serde::Deserialize;
+    use zx::MonotonicInstant;
 
     #[derive(Clone, Debug, Deserialize)]
     struct TestConfigData {
@@ -193,7 +193,7 @@ pub(crate) mod testing {
 
     #[fuchsia::test]
     fn test_config_inspect_write() {
-        clock::mock::set(MonotonicTime::from_nanos(0));
+        clock::mock::set(MonotonicInstant::from_nanos(0));
 
         let mut executor = TestExecutor::new_with_fake_time();
 

@@ -70,7 +70,7 @@ fn host_service_handler(
     dispatcher: &HostDispatcher,
     service_name: &'static str,
     service: HostService,
-) -> impl FnMut(fuchsia_zircon::Channel) -> Option<()> {
+) -> impl FnMut(zx::Channel) -> Option<()> {
     let dispatcher = dispatcher.clone();
     move |chan| {
         info!("Connecting {} to Host Device", service_name);

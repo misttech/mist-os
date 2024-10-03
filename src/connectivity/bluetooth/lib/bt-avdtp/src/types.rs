@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
 use std::io::{Cursor, Write};
 use std::{fmt, result};

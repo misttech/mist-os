@@ -26,8 +26,7 @@ use tuf::repository::{
     EphemeralRepository, HttpRepositoryBuilder, RepositoryProvider, RepositoryStorageProvider,
 };
 use {
-    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg,
-    fuchsia_zircon as zx,
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg, zx,
 };
 
 mod updating_tuf_client;
@@ -139,7 +138,7 @@ impl Repository {
             inspect: RepositoryInspectState {
                 last_merkle_successfully_resolved_time: node.create_string(
                     "last_merkle_successfully_resolved_time",
-                    format!("{:?}", Option::<zx::MonotonicTime>::None),
+                    format!("{:?}", Option::<zx::MonotonicInstant>::None),
                 ),
                 merkles_successfully_resolved_count: inspect_util::Counter::new(
                     &node,
@@ -567,7 +566,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn only_update_subscribed_repo_if_stale() {
-        let initial_time = zx::MonotonicTime::from_nanos(0);
+        let initial_time = zx::MonotonicInstant::from_nanos(0);
         clock::mock::set(initial_time);
         let (_env, served_repository, mut ts_metadata_fetched, mut repo) =
             make_repo_with_auto_and_watched_timestamp_metadata().await;
@@ -642,7 +641,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn resolve_caches_metadata() {
-        clock::mock::set(zx::MonotonicTime::from_nanos(0));
+        clock::mock::set(zx::MonotonicInstant::from_nanos(0));
 
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let env = TestEnv::builder().add_package(&pkg).build().await;
@@ -673,7 +672,7 @@ mod tests {
 
         // Advance time right before the timeout, and make sure we don't access the server.
         clock::mock::set(
-            zx::MonotonicTime::from_nanos(0) + METADATA_CACHE_STALE_TIMEOUT
+            zx::MonotonicInstant::from_nanos(0) + METADATA_CACHE_STALE_TIMEOUT
                 - zx::Duration::from_seconds(1),
         );
         assert_matches!(repo.get_merkle_at_path(&target_path).await, Ok(_));
@@ -683,7 +682,7 @@ mod tests {
 
         // Advance time right after the timeout, and make sure we access the server.
         clock::mock::set(
-            zx::MonotonicTime::from_nanos(0)
+            zx::MonotonicInstant::from_nanos(0)
                 + METADATA_CACHE_STALE_TIMEOUT
                 + zx::Duration::from_seconds(1),
         );
@@ -767,7 +766,7 @@ mod inspect_tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn get_merkle_at_path_updates_inspect() {
-        clock::mock::set(zx::MonotonicTime::from_nanos(0));
+        clock::mock::set(zx::MonotonicInstant::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
@@ -802,11 +801,11 @@ mod inspect_tests {
             root: {
                 "repo-node": {
                     merkles_successfully_resolved_count: 1u64,
-                    last_merkle_successfully_resolved_time: "Some(Time<MonotonicTimeline, NsUnit>(0))",
+                    last_merkle_successfully_resolved_time: "Some(Instant<MonotonicTimeline, NsUnit>(0))",
                     "updating_tuf_client": {
                         update_check_success_count: 1u64,
                         update_check_failure_count: 0u64,
-                        last_update_successfully_checked_time: "Some(Time<MonotonicTimeline, NsUnit>(0))",
+                        last_update_successfully_checked_time: "Some(Instant<MonotonicTimeline, NsUnit>(0))",
                         updated_count: 1u64,
                         root_version: 1u64,
                         timestamp_version: 2i64,
@@ -820,7 +819,7 @@ mod inspect_tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn subscribed_repo_after_event() {
-        clock::mock::set(zx::MonotonicTime::from_nanos(0));
+        clock::mock::set(zx::MonotonicInstant::from_nanos(0));
         let inspector = inspect::Inspector::default();
         let pkg = PackageBuilder::new("just-meta-far").build().await.expect("created pkg");
         let repo = Arc::new(
@@ -873,7 +872,7 @@ mod inspect_tests {
                     "updating_tuf_client": {
                         update_check_success_count: 1u64,
                         update_check_failure_count: 0u64,
-                        last_update_successfully_checked_time: "Some(Time<MonotonicTimeline, NsUnit>(0))",
+                        last_update_successfully_checked_time: "Some(Instant<MonotonicTimeline, NsUnit>(0))",
                         updated_count: 1u64,
                         root_version: 1u64,
                         timestamp_version: 2i64,

@@ -114,7 +114,7 @@ fi
 
 # Error out if something else is listening on the package server port.
 if is-listening-on-port "${package_server_port}"; then
-  ffx_repo_port=$(ffx-repository-server-running-port)
+  ffx_repo_port=$(ffx-repository-server-running-port "")
   err=$?
   if [[ "${err}" -ne 0 ]]; then
     return "${err}"
@@ -257,41 +257,13 @@ until ssh -q -O check ${ssh_base_args[@]} "${host}"; do
 done
 
 if "${serve}"; then
-  remote_server_mode=$(ssh "${host}" "${ssh_base_args[@]}" "cd ${dir} && ./.jiri_root/bin/ffx config get repository.server.mode") || err=$?
-  if [[ "${err}" -ne 0 ]]; then
-    # Warn if we can't look up the remote server mode, which might mean the
-    # remote checkout is out of date.
-    fx-warn "It appears the remote host does not have a value defined for"
-    fx-warn "'ffx config get repository.server.mode', which suggests it might be"
-    fx-warn "out of date."
-    fx-warn ""
-    fx-warn "Run '$ jiri update && fx build ffx' on both the local and remote hosts, then"
-    fx-warn "confirm that '$ ffx config get repository.server.mode' returns a string on"
-    fx-warn "both the local and remote hosts."
 
-    # Clear the error so later checks won't fail.
-    err=0
-  fi
-
-  if [[ "${remote_server_mode}" == \"pm\" ]]; then
-    fx-error "Invoking pm on a remote host via fx serve-remote is no longer supported."
-    fx-error "On both the local and remote host, migrate to ffx foreground serving:"
-    fx-error ""
-    fx-error "$ ffx config remove repository.server.mode"
-    fx-error "$ ffx config remove repository.server.enabled"
-    fx-error "$ ffx doctor --restart-daemon"
-    fx-error ""
-    fx-error "Then restart \"fx serve-remote\" <your parameters> on the local host."
-    exit 1
-  else
     # Check if the remote repository server is running on a different port.
-    # FIXME(https://fxbug.dev/42071440): Remove the `ffx_repository=true` once this command is stable.
     remote_server_status=$(
       ssh "${host}" "${ssh_base_args[@]}" "cd ${dir} && \
         ./.jiri_root/bin/ffx \
-        --config ffx_repository=true \
         --machine json \
-        repository server status"
+        repository server list"
     ) || err=$?
 
     if [[ "${err}" -ne 0 ]]; then
@@ -299,7 +271,7 @@ if "${serve}"; then
       exit "${err}"
     fi
 
-    remote_addr=$(echo "${remote_server_status}" | fx-command-run jq '. | select(.state == "running") | .address')
+    remote_addr=$(echo "${remote_server_status}" | fx-command-run jq -r '.ok.data[].address')
     if [[ "${err}" -ne 0 ]]; then
       fx-error "Unable to parse remote repository server status: ${remote_server_status}"
       exit 1
@@ -324,7 +296,7 @@ if "${serve}"; then
         exit 1
       fi
     fi
-  fi
+
 
   # Ctrl-C will exit the ssh remote command and this ssh session. Then script exit will trigger
   # `trap_exit` to close the ssh connection.

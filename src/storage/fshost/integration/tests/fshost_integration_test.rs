@@ -18,9 +18,9 @@ use fshost_test_fixture::{
     BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
 };
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::FutureExt;
 use regex::Regex;
+use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(feature = "fxfs")]

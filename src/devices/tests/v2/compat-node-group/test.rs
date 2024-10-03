@@ -10,7 +10,7 @@ use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
 use {
     fidl_fuchsia_compat_nodegroup_test as fcdt, fidl_fuchsia_driver_test as fdt,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 const WAITER_NAME: &'static str = "waiter";

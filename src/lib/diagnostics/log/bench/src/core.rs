@@ -11,7 +11,7 @@ use std::sync::Once;
 use std::time::Duration;
 use tracing::{span, Event, Metadata, Subscriber};
 use tracing_log::LogTracer;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 async fn setup_publisher() -> (zx::Socket, Publisher) {
     let (proxy, mut requests) =

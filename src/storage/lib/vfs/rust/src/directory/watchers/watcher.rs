@@ -15,7 +15,7 @@ use futures::{select, FutureExt};
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::MessageBuf;
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::MessageBuf;
+use zx::MessageBuf;
 
 /// `done` is not guaranteed to be called if the task failed to start.  It should only happen
 /// in case the return value is an `Err`.  Unfortunately, there is no way to return the `done`

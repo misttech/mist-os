@@ -106,9 +106,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.service/FirstProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.service/FirstProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.service/FirstProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -131,9 +134,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.service/SecondProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.service/SecondProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.service/SecondProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -168,9 +174,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.service/FirstProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.service/FirstProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.service/FirstProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -193,9 +202,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.service/FirstProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.service/FirstProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.service/FirstProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -230,9 +242,12 @@
         {
           "type": {
             "kind": "identifier",
-            "identifier": "test.service/FirstProtocol",
+            "kind_v2": "endpoint",
+            "role": "client",
+            "protocol": "test.service/FirstProtocol",
             "nullable": false,
             "protocol_transport": "Channel",
+            "identifier": "test.service/FirstProtocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,

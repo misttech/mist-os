@@ -10,7 +10,7 @@
 use anyhow::{Context, Error};
 use fidl::endpoints::ClientEnd;
 use std::sync::Arc;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// A trait for opening filesystem nodes.
 pub trait Directory {

@@ -48,8 +48,6 @@ use {
 };
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-use fuchsia_zircon as zx;
-
 mod color_transform_manager;
 mod factory_reset_countdown_server;
 mod factory_reset_device_server;

@@ -345,6 +345,17 @@ void TunDevice::GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync
   }
 }
 
+void TunDevice::DelegateRxLease(DelegateRxLeaseRequestView request,
+                                DelegateRxLeaseCompleter::Sync& completer) {
+  zx_status_t status = device_->DelegateRxLease(request->lease);
+  if (status != ZX_OK) {
+    FX_LOGF(ERROR, "tun", "Failed to delegate rx lease: %s", zx_status_get_string(status));
+    // Failures here mean the lease is bad and can't be converted. Fail loudly
+    // by propagating up to the caller in the form of an epitaph.
+    completer.Close(status);
+  }
+}
+
 void TunDevice::OnTxAvail(DeviceAdapter* device) {
   signals_self_.signal_peer(0, uint32_t(fuchsia_net_tun::wire::Signals::kReadable));
   async::PostTask(loop_.dispatcher(), [this]() { RunReadFrame(); });

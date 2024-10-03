@@ -5,6 +5,8 @@
 //! Fuchsia netdevice buffer pool.
 
 use fuchsia_sync::Mutex;
+use futures::task::AtomicWaker;
+use std::borrow::Borrow;
 use std::collections::VecDeque;
 use std::convert::TryInto as _;
 use std::fmt::Debug;
@@ -13,12 +15,14 @@ use std::mem::{ManuallyDrop, MaybeUninit};
 use std::num::TryFromIntError;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
+use std::sync::atomic::{self, AtomicBool, AtomicU64};
 use std::sync::Arc;
+use std::task::Poll;
 
 use explicit::ResultExt as _;
 use fuchsia_runtime::vmar_root_self;
 use futures::channel::oneshot::{channel, Receiver, Sender};
-use {fidl_fuchsia_hardware_network as netdev, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_network as netdev, zx};
 
 use super::{ChainLength, DescId, DescRef, DescRefMut, Descriptors};
 use crate::error::{Error, Result};
@@ -39,6 +43,8 @@ pub(in crate::session) struct Pool {
     pub(in crate::session) rx_pending: Pending<Rx>,
     /// The buffer layout.
     buffer_layout: BufferLayout,
+    /// State-keeping allowing sessions to handle rx leases.
+    rx_leases: RxLeaseHandlingState,
 }
 
 // `Pool` is `Send` and `Sync`, and this allows the compiler to deduce `Buffer`
@@ -76,7 +82,7 @@ impl Pool {
     /// Returns [`Pool`] and the [`zx::Vmo`]s for descriptors and data, in that
     /// order.
     pub(in crate::session) fn new(config: Config) -> Result<(Arc<Self>, zx::Vmo, zx::Vmo)> {
-        let Config { buffer_stride, num_rx_buffers, num_tx_buffers, options: _, buffer_layout } =
+        let Config { buffer_stride, num_rx_buffers, num_tx_buffers, options, buffer_layout } =
             config;
         let num_buffers = num_rx_buffers.get() + num_tx_buffers.get();
         let (descriptors, descriptors_vmo, tx_free, mut rx_free) =
@@ -126,6 +132,7 @@ impl Pool {
                 tx_alloc_state: Mutex::new(tx_alloc_state),
                 rx_pending: Pending::new(rx_free),
                 buffer_layout,
+                rx_leases: RxLeaseHandlingState::new_with_flags(options),
             }),
             descriptors_vmo,
             data_vmo,
@@ -1045,6 +1052,138 @@ impl AllocKind for Rx {
     fn free(alloc: private::Allocation<'_, Self>) {
         let private::Allocation(AllocGuard { pool, descs }) = alloc;
         pool.free_rx(std::mem::replace(descs, Chained::empty()));
+        pool.rx_leases.rx_complete();
+    }
+}
+
+/// An extracted struct containing state pertaining to watching rx leases.
+pub(in crate::session) struct RxLeaseHandlingState {
+    can_watch_rx_leases: AtomicBool,
+    /// Keeps a rolling counter of received rx frames MINUS the target frame
+    /// number of the current outstanding lease.
+    ///
+    /// When no leases are pending (via [`RxLeaseWatcher::wait_until`]),
+    /// then this matches exactly the number of received frames.
+    ///
+    /// Otherwise, the lease is currently waiting for remaining `u64::MAX -
+    /// rx_Frame_counter` frames. The logic depends on `AtomicU64` wrapping
+    /// around as part of completing rx buffers.
+    rx_frame_counter: AtomicU64,
+    rx_lease_waker: AtomicWaker,
+}
+
+impl RxLeaseHandlingState {
+    fn new_with_flags(flags: netdev::SessionFlags) -> Self {
+        Self::new_with_enabled(flags.contains(netdev::SessionFlags::RECEIVE_RX_POWER_LEASES))
+    }
+
+    fn new_with_enabled(enabled: bool) -> Self {
+        Self {
+            can_watch_rx_leases: AtomicBool::new(enabled),
+            rx_frame_counter: AtomicU64::new(0),
+            rx_lease_waker: AtomicWaker::new(),
+        }
+    }
+
+    /// Increments the total receive frame counter and possibly wakes up a
+    /// waiting lease yielder.
+    fn rx_complete(&self) {
+        let Self { can_watch_rx_leases: _, rx_frame_counter, rx_lease_waker } = self;
+        let prev = rx_frame_counter.fetch_add(1, atomic::Ordering::SeqCst);
+
+        // See wait_until for details. We need to hit a waker whenever our add
+        // wrapped the u64 back around to 0.
+        if prev == u64::MAX {
+            rx_lease_waker.wake();
+        }
+    }
+}
+
+/// A trait allowing [`RxLeaseWatcher`] to be agnostic over how to get an
+/// [`RxLeaseHandlingState`].
+pub(in crate::session) trait RxLeaseHandlingStateContainer {
+    fn lease_handling_state(&self) -> &RxLeaseHandlingState;
+}
+
+impl<T: Borrow<RxLeaseHandlingState>> RxLeaseHandlingStateContainer for T {
+    fn lease_handling_state(&self) -> &RxLeaseHandlingState {
+        self.borrow()
+    }
+}
+
+impl RxLeaseHandlingStateContainer for Arc<Pool> {
+    fn lease_handling_state(&self) -> &RxLeaseHandlingState {
+        &self.rx_leases
+    }
+}
+
+/// A type safe-wrapper around a single lease watcher per `Pool`.
+pub(in crate::session) struct RxLeaseWatcher<T> {
+    state: T,
+}
+
+impl<T: RxLeaseHandlingStateContainer> RxLeaseWatcher<T> {
+    /// Creates a new lease watcher.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an [`RxLeaseWatcher`] has already been created for the given
+    /// pool or the pool was not configured for it.
+    pub(in crate::session) fn new(state: T) -> Self {
+        assert!(
+            state.lease_handling_state().can_watch_rx_leases.swap(false, atomic::Ordering::SeqCst),
+            "can't watch rx leases"
+        );
+        Self { state }
+    }
+
+    /// Called by sessions to wait until `hold_until_frame` is fulfilled to
+    /// yield leases out.
+    ///
+    /// Blocks until `hold_until_frame`-th rx buffer has been released.
+    ///
+    /// Note that this method takes `&mut self` because only one
+    /// [`RxLeaseWatcher`] may be created by lease handling state, and exclusive
+    /// access to it is required to watch lease completion.
+    pub(in crate::session) async fn wait_until(&mut self, hold_until_frame: u64) {
+        // A note about wrap-arounds.
+        //
+        // We're assuming the frame counter will never wrap around for
+        // correctness here. This should be fine, even assuming a packet
+        // rate of 1 million pps it'd take almost 600k years for this counter
+        // to wrap around:
+        // - 2^64 / 1e6 / 60 / 60 / 24 / 365 ~ 584e3.
+
+        let RxLeaseHandlingState { can_watch_rx_leases: _, rx_frame_counter, rx_lease_waker } =
+            self.state.lease_handling_state();
+
+        let prev = rx_frame_counter.fetch_sub(hold_until_frame, atomic::Ordering::SeqCst);
+        // After having subtracted the waiting value we *must always restore the
+        // value* on return, even if the future is not polled to completion.
+        let _guard = scopeguard::guard((), |()| {
+            let _: u64 = rx_frame_counter.fetch_add(hold_until_frame, atomic::Ordering::SeqCst);
+        });
+
+        // Lease is ready to be fulfilled.
+        if prev >= hold_until_frame {
+            return;
+        }
+        // Threshold is a wrapped around subtraction. So now we must wait
+        // until the read value from the atomic is LESS THAN the threshold.
+        let threshold = prev.wrapping_sub(hold_until_frame);
+        futures::future::poll_fn(|cx| {
+            let v = rx_frame_counter.load(atomic::Ordering::SeqCst);
+            if v < threshold {
+                return Poll::Ready(());
+            }
+            rx_lease_waker.register(cx.waker());
+            let v = rx_frame_counter.load(atomic::Ordering::SeqCst);
+            if v < threshold {
+                return Poll::Ready(());
+            }
+            Poll::Pending
+        })
+        .await;
     }
 }
 
@@ -1739,5 +1878,43 @@ mod tests {
         config.buffer_layout.min_tx_head = 0;
         let (pool, _descriptors, _vmo) = Pool::new(config).expect("failed to create pool");
         assert_matches!(pool.alloc_tx_buffer(1).now_or_never(), Some(Err(Error::TxLength)));
+    }
+
+    #[test]
+    fn rx_leases() {
+        let mut executor = fuchsia_async::TestExecutor::new();
+        let state = RxLeaseHandlingState::new_with_enabled(true);
+        let mut watcher = RxLeaseWatcher { state: &state };
+
+        {
+            let mut fut = pin!(watcher.wait_until(0));
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+        {
+            state.rx_complete();
+            let mut fut = pin!(watcher.wait_until(1));
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+        {
+            let mut fut = pin!(watcher.wait_until(0));
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+        {
+            let mut fut = pin!(watcher.wait_until(3));
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
+            state.rx_complete();
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
+            state.rx_complete();
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+        // Dropping the wait future without seeing it complete restores the
+        // value.
+        let counter_before = state.rx_frame_counter.load(atomic::Ordering::SeqCst);
+        {
+            let mut fut = pin!(watcher.wait_until(10000));
+            assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
+        }
+        let counter_after = state.rx_frame_counter.load(atomic::Ordering::SeqCst);
+        assert_eq!(counter_before, counter_after);
     }
 }

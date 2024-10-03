@@ -15,6 +15,7 @@ rustc_binary("hwinfo_bin") {
 
   deps = [
     ":hwinfo_structured_config",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
@@ -24,6 +25,7 @@ rustc_binary("hwinfo_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/sys/lib/fuchsia-zbi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures",

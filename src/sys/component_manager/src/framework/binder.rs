@@ -10,7 +10,7 @@ use ::routing::RouteRequest;
 use async_trait::async_trait;
 use cm_types::Name;
 use errors::ModelError;
-use fuchsia_zircon as zx;
+
 use lazy_static::lazy_static;
 use routing::capability_source::InternalCapability;
 use tracing::warn;
@@ -96,7 +96,8 @@ impl FrameworkCapability for BinderFrameworkCapability {
 async fn report_routing_failure_to_target(target: WeakComponentInstance, err: ModelError) {
     match target.upgrade().map_err(|e| ModelError::from(e)) {
         Ok(target) => {
-            report_routing_failure(&DEBUG_REQUEST, &target, &err).await;
+            report_routing_failure(&*DEBUG_REQUEST, DEBUG_REQUEST.availability(), &target, &err)
+                .await;
         }
         Err(err) => {
             warn!(moniker=%target.moniker, error=%err, "failed to upgrade reference");
@@ -126,7 +127,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,

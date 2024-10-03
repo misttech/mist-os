@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_hardware_display::ClientCompositionOp;
 use fidl_fuchsia_hardware_display_types::{ClientCompositionOpcode, ConfigResult};
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc;
 use thiserror::Error;
 

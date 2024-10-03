@@ -6,11 +6,11 @@ use anyhow::Error;
 use fidl::prelude::*;
 use fidl_fuchsia_fs::AdminRequestStream;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::Status;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use zx::Status;
 
 mod device;
 use crate::device::FatDevice;

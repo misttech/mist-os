@@ -11,7 +11,7 @@ use fuchsia_merkle::Hash;
 use std::path::Path;
 use storage_benchmarks::block_device::BlockDevice;
 use storage_benchmarks::{CacheClearableFilesystem, Filesystem};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 mod blobfs;
 mod f2fs;

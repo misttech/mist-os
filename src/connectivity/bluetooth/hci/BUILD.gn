@@ -18,6 +18,5 @@ group("tests") {
     "transport/uart:tests",
     "transport/usb:tests",
     "vendor:tests",
-    "virtual:tests",
   ]
 }

@@ -13,7 +13,7 @@ use valico::json_schema;
 
 pub mod schema {
     pub const COMMON: &str = include_str!("../common.json");
-    pub const HARDWARE_V1: &str = include_str!("../hardware-f6f47515.json");
+    pub const HARDWARE_V1: &str = include_str!("../hardware.json");
 }
 
 /// The various types of errors raised by this module.

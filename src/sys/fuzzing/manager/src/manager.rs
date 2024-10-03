@@ -16,9 +16,7 @@ use test_manager::{
 };
 use tracing::warn;
 use url::Url;
-use {
-    fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, zx};
 
 // If this much time elapses from a test suite's start without it connecting to the fuzz-registry,
 // the test is assumed to not be a fuzz test.
@@ -487,17 +485,17 @@ mod tests {
             let msg = read_async(&stdout).await.context("failed to read stdout")?;
             assert_eq!(msg, "");
             assert!(stdout
-                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
                 .is_ok());
             let msg = read_async(&stderr).await.context("failed to read stderr")?;
             assert_eq!(msg, "");
             assert!(stderr
-                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
                 .is_ok());
             let msg = read_async(&syslog).await.context("failed to read syslog")?;
             assert_eq!(msg, "");
             assert!(syslog
-                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
+                .wait_handle(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
                 .is_ok());
             Ok::<(), Error>(())
         };

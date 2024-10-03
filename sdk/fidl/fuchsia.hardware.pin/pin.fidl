@@ -16,14 +16,24 @@ type Pull = strict enum {
     NONE = 2;
 };
 
+type DriveType = flexible enum {
+    PUSH_PULL = 0;
+    OPEN_DRAIN = 1;
+    OPEN_SOURCE = 2;
+};
+
 type Configuration = table {
     /// Whether to enable the built-in pull-down resistor, pull-up resistor, or neither.
     1: pull Pull;
     /// Configures the pin for an alternate function (I2C, SPI, etc). The interpretation of
     /// `function` is controller dependent.
     2: function uint64;
-    /// The pin drive strength in microamps.
+    /// The pin drive strength in microamps. Rounds up to the nearest supported drive strength.
     3: drive_strength_ua uint64;
+    /// The pin drive type.
+    4: drive_type DriveType;
+    /// Selects the power source. Interpretation is controller dependent.
+    5: power_source uint64;
 };
 
 open protocol Pin {

@@ -24,6 +24,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as array type",
+                    "enum": [
+                        "array"
+                    ],
+                    "type": "string"
+                },
                 "type_shape_v2": {
                     "$ref": "#/definitions/typeshape",
                     "description": "Type shape of this declaration"
@@ -31,6 +38,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "element_type",
                 "element_count",
                 "type_shape_v2"
@@ -55,6 +63,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as string_array type",
+                    "enum": [
+                        "string_array"
+                    ],
+                    "type": "string"
+                },
                 "type_shape_v2": {
                     "$ref": "#/definitions/typeshape",
                     "description": "Type shape of this declaration"
@@ -62,6 +77,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "element_count",
                 "type_shape_v2"
             ],
@@ -283,6 +299,67 @@
                 "location",
                 "name",
                 "value"
+            ],
+            "type": "object"
+        },
+        "client-endpoint-type": {
+            "additionalProperties": false,
+            "description": "Definition of a client-side endpoint type (TODO(https://fxbug.dev/42149402): Merge with server-endpoint-type.)",
+            "patternProperties": {
+                "^experimental_": {}
+            },
+            "properties": {
+                "identifier": {
+                    "$ref": "#/definitions/compound-identifier",
+                    "description": "Identifier type name (TODO(https://fxbug.dev/42149402): Remove.)"
+                },
+                "kind": {
+                    "description": "Selection of base type as endpoint type",
+                    "enum": [
+                        "identifier"
+                    ],
+                    "type": "string"
+                },
+                "kind_v2": {
+                    "description": "Selection of base type as endpoint type",
+                    "enum": [
+                        "endpoint"
+                    ],
+                    "type": "string"
+                },
+                "role": {
+                    "description": "Selection of the endpoint's connection role.",
+                    "enum": [
+                        "client"
+                    ],
+                    "type": "string"
+                },
+                "nullable": {
+                    "description": "Flag indicating nullability of endpoint type",
+                    "type": "boolean"
+                },
+                "protocol": {
+                    "$ref": "#/definitions/compound-identifier",
+                    "description": "Protocol name of endpoint type"
+                },
+                "protocol_transport": {
+                    "description": "Transport used by the request protocol",
+                    "type": "string"
+                },
+                "type_shape_v2": {
+                    "$ref": "#/definitions/typeshape",
+                    "description": "Type shape of this declaration"
+                }
+            },
+            "required": [
+                "kind",
+                "kind_v2",
+                "identifier",
+                "role",
+                "nullable",
+                "protocol",
+                "protocol_transport",
+                "type_shape_v2"
             ],
             "type": "object"
         },
@@ -517,6 +594,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as experimental pointer type",
+                    "enum": [
+                        "experimental_pointer"
+                    ],
+                    "type": "string"
+                },
                 "pointee_type": {
                     "$ref": "#/definitions/type",
                     "description": "Type of what is being pointed to"
@@ -528,6 +612,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "pointee_type",
                 "type_shape_v2"
             ],
@@ -665,6 +750,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as handle type",
+                    "enum": [
+                        "handle"
+                    ],
+                    "type": "string"
+                },
                 "nullable": {
                     "description": "Flag indicating nullability of handle type",
                     "type": "boolean"
@@ -692,6 +784,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "nullable",
                 "obj_type",
                 "rights",
@@ -758,13 +851,16 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as identifier type",
+                    "enum": [
+                        "identifier"
+                    ],
+                    "type": "string"
+                },
                 "nullable": {
                     "description": "Flag indicating nullability of identifier type",
                     "type": "boolean"
-                },
-                "protocol_transport": {
-                    "description": "Transport used by the request protocol",
-                    "type": "string"
                 },
                 "type_shape_v2": {
                     "$ref": "#/definitions/typeshape",
@@ -773,6 +869,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "identifier",
                 "nullable",
                 "type_shape_v2"
@@ -1020,6 +1117,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of type as internal type",
+                    "enum": [
+                        "internal"
+                    ],
+                    "type": "string"
+                },
                 "subtype": {
                     "$ref": "#/definitions/internal-subtype",
                     "description": "Sub-type of the internal type"
@@ -1031,6 +1135,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "subtype",
                 "type_shape_v2"
             ],
@@ -1264,6 +1369,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as primitive type",
+                    "enum": [
+                        "primitive"
+                    ],
+                    "type": "string"
+                },
                 "subtype": {
                     "$ref": "#/definitions/primitive-subtype",
                     "description": "Sub-type of the primitive type"
@@ -1275,47 +1387,8 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "subtype",
-                "type_shape_v2"
-            ],
-            "type": "object"
-        },
-        "request-type": {
-            "additionalProperties": false,
-            "description": "Definition of a request type",
-            "patternProperties": {
-                "^experimental_": {}
-            },
-            "properties": {
-                "kind": {
-                    "description": "Selection of base type as request type",
-                    "enum": [
-                        "request"
-                    ],
-                    "type": "string"
-                },
-                "nullable": {
-                    "description": "Flag indicating nullability of request type",
-                    "type": "boolean"
-                },
-                "subtype": {
-                    "$ref": "#/definitions/compound-identifier",
-                    "description": "Protocol name of request type"
-                },
-                "protocol_transport": {
-                    "description": "Transport used by the request protocol",
-                    "type": "string"
-                },
-                "type_shape_v2": {
-                    "$ref": "#/definitions/typeshape",
-                    "description": "Type shape of this declaration"
-                }
-            },
-            "required": [
-                "kind",
-                "subtype",
-                "nullable",
-                "protocol_transport",
                 "type_shape_v2"
             ],
             "type": "object"
@@ -1392,6 +1465,67 @@
                 "location",
                 "name",
                 "type"
+            ],
+            "type": "object"
+        },
+        "server-endpoint-type": {
+            "additionalProperties": false,
+            "description": "Definition of a server-side endpoint type (TODO(https://fxbug.dev/42149402): Merge with client-endpoint-type.)",
+            "patternProperties": {
+                "^experimental_": {}
+            },
+            "properties": {
+                "kind": {
+                    "description": "Selection of base type as request type",
+                    "enum": [
+                        "request"
+                    ],
+                    "type": "string"
+                },
+                "kind_v2": {
+                    "description": "Selection of base type as endpoint type",
+                    "enum": [
+                        "endpoint"
+                    ],
+                    "type": "string"
+                },
+                "role": {
+                    "description": "Selection of the endpoint's connection role.",
+                    "enum": [
+                        "server"
+                    ],
+                    "type": "string"
+                },
+                "nullable": {
+                    "description": "Flag indicating nullability of endpoint type",
+                    "type": "boolean"
+                },
+                "subtype": {
+                    "$ref": "#/definitions/compound-identifier",
+                    "description": "Protocol name of endpoint type (TODO(https://fxbug.dev/42149402): Remove)"
+                },
+                "protocol": {
+                    "$ref": "#/definitions/compound-identifier",
+                    "description": "Protocol name of endpoint type"
+                },
+                "protocol_transport": {
+                    "description": "Transport used by the protocol",
+                    "type": "string"
+                },
+                "type_shape_v2": {
+                    "$ref": "#/definitions/typeshape",
+                    "description": "Type shape of this declaration"
+                }
+            },
+            "required": [
+                "kind",
+                "kind_v2",
+                "role",
+                "nullable",
+                "subtype",
+                "protocol",
+                "protocol_transport",
+                "type_shape_v2"
             ],
             "type": "object"
         },
@@ -1484,6 +1618,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as string type",
+                    "enum": [
+                        "string"
+                    ],
+                    "type": "string"
+                },
                 "maybe_element_count": {
                     "$ref": "#/definitions/count",
                     "description": "Optional size of string, in bytes"
@@ -1499,6 +1640,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "nullable",
                 "type_shape_v2"
             ],
@@ -1737,8 +1879,12 @@
                     "description": "Selection of handle type"
                 },
                 {
-                    "$ref": "#/definitions/request-type",
-                    "description": "Selection of request type"
+                    "$ref": "#/definitions/client-endpoint-type",
+                    "description": "Selection of client-side endpoint type"
+                },
+                {
+                    "$ref": "#/definitions/server-endpoint-type",
+                    "description": "Selection of server-side endpoint type"
                 },
                 {
                     "$ref": "#/definitions/primitive-type",
@@ -2117,6 +2263,13 @@
                     ],
                     "type": "string"
                 },
+                "kind_v2": {
+                    "description": "Selection of base type as vector type",
+                    "enum": [
+                        "vector"
+                    ],
+                    "type": "string"
+                },
                 "maybe_element_count": {
                     "$ref": "#/definitions/count",
                     "description": "Optional number of maximum elements in vector type"
@@ -2132,6 +2285,7 @@
             },
             "required": [
                 "kind",
+                "kind_v2",
                 "element_type",
                 "nullable",
                 "type_shape_v2"

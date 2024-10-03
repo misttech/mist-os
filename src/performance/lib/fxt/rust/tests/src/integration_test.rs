@@ -16,7 +16,7 @@ use futures::StreamExt;
 use std::collections::BTreeMap;
 use std::path::Path;
 use tracing::info;
-use {fidl_fuchsia_component_decl as fdecl, fuchsia_zircon as zx};
+use {fidl_fuchsia_component_decl as fdecl, zx};
 
 const COLLECTION_NAME: &str = "dynamic";
 const CHILD_NAME: &str = "provider_puppet";
@@ -40,12 +40,12 @@ async fn main() {
         panic!("must be packaged with a recognized puppet url");
     };
 
-    let min_timestamp = zx::MonotonicTime::get().into_nanos();
+    let min_timestamp = zx::MonotonicInstant::get().into_nanos();
     let trace_session = TraceSession::start().await;
     run_puppet(format!("#{puppet_subpath}")).await;
     let (records, warnings) = trace_session.terminate().await;
     assert_eq!(warnings, [], "should not see any warnings from parsing puppets' traces");
-    let max_timestamp = zx::MonotonicTime::get().into_nanos();
+    let max_timestamp = zx::MonotonicInstant::get().into_nanos();
 
     let mut per_process = BTreeMap::<fxt::ProcessKoid, PerProcessRecords>::default();
     for record in records {

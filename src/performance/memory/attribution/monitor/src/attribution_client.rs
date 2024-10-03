@@ -9,10 +9,7 @@ use std::sync::Arc;
 use crate::common::{GlobalPrincipalIdentifier, GlobalPrincipalIdentifierFactory};
 use fuchsia_sync::Mutex;
 use tracing::error;
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution, zx};
 
 /// An error of the attribution client.
 #[derive(Debug)]
@@ -435,7 +432,7 @@ mod tests {
     use super::*;
     use fidl::endpoints::RequestStream;
     use futures::TryStreamExt;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// Tests a two-level attribution hierarchy.
     #[test]

@@ -10,7 +10,7 @@ use fidl_fuchsia_mem::Buffer as MemBuffer;
 use fidl_fuchsia_net_http::{
     Body as HttpBody, LoaderProxyInterface, Request as HttpRequest, Response as HttpResponse,
 };
-use fuchsia_zircon as zx;
+
 use futures::io::AsyncReadExt;
 use futures::Future;
 use itertools::Itertools;

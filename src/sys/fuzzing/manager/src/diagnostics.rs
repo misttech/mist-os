@@ -15,7 +15,7 @@ use test_manager::Artifact;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_test_manager as test_manager,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 /// Dispatches `test_manager` artifacts to the `ArtifactBridge`s used to forward data to `ffx fuzz`.
@@ -94,12 +94,12 @@ impl ArtifactHandler {
 
 struct Message {
     data: Vec<u8>,
-    expiration: zx::MonotonicTime,
+    expiration: zx::MonotonicInstant,
 }
 
 impl Message {
     fn new(data: Vec<u8>) -> Self {
-        let mut expiration = zx::MonotonicTime::get();
+        let mut expiration = zx::MonotonicInstant::get();
         expiration += zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
         Self { data, expiration }
     }
@@ -158,7 +158,7 @@ trait ArtifactBridgeInternal: ArtifactBridge {
         let mut socket = None;
         let socket_receiver_rc = Rc::new(RefCell::new(socket_receiver));
         while let Some(msg) = msg_receiver.next().await {
-            let now = zx::MonotonicTime::get();
+            let now = zx::MonotonicInstant::get();
             if msg.expiration < now {
                 continue;
             }

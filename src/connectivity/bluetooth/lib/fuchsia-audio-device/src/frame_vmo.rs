@@ -4,10 +4,10 @@
 
 use fidl_fuchsia_hardware_audio::*;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
 use tracing::debug;
+use zx::{self as zx, HandleBased};
 
 use crate::stream_config::frames_from_duration;
 use crate::types::{AudioSampleFormat, Error, Result};
@@ -406,7 +406,6 @@ mod tests {
 
     use async_utils::PollExt;
     use fixture::fixture;
-    use fuchsia_zircon as zx;
 
     // Convenience choice because one byte = one frame.
     const TEST_FORMAT: AudioSampleFormat = AudioSampleFormat::Eight { unsigned: false };

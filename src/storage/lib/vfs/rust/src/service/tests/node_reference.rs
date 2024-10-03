@@ -20,8 +20,8 @@ use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
-use fuchsia_zircon_status::Status;
 use futures::StreamExt;
+use zx_status::Status;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;

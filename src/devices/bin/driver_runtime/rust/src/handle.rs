@@ -12,8 +12,8 @@ use core::mem::ManuallyDrop;
 use core::num::NonZero;
 use core::ops::Deref;
 
-use fuchsia_zircon::HandleBased;
-pub use fuchsia_zircon::{Handle as ZirconHandle, HandleRef as ZirconHandleRef};
+use zx::HandleBased;
+pub use zx::{Handle as ZirconHandle, HandleRef as ZirconHandleRef};
 
 pub use crate::fdf_sys::fdf_handle_t;
 
@@ -200,7 +200,7 @@ impl Drop for MixedHandle {
 
 #[cfg(test)]
 mod tests {
-    use fuchsia_zircon::{Port, Status};
+    use zx::{Port, Status};
 
     use super::*;
 

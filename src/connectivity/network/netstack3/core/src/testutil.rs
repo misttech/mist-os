@@ -28,8 +28,8 @@ use net_types::ip::{
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::{DynDebugReferences, Mutex};
 use netstack3_base::testutil::{
-    FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
-    FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs,
+    FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks,
+    FakeNetworkSpec, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs,
     WithFakeFrameContext, WithFakeTimerContext,
 };
 use netstack3_base::{
@@ -63,8 +63,8 @@ use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId,
     Marks, RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
-use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
-use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
+use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
+use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
 use netstack3_udp::{UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId};
 use packet::{Buf, BufferMut};
 use zerocopy::SplitByteSlice;
@@ -757,6 +757,7 @@ impl WithFakeFrameContext<DispatchedFrame> for FakeBindingsCtx {
 
 impl InstantBindingsTypes for FakeBindingsCtx {
     type Instant = FakeInstant;
+    type AtomicInstant = FakeAtomicInstant;
 }
 
 impl InstantContext for FakeBindingsCtx {
@@ -1422,7 +1423,7 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>> for D
     }
 }
 
-impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>> for DispatchedEvent {
+impl<I: IpExt> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>> for DispatchedEvent {
     fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>) -> DispatchedEvent {
         let e = e.map_device(|d| d.downgrade());
         I::map_ip(e, |e| DispatchedEvent::IpLayerIpv4(e), |e| DispatchedEvent::IpLayerIpv6(e))

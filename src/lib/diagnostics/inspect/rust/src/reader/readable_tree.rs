@@ -10,7 +10,7 @@ use crate::Inspector;
 use async_trait::async_trait;
 
 #[cfg(target_os = "fuchsia")]
-pub type SnapshotSource = fuchsia_zircon::Vmo;
+pub type SnapshotSource = zx::Vmo;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub type SnapshotSource = Vec<u8>;
@@ -62,7 +62,7 @@ impl ReadableTree for Inspector {
 #[cfg(target_os = "fuchsia")]
 #[async_trait]
 impl ReadableTree for fidl_fuchsia_inspect::TreeProxy {
-    async fn vmo(&self) -> Result<fuchsia_zircon::Vmo, ReaderError> {
+    async fn vmo(&self) -> Result<zx::Vmo, ReaderError> {
         let tree_content = self.get_content().await.map_err(|e| ReaderError::Fidl(e.into()))?;
         tree_content.buffer.map(|b| b.vmo).ok_or(ReaderError::FetchVmo)
     }

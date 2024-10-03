@@ -11,8 +11,8 @@ use fidl_fuchsia_io as fio;
 use fuchsia_async::TimeoutExt;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
-use fuchsia_zircon::{self as zx, Duration};
 use futures::StreamExt;
+use zx::{self as zx, Duration};
 
 /// Set of parameters to use for identifying the correct partition to open via
 /// [`open_partition`]

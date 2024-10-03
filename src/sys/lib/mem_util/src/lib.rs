@@ -5,7 +5,7 @@
 //! Utilities for working with the `fuchsia.mem` FIDL library.
 
 use std::borrow::Cow;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_zircon_status as zxs};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, zx_status as zxs};
 
 /// Open `path` from given `parent` directory, returning an [`fmem::Data`] of the contents.
 ///
@@ -87,7 +87,6 @@ pub enum DataError {
 mod tests {
     use super::*;
     use fidl::endpoints::{create_proxy, ServerEnd};
-    use fuchsia_zircon_status::Status;
     use futures::StreamExt;
     use std::sync::Arc;
     use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
@@ -97,6 +96,7 @@ mod tests {
     use vfs::file::{FileLike, FileOptions};
     use vfs::object_request::Representation;
     use vfs::{pseudo_directory, ObjectRequestRef};
+    use zx_status::Status;
 
     #[fuchsia::test]
     async fn bytes_from_read_only() {

@@ -10,11 +10,24 @@
     program: {
         binary: "bin/bt_le_integration_tests",
     },
+    use: [
+        { protocol: "fuchsia.component.resolution.Resolver-hermetic" },
+    ],
     offer: [
         {
             storage: "tmp",
             from: "parent",
             to: [ "#realm_builder" ],
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
         },
     ],
 }

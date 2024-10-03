@@ -89,12 +89,17 @@ class LowEnergyAdvertisingManager::ActiveAdvertisement final {
 
 LowEnergyAdvertisingManager::LowEnergyAdvertisingManager(
     hci::LowEnergyAdvertiser* advertiser,
-    hci::LocalAddressDelegate* local_addr_delegate)
+    hci::LocalAddressDelegate* local_addr_delegate,
+    bool simultaneous_le_and_bredr_controller)
     : advertiser_(advertiser),
       local_addr_delegate_(local_addr_delegate),
       weak_self_(this) {
   BT_DEBUG_ASSERT(advertiser_);
   BT_DEBUG_ASSERT(local_addr_delegate_);
+  default_flags_ = AdvFlag::kLEGeneralDiscoverableMode;
+  if (simultaneous_le_and_bredr_controller) {
+    default_flags_ |= AdvFlag::kSimultaneousLEAndBREDRController;
+  }
 }
 
 LowEnergyAdvertisingManager::~LowEnergyAdvertisingManager() {
@@ -131,7 +136,7 @@ void LowEnergyAdvertisingManager::StartAdvertising(
   }
   hci::LowEnergyAdvertiser::AdvertisingOptions options(
       GetIntervalRange(interval),
-      AdvFlag::kLEGeneralDiscoverableMode,
+      default_flags_,
       extended_pdu,
       anonymous,
       include_tx_power_level);

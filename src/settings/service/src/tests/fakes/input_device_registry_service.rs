@@ -9,7 +9,7 @@ use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
 use fuchsia_sync::RwLock;
 use futures::TryStreamExt;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_policy::MediaButtonsListenerProxy;

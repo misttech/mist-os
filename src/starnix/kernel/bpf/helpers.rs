@@ -32,10 +32,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-fn read_skbuf_data(
+fn read_packet_data(
     _context: &mut HelperFunctionContext<'_>,
     _sk_buf_ptr: BpfValue,
-    _offset: u16,
+    _offset: i32,
     _width: DataWidth,
 ) -> Option<BpfValue> {
     track_stub!(TODO("https://fxbug.dev/287120494"), "read_skbuf_data");
@@ -1033,7 +1033,7 @@ pub fn get_packet_descriptor(
         | ProgramType::SchedCls
         | ProgramType::SocketFilter => Some(PacketDescriptor {
             packet_memory_id: SK_BUF_ID.clone(),
-            packet_accessor: PacketAccessor::new(read_skbuf_data),
+            packet_accessor: PacketAccessor::new(read_packet_data),
         }),
         _ => None,
     }

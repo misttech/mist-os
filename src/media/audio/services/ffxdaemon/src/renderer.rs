@@ -9,10 +9,10 @@ use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::create_proxy;
 use fuchsia_audio::Format;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryStreamExt};
 use std::cmp::min;
+use zx::{self as zx, HandleBased};
 use {
     fidl_fuchsia_audio_controller as fac, fidl_fuchsia_media as fmedia,
     fidl_fuchsia_media_audio as fmedia_audio, fidl_fuchsia_ultrasound as fultrasound,

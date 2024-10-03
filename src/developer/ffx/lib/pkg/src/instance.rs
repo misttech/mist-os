@@ -3,43 +3,23 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Result};
+use camino::Utf8PathBuf;
 use ffx_config::EnvironmentContext;
 use fidl_fuchsia_pkg_ext::{
     RepositoryConfig, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
 };
+use fuchsia_repo::repository::RepositorySpec;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt::Display;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{fs, process};
 use timeout::timeout;
-
-/// PathType is an enum encapulating filesystem and URL based paths.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum PathType {
-    File(PathBuf),
-    Url(String),
-}
-
-impl From<&Path> for PathType {
-    fn from(value: &Path) -> Self {
-        PathType::File(value.into())
-    }
-}
-
-impl Display for PathType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PathType::File(p) => write!(f, "{}", p.display()),
-            PathType::Url(s) => write!(f, "{s}"),
-        }
-    }
-}
 
 /// ServerMode is the execution mode of the server process.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
@@ -72,13 +52,17 @@ impl Display for ServerMode {
 pub struct PkgServerInfo {
     pub name: String,
     pub address: SocketAddr,
-    pub repo_path: PathType,
-    pub registration_aliases: Vec<String>,
+    #[serde(default = "empty_repo_spec")]
+    pub repo_spec: RepositorySpec,
     pub registration_storage_type: RepositoryStorageType,
     pub registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     pub server_mode: ServerMode,
     pub repo_config: RepositoryConfig,
     pub pid: u32,
+}
+
+fn empty_repo_spec() -> RepositorySpec {
+    RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() }
 }
 
 impl PkgServerInfo {
@@ -144,6 +128,36 @@ impl PkgServerInfo {
         }
         Ok(())
     }
+
+    pub fn repo_path(&self) -> Option<Utf8PathBuf> {
+        match &self.repo_spec {
+            RepositorySpec::FileSystem { metadata_repo_path, .. } => {
+                Some(metadata_repo_path.clone())
+            }
+            RepositorySpec::Pm { path, .. } => Some(path.clone()),
+            _ => None,
+        }
+    }
+
+    /// Returns a string for the repo path. This can be a file system path
+    /// or a URL. Use repo_spec() to get the detailed information. This method
+    /// should only be used for display purposes.
+    pub fn repo_path_display(&self) -> String {
+        match &self.repo_spec {
+            RepositorySpec::FileSystem { metadata_repo_path, .. } => metadata_repo_path.to_string(),
+            RepositorySpec::Pm { path, .. } => path.to_string(),
+            RepositorySpec::Http { metadata_repo_url, .. } => metadata_repo_url.clone(),
+            RepositorySpec::Gcs { metadata_repo_url, .. } => metadata_repo_url.clone(),
+        }
+    }
+
+    pub fn repo_spec(&self) -> RepositorySpec {
+        self.repo_spec.clone()
+    }
+
+    pub fn aliases(&self) -> BTreeSet<String> {
+        self.repo_spec.aliases()
+    }
 }
 
 /// PkgServerInstanceInfo is the trait implemented by
@@ -203,8 +217,13 @@ impl PkgServerInstanceInfo for PkgServerInstances {
                                     entry.path()
                                 );
                                 let mut bad_name = entry.path().clone();
-                                bad_name.set_extension(".json.bad");
-                                fs::rename(entry.path(), bad_name)?;
+                                bad_name.set_extension("json.bad");
+                                fs::rename(entry.path(), &bad_name)?;
+                                tracing::warn!(
+                                    "Renamed instance file {old} to {new}",
+                                    old = entry.path().display(),
+                                    new = bad_name.display()
+                                );
                             }
                         };
                     }
@@ -265,8 +284,7 @@ pub async fn write_instance_info(
     server_mode: ServerMode,
     name: &str,
     address: &SocketAddr,
-    repo_path: PathType,
-    aliases: Vec<String>,
+    repo_spec: RepositorySpec,
     storage_type: RepositoryStorageType,
     conflict_mode: RepositoryRegistrationAliasConflictMode,
     repo_config: RepositoryConfig,
@@ -281,8 +299,7 @@ pub async fn write_instance_info(
     let info = PkgServerInfo {
         name: name.into(),
         address: address.clone(),
-        repo_path: repo_path,
-        registration_aliases: aliases.clone(),
+        repo_spec,
         registration_storage_type: storage_type.into(),
         registration_alias_conflict_mode: conflict_mode.into(),
         server_mode,
@@ -303,6 +320,7 @@ pub async fn write_instance_info(
 mod tests {
     use super::*;
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
+    use std::collections::BTreeSet;
     use std::net::Ipv6Addr;
     use std::os::unix::fs::PermissionsExt as _;
     use std::process;
@@ -321,8 +339,11 @@ mod tests {
             ServerMode::Foreground,
             instance_name.into(),
             &addr,
-            PathBuf::new().as_path().into(),
-            vec![],
+            RepositorySpec::Http {
+                metadata_repo_url: "http://metadata".into(),
+                blob_repo_url: "http://blobs".into(),
+                aliases: BTreeSet::new(),
+            },
             RepositoryStorageType::Ephemeral,
             RepositoryRegistrationAliasConflictMode::ErrorOut,
             repo_config,
@@ -350,8 +371,11 @@ mod tests {
             ServerMode::Foreground,
             "somename",
             &addr,
-            PathBuf::new().as_path().into(),
-            vec![],
+            RepositorySpec::Http {
+                metadata_repo_url: "http://metadata".into(),
+                blob_repo_url: "http://blobs".into(),
+                aliases: BTreeSet::new(),
+            },
             RepositoryStorageType::Ephemeral,
             RepositoryRegistrationAliasConflictMode::ErrorOut,
             repo_config,
@@ -378,11 +402,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -418,11 +441,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -443,11 +465,13 @@ mod tests {
         let mut info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::from("path1").as_path().into(),
+            repo_spec: RepositorySpec::Pm {
+                path: Utf8PathBuf::from("path1"),
+                aliases: BTreeSet::new(),
+            },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -455,14 +479,14 @@ mod tests {
         mgr.write_instance(&info).expect("written OK");
 
         let got = mgr.get_instance(instance_name.into()).expect("get instance").unwrap();
-        assert_eq!(got.repo_path, PathBuf::from("path1").as_path().into());
+        assert_eq!(got.repo_path(), Some(Utf8PathBuf::from("path1")));
 
-        info.repo_path = PathBuf::from("path2").as_path().into();
-
+        info.repo_spec =
+            RepositorySpec::Pm { path: Utf8PathBuf::from("path2"), aliases: BTreeSet::new() };
         mgr.write_instance(&info).expect("written OK");
 
         let mut got = mgr.get_instance(instance_name.into()).expect("get instance").unwrap();
-        assert_eq!(got.repo_path, PathBuf::from("path2").as_path().into());
+        assert_eq!(got.repo_path(), Some(Utf8PathBuf::from("path2")));
 
         let mut instances = mgr.list_instances().expect("list instances");
         assert_eq!(instances.len(), 1);
@@ -482,11 +506,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -511,11 +534,10 @@ mod tests {
         let info_1 = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_1,
         };
@@ -529,11 +551,10 @@ mod tests {
         let info_2 = PkgServerInfo {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_2,
         };
@@ -563,11 +584,10 @@ mod tests {
         let info_1 = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_1,
         };
@@ -581,11 +601,10 @@ mod tests {
         let info_2 = PkgServerInfo {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: 0,
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_2,
         };
@@ -628,11 +647,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: 0,
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -665,11 +683,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -692,11 +709,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: 0,
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -720,11 +736,10 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
@@ -762,11 +777,10 @@ mod tests {
         let info = PkgServerInfo {
             name: "some-server".into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: Path::new("").into(),
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::new(), aliases: BTreeSet::new() },
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: child.id(),
-            registration_aliases: vec![],
             registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };

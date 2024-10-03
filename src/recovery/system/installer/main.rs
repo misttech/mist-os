@@ -26,7 +26,7 @@ use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::StreamExt;
 use recovery_ui_config::Config as UiConfig;
 use std::path::PathBuf;
-use {fuchsia_zircon as zx, rive_rs as rive};
+use {rive_rs as rive, zx};
 
 mod menu;
 use menu::{Key, MenuButtonType, MenuEvent, MenuState, MenuStateMachine};

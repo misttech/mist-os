@@ -13,7 +13,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::time::{time_from_timeval, timeval_from_time};
 use starnix_uapi::{error, uapi};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
-use {fidl_fuchsia_input_report as fir, fidl_fuchsia_ui_input3 as fuiinput, fuchsia_zircon as zx};
+use {fidl_fuchsia_input_report as fir, fidl_fuchsia_ui_input3 as fuiinput, zx};
 
 type SlotId = usize;
 type TrackingId = u32;
@@ -269,7 +269,7 @@ impl LinuxTouchEventParser {
 
     fn produce_input_report(
         &mut self,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> Result<Option<fir::InputReport>, Errno> {
         self.reset_sequence_state();
 
@@ -536,7 +536,7 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
         let mut existing_slot: VecDeque<uapi::input_event> = VecDeque::new();
         let mut new_slots: VecDeque<uapi::input_event> = VecDeque::new();
 
-        let time = timeval_from_time(zx::MonotonicTime::from_nanos(time_nanos));
+        let time = timeval_from_time(zx::MonotonicInstant::from_nanos(time_nanos));
 
         let no_contact_before_process_events = self.pointer_id_to_slot_id.is_empty();
         let mut need_btn_touch_down = false;
@@ -730,7 +730,7 @@ pub fn parse_fidl_keyboard_event_to_linux_input_event(
                 k => k,
             };
 
-            let time = timeval_from_time(zx::MonotonicTime::from_nanos(time_nanos));
+            let time = timeval_from_time(zx::MonotonicInstant::from_nanos(time_nanos));
             let key_event = uapi::input_event {
                 time,
                 type_: uapi::EV_KEY as u16,
@@ -1891,7 +1891,7 @@ mod touchscreen_fuchsia_linux_tests {
         time_nanos: i64,
     ) -> uapi::input_event {
         uapi::input_event {
-            time: timeval_from_time(zx::MonotonicTime::from_nanos(time_nanos)),
+            time: timeval_from_time(zx::MonotonicInstant::from_nanos(time_nanos)),
             type_: ty as u16,
             code: code as u16,
             value,

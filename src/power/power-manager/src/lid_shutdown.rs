@@ -23,10 +23,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use tracing::*;
-use {
-    fidl_fuchsia_hardware_hidbus as fhidbus, fuchsia_async as fasync, fuchsia_zircon as zx,
-    serde_json as json,
-};
+use {fidl_fuchsia_hardware_hidbus as fhidbus, fuchsia_async as fasync, serde_json as json, zx};
 
 /// Node: LidShutdown
 ///
@@ -394,8 +391,8 @@ mod tests {
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, TreeAssertion};
     use fidl::endpoints::create_proxy_and_stream;
-    use fuchsia_zircon::{AsHandleRef, HandleBased};
     use std::cell::Cell;
+    use zx::{AsHandleRef, HandleBased};
     use {fidl_fuchsia_hardware_input as finput, fuchsia_async as fasync};
 
     const LID_OPEN: u8 = 0x1;

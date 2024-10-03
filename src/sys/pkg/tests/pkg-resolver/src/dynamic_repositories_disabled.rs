@@ -5,11 +5,11 @@
 /// This module tests pkg_resolver's RepositoryManager when
 /// dynamic repository configs.
 use {
-    fuchsia_zircon::Status,
     lib::{
         get_repos, make_repo, make_repo_config, mock_filesystem, DirOrProxy, EnableDynamicConfig,
         MountsBuilder, TestEnvBuilder,
     },
+    zx::Status,
 };
 
 #[fuchsia::test]

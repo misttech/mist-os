@@ -18,6 +18,7 @@ template("fidl_golden_library") {
 
     contains_drivers = true
     enable_hlcpp = true
+    enable_rust_drivers = true
     enable_rust_next = true
     golden_fuzzer = true
     disable_rustdoc = true

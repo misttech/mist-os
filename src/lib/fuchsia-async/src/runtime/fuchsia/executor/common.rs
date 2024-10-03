@@ -9,7 +9,7 @@ use super::time::Time;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use std::any::Any;
 use std::cell::RefCell;
 use std::future::Future;
@@ -253,7 +253,7 @@ impl Executor {
 
     pub fn now(&self) -> Time {
         match &self.time {
-            ExecutorTime::RealTime => Time::from_zx(zx::MonotonicTime::get()),
+            ExecutorTime::RealTime => Time::from_zx(zx::MonotonicInstant::get()),
             ExecutorTime::FakeTime(t) => Time::from_nanos(t.load(Ordering::Relaxed)),
         }
     }
@@ -442,9 +442,9 @@ impl Executor {
                 // If we're considered awake choose INFINITE_PAST which will make the wait call
                 // return immediately.  Otherwise, wait until a packet arrives.
                 let deadline = if !sleeping || UNTIL_STALLED {
-                    zx::Time::INFINITE_PAST
+                    zx::Instant::INFINITE_PAST
                 } else {
-                    zx::Time::INFINITE
+                    zx::Instant::INFINITE
                 };
 
                 match self.port.wait(deadline) {

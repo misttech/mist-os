@@ -4,9 +4,9 @@
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use crate::OnSignalsRef;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::{Arc, Mutex};
 use std::task::{ready, Context, Poll, Waker};
+use zx::{self as zx, AsHandleRef};
 
 const OBJECT_PEER_CLOSED: zx::Signals = zx::Signals::OBJECT_PEER_CLOSED;
 const OBJECT_READABLE: zx::Signals = zx::Signals::OBJECT_READABLE;
@@ -214,7 +214,7 @@ where
         // But having `is_closed` wakeup tasks if it discovered a signal change seems too weird, so
         // we just leave the bitset as-is and let the regular notification mechanism get around to
         // it when it gets around to it.
-        match self.handle.wait_handle(OBJECT_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST) {
+        match self.handle.wait_handle(OBJECT_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST) {
             Ok(_) => true,
             Err(zx::Status::TIMED_OUT) => false,
             Err(status) => {
@@ -317,7 +317,6 @@ where
 mod tests {
     use super::*;
     use crate::TestExecutor;
-    use fuchsia_zircon as zx;
 
     #[test]
     fn is_closed_immediately_after_close() {

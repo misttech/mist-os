@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crc::Hasher32 as _;
-use fuchsia_zircon as zx;
+
 use gpt::format::{Header, PartitionTableEntry};
 use zerocopy::IntoBytes as _;
 

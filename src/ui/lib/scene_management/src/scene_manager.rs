@@ -31,7 +31,7 @@ use {
     fidl_fuchsia_accessibility_scene as a11y_scene, fidl_fuchsia_math as math,
     fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_display_singleton as singleton_display,
     fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
-    fuchsia_trace as trace, fuchsia_zircon as zx, math as fmath,
+    fuchsia_trace as trace, math as fmath, zx,
 };
 
 /// Presentation messages.
@@ -869,8 +869,8 @@ pub fn start_flatland_presentation_loop(
                                 .iter()
                                 .map(
                                 |x| PresentationInfo{
-                                    latch_point: zx::MonotonicTime::from_nanos(x.latch_point.unwrap()),
-                                    presentation_time: zx::MonotonicTime::from_nanos(
+                                    latch_point: zx::MonotonicInstant::from_nanos(x.latch_point.unwrap()),
+                                    presentation_time: zx::MonotonicInstant::from_nanos(
                                                         x.presentation_time.unwrap())
                                 })
                                 .collect();
@@ -880,7 +880,7 @@ pub fn start_flatland_presentation_loop(
                             trace::duration!(c"scene_manager", c"SceneManager::OnFramePresented",
                                              "debug_name" => &*debug_name);
                             let actual_presentation_time =
-                                zx::MonotonicTime::from_nanos(frame_presented_info.actual_presentation_time);
+                                zx::MonotonicInstant::from_nanos(frame_presented_info.actual_presentation_time);
                             let presented_infos: Vec<PresentedInfo> =
                                 frame_presented_info.presentation_infos
                                 .into_iter()

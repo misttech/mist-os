@@ -57,7 +57,9 @@ async fn start_scan(central: &CentralHarness) -> Result<(), Error> {
     Ok(())
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_enable_scan(central: CentralHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
     let fut = add_le_peer(central.aux().as_ref(), default_le_peer(&address), None);
@@ -90,7 +92,9 @@ async fn test_enable_scan(central: CentralHarness) {
         .unwrap();
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-le-integration-tests#meta/bt-le-integration-tests-component.cm"
+)]
 async fn test_enable_and_disable_scan(central: CentralHarness) {
     start_scan(&central).await.unwrap();
     let _ = central.when_satisfied(expect::scan_enabled(), INTEGRATION_TIMEOUT).await.unwrap();

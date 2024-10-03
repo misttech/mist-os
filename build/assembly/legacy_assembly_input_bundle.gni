@@ -517,6 +517,7 @@ template("legacy_assembly_input_bundle") {
                              "testonly",
                              "visibility",
                            ])
+    deps = [ "//build:legacy_bundle_allowlist" ]
     public_deps = [ ":${labels.assembly_input_bundle}" ]
     if (_include_assembly_inputs) {
       public_deps += [ ":${labels.assembly_inputs}" ]

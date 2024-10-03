@@ -8,8 +8,8 @@ use crate::Device;
 use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
 use block_client::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId, WriteOptions};
-use fuchsia_zircon::Status;
 use std::ops::Range;
+use zx::Status;
 
 /// BlockDevice is an implementation of Device backed by a real block device behind a FIFO.
 pub struct BlockDevice {
@@ -137,7 +137,7 @@ mod tests {
     use crate::block_device::BlockDevice;
     use crate::Device;
     use fake_block_client::FakeBlockClient;
-    use fuchsia_zircon::Status;
+    use zx::Status;
 
     #[fuchsia::test]
     async fn test_lifecycle() {

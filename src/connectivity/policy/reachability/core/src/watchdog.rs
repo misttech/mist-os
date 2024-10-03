@@ -13,7 +13,7 @@ use crate::{Id as InterfaceId, InterfaceView};
 use itertools::Itertools as _;
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx};
+use {fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx};
 
 /// The minimum amount of time for a device counter to be stuck in the same
 /// value for the device to be considered unhealthy.
@@ -49,11 +49,11 @@ pub struct DeviceCounters {
 #[cfg_attr(test, derive(Eq, PartialEq))]
 struct TimestampedCounter {
     value: u64,
-    at: zx::MonotonicTime,
+    at: zx::MonotonicInstant,
 }
 
 impl TimestampedCounter {
-    fn update(&mut self, new_value: u64, new_at: zx::MonotonicTime) -> bool {
+    fn update(&mut self, new_value: u64, new_at: zx::MonotonicInstant) -> bool {
         let Self { value, at } = self;
         if new_value != *value {
             *at = new_at;
@@ -75,8 +75,8 @@ pub trait DeviceDiagnosticsProvider {
 #[derive(Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 enum HealthStatus {
-    Unhealthy { last_action: zx::MonotonicTime },
-    Healthy { last_action: Option<zx::MonotonicTime> },
+    Unhealthy { last_action: zx::MonotonicInstant },
+    Healthy { last_action: Option<zx::MonotonicInstant> },
 }
 
 impl HealthStatus {
@@ -84,7 +84,10 @@ impl HealthStatus {
     ///
     /// Return `true` if a debug info action should be triggered respecting
     /// cooldown.
-    fn set_unhealthy_and_check_for_debug_info_cooldown(&mut self, now: zx::MonotonicTime) -> bool {
+    fn set_unhealthy_and_check_for_debug_info_cooldown(
+        &mut self,
+        now: zx::MonotonicInstant,
+    ) -> bool {
         let last_action = match self {
             HealthStatus::Unhealthy { last_action } => Some(*last_action),
             HealthStatus::Healthy { last_action } => *last_action,
@@ -122,7 +125,7 @@ struct InterfaceDiagnosticsState<D> {
     diagnostics: D,
     rx: TimestampedCounter,
     tx: TimestampedCounter,
-    updated_at: zx::MonotonicTime,
+    updated_at: zx::MonotonicInstant,
     health: HealthStatus,
 }
 
@@ -176,7 +179,7 @@ where
     }
 
     async fn initialize_interface_state(
-        now: zx::MonotonicTime,
+        now: zx::MonotonicInstant,
         sys: &S,
         interface: InterfaceId,
     ) -> Option<InterfaceDiagnosticsState<S::DeviceDiagnostics>> {
@@ -214,7 +217,7 @@ where
 
     pub async fn check_interface_state(
         &mut self,
-        now: zx::MonotonicTime,
+        now: zx::MonotonicInstant,
         sys: &S,
         view: InterfaceView<'_>,
     ) {
@@ -272,7 +275,7 @@ where
     /// If there's a timeout attempting to fetch interface counters, a debug
     /// request may also be issued.
     async fn evaluate_interface_state(
-        now: zx::MonotonicTime,
+        now: zx::MonotonicInstant,
         diag_state: &mut InterfaceDiagnosticsState<S::DeviceDiagnostics>,
         InterfaceView {
             properties: fnet_interfaces_ext::Properties { id: interface, .. },
@@ -438,7 +441,7 @@ enum GatewayHealth {
 
 impl GatewayHealth {
     /// Checks if a gateway with reported `health` should be considered healthy.
-    fn from_neighbor_health(health: &NeighborHealth, now: zx::MonotonicTime) -> Self {
+    fn from_neighbor_health(health: &NeighborHealth, now: zx::MonotonicInstant) -> Self {
         match health {
             NeighborHealth::Unknown => Self::Unknown,
             NeighborHealth::Healthy { last_observed: _ } => Self::Healthy,
@@ -814,9 +817,9 @@ mod tests {
         );
     }
 
-    const ZERO_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(0);
-    const SOME_TIME: zx::MonotonicTime =
-        zx::MonotonicTime::from_nanos(NEIGHBOR_UNHEALTHY_TIME.into_nanos());
+    const ZERO_TIME: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(0);
+    const SOME_TIME: zx::MonotonicInstant =
+        zx::MonotonicInstant::from_nanos(NEIGHBOR_UNHEALTHY_TIME.into_nanos());
     const UNHEALTHY_NEIGHBOR: NeighborState =
         NeighborState::new(NeighborHealth::Unhealthy { last_healthy: Some(ZERO_TIME) });
     const HEALTHY_NEIGHBOR: NeighborState =
@@ -917,7 +920,7 @@ mod tests {
 
         fn new_diagnostics_state(
             &self,
-            now: zx::MonotonicTime,
+            now: zx::MonotonicInstant,
             interface: InterfaceId,
         ) -> InterfaceDiagnosticsState<MockDiagnostics> {
             self.insert_interface_diagnostics(interface);

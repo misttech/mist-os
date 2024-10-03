@@ -14,7 +14,7 @@ use fidl::endpoints::RequestStream;
 use fidl_fuchsia_virtualization::{HostVsockEndpointRequest, HostVsockEndpointRequestStream};
 use fidl_fuchsia_virtualization_hardware::VirtioVsockRequestStream;
 use fuchsia_component::server;
-use fuchsia_zircon as zx;
+
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use std::rc::Rc;
 

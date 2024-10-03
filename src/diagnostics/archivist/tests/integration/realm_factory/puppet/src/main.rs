@@ -28,7 +28,7 @@ use inspect_runtime::EscrowOptions;
 use inspect_testing::ExampleInspectData;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
-use {fidl_fuchsia_archivist_test as fpuppet, fuchsia_zircon as zx};
+use {fidl_fuchsia_archivist_test as fpuppet, zx};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),
@@ -276,7 +276,7 @@ async fn handle_puppet_request(
                             dispatcher.downcast_ref().unwrap();
                         let record = TestRecord {
                             severity: severity.into_primitive(),
-                            timestamp: zx::BootTime::from_nanos(time),
+                            timestamp: zx::BootInstant::from_nanos(time),
                             file: None,
                             line: None,
                             record_arguments: vec![Argument {

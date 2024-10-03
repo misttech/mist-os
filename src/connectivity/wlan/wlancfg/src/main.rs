@@ -45,7 +45,7 @@ use wlancfg_lib::telemetry::{
 use wlancfg_lib::util;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-    fuchsia_trace_provider as ftrace_provider, fuchsia_zircon as zx, wlan_trace as wtrace,
+    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace, zx,
 };
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;

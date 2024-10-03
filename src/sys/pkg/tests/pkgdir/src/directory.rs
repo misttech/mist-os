@@ -13,7 +13,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn open() {
@@ -598,7 +598,7 @@ async fn verify_content_file_opened(
             // should be immediately readable here.
             if let Some(observer) = observer {
                 let _: zx::Signals = observer
-                    .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST)
+                    .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
                     .context("FILE_SIGNAL_READABLE not set")?;
             }
         }
@@ -615,7 +615,10 @@ async fn verify_content_file_opened(
                         // The blobs should be immediately readable here.
                         if let Some(event) = event {
                             let _: zx::Signals = event
-                                .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST)
+                                .wait_handle(
+                                    zx::Signals::USER_0,
+                                    zx::MonotonicInstant::INFINITE_PAST,
+                                )
                                 .context("FILE_SIGNAL_READABLE not set")?;
                         }
                     } else {

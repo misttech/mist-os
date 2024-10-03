@@ -6,10 +6,8 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/component/cpp/service.h>
-#include <zircon/availability.h>
 
 namespace inspect {
-#if FUCHSIA_API_LEVEL_AT_LEAST(16)
 ComponentInspector::ComponentInspector(async_dispatcher_t* dispatcher, PublishOptions opts)
     : inspector_(std::move(opts.inspector)) {
   auto client_end = opts.client_end.has_value()
@@ -37,21 +35,6 @@ void PublishVmo(async_dispatcher_t* dispatcher, zx::vmo vmo, VmoOptions opts) {
       client->Publish({{.tree = std::move(endpoints->client), .name = std::move(opts.tree_name)}});
   ZX_ASSERT(result.is_ok());
 }
-#else
-ComponentInspector::ComponentInspector(component::OutgoingDirectory& outgoing_directory,
-                                       async_dispatcher_t* dispatcher, Inspector inspector,
-                                       TreeHandlerSettings settings)
-    : inspector_(inspector) {
-  auto status = outgoing_directory.AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
-      "diagnostics", [dispatcher, inspector = std::move(inspector), settings = std::move(settings)](
-                         fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
-        TreeServer::StartSelfManagedServer(std::move(inspector), std::move(settings), dispatcher,
-                                           std::move(server_end));
-      });
-
-  ZX_ASSERT(status.is_ok());
-}
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(16)
 
 NodeHealth& ComponentInspector::Health() {
   if (!component_health_) {

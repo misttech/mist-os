@@ -14,8 +14,8 @@ use crate::file::{File, FileLike, FileOptions, GetVmo, StreamIoConnection, SyncM
 use crate::node::Node;
 use crate::ObjectRequestRef;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, HandleBased as _, Status, Vmo};
 use std::sync::Arc;
+use zx::{self as zx, HandleBased as _, Status, Vmo};
 
 /// Creates a new read-only `VmoFile` with the specified `content`.
 ///

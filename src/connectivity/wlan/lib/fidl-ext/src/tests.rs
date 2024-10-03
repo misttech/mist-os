@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{ResponderExt, SendResultExt, WithName};
-use fuchsia_zircon as zx;
+
 use test_case::test_case;
 
 // The following type definitions emulate the definition of FIDL requests and responder types.

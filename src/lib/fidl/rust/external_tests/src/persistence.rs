@@ -54,7 +54,6 @@ mod zx {
         standalone_encode_resource, AsHandleRef,
     };
     use fidl_test_external::StructWithHandles;
-    use fuchsia_zircon as zx;
 
     #[test]
     fn standalone_encode_decode_resource() {

@@ -13,10 +13,10 @@ use fidl_fuchsia_pkg::{
 use fidl_fuchsia_pkg_ext::RepositoryConfig;
 use fuchsia_async as fasync;
 use fuchsia_url::RepositoryUrl;
-use fuchsia_zircon::Status;
 use futures::prelude::*;
 use std::sync::Arc;
 use tracing::{error, info};
+use zx::Status;
 
 const LIST_CHUNK_SIZE: usize = 100;
 

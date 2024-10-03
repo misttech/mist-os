@@ -31,7 +31,7 @@ use std::cmp::Ordering;
 use std::time::Duration;
 use test_case::test_case;
 use tracing::*;
-use {fidl_test_detect_factory as ftest, fuchsia_zircon as zx};
+use {fidl_test_detect_factory as ftest, zx};
 
 // Test that the "repeat" field of snapshots works correctly.
 mod test_snapshot_throttle;

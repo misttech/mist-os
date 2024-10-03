@@ -25,14 +25,6 @@ use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_component::server::ServiceFs;
-#[cfg(not(feature = "starnix_lite"))]
-use fuchsia_zircon::{
-    AsHandleRef, Signals, Task as _, {self as zx},
-};
-#[cfg(feature = "starnix_lite")]
-use fuchsia_zircon::{
-    Task as _, {self as zx},
-};
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
@@ -61,6 +53,9 @@ use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use zx::{
+    AsHandleRef, Signals, Task as _, {self as zx},
+};
 #[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,

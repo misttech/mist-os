@@ -23,7 +23,7 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
             }
         }
     },
-    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+    "schema_id": "https://fuchsia.dev/schema/version_history.json"
 }
 """
 
@@ -78,7 +78,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
                             },
                         },
                     },
-                    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
+                    "schema_id": "https://fuchsia.dev/schema/version_history.json",
                 },
             )
 
@@ -119,7 +119,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
                             },
                         },
                     },
-                    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
+                    "schema_id": "https://fuchsia.dev/schema/version_history.json",
                 },
             )
 

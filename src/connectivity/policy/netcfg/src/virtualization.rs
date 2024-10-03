@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_zircon as zx,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, zx,
 };
 
 use anyhow::{anyhow, Context as _};

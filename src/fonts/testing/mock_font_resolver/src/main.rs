@@ -7,13 +7,13 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_pkg::{FontResolverRequest, FontResolverRequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_url::AbsolutePackageUrl;
-use fuchsia_zircon::Status;
 use futures::{StreamExt, TryStreamExt};
 use tracing::*;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
+use zx::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_tags = ["mock_font_resolver"])]

@@ -109,16 +109,16 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
     local_params.last_rate_adjust_update_ticks = now_ticks;
     local_ticks_to_synthetic = affine::Transform{
         0, 0, {ticks_to_time_ratio.numerator(), ticks_to_time_ratio.denominator()}};
-    local_params.mono_to_synthetic = affine::Transform({0, 0, {1, 1}});
+    local_params.reference_to_synthetic = affine::Transform({0, 0, {1, 1}});
   } else {
     local_ticks_to_synthetic = affine::Transform{0, backstop_time, {0, 1}};
-    local_params.mono_to_synthetic = affine::Transform{0, backstop_time, {0, 1}};
+    local_params.reference_to_synthetic = affine::Transform{0, backstop_time, {0, 1}};
   }
 
   // Publish the state from within the SeqLock
   {
     SeqLockGuard<ExclusiveIrqSave> lock{&seq_lock_};
-    ticks_to_synthetic_.Update(local_ticks_to_synthetic);
+    reference_ticks_to_synthetic_.Update(local_ticks_to_synthetic);
     params_.Update(local_params);
   }
 
@@ -143,7 +143,7 @@ zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {
   bool transaction_success;
   do {
     SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
-    ticks_to_synthetic_.Read(ticks_to_synthetic);
+    reference_ticks_to_synthetic_.Read(ticks_to_synthetic);
     now_ticks = GetCurrentTicks();
   } while (!transaction_success);
 
@@ -160,14 +160,14 @@ zx_status_t ClockDispatcher::GetDetails(zx_clock_details_v1_t* out_details) {
   bool transaction_success;
   do {
     SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
-    ticks_to_synthetic_.Read(ticks_to_synthetic);
+    reference_ticks_to_synthetic_.Read(ticks_to_synthetic);
     params_.Read(params);
     now_ticks = GetCurrentTicks();
   } while (!transaction_success);
 
   out_details->generation_counter = params.generation_counter_;
-  out_details->ticks_to_synthetic = CopyTransform(ticks_to_synthetic);
-  out_details->mono_to_synthetic = CopyTransform(params.mono_to_synthetic);
+  out_details->reference_ticks_to_synthetic = CopyTransform(ticks_to_synthetic);
+  out_details->reference_to_synthetic = CopyTransform(params.reference_to_synthetic);
   out_details->error_bound = params.error_bound;
   out_details->query_ticks = now_ticks;
   out_details->last_value_update_ticks = params.last_value_update_ticks;
@@ -260,11 +260,11 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     affine::Transform local_ticks_to_synthetic;
     Params local_params;
     params_.Read(local_params);
-    ticks_to_synthetic_.Read(local_ticks_to_synthetic);
+    reference_ticks_to_synthetic_.Read(local_ticks_to_synthetic);
 
     // Aliases make some of the typing a bit shorter.
     affine::Transform& t2s = local_ticks_to_synthetic;
-    affine::Transform& m2s = local_params.mono_to_synthetic;
+    affine::Transform& m2s = local_params.reference_to_synthetic;
 
     // Mark the time at which this update will take place.
     int64_t now_ticks = static_cast<int64_t>(GetCurrentTicks());
@@ -376,7 +376,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // We are finished.  Bump the generation counter and publish the results in
     // the shared structures.
     ++local_params.generation_counter_;
-    ticks_to_synthetic_.Update(local_ticks_to_synthetic);
+    reference_ticks_to_synthetic_.Update(local_ticks_to_synthetic);
     params_.Update(local_params);
   }
 

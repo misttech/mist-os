@@ -77,6 +77,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax.parent/ParentUsesErrorSyntaxComposedCallWhichMayFailRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -92,6 +93,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -108,6 +110,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -122,6 +125,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -149,6 +153,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -164,6 +169,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -180,6 +186,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -194,6 +201,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -229,6 +237,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -285,6 +294,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -342,6 +352,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -398,6 +409,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -458,6 +470,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -483,6 +496,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,

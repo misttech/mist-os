@@ -192,6 +192,8 @@ func TestSubprocessTester(t *testing.T) {
 				"--bindmount_ro",
 				"/etc/ssl/certs:/etc/ssl/certs",
 				"--bindmount_ro",
+				"/usr/share/ca-certificates:/usr/share/ca-certificates",
+				"--bindmount_ro",
 				"/lib:/lib",
 				"--bindmount_ro",
 				"/lib64:/lib64",
@@ -454,7 +456,7 @@ func TestFFXTester(t *testing.T) {
 			}
 			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome, Output: c.output}
 			localOutputDir := t.TempDir()
-			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, c.experimentLevel)
+			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, c.experimentLevel, "")
 			if err != nil {
 				t.Fatalf("NewFFXTester got unexpected error: %s", err)
 			}

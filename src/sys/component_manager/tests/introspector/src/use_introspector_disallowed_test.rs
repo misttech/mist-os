@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use fidl::Error;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 
 /// Tests that a regular component cannot use RealmDebug because it is a

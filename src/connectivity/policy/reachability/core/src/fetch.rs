@@ -6,7 +6,7 @@ use anyhow::{format_err, Context};
 use async_trait::async_trait;
 use fuchsia_async::net::TcpStream;
 use fuchsia_async::TimeoutExt;
-use fuchsia_zircon as zx;
+
 use futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt};
 use std::net;
 use tracing::warn;
@@ -30,7 +30,7 @@ async fn fetch<FA: FetchAddr + std::marker::Sync>(
     path: &str,
     addr: &FA,
 ) -> anyhow::Result<u8> {
-    let timeout = zx::MonotonicTime::after(FETCH_TIMEOUT);
+    let timeout = zx::MonotonicInstant::after(FETCH_TIMEOUT);
     let addr = addr.as_socket_addr();
     let socket = socket2::Socket::new(
         match addr {
@@ -141,7 +141,7 @@ mod test {
         let addr = listener.local_addr()?;
 
         let server_fut = async {
-            let timeout = zx::MonotonicTime::after(FETCH_TIMEOUT);
+            let timeout = zx::MonotonicInstant::after(FETCH_TIMEOUT);
             let mut incoming = listener.accept_stream();
             if let Some(result) = incoming
                 .next()

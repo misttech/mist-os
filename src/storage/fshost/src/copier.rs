@@ -5,9 +5,9 @@
 use anyhow::{Context, Error};
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_fs::file::{ReadError, WriteError};
-use fuchsia_zircon::Status;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use zx::Status;
 
 /// Copies all data from src to dst recursively.
 pub fn recursive_copy<'a>(

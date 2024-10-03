@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SuperFooRequest {
@@ -84,11 +81,15 @@ impl SubSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<SubEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicInstant) -> Result<SubEvent, fidl::Error> {
         SubEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
-    pub fn r#foo(&self, mut s: &str, ___deadline: zx::MonotonicTime) -> Result<i64, fidl::Error> {
+    pub fn r#foo(
+        &self,
+        mut s: &str,
+        ___deadline: zx::MonotonicInstant,
+    ) -> Result<i64, fidl::Error> {
         let _response = self.client.send_query::<SuperFooRequest, SuperFooResponse>(
             (s,),
             0x68a61c2a230db8b8,
@@ -476,11 +477,18 @@ impl Super_SynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<Super_Event, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicInstant,
+    ) -> Result<Super_Event, fidl::Error> {
         Super_Event::decode(self.client.wait_for_event(deadline)?)
     }
 
-    pub fn r#foo(&self, mut s: &str, ___deadline: zx::MonotonicTime) -> Result<i64, fidl::Error> {
+    pub fn r#foo(
+        &self,
+        mut s: &str,
+        ___deadline: zx::MonotonicInstant,
+    ) -> Result<i64, fidl::Error> {
         let _response = self.client.send_query::<SuperFooRequest, SuperFooResponse>(
             (s,),
             0x68a61c2a230db8b8,

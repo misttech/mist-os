@@ -37,7 +37,10 @@ void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_vie
 
 void LdStartupCreateProcessTestsBase::FinishLoad(std::string_view executable_name) {
   // Send the executable VMO.
-  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(executable_name));
+  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(GetExecutableVmo(executable_name)));
+
+  // Prime the mock loader service from the Needed() calls.
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
   // If a mock loader service has been set up by calls to Needed() et al,
   // send the client end over.

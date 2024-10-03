@@ -9,12 +9,12 @@ use fidl_fuchsia_stresstest::{
     ActorRequestStream, Error,
 };
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::future::BoxFuture;
 use futures::{StreamExt, TryStreamExt};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rust_measure_tape_for_action::Measurable;
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
 enum OutgoingProtocols {
     Actor(ActorRequestStream),

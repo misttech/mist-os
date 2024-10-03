@@ -37,10 +37,6 @@ def create(
         configs: list of dicts. Each dict representing a configuration for a
             Fuchsia device.
 
-            Ensure to have following keys in the config dict:
-            * name - Device name returned by `ffx target list`.
-            * transport - Transport to be used to perform the host-target
-                interactions.
     Returns:
         A list of FuchsiaDevice objects.
     """
@@ -90,7 +86,6 @@ def create(
                     ip_port=device_config.get("device_ip_port"),
                     serial_socket=device_config.get("serial_socket"),
                 ),
-                transport=device_config["transport"],
                 ffx_config=_FFX_CONFIG_OBJ.get_config(),
                 config=device_config["honeydew_config"],
             )
@@ -205,13 +200,9 @@ def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     #       nodename: botanist-target-qemu
     #       serial_socket: ''
     #       ssh_key: private_key
-    #       transport: fuchsia-controller
     #       device_ip_port: [::1]:8022
     if "name" not in config:
         raise RuntimeError("Missing fuchsia device name in the config")
-
-    if "transport" not in config:
-        raise RuntimeError("Missing transport field in the config")
 
     if "honeydew_config" not in config:
         raise RuntimeError("Missing Honeydew config field in the config")
@@ -219,11 +210,7 @@ def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     device_config: dict[str, Any] = {}
 
     for config_key, config_value in config.items():
-        if config_key == "transport":
-            device_config["transport"] = custom_types.TRANSPORT(
-                config["transport"]
-            )
-        elif config_key == "device_ip_port":
+        if config_key == "device_ip_port":
             try:
                 device_config[
                     "device_ip_port"

@@ -14,7 +14,7 @@ use fidl_fuchsia_hardware_block_partition::PartitionMarker;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::prelude::*;
 use tracing::{error, info};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// This GUID is used by the installer to identify partitions that contain
 /// data that will be installed to disk. The `fx mkinstaller` tool generates

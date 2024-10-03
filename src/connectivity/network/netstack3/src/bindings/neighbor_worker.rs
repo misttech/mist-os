@@ -10,10 +10,7 @@ use fidl_fuchsia_net_neighbor::{
     self as fnet_neighbor, ControllerRequest, ControllerRequestStream, ViewRequest,
     ViewRequestStream,
 };
-use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext, zx};
 
 use assert_matches::assert_matches;
 use futures::channel::mpsc;
@@ -25,7 +22,9 @@ use net_types::ip::{IpAddr, IpAddress, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 
 use crate::bindings::devices::{BindingId, DeviceIdAndName};
-use crate::bindings::{BindingsCtx, Ctx, StackTime};
+use crate::bindings::time::StackTime;
+use crate::bindings::util::IntoFidl;
+use crate::bindings::{BindingsCtx, Ctx};
 use netstack3_core::device::{
     DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
 };
@@ -52,7 +51,7 @@ fn new_fidl_entry(
     binding_id: BindingId,
     addr: SpecifiedAddr<IpAddr>,
     state: neighbor::EventState<Mac>,
-    StackTime(at): StackTime,
+    at: StackTime,
 ) -> fnet_neighbor::Entry {
     let (state, mac) = match state {
         neighbor::EventState::Dynamic(dynamic_state) => match dynamic_state {
@@ -82,7 +81,7 @@ fn new_fidl_entry(
         neighbor: addr.get().into_ext(),
         state,
         mac: mac.map(IntoExt::into_ext),
-        updated_at: at.into_nanos(),
+        updated_at: at.into_fidl(),
     }
     .into()
 }

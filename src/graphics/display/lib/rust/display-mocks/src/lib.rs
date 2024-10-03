@@ -15,7 +15,7 @@ use fidl_fuchsia_hardware_display::{
 use itertools::Itertools;
 use std::collections::HashMap;
 use thiserror::Error;
-use {fidl_fuchsia_hardware_display_types as display_types, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_display_types as display_types, zx};
 
 /// Errors that can be returned by `MockCoordinator`.
 #[derive(Error, Debug)]
@@ -99,7 +99,7 @@ impl MockCoordinator {
         self.listener_proxy
             .on_vsync(
                 &display_types::DisplayId { value: display_id_value },
-                zx::MonotonicTime::get().into_nanos(),
+                zx::MonotonicInstant::get().into_nanos(),
                 &stamp,
                 &VsyncAckCookie { value: INVALID_DISP_ID },
             )

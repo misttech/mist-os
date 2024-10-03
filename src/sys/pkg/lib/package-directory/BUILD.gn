@@ -19,10 +19,10 @@ rustc_library("package-directory") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-fs",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/pkg/lib/blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",

@@ -8,16 +8,26 @@
 #include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/ld/abi.h>
 
+#include <filesystem>
+
 #include <gtest/gtest.h>
 
 namespace dl::testing {
+namespace {
+
+const std::filesystem::path kTestDir =
+    elfldltl::testing::GetTestDataPath("sdk/lib/ld/test/modules/dl-tests");
+
+bool TestLibExists(std::string_view name) { return std::filesystem::exists(kTestDir / name); }
+
+}  // namespace
 
 void DlLoadTestsBase::ExpectRootModule(std::string_view name) {
-  ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
+  ASSERT_TRUE(TestLibExists(name)) << name;
 }
 
 void DlLoadTestsBase::ExpectMissing(std::string_view name) {
-  ASSERT_FALSE(elfldltl::testing::TryGetTestLib(name)) << name;
+  ASSERT_FALSE(TestLibExists(name)) << name;
 }
 
 void DlLoadTestsBase::Needed(std::initializer_list<std::string_view> names) {
@@ -27,7 +37,7 @@ void DlLoadTestsBase::Needed(std::initializer_list<std::string_view> names) {
   // does the expected set in the expected order.  So this just verifies that
   // each SONAME in the list is an existing test file.
   for (std::string_view name : names) {
-    ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
+    ASSERT_TRUE(TestLibExists(name)) << name;
   }
 }
 
@@ -35,9 +45,9 @@ void DlLoadTestsBase::Needed(
     std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
   for (auto [name, found] : name_found_pairs) {
     if (found) {
-      ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
+      ASSERT_TRUE(TestLibExists(name)) << name;
     } else {
-      ASSERT_FALSE(elfldltl::testing::TryGetTestLib(name)) << name;
+      ASSERT_FALSE(TestLibExists(name)) << name;
     }
   }
 }
@@ -49,7 +59,7 @@ void DlLoadTestsBase::FileCheck(std::string_view filename) {
 fit::result<std::optional<DlLoadTestsBase::SystemError>, DlLoadTestsBase::File>
 DlLoadTestsBase::RetrieveFile(Diagnostics& diag, std::string_view filename) {
   FileCheck(filename);
-  std::filesystem::path path = elfldltl::testing::GetTestDataPath(filename);
+  const std::filesystem::path path = kTestDir / filename;
   if (fbl::unique_fd fd{open(path.c_str(), O_RDONLY)}) {
     return fit::ok(File{std::move(fd), diag});
   }

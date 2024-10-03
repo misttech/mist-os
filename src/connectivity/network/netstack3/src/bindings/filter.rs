@@ -22,7 +22,7 @@ use log::{debug, error, info, warn};
 use thiserror::Error;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_root as fnet_root, fuchsia_zircon as zx,
+    fidl_fuchsia_net_root as fnet_root, zx,
 };
 
 use controller::{CommitResult, Controller};
@@ -86,12 +86,32 @@ impl UpdateDispatcherInner {
         }
     }
 
-    fn remove_controller(&mut self, id: &fnet_filter_ext::ControllerId) {
+    fn remove_controller(
+        &mut self,
+        id: &fnet_filter_ext::ControllerId,
+        mut ctx: crate::bindings::Ctx,
+    ) {
         let Self { resources, clients } = self;
-        let resources = resources.remove(id).expect("controller should only be removed once");
+        let removed_controller =
+            resources.remove(id).expect("controller should only be removed once");
+
+        // Merge the state from all remaining controllers and update Core.
+        let (v4, v6) = resources.values().fold(
+            (conversion::State::default(), conversion::State::default()),
+            |(mut v4, mut v6), controller| {
+                v4.merge(&controller.core_state_v4);
+                v6.merge(&controller.core_state_v6);
+                (v4, v6)
+            },
+        );
+        ctx.api().filter().set_filter_state(v4.into(), v6.into()).expect(
+            "removing an existing controller should never cause an error; all remaining state was \
+            already validated when created, and controller removal should be self-contained as \
+            resources can only refer to other resources owned by the same controller",
+        );
 
         // Notify all existing watchers of the removed resources.
-        let events = resources
+        let events = removed_controller
             .existing_ids()
             .map(|resource| fnet_filter_ext::Event::Removed(id.clone(), resource))
             .chain(std::iter::once(fnet_filter_ext::Event::EndOfUpdate))
@@ -450,7 +470,7 @@ pub(crate) async fn serve_control(
                         .await
                         .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
 
-                    inner.lock().await.remove_controller(&final_id);
+                    inner.lock().await.remove_controller(&final_id, ctx.clone());
                 }
                 ControlRequest::ReopenDetachedController { key: _, request: _, control_handle } => {
                     error!("TODO(https://fxbug.dev/42182623): detaching is not implemented");

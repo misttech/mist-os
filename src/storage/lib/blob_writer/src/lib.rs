@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_fxfs::BlobWriterProxy;
-use fuchsia_zircon as zx;
+
 use futures::future::{BoxFuture, FutureExt as _};
 use futures::stream::{FuturesOrdered, StreamExt as _, TryStreamExt as _};
 
@@ -159,10 +159,10 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest};
-    use fuchsia_zircon::HandleBased;
     use futures::{pin_mut, select};
     use rand::{thread_rng, Rng as _};
     use std::sync::{Arc, Mutex};
+    use zx::HandleBased;
 
     const VMO_SIZE: usize = 4096;
 

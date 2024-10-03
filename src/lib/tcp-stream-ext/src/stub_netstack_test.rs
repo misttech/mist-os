@@ -5,9 +5,9 @@
 #![cfg(test)]
 
 use fidl::endpoints::{ControlHandle as _, DiscoverableProtocolMarker as _, Responder as _};
-use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::stream::StreamExt as _;
 use tcp_stream_ext::TcpStreamExt as _;
+use zx::{self as zx, HandleBased as _};
 use {fidl_fuchsia_posix_socket as fposix_socket, fuchsia_async as fasync};
 
 const TCP_USER_TIMEOUT_OPTION_VALUE: i32 = -13;

@@ -15,11 +15,11 @@ use ffx_target::add_manual_target;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl::AsHandleRef;
 use fidl_fuchsia_developer_ffx::{TargetCollectionMarker, TargetCollectionProxy, TargetProxy};
-use fuchsia_zircon_types as zx_types;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
+use zx_types;
 
 fn fxe<E: std::fmt::Debug>(e: E) -> anyhow::Error {
     ffx_error!("{e:?}").into()

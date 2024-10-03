@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fpromise/promise.h>
+#include <zircon/availability.h>
 
 namespace fdf {
 
@@ -28,9 +29,16 @@ fpromise::result<fidl::WireSharedClient<Protocol>, zx_status_t> ConnectWithResul
 
 // Opens the given `path` in `ns`, and returns a fpromise::result containing a
 // fidl::WireSharedClient on success.
+// TODO(https://fxbug.dev/324080864): Remove this when we no longer support io1.
+fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResultDeprecated(
+    const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
+    fuchsia_io::OpenFlags flags);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
-    fuchsia_io::wire::OpenFlags flags);
+    fuchsia_io::Flags flags);
+#endif
 
 }  // namespace internal
 
@@ -45,12 +53,24 @@ fpromise::promise<fidl::WireSharedClient<Protocol>, zx_status_t> Connect(
 }
 
 // Opens the given `path` in `ns`, and returns a fpromise::promise containing a
+// fidl::WireSharedClient on success. Uses deprecated fuchsia.io/Directory.Open1.
+inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(
+    const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
+    fuchsia_io::OpenFlags flags)
+    ZX_DEPRECATED_SINCE(1, NEXT, "Use new signature that takes fuchsia.io/Flags instead.") {
+  return fpromise::make_result_promise(
+      internal::OpenWithResultDeprecated(ns, dispatcher, path, flags));
+}
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+// Opens the given `path` in `ns`, and returns a fpromise::promise containing a
 // fidl::WireSharedClient on success.
 inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
-    fuchsia_io::wire::OpenFlags flags = fuchsia_io::wire::OpenFlags::kRightReadable) {
+    fuchsia_io::Flags flags) {
   return fpromise::make_result_promise(internal::OpenWithResult(ns, dispatcher, path, flags));
 }
+#endif
 
 // Adds a child to `client`, using `args`. `controller` must be provided, but
 // `node` is optional.

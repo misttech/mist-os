@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use std::mem;
 
 /// Takes ownership of the channel in `chan`. `chan` is replaced with an invalid channel.

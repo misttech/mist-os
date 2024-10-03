@@ -20,7 +20,7 @@ use rand::Rng;
 use std::io::Read;
 use std::path::PathBuf;
 use tracing::{info, warn};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// The broadcast channel to use for the initial init request, as defined in the CTAP HID spec.
 const INIT_CHANNEL: u32 = 0xffffffff;

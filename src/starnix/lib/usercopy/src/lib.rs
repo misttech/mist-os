@@ -5,7 +5,6 @@
 use std::mem::MaybeUninit;
 use std::ops::Range;
 
-use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
 
@@ -342,7 +341,7 @@ impl Usercopy {
                         pending: zx::Signals::empty(),
                     },
                 ];
-                let _ = zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE);
+                let _ = zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE);
                 if wait_items[1].pending == zx::Signals::USER_0 {
                     break;
                 }

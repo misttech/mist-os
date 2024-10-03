@@ -22,7 +22,7 @@ use test_case::test_case;
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx,
 };
 
 #[netstack_test]
@@ -681,7 +681,7 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
 
         // Keep sending data until writing to the socket fails.
         let io_fut = async {
-            let mut write_wait_interval = fuchsia_zircon::Duration::from_micros(10);
+            let mut write_wait_interval = zx::Duration::from_micros(10);
             loop {
                 match sock
                     .send_to(&[1u8, 2, 3, 4], std::net::SocketAddr::new(MCAST_ADDR, 1234))
@@ -715,10 +715,9 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
 
         let id = dev.id();
         let drop_fut = async move {
-            let () = fuchsia_async::Timer::new(fuchsia_async::Time::after(
-                fuchsia_zircon::Duration::from_millis(3),
-            ))
-            .await;
+            let () =
+                fuchsia_async::Timer::new(fuchsia_async::Time::after(zx::Duration::from_millis(3)))
+                    .await;
             std::mem::drop(dev);
         };
 
@@ -1321,10 +1320,7 @@ async fn watcher<N: Netstack>(name: &str) {
                 let event = event.expect("watcher event stream ended");
                 Some(event)
             })
-            .on_timeout(
-                fuchsia_async::Time::after(fuchsia_zircon::Duration::from_millis(50)),
-                || None,
-            )
+            .on_timeout(fuchsia_async::Time::after(zx::Duration::from_millis(50)), || None)
             .map(|e| match e {
                 Some(e) => panic!("did not block but yielded {:?}", e),
                 None => (),

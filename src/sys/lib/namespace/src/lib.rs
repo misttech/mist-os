@@ -89,7 +89,6 @@ impl Default for Namespace {
 impl Clone for Namespace {
     fn clone(&self) -> Self {
         use fidl::AsHandleRef;
-        use fuchsia_zircon as zx;
 
         // TODO(https://fxbug.dev/42083023): The unsafe block can go away if Rust FIDL bindings exposed the
         // feature of calling FIDL methods (e.g. Clone) on a borrowed client endpoint.
@@ -323,7 +322,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use zx::{AsHandleRef, Peered};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     fn ns_path(str: &str) -> NamespacePath {
         str.parse().unwrap()
@@ -420,7 +419,7 @@ mod tests {
             .into_channel()
             .signal_peer(zx::Signals::empty(), zx::Signals::USER_0)
             .unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE).unwrap();
     }
 
     #[test]
@@ -432,6 +431,6 @@ mod tests {
         let entries = namespace.flatten();
         assert!(entries.is_empty());
         client_end.into_channel().signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE).unwrap();
     }
 }

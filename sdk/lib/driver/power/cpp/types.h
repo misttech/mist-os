@@ -5,6 +5,7 @@
 #ifndef LIB_DRIVER_POWER_CPP_TYPES_H_
 #define LIB_DRIVER_POWER_CPP_TYPES_H_
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/result.h>
 
@@ -18,6 +19,9 @@ namespace fdf_power {
 
 // The length of time it takes to move to a power level.
 struct Transition {
+  static zx::result<Transition> FromFidl(const fuchsia_hardware_power::Transition& src);
+  static zx::result<Transition> FromFidl(const fuchsia_hardware_power::wire::Transition& src);
+
   // The power level we're moving to.
   uint8_t target_level;
 
@@ -27,6 +31,9 @@ struct Transition {
 
 // A zero-indexed set of levels that a device can assume.
 struct PowerLevel {
+  static zx::result<PowerLevel> FromFidl(const fuchsia_hardware_power::PowerLevel& src);
+  static zx::result<PowerLevel> FromFidl(const fuchsia_hardware_power::wire::PowerLevel& src);
+
   // The zero-indexed level of this `PowerLevel`.
   uint8_t level;
 
@@ -40,12 +47,18 @@ struct PowerLevel {
 // Set of `PowerLevel`s and a human-readable identifier. A `PowerLevel` itself contains information
 // about valid transitions out of that level.
 struct PowerElement {
+  static zx::result<PowerElement> FromFidl(const fuchsia_hardware_power::PowerElement& src);
+  static zx::result<PowerElement> FromFidl(const fuchsia_hardware_power::wire::PowerElement& src);
+
   std::string name;
   std::vector<PowerLevel> levels;
 };
 
 // Represents a dependency between two power levels of two different `PowerElement`s.
 struct LevelTuple {
+  static zx::result<LevelTuple> FromFidl(const fuchsia_hardware_power::LevelTuple& src);
+  static zx::result<LevelTuple> FromFidl(const fuchsia_hardware_power::wire::LevelTuple& src);
+
   uint8_t child_level;
   uint8_t parent_level;
 };
@@ -68,6 +81,9 @@ enum class SagElement : uint32_t {
 // other element depends upon.
 class ParentElement {
  public:
+  static zx::result<ParentElement> FromFidl(const fuchsia_hardware_power::ParentElement& src);
+  static zx::result<ParentElement> FromFidl(const fuchsia_hardware_power::wire::ParentElement& src);
+
   enum class Type {
     // The parent element is one of SAG's elements and the access token should be obtained from the
     // appropriate SAG-related protocol.
@@ -117,6 +133,10 @@ class ParentElement {
 // Describes the relationship between the `PowerLevel`s of two `PowerElement`s. `child` is the name
 // of the `PowerElement` which has `PowerLevel`s that depend on `parent`.
 struct PowerDependency {
+  static zx::result<PowerDependency> FromFidl(const fuchsia_hardware_power::PowerDependency& src);
+  static zx::result<PowerDependency> FromFidl(
+      const fuchsia_hardware_power::wire::PowerDependency& src);
+
   // The name for a `PowerElement` which a driver owns.
   std::string child;
 
@@ -131,6 +151,11 @@ struct PowerDependency {
 
 // Contains the `PowerElement` description and any dependencies it has on other `PowerElement`s.
 struct PowerElementConfiguration {
+  static zx::result<PowerElementConfiguration> FromFidl(
+      const fuchsia_hardware_power::PowerElementConfiguration& src);
+  static zx::result<PowerElementConfiguration> FromFidl(
+      const fuchsia_hardware_power::wire::PowerElementConfiguration& src);
+
   PowerElement element;
   std::vector<PowerDependency> dependencies;
 };

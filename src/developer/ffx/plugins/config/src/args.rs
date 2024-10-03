@@ -58,7 +58,6 @@ impl SetCommand {
         ConfigQuery::new(
             Some(self.name.as_str()),
             Some(self.level),
-            self.build_dir.as_deref().map(|dir| dir.into()),
             SelectMode::default(),
             Some(ctx),
         )
@@ -112,13 +111,7 @@ pub struct GetCommand {
 
 impl GetCommand {
     pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
-        ConfigQuery::new(
-            self.name.as_deref(),
-            None,
-            self.build_dir.as_deref().map(|dir| dir.into()),
-            self.select,
-            Some(ctx),
-        )
+        ConfigQuery::new(self.name.as_deref(), None, self.select, Some(ctx))
     }
 }
 
@@ -152,7 +145,6 @@ impl RemoveCommand {
         ConfigQuery::new(
             Some(self.name.as_str()),
             Some(self.level),
-            self.build_dir.as_deref().map(|dir| dir.into()),
             SelectMode::default(),
             Some(ctx),
         )
@@ -194,7 +186,6 @@ impl AddCommand {
         ConfigQuery::new(
             Some(self.name.as_str()),
             Some(self.level),
-            self.build_dir.as_deref().map(|dir| dir.into()),
             SelectMode::default(),
             Some(ctx),
         )

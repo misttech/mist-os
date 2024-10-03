@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use fuchsia_zircon::Socket;
+use zx::Socket;
 
 // This program take a startup handle as a socket and write to it.
 fn main() {

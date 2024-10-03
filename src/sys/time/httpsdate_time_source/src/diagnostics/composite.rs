@@ -33,15 +33,15 @@ mod test {
     use super::*;
     use crate::datatypes::{HttpsSample, Phase};
     use crate::diagnostics::FakeDiagnostics;
-    use fuchsia_zircon as zx;
+
     use httpdate_hyper::HttpsDateErrorType;
     use lazy_static::lazy_static;
     use std::sync::Arc;
 
     lazy_static! {
         static ref TEST_SAMPLE: HttpsSample = HttpsSample {
-            utc: zx::MonotonicTime::from_nanos(111_111_111),
-            monotonic: zx::MonotonicTime::from_nanos(222_222_222),
+            utc: zx::MonotonicInstant::from_nanos(111_111_111),
+            monotonic: zx::MonotonicInstant::from_nanos(222_222_222),
             standard_deviation: zx::Duration::from_millis(235),
             final_bound_size: zx::Duration::from_millis(100),
             polls: vec![],

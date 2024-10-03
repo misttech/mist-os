@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon as zx;
-use fuchsia_zircon::sys::zx_time_t;
+
 use std::future::Future;
 use std::os::raw::c_char;
+use zx::sys::zx_time_t;
 
 /// A version of the fidl `DeadlineId` containing unowned data.
 #[derive(Clone, Copy)]
@@ -55,7 +55,7 @@ fn create_named_deadline_rust(deadline: &DeadlineId<'_>, duration: zx::Duration)
         )
     };
     match time_valid {
-        true => zx::MonotonicTime::from_nanos(time).into(),
+        true => zx::MonotonicInstant::from_nanos(time).into(),
         false => fasync::Time::now() + duration,
     }
 }

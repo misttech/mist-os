@@ -6,7 +6,7 @@ use fidl_fuchsia_ui_composition::{ContentId, FlatlandProxy, PresentArgs, Transfo
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fuchsia_trace as ftrace, zx};
 
 pub type FlatlandInstanceId = usize;
 

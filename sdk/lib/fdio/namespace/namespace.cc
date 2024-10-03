@@ -33,14 +33,6 @@ zx_status_t fdio_ns_set_root(fdio_ns_t* ns, fdio_t* io) { return ns->SetRoot(io)
 __BEGIN_CDECLS
 
 __EXPORT
-zx_status_t fdio_ns_connect(fdio_ns_t* ns, const char* path, uint32_t flags, zx_handle_t request) {
-  if (static_cast<fio::wire::OpenFlags>(flags) & fio::wire::OpenFlags::kDescribe) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  return fdio_ns_open(ns, path, flags, request);
-}
-
-__EXPORT
 zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_handle_t request) {
   if (path == nullptr) {
     return ZX_ERR_INVALID_ARGS;
@@ -51,7 +43,8 @@ zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_han
     return ZX_ERR_BAD_PATH;
   }
   auto remote = fidl::ServerEnd<fio::Node>(zx::channel(request));
-  return ns->ConnectDeprecated(clean, static_cast<fio::wire::OpenFlags>(flags), std::move(remote));
+  return ns->OpenRemoteDeprecated(clean, static_cast<fio::wire::OpenFlags>(flags),
+                                  std::move(remote));
 }
 
 __EXPORT
@@ -64,7 +57,7 @@ zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_ha
   if (!fdio_internal::CleanPath(path, &clean, &is_dir)) {
     return ZX_ERR_BAD_PATH;
   }
-  return ns->Connect(clean, static_cast<fio::wire::Flags>(flags), zx::channel(request));
+  return ns->OpenRemote(clean, static_cast<fio::Flags>(flags), zx::channel(request));
 }
 
 __EXPORT

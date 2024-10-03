@@ -26,11 +26,11 @@ use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_trace::{duration, instant};
-use fuchsia_zircon::{self as zx, Event, HandleBased, MonotonicTime, Signals};
 use futures::channel::mpsc::UnboundedSender;
 use futures::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use zx::{self as zx, Event, HandleBased, MonotonicInstant, Signals};
 
 fn setup_handle_flatland_events(
     event_stream: flatland::FlatlandEventStream,
@@ -234,7 +234,7 @@ impl FlatlandViewStrategy {
         // Flatland session within Scenic.
         {
             use fidl::endpoints::Proxy;
-            use fuchsia_zircon::AsHandleRef;
+            use zx::AsHandleRef;
 
             let koid = flatland.as_channel().get_koid().unwrap().raw_koid();
             instant!(
@@ -488,7 +488,7 @@ impl FlatlandViewStrategy {
         image_id: ImageId,
         image_index: u32,
         app_sender: UnboundedSender<MessageInternal>,
-        presentation_time: MonotonicTime,
+        presentation_time: MonotonicInstant,
     ) -> ViewAssistantContext {
         ViewAssistantContext {
             key: view_details.key,
@@ -515,7 +515,7 @@ impl FlatlandViewStrategy {
             image_id,
             image_index,
             app_sender,
-            MonotonicTime::get(),
+            MonotonicInstant::get(),
         )
     }
 
@@ -595,7 +595,7 @@ impl FlatlandViewStrategy {
                 available,
                 *available_index,
                 self.app_sender.clone(),
-                MonotonicTime::from_nanos(presentation_time.presentation_time),
+                MonotonicInstant::from_nanos(presentation_time.presentation_time),
             );
             let buffer_ready_event = Event::create();
             view_assistant

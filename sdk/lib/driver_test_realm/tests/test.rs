@@ -16,7 +16,7 @@ use vfs::service;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 async fn get_driver_info(

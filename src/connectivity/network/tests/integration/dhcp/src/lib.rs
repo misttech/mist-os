@@ -14,7 +14,6 @@ use dhcpv4::protocol::IntoFidlExt as _;
 use fidl_fuchsia_net_ext::{self as fnet_ext, FromExt as _, IntoExt as _};
 use fuchsia_async::net::DatagramSocket;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon_types::zx_time_t;
 use futures::future::TryFutureExt as _;
 use futures::stream::{self, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_mac, net_subnet_v4};
@@ -33,10 +32,11 @@ use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use sockaddr::{IntoSockAddr as _, TryToSockaddrLl as _};
 use test_case::test_case;
+use zx_types::zx_time_t;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
 };
 
 const DEFAULT_NETWORK_NAME: &str = "net1";

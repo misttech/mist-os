@@ -22,7 +22,7 @@ use log_formatter::{
 use log_utils::log_formatter::BootTimeAccessor;
 use log_utils::{LogCommand, LogSubCommand};
 use std::io::Write;
-use {fuchsia_zircon as zx, log_command as log_utils};
+use {log_command as log_utils, zx};
 
 /// Target-side symbolizer implementation.
 /// Does nothing as no symbols are available on the target.
@@ -43,7 +43,7 @@ impl Symbolize for Symbolizer {
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+    let (sender, receiver) = zx::Socket::create_stream();
     let proxy = connect_to_protocol::<ArchiveAccessorMarker>().unwrap();
     let realm_proxy =
         connect_to_protocol_at_path::<RealmQueryMarker>("/svc/fuchsia.sys2.RealmQuery.root")
@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
         .await
         .unwrap();
     let boot_ts = Timestamp::from_nanos(
-        fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicTime::get().into_nanos(),
+        fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicInstant::get().into_nanos(),
     );
     let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
         &cmd,

@@ -127,7 +127,7 @@ fn handle_suspend_request<SC: StreamController>(
             // If the suspend request couldn't be processed, close the `StreamSuspender` channel and
             // notify the FIDL client.
             trace!("Couldn't suspend stream for {:?}: {:?}", id, e);
-            let _ = stream.control_handle().shutdown_with_epitaph(fuchsia_zircon::Status::INTERNAL);
+            let _ = stream.control_handle().shutdown_with_epitaph(zx::Status::INTERNAL);
             let _ = responder.send();
             return None;
         }
@@ -419,8 +419,7 @@ mod tests {
         let mut event_stream = client.take_event_stream();
         match event_stream.next().await {
             Some(Err(fidl::Error::ClientChannelClosed {
-                status: fuchsia_zircon::Status::INTERNAL,
-                ..
+                status: zx::Status::INTERNAL, ..
             })) => {}
             x => panic!("Expected ready with INTERNAL error but got: {:?}", x),
         }

@@ -15,11 +15,11 @@ use fidl_fuchsia_settings::{
 use fuchsia_component::server::{ServiceFsDir, ServiceObj};
 use serde::Deserialize;
 
-impl From<Error> for fuchsia_zircon::Status {
-    fn from(error: Error) -> fuchsia_zircon::Status {
+impl From<Error> for zx::Status {
+    fn from(error: Error) -> zx::Status {
         match error {
-            Error::UnhandledType(_) => fuchsia_zircon::Status::UNAVAILABLE,
-            _ => fuchsia_zircon::Status::INTERNAL,
+            Error::UnhandledType(_) => zx::Status::UNAVAILABLE,
+            _ => zx::Status::INTERNAL,
         }
     }
 }

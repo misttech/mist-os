@@ -15,7 +15,7 @@ use core::ptr::{addr_of_mut, null_mut, NonNull};
 use core::task::Context;
 use std::sync::{Arc, Mutex};
 
-use fuchsia_zircon::Status;
+use zx::Status;
 
 use futures::future::{BoxFuture, FutureExt};
 use futures::task::{waker_ref, ArcWake};
@@ -581,7 +581,7 @@ pub(crate) mod test {
         mut tx: async_mpsc::Sender<u8>,
         mut rx: async_mpsc::Receiver<u8>,
     ) {
-        use fuchsia_zircon::Duration;
+        use zx::Duration;
         println!("starting pong!");
         while let Some(next) = rx.next().await {
             println!("pong! {next}");

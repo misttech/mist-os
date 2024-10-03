@@ -17,9 +17,9 @@ use carnelian::{
 };
 use euclid::default::{Point2D, Rect};
 use euclid::{point2, size2};
-use fuchsia_zircon::{AsHandleRef, Event, Signals};
 use std::collections::BTreeMap;
 use std::fs::File;
+use zx::{AsHandleRef, Event, Signals};
 
 const WHITE_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 

@@ -7,7 +7,7 @@ use display_utils::{Image, ImageId};
 use fuchsia_image_format::{
     image_format_minimum_row_bytes_2, image_format_stride_bytes_per_width_pixel_2,
 };
-use fuchsia_zircon as zx;
+
 use mapped_vmo::Mapping;
 use std::cmp::min;
 

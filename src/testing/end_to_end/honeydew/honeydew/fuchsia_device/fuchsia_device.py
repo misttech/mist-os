@@ -9,6 +9,7 @@ import logging
 import os
 from collections.abc import Callable
 from datetime import datetime
+from functools import cached_property
 from typing import Any
 
 import fidl.fuchsia_buildinfo as f_buildinfo
@@ -24,6 +25,7 @@ from honeydew import errors
 from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
+from honeydew.affordances.fuchsia_controller import location as location_fc
 from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
@@ -92,7 +94,9 @@ from honeydew.transports import (
 )
 from honeydew.transports import serial_using_unix_socket
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import bluetooth as bluetooth_types
 from honeydew.typing import custom_types
+from honeydew.typing import wlan as wlan_types
 from honeydew.utils import common, properties
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
@@ -181,7 +185,6 @@ class FuchsiaDevice(
         self,
         device_info: custom_types.DeviceInfo,
         ffx_config: custom_types.FFXConfig,
-        transport: custom_types.TRANSPORT,
         # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
         config: dict[str, Any] | None = None,
     ) -> None:
@@ -190,8 +193,6 @@ class FuchsiaDevice(
         self._device_info: custom_types.DeviceInfo = device_info
 
         self._ffx_config: custom_types.FFXConfig = ffx_config
-
-        self._transport: custom_types.TRANSPORT = transport
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
         self._on_device_close_fns: list[Callable[[], None]] = []
@@ -474,8 +475,8 @@ class FuchsiaDevice(
             bluetooth_avrcp.BluetoothAvrcp object
         """
         if (
-            self._transport
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+            self._get_bluetooth_affordances_implementation()
+            == bluetooth_types.Implementation.SL4F
         ):
             return bluetooth_avrcp_sl4f.BluetoothAvrcp(
                 device_name=self.device_name,
@@ -505,8 +506,8 @@ class FuchsiaDevice(
             bluetooth_gap.BluetoothGap object
         """
         if (
-            self._transport
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+            self._get_bluetooth_affordances_implementation()
+            == bluetooth_types.Implementation.SL4F
         ):
             return bluetooth_gap_sl4f.BluetoothGap(
                 device_name=self.device_name,
@@ -528,11 +529,12 @@ class FuchsiaDevice(
             wlan_policy.WlanPolicy object
         """
         if (
-            self._transport
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+            self._get_wlan_affordances_implementation()
+            == wlan_types.Implementation.SL4F
         ):
             return wlan_policy_sl4f.WlanPolicy(
-                device_name=self.device_name, sl4f=self.sl4f
+                device_name=self.device_name,
+                sl4f=self.sl4f,
             )
         else:
             return wlan_policy_fc.WlanPolicy(
@@ -551,8 +553,8 @@ class FuchsiaDevice(
             wlan.Wlan object
         """
         if (
-            self._transport
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
+            self._get_wlan_affordances_implementation()
+            == wlan_types.Implementation.SL4F
         ):
             return wlan_sl4f.Wlan(device_name=self.device_name, sl4f=self.sl4f)
         else:
@@ -561,6 +563,7 @@ class FuchsiaDevice(
                 ffx=self.ffx,
                 fuchsia_controller=self.fuchsia_controller,
                 reboot_affordance=self,
+                fuchsia_device_close=self,
             )
 
     @properties.Affordance
@@ -589,6 +592,20 @@ class FuchsiaDevice(
             reboot_affordance=self,
         )
 
+    @properties.Affordance
+    def location(self) -> location_fc.Location:
+        """Returns a location affordance object.
+
+        Returns:
+            location.Location object
+        """
+        return location_fc.Location(
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
+
     # List all the public methods
     def close(self) -> None:
         """Clean up method."""
@@ -606,10 +623,7 @@ class FuchsiaDevice(
         # Note - FFX need to be invoked first before FC as FC depends on the daemon that will be created by FFX
         self.ffx.check_connection()
         self.fuchsia_controller.check_connection()
-        if (
-            self._transport
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
-        ):
+        if self._is_sl4f_needed:
             self.sl4f.check_connection()
 
     def log_message_to_device(
@@ -637,10 +651,7 @@ class FuchsiaDevice(
             errors.Sl4FError: On communications failure.
         """
         # Restart the SL4F server on device boot up.
-        if (
-            self._transport
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED
-        ):
+        if self._is_sl4f_needed:
             common.retry(fn=self.sl4f.start_server, wait_time=5)
 
         # Create a new Fuchsia controller context for new device connection.
@@ -1026,3 +1037,86 @@ class FuchsiaDevice(
                 "get_snapshot() failed"
             ) from status
         return self._read_snapshot_from_channel(channel_client)
+
+    def _get_bluetooth_affordances_implementation(
+        self,
+        should_exist: bool = True,
+    ) -> bluetooth_types.Implementation | None:
+        """Parses the bluetooth affordance config information and returns which bluetooth
+        implementation to use.
+
+        Returns:
+            bluetooth_types.Implementation
+
+        Raises:
+            errors.ConfigError: If bluetooth affordance implementation detail is missing or not valid.
+        """
+        if self._config is None:
+            return None
+
+        bluetooth_affordance_implementation: str | None = common.read_from_dict(
+            self._config,
+            key_path=("affordances", "bluetooth", "implementation"),
+            should_exist=should_exist,
+        )
+        if bluetooth_affordance_implementation is None:
+            return None
+
+        try:
+            return bluetooth_types.Implementation(
+                bluetooth_affordance_implementation
+            )
+        except ValueError as err:
+            raise errors.ConfigError(
+                f"Invalid value passed in config['affordances']['bluetooth']['implementation]. "
+                f"Valid values are: {list(map(str, bluetooth_types.Implementation))}"
+            ) from err
+
+    def _get_wlan_affordances_implementation(
+        self,
+        should_exist: bool = True,
+    ) -> wlan_types.Implementation | None:
+        """Parses the WLAN affordance config information and returns which WLAN implementation to use.
+
+        Returns:
+            wlan_types.Implementation
+
+        Raises:
+            ValueError: If wlan affordance implementation detail is missing or not valid.
+        """
+        if self._config is None:
+            return None
+
+        wlan_affordance_implementation: str | None = common.read_from_dict(
+            self._config,
+            key_path=("affordances", "wlan", "implementation"),
+            should_exist=should_exist,
+        )
+        if wlan_affordance_implementation is None:
+            return None
+
+        try:
+            return wlan_types.Implementation(wlan_affordance_implementation)
+        except ValueError as err:
+            raise ValueError(
+                f"Invalid value passed in config['affordances']['wlan']['implementation]. "
+                f"Valid values are: {list(map(str, wlan_types.Implementation))}"
+            ) from err
+
+    @cached_property
+    def _is_sl4f_needed(self) -> bool:
+        """Returns whether or not SL4F will be used.
+
+        Returns:
+            True if SL4F is needed. False, otherwise.
+        """
+        if (
+            self._get_wlan_affordances_implementation(should_exist=False)
+            == wlan_types.Implementation.SL4F
+            or self._get_bluetooth_affordances_implementation(
+                should_exist=False
+            )
+            == bluetooth_types.Implementation.SL4F
+        ):
+            return True
+        return False

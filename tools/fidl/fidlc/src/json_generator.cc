@@ -91,6 +91,17 @@ void JSONGenerator::Generate(Openness value) {
   }
 }
 
+void JSONGenerator::Generate(TransportSide value) {
+  switch (value) {
+    case TransportSide::kClient:
+      EmitString("client");
+      break;
+    case TransportSide::kServer:
+      EmitString("server");
+      break;
+  }
+}
+
 void JSONGenerator::Generate(const RawIdentifier& value) { EmitString(value.span().data()); }
 
 void JSONGenerator::Generate(const LiteralConstant& value) {
@@ -127,7 +138,9 @@ void JSONGenerator::Generate(const Constant& value) {
 
 void JSONGenerator::Generate(const Type* value) {
   GenerateObject([&]() {
+    // TODO(https://fxbug.dev/42149402): Delete KindV1.
     GenerateObjectMember("kind", NameTypeKind(value), Position::kFirst);
+    GenerateObjectMember("kind_v2", NameTypeKindV2(value));
 
     switch (value->kind) {
       case Type::Kind::kBox: {
@@ -184,17 +197,25 @@ void JSONGenerator::Generate(const Type* value) {
         GenerateObjectMember("nullable", type->nullability);
         break;
       }
-      // We treat client_end the same as an IdentifierType of a protocol to avoid changing
-      // the JSON IR.
-      // TODO(https://fxbug.dev/42149402): clean up client/server end representation in the IR
       case Type::Kind::kTransportSide: {
         const auto* type = static_cast<const TransportSideType*>(value);
-        // This code path should only apply to client ends. The server end code
-        // path is colocated with the parameterized types.
-        ZX_ASSERT(type->end == TransportSide::kClient);
-        GenerateObjectMember("identifier", type->protocol_decl->name);
+
+        GenerateObjectMember("role", type->end);
+        GenerateObjectMember("protocol", type->protocol_decl->name);
         GenerateObjectMember("nullable", type->nullability);
         GenerateObjectMember("protocol_transport", type->protocol_transport);
+
+        // TODO(https://fxbug.dev/42149402): This is for compatibility with
+        // backends that use "identifier" and "request" kinds to represent
+        // endpoints. Delete this once they've been updated.
+        switch (type->end) {
+          case TransportSide::kClient:
+            GenerateObjectMember("identifier", type->protocol_decl->name);
+            break;
+          case TransportSide::kServer:
+            GenerateObjectMember("subtype", type->protocol_decl->name);
+            break;
+        }
         break;
       }
       case Type::Kind::kZxExperimentalPointer: {
@@ -425,20 +446,11 @@ void JSONGenerator::GenerateTypeAndFromAlias(const TypeConstructor* value, Posit
   GenerateTypeAndFromAlias(TypeKind::kConcrete, value, position);
 }
 
-bool ShouldExposeAliasOfParametrizedType(const Type& type) {
-  bool is_server_end = false;
-  if (type.kind == Type::Kind::kTransportSide) {
-    const auto* transport_side = static_cast<const TransportSideType*>(&type);
-    is_server_end = transport_side->end == TransportSide::kServer;
-  }
-  return type.kind == Type::Kind::kArray || type.kind == Type::Kind::kVector || is_server_end;
-}
-
 void JSONGenerator::GenerateTypeAndFromAlias(TypeKind parent_type_kind,
                                              const TypeConstructor* value, Position position) {
   const auto* type = value->type;
   const auto& invocation = value->resolved_params;
-  if (ShouldExposeAliasOfParametrizedType(*type)) {
+  if (type->kind == Type::Kind::kArray || type->kind == Type::Kind::kVector) {
     if (invocation.from_alias) {
       GenerateParameterizedType(parent_type_kind, type,
                                 invocation.from_alias->partial_type_ctor.get(), position);
@@ -486,7 +498,9 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
   GenerateObjectPunctuation(position);
   EmitObjectKey(key);
   GenerateObject([&]() {
+    // TODO(https://fxbug.dev/42149402): Delete KindV1.
     GenerateObjectMember("kind", NameTypeKind(type), Position::kFirst);
+    GenerateObjectMember("kind_v2", NameTypeKind(type));
 
     switch (type->kind) {
       case Type::Kind::kArray: {
@@ -505,20 +519,6 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
         GenerateObjectMember("nullable", vector_type->nullability);
         break;
       }
-      case Type::Kind::kTransportSide: {
-        const auto* server_end = static_cast<const TransportSideType*>(type);
-        // This code path should only apply to server ends. The client end code
-        // path is colocated with the identifier type code for protocols.
-        ZX_ASSERT(server_end->end == TransportSide::kServer);
-        GenerateObjectMember("subtype", server_end->protocol_decl->name);
-        // We don't need to call GenerateExperimentalMaybeFromAlias here like we
-        // do above because we're guaranteed that the protocol constraint didn't come
-        // from an alias: in the new syntax, protocols aren't types, and therefore
-        // `alias Foo = MyProtocol;` is not allowed.
-        GenerateObjectMember("nullable", server_end->nullability);
-        GenerateObjectMember("protocol_transport", server_end->protocol_transport);
-        break;
-      }
       case Type::Kind::kZxExperimentalPointer: {
         GenerateTypeAndFromAlias(TypeKind::kParameterized, invocation.element_type_raw);
         break;
@@ -528,6 +528,7 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
       case Type::Kind::kPrimitive:
       case Type::Kind::kBox:
       case Type::Kind::kHandle:
+      case Type::Kind::kTransportSide:
       case Type::Kind::kUntypedNumeric:
         ZX_PANIC("unexpected kind");
       case Type::Kind::kInternal: {

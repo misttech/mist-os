@@ -24,8 +24,7 @@ use std::pin::pin;
 use test_case::test_case;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_async as fasync, zx,
 };
 
 const MAC: net_types::ethernet::Mac = net_declare::net_mac!("00:00:00:00:00:01");
@@ -182,7 +181,7 @@ async fn create_test_realm<'a, N: Netstack>(
 
     let server_realm: netemul::TestRealm<'_> = sandbox
         .create_netstack_realm_with::<N, _, _>(
-            "server-realm",
+            format!("server-realm-{name}"),
             &[KnownServiceProvider::DhcpServer { persistent: false }],
         )
         .expect("create realm should succeed");

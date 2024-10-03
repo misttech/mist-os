@@ -8,10 +8,10 @@
 /// dynamic rewrite rules have been disabled.
 use {
     fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig},
-    fuchsia_zircon::Status,
     lib::{
         get_rules, mock_filesystem, DirOrProxy, EnableDynamicConfig, MountsBuilder, TestEnvBuilder,
     },
+    zx::Status,
 };
 
 fn make_rule_config(rule: &Rule) -> RuleConfig {

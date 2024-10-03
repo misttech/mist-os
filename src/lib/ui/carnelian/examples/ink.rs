@@ -13,13 +13,13 @@ use carnelian::{
 use euclid::default::{Rect, Transform2D, Vector2D};
 use euclid::{point2, size2, vec2, Angle};
 use fuchsia_trace::duration;
-use fuchsia_zircon::{self as zx, AsHandleRef, Event, MonotonicTime, Signals};
 use itertools::izip;
 use rand::{thread_rng, Rng};
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::Range;
 use std::time::Duration;
 use std::{f32, fs};
+use zx::{self as zx, AsHandleRef, Event, MonotonicInstant, Signals};
 use {fidl_fuchsia_hardware_hidbus as hidbus, fidl_fuchsia_hardware_input as hid};
 
 const BACKGROUND_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
@@ -892,7 +892,7 @@ impl StylusDevice {
                 vendor_id: Some(0x00002d1f),
                 product_id: Some(product_id),
                 ..
-            })) = device.query(zx::MonotonicTime::INFINITE)
+            })) = device.query(zx::MonotonicInstant::INFINITE)
             {
                 // Paradise
                 if product_id == 0x00005143 {
@@ -923,7 +923,7 @@ impl StylusDevice {
 
     fn get_events(&mut self) -> Result<Vec<Stylus>, Error> {
         let mut stylus_events = Vec::<Stylus>::new();
-        let reports = self.device.read_reports(zx::MonotonicTime::INFINITE)?;
+        let reports = self.device.read_reports(zx::MonotonicInstant::INFINITE)?;
         let reports = reports.map_err(zx::Status::from_raw)?;
         let mut report_index = 0;
         while report_index < reports.len() {
@@ -955,7 +955,7 @@ struct Ink {
     last_stylus_y: u16,
     last_stylus_point: Option<Point>,
     flower: Option<Flower>,
-    flower_start: MonotonicTime,
+    flower_start: MonotonicInstant,
     color: usize,
     pencil: usize,
     pan_origin: Vector2D<f32>,
@@ -977,8 +977,8 @@ impl Ink {
         scene.select_tools(&vec![color, COLORS.len() + pencil]);
 
         let stylus_device = StylusDevice::create().ok();
-        let flower_start = MonotonicTime::from_nanos(
-            MonotonicTime::get()
+        let flower_start = MonotonicInstant::from_nanos(
+            MonotonicInstant::get()
                 .into_nanos()
                 .saturating_add(zx::Duration::from_seconds(FLOWER_DELAY_SECONDS).into_nanos()),
         );
@@ -1010,7 +1010,7 @@ impl Ink {
     ) -> Result<(), Error> {
         duration!(c"gfx", c"update");
 
-        let time_now = MonotonicTime::get();
+        let time_now = MonotonicInstant::get();
         let size = &context.size;
         let mut full_damage = false;
 
@@ -1109,7 +1109,7 @@ impl Ink {
             let distance = (origin - self.clear_origin).length();
             if distance >= MIN_CLEAR_SWIPE_DISTANCE {
                 self.flower_start =
-                    MonotonicTime::from_nanos(time_now.into_nanos().saturating_add(
+                    MonotonicInstant::from_nanos(time_now.into_nanos().saturating_add(
                         zx::Duration::from_seconds(FLOWER_DELAY_SECONDS).into_nanos(),
                     ));
                 self.flower = None;
@@ -1158,7 +1158,7 @@ impl Ink {
                                     self.last_stylus_point = Some(point);
                                 }
                                 // Disable flower demo.
-                                self.flower_start = zx::MonotonicTime::INFINITE;
+                                self.flower_start = zx::MonotonicInstant::INFINITE;
                                 self.flower = None;
                             }
                         }
@@ -1210,7 +1210,7 @@ impl Ink {
                 self.flower_start = if self.scene.strokes.len() < MAX_STROKES {
                     time_now
                 } else {
-                    zx::MonotonicTime::INFINITE
+                    zx::MonotonicInstant::INFINITE
                 };
             } else {
                 self.flower = Some(flower);

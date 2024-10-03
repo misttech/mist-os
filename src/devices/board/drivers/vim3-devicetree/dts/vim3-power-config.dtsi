@@ -130,34 +130,10 @@
 				};
 				on-level {
 					level = <1>;
-					level-dependencies = <&sag_execution_handling 2>;
 					level-transition-table {
 						transition-to-off {
 							target-level = <0>;
 							latency-us = <200>;
-						};
-					};
-				};
-			};
-		};
-		aml-sdmmc-system-wake-on-request-element {
-			power-levels {
-				off-level {
-					level = <0>;
-					level-transition-table {
-						transition-to-on {
-							target-level = <1>;
-							latency-us = <0>;
-						};
-					};
-				};
-				on-level {
-					level = <1>;
-					level-dependencies = <&sag_wake_active 1>;
-					level-transition-table {
-						transition-to-off {
-							target-level = <0>;
-							latency-us = <0>;
 						};
 					};
 				};

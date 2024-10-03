@@ -24,10 +24,10 @@ rustc_binary("bin") {
   deps = [
     ":config",
     "//examples/fidl/new/key_value_store/support_exports/fidl:examples.keyvaluestore.supportexports_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 }

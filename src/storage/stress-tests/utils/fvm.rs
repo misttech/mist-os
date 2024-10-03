@@ -4,12 +4,12 @@
 
 use fidl_fuchsia_hardware_block_volume::VolumeManagerProxy;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{AsHandleRef, Rights, Status, Vmo};
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
 use std::path::PathBuf;
 use storage_isolated_driver_manager::{
     create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
 };
+use zx::{AsHandleRef, Rights, Status, Vmo};
 
 pub use storage_isolated_driver_manager::Guid;
 

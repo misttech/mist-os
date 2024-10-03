@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx};
 use virtio_device::mem::{DeviceRange, DriverMem, DriverRange};
 use virtio_device::queue::QueueMemory;
 use virtio_device::ring;
@@ -111,7 +110,7 @@ pub fn translate_queue<'a, M: DriverMem>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon as zx;
+
     #[test]
     fn test_translate() -> Result<(), anyhow::Error> {
         let size = zx::system_get_page_size() as usize * 1024;

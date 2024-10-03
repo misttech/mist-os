@@ -19,7 +19,6 @@ use fuchsia_pkg_testing::{
 };
 use fuchsia_sync::Mutex;
 use fuchsia_url::AbsoluteComponentUrl;
-use fuchsia_zircon::Status;
 use futures::prelude::*;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
@@ -33,6 +32,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
+use zx::Status;
 use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_paver as paver,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,

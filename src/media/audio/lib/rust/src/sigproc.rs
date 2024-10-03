@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc,
-    fuchsia_zircon_types as zx_types,
-};
+use {fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, zx_types};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Topology {

@@ -27,7 +27,7 @@ use std::sync::LazyLock;
 use std::time::Instant;
 use tracing::{debug, error, info};
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
-use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, zx};
 
 // Ensure that only a single operation is running at a time.
 // Running multiple tests in parallel will give noisy benchmark results.

@@ -463,12 +463,13 @@ mod test {
     #[cfg(target_os = "fuchsia")]
     use {
         fidl::endpoints::ServerEnd,
-        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        fidl_fuchsia_io as fio,
         futures::future::join3,
         vfs::{
             directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, pseudo_directory,
         },
+        zx,
     };
 
     // TODO(https://fxbug.dev/42180532): add unit tests for suite artifacts too.
@@ -828,7 +829,7 @@ mod test {
         let (debug_client, debug_service) =
             fidl::endpoints::create_endpoints::<ftest_manager::DebugDataIteratorMarker>();
         let debug_data_fut = async move {
-            let (client, server) = fuchsia_zircon::Socket::create_stream();
+            let (client, server) = zx::Socket::create_stream();
             let _ = server.write(b"Not a real profile").unwrap();
             let mut service = debug_service.into_stream().unwrap();
             let mut data = vec![ftest_manager::DebugData {

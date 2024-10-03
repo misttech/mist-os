@@ -222,6 +222,9 @@ class NetworkDeviceTests : public zxtest::Test,
   void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
     ADD_FAILURE("Snoop should never be called, only auto snoop expected");
   }
+  void NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {
+    ADD_FAILURE("DelegateRxLease should never be called");
+  }
 
   struct CompleteRx {
     buffer_metadata_t meta;

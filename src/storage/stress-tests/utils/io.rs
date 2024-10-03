@@ -6,9 +6,9 @@ use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::*;
 use fuchsia_fs::file::*;
 use fuchsia_fs::node::OpenError;
-use fuchsia_zircon::{Event, Status};
 use std::path::Path;
 use tracing::debug;
+use zx::{Event, Status};
 
 // A convenience wrapper over a FIDL DirectoryProxy.
 // Functions of this struct do not tolerate FIDL errors and will panic when they encounter them.

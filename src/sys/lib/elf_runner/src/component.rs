@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_component_runner::ComponentControllerOnEscrowRequest;
 use fidl_fuchsia_process_lifecycle::{LifecycleEvent, LifecycleProxy};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task};
 use futures::future::{join_all, BoxFuture, FutureExt};
 use futures::stream::BoxStream;
 use futures::StreamExt;
@@ -18,6 +17,7 @@ use runner::component::Controllable;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use tracing::{error, warn};
+use zx::{self as zx, AsHandleRef, HandleBased, Process, Task};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Immutable information about the component.

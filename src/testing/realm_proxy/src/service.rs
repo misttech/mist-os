@@ -6,7 +6,7 @@ use anyhow::{Context, Error, Result};
 use fidl::endpoints;
 use fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream};
 use fuchsia_component_test::RealmInstance;
-use fuchsia_zircon::{self as zx};
+
 use futures::{Future, StreamExt, TryStreamExt};
 use tracing::{debug, error, warn};
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};

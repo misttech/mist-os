@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 #[async_trait]
@@ -53,6 +53,10 @@ impl DeviceMonitorIfaceManager {
         >()
         .context("failed to connect to device monitor")?;
         Ok(Self { monitor_svc, ifaces: Mutex::new(HashMap::new()) })
+    }
+
+    pub fn clone_device_monitor_svc(&self) -> fidl_device_service::DeviceMonitorProxy {
+        self.monitor_svc.clone()
     }
 }
 

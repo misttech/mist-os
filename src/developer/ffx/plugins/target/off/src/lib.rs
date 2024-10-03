@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use ffx_off_args::OffCommand;
 use fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
-use fuchsia_zircon_status as zx;
+use zx_status as zx;
 
 #[derive(FfxTool)]
 pub struct OffTool {

@@ -6,7 +6,7 @@ use crate::flags::Rights;
 use fidl::endpoints::create_proxy;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test, zx,
 };
 
 /// Helper struct for connecting to an io1 test harness and running a conformance test on it.
@@ -131,7 +131,7 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
         .open_exposed_dir(
             &child_ref,
             fidl::endpoints::ServerEnd::<fio::DirectoryMarker>::new(server),
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         )
         .expect("FIDL error when binding to child in Realm")
         .expect("Cannot bind to test harness child in Realm");

@@ -27,7 +27,7 @@ use lazy_static::lazy_static;
 use maplit::hashmap;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fuchsia_trace as ftrace, zx};
 
 /// The vendor ID denoting the internal Chromebook keyboard.
 const VENDOR_ID: u32 = 0x18d1; // Google
@@ -95,7 +95,7 @@ struct Inner {
     /// The minimum timestamp that is still larger than the last observed
     /// timestamp (i.e. last + 1ns). Used to generate monotonically increasing
     /// timestamps for generated events.
-    next_event_time: zx::MonotonicTime,
+    next_event_time: zx::MonotonicInstant,
     /// Have any regular (non-remapped) keys been pressed since the actuation
     /// of the Search key?
     regular_keys_pressed: bool,
@@ -156,7 +156,7 @@ impl ChromebookKeyboardHandler {
 
     /// Gets the next event time that is at least as large as event_time, and
     /// larger than last seen time.
-    fn next_event_time(self: &Rc<Self>, event_time: zx::MonotonicTime) -> zx::MonotonicTime {
+    fn next_event_time(self: &Rc<Self>, event_time: zx::MonotonicInstant) -> zx::MonotonicInstant {
         let proposed = self.state.borrow().next_event_time;
         let returned = if event_time < proposed { proposed } else { event_time };
         self.state.borrow_mut().next_event_time = returned + zx::Duration::from_nanos(1);
@@ -204,7 +204,7 @@ impl ChromebookKeyboardHandler {
         event: KeyboardEvent,
         event_type: KeyEventType,
         descriptor: KeyboardDeviceDescriptor,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
         trace_id: Option<ftrace::Id>,
         keys: I,
         mapfn: fn(&KeyPair) -> Key,
@@ -228,7 +228,7 @@ impl ChromebookKeyboardHandler {
         self: &Rc<Self>,
         event: KeyboardEvent,
         device_descriptor: KeyboardDeviceDescriptor,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
         trace_id: Option<ftrace::Id>,
     ) -> Vec<InputEvent> {
         // Remapping happens when search key is *not* actuated. The keyboard
@@ -401,7 +401,7 @@ impl ChromebookKeyboardHandler {
 fn into_unhandled_input_event(
     event: KeyboardEvent,
     device_descriptor: KeyboardDeviceDescriptor,
-    event_time: zx::MonotonicTime,
+    event_time: zx::MonotonicInstant,
     trace_id: Option<ftrace::Id>,
 ) -> InputEvent {
     InputEvent {
@@ -467,7 +467,7 @@ mod tests {
     // created share a descriptor and a handled marker.  The event time is incremented
     // for each event in turn.
     fn new_key_sequence(
-        mut event_time: zx::MonotonicTime,
+        mut event_time: zx::MonotonicInstant,
         descriptor: &InputDeviceDescriptor,
         handled: Handled,
         keys: Vec<(Key, KeyEventType)>,
@@ -486,24 +486,24 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         assert_eq!(
-            zx::MonotonicTime::from_nanos(10),
-            handler.next_event_time(zx::MonotonicTime::from_nanos(10))
+            zx::MonotonicInstant::from_nanos(10),
+            handler.next_event_time(zx::MonotonicInstant::from_nanos(10))
         );
         assert_eq!(
-            zx::MonotonicTime::from_nanos(11),
-            handler.next_event_time(zx::MonotonicTime::from_nanos(10))
+            zx::MonotonicInstant::from_nanos(11),
+            handler.next_event_time(zx::MonotonicInstant::from_nanos(10))
         );
         assert_eq!(
-            zx::MonotonicTime::from_nanos(12),
-            handler.next_event_time(zx::MonotonicTime::from_nanos(10))
+            zx::MonotonicInstant::from_nanos(12),
+            handler.next_event_time(zx::MonotonicInstant::from_nanos(10))
         );
         assert_eq!(
-            zx::MonotonicTime::from_nanos(13),
-            handler.next_event_time(zx::MonotonicTime::from_nanos(13))
+            zx::MonotonicInstant::from_nanos(13),
+            handler.next_event_time(zx::MonotonicInstant::from_nanos(13))
         );
         assert_eq!(
-            zx::MonotonicTime::from_nanos(14),
-            handler.next_event_time(zx::MonotonicTime::from_nanos(13))
+            zx::MonotonicInstant::from_nanos(14),
+            handler.next_event_time(zx::MonotonicInstant::from_nanos(13))
         );
     }
 
@@ -532,14 +532,14 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(input_key, KeyEventType::Pressed), (input_key, KeyEventType::Released)],
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(output_key, KeyEventType::Pressed), (output_key, KeyEventType::Released)],
@@ -566,14 +566,14 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MISMATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(input_key, KeyEventType::Pressed), (input_key, KeyEventType::Released)],
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MISMATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(output_key, KeyEventType::Pressed), (output_key, KeyEventType::Released)],
@@ -593,14 +593,14 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(SEARCH_KEY, KeyEventType::Pressed), (SEARCH_KEY, KeyEventType::Released)],
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(43),
+            zx::MonotonicInstant::from_nanos(43),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(SEARCH_KEY, KeyEventType::Pressed), (SEARCH_KEY, KeyEventType::Released)],
@@ -622,7 +622,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -634,7 +634,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(43),
+            zx::MonotonicInstant::from_nanos(43),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(Key::F1, KeyEventType::Pressed), (Key::F1, KeyEventType::Released)],
@@ -674,7 +674,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -686,7 +686,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(43),
+            zx::MonotonicInstant::from_nanos(43),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![(output_key, KeyEventType::Pressed), (output_key, KeyEventType::Released)],
@@ -706,7 +706,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -718,7 +718,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(43),
+            zx::MonotonicInstant::from_nanos(43),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -745,7 +745,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -757,7 +757,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(43),
+            zx::MonotonicInstant::from_nanos(43),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -783,7 +783,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -797,7 +797,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(43),
+            zx::MonotonicInstant::from_nanos(43),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -822,7 +822,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -834,7 +834,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -866,7 +866,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -880,7 +880,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -918,7 +918,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let handler = ChromebookKeyboardHandler::new(&test_node);
         let input = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -934,7 +934,7 @@ mod tests {
         );
         let actual = run_all_events(&handler, input).await;
         let expected = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![
@@ -981,7 +981,7 @@ mod tests {
         let fake_handlers_node = inspector.root().create_child("input_handlers_node");
         let handler = ChromebookKeyboardHandler::new(&fake_handlers_node);
         let events = new_key_sequence(
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             &MATCHING_KEYBOARD_DESCRIPTOR,
             Handled::No,
             vec![

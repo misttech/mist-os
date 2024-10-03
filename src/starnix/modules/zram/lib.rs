@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
@@ -30,12 +29,13 @@ pub struct ZramDevice {
 
 impl ZramDevice {
     fn get_stats(&self) -> Result<fidl_fuchsia_kernel::MemoryStatsCompression, Errno> {
-        self.kernel_stats.get().get_memory_stats_compression(zx::MonotonicTime::INFINITE).map_err(
-            |e| {
+        self.kernel_stats
+            .get()
+            .get_memory_stats_compression(zx::MonotonicInstant::INFINITE)
+            .map_err(|e| {
                 log_error!("FIDL error getting memory compression stats: {e}");
                 errno!(EIO)
-            },
-        )
+            })
     }
 }
 

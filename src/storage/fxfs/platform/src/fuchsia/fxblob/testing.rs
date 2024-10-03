@@ -10,7 +10,7 @@ use delivery_blob::{CompressionMode, Type1Blob};
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError};
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_merkle::Hash;
-use fuchsia_zircon as zx;
+
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::{DataObjectHandle, HandleOptions, ObjectStore};
 use storage_device::fake_device::FakeDevice;

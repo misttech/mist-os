@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 use zx::Duration;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// [`until_stalled`] wraps a FIDL request stream of type [`RS`] into another
 /// stream yielding the same requests, but could complete prematurely if it
@@ -166,7 +166,7 @@ mod tests {
     use fidl::endpoints::Proxy;
     use fidl::AsHandleRef;
     use futures::{pin_mut, TryStreamExt};
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
     #[fuchsia::test(allow_stalls = false)]
     async fn no_message() {

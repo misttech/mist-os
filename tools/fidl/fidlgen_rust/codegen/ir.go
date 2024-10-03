@@ -588,7 +588,7 @@ func isZirconIdentifier(ci fidlgen.CompoundIdentifier) bool {
 var zirconNames = map[fidlgen.EncodedCompoundIdentifier]string{
 	"zx/Rights":                "fidl::Rights",
 	"zx/ObjType":               "fidl::ObjectType",
-	"zx/CHANNEL_MAX_MSG_BYTES": "fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES",
+	"zx/CHANNEL_MAX_MSG_BYTES": "zx_types::ZX_CHANNEL_MAX_MSG_BYTES",
 }
 
 // compileDeclIdentifier returns a Rust path expression referring to the given
@@ -844,8 +844,14 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.RequestType:
-		s := fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
-		t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+		s := ""
+		if val.ProtocolTransport != "Driver" {
+			s = fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
+			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+		} else {
+			s = fmt.Sprintf("fidl_driver::endpoints::DriverServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
+			t.FidlTemplate = fmt.Sprintf("fidl_driver::encoding::DriverEndpoint<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
+		}
 		t.Owned = s
 		t.Param = s
 		if val.Nullable {
@@ -887,8 +893,14 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 				}
 			}
 		case fidlgen.ProtocolDeclType:
-			s := fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
-			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+			s := ""
+			if val.ProtocolTransport != "Driver" {
+				s = fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
+				t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+			} else {
+				s = fmt.Sprintf("fidl_driver::endpoints::DriverClientEnd<%sMarker>", name)
+				t.FidlTemplate = fmt.Sprintf("fidl_driver::encoding::DriverEndpoint<%sMarker>", name)
+			}
 			t.Owned = s
 			t.Param = s
 			if val.Nullable {
@@ -1833,9 +1845,14 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 	}
 }
 
-func Compile(r fidlgen.Root) Root {
+func Compile(r fidlgen.Root, includeDrivers bool) Root {
 	r = r.ForBindings("rust")
-	r = r.ForTransport("Channel")
+	transports := []string{"Channel"}
+	if includeDrivers {
+		transports = append(transports, "Driver")
+	}
+	r = r.ForTransports(transports)
+
 	root := Root{
 		Experiments: r.Experiments,
 	}

@@ -54,13 +54,25 @@ typedef void (*vfs_internal_release_buffer_t)(void* cookie);
 typedef zx_status_t (*vfs_internal_write_handler_t)(const void* cookie, const char* data,
                                                     size_t len);
 
-// Serve `vnode` using `dispatcher` over `channel` with specified `flags. `channel` must be
-// be protocol compatible with the type of node being served. Takes ownership of `channel` and
-// closes the handle on failure or when `vfs` is destroyed. The same `dispatcher` must be used
-// on subsequent calls to this method for a given `vnode` otherwise returns `ZX_ERR_INVALID_ARGS`.
+// Serve `vnode` using `dispatcher` over `channel` with specified `flags`, where `flags` aligns with
+// fuchsia.io/OpenFlags. `channel` must be protocol compatible with the type of node. Takes
+// ownership of `channel` and closes the handle on failure or when `vfs` is destroyed. The same
+// `dispatcher` must be used on subsequent calls to this method for a given `vnode` otherwise
+// returns `ZX_ERR_INVALID_ARGS`.
+//
 // This function is thread-safe.
 zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode, async_dispatcher_t* dispatcher,
                                     zx_handle_t channel, uint32_t flags);
+
+// Serve `vnode` using `dispatcher` over `channel` with specified `flags`, where `flags` aligns with
+// fuchsia.io/Flags. `channel` must be protocol compatible with the type of node. Takes
+// ownership of `channel` and closes the handle on failure or when `vfs` is destroyed. The same
+// `dispatcher` must be used on subsequent calls to this method for a given `vnode` otherwise
+// returns `ZX_ERR_INVALID_ARGS`.
+//
+// This function is thread-safe.
+zx_status_t vfs_internal_node_serve3(vfs_internal_node_t* vnode, async_dispatcher_t* dispatcher,
+                                     zx_handle_t channel, uint64_t flags);
 
 // Shuts down all active connections being served by `vnode`. This function is thread-safe.
 zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode);

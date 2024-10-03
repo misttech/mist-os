@@ -4,9 +4,6 @@
 
 use inspect_format::{BlockIndex, BlockType, Error as FormatError};
 
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
-
 /// Errors that Inspect API functions can return.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum Error {

@@ -9,9 +9,9 @@ use std::{mem, slice};
 use anyhow::Error;
 use fidl_fuchsia_sysmem2::{BufferCollectionSynchronousProxy, CoherencyDomain};
 use fuchsia_trace::duration;
-use fuchsia_zircon::prelude::*;
-use fuchsia_zircon::{self as zx, sys};
 use mapped_vmo::Mapping;
+use zx::prelude::*;
+use zx::{self as zx, sys};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct FormaImage(pub(crate) usize);
@@ -112,7 +112,7 @@ impl VmoImage {
         index: u32,
     ) -> Self {
         let wait_result = buffer_collection
-            .wait_for_all_buffers_allocated(zx::MonotonicTime::INFINITE)
+            .wait_for_all_buffers_allocated(zx::MonotonicInstant::INFINITE)
             .expect("failed to allocate buffer collection");
         assert!(
             wait_result.is_ok(),

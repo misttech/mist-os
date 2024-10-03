@@ -6,6 +6,7 @@
 
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
+#include "src/developer/debug/zxdb/expr/format_options.h"
 #include "src/developer/debug/zxdb/expr/vector_register_format.h"
 #include "src/lib/files/path.h"
 
@@ -25,6 +26,19 @@ const char* ClientSettings::Target::kSourceMapDescription =
   For example, if zxdb cannot find ./../../zircon/system/ulib/c/Scrt1.cc,
   "set source-map += ./../..=/path/to/fuchsia/checkout" will make zxdb search
   /path/to/fuchsia/checkout/zircon/system/ulib/c/Scrt1.cc instead.)";
+
+const char* ClientSettings::Target::kIntegerFormat = "integer-format";
+const char* ClientSettings::Target::kIntegerFormatDescription =
+    R"(  How to display integers.
+
+  The default way to display integers in commands like "print" and "locals".
+  Explicit options given to those commands will override this setting.
+
+  Possible values:
+
+    dec : Decimal base-10 (default).
+    hex : Hexadecimal base-16.
+    bin : Binary base-2.)";
 
 const char* ClientSettings::Target::kVectorFormat = "vector-format";
 const char* ClientSettings::Target::kVectorFormatDescription =
@@ -61,14 +75,19 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
 
   schema->AddBool(ClientSettings::System::kShowStdout, kShowStdoutDescription, true);
 
-  schema->AddList(ClientSettings::Target::kSourceMap, ClientSettings::Target::kSourceMapDescription,
-                  // TODO(https://fxbug.dev/336868560): Fix the rust toolchain prebuilt to point
-                  // DW_AT_comp_dir to the right place and remove this hack.
-                  {"/b/s/w/ir/x/w/fuchsia-third_party-rust=" + files::GetDirectoryName(GetSelfPath()) +
-                   "/../../../prebuilt/third_party/rust/linux-x64/lib/rustlib/src/rust"});
+  schema->AddList(
+      ClientSettings::Target::kSourceMap, ClientSettings::Target::kSourceMapDescription,
+      // TODO(https://fxbug.dev/336868560): Fix the rust toolchain prebuilt to point
+      // DW_AT_comp_dir to the right place and remove this hack.
+      {"/b/s/w/ir/x/w/fuchsia-third_party-rust=" + files::GetDirectoryName(GetSelfPath()) +
+       "/../../../prebuilt/third_party/rust/linux-x64/lib/rustlib/src/rust"});
 
   schema->AddBool(ClientSettings::Thread::kDebugStepping,
                   ClientSettings::Thread::kDebugSteppingDescription, false);
+
+  schema->AddString(ClientSettings::Target::kIntegerFormat,
+                    ClientSettings::Target::kIntegerFormatDescription, kIntegerFormatDecimal,
+                    {kIntegerFormatDecimal, kIntegerFormatHexadecimal, kIntegerFormatBinary});
 
   schema->AddString(
       ClientSettings::Target::kVectorFormat, ClientSettings::Target::kVectorFormatDescription,

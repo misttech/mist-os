@@ -210,7 +210,7 @@ impl DriverTestRealmInstance for RealmInstance {
             .start(args)
             .await
             .context("DriverTestRealm Start failed")?
-            .map_err(fuchsia_zircon_status::Status::from_raw)
+            .map_err(zx_status::Status::from_raw)
             .context("DriverTestRealm Start failed")?;
         Ok(())
     }

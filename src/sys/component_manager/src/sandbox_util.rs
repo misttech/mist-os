@@ -29,7 +29,7 @@ use vfs::directory::entry::{
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);

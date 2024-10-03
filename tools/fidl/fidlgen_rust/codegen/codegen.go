@@ -28,7 +28,7 @@ func NewGenerator(rustfmtPath, rustfmtConfigPath string) *Generator {
 	})}
 }
 
-func (gen *Generator) GenerateFidl(ir fidlgen.Root, outputFilename string) error {
-	tree := Compile(ir)
+func (gen *Generator) GenerateFidl(ir fidlgen.Root, outputFilename string, includeDrivers bool) error {
+	tree := Compile(ir, includeDrivers)
 	return gen.GenerateFile(outputFilename, "GenerateSourceFile", tree)
 }

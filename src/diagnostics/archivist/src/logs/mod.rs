@@ -26,7 +26,7 @@ mod tests {
     use diagnostics_data::{DROPPED_LABEL, MESSAGE_LABEL, PID_LABEL, TAG_LABEL, TID_LABEL};
     use diagnostics_log_encoding::{Argument, Record, Severity, Value};
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
-    use fuchsia_zircon as zx;
+
     use moniker::ExtendedMoniker;
     use std::sync::Arc;
 

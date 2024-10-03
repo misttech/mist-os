@@ -11,7 +11,7 @@
 #include <initializer_list>
 #include <string_view>
 
-#include "ld-load-tests-base.h"
+#include "ld-load-tests-posix-base.h"
 
 // The in-process here work by doing ELF loading approximately as the system
 // program loader would, but into this process that's running the test.  Once
@@ -26,7 +26,7 @@ namespace ld::testing {
 // On POSIX-like systems this means a canonical stack setup that transfers
 // arguments, environment, and a set of integer key-value pairs called the
 // auxiliary vector (auxv) that carries values important for bootstrapping.
-class LdStartupInProcessTests : public elfldltl::testing::LoadTests<>, public LdLoadTestsBase {
+class LdStartupInProcessTests : public elfldltl::testing::LoadTests<>, public LdLoadTestsPosixBase {
  public:
   static constexpr bool kCanCollectLog = false;
 

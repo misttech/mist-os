@@ -25,7 +25,6 @@ bazel_product_bundle("microfuchsia_eng.${target_cpu}") {
   bazel_recovery_image_target = "//products/zedboot:${target_cpu}"
   bazel_inputs_from_gn = [
     "//build/images/flash:esp.bazel_input",
-    "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
     "//src/tee/ta/noop:ta-noop_for_bazel",
 
@@ -52,7 +51,6 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
         "//products/microfuchsia:microfuchsia_eng.${board}"
     bazel_inputs_from_gn = [
       "//build/images/flash:esp.bazel_input",
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//boards/pkvm:${target_cpu}.bazel_input",
       "//src/tee/ta/noop:ta-noop_for_bazel",
     ]

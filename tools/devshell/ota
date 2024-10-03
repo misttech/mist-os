@@ -40,7 +40,7 @@ function needs-update {
   fi
 
   if ! base_package_merkle=$(fx-command-run jq -e -r "$jq_filter" "$targets_path"); then
-    fx-error "TUF targets metadata does not contain the packge '${base_package}'".
+    fx-error "TUF targets metadata does not contain the package '${base_package}'".
     fx-error "You may need to run 'fx build' to create it."
     return 1
   fi

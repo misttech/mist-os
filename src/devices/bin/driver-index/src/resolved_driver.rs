@@ -59,12 +59,12 @@ impl ResolvedDriver {
         component_url: cm_types::Url,
         resolver: &fresolution::ResolverProxy,
         package_type: DriverPackageType,
-    ) -> Result<ResolvedDriver, fuchsia_zircon::Status> {
+    ) -> Result<ResolvedDriver, zx::Status> {
         let res = resolver
             .resolve(component_url.as_str())
             .map_err(|e| {
                 tracing::warn!("Resolve call failed: {}", e);
-                fuchsia_zircon::Status::INTERNAL
+                zx::Status::INTERNAL
             })
             .await?;
         let resolved_component = res.map_err(|e| {
@@ -73,29 +73,29 @@ impl ResolvedDriver {
         })?;
         let decl_data = resolved_component.decl.ok_or_else(|| {
             tracing::warn!("{}: Missing component decl", component_url);
-            fuchsia_zircon::Status::NOT_FOUND
+            zx::Status::NOT_FOUND
         })?;
         let decl_bytes = mem_util::bytes_from_data(&decl_data).map_err(|e| {
             tracing::warn!("{}: Failed to parse decl data into bytes: {}", component_url, e);
-            fuchsia_zircon::Status::IO
+            zx::Status::IO
         })?;
         let decl: fdecl::Component = fidl::unpersist(&decl_bytes[..]).map_err(|e| {
             tracing::warn!("{}: Failed to parse component decl: {}", component_url, e);
-            fuchsia_zircon::Status::INVALID_ARGS
+            zx::Status::INVALID_ARGS
         })?;
         let package = resolved_component.package.and_then(|p| p.directory).ok_or_else(|| {
             tracing::warn!("{}: Missing package directory", component_url);
-            fuchsia_zircon::Status::NOT_FOUND
+            zx::Status::NOT_FOUND
         })?;
         let proxy = package.into_proxy().map_err(|e| {
             tracing::warn!("Failed to create package proxy: {:?}", e);
-            fuchsia_zircon::Status::INTERNAL
+            zx::Status::INTERNAL
         })?;
         let package_dir = PackageDirectory::from_proxy(proxy);
         #[cfg(not(mistos))]
         let package_hash = package_dir.merkle_root().await.map_err(|e| {
             tracing::warn!("Failed to read package directory's hash: {}", e);
-            fuchsia_zircon::Status::INTERNAL
+            zx::Status::INTERNAL
         })?;
         load_driver(
             component_url,
@@ -109,7 +109,7 @@ impl ResolvedDriver {
         )
         .map_err(|e| {
             tracing::warn!("Could not load driver: {}", e);
-            fuchsia_zircon::Status::INTERNAL
+            zx::Status::INTERNAL
         })
         .await
     }
@@ -291,23 +291,21 @@ fn get_dictionary_string_value(
     None
 }
 
-fn map_resolve_err_to_zx_status(
-    resolve_error: fresolution::ResolverError,
-) -> fuchsia_zircon::Status {
+fn map_resolve_err_to_zx_status(resolve_error: fresolution::ResolverError) -> zx::Status {
     match resolve_error {
-        fresolution::ResolverError::Internal => fuchsia_zircon::Status::INTERNAL,
-        fresolution::ResolverError::NoSpace => fuchsia_zircon::Status::NO_SPACE,
-        fresolution::ResolverError::Io => fuchsia_zircon::Status::IO,
-        fresolution::ResolverError::NotSupported => fuchsia_zircon::Status::NOT_SUPPORTED,
-        fresolution::ResolverError::ResourceUnavailable => fuchsia_zircon::Status::UNAVAILABLE,
+        fresolution::ResolverError::Internal => zx::Status::INTERNAL,
+        fresolution::ResolverError::NoSpace => zx::Status::NO_SPACE,
+        fresolution::ResolverError::Io => zx::Status::IO,
+        fresolution::ResolverError::NotSupported => zx::Status::NOT_SUPPORTED,
+        fresolution::ResolverError::ResourceUnavailable => zx::Status::UNAVAILABLE,
 
         fresolution::ResolverError::PackageNotFound
         | fresolution::ResolverError::ManifestNotFound
         | fresolution::ResolverError::ConfigValuesNotFound
-        | fresolution::ResolverError::AbiRevisionNotFound => fuchsia_zircon::Status::NOT_FOUND,
+        | fresolution::ResolverError::AbiRevisionNotFound => zx::Status::NOT_FOUND,
 
         fresolution::ResolverError::InvalidArgs
         | fresolution::ResolverError::InvalidAbiRevision
-        | fresolution::ResolverError::InvalidManifest => fuchsia_zircon::Status::INVALID_ARGS,
+        | fresolution::ResolverError::InvalidManifest => zx::Status::INVALID_ARGS,
     }
 }

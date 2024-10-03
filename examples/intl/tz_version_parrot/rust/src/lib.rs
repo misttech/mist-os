@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use assert_matches::assert_matches;
-use {fuchsia_zircon as zx, rust_icu_ucal as ucal};
+use {rust_icu_ucal as ucal, zx};
 // [START imports]
 use icu_data::Loader;
 // [END imports]

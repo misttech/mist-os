@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use block_client::BlockClient;
-use fuchsia_zircon as zx;
+
 use hyper::body::Sender;
 use std::cmp::min;
 use std::collections::HashMap;

@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -164,7 +161,7 @@ impl MainProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolEvent, fidl::Error> {
         MainProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -180,7 +177,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_composed(
         &self,
         mut a: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocolpayloads_imported::ImportStructPayload,
@@ -197,7 +194,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_composed_with_error(
         &self,
         mut a: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<
         fidl_test_protocolpayloads_imported::ComposedProtocolTwoWayComposedWithErrorResult,
         fidl::Error,
@@ -226,7 +223,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<(u32, u32), fidl::Error> {
         let _response = self.client.send_query::<LocalStructPayload, LocalStructPayload>(
             (a, b),
@@ -241,7 +238,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
         let _response = self
             .client
@@ -265,7 +262,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_import(
         &self,
         mut a: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocolpayloads_imported::ImportStructPayload,
@@ -282,7 +279,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_import_with_error(
         &self,
         mut a: i32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayImportWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocolpayloads_imported::ImportStructPayload,
@@ -308,7 +305,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<(u32, u32), fidl::Error> {
         let _response = self
             .client
@@ -325,7 +322,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             MainProtocolTwoWayAnonWithErrorRequest,

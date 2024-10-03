@@ -4,6 +4,7 @@
 
 mod natural;
 mod query;
+mod resource_binding;
 mod util;
 mod wire;
 
@@ -11,44 +12,47 @@ use std::collections::HashMap;
 use std::io::{Error, Write};
 
 use self::query::{Properties, Property};
-use crate::ir::{CompIdent, DeclType, Library};
+use crate::ir::{CompIdent, DeclType, Schema};
+
+pub use self::resource_binding::ResourceBindings;
 
 pub struct Config {
     pub emit_debug_impls: bool,
+    pub resource_bindings: ResourceBindings,
 }
 
 pub struct Compiler<'a> {
-    library: &'a Library,
+    schema: &'a Schema,
     config: Config,
     type_to_properties: HashMap<CompIdent, Properties>,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(library: &'a Library, config: Config) -> Self {
-        Self { library, config, type_to_properties: HashMap::new() }
+    pub fn new(schema: &'a Schema, config: Config) -> Self {
+        Self { schema, config, type_to_properties: HashMap::new() }
     }
 
     fn calculate<P: Property>(&mut self, ident: &CompIdent) -> P::Type {
-        match self.library.declarations[ident] {
+        match self.schema.declarations[ident] {
             DeclType::Struct => {
                 let s = self
-                    .library
+                    .schema
                     .struct_declarations
                     .get(ident)
-                    .or_else(|| self.library.external_struct_declarations.get(ident))
+                    .or_else(|| self.schema.external_struct_declarations.get(ident))
                     .expect("undeclared struct");
                 P::calculate_struct(self, s)
             }
             DeclType::Table => {
-                let table = &self.library.table_declarations[ident];
+                let table = &self.schema.table_declarations[ident];
                 P::calculate_table(self, table)
             }
             DeclType::Enum => {
-                let enm = &self.library.enum_declarations[ident];
+                let enm = &self.schema.enum_declarations[ident];
                 P::calculate_enum(self, enm)
             }
             DeclType::Union => {
-                let union = &self.library.union_declarations[ident];
+                let union = &self.schema.union_declarations[ident];
                 P::calculate_union(self, union)
             }
             _ => todo!(),
@@ -84,8 +88,8 @@ impl<'a> Compiler<'a> {
             "#,
         )?;
 
-        for ident in &self.library.declaration_order {
-            match self.library.declarations[ident] {
+        for ident in &self.schema.declaration_order {
+            match self.schema.declarations[ident] {
                 DeclType::Struct => {
                     natural::emit_struct(self, out, ident)?;
                     wire::emit_struct(self, out, ident)?;

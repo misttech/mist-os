@@ -124,16 +124,16 @@ pub mod ip {
     // Re-exported types.
     pub use netstack3_base::{SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
-        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
+        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason, IidSecret,
         IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceConfigurationUpdate,
         Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfiguration,
-        StableIidSecret, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+        TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::multicast_forwarding::{
-        ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastRoute,
-        MulticastRouteKey, MulticastRouteTarget,
+        ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
+        MulticastRoute, MulticastRouteKey, MulticastRouteStats, MulticastRouteTarget,
     };
     pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,
@@ -201,15 +201,15 @@ pub mod tcp {
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        OriginalDestinationError, ReceiveBuffer, RingBuffer, SendBuffer, SetDeviceError,
-        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId,
-        UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        OriginalDestinationError, ReceiveBuffer, SendBuffer, SetDeviceError, SetReuseAddrError,
+        SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId, UnboundInfo,
+        DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use netstack3_base::WorkQueueReport;
+    pub use netstack3_base::{Counter, WorkQueueReport};
 }
 
 /// Methods for dealing with UDP sockets.
@@ -229,7 +229,7 @@ pub use netstack3_base::{
     ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
 };
 pub use state::{StackState, StackStateBuilder};
-pub use time::{Instant, TimerId};
+pub use time::{AtomicInstant, Instant, TimerId};
 
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;

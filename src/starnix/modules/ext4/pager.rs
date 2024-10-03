@@ -7,8 +7,8 @@
 //! pages that should be zeroed.
 
 use fidl::AsHandleRef;
-use fuchsia_zircon::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ};
-use fuchsia_zircon::{self as zx};
+use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ};
+
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::FsStr;
 use starnix_logging::{log_debug, log_error, log_warn};
@@ -130,7 +130,7 @@ impl Pager {
             };
         });
         loop {
-            match self.port.wait(zx::MonotonicTime::INFINITE) {
+            match self.port.wait(zx::MonotonicInstant::INFINITE) {
                 Ok(packet) => {
                     match packet.contents() {
                         zx::PacketContents::Pager(contents)
@@ -428,7 +428,7 @@ impl<'a> SupplyHelper<'a> {
 #[cfg(test)]
 mod tests {
     use super::{Pager, PagerExtent};
-    use fuchsia_zircon as zx;
+
     use starnix_core::testing::*;
     use std::sync::Arc;
     use std::time::Duration;

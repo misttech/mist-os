@@ -41,8 +41,8 @@ class DriverOutputTest : public testing::ThreadingModelFixture {
     PipelineConfig config;
     config.mutable_root().name = "default";
     config.mutable_root().input_streams = {
-        RenderUsage::BACKGROUND,   RenderUsage::MEDIA,         RenderUsage::INTERRUPTION,
-        RenderUsage::SYSTEM_AGENT, RenderUsage::COMMUNICATION,
+        RenderUsage::BACKGROUND, RenderUsage::COMMUNICATION, RenderUsage::INTERRUPTION,
+        RenderUsage::MEDIA,      RenderUsage::SYSTEM_AGENT,
     };
     config.mutable_root().output_rate = kRequestedDeviceRate;
     config.mutable_root().output_channels = kRequestedDeviceChannels / 2;

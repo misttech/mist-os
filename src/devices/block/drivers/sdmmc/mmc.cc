@@ -534,7 +534,6 @@ void SdmmcBlockDevice::MmcSetInspectProperties() {
       root_.CreateUint("max_packed_writes_effective", max_packed_writes_effective_);
   properties_.using_fidl_ = root_.CreateBool("using_fidl", sdmmc_->using_fidl());
   properties_.power_suspended_ = root_.CreateBool("power_suspended", power_suspended_);
-  properties_.wake_on_request_count_ = root_.CreateUint("wake_on_request_count", 0);
 }
 
 }  // namespace sdmmc

@@ -27,6 +27,18 @@
         {
             service: [ "fuchsia.hardware.suspend.SuspendService" ],
         },
+        {
+            config: "fuchsia.power.UseSuspender",
+
+            // If set, SAG blocks until the fuchsia.hardware.suspend.SuspendService
+            // service exposes a Suspender. Otherwise, it will not attempt to
+            // connect to SuspendService and suspension will be disabled.
+            from: "parent",
+            key: "use_suspender",
+            type: "bool",
+            availability: "optional",
+            default: true,
+        },
     ],
     expose: [
         {

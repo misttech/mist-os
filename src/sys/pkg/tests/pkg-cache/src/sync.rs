@@ -4,8 +4,8 @@
 
 use crate::TestEnv;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Status;
 use futures::TryFutureExt;
+use zx::Status;
 
 struct BrokenBlobfs;
 

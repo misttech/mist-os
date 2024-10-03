@@ -4,6 +4,8 @@
 
 #include <lib/driver/platform-device/cpp/pdev.h>
 
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
+
 namespace fdf {
 
 PDev::PDev(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> client)
@@ -136,6 +138,43 @@ zx::result<PDev::BoardInfo> PDev::GetBoardInfo() const {
   }
   return zx::ok(out_info);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+zx::result<std::vector<fdf_power::PowerElementConfiguration>> PDev::GetPowerConfiguration() {
+  fidl::WireResult result = pdev_->GetPowerConfiguration();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    return zx::error(result->error_value());
+  }
+
+  std::vector<fdf_power::PowerElementConfiguration> configs;
+  configs.reserve(result.value()->config.count());
+  for (const auto& fidl_config : result.value()->config) {
+    zx::result config = power::from_fidl::CreatePowerElementConfiguration(fidl_config);
+    if (config.is_error()) {
+      return zx::error(config.status_value());
+    }
+    configs.emplace_back(std::move(config.value()));
+  }
+  return zx::ok(std::move(configs));
+}
+
+fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>>
+PDev::GetAndApplyPowerConfiguration(const fdf::Namespace& ns) {
+  zx::result configs = GetPowerConfiguration();
+  if (configs.is_error()) {
+    return fit::error(fdf_power::Error::CONFIGURATION_UNAVAILABLE);
+  }
+
+  if (configs->empty()) {
+    return fit::success(std::vector<fdf_power::ElementDesc>{});
+  }
+
+  return fdf_power::ApplyPowerConfiguration(ns, configs.value());
+}
+#endif
 
 namespace internal {
 // Regular implementation for drivers. Tests might override this.

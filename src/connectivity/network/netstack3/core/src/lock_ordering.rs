@@ -159,6 +159,9 @@ pub struct UdpCounters<I>(PhantomData<I>, Never);
 pub enum SlaacCounters {}
 // Provides unlocked access to a device's routing metric.
 pub enum RoutingMetric {}
+// Provides unlocked access to the secret key used to generate temporary SLAAC
+// addresses.
+pub enum SlaacTempSecretKey {}
 
 pub struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub struct IpDeviceGmp<I>(PhantomData<I>, Never);
@@ -269,11 +272,7 @@ impl_lock_after!(UdpAllSocketsSet<Ipv6> => UdpSocketState<Ipv4>);
 impl_lock_after!(UdpSocketState<Ipv4> => UdpSocketState<Ipv6>);
 impl_lock_after!(UdpSocketState<Ipv6> => UdpBoundMap<Ipv4>);
 impl_lock_after!(UdpBoundMap<Ipv4> => UdpBoundMap<Ipv6>);
-impl_lock_after!(UdpBoundMap<Ipv6> => IpDeviceConfiguration<Ipv4>);
-impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
-impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
-impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
-impl_lock_after!(Ipv6DeviceSlaac => IpMulticastForwardingState<Ipv4>);
+impl_lock_after!(UdpBoundMap<Ipv6> => IpMulticastForwardingState<Ipv4>);
 impl_lock_after!(IpMulticastForwardingState<Ipv4> => IpMulticastRouteTable<Ipv4>);
 impl_lock_after!(IpMulticastRouteTable<Ipv4> => IpMulticastForwardingPendingPackets<Ipv4>);
 impl_lock_after!(IpMulticastForwardingPendingPackets<Ipv4> => IpMulticastForwardingState<Ipv6>);
@@ -285,7 +284,11 @@ impl_lock_after!(IpStateRulesTable<Ipv6> => IpStateRoutingTables<Ipv4>);
 impl_lock_after!(IpStateRoutingTables<Ipv4> => IpStateRoutingTables<Ipv6>);
 impl_lock_after!(IpStateRoutingTables<Ipv6> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
-impl_lock_after!(IpStateRoutingTable<Ipv6> => Ipv6DeviceAddressDad);
+impl_lock_after!(IpStateRoutingTable<Ipv6> => IpDeviceConfiguration<Ipv4>);
+impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
+impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
+impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
+impl_lock_after!(Ipv6DeviceSlaac => Ipv6DeviceAddressDad);
 impl_lock_after!(Ipv6DeviceAddressDad => FilterState<Ipv4>);
 impl_lock_after!(FilterState<Ipv4> => FilterState<Ipv6>);
 impl_lock_after!(FilterState<Ipv6> => IpState<Ipv4>);

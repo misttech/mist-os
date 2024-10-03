@@ -6,7 +6,7 @@ use crate::context::LowpanCtlContext;
 use crate::invocation::CommandEnum;
 use crate::prelude::*;
 use fuchsia_async::{Time, Timer};
-use fuchsia_zircon::Duration;
+use zx::Duration;
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "repeat", description = "repeats the given command")]

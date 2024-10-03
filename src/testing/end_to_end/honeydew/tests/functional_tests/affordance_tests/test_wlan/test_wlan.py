@@ -10,14 +10,17 @@ from antlion.controllers import access_point
 from antlion.controllers.ap_lib import hostapd_constants
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, signals, test_runner
+from utils import wait_for_interface
 
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.netstack import InterfaceProperties
+from honeydew.typing.netstack import PortClass
 from honeydew.typing.wlan import (
+    Authentication,
     ClientStatusConnected,
     ClientStatusConnecting,
     ClientStatusIdle,
     CountryCode,
+    SecurityProtocol,
     WlanMacRole,
 )
 
@@ -53,18 +56,7 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
             access_points[0] if access_points else None
         )
 
-        # Wait for a WLAN interface to become available.
-        interfaces: list[InterfaceProperties] = []
-        end_time = time.time() + WLAN_INTERFACE_TIMEOUT
-        while time.time() < end_time:
-            interfaces = self.device.netstack.list_interfaces()
-            for interface in interfaces:
-                if "wlan" in interface.name:
-                    return
-            time.sleep(1)  # Prevent denial-of-service
-        asserts.abort_class(
-            f"Expected presence of a WLAN interface, got {interfaces}"
-        )
+        wait_for_interface(self.device.netstack, PortClass.WLAN_CLIENT)
 
     def test_iface_methods(self) -> None:
         """Test case for device wlan iface methods.
@@ -170,19 +162,15 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
         bss_scan_response = self.device.wlan.scan_for_bss_info()
         bss_desc_for_ssid = bss_scan_response.get(test_ssid)
         if bss_desc_for_ssid:
-            try:
-                asserts.assert_true(
-                    self.device.wlan.connect(
-                        ssid=test_ssid,
-                        password=None,
-                        bss_desc=bss_desc_for_ssid[0],
-                    ),
-                    "Failed to connect.",
-                )
-            except NotImplementedError:
-                # TODO(http://b/324949922): Remove this try-catch statement once
-                # WLAN FC affordance implements connect.
-                pass
+            asserts.assert_true(
+                self.device.wlan.connect(
+                    ssid=test_ssid,
+                    password=None,
+                    bss_desc=bss_desc_for_ssid[0],
+                    authentication=Authentication(SecurityProtocol.OPEN, None),
+                ),
+                "Failed to connect.",
+            )
         else:
             asserts.fail("Scan did not find bss descriptions for test ssid")
 

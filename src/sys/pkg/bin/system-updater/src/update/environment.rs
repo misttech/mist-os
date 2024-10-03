@@ -125,9 +125,7 @@ impl NamespaceBuildInfo {
         .await
         {
             Ok(file) => file,
-            Err(fuchsia_fs::node::OpenError::OpenError(fuchsia_zircon::Status::NOT_FOUND)) => {
-                return Ok(None)
-            }
+            Err(fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)) => return Ok(None),
             Err(e) => {
                 return Err(e).with_context(|| format!("while opening /config/build-info/{name}"))
             }

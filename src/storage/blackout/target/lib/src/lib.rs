@@ -23,7 +23,7 @@ use rand::{distributions, Rng, SeedableRng};
 use std::sync::Arc;
 use storage_isolated_driver_manager::fvm;
 use uuid::Uuid;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 pub mod static_tree;
 

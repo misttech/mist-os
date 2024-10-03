@@ -188,27 +188,34 @@ impl Peer {
         conn_stream_reader: circuit::stream::Reader,
         service_observer: Observer<Vec<String>>,
         router: &Arc<Router>,
+        peer_node_id: NodeId,
     ) -> Result<Arc<Self>, Error> {
         let node_id =
             NodeId::from_circuit_string(conn.from()).map_err(|_| format_err!("Invalid node ID"))?;
         tracing::trace!(node_id = router.node_id().0, peer = node_id.0, "NEW CLIENT",);
         let (command_sender, command_receiver) = mpsc::channel(1);
+        let weak_router = Arc::downgrade(router);
+
+        let client_conn_fut = client_conn_stream(
+            Arc::downgrade(router),
+            node_id,
+            conn_stream_writer,
+            conn_stream_reader,
+            conn.clone(),
+            command_receiver,
+            service_observer,
+        );
+
         Ok(Arc::new(Self {
             endpoint: Endpoint::Client,
             commands: Some(command_sender.clone()),
-            _task: Task::spawn(Peer::runner(
-                Endpoint::Client,
-                Arc::downgrade(router),
-                client_conn_stream(
-                    Arc::downgrade(router),
-                    node_id,
-                    conn_stream_writer,
-                    conn_stream_reader,
-                    conn.clone(),
-                    command_receiver,
-                    service_observer,
-                ),
-            )),
+            _task: Task::spawn(Peer::runner(Endpoint::Client, weak_router.clone(), async move {
+                let result = client_conn_fut.await;
+                if let Some(router) = weak_router.upgrade() {
+                    router.client_closed(peer_node_id).await;
+                }
+                result
+            })),
             conn: PeerConn::from_circuit(conn, node_id),
         }))
     }
@@ -217,7 +224,7 @@ impl Peer {
     pub(crate) async fn new_circuit_server(
         conn: circuit::Connection,
         router: &Arc<Router>,
-    ) -> Result<Arc<Self>, Error> {
+    ) -> Result<(), Error> {
         let node_id =
             NodeId::from_circuit_string(conn.from()).map_err(|_| format_err!("Invalid node ID"))?;
         tracing::trace!(node_id = router.node_id().0, peer = node_id.0, "NEW SERVER",);
@@ -225,22 +232,19 @@ impl Peer {
             .bind_stream(0)
             .await
             .ok_or_else(|| format_err!("Could not establish connection"))?;
-        Ok(Arc::new(Self {
-            endpoint: Endpoint::Server,
-            commands: None,
-            _task: Task::spawn(Peer::runner(
-                Endpoint::Server,
+        Task::spawn(Peer::runner(
+            Endpoint::Server,
+            Arc::downgrade(router),
+            server_conn_stream(
+                node_id,
+                conn_stream_writer,
+                conn_stream_reader,
+                conn.clone(),
                 Arc::downgrade(router),
-                server_conn_stream(
-                    node_id,
-                    conn_stream_writer,
-                    conn_stream_reader,
-                    conn.clone(),
-                    Arc::downgrade(router),
-                ),
-            )),
-            conn: PeerConn::from_circuit(conn, node_id),
-        }))
+            ),
+        ))
+        .detach();
+        Ok(())
     }
 
     async fn runner(

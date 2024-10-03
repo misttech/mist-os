@@ -28,13 +28,13 @@ use fidl_fuchsia_storage_ext4::{
 };
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use fuchsia_zircon::{Channel, Vmo};
 use futures::future::TryFutureExt;
 use futures::stream::{StreamExt, TryStreamExt};
 use tracing::info;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
+use zx::{Channel, Vmo};
 
 async fn run_ext4_server(mut stream: Server_RequestStream) -> Result<(), Error> {
     while let Some(req) = stream.try_next().await.context("Error while reading request")? {

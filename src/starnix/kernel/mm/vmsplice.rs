@@ -6,7 +6,7 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::MemoryManager;
 use crate::vfs::buffers::{InputBuffer, MessageData, OutputBuffer};
 use crate::vfs::with_iovec_segments;
-use fuchsia_zircon as zx;
+
 use smallvec::SmallVec;
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;

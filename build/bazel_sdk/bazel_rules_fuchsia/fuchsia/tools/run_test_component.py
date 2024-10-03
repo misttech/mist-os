@@ -5,12 +5,15 @@
 
 import argparse
 import subprocess
+from typing import List, Tuple
 
 from fuchsia_task_lib import *
 
 
 class FuchsiaTaskRunTestComponent(FuchsiaTask):
-    def parse_args(self, parser: ScopedArgumentParser) -> argparse.Namespace:
+    def parse_known_args(
+        self, parser: ScopedArgumentParser
+    ) -> Tuple[argparse.Namespace, List[str]]:
         """Parses arguments."""
 
         parser.add_argument(
@@ -42,10 +45,10 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
             required=False,
             scope=ArgumentScope.GLOBAL,
         )
-        return parser.parse_args()
+        return parser.parse_known_args()
 
     def run(self, parser: ScopedArgumentParser) -> None:
-        args = self.parse_args(parser)
+        args, remainder_args = self.parse_known_args(parser)
         ffx = [args.ffx] + (["--target", args.target] if args.target else [])
         url = (
             args.url.replace(
@@ -59,6 +62,11 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
         )
 
         try:
+            print(
+                Terminal.info(
+                    f"Forwarding unrecognized args to test: {remainder_args}"
+                )
+            )
             subprocess.check_call(
                 [
                     *ffx,
@@ -66,6 +74,8 @@ class FuchsiaTaskRunTestComponent(FuchsiaTask):
                     "run",
                     *(["--realm", args.realm] if args.realm else []),
                     url,
+                    "--",
+                    *remainder_args,
                 ]
             )
         except subprocess.CalledProcessError as e:

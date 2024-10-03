@@ -16,9 +16,9 @@ use anyhow::{ensure, Error};
 use euclid::size2;
 use fuchsia_framebuffer::ImageId;
 use fuchsia_trace::instant;
-use fuchsia_zircon::{Event, MonotonicTime};
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use std::fmt::{Display, Formatter};
+use zx::{Event, MonotonicInstant};
 
 pub(crate) mod strategies;
 
@@ -52,7 +52,7 @@ pub struct ViewAssistantContext {
     pub metrics: Size,
     /// For render, the time the rendering will be presented. Currently
     /// not implemented correctly.
-    pub presentation_time: MonotonicTime,
+    pub presentation_time: MonotonicInstant,
     /// When running in frame buffer mode, the number of buffers in
     /// the buffer collection
     pub buffer_count: Option<usize>,
@@ -380,9 +380,9 @@ pub trait ViewAssistant {
     /// # };
     /// # #[derive(Default)]
     /// # struct SampleViewAssistant {}
-    /// use fuchsia_zircon::MonotonicTime;
+    /// use zx::MonotonicInstant;
     /// pub enum SampleMessages {
-    ///     Pressed(MonotonicTime),
+    ///     Pressed(MonotonicInstant),
     /// }
     /// impl ViewAssistant for SampleViewAssistant {
     ///     fn handle_message(&mut self, message: Message) {

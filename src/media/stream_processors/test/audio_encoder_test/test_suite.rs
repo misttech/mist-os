@@ -8,7 +8,7 @@ use crate::pcm_audio::*;
 use crate::timestamp_validator::*;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem2::*;
-use fuchsia_zircon as zx;
+
 use rand::prelude::*;
 use std::rc::Rc;
 use stream_processor_encoder_factory::*;

@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_audio_controller as fac;
-use fuchsia_zircon::{self as zx, HandleBased};
+use zx::{self as zx, HandleBased};
 
 pub fn create_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::Clock>, Error> {
     match clock_type {
@@ -23,13 +23,13 @@ pub fn create_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::C
         fac::ClockType::Custom(info) => {
             let rate = info.rate_adjust;
             let offset = info.offset;
-            let now = zx::MonotonicTime::get();
+            let now = zx::MonotonicInstant::get();
             let delta_time = now.into_nanos()
                 + zx::Duration::from_nanos(offset.unwrap_or(0).into()).into_nanos();
 
             let update_builder = zx::ClockUpdate::builder()
                 .rate_adjust(rate.unwrap_or(0))
-                .absolute_value(now, zx::SyntheticTime::from_nanos(delta_time));
+                .absolute_value(now, zx::SyntheticInstant::from_nanos(delta_time));
 
             let auto_start =
                 if offset.is_some() { zx::ClockOpts::empty() } else { zx::ClockOpts::AUTO_START };

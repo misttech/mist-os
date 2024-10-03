@@ -14,12 +14,12 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::channel::mpsc;
 use futures::{future, TryStreamExt};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use zx::{self as zx, HandleBased};
 
 use crate::config::{DisplayConfig, LayerConfig};
 use crate::error::{ConfigError, Error, Result};
@@ -57,7 +57,7 @@ pub struct VsyncEvent {
     pub id: DisplayId,
 
     /// The monotonic timestamp of the vsync event.
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
 
     /// The stamp of the latest fully applied display configuration.
     pub config: display_types::ConfigStamp,
@@ -197,7 +197,7 @@ impl Coordinator {
                 } => {
                     inner.write().handle_vsync(
                         display_id.into(),
-                        zx::MonotonicTime::from_nanos(timestamp),
+                        zx::MonotonicInstant::from_nanos(timestamp),
                         applied_config_stamp,
                         cookie,
                     )?;
@@ -356,7 +356,7 @@ impl CoordinatorInner {
     fn handle_vsync(
         &mut self,
         display_id: DisplayId,
-        timestamp: zx::MonotonicTime,
+        timestamp: zx::MonotonicInstant,
         applied_config_stamp: display_types::ConfigStamp,
         cookie: display::VsyncAckCookie,
     ) -> Result<()> {

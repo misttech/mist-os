@@ -180,7 +180,7 @@ class WakeEvent {
   // are currently pending OR that were triggered after the optional time value are logged.
   //
   // Safe to call concurrently with any and all methods, including ctors and dtors.
-  static void Dump(FILE* f, zx_boot_time_t log_triggered_after_boot_time = ZX_TIME_INFINITE);
+  static void Dump(FILE* f, zx_instant_boot_t log_triggered_after_boot_time = ZX_TIME_INFINITE);
 
   using NodeState = fbl::DoublyLinkedListNodeState<WakeEvent*>;
   struct NodeListTraits {
@@ -212,7 +212,7 @@ class WakeEvent {
       return static_cast<zx_ticks_t>(value_ & kTicksMask);
     }
 
-    zx_boot_time_t last_triggered_boot_time() const;
+    zx_instant_boot_t last_triggered_boot_time() const;
 
    private:
     static constexpr uint64_t kPendingBit = uint64_t{1} << 63;

@@ -4,15 +4,15 @@
 
 use crate::prelude::ot::Error;
 use fidl_fuchsia_net_stack_ext::NetstackError;
-use fuchsia_zircon_status::Status as ZxStatus;
 use openthread::ot;
 use std::fmt::Debug;
+use zx_status::Status as ZxStatus;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
 /// Used for wrapping around error types so that they can be
-/// converted to [`::fuchsia_zircon_status::Status`] values
+/// converted to [`::zx_status::Status`] values
 /// that are returned by the methods of [`lowpan_driver_common::Driver`].
 #[derive(thiserror::Error, Debug)]
 pub(super) struct ErrorAdapter<T: Debug>(pub T);

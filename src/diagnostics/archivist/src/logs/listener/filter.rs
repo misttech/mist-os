@@ -111,7 +111,7 @@ mod tests {
     use super::*;
     use crate::identity::ComponentIdentity;
     use diagnostics_data::Severity;
-    use fuchsia_zircon as zx;
+
     use moniker::ExtendedMoniker;
 
     fn test_message_with_tag(tag: Option<&str>) -> LogsData {
@@ -120,7 +120,7 @@ mod tests {
             "fuchsia-pkg://not-a-package",
         );
         let mut builder = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp: zx::BootTime::from_nanos(1).into(),
+            timestamp: zx::BootInstant::from_nanos(1).into(),
             component_url: Some(identity.url.clone()),
             moniker: identity.moniker.clone(),
             severity: Severity::Info,

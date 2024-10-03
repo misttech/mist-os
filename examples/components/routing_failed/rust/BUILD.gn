@@ -10,10 +10,10 @@ rustc_binary("bin") {
   name = "routing_failed_echo_client_rust"
   deps = [
     "//examples/components/routing/fidl:echo_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:tracing",
   ]

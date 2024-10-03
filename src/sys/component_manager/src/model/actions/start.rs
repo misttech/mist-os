@@ -36,7 +36,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+    fidl_fuchsia_process as fprocess, zx,
 };
 
 /// Starts a component instance.
@@ -148,12 +148,12 @@ async fn do_start(
                 moniker: component.moniker.clone(),
                 err: Box::new(err),
             })?;
-        let runner = resolved_state.sandbox.program_input.runner.lock().unwrap().clone();
+        let runner = resolved_state.sandbox.program_input.runner();
         (
             runner,
             resolved_state.decl().get_runner().as_ref().map(|r| r.source_name.clone()),
             resolved_state.resolved_component.clone(),
-            resolved_state.sandbox.program_input.namespace.clone(),
+            resolved_state.sandbox.program_input.namespace(),
         )
     };
     let runner = match runner_router {
@@ -653,7 +653,7 @@ mod tests {
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::resolving::ComponentAddress;
     use std::sync::{Mutex, Weak};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     // Child name for test child components instantiated during tests.
     const TEST_CHILD_NAME: &str = "child";
@@ -858,7 +858,7 @@ mod tests {
         let (_test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
-            let timestamp = zx::MonotonicTime::get();
+            let timestamp = zx::MonotonicInstant::get();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
@@ -879,7 +879,7 @@ mod tests {
         }
 
         {
-            let timestamp = zx::MonotonicTime::get();
+            let timestamp = zx::MonotonicInstant::get();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
@@ -897,7 +897,7 @@ mod tests {
         let (test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
-            let timestamp = zx::MonotonicTime::get();
+            let timestamp = zx::MonotonicInstant::get();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),

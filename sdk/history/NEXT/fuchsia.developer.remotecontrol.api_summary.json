@@ -113,6 +113,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.developer.remotecontrol/IdentifyHostResponse.boot_id",
+        "ordinal": "9",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.developer.remotecontrol/IdentifyHostResponse.boot_timestamp_nanos",
         "ordinal": "3",
         "type": "uint64"

@@ -22,14 +22,14 @@ use {
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_zircon as zx,
+    fidl_fuchsia_netemul_network as fnetemul_network, zx,
 };
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
-use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
+use futures::future::{FutureExt as _, TryFutureExt as _};
 use futures::stream::{self, StreamExt as _, TryStreamExt as _};
 use futures_util::AsyncWriteExt;
 use net_declare::{
@@ -42,7 +42,7 @@ use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::nud::apply_nud_flake_workaround;
 use netstack_testing_common::realms::{
     KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
-    Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt,
+    Netstack, Netstack3, NetstackExt, TestRealmExt as _, TestSandboxExt,
 };
 use netstack_testing_common::{
     dhcpv4 as dhcpv4_helper, try_all, try_any, wait_for_component_stopped,
@@ -59,101 +59,8 @@ use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::parse_ip_packet;
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6 as dhcpv6;
+use policy_testing_common::with_netcfg_owned_device;
 use test_case::test_case;
-
-async fn with_netcfg_owned_device<
-    M: Manager,
-    N: Netstack,
-    F: for<'a> FnOnce(
-        u64,
-        &'a netemul::TestNetwork<'a>,
-        &'a fnet_interfaces::StateProxy,
-        &'a netemul::TestRealm<'a>,
-        &'a netemul::TestSandbox,
-    ) -> LocalBoxFuture<'a, ()>,
->(
-    name: &str,
-    manager_config: ManagerConfig,
-    use_out_of_stack_dhcp_client: bool,
-    extra_known_service_providers: impl IntoIterator<Item = KnownServiceProvider>,
-    after_interface_up: F,
-) -> String {
-    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox
-        .create_netstack_realm_with::<N, _, _>(
-            name,
-            [
-                KnownServiceProvider::Manager {
-                    agent: M::MANAGEMENT_AGENT,
-                    use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client,
-                    config: manager_config,
-                },
-                KnownServiceProvider::DnsResolver,
-                KnownServiceProvider::FakeClock,
-            ]
-            .into_iter()
-            .chain(extra_known_service_providers)
-            // If the client requested an out of stack DHCP client, add it to
-            // the list of service providers.
-            .chain(
-                use_out_of_stack_dhcp_client
-                    .then_some(KnownServiceProvider::DhcpClient)
-                    .into_iter(),
-            ),
-        )
-        .expect("create netstack realm");
-
-    // Add a device to the realm.
-    let network = sandbox.create_network(name).await.expect("create network");
-    let endpoint = network.create_endpoint(name).await.expect("create endpoint");
-    endpoint.set_link_up(true).await.expect("set link up");
-    let endpoint_mount_path = netemul::devfs_device_path("ep");
-    let endpoint_mount_path = endpoint_mount_path.as_path();
-    realm.add_virtual_device(&endpoint, endpoint_mount_path).await.unwrap_or_else(|e| {
-        panic!("add virtual device {}: {:?}", endpoint_mount_path.display(), e)
-    });
-
-    // Make sure the Netstack got the new device added.
-    let interface_state = realm
-        .connect_to_protocol::<fnet_interfaces::StateMarker>()
-        .expect("connect to fuchsia.net.interfaces/State service");
-    let wait_for_netmgr =
-        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
-    let mut wait_for_netmgr = pin!(wait_for_netmgr);
-    let (if_id, if_name): (u64, String) = interfaces::wait_for_non_loopback_interface_up(
-        &interface_state,
-        &mut wait_for_netmgr,
-        None,
-        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
-    )
-    .await
-    .expect("wait for non loopback interface");
-
-    after_interface_up(if_id, &network, &interface_state, &realm, &sandbox).await;
-
-    // Wait for orderly shutdown of the test realm to complete before allowing
-    // test interfaces to be cleaned up.
-    //
-    // This is necessary to prevent test interfaces from being removed while
-    // NetCfg is still in the process of configuring them after adding them to
-    // the Netstack, which causes spurious errors.
-    realm.shutdown().await.expect("failed to shutdown realm");
-
-    if_name
-}
-
-/// An extension trait for [`Netstack`].
-trait NetstackExt {
-    const USE_OUT_OF_STACK_DHCP_CLIENT: bool;
-}
-
-impl<N: Netstack> NetstackExt for N {
-    const USE_OUT_OF_STACK_DHCP_CLIENT: bool = match Self::VERSION {
-        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => true,
-        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => false,
-    };
-}
 
 /// Test that NetCfg discovers a newly added device and it adds the device
 /// to the Netstack.
@@ -1826,8 +1733,8 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                             prefix_len: dhcpv6_helper::PREFIX.prefix(),
                         },
                         lifetimes: fnet_dhcpv6::Lifetimes {
-                            valid_until: zx::MonotonicTime::INFINITE.into_nanos(),
-                            preferred_until: zx::MonotonicTime::INFINITE.into_nanos(),
+                            valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                            preferred_until: zx::MonotonicInstant::INFINITE.into_nanos(),
                         },
                     }),
                 );
@@ -1845,8 +1752,8 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                                 prefix_len: dhcpv6_helper::RENEWED_PREFIX.prefix(),
                             },
                             lifetimes: fnet_dhcpv6::Lifetimes {
-                                valid_until: zx::MonotonicTime::INFINITE.into_nanos(),
-                                preferred_until: zx::MonotonicTime::INFINITE.into_nanos(),
+                                valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                                preferred_until: zx::MonotonicInstant::INFINITE.into_nanos(),
                             },
                         }),
                     ),
@@ -1952,8 +1859,8 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
                             prefix_len: dhcpv6_helper::PREFIX.prefix(),
                         },
                         lifetimes: fnet_dhcpv6::Lifetimes {
-                            valid_until: zx::MonotonicTime::INFINITE.into_nanos(),
-                            preferred_until: zx::MonotonicTime::INFINITE.into_nanos(),
+                            valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                            preferred_until: zx::MonotonicInstant::INFINITE.into_nanos(),
                         },
                     }),
                 );
@@ -2170,9 +2077,8 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
 
     masq.create(
         &fnet_masquerade::ControlConfig {
-            input_interface: router_client_iface.id(),
-            output_interface: router_server_iface.id(),
             src_subnet: router_client_ip,
+            output_interface: router_server_iface.id(),
         },
         server_end,
     )

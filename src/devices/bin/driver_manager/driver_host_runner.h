@@ -53,6 +53,7 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
 
   void StartDriverHost(driver_loader::Loader* loader, zx::channel bootstrap_receiver,
+                       fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                        StartDriverHostCallback callback);
 
   // Returns all started driver hosts. This will be used by tests.
@@ -73,6 +74,7 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
+                                fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                                 StartComponentCallback callback);
 
   void LoadDriverHost(driver_loader::Loader* loader,

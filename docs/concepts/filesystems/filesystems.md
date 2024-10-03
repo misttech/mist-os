@@ -207,7 +207,7 @@ filesystems to a namespace from the command line.
 
 [Blobfs](/src/storage/blobfs/bin/)
 is a simple, flat filesystem optimized for “write-once, then read-only” [signed
-data](/docs/concepts/packages/merkleroot.md), such as
+data](/docs/concepts/security/merkleroot.md), such as
 [packages](/docs/concepts/packages/package.md).
 Other than two small prerequisites (file names, which are deterministic, content
 addressable hashes of a file’s Merkle Tree root, for integrity-verification)

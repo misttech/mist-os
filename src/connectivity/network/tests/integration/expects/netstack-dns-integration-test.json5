@@ -11,16 +11,36 @@
         },
         {
             type: "expect_pass_with_err_logs",
-            matchers: [
-                "discovered_dhcpv6_dns_netcfg_basic_ns3",
-                "discovered_dhcpv6_dns_netcfg_advanced_ns3",
-            ],
+            matchers: [],
         },
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "discovered_dns_netcfg_basic_ns3",
-                "discovered_dns_netcfg_advanced_ns3",
+                // TODO(https://fxbug.dev/341759423): Once
+                // Netstack3 exposes NDP RAs, listen for
+                // these servers in netcfg.
+                "discovered_ndp_dns_netcfg_basic_ns3::lookup_admin",
+                "discovered_ndp_dns_netcfg_advanced_ns3::lookup_admin",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/341759423): Once
+                // Netstack3 exposes NDP RAs, listen for
+                // these servers in netcfg.
+                "discovered_ndp_dns_netcfg_basic_ns3::dns_server_watcher",
+                "discovered_ndp_dns_netcfg_advanced_ns3::dns_server_watcher",
+
+                // TODO(https://fxbug.dev/328647117): Remove
+                // once netcfg is publishing out-of-stack DHCPv4
+                // and DHCPv6 DNS servers to DnsServerWatcher.
+                "discovered_dhcpv4_dns_netcfg_basic_ns3::dns_server_watcher",
+                "discovered_dhcpv4_dns_netcfg_advanced_ns3::dns_server_watcher",
+                "discovered_dhcpv6_dns_netcfg_basic_ns2::dns_server_watcher",
+                "discovered_dhcpv6_dns_netcfg_advanced_ns2::dns_server_watcher",
+                "discovered_dhcpv6_dns_netcfg_basic_ns3::dns_server_watcher",
+                "discovered_dhcpv6_dns_netcfg_advanced_ns3::dns_server_watcher",
             ],
         },
     ],

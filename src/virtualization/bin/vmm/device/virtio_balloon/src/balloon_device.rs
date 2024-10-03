@@ -10,7 +10,7 @@ use fidl_fuchsia_virtualization_hardware::{
 };
 use fuchsia_inspect as inspect;
 use fuchsia_inspect::NumericProperty;
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
 use machina_virtio_device::{Device, WrappedDescChainStream};

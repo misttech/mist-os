@@ -192,7 +192,7 @@ mod tests {
     use crate::{keyboard_binding, testing_utilities};
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     fn input_event_from(
         keyboard_event: keyboard_binding::KeyboardEvent,
@@ -200,7 +200,7 @@ mod tests {
         testing_utilities::create_input_event(
             keyboard_event,
             &input_device::InputDeviceDescriptor::Fake,
-            zx::MonotonicTime::from_nanos(42),
+            zx::MonotonicInstant::from_nanos(42),
             input_device::Handled::No,
         )
     }

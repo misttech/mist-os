@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.hardware.power/cpp/common_types.h"
+
 namespace power_element_visitor_dt {
 
 class PowerElementVisitorTester
@@ -75,7 +77,7 @@ TEST(PowerElementVisitorTest, TestMetadataAndBindProperty) {
 
       ASSERT_TRUE((*node.power_config())[0].dependencies());
       auto dependencies = (*node.power_config())[0].dependencies();
-      EXPECT_EQ(dependencies->size(), 3u);
+      EXPECT_EQ(dependencies->size(), 4u);
       uint32_t dependencies_tested = 0;
       for (auto& dependency : *dependencies) {
         EXPECT_EQ(dependency.child(), "wake-on-interrupt");
@@ -100,6 +102,15 @@ TEST(PowerElementVisitorTest, TestMetadataAndBindProperty) {
                       static_cast<fuchsia_hardware_power::RequirementType>(2u));
           }
         }
+
+        if (dependency.parent()->cpu_control().has_value()) {
+          dependencies_tested++;
+          EXPECT_EQ(dependency.level_deps()->at(0).child_level(), 1u);
+          EXPECT_EQ(dependency.level_deps()->at(0).parent_level(), 1u);
+          EXPECT_EQ(dependency.strength(),
+                    static_cast<fuchsia_hardware_power::RequirementType>(1u));
+        }
+
         if (dependency.parent()->instance_name().has_value()) {
           dependencies_tested++;
           EXPECT_EQ(dependency.parent()->instance_name().value(), "rail-1");
@@ -109,7 +120,7 @@ TEST(PowerElementVisitorTest, TestMetadataAndBindProperty) {
                     static_cast<fuchsia_hardware_power::RequirementType>(2u));
         }
       }
-      EXPECT_EQ(dependencies_tested, 3u);
+      EXPECT_EQ(dependencies_tested, 4u);
     }
 
     if (node.name()->find("power-controller") != std::string::npos) {

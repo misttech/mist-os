@@ -843,7 +843,6 @@ mod tests {
     use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
-    use fuchsia_zircon::Status;
     use fxfs::filesystem::FxFilesystem;
     use fxfs::fsck::{fsck, fsck_volume};
     use fxfs::object_handle::ObjectHandle;
@@ -859,11 +858,12 @@ mod tests {
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
+    use zx::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test(threads = 10)]
     async fn test_rename_different_dirs() {
-        use fuchsia_zircon::Event;
+        use zx::Event;
 
         let fixture = TestFixture::new().await;
         let root = fixture.root();
@@ -922,7 +922,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_rename_same_dir() {
-        use fuchsia_zircon::Event;
+        use zx::Event;
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
@@ -969,7 +969,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_rename_overwrites_file() {
-        use fuchsia_zircon::Event;
+        use zx::Event;
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_rename_overwrites_dir() {
-        use fuchsia_zircon::Event;
+        use zx::Event;
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 

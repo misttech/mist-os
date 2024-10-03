@@ -15,11 +15,11 @@ rustc_library("example_tester") {
   source_root = "src/lib.rs"
   sources = [ "src/lib.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:regex",

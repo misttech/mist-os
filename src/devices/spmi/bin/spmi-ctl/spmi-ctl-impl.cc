@@ -17,37 +17,25 @@
 
 namespace {
 
-constexpr char kSpmiTargetServiceDir[] = "/svc/fuchsia.hardware.spmi.TargetService";
-constexpr char kSpmiSubTargetServiceDir[] = "/svc/fuchsia.hardware.spmi.SubTargetService";
+constexpr char kSpmiDebugServiceDir[] = "/svc/fuchsia.hardware.spmi.DebugService";
 
 constexpr char kUsageSummary[] = R"""(
 SPMI driver control.
 
 Usage:
-  spmi-ctl [-t|--target <device>] -a|--address <address> -r|--read <read_bytes>
-  spmi-ctl [-t|--target <device>] -a|--address <address> -w|--write <hex_byte0> <hex_byte1>...
-  spmi-ctl [-t|--target <device>] -p|--properties
-  spmi-ctl -s|--sub-target <device> -a|--address <address> -r|--read <read_bytes>
-  spmi-ctl -s|--sub-target <device> -a|--address <address> -w|--write <hex_byte0> <hex_byte1>...
-  spmi-ctl -s|--sub-target <device> -p|--properties
+  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <address> -r|--read <read_bytes>
+  spmi-ctl [-c|--controller <controller>] -t|--target <id> -a|--address <address> -w|--write <hex_byte0> <hex_byte1>...
+  spmi-ctl [-c|--controller <controller>] -t|--target <id> -p|--properties
   spmi-ctl -l|--list
   spmi-ctl -h|--help
 )""";
 
 constexpr char kUsageDetails[] = R"""(
 Options:
-  -t, --target      Target device name or path. The name can be specified e.g. pmic,
-                    the full service path can be specified e.g.
-                    /svc/fuchsia.hardware.spmi.TargetService/3afc81c75f364aafed716537adbb5b9a/device,
-                    the service name can be specified e.g. 3afc81c75f364aafed716537adbb5b9a/device,
-                    or it can be left unspecified (picks the first device in
-                    /svc/fuchsia.hardware.spmi.TargetService).
-                    If specified, must be listed before other options.
-  -s, --sub-target  Sub-target device name or path. The name can be specified e.g. pmic,
-                    the full service path can be specified e.g.
-                    /svc/fuchsia.hardware.spmi.SubTargetService/3afc81c75f364aafed716537adbb5b9a/device,
-                    the service name can be specified e.g. 3afc81c75f364aafed716537adbb5b9a/device.
-                    Must be listed before other options.
+  -c, --controller  Controller device name. If specified, must be listed before other options. If
+                    left unspecified, the first device in /svc/fuchsia.hardware.spmi.DebugService is
+                    used.
+  -t, --target      Target ID in [0, 15]. Must be listed before the following options.
   -a, --address     Address to read or write. Must be listed before --read or --write.
   -r, --read        Reads <read_bytes> from the device.
   -w, --write       Writes <hex_byte0>, <hex_byte1>, etc to the device.
@@ -58,26 +46,23 @@ Options:
 Examples:
 
 Write 0x12 (one byte) to address 0x1234 using a Long Extended Write SPMI command:
-$ spmi-ctl -a 0x1234 -w 0x12 0x34 0x56 0x78
-Executing on device: /svc/fuchsia.hardware.spmi.TargetService/c3d9294786beb5a906e4dbd5fd3b596e/device
+$ spmi-ctl -t 0 -a 0x1234 -w 0x12 0x34 0x56 0x78
+Executing on device: /svc/fuchsia.hardware.spmi.DebugService/c3d9294786beb5a906e4dbd5fd3b596e/device
 
 Read one byte from address 0x1234 using a Long Extended Read SPMI command:
-$ spmi-ctl -a 0x5678 -r 1
-Executing on device: /svc/fuchsia.hardware.spmi.TargetService/c3d9294786beb5a906e4dbd5fd3b596e/device
+$ spmi-ctl -t 0 -a 0x5678 -r 1
+Executing on device: /svc/fuchsia.hardware.spmi.DebugService/c3d9294786beb5a906e4dbd5fd3b596e/device
 fuchsia_hardware_spmi::DeviceExtendedRegisterReadLongResponse{ data = [ 219, ], }
 
 Get properties for device named "pmic":
-$ spmi-ctl -t pmic -p
+$ spmi-ctl -c pmic -t 0 -p
 Executing on device: pmic
 fuchsia_hardware_spmi::DeviceGetPropertiesResponse{ sid = 0, name = "pmic", }
 
 List all devices:
 $ spmi-ctl -l
-Devices found:
-- sid: 0 name: pmic
-Sub-targets found:
-- sid: 1 name: gpio
-- sid: 1 name: i2c
+Controllers found:
+- name: pmic
 
 )""";
 
@@ -101,16 +86,15 @@ void ShowUsage(bool show_details) {
   std::cout << kUsageDetails;
 }
 
-fidl::SyncClient<fuchsia_hardware_spmi::Device> GetDeviceByName(std::string_view name,
-                                                                std::string_view directory) {
-  for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+fidl::SyncClient<fuchsia_hardware_spmi::Debug> GetControllerByName(std::string_view name) {
+  for (const auto& entry : std::filesystem::directory_iterator(kSpmiDebugServiceDir)) {
     std::string path = entry.path().string() + "/device";
-    zx::result connector = component::Connect<fuchsia_hardware_spmi::Device>(path);
+    zx::result connector = component::Connect<fuchsia_hardware_spmi::Debug>(path);
     if (connector.is_error()) {
       continue;
     }
-    auto client = fidl::SyncClient<fuchsia_hardware_spmi::Device>(std::move(connector.value()));
-    auto result = client->GetProperties();
+    auto client = fidl::SyncClient<fuchsia_hardware_spmi::Debug>(std::move(connector.value()));
+    auto result = client->GetControllerProperties();
     if (result.is_ok() && result->name().has_value() && *result->name() == name) {
       return client;
     }
@@ -119,17 +103,17 @@ fidl::SyncClient<fuchsia_hardware_spmi::Device> GetDeviceByName(std::string_view
   return {};
 }
 
-std::vector<fidl::Response<fuchsia_hardware_spmi::Device::GetProperties>> GetAllDeviceProperties(
-    std::string_view directory) {
-  std::vector<fidl::Response<fuchsia_hardware_spmi::Device::GetProperties>> responses;
+std::vector<fidl::Response<fuchsia_hardware_spmi::Debug::GetControllerProperties>>
+GetAllControllerProperties(std::string_view directory) {
+  std::vector<fidl::Response<fuchsia_hardware_spmi::Debug::GetControllerProperties>> responses;
   for (const auto& entry : std::filesystem::directory_iterator(directory)) {
     std::string path = entry.path().string() + "/device";
-    zx::result connector = component::Connect<fuchsia_hardware_spmi::Device>(path);
+    zx::result connector = component::Connect<fuchsia_hardware_spmi::Debug>(path);
     if (connector.is_error()) {
       continue;
     }
-    auto client = fidl::SyncClient<fuchsia_hardware_spmi::Device>(std::move(connector.value()));
-    if (auto result = client->GetProperties(); result.is_ok()) {
+    auto client = fidl::SyncClient<fuchsia_hardware_spmi::Debug>(std::move(connector.value()));
+    if (auto result = client->GetControllerProperties(); result.is_ok()) {
       responses.push_back(*std::move(result));
     }
   }
@@ -137,144 +121,98 @@ std::vector<fidl::Response<fuchsia_hardware_spmi::Device::GetProperties>> GetAll
   return responses;
 }
 
-void PrintDeviceProperties(
-    const fidl::Response<fuchsia_hardware_spmi::Device::GetProperties>& properties) {
-  if (properties.sid().has_value()) {
-    std::cout << "- sid: " << std::to_string(*properties.sid());
-    if (properties.name().has_value()) {
-      std::cout << " name: " << *properties.name();
-    }
-    std::cout << std::endl;
+void PrintControllerProperties(
+    const fidl::Response<fuchsia_hardware_spmi::Debug::GetControllerProperties>& properties) {
+  if (properties.name().has_value()) {
+    std::cout << "- name: " << *properties.name();
+  } else {
+    std::cout << "- no name";
   }
+  std::cout << std::endl;
 }
 
 }  // namespace
 
-fidl::SyncClient<fuchsia_hardware_spmi::Device> SpmiCtl::GetSpmiClient(std::string target,
-                                                                       std::string sub_target) {
+fidl::SyncClient<fuchsia_hardware_spmi::Device> SpmiCtl::GetSpmiClient(std::string controller,
+                                                                       uint8_t target) {
+  if (!test_client_ && !std::filesystem::exists(kSpmiDebugServiceDir)) {
+    std::cerr << "Folder " << kSpmiDebugServiceDir << " not found" << std::endl;
+    return {};
+  }
+
+  fidl::SyncClient<fuchsia_hardware_spmi::Debug> debug;
   if (test_client_) {
-    return *std::move(test_client_);
-  }
-  if (!std::filesystem::exists(kSpmiTargetServiceDir)) {
-    std::cerr << "Folder " << kSpmiTargetServiceDir << " not found" << std::endl;
-    return {};
-  }
-  if (!std::filesystem::exists(kSpmiSubTargetServiceDir)) {
-    std::cerr << "Folder " << kSpmiSubTargetServiceDir << " not found" << std::endl;
-    return {};
-  }
-
-  if (!target.empty() && !sub_target.empty()) {
-    std::cerr << "target and sub-target options are mutually exclusive" << std::endl;
-    ShowUsage(false);
-    return {};
-  }
-
-  std::string device;
-
-  // Try to find by name.
-  if (!target.empty()) {
-    fidl::SyncClient<fuchsia_hardware_spmi::Device> client =
-        GetDeviceByName(target, kSpmiTargetServiceDir);
-    if (client.is_valid()) {
-      std::cout << "Executing on target: " << target << std::endl;
-      return client;
+    debug = *std::move(test_client_);
+  } else if (controller.empty()) {
+    // If controller is not specified, use the first target entry in devfs.
+    for (const auto& entry : std::filesystem::directory_iterator(kSpmiDebugServiceDir)) {
+      controller = entry.path().string();
+      zx::result connector =
+          component::Connect<fuchsia_hardware_spmi::Debug>(controller + "/device");
+      if (connector.is_error()) {
+        continue;
+      }
+      auto client = fidl::SyncClient<fuchsia_hardware_spmi::Debug>(std::move(connector.value()));
+      if (auto result = client->GetControllerProperties(); result.is_ok()) {
+        debug = std::move(client);
+        if (result->name().has_value()) {
+          controller = *result->name();
+        }
+        break;
+      }
     }
-
-    // If target is a hex number (and hence we have not found a full path above),
-    // for instance "1234abcd" make it "/svc/fuchsia.hardware.spmi.TargetService/1234abcd".
-    int node_number = -1;
-    if (sscanf(target.c_str(), "%x", &node_number) == 1) {
-      target = std::string(kSpmiTargetServiceDir) + "/" + target;
-    }
-
-    device = target + "/device";
-    std::cout << "Executing on target: " << device << std::endl;
-  } else if (!sub_target.empty()) {
-    fidl::SyncClient<fuchsia_hardware_spmi::Device> client =
-        GetDeviceByName(target, kSpmiSubTargetServiceDir);
-    if (client.is_valid()) {
-      std::cout << "Executing on sub-target: " << sub_target << std::endl;
-      return client;
-    }
-
-    int node_number = -1;
-    if (sscanf(sub_target.c_str(), "%x", &node_number) == 1) {
-      sub_target = std::string(kSpmiSubTargetServiceDir) + "/" + sub_target;
-    }
-
-    device = sub_target + "/device";
-    std::cout << "Executing on sub-target: " << device << std::endl;
-  } else {
-    // If neither target nor sub-target are specified, use the first target entry in devfs.
-    for (const auto& entry : std::filesystem::directory_iterator(kSpmiTargetServiceDir)) {
-      target = entry.path().string();
-      break;
-    }
-    if (!target.size()) {
-      std::cerr << "no device found in: " << kSpmiTargetServiceDir << std::endl;
+    if (!debug.is_valid()) {
+      std::cerr << "no device found in: " << kSpmiDebugServiceDir << std::endl;
       return {};
     }
-
-    device = target + "/device";
-    std::cout << "Executing on target: " << device << std::endl;
-  }
-
-  zx::result connector = component::Connect<fuchsia_hardware_spmi::Device>(device.c_str());
-  if (connector.is_error()) {
-    std::cerr << "could not connect to:" << device << " status:" << connector.status_string()
-              << std::endl;
+  } else if (debug = GetControllerByName(controller); !debug.is_valid()) {  // Try to find by name.
+    std::cerr << "No controller found with name " << controller << std::endl;
     return {};
   }
-  return fidl::SyncClient<fuchsia_hardware_spmi::Device>(std::move(connector.value()));
+
+  auto [device_client, device_server] = fidl::Endpoints<fuchsia_hardware_spmi::Device>::Create();
+  if (auto result = debug->ConnectTarget({target, std::move(device_server)}); result.is_error()) {
+    std::cerr << "could not connect to target " << static_cast<uint32_t>(target)
+              << " on controller " << controller
+              << " status:" << result.error_value().FormatDescription() << std::endl;
+    return {};
+  }
+
+  std::cout << "Executing on controller: " << controller << std::endl;
+  return fidl::SyncClient<fuchsia_hardware_spmi::Device>(std::move(device_client));
 }
 
 void SpmiCtl::ListDevices() {
-  if (!std::filesystem::exists(kSpmiTargetServiceDir)) {
-    std::cerr << "Folder " << kSpmiTargetServiceDir << " not found" << std::endl;
-    return;
-  }
-  if (!std::filesystem::exists(kSpmiSubTargetServiceDir)) {
-    std::cerr << "Folder " << kSpmiSubTargetServiceDir << " not found" << std::endl;
+  if (!std::filesystem::exists(kSpmiDebugServiceDir)) {
+    std::cerr << "Folder " << kSpmiDebugServiceDir << " not found" << std::endl;
     return;
   }
 
-  std::vector target_properties = GetAllDeviceProperties(kSpmiTargetServiceDir);
-  std::vector sub_target_properties = GetAllDeviceProperties(kSpmiSubTargetServiceDir);
+  std::vector controller_properties = GetAllControllerProperties(kSpmiDebugServiceDir);
 
-  if (target_properties.empty() && sub_target_properties.empty()) {
-    std::cerr << "No devices found" << std::endl;
+  if (controller_properties.empty()) {
+    std::cerr << "No controllers found" << std::endl;
     return;
   }
 
-  if (!target_properties.empty()) {
-    std::cout << "Targets found: " << std::endl;
-  }
+  std::cout << "Controllers found: " << std::endl;
 
-  for (const auto& properties : target_properties) {
-    PrintDeviceProperties(properties);
-  }
-
-  if (!target_properties.empty()) {
-    std::cout << "Sub-targets found: " << std::endl;
-  }
-
-  for (const auto& properties : sub_target_properties) {
-    PrintDeviceProperties(properties);
+  for (const auto& properties : controller_properties) {
+    PrintControllerProperties(properties);
   }
 }
 
 int SpmiCtl::Execute(int argc, char** argv) {
-  std::string target = {};
-  std::string sub_target = {};
+  std::string controller = {};
+  std::optional<uint8_t> target;
   std::optional<uint16_t> address;
   optind = 0;
 
   while (true) {
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
+        {"controller", required_argument, 0, 'c'},
         {"target", required_argument, 0, 't'},
-        {"sub-target", required_argument, 0, 's'},
         {"address", required_argument, 0, 'a'},
         {"read", required_argument, 0, 'r'},
         {"write", required_argument, 0, 'w'},
@@ -283,7 +221,7 @@ int SpmiCtl::Execute(int argc, char** argv) {
         {0, 0, 0, 0},
     };
 
-    int c = getopt_long(argc, argv, "ht:s:a:r:w:pl", long_options, 0);
+    int c = getopt_long(argc, argv, "hc:t:a:r:w:pl", long_options, 0);
     if (c == -1)
       break;
 
@@ -292,13 +230,23 @@ int SpmiCtl::Execute(int argc, char** argv) {
         ShowUsage(true);
         return 0;
 
-      case 't':
-        target = optarg;
+      case 'c':
+        controller = optarg;
         break;
 
-      case 's':
-        sub_target = optarg;
+      case 't': {
+        uint32_t target_id;
+        if (sscanf(optarg, "%u", &target_id) != 1) {
+          ShowUsage(false);
+          return -1;
+        }
+        if (target_id >= fuchsia_hardware_spmi::kMaxTargets) {
+          std::cerr << "target must be between 0 and 15 inclusive" << std::endl;
+          return -1;
+        }
+        target = target_id;
         break;
+      }
 
       case 'a': {
         uint32_t local_address;
@@ -314,7 +262,7 @@ int SpmiCtl::Execute(int argc, char** argv) {
       } break;
 
       case 'r': {
-        if (!address) {
+        if (!target || !address) {
           break;
         }
 
@@ -331,7 +279,7 @@ int SpmiCtl::Execute(int argc, char** argv) {
         fuchsia_hardware_spmi::DeviceExtendedRegisterReadLongRequest request;
         request.address(std::move(*address));
         request.size_bytes(static_cast<uint8_t>(read_bytes));
-        auto client = GetSpmiClient(target, sub_target);
+        auto client = GetSpmiClient(controller, *target);
         if (!client.is_valid()) {
           return -1;
         }
@@ -345,7 +293,7 @@ int SpmiCtl::Execute(int argc, char** argv) {
       } break;
 
       case 'w': {
-        if (!address) {
+        if (!target || !address) {
           break;
         }
 
@@ -364,7 +312,7 @@ int SpmiCtl::Execute(int argc, char** argv) {
         fuchsia_hardware_spmi::DeviceExtendedRegisterWriteLongRequest request;
         request.address(std::move(*address));
         request.data(std::move(write_bytes));
-        auto client = GetSpmiClient(target, sub_target);
+        auto client = GetSpmiClient(controller, *target);
         if (!client.is_valid()) {
           return -1;
         }
@@ -379,7 +327,11 @@ int SpmiCtl::Execute(int argc, char** argv) {
       } break;
 
       case 'p': {
-        auto client = GetSpmiClient(target, sub_target);
+        if (!target) {
+          break;
+        }
+
+        auto client = GetSpmiClient(controller, *target);
         if (!client.is_valid()) {
           return -1;
         }

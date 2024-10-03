@@ -120,10 +120,15 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // module; global modules that may have been used for relocations, but are not
   // a DT_NEEDED of any dependency, are not included in this list.
   // This list is set when dlopen() is called on this module.
-  constexpr const ModuleRefList& module_tree() const { return module_tree_; }
-  void set_module_tree(ModuleRefList module_tree) { module_tree_ = std::move(module_tree); }
+  constexpr const ModuleRefList& module_tree() const {
+    // RuntimeModule::ReifyModuleTree should have ben called before any callers
+    // call this accessor.
+    assert(!module_tree_.is_empty());
+    return module_tree_;
+  }
 
-  ModuleRefList TraverseDeps(Diagnostics& diag, const RuntimeModule& root_module);
+  // Constructs this module's `module_tree` if it has not been set yet.
+  bool ReifyModuleTree(Diagnostics& diag);
 
  private:
   // A RuntimeModule can only be created with Module::Create...).

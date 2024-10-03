@@ -17,7 +17,6 @@ use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
-use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::future::{self, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -63,6 +62,7 @@ use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
 use test_case::test_case;
+use zx::{self as zx, AsHandleRef as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
@@ -405,7 +405,7 @@ fn validate_send_msg_preflight_response(
                 pending: zx::Signals::NONE,
             })
             .collect::<Vec<_>>();
-        zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE_PAST)
+        zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE_PAST)
             == Err(zx::Status::TIMED_OUT)
     };
     if expect_all_eventpairs_valid != all_eventpairs_valid {
@@ -1255,7 +1255,8 @@ fn validate_recv_msg_postflight_response(
         if valid { Err(zx::Status::TIMED_OUT) } else { Ok(zx::Signals::EVENTPAIR_PEER_CLOSED) };
     let validity = validity.as_ref().expect("expected validity present");
     assert_eq!(
-        validity.wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST),
+        validity
+            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
         expected_validity,
     );
 }
@@ -1617,6 +1618,54 @@ async fn tcp_socket_shutdown_connection<I: TestIpExt, Client: Netstack, Server: 
                 Err(std::io::ErrorKind::BrokenPipe)
             );
             assert_matches!(client.read_to_end(&mut Vec::new()).await, Ok(0));
+        },
+    )
+    .await
+}
+
+// Shutting down one end of the socket in both directions should cause writes to fail on the
+// other end. Same applies when closing the socket, (`close()` implies `shutdown(RDWR)`).
+#[netstack_test]
+#[variant(I, Ip)]
+#[variant(Client, Netstack)]
+#[variant(Server, Netstack)]
+#[test_case(false; "shutdown")]
+#[test_case(true; "close")]
+async fn tcp_socket_send_after_shutdown<I: TestIpExt, Client: Netstack, Server: Netstack>(
+    name: &str,
+    close: bool,
+) {
+    tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(
+        name,
+        |mut client: fasync::net::TcpStream, server: fasync::net::TcpStream| async move {
+            // Either close or shutdown the server end of the socket.
+            let _server = if close {
+                std::mem::drop(server);
+                None
+            } else {
+                server.shutdown(std::net::Shutdown::Both).expect("Failed to shutdown TCP read");
+                Some(server)
+            };
+
+            async {
+                // Keep writing until we get an error.
+                loop {
+                    if let Err(e) = client.write(b"Hello").await {
+                        // NS2 returns EPIPE, which is incorrect. Check the error only with NS3.
+                        if !matches!(
+                            Client::VERSION,
+                            NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2
+                        ) {
+                            assert_eq!(e.kind(), std::io::ErrorKind::ConnectionReset);
+                        }
+                        break;
+                    }
+                }
+            }
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+                panic!("timed out waiting for error from send()")
+            })
+            .await;
         },
     )
     .await

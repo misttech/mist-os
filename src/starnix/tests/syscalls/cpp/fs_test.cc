@@ -648,16 +648,16 @@ TEST_P(FsMountTest, ChownMinusOneNoPathAccessFails) {
   SAFE_SYSCALL(unlink(user1_file.c_str()));
 }
 
-TEST_P(FsMountTest, ChownMinusOneOnSUIDFileFails) {
-  // Executing chown(file, -1, -1) fails if the file is set-user-ID.
+TEST_P(FsMountTest, ChownMinusOneOnSIDFileFails) {
+  // Executing chown(file, -1, -1) fails if the file is set-ID.
   std::string user1_file = files::JoinPath(mount_path_, "user1_file");
   close(SAFE_SYSCALL(creat(user1_file.c_str(), 0)));
   SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
-  SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISUID));
 
   test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([user1_file] {
+    SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISUID));
     ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
     test_helper::DropAllCapabilities();
 
@@ -669,6 +669,19 @@ TEST_P(FsMountTest, ChownMinusOneOnSUIDFileFails) {
   struct stat file_stat{};
   SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
   EXPECT_NE(file_stat.st_mode & S_ISUID, 0U);
+
+  helper.RunInForkedProcess([user1_file] {
+    SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISGID | S_IXGRP));
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    test_helper::DropAllCapabilities();
+
+    EXPECT_THAT(chown(user1_file.c_str(), -1, -1), SyscallFailsWithErrno(EPERM));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  // The file should still be set-group-ID even after failure.
+  SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
+  EXPECT_EQ(file_stat.st_mode & (S_ISGID | S_IXGRP), (unsigned int)(S_ISGID | S_IXGRP));
 
   // But not if we are the owners.
   helper.RunInForkedProcess([user1_file] {
@@ -727,6 +740,37 @@ TEST_P(FsMountTest, ChownOnSUIDFileDropsSUIDBit) {
       struct stat file_stat{};
       SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
       EXPECT_EQ(file_stat.st_mode & S_ISUID, 0U);
+    }
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+TEST_P(FsMountTest, ChownOnSGIDFileDropsSGIDBit) {
+  std::string user1_file = files::JoinPath(mount_path_, "user1_file");
+  close(SAFE_SYSCALL(creat(user1_file.c_str(), 0)));
+  SAFE_SYSCALL(chown(user1_file.c_str(), kUser1Uid, kUser1Gid));
+
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([user1_file] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    test_helper::DropAllCapabilities();
+
+    for (mode_t mode = 0000; mode <= 0777; mode++) {
+      SCOPED_TRACE(fxl::StringPrintf("Mode: %o", mode));
+      SAFE_SYSCALL(chmod(user1_file.c_str(), S_ISGID | mode));
+      SAFE_SYSCALL(chown(user1_file.c_str(), -1, -1));
+
+      struct stat file_stat{};
+      SAFE_SYSCALL(stat(user1_file.c_str(), &file_stat));
+      if (mode & S_IXGRP) {
+        // The set-group-ID bit only takes effect if the file is
+        // group-executable. Otherwise it has other meaning and should not drop
+        // that bit upon chown.
+        EXPECT_EQ(file_stat.st_mode & S_ISGID, 0U);
+      } else {
+        EXPECT_NE(file_stat.st_mode & S_ISGID, 0U);
+      }
     }
   });
 

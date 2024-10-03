@@ -14,11 +14,11 @@ use fuchsia_async::unblock;
 use fuchsia_fs::directory::{
     open_directory_no_describe_deprecated, open_file_no_describe_deprecated,
 };
-use fuchsia_zircon_status::Status;
 use futures::StreamExt;
 use std::io::{BufRead, Write};
 use std::process::Command;
 use tempfile::{NamedTempFile, TempPath};
+use zx_status::Status;
 
 // Must be kept in sync with //src/sys/core/core_component_id_index.json5.
 const STORAGE_ID: &str = "eb345fb7dcaa4260ee0c65bb73ef0ec5341b15a4f603f358d6631c4be6bf7080";

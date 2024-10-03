@@ -72,6 +72,7 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
   void Generate(Nullability value);
   void Generate(Strictness value);
   void Generate(Openness value);
+  void Generate(TransportSide value);
 
   void Generate(const RawIdentifier& value);
   void Generate(const AttributeArg& value);

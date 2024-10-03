@@ -5,7 +5,6 @@
 use anyhow::{anyhow, Context as _, Error};
 use fidl_fuchsia_device::ControllerMarker;
 use fidl_fuchsia_hardware_block::BlockMarker;
-use fuchsia_zircon as zx;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlockDevice {

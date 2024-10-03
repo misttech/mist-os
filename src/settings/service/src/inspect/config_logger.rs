@@ -106,12 +106,12 @@ mod tests {
     use super::*;
     use crate::config::base::ConfigLoadStatus;
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_zircon::MonotonicTime;
+    use zx::MonotonicInstant;
 
     #[fuchsia::test]
     fn test_listener_logger() {
         // Set clock for consistent timestamps.
-        clock::mock::set(MonotonicTime::from_nanos(0));
+        clock::mock::set(MonotonicInstant::from_nanos(0));
 
         let mut logger = InspectConfigLogger::new();
 
@@ -140,7 +140,7 @@ mod tests {
     #[fuchsia::test]
     fn test_response_counts() {
         // Set clock for consistent timestamps.
-        clock::mock::set(MonotonicTime::from_nanos(0));
+        clock::mock::set(MonotonicInstant::from_nanos(0));
 
         let mut logger = InspectConfigLogger::new();
 

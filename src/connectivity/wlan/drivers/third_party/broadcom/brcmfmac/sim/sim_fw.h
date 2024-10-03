@@ -155,6 +155,8 @@ class SimFirmware {
     uint8_t target_bss_info_ies[BSS_INFO_IES_MAX_LEN];
     // If we need to send disassoc during roam, we need to know the original BSS channel.
     wlan_common::WlanChannel orig_bss_channel;
+    // Firmware-initiated and SME-initiated roams have slightly different behavior.
+    bool firmware_initiated;
   };
 
  public:

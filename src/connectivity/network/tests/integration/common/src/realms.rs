@@ -110,6 +110,19 @@ impl NetstackVersion {
     }
 }
 
+/// An extension trait for [`Netstack`].
+pub trait NetstackExt {
+    /// Whether to use the out of stack DHCP client for the given Netstack.
+    const USE_OUT_OF_STACK_DHCP_CLIENT: bool;
+}
+
+impl<N: Netstack> NetstackExt for N {
+    const USE_OUT_OF_STACK_DHCP_CLIENT: bool = match Self::VERSION {
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => true,
+        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => false,
+    };
+}
+
 /// The NetCfg version.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum NetCfgVersion {

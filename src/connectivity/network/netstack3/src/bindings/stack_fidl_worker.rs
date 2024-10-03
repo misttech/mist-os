@@ -74,7 +74,7 @@ impl StackFidlWorker {
                     StackRequest::BridgeInterfaces { interfaces: _, bridge, control_handle: _ } => {
                         error!("bridging is not supported in netstack3");
                         bridge
-                            .close_with_epitaph(fuchsia_zircon::Status::NOT_SUPPORTED)
+                            .close_with_epitaph(zx::Status::NOT_SUPPORTED)
                             .unwrap_or_else(|e| debug!("failed to close bridge control {:?}", e));
                     }
                 }

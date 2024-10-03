@@ -889,6 +889,9 @@ func chooseLintTargets(
 
 	var targets []string
 	for _, clippy := range modules.ClippyTargets() {
+		if clippy.DisableClippy {
+			continue
+		}
 		include, err := shouldInclude(clippy.Sources)
 		if err != nil {
 			return nil, err

@@ -49,6 +49,7 @@ parser.add_argument(
     default=None,
     help="path to FFX subtools path.",
 )
+# TODO(b/369445945): will be deleted after removing "transport" arg from all of "python_mobly_tests()"
 parser.add_argument(
     "--transport",
     default=None,
@@ -87,7 +88,6 @@ def main() -> None:
     """
     factory = driver_factory.DriverFactory(
         honeydew_config=generate_honeydew_config(),
-        transport=args.transport,
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,

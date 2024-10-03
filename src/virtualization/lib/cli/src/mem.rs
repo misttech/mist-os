@@ -7,7 +7,7 @@ use fidl_fuchsia_virtualization::{
     GuestMarker, GuestStatus, MemControllerMarker, MemControllerProxy,
 };
 use std::fmt;
-use {fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
+use {guest_cli_args as arguments, zx_status};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct RequestSizeResult {

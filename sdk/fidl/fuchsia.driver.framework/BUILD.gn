@@ -29,5 +29,6 @@ fidl("fuchsia.driver.framework") {
     "//sdk/fidl/fuchsia.url",
   ]
   enable_hlcpp = true
+  enable_rust_drivers = true
   contains_drivers = true
 }

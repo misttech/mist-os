@@ -87,7 +87,6 @@ closed protocol Clockfuncs {
     /// ## Errors
     ///
     /// `zx_clock_get_boot()` cannot fail.
-    @next
     @vdsocall
     strict ClockGetBoot() -> (@wrapped_return struct {
         time Time;

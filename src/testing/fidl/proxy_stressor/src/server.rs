@@ -36,7 +36,7 @@ async fn serve_stressor(stream: fstress::StressorRequestStream) -> Result<(), Er
                             Ok(bytes) => {
                                 bytes_written += bytes;
                             }
-                            Err(fuchsia_zircon::Status::SHOULD_WAIT) => break,
+                            Err(zx::Status::SHOULD_WAIT) => break,
                             Err(status) => {
                                 warn!("Error while writing to socket: {:?}", status);
                                 return Err(status.into());

@@ -34,6 +34,7 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//sdk/rust/zx",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/format/rust",
@@ -45,7 +46,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",

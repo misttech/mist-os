@@ -10,8 +10,7 @@
 use crate::runtime::{EHandle, Time, WakeupTime};
 use crate::PacketReceiver;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef as _;
+
 use futures::stream::FusedStream;
 use futures::task::{AtomicWaker, Context};
 use futures::{FutureExt, Stream};
@@ -22,20 +21,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use std::task::Poll;
 use std::{cmp, fmt};
+use zx::AsHandleRef as _;
 
 pub trait TimeInterface:
     Clone + Copy + fmt::Debug + PartialEq + PartialOrd + Ord + Send + Sync + 'static
 {
     type Timeline: zx::Timeline + Send + Sync + 'static;
 
-    fn into_zx(self) -> zx::Time<Self::Timeline>;
+    fn into_zx(self) -> zx::Instant<Self::Timeline>;
     fn now() -> Self;
 }
 
 impl TimeInterface for Time {
     type Timeline = zx::MonotonicTimeline;
 
-    fn into_zx(self) -> zx::MonotonicTime {
+    fn into_zx(self) -> zx::MonotonicInstant {
         self.into_zx()
     }
 
@@ -58,7 +58,7 @@ impl WakeupTime for Time {
     }
 }
 
-impl WakeupTime for zx::MonotonicTime {
+impl WakeupTime for zx::MonotonicInstant {
     fn into_time(self) -> Time {
         self.into()
     }
@@ -396,9 +396,9 @@ mod test {
     use super::*;
     use crate::{LocalExecutor, SendExecutor, TestExecutor};
     use assert_matches::assert_matches;
-    use fuchsia_zircon::Duration;
     use futures::future::Either;
     use futures::prelude::*;
+    use zx::Duration;
 
     #[test]
     fn shorter_fires_first() {

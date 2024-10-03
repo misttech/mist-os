@@ -9,19 +9,19 @@ use fuchsia_component::client;
 use lazy_static::lazy_static;
 use {
     fidl_fuchsia_testing_harness as ftth, fidl_fuchsia_time as fft, fidl_test_time_realm as fttr,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 lazy_static! {
     // A sample backstop time.
-    static ref BACKSTOP_TIME: zx::SyntheticTime = from_rfc2822("Sun, 20 Sep 2020 01:01:01 GMT");
+    static ref BACKSTOP_TIME: zx::SyntheticInstant = from_rfc2822("Sun, 20 Sep 2020 01:01:01 GMT");
 
     // A sample valid time.  It is strictly after backstop.
-    static ref VALID_TIME: zx::SyntheticTime = from_rfc2822("Tue, 29 Sep 2020 02:19:01 GMT");
+    static ref VALID_TIME: zx::SyntheticInstant = from_rfc2822("Tue, 29 Sep 2020 02:19:01 GMT");
 }
 
-fn from_rfc2822(date: &str) -> zx::SyntheticTime {
-    zx::SyntheticTime::from_nanos(
+fn from_rfc2822(date: &str) -> zx::SyntheticInstant {
+    zx::SyntheticInstant::from_nanos(
         chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos_opt().unwrap(),
     )
 }
@@ -73,7 +73,7 @@ async fn test_example() {
 
     // Sampling the monotonic clock directly is OK since we configured the timekeeper test realm
     // to use the real monotonic clock. See `fttr::RealmOptions` above.
-    let sample_monotonic = zx::MonotonicTime::get();
+    let sample_monotonic = zx::MonotonicInstant::get();
 
     // Convert to a proxy so we can send RPCs.
     let push_source_puppet = push_source_puppet_client_end.into_proxy().expect("infallible");

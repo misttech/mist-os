@@ -8,7 +8,7 @@
 
 use crate::interface;
 use fidl_fuchsia_net::MacAddress;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use std::marker::PhantomPinned;
 use std::pin::Pin;

@@ -11,9 +11,9 @@ use crate::directory::entry::EntryInfo;
 use crate::directory::traversal_position::TraversalPosition;
 
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::any::Any;
 use std::convert::TryInto as _;
+use zx_status::Status;
 
 /// An instance of this type represents a sink that may still accept additional entries.  Depending
 /// on the entry size it may turn itself into a [`Done`] value, indicating that the internal buffer

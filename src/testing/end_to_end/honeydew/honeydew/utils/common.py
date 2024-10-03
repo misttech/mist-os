@@ -5,6 +5,7 @@
 import logging
 import time
 from collections.abc import Callable
+from typing import Any
 
 from honeydew import errors
 from honeydew.utils import decorators
@@ -129,3 +130,43 @@ def retry(
         raise errors.HoneydewTimeoutError(
             f"{fn.__qualname__} didn't succeed in {timeout} sec"
         )
+
+
+def read_from_dict(
+    d: dict[str, Any],
+    key_path: tuple[str, ...],
+    should_exist: bool = True,
+) -> Any:
+    """Given a (nested) dictionary and path to the key, return value at that key.
+
+    Args:
+        d: Input nested dictionary
+        key_path: path from root key to destination key
+        should_exist: If set to True, exception will be raised if key does not exist. Otherwise,
+            returns None.
+
+    Returns:
+        Value of the key if exist. Return None or raise exception, otherwise
+
+    Raises:
+        errors.ConfigError: Failed to traverse to the key using path
+    """
+    try:
+        traversed_path: list[str] = []
+        item_value: Any = d
+        for item in key_path:
+            item_value = item_value[item]
+            traversed_path.append(item)
+        return item_value
+    except KeyError as err:
+        traversed_path.append(item)
+        _LOGGER.info(
+            "'%s' does not exist in the dict: %s",
+            traversed_path,
+            d,
+        )
+        if should_exist:
+            raise errors.ConfigError(
+                f"'{traversed_path}' does not exist in the config dict passed during init."
+            ) from err
+        return None

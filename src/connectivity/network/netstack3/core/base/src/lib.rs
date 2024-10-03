@@ -69,8 +69,9 @@ pub use tcp::segment::{Options, Payload, PayloadLen, Segment, SegmentHeader};
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
-    CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
-    IntoCoreTimerCtx, NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext, TimerHandler,
+    AtomicInstant, CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes,
+    InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext,
+    TimerHandler,
 };
 pub use trace::TracingContext;
 pub use uninstantiable::{Uninstantiable, UninstantiableWrapper};
@@ -145,8 +146,8 @@ pub mod testutil {
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
-        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, InstantAndData,
-        WithFakeTimerContext,
+        FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
+        InstantAndData, WithFakeTimerContext,
     };
     pub use crate::trace::testutil::FakeTracingCtx;
     pub use addr::{TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};

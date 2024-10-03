@@ -37,7 +37,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx, hex,
+    fidl_fuchsia_wlan_sme as fidl_sme, hex, zx,
 };
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;
@@ -705,7 +705,7 @@ fn save_and_connect(
     assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
     let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
-        timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
         bss_description: random_fidl_bss_description!(
             protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(scanned_security),
             bssid: [0, 0, 0, 0, 0, 0],
@@ -991,7 +991,7 @@ fn test_save_and_fail_to_connect(
         assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
         let mock_scan_results = vec![fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(scanned_security),
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -1153,7 +1153,7 @@ fn test_connect_to_new_network() {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: mutual_security_protocols.clone(),
             })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Wpa2Personal),
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -1165,7 +1165,7 @@ fn test_connect_to_new_network() {
         },
         fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Wpa2Personal),
                 bssid: [0, 0, 0, 0, 0, 1],
@@ -1319,7 +1319,7 @@ fn test_autoconnect_to_saved_network() {
     assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
     let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
-        timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
         bss_description: random_fidl_bss_description!(
             protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Wpa2Personal),
             bssid: [0, 0, 0, 0, 0, 0],
@@ -1560,7 +1560,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
         let mock_scan_results = vec![fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Wpa2Personal),
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -2179,7 +2179,7 @@ fn test_connect_failure_recovery() {
         compatibility: Some(Box::new(fidl_sme::Compatibility {
             mutual_security_protocols: vec![fidl_common_security::Protocol::Open],
         })),
-        timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
         bss_description: random_fidl_bss_description!(
             protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(fidl_sme::Protection::Open),
             bssid: [0, 0, 0, 0, 0, 0],

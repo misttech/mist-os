@@ -16,11 +16,11 @@ use fuchsia_inspect::hierarchy::*;
 /// local ("data::Data") implementation before sending them to the puppets.
 use fuchsia_inspect::Property as UsablePropertyTrait;
 use fuchsia_inspect::*;
-use fuchsia_zircon::HandleBased;
 use futures::prelude::*;
 use inspect_runtime::{service, TreeServerSendPreference};
 use std::collections::HashMap;
 use tracing::{error, info, warn};
+use zx::HandleBased;
 
 #[derive(Debug)]
 enum Property {

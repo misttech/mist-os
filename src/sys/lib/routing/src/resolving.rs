@@ -11,10 +11,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use url::Url;
 use version_history::AbiRevision;
-use {
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fuchsia_zircon_status as zx,
-};
+use {fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio, zx_status as zx};
 
 #[cfg(target_os = "fuchsia")]
 use cm_rust::{FidlIntoNative, NativeIntoFidl};

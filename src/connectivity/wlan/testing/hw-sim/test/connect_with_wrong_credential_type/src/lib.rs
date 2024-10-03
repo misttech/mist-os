@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::{self as zx};
+
 use ieee80211::Bssid;
 use lazy_static::lazy_static;
 use std::pin::pin;

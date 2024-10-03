@@ -10,7 +10,7 @@ use diagnostics_data::{
 };
 use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
 use flyweights::FlyStr;
-use fuchsia_zircon as zx;
+
 use libc::{c_char, c_int};
 use std::{mem, str};
 
@@ -126,7 +126,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoggerMessage {
-    pub timestamp: zx::BootTime,
+    pub timestamp: zx::BootInstant,
     pub raw_severity: u8,
     pub pid: u64,
     pub tid: u64,
@@ -157,7 +157,7 @@ impl TryFrom<&[u8]> for LoggerMessage {
 
         let pid = LittleEndian::read_u64(&bytes[..8]);
         let tid = LittleEndian::read_u64(&bytes[8..16]);
-        let timestamp = zx::BootTime::from_nanos(LittleEndian::read_i64(&bytes[16..24]));
+        let timestamp = zx::BootInstant::from_nanos(LittleEndian::read_i64(&bytes[16..24]));
 
         let raw_severity = LittleEndian::read_i32(&bytes[24..28]);
         let raw_severity = if raw_severity > (u8::MAX as i32) {

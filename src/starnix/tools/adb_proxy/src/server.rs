@@ -10,7 +10,7 @@ use fidl_fuchsia_vsock::{
     ConnectorMarker,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 
 pub struct ProxyServer {

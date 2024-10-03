@@ -136,6 +136,10 @@ impl BpfValue {
         self.0 as u32
     }
 
+    pub fn as_i32(&self) -> i32 {
+        self.0 as i32
+    }
+
     pub fn as_u64(&self) -> u64 {
         self.0
     }
@@ -151,7 +155,7 @@ impl BpfValue {
 
 /// Wrapper around the helper function needed to access the content of a packet.
 pub struct PacketAccessor<C: EbpfRunContext>(
-    Arc<dyn Fn(&mut C::Context<'_>, BpfValue, u16, DataWidth) -> Option<BpfValue> + Send + Sync>,
+    Arc<dyn Fn(&mut C::Context<'_>, BpfValue, i32, DataWidth) -> Option<BpfValue> + Send + Sync>,
 );
 
 impl<C: EbpfRunContext> PacketAccessor<C> {
@@ -159,17 +163,17 @@ impl<C: EbpfRunContext> PacketAccessor<C> {
     pub fn run(
         &self,
         context: &mut C::Context<'_>,
-        sk_buf_ptr: BpfValue,
-        offset: u16,
+        packet_ptr: BpfValue,
+        offset: i32,
         width: DataWidth,
     ) -> Option<BpfValue> {
-        self.0(context, sk_buf_ptr, offset, width)
+        self.0(context, packet_ptr, offset, width)
     }
 }
 
 impl<C: EbpfRunContext> PacketAccessor<C> {
     pub fn new(
-        f: impl Fn(&mut C::Context<'_>, BpfValue, u16, DataWidth) -> Option<BpfValue>
+        f: impl Fn(&mut C::Context<'_>, BpfValue, i32, DataWidth) -> Option<BpfValue>
             + Send
             + Sync
             + 'static,
@@ -181,6 +185,29 @@ impl<C: EbpfRunContext> PacketAccessor<C> {
 impl<C: EbpfRunContext> std::fmt::Debug for PacketAccessor<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("PacketAccessor").finish()
+    }
+}
+
+/// A `PacketAccessor` callback that reads the data from a value of type `T`.
+pub fn read_raw_packet_data<C, T>(
+    _context: &mut C,
+    packet_ptr: BpfValue,
+    offset: i32,
+    width: DataWidth,
+) -> Option<BpfValue>
+where
+    T: IntoBytes + Immutable,
+{
+    let data = unsafe { packet_ptr.as_ptr::<T>().as_ref()? }.as_bytes();
+    if offset < 0 || offset as usize >= data.len() {
+        return None;
+    }
+    let slice = &data[(offset as usize)..];
+    match width {
+        DataWidth::U8 => u8::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+        DataWidth::U16 => u16::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+        DataWidth::U32 => u32::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+        DataWidth::U64 => u64::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
     }
 }
 
@@ -292,17 +319,19 @@ pub struct EbpfProgram<C: EbpfRunContext> {
 }
 
 impl<C: EbpfRunContext> EbpfProgram<C> {
-    /// Executes the current program on the provided data.  Warning: If
-    /// this program was a cbpf program, and it uses BPF_MEM, the
-    /// scratch memory must be provided by the caller to this
-    /// function.  The translated CBPF program will use the last 16
-    /// words of |data|.
+    /// Executes the current program passing `data` and `packet_size` as two
+    /// arguments.
+    ///
+    /// Warning: If this program was a cBPF program then the `data` must be the
+    /// packet. It's passed to the `PacketAccessor` as the packet. `packet_size`
+    /// specified the value loaded by `BPF_LD | BPF_LEN`.
     pub fn run<T: IntoBytes + FromBytes + Immutable>(
         &self,
         run_context: &mut C::Context<'_>,
         data: &mut T,
+        packet_size: usize,
     ) -> u64 {
-        self.run_with_slice(run_context, data.as_mut_bytes())
+        self.run_with_arguments(run_context, &[data as *mut T as u64, packet_size as u64])
     }
 
     /// Executes the current program on the provided data.  Warning: If
@@ -321,21 +350,29 @@ impl<C: EbpfRunContext> EbpfProgram<C> {
 
 impl EbpfProgram<()> {
     /// This method instantiates an EbpfProgram given a cbpf original.
-    pub fn from_cbpf<T>(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
-        let code = cbpf_to_ebpf(bpf_code)?;
-        let buffer_size = std::mem::size_of::<T>() as u64;
-        let mut builder = EbpfProgramBuilder::<()>::default();
+    pub fn from_cbpf(
+        bpf_code: &[sock_filter],
+        packet_accessor: PacketAccessor<()>,
+    ) -> Result<Self, EbpfError> {
+        let mut builder = EbpfProgramBuilder::default();
+        let packet_memory_id = new_bpf_type_identifier();
         builder.set_args(&[
+            // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
+            // packet is supposed to be access only through the `PacketAccessor` which validates
+            // the offset in runtime.
             Type::PtrToMemory {
-                id: new_bpf_type_identifier(),
+                id: packet_memory_id.clone(),
                 offset: 0,
-                buffer_size,
+                buffer_size: 0,
                 fields: Default::default(),
                 mappings: Default::default(),
             },
-            Type::from(buffer_size),
+            // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
+            // value pointed by the first argument.
+            Type::ScalarValueParameter,
         ]);
-        builder.load(code, &mut NullVerifierLogger)
+        builder.set_packet_descriptor(PacketDescriptor { packet_memory_id, packet_accessor });
+        builder.load(cbpf_to_ebpf(bpf_code)?, &mut NullVerifierLogger)
     }
 }
 
@@ -374,7 +411,7 @@ mod test {
         result: u32,
         msg: &str,
     ) {
-        let return_value = prg.run(&mut (), &mut data);
+        let return_value = prg.run(&mut (), &mut data, std::mem::size_of::<seccomp_data>());
         assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
     }
 
@@ -413,7 +450,11 @@ mod test {
             sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
         ];
 
-        let prg = EbpfProgram::from_cbpf::<seccomp_data>(&test_prg).expect("Error parsing program");
+        let prg = EbpfProgram::<()>::from_cbpf(
+            &test_prg,
+            PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
+        )
+        .expect("Error parsing program");
 
         with_prg_assert_result(
             &prg,
@@ -487,8 +528,11 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg =
-                EbpfProgram::from_cbpf::<seccomp_data>(&test_prg).expect("Error parsing program");
+            let prg = EbpfProgram::<()>::from_cbpf(
+                &test_prg,
+                PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
+            )
+            .expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -514,8 +558,11 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg =
-                EbpfProgram::from_cbpf::<seccomp_data>(&test_prg).expect("Error parsing program");
+            let prg = EbpfProgram::<()>::from_cbpf(
+                &test_prg,
+                PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
+            )
+            .expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -586,7 +633,7 @@ mod test {
         let v_ptr = (&v as *const u64) as u64;
         let mut data =
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &mut data), v);
+        assert_eq!(program.run(&mut (), &mut data, 0), v);
     }
 
     #[test]
@@ -640,7 +687,7 @@ mod test {
         let v_ptr = (&v as *const u64) as u64;
         let mut data =
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &mut data), v);
+        assert_eq!(program.run(&mut (), &mut data, 0), v);
     }
 
     #[test]
@@ -681,6 +728,47 @@ mod test {
         let v_ptr = (&v as *const u64) as u64;
         let mut data =
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &mut data), 17);
+        assert_eq!(program.run(&mut (), &mut data, 0), 17);
+    }
+
+    #[test]
+    fn test_invalid_packet_load() {
+        let program = r#"
+        mov %r6, %r2
+        mov %r0, 0
+        ldpw
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+
+        let packet_memory_id = new_bpf_type_identifier();
+        builder.set_packet_descriptor(PacketDescriptor {
+            packet_memory_id: packet_memory_id.clone(),
+            packet_accessor: PacketAccessor::new(read_raw_packet_data::<(), ()>),
+        });
+        let second_memory_id = new_bpf_type_identifier();
+        builder.set_args(&[
+            Type::PtrToMemory {
+                id: packet_memory_id,
+                offset: 0,
+                buffer_size: 16,
+                fields: Default::default(),
+                mappings: Default::default(),
+            },
+            Type::PtrToMemory {
+                id: second_memory_id,
+                offset: 0,
+                buffer_size: 16,
+                fields: Default::default(),
+                mappings: Default::default(),
+            },
+        ]);
+
+        assert_eq!(
+            builder.load(code, &mut NullVerifierLogger).expect_err("validation should fail"),
+            EbpfError::ProgramLoadError("R6 is not a packet at pc 2".to_string())
+        );
     }
 }

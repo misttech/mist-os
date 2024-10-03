@@ -30,8 +30,7 @@ use tracing::{error, info, warn};
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp,
     fidl_fuchsia_ui_composition as fland, fidl_fuchsia_ui_pointer as fptr,
-    fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync, fuchsia_trace as trace,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync, fuchsia_trace as trace, zx,
 };
 
 const IMAGE_COUNT: usize = 3;
@@ -93,7 +92,7 @@ struct AppModel<'a> {
     internal_sender: UnboundedSender<InternalMessage>,
     sched_lib: &'a dyn SchedulingLib,
     hue: f32,
-    last_expected_presentation_time: zx::MonotonicTime,
+    last_expected_presentation_time: zx::MonotonicInstant,
     is_focused: bool,
     frame_count: usize,
 }
@@ -111,7 +110,7 @@ impl<'a> AppModel<'a> {
             hue: 0.0,
             // If there are multiple instances of this example on-screen, it looks prettier if they
             // don't all have exactly the same color, which would happen if we zeroed this value.
-            last_expected_presentation_time: zx::MonotonicTime::get(),
+            last_expected_presentation_time: zx::MonotonicInstant::get(),
             is_focused: false,
             frame_count: 0,
         }
@@ -272,7 +271,11 @@ impl<'a> AppModel<'a> {
         .detach();
     }
 
-    fn draw(&mut self, expected_presentation_time: zx::MonotonicTime, renderer: &mut dyn Renderer) {
+    fn draw(
+        &mut self,
+        expected_presentation_time: zx::MonotonicInstant,
+        renderer: &mut dyn Renderer,
+    ) {
         trace::duration!(c"gfx", c"FlatlandViewProvider::draw");
 
         self.frame_count += 1;
@@ -486,8 +489,8 @@ async fn main() {
                     .iter()
                     .map(
                       |x| PresentationInfo{
-                        latch_point: zx::MonotonicTime::from_nanos(x.latch_point.unwrap()),
-                        presentation_time: zx::MonotonicTime::from_nanos(x.presentation_time.unwrap())
+                        latch_point: zx::MonotonicInstant::from_nanos(x.latch_point.unwrap()),
+                        presentation_time: zx::MonotonicInstant::from_nanos(x.presentation_time.unwrap())
                       })
                     .collect();
                     sched_lib.on_next_frame_begin(additional_present_credits, infos);
@@ -498,14 +501,14 @@ async fn main() {
                     .iter()
                     .map(|info| PresentedInfo{
                       present_received_time:
-                        zx::MonotonicTime::from_nanos(info.present_received_time.unwrap()),
+                        zx::MonotonicInstant::from_nanos(info.present_received_time.unwrap()),
                       actual_latch_point:
-                        zx::MonotonicTime::from_nanos(info.latched_time.unwrap()),
+                        zx::MonotonicInstant::from_nanos(info.latched_time.unwrap()),
                     })
                     .collect();
 
                     sched_lib.on_frame_presented(
-                      zx::MonotonicTime::from_nanos(frame_presented_info.actual_presentation_time),
+                      zx::MonotonicInstant::from_nanos(frame_presented_info.actual_presentation_time),
                       presented_infos);
                   }
                   InternalMessage::FocusChanged{ is_focused } => {

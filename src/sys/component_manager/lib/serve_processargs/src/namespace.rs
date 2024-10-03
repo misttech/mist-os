@@ -168,7 +168,6 @@ mod tests {
     use fidl::endpoints::{self, Proxy, ServerEnd};
     use fidl::Peered;
     use fuchsia_fs::directory::DirEntry;
-    use fuchsia_zircon::AsHandleRef;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
     use sandbox::Directory;
@@ -178,7 +177,8 @@ mod tests {
     use vfs::directory::entry_container::Directory as VfsDirectory;
     use vfs::remote::RemoteLike;
     use vfs::{path, pseudo_directory};
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::AsHandleRef;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
     fn connector_cap() -> Capability {
         let (sender, _receiver) = multishot();
@@ -321,7 +321,7 @@ mod tests {
         // Make sure the server_end is received, and test connectivity.
         let server_end: zx::Channel = receiver.receive().await.unwrap().channel.into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST).unwrap();
     }
 
     #[fuchsia::test]

@@ -58,7 +58,7 @@ async fn test_error_propagation() {
     assert_matches!(
         factory_reset_proxy.watch().await,
         Err(fidl::Error::ClientChannelClosed {
-            status: fuchsia_zircon::Status::UNAVAILABLE,
+            status: zx::Status::UNAVAILABLE,
             protocol_name: "fuchsia.settings.FactoryReset"
         })
     );

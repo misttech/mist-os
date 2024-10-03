@@ -42,7 +42,6 @@
 		fdio_fd_create_null;
 		fdio_fd_transfer;
 		fdio_fd_transfer_or_clone;
-		fdio_get_service_handle;
 		fdio_get_vmo_clone;
 		fdio_get_vmo_copy;
 		fdio_get_vmo_exact;
@@ -53,7 +52,6 @@
 		fdio_ns_bind_fd;
 		fdio_ns_bind_local;
 		fdio_ns_chdir;
-		fdio_ns_connect;
 		fdio_ns_create;
 		fdio_ns_destroy;
 		fdio_ns_export;
@@ -72,8 +70,6 @@
 		fdio_open_fd;
 		fdio_open_fd_at;
 		fdio_pipe_half;
-		fdio_service_clone;
-		fdio_service_clone_to;
 		fdio_service_connect;
 		fdio_service_connect_at;
 		fdio_service_connect_by_name;

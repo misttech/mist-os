@@ -17,10 +17,7 @@ use wlan_common::sequence::SequenceManager;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm, TimeUnit};
 use wlan_frame_writer::{write_frame, write_frame_with_fixed_slice};
-use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme, zx};
 
 /// BeaconParams contains parameters that may be used to offload beaconing to the hardware.
 pub struct BeaconOffloadParams {

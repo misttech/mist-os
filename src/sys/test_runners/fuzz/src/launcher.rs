@@ -12,8 +12,7 @@ use test_runners_lib::launch;
 use test_runners_lib::logs::LoggerStream;
 use zx::HandleBased;
 use {
-    fidl_fuchsia_fuzzer as fuzzer, fidl_fuchsia_process as fproc, fuchsia_runtime as runtime,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_fuzzer as fuzzer, fidl_fuchsia_process as fproc, fuchsia_runtime as runtime, zx,
 };
 
 static VDSO_VMO: LazyLock<zx::Handle> = LazyLock::new(|| {

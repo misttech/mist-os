@@ -17,9 +17,6 @@ use crate::vfs::{
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Metadata, Node, NodeInfo};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{
-    HandleBased, {self as zx},
-};
 use starnix_logging::{impossible_error, log_warn};
 use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::auth::FsCred;
@@ -32,6 +29,9 @@ use starnix_uapi::{errno, error, from_status_like_fdio, ino_t, off_t, statfs};
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
+use zx::{
+    HandleBased, {self as zx},
+};
 
 const REMOTE_BUNDLE_NODE_LRU_CAPACITY: usize = 1024;
 
@@ -155,7 +155,7 @@ impl Inner {
     fn get_memory(&mut self) -> Result<Arc<MemoryObject>, Errno> {
         if let Inner::NeedsVmo(file) = &*self {
             let memory = Arc::new(MemoryObject::from(
-                file.get_backing_memory(fio::VmoFlags::READ, zx::MonotonicTime::INFINITE)
+                file.get_backing_memory(fio::VmoFlags::READ, zx::MonotonicInstant::INFINITE)
                     .map_err(|err| errno!(EIO, format!("Error {err} on GetBackingMemory")))?
                     .map_err(|s| from_status_like_fdio!(zx::Status::from_raw(s)))?,
             ));
@@ -522,7 +522,7 @@ mod test {
     use starnix_uapi::open_flags::OpenFlags;
     use starnix_uapi::{ino_t, off_t};
     use std::collections::{HashMap, HashSet};
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     #[::fuchsia::test]
     async fn test_read_image() {

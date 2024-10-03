@@ -22,7 +22,6 @@ use fuchsia_component_test::{
     Route,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, HandleBased, Rights};
 use futures::channel::mpsc::Sender;
 use futures::stream::{Stream, StreamExt, TryStreamExt};
 use futures::{Future, FutureExt, SinkExt};
@@ -34,6 +33,7 @@ use time_metrics_registry::PROJECT_ID;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::pseudo_directory;
+use zx::{self as zx, HandleBased, Rights};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// URL for timekeeper.
@@ -451,7 +451,7 @@ pub enum RtcOptions {
     /// does not have a RTC circuit available.
     None,
     /// Fake real-time clock. Supplied initial RTC time to report.
-    InitialRtcTime(zx::SyntheticTime),
+    InitialRtcTime(zx::SyntheticInstant),
     /// Injected real-time clock.
     ///
     /// This is the handle that will appear as the directory
@@ -477,21 +477,21 @@ impl From<fidl_test_time_realm::RtcOptions> for RtcOptions {
                 RtcOptions::InjectedRtc(h.into_proxy().expect("can be converted to proxy"))
             }
             fidl_test_time_realm::RtcOptions::InitialRtcTime(t) => {
-                RtcOptions::InitialRtcTime(zx::SyntheticTime::from_nanos(t))
+                RtcOptions::InitialRtcTime(zx::SyntheticInstant::from_nanos(t))
             }
             _ => unimplemented!(),
         }
     }
 }
 
-impl From<zx::SyntheticTime> for RtcOptions {
-    fn from(value: zx::SyntheticTime) -> Self {
+impl From<zx::SyntheticInstant> for RtcOptions {
+    fn from(value: zx::SyntheticInstant) -> Self {
         RtcOptions::InitialRtcTime(value)
     }
 }
 
-impl From<Option<zx::SyntheticTime>> for RtcOptions {
-    fn from(value: Option<zx::SyntheticTime>) -> Self {
+impl From<Option<zx::SyntheticInstant>> for RtcOptions {
+    fn from(value: Option<zx::SyntheticInstant>) -> Self {
         value.map(|t| t.into()).unwrap_or(Self::None)
     }
 }
@@ -598,7 +598,7 @@ async fn setup_rtc(
 }
 
 async fn serve_fake_rtc(
-    initial_time: zx::SyntheticTime,
+    initial_time: zx::SyntheticInstant,
     rtc_updates: RtcUpdates,
     mut stream: DeviceRequestStream,
 ) {
@@ -681,20 +681,22 @@ async fn maintenance_mock_server(
     Ok(())
 }
 
-fn from_rfc2822(date: &str) -> zx::SyntheticTime {
-    zx::SyntheticTime::from_nanos(
+fn from_rfc2822(date: &str) -> zx::SyntheticInstant {
+    zx::SyntheticInstant::from_nanos(
         chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos_opt().unwrap(),
     )
 }
 
 lazy_static! {
-    pub static ref BACKSTOP_TIME: zx::SyntheticTime = from_rfc2822("Sun, 20 Sep 2020 01:01:01 GMT");
-    pub static ref VALID_RTC_TIME: zx::SyntheticTime =
+    pub static ref BACKSTOP_TIME: zx::SyntheticInstant =
+        from_rfc2822("Sun, 20 Sep 2020 01:01:01 GMT");
+    pub static ref VALID_RTC_TIME: zx::SyntheticInstant =
         from_rfc2822("Sun, 20 Sep 2020 02:02:02 GMT");
-    pub static ref BEFORE_BACKSTOP_TIME: zx::SyntheticTime =
+    pub static ref BEFORE_BACKSTOP_TIME: zx::SyntheticInstant =
         from_rfc2822("Fri, 06 Mar 2020 04:04:04 GMT");
-    pub static ref VALID_TIME: zx::SyntheticTime = from_rfc2822("Tue, 29 Sep 2020 02:19:01 GMT");
-    pub static ref VALID_TIME_2: zx::SyntheticTime = from_rfc2822("Wed, 30 Sep 2020 14:59:59 GMT");
+    pub static ref VALID_TIME: zx::SyntheticInstant = from_rfc2822("Tue, 29 Sep 2020 02:19:01 GMT");
+    pub static ref VALID_TIME_2: zx::SyntheticInstant =
+        from_rfc2822("Wed, 30 Sep 2020 14:59:59 GMT");
 }
 
 /// Time between each reported sample.
@@ -714,7 +716,7 @@ pub fn new_nonshareable_clock() -> zx::SyntheticClock {
     zx::SyntheticClock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME)).unwrap()
 }
 
-fn zx_time_to_rtc_time(zx_time: zx::SyntheticTime) -> fidl_fuchsia_hardware_rtc::Time {
+fn zx_time_to_rtc_time(zx_time: zx::SyntheticInstant) -> fidl_fuchsia_hardware_rtc::Time {
     let date = chrono::Utc.timestamp_nanos(zx_time.into_nanos());
     fidl_fuchsia_hardware_rtc::Time {
         seconds: date.second() as u8,
@@ -726,7 +728,7 @@ fn zx_time_to_rtc_time(zx_time: zx::SyntheticTime) -> fidl_fuchsia_hardware_rtc:
     }
 }
 
-pub fn rtc_time_to_zx_time(rtc_time: fidl_fuchsia_hardware_rtc::Time) -> zx::SyntheticTime {
+pub fn rtc_time_to_zx_time(rtc_time: fidl_fuchsia_hardware_rtc::Time) -> zx::SyntheticInstant {
     let date = chrono::Utc
         .with_ymd_and_hms(
             rtc_time.year as i32,
@@ -737,7 +739,7 @@ pub fn rtc_time_to_zx_time(rtc_time: fidl_fuchsia_hardware_rtc::Time) -> zx::Syn
             rtc_time.seconds as u32,
         )
         .unwrap();
-    zx::SyntheticTime::from_nanos(date.timestamp_nanos_opt().unwrap())
+    zx::SyntheticInstant::from_nanos(date.timestamp_nanos_opt().unwrap())
 }
 
 /// Create a stream of MetricEvents from a proxy.

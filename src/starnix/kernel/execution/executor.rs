@@ -20,9 +20,6 @@ use anyhow::{format_err, Error};
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
-use fuchsia_zircon::{
-    AsHandleRef, {self as zx},
-};
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
     firehose_trace_instant, log_error, log_trace, log_warn, set_zx_name, ARG_NAME,
@@ -39,6 +36,9 @@ use starnix_uapi::{errno, from_status_like_fdio, pid_t};
 use std::os::unix::thread::JoinHandleExt;
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
+use zx::{
+    AsHandleRef, {self as zx},
+};
 
 extern "C" {
     fn restricted_enter_loop(

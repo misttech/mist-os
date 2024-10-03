@@ -62,7 +62,7 @@ pub struct ExecutableRegion {
 #[derive(Debug)]
 pub struct ThreadInfo {
     /// The thread's koid.
-    pub koid: fuchsia_zircon_types::zx_koid_t,
+    pub koid: zx_types::zx_koid_t,
 
     /// The thread's name.
     pub name: String,

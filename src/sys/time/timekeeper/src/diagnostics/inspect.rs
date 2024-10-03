@@ -12,9 +12,9 @@ use fidl_fuchsia_time_external::Status;
 use fuchsia_inspect::{
     Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
 };
-use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcTime};
+use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcInstant};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use futures::FutureExt;
 use inspect_writable::{InspectWritable, InspectWritableNode};
 use lazy_static::lazy_static;
@@ -37,7 +37,7 @@ lazy_static! {
 }
 
 fn monotonic_time() -> i64 {
-    zx::MonotonicTime::get().into_nanos()
+    zx::MonotonicInstant::get().into_nanos()
 }
 
 /// A vector of inspect nodes used to store some struct implementing `InspectWritable`, where the
@@ -92,7 +92,7 @@ impl TimeSet {
     pub fn now(clock: &UtcClock) -> Self {
         TimeSet {
             monotonic: monotonic_time(),
-            clock_utc: clock.read().map(UtcTime::into_nanos).unwrap_or(FAILED_TIME),
+            clock_utc: clock.read().map(UtcInstant::into_nanos).unwrap_or(FAILED_TIME),
         }
     }
 }
@@ -162,7 +162,11 @@ struct RealTimeClockNode {
 
 impl RealTimeClockNode {
     /// Constructs a new `RealTimeClockNode`, recording the initial state.
-    pub fn new(node: Node, outcome: InitializeRtcOutcome, initial_time: Option<UtcTime>) -> Self {
+    pub fn new(
+        node: Node,
+        outcome: InitializeRtcOutcome,
+        initial_time: Option<UtcInstant>,
+    ) -> Self {
         node.record_string("initialization", format!("{:?}", outcome));
         if let Some(time) = initial_time {
             node.record_int("initial_time", time.into_nanos());
@@ -327,8 +331,8 @@ impl TrackNode {
     /// Records a new Kalman filter update for the track.
     pub fn update_filter_state(
         &mut self,
-        monotonic: zx::MonotonicTime,
-        utc: UtcTime,
+        monotonic: zx::MonotonicInstant,
+        utc: UtcInstant,
         sqrt_covariance: zx::Duration,
     ) {
         let filter_state = KalmanFilterState {
@@ -342,7 +346,7 @@ impl TrackNode {
     /// Records a new frequency update for the track.
     pub fn update_frequency(
         &mut self,
-        monotonic: zx::MonotonicTime,
+        monotonic: zx::MonotonicInstant,
         rate_adjust_ppm: i32,
         window_count: u32,
     ) {
@@ -568,7 +572,7 @@ mod tests {
     /// Creates a new wrapped clock set to backstop time.
     fn create_clock() -> Arc<UtcClock> {
         Arc::new(
-            UtcClock::create(zx::ClockOpts::empty(), Some(UtcTime::from_nanos(BACKSTOP_TIME)))
+            UtcClock::create(zx::ClockOpts::empty(), Some(UtcInstant::from_nanos(BACKSTOP_TIME)))
                 .unwrap(),
         )
     }
@@ -658,11 +662,11 @@ mod tests {
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
         // Perform two updates to the clock. The inspect data should reflect the most recent.
-        let monotonic_time = zx::MonotonicTime::get();
+        let monotonic_time = zx::MonotonicInstant::get();
         clock
             .update(
                 UtcClockUpdate::builder()
-                    .absolute_value(monotonic_time, UtcTime::from_nanos(BACKSTOP_TIME + 1234))
+                    .absolute_value(monotonic_time, UtcInstant::from_nanos(BACKSTOP_TIME + 1234))
                     .rate_adjust(0)
                     .error_bounds(0),
             )
@@ -670,11 +674,11 @@ mod tests {
         inspect_diagnostics
             .record(Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc });
 
-        let monotonic_time = zx::MonotonicTime::get();
+        let monotonic_time = zx::MonotonicInstant::get();
         clock
             .update(
                 UtcClockUpdate::builder()
-                    .absolute_value(monotonic_time, UtcTime::from_nanos(BACKSTOP_TIME + 2345))
+                    .absolute_value(monotonic_time, UtcInstant::from_nanos(BACKSTOP_TIME + 2345))
                     .rate_adjust(RATE_ADJUST)
                     .error_bounds(ERROR_BOUNDS),
             )
@@ -716,7 +720,7 @@ mod tests {
         let (inspect_diagnostics, _) = create_test_object(&inspector, false);
         inspect_diagnostics.record(Event::InitializeRtc {
             outcome: InitializeRtcOutcome::Succeeded,
-            time: Some(UtcTime::from_nanos(RTC_INITIAL_TIME)),
+            time: Some(UtcInstant::from_nanos(RTC_INITIAL_TIME)),
         });
         assert_data_tree!(
             inspector,
@@ -849,13 +853,13 @@ mod tests {
         for i in 1..8 {
             test.record(Event::KalmanFilterUpdated {
                 track: Track::Primary,
-                monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
-                utc: UtcTime::from_nanos(BACKSTOP_TIME) + OFFSET * i,
+                monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
+                utc: UtcInstant::from_nanos(BACKSTOP_TIME) + OFFSET * i,
                 sqrt_covariance: zx::Duration::from_nanos(SQRT_COVARIANCE) * i,
             });
             test.record(Event::FrequencyUpdated {
                 track: Track::Primary,
-                monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
+                monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
                 rate_adjust_ppm: -i,
                 window_count: i as u32,
             });

@@ -5,9 +5,9 @@
 use crate::directory::entry::DirectoryEntry;
 use crate::directory::entry_container::Directory;
 use crate::name::Name;
-use fuchsia_zircon_status::Status;
 use std::sync::Arc;
 use thiserror::Error;
+use zx_status::Status;
 
 /// An entry with the same name already exists in the directory.
 #[derive(Error, Debug)]

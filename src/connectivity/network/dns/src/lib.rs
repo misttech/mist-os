@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon as zx;
+
 use futures::future::FutureExt;
 use futures::Future;
 use std::io;

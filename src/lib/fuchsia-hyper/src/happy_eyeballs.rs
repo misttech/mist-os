@@ -4,7 +4,7 @@
 
 use crate::connect_and_bind_device;
 use fuchsia_async::{net, Time, Timer};
-use fuchsia_zircon as zx;
+
 use futures::future::{Fuse, Future, FutureExt};
 use futures::stream::{FuturesUnordered, Stream};
 use itertools::{Interleave, Itertools};
@@ -331,7 +331,7 @@ mod test {
     use assert_matches::assert_matches;
     use fuchsia_async::{self as fasync};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::{self as zx};
+
     use std::collections::HashMap;
     use std::fmt::Debug;
     use std::io::{Error, ErrorKind};

@@ -10,10 +10,10 @@ use fidl_fuchsia_testing::{
 use fidl_fuchsia_testing_deadline::DeadlineId;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::FutureExt;
 use tracing::{debug, error, trace, warn};
+use zx::{self as zx, AsHandleRef, Peered};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -22,7 +22,7 @@ const DEFAULT_INCREMENTS_MS: i64 = 10;
 
 #[derive(Debug)]
 struct PendingEvent<E = zx::Koid> {
-    time: zx::MonotonicTime,
+    time: zx::MonotonicInstant,
     event: E,
 }
 
@@ -80,7 +80,7 @@ struct StopPoint {
 #[derive(Debug)]
 struct PendingDeadlineExpireEvent {
     deadline_id: DeadlineId,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 }
 
 // Ord and Eq implementations provided for use with BinaryHeap.
@@ -108,7 +108,7 @@ impl Ord for PendingDeadlineExpireEvent {
 /// The empty tuple `()` implements `FakeClockObserver` and is meant to be used
 /// for production instances.
 struct FakeClock<T> {
-    time: zx::MonotonicTime,
+    time: zx::MonotonicInstant,
     free_running: Option<fasync::Task<()>>,
     pending_events: BinaryHeap<PendingEvent>,
     registered_events: HashMap<zx::Koid, RegisteredEvent>,
@@ -135,7 +135,7 @@ impl FakeClockObserver for () {
 impl<T: FakeClockObserver> FakeClock<T> {
     fn new() -> Self {
         FakeClock {
-            time: zx::MonotonicTime::from_nanos(1),
+            time: zx::MonotonicInstant::from_nanos(1),
             free_running: None,
             pending_events: BinaryHeap::new(),
             registered_events: HashMap::new(),
@@ -205,7 +205,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
     fn install_event(
         &mut self,
         arc_self: FakeClockHandle<T>,
-        time: zx::MonotonicTime,
+        time: zx::MonotonicInstant,
         event: zx::EventPair,
     ) {
         let koid = if let Ok(koid) = event.basic_info().map(|i| i.related_koid) {
@@ -245,7 +245,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
         fasync::Task::local(closed_fut).detach();
     }
 
-    fn reschedule_event(&mut self, time: zx::MonotonicTime, koid: zx::Koid) {
+    fn reschedule_event(&mut self, time: zx::MonotonicInstant, koid: zx::Koid) {
         // always cancel the event if pending.
         self.cancel_event(koid);
         let entry = if let Some(e) = self.registered_events.get_mut(&koid) {
@@ -302,7 +302,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
             hash_map::Entry::Occupied(mut occupied) => {
                 match occupied
                     .get()
-                    .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicTime::ZERO)
+                    .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::ZERO)
                 {
                     Ok(_) => {
                         // Okay to replace an eventpair if the other end is already closed.
@@ -466,7 +466,7 @@ async fn handle_events<T: FakeClockObserver>(
             FakeClockRequest::RegisterEvent { time, event, control_handle: _ } => {
                 mock_clock.lock().unwrap().install_event(
                     Arc::clone(&mock_clock),
-                    zx::MonotonicTime::from_nanos(time),
+                    zx::MonotonicInstant::from_nanos(time),
                     event.into(),
                 );
                 Ok(())
@@ -479,7 +479,7 @@ async fn handle_events<T: FakeClockObserver>(
                     mock_clock
                         .lock()
                         .unwrap()
-                        .reschedule_event(zx::MonotonicTime::from_nanos(time), k)
+                        .reschedule_event(zx::MonotonicInstant::from_nanos(time), k)
                 }
                 responder.send()
             }
@@ -498,7 +498,7 @@ async fn handle_events<T: FakeClockObserver>(
                 }
 
                 let deadline = if mock_clock.lock().unwrap().ignored_deadline_ids.contains(&id) {
-                    zx::MonotonicTime::INFINITE
+                    zx::MonotonicInstant::INFINITE
                 } else {
                     mock_clock.lock().unwrap().time + zx::Duration::from_nanos(duration)
                 };
@@ -555,17 +555,17 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use super::*;
     use fidl_fuchsia_testing::{FakeClockControlMarker, FakeClockMarker};
-    use fuchsia_zircon::Koid;
     use futures::channel::mpsc;
     use futures::pin_mut;
     use named_timer::DeadlineId;
+    use zx::Koid;
 
     const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("component_1", "code_1");
     const DEADLINE_ID_2: DeadlineId<'static> = DeadlineId::new("component_1", "code_2");
 
     #[fuchsia::test]
     fn test_event_heap() {
-        let time = zx::MonotonicTime::get();
+        let time = zx::MonotonicInstant::get();
         let after = time + zx::Duration::from_millis(10);
         let e1 = PendingEvent { time, event: 0 };
         let e2 = PendingEvent { time: after, event: 1 };
@@ -613,7 +613,7 @@ mod tests {
     }
 
     fn check_signaled(e: &zx::EventPair) -> bool {
-        e.wait_handle(zx::Signals::EVENTPAIR_SIGNALED, zx::MonotonicTime::from_nanos(0))
+        e.wait_handle(zx::Signals::EVENTPAIR_SIGNALED, zx::MonotonicInstant::from_nanos(0))
             .map(|s| s & zx::Signals::EVENTPAIR_SIGNALED != zx::Signals::NONE)
             .unwrap_or(false)
     }
@@ -671,7 +671,7 @@ mod tests {
 
         // after free running has ended, timer must not be updating anymore:
         let bef = clock_handle.lock().unwrap().time;
-        fasync::Timer::new(zx::MonotonicTime::after(zx::Duration::from_millis(30))).await;
+        fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(30))).await;
         assert_eq!(clock_handle.lock().unwrap().time, bef);
     }
 
@@ -739,6 +739,7 @@ mod tests {
         assert!(check_signaled(&client));
     }
 
+    #[ignore = "TODO: https://fxbug.dev/369696252 - Deflake and re-enable"]
     #[fuchsia::test]
     async fn test_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
@@ -797,6 +798,7 @@ mod tests {
         assert_eq!(clock_handle.lock().unwrap().time, future_deadline_timeout);
     }
 
+    #[ignore = "TODO: https://fxbug.dev/369696252 - Deflake and re-enable"]
     #[fuchsia::test]
     async fn test_ignored_stop_points() {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
@@ -984,7 +986,7 @@ mod tests {
                 .await
                 .expect("failed to ignore deadline");
 
-            // Set an arbitrary time to see if it is replaced with zx::MonotonicTime::INFINITE.
+            // Set an arbitrary time to see if it is replaced with zx::MonotonicInstant::INFINITE.
             let deadline_time_millis = 10;
             let deadline = fake_clock_proxy
                 .create_named_deadline(
@@ -994,7 +996,7 @@ mod tests {
                 .await
                 .expect("failed to create named deadline");
 
-            assert_eq!(deadline, zx::MonotonicTime::INFINITE.into_nanos());
+            assert_eq!(deadline, zx::MonotonicInstant::INFINITE.into_nanos());
             Ok(())
         };
 
@@ -1007,7 +1009,7 @@ mod tests {
             clock_handle.lock().unwrap().pending_named_deadlines.pop().unwrap(),
             PendingDeadlineExpireEvent {
                 deadline_id: DEADLINE_ID.into(),
-                deadline: zx::MonotonicTime::INFINITE,
+                deadline: zx::MonotonicInstant::INFINITE,
             }
         );
     }

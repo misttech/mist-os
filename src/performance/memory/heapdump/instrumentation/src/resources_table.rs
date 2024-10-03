@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 pub use heapdump_vmo::resources_table_v1::ResourceKey;
 use heapdump_vmo::resources_table_v1::ResourcesTableWriter;
 use std::sync::atomic::fence;
 use std::sync::atomic::Ordering::Release;
+use zx::{self as zx, AsHandleRef, HandleBased};
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
 /// Actual memory for each page will only be committed when we first write to that page.

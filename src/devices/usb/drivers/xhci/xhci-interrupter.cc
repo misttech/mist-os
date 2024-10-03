@@ -28,12 +28,6 @@ zx_status_t Interrupter::Init(uint16_t interrupter, size_t page_size, fdf::MmioB
   inspect_root_ = hci_->inspect_root_node().CreateChild(name);
   total_irqs_ = inspect_root_.CreateUint("Total IRQs", 0);
   wake_events_ = inspect_root_.CreateChild("Wake Events");
-  total_wake_events_ = wake_events_.CreateUint("Total Wake Events", 0);
-  wake_lease_held_ = wake_events_.CreateBool("Wake Lease Held", false);
-  wake_lease_last_acquired_timestamp_ =
-      wake_events_.CreateUint("Wake Lease Last Acquired Timestamp (ms)", 0);
-  wake_lease_last_refreshed_timestamp_ =
-      wake_events_.CreateUint("Wake Lease Last Refreshed Timestamp (ms)", 0);
 
   return event_ring_.Init(page_size, hci_->bti(), buffer, hci->Is32BitController(), erst_max,
                           ERSTSZ::Get(offset, interrupter_).ReadFrom(buffer),
@@ -89,42 +83,9 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   return bridge.consumer.promise().box();
 }
 
-void Interrupter::HandleWakeLease() {
-  // TODO(b/362759606): For now, release the lease after a timeout. In the future, this should be
-  // passed up the USB stack in "baton-passing" manner.
-  if (!hci_->activity_governer().is_valid()) {
-    return;
-  }
-
-  if (lease_timeout_.has_handler()) {
-    // If already holding a lease, cancel the current timeout.
-    lease_timeout_.Cancel();
-  } else {
-    // If not holding a lease, get one.
-    auto result_lease = hci_->activity_governer()->TakeWakeLease({"xhci-wake"});
-    lease_timeout_.set_handler(
-        [this, lease = std::move(result_lease->token()), start_time = zx::clock::get_monotonic()](
-            async_dispatcher_t*, async::Task*, zx_status_t) mutable {
-          // Drops the lease and resets handler
-          lease.reset();
-          lease_timeout_.set_handler({});
-
-          wake_lease_held_.Set(false);
-        });
-
-    total_wake_events_.Add(1);
-    wake_lease_held_.Set(true);
-    wake_lease_last_acquired_timestamp_.Set(zx::clock::get_monotonic().get());
-  }
-
-  // Start timeout.
-  const zx::duration kLeaseTimeout = zx::msec(500);
-  lease_timeout_.PostDelayed(dispatcher_.async_dispatcher(), kLeaseTimeout);
-
-  wake_lease_last_refreshed_timestamp_.Set(zx::clock::get_monotonic().get());
-}
-
 zx_status_t Interrupter::StartIrqThread() {
+  wake_lease_.emplace(dispatcher_.async_dispatcher(), "xhci-wake",
+                      std::move(hci_->activity_governer()), &wake_events_);
   irq_handler_.set_object(irq_.get());
   irq_handler_.set_handler([&](async_dispatcher_t* dispatcher, async::Irq* irq, zx_status_t status,
                                const zx_packet_interrupt_t* interrupt) {
@@ -135,7 +96,10 @@ zx_status_t Interrupter::StartIrqThread() {
       return;
     }
 
-    HandleWakeLease();
+    // TODO(b/362759606): For now, release the lease after a timeout. In the future, this should be
+    // passed up the USB stack in "baton-passing" manner.
+    const zx::duration kLeaseTimeout = zx::msec(500);
+    wake_lease_->AcquireWakeLease(kLeaseTimeout);
 
     if (event_ring_.HandleIRQ() != ZX_OK) {
       FDF_LOG(ERROR, "Error handling IRQ. Exiting async loop.");

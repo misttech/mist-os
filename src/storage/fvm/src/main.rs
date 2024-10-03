@@ -44,7 +44,7 @@ use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, zx};
 
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
 
@@ -1662,7 +1662,7 @@ mod tests {
     use std::sync::Arc;
     use {
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, zx,
     };
 
     struct Fixture {

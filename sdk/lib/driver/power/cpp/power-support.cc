@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>

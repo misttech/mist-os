@@ -9,13 +9,13 @@ use fidl_fuchsia_feedback::{
 };
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_logging::{
     log_error, log_info, log_warn, trace_instant, CoreDumpInfo, CoreDumpList, TraceScope,
     CATEGORY_STARNIX,
 };
 use starnix_sync::Mutex;
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef};
 
 /// The maximum number of reports we'll allow to be in-flight to the feedback stack at a time.
 const MAX_REPORTS_IN_FLIGHT: u8 = 10;
@@ -72,7 +72,7 @@ impl CrashReporter {
         };
 
         // TODO(https://fxbug.dev/356912301) use boot time
-        let uptime = zx::MonotonicTime::get() - current_task.thread_group.start_time;
+        let uptime = zx::MonotonicInstant::get() - current_task.thread_group.start_time;
 
         let dump_info = CoreDumpInfo {
             process_koid,

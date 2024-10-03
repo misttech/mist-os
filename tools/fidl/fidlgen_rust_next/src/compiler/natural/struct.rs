@@ -15,7 +15,7 @@ pub fn emit_struct<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let s = &compiler.library.struct_declarations[ident];
+    let s = &compiler.schema.struct_declarations[ident];
 
     let is_wire_static = compiler.query::<IsWireStatic>(ident);
 
@@ -48,21 +48,36 @@ pub fn emit_struct<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::Encode for {name} {{
+        impl ::fidl_next::Encodable for {name} {{
             type Encoded<'buf> = Wire{name}{wire_params};
+        }}
 
+        impl<___E> ::fidl_next::Encode<___E> for {name}
+        where
+        "#,
+    )?;
+
+    for member in &s.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl_next::Encode<___E>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn encode(
                 &mut self,
-                encoder: &mut ::fidl::encode::Encoder,
-                slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+                encoder: &mut ___E,
+                slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+            ) -> Result<(), ::fidl_next::EncodeError> {{
         "#,
     )?;
 
     // Have to do some nasty manual formatting to get destructuring to be
     // formatted correctly
 
-    writeln!(out, "::fidl::munge! {{")?;
+    writeln!(out, "::fidl_next::munge! {{")?;
     writeln!(out, "            let Self::Encoded {{")?;
 
     for member in &s.members {
@@ -75,7 +90,7 @@ pub fn emit_struct<W: Write>(
 
     for member in &s.members {
         let name = &member.name;
-        write!(out, "::fidl::Encode::encode(&mut self.{name}, encoder, {name})?;")?;
+        write!(out, "::fidl_next::Encode::encode(&mut self.{name}, encoder, {name})?;")?;
     }
 
     writeln!(
@@ -85,20 +100,26 @@ pub fn emit_struct<W: Write>(
             }}
         }}
 
-        impl ::fidl::EncodeOption for Box<{name}> {{
+        impl ::fidl_next::EncodableOption for Box<{name}> {{
             type EncodedOption<'buf> =
-                ::fidl::WireBox<'buf, Wire{name}{wire_params}>;
+                ::fidl_next::WireBox<'buf, Wire{name}{wire_params}>;
+        }}
 
+        impl<___E> ::fidl_next::EncodeOption<___E> for Box<{name}>
+        where
+            ___E: ::fidl_next::Encoder + ?Sized,
+            {name}: ::fidl_next::Encode<___E>,
+        {{
             fn encode_option(
                 this: Option<&mut Self>,
-                encoder: &mut ::fidl::encode::Encoder,
-                slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
+                encoder: &mut ___E,
+                slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+            ) -> Result<(), ::fidl_next::EncodeError> {{
                 if let Some(inner) = this {{
-                    encoder.encode(inner)?;
-                    ::fidl::WireBox::encode_present(slot);
+                    ::fidl_next::EncoderExt::encode(encoder, inner)?;
+                    ::fidl_next::WireBox::encode_present(slot);
                 }} else {{
-                    ::fidl::WireBox::encode_absent(slot);
+                    ::fidl_next::WireBox::encode_absent(slot);
                 }}
 
                 Ok(())
@@ -112,7 +133,7 @@ pub fn emit_struct<W: Write>(
     writeln!(
         out,
         r#"
-        impl{wire_params} ::fidl::TakeFrom<Wire{name}{wire_params}>
+        impl{wire_params} ::fidl_next::TakeFrom<Wire{name}{wire_params}>
             for {name}
         {{
             fn take_from(from: &mut Wire{name}{wire_params}) -> Self {{
@@ -122,7 +143,7 @@ pub fn emit_struct<W: Write>(
 
     for member in &s.members {
         let name = &member.name;
-        writeln!(out, "{name}: ::fidl::TakeFrom::take_from(&mut from.{name}),")?;
+        writeln!(out, "{name}: ::fidl_next::TakeFrom::take_from(&mut from.{name}),")?;
     }
 
     writeln!(

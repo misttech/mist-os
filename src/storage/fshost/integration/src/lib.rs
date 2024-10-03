@@ -13,8 +13,7 @@ use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
 use std::time::Duration;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
 };
 
 pub mod disk_builder;

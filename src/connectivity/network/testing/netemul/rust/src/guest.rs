@@ -262,6 +262,6 @@ impl Drop for Controller {
                 .into_zx_channel(),
         );
 
-        let () = guest.shutdown(zx::MonotonicTime::INFINITE).expect("shutdown FIDL error");
+        let () = guest.shutdown(zx::MonotonicInstant::INFINITE).expect("shutdown FIDL error");
     }
 }

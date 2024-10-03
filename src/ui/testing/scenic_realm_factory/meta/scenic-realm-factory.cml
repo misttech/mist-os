@@ -15,15 +15,9 @@
             protocol: [ "fuchsia.ui.test.context.ScenicRealmFactory" ],
         },
     ],
-    use: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-        },
-    ],
     offer: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",

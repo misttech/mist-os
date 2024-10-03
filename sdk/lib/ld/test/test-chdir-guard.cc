@@ -15,20 +15,17 @@
 
 namespace ld::testing {
 
-TestChdirGuard::TestChdirGuard() {
-  cwd_ = open(".", O_RDONLY | O_DIRECTORY);
-  EXPECT_GE(cwd_, 0) << strerror(errno);
-  if (cwd_ >= 0) {
-    std::filesystem::path path = elfldltl::testing::GetTestDataPath(".");
-    EXPECT_FALSE(path.empty());
-    EXPECT_EQ(chdir(path.c_str()), 0) << path << ": " << strerror(errno);
+TestChdirGuard::TestChdirGuard(int dir_fd) {
+  cwd_.reset(open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC));
+  EXPECT_TRUE(cwd_) << strerror(errno);
+  if (cwd_) {
+    EXPECT_EQ(fchdir(dir_fd), 0) << "fchdir: " << strerror(errno);
   }
 }
 
 TestChdirGuard::~TestChdirGuard() {
-  if (cwd_ >= 0) {
-    EXPECT_EQ(fchdir(cwd_), 0) << strerror(errno);
-    EXPECT_EQ(close(cwd_), 0) << strerror(errno);
+  if (cwd_) {
+    EXPECT_EQ(fchdir(cwd_.get()), 0) << strerror(errno);
   }
 }
 

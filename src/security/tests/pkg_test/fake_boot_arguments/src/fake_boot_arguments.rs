@@ -7,7 +7,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::stream::{StreamExt as _, TryStreamExt as _};
 use std::sync::Arc;
 use tracing::{error, info};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &'static str = "bin/pkgsvr+";

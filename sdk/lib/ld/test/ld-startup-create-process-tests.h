@@ -7,6 +7,7 @@
 
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/testing/loader.h>
+#include <lib/ld/abi.h>
 #include <lib/ld/testing/test-processargs.h>
 #include <lib/ld/testing/test-vmo.h>
 #include <lib/zx/thread.h>
@@ -69,9 +70,12 @@ class LdStartupCreateProcessTests
   void Load(std::string_view executable_name) {
     ASSERT_TRUE(root_vmar());  // Init must have been called already.
 
+    // This points GetLibVmo() to the right place.
+    LdsvcPathPrefix(executable_name);
+
     // Load the dynamic linker and record its entry point.
     std::optional<LoadResult> result;
-    ASSERT_NO_FATAL_FAILURE(Load(kLdStartupName, result, root_vmar()));
+    ASSERT_NO_FATAL_FAILURE(this->Load(GetLibVmo(ld::abi::kInterp), result, root_vmar()));
     set_entry(result->entry + result->loader.load_bias());
     set_stack_size(result->stack_size);
 

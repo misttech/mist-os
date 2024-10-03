@@ -28,6 +28,7 @@ void MetadataSenderTestDriver::Serve(
 }
 
 void MetadataSenderTestDriver::ServeMetadata(ServeMetadataCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
@@ -36,16 +37,25 @@ void MetadataSenderTestDriver::ServeMetadata(ServeMetadataCompleter::Sync& compl
   }
   offer_metadata_to_child_nodes_ = true;
   completer.Reply(fit::ok());
+#else
+  FDF_SLOG(ERROR, "Serving metadata not supported at current Fuchsia API level.");
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+#endif
 }
 
 void MetadataSenderTestDriver::SetMetadata(SetMetadataRequest& request,
                                            SetMetadataCompleter::Sync& completer) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx_status_t status = metadata_server_.SetMetadata(request.metadata());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
     completer.Reply(fit::error(status));
   }
   completer.Reply(fit::ok());
+#else
+  FDF_SLOG(ERROR, "Setting metadata not supported at current Fuchsia API level.");
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+#endif
 }
 
 void MetadataSenderTestDriver::AddMetadataRetrieverNode(
@@ -95,9 +105,11 @@ zx_status_t MetadataSenderTestDriver::AddMetadataNode(
     std::string_view node_name,
     const fuchsia_driver_framework::NodePropertyVector& node_properties) {
   std::vector<fuchsia_driver_framework::Offer> offers;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (offer_metadata_to_child_nodes_) {
     offers.emplace_back(metadata_server_.MakeOffer());
   }
+#endif
   zx::result result = AddChild(node_name, node_properties, offers);
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));

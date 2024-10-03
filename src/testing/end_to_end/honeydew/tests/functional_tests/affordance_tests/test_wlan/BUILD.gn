@@ -8,23 +8,37 @@ import("//build/testing/environments.gni")
 if (is_host) {
   python_mobly_test("wlan_policy_test_sl4f") {
     main_source = "test_wlan_policy.py"
+    sources = [ "utils.py" ]
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller-preferred"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
   }
 
   python_mobly_test("wlan_test_sl4f") {
     main_source = "test_wlan.py"
+    sources = [ "utils.py" ]
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller-preferred"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
@@ -32,12 +46,19 @@ if (is_host) {
 
   python_mobly_test("wlan_policy_test_fc") {
     main_source = "test_wlan_policy.py"
+    sources = [ "utils.py" ]
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
@@ -45,12 +66,19 @@ if (is_host) {
 
   python_mobly_test("wlan_test_fc") {
     main_source = "test_wlan.py"
+    sources = [ "utils.py" ]
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/antlion",
     ]
-    transport = "fuchsia-controller"
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]

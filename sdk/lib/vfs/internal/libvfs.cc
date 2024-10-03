@@ -193,7 +193,26 @@ __EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
   } else if (dispatcher != vnode->vfs->dispatcher()) {
     return ZX_ERR_INVALID_ARGS;
   }
-  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan), *open_options);
+  return vnode->vfs->ServeDeprecated(vnode->AsNode(), std::move(chan), *open_options);
+}
+
+__EXPORT zx_status_t vfs_internal_node_serve3(vfs_internal_node_t* vnode,
+                                              async_dispatcher_t* dispatcher, zx_handle_t channel,
+                                              uint64_t flags) {
+  zx::channel chan(channel);
+  if (!vnode || !dispatcher) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!chan) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  std::lock_guard guard(vnode->mutex);
+  if (!vnode->vfs) {
+    vnode->vfs = std::make_unique<intree_vfs::SynchronousVfs>(dispatcher);
+  } else if (dispatcher != vnode->vfs->dispatcher()) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan), static_cast<fuchsia_io::Flags>(flags));
 }
 
 __EXPORT zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode) {

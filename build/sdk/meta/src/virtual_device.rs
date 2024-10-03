@@ -15,8 +15,7 @@ use camino::Utf8Path;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
-const VIRTUAL_DEVICE_SCHEMA_V1: &str =
-    "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json";
+const VIRTUAL_DEVICE_SCHEMA_V1: &str = "http://fuchsia.com/schemas/sdk/virtual_device.json";
 
 /// Private helper for deserializing the virtual device.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -90,7 +89,7 @@ mod tests {
         serde_json::to_writer(
             &vd_file,
             &json!({
-                "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
+                "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device.json",
                 "data": {
                     "name": "generic-x64",
                     "type": "virtual_device",

@@ -54,6 +54,13 @@ class RxQueue {
   void TriggerRxWatch();
   // Kills and joins the watcher thread.
   void JoinThread();
+  // Helper function to verify if a pending rx lease can be delegated to the
+  // primary session.
+  void MaybeDelegateRxLease() __TA_REQUIRES(parent_->rx_lock())
+      __TA_REQUIRES_SHARED(parent_->control_lock());
+  uint64_t rx_completed_frame_index() const __TA_REQUIRES(parent_->rx_lock()) {
+    return rx_completed_frame_index_;
+  }
 
   // A transaction to add buffers from a session to the RxQueue.
   class SessionTransaction {
@@ -104,6 +111,7 @@ class RxQueue {
   std::unique_ptr<IndexedSlab<InFlightBuffer>> in_flight_ __TA_GUARDED(parent_->rx_lock());
   std::unique_ptr<RingQueue<uint32_t>> available_queue_ __TA_GUARDED(parent_->rx_lock());
   size_t device_buffer_count_ __TA_GUARDED(parent_->rx_lock()) = 0;
+  uint64_t rx_completed_frame_index_ __TA_GUARDED(parent_->rx_lock()) = 0;
 
   zx::port rx_watch_port_;
   fdf::Dispatcher dispatcher_;

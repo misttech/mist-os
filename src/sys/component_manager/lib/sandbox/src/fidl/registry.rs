@@ -6,12 +6,12 @@ use crate::{Capability, RemoteError};
 use fidl::handle::{AsHandleRef, EventPair, Signals};
 use fidl::HandleRef;
 use fuchsia_async as fasync;
-use fuchsia_zircon::Koid;
 use futures::FutureExt;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
+use zx::Koid;
 
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry::default());

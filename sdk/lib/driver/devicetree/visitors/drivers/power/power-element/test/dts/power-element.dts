@@ -51,6 +51,21 @@
       };
     };
 
+    cpu {
+      power-elements {
+        cpu-element {
+          power-levels {
+            off-level {
+              level = <0>;
+            };
+            cpu_on_level: on-level {
+              level = <1>;
+            };
+          };
+        };
+      };
+    };
+
     bluetooth {
       compatible = "test,bluetooth";
 
@@ -68,7 +83,7 @@
             };
             handling-level {
               level = <1>;
-              level-dependencies = <&sag_wake_active 2>;
+              level-dependencies = <&sag_wake_active 2 &cpu_on_level 1>;
             };
             on-level {
               level = <2>;

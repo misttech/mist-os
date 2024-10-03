@@ -15,8 +15,7 @@ use media::AudioDeviceEnumeratorProxy;
 use std::pin::pin;
 use tracing::{error, info, warn};
 use {
-    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media, fuchsia_async as fasync, zx,
 };
 
 use crate::audio::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};

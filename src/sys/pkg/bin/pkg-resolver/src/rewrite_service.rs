@@ -11,10 +11,10 @@ use fidl_fuchsia_pkg_rewrite::{
 };
 use fidl_fuchsia_pkg_rewrite_ext::Rule;
 use fuchsia_async as fasync;
-use fuchsia_zircon::Status;
 use futures::prelude::*;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use zx::Status;
 
 const LIST_CHUNK_SIZE: usize = 100;
 
@@ -199,7 +199,7 @@ mod tests {
     }
 
     /// Given the future of a FIDL API call, wait for it to complete, and assert that it
-    /// successfully returns the given Result<(),[`fuchsia_zircon::Status`]>.
+    /// successfully returns the given Result<(),[`zx::Status`]>.
     macro_rules! assert_yields_result {
         ($expr:expr, $result:expr) => {
             assert_eq!($expr.await.unwrap().map_err(Status::from_raw), $result);

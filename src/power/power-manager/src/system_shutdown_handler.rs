@@ -12,7 +12,6 @@ use async_trait::async_trait;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, Property};
-use fuchsia_zircon::{self as zx, Status as zx_status};
 use futures::prelude::*;
 use futures::TryStreamExt;
 use serde_derive::Deserialize;
@@ -20,6 +19,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use zx::{self as zx, Status as zx_status};
 use {
     fidl_fuchsia_hardware_power_statecontrol as fpowercontrol, fidl_fuchsia_sys2 as fsys,
     serde_json as json,

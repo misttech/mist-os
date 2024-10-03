@@ -6,7 +6,7 @@ use super::common::{EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeRef;
 use super::time::Time;
 use crate::atomic_future::AtomicFuture;
-use fuchsia_zircon as zx;
+
 use futures::future::{self, Either};
 use futures::task::AtomicWaker;
 use std::fmt;
@@ -147,7 +147,9 @@ impl TestExecutor {
     /// Create a new single-threaded executor running with fake time.
     pub fn new_with_fake_time() -> Self {
         let inner = Arc::new(Executor::new(
-            ExecutorTime::FakeTime(AtomicI64::new(zx::MonotonicTime::INFINITE_PAST.into_nanos())),
+            ExecutorTime::FakeTime(AtomicI64::new(
+                zx::MonotonicInstant::INFINITE_PAST.into_nanos(),
+            )),
             /* is_local */ true,
             /* num_threads */ 1,
         ));
@@ -378,10 +380,10 @@ mod tests {
     use crate::handle::on_signals::OnSignals;
     use crate::{Interval, Timer};
     use assert_matches::assert_matches;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::StreamExt;
     use std::cell::{Cell, RefCell};
     use std::task::Waker;
+    use zx::{self as zx, AsHandleRef};
 
     fn spawn(future: impl Future<Output = ()> + Send + 'static) {
         crate::EHandle::local().spawn_detached(future);
@@ -521,9 +523,9 @@ mod tests {
     #[test]
     fn time_now_real_time() {
         let _executor = LocalExecutor::new();
-        let t1 = zx::MonotonicTime::after(zx::Duration::from_seconds(0));
+        let t1 = zx::MonotonicInstant::after(zx::Duration::from_seconds(0));
         let t2 = Time::now().into_zx();
-        let t3 = zx::MonotonicTime::after(zx::Duration::from_seconds(0));
+        let t3 = zx::MonotonicInstant::after(zx::Duration::from_seconds(0));
         assert!(t1 <= t2);
         assert!(t2 <= t3);
     }
@@ -531,11 +533,11 @@ mod tests {
     #[test]
     fn time_now_fake_time() {
         let executor = TestExecutor::new_with_fake_time();
-        let t1 = Time::from_zx(zx::MonotonicTime::from_nanos(0));
+        let t1 = Time::from_zx(zx::MonotonicInstant::from_nanos(0));
         executor.set_fake_time(t1);
         assert_eq!(Time::now(), t1);
 
-        let t2 = Time::from_zx(zx::MonotonicTime::from_nanos(1000));
+        let t2 = Time::from_zx(zx::MonotonicInstant::from_nanos(1000));
         executor.set_fake_time(t2);
         assert_eq!(Time::now(), t2);
     }

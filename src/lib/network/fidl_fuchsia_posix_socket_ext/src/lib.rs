@@ -5,10 +5,7 @@
 //! Extension crate for `fuchsia.posix.socket` and `fuchsia.posix.socket.packet`.
 #![deny(missing_docs)]
 
-use {
-    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_packet as fpacket,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_packet as fpacket, zx};
 
 /// Creates a datagram socket using the given provider.
 pub async fn datagram_socket(

@@ -128,11 +128,11 @@ void MockLoaderServiceForTest::ExpectLoadObject(std::string_view name, zx::vmo v
 }
 
 void MockLoaderServiceForTest::ExpectDependency(std::string_view name) {
-  ExpectLoadObject(name, GetDepVmo(name));
+  ExpectLoadObject(name, GetVmo(name));
 }
 
 void MockLoaderServiceForTest::ExpectRootModule(std::string_view name) {
-  ExpectLoadObject(name, GetRootModuleVmo(name));
+  ExpectLoadObject(name, GetVmo(name));
 }
 
 void MockLoaderServiceForTest::ExpectMissing(std::string_view name) {
@@ -186,14 +186,8 @@ void MockLoaderServiceForTest::VerifyAndClearExpectations() {
   Mock::VerifyAndClearExpectations(&mock_loader_);
 }
 
-zx::vmo MockLoaderServiceForTest::GetDepVmo(std::string_view name) {
-  // TODO(https://fxbug.dev/335737373): use a more direct means to look up the file.
-  const std::string path = std::filesystem::path("test") / "lib" / LD_TEST_LIBPREFIX / name;
-  return elfldltl::testing::GetTestLibVmo(path);
-}
-
-zx::vmo MockLoaderServiceForTest::GetRootModuleVmo(std::string_view name) {
-  const std::string path = std::filesystem::path("test") / "lib" / name;
+zx::vmo MockLoaderServiceForTest::GetVmo(std::string_view name) {
+  const std::string path = path_prefix_ / name;
   return elfldltl::testing::GetTestLibVmo(path);
 }
 

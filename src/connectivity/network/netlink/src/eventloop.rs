@@ -9,6 +9,7 @@ use anyhow::{Context as _, Error};
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use futures::channel::{mpsc, oneshot};
+use futures::stream::BoxStream;
 use futures::{FutureExt as _, StreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use {
@@ -76,6 +77,255 @@ pub(crate) struct EventLoop<
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
 }
 
+/// The types that implement this trait ([`Optional`] and [`Required`]) are used to signify whether
+/// a given [`EventLoopComponent`] can be omitted with a given [`EventLoopSpec`] configuration.
+pub(crate) trait EventLoopOptionality: std::fmt::Debug {}
+#[cfg(test)]
+impl EventLoopOptionality for Optional {}
+impl EventLoopOptionality for Required {}
+
+/// If used to fill the `Absence` type parameter on an [`EventLoopComponent`],
+/// the component can be omitted at run time for testing purposes.
+#[cfg(test)]
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct Optional;
+
+/// An uninhabited type used to fill the `Absence` generic on an [`EventLoopComponent`] to indicate
+/// the component must be present at run time. This is the only implementor of
+/// [`EventLoopOptionality`] when `cfg(not(test))`.
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum Required {}
+
+/// A component of the netlink event loop that can be either required or optional depending on
+/// the [`EventLoopSpec`] the event loop is configured with at compile time.
+///
+/// The event loop implementation methods on [`EventLoopInputs`] and [`EventLoopState`]
+/// unwrap this only if they actually need the contents, so that tests can be run with only a
+/// subset of required functionality.
+pub(crate) enum EventLoopComponent<T, Absence: EventLoopOptionality> {
+    Present(T),
+    /// Never constructed outside of tests. This variant is uninstantiable when `Absence` is
+    /// [`Required`], as [`Required`] is itself uninstantiable.
+    #[cfg_attr(not(test), allow(dead_code))]
+    Absent(Absence),
+}
+
+impl<T, E: EventLoopOptionality> EventLoopComponent<T, E> {
+    fn get(self) -> T {
+        match self {
+            EventLoopComponent::Present(t) => t,
+            EventLoopComponent::Absent(_) => panic!("must be present"),
+        }
+    }
+
+    fn get_mut(&mut self) -> &mut T {
+        match self {
+            EventLoopComponent::Present(t) => t,
+            EventLoopComponent::Absent(_) => panic!("must be present"),
+        }
+    }
+
+    fn get_ref(&self) -> &T {
+        match self {
+            EventLoopComponent::Present(t) => t,
+            EventLoopComponent::Absent(_) => panic!("must be present"),
+        }
+    }
+}
+
+pub(crate) trait EventLoopSpec {
+    type InterfacesProxy: EventLoopOptionality;
+    type InterfacesStateProxy: EventLoopOptionality;
+    type V4RoutesState: EventLoopOptionality;
+    type V6RoutesState: EventLoopOptionality;
+    type V4RoutesSetProvider: EventLoopOptionality;
+    type V6RoutesSetProvider: EventLoopOptionality;
+    type InterfacesHandler: EventLoopOptionality;
+    type RouteClients: EventLoopOptionality;
+
+    type RoutesV4Worker: EventLoopOptionality;
+    type RoutesV6Worker: EventLoopOptionality;
+    type InterfacesWorker: EventLoopOptionality;
+}
+
+pub(crate) struct IncludedWorkers<E: EventLoopSpec> {
+    pub(crate) routes_v4: EventLoopComponent<(), E::RoutesV4Worker>,
+    pub(crate) routes_v6: EventLoopComponent<(), E::RoutesV6Worker>,
+    pub(crate) interfaces: EventLoopComponent<(), E::InterfacesWorker>,
+}
+
+enum AllWorkers {}
+impl EventLoopSpec for AllWorkers {
+    type InterfacesProxy = Required;
+    type InterfacesStateProxy = Required;
+    type V4RoutesState = Required;
+    type V6RoutesState = Required;
+    type V4RoutesSetProvider = Required;
+    type V6RoutesSetProvider = Required;
+    type InterfacesHandler = Required;
+    type RouteClients = Required;
+
+    type RoutesV4Worker = Required;
+    type RoutesV6Worker = Required;
+    type InterfacesWorker = Required;
+}
+
+pub(crate) struct EventLoopInputs<
+    H,
+    S: crate::messaging::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    E: EventLoopSpec,
+> {
+    pub(crate) interfaces_proxy: EventLoopComponent<fnet_root::InterfacesProxy, E::InterfacesProxy>,
+    pub(crate) interfaces_state_proxy:
+        EventLoopComponent<fnet_interfaces::StateProxy, E::InterfacesStateProxy>,
+    pub(crate) v4_routes_state: EventLoopComponent<fnet_routes::StateV4Proxy, E::V4RoutesState>,
+    pub(crate) v6_routes_state: EventLoopComponent<fnet_routes::StateV6Proxy, E::V6RoutesState>,
+    pub(crate) v4_routes_set_provider:
+        EventLoopComponent<fnet_routes_admin::RouteTableV4Proxy, E::V4RoutesSetProvider>,
+    pub(crate) v6_routes_set_provider:
+        EventLoopComponent<fnet_routes_admin::RouteTableV6Proxy, E::V6RoutesSetProvider>,
+    pub(crate) interfaces_handler: EventLoopComponent<H, E::InterfacesHandler>,
+    pub(crate) route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
+
+    pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
+}
+
+impl<
+        H: interfaces::InterfacesHandler,
+        S: crate::messaging::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+        E: EventLoopSpec,
+    > EventLoopInputs<H, S, E>
+{
+    /// Creates routes and interface hanging get watchers and connects to route and
+    /// interface administration protocols so that requests can be serviced by the returned
+    /// `EventLoopState`.
+    pub(crate) async fn initialize(
+        self,
+        included_workers: IncludedWorkers<E>,
+    ) -> Result<EventLoopState<H, S, E>, Error> {
+        let Self {
+            interfaces_proxy,
+            interfaces_state_proxy,
+            v4_routes_state,
+            v6_routes_state,
+            v4_routes_set_provider,
+            v6_routes_set_provider,
+            interfaces_handler,
+            route_clients,
+            unified_request_stream,
+        } = self;
+
+        let (routes_v4_result, routes_v6_result, interfaces_result) = futures::join!(
+            async {
+                match included_workers.routes_v4 {
+                    EventLoopComponent::Present(()) => {
+                        let (worker, stream) = routes::RoutesWorkerState::<Ipv4>::create(
+                            v4_routes_set_provider.get_ref(),
+                            v4_routes_state.get_ref(),
+                        )
+                        .await
+                        .context("create v4 routes worker")?;
+                        Ok::<_, Error>((EventLoopComponent::Present(worker), stream.left_stream()))
+                    }
+                    EventLoopComponent::Absent(omitted) => Ok((
+                        EventLoopComponent::Absent(omitted),
+                        futures::stream::pending().right_stream(),
+                    )),
+                }
+            },
+            async {
+                match included_workers.routes_v6 {
+                    EventLoopComponent::Present(()) => {
+                        let (worker, stream) = routes::RoutesWorkerState::<Ipv6>::create(
+                            v6_routes_set_provider.get_ref(),
+                            v6_routes_state.get_ref(),
+                        )
+                        .await
+                        .context("create v6 routes worker")?;
+                        Ok::<_, Error>((EventLoopComponent::Present(worker), stream.left_stream()))
+                    }
+                    EventLoopComponent::Absent(omitted) => Ok((
+                        EventLoopComponent::Absent(omitted),
+                        futures::stream::pending().right_stream(),
+                    )),
+                }
+            },
+            async {
+                match included_workers.interfaces {
+                    EventLoopComponent::Present(()) => {
+                        let (worker, stream) = interfaces::InterfacesWorkerState::create(
+                            interfaces_handler.get(),
+                            route_clients.get_ref().clone(),
+                            interfaces_proxy.get_ref().clone(),
+                            interfaces_state_proxy.get(),
+                        )
+                        .await
+                        .context("create interfaces worker")?;
+                        Ok::<_, Error>((EventLoopComponent::Present(worker), stream.left_stream()))
+                    }
+                    EventLoopComponent::Absent(omitted) => Ok((
+                        EventLoopComponent::Absent(omitted),
+                        futures::stream::pending().right_stream(),
+                    )),
+                }
+            },
+        );
+
+        let (routes_v4_worker, v4_route_event_stream) =
+            routes_v4_result.context("create v4 routes worker")?;
+        let (routes_v6_worker, v6_route_event_stream) =
+            routes_v6_result.context("create v6 routes worker")?;
+        let (interfaces_worker, if_event_stream) =
+            interfaces_result.context("create interfaces worker")?;
+
+        let unified_event_stream = futures::stream_select!(
+            v4_route_event_stream
+                .map(|res| {
+                    res.map(UnifiedEvent::RoutesV4Event)
+                        .map_err(|e| Error::new(EventStreamError::RoutesV4(e)))
+                })
+                .chain(futures::stream::once(futures::future::ready(Err(Error::new(
+                    EventStreamEnded::RoutesV4,
+                )))))
+                .fuse(),
+            v6_route_event_stream
+                .map(|res| {
+                    res.map(UnifiedEvent::RoutesV6Event)
+                        .map_err(|e| Error::new(EventStreamError::RoutesV6(e)))
+                })
+                .chain(futures::stream::once(futures::future::ready(Err(Error::new(
+                    EventStreamEnded::RoutesV6,
+                )))))
+                .fuse(),
+            if_event_stream
+                .map(|res| {
+                    res.map(UnifiedEvent::InterfacesEvent)
+                        .map_err(|e| Error::new(EventStreamError::Interfaces(e)))
+                })
+                .chain(futures::stream::once(futures::future::ready(Err(Error::new(
+                    EventStreamEnded::Interfaces,
+                )))))
+                .fuse(),
+        )
+        .boxed()
+        .fuse();
+
+        Ok(EventLoopState {
+            routes_v4_worker,
+            routes_v6_worker,
+            interfaces_worker,
+            rules_worker: rules::RuleTable::new_with_defaults(),
+            unified_pending_request: None,
+            unified_event_stream,
+            route_clients,
+            interfaces_proxy,
+            v4_routes_set_provider,
+            v6_routes_set_provider,
+            unified_request_stream,
+        })
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum EventStreamEnded {
     #[error("routes v4 event stream ended")]
@@ -96,6 +346,164 @@ pub(crate) enum EventStreamError {
     Interfaces(fidl::Error),
 }
 
+/// All of the state tracked by the netlink event loop while it is in operation.
+/// Runs routes and interface hanging get watchers and connects to route and
+/// interface administration protocols in order to single-threadedly service
+/// incoming `UnifiedRequest`s.
+pub(crate) struct EventLoopState<
+    H: interfaces::InterfacesHandler,
+    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    E: EventLoopSpec,
+> {
+    routes_v4_worker: EventLoopComponent<routes::RoutesWorkerState<Ipv4>, E::RoutesV4Worker>,
+    routes_v6_worker: EventLoopComponent<routes::RoutesWorkerState<Ipv6>, E::RoutesV6Worker>,
+    interfaces_worker:
+        EventLoopComponent<interfaces::InterfacesWorkerState<H, S>, E::InterfacesWorker>,
+
+    route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
+    interfaces_proxy: EventLoopComponent<fnet_root::InterfacesProxy, E::InterfacesProxy>,
+    v4_routes_set_provider:
+        EventLoopComponent<fnet_routes_admin::RouteTableV4Proxy, E::V4RoutesSetProvider>,
+    v6_routes_set_provider:
+        EventLoopComponent<fnet_routes_admin::RouteTableV6Proxy, E::V6RoutesSetProvider>,
+
+    rules_worker: rules::RuleTable,
+    unified_pending_request: Option<UnifiedPendingRequest<S>>,
+    unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
+    unified_event_stream: futures::stream::Fuse<BoxStream<'static, Result<UnifiedEvent, Error>>>,
+}
+
+impl<
+        H: interfaces::InterfacesHandler,
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+        E: EventLoopSpec,
+    > EventLoopState<H, S, E>
+{
+    pub(crate) async fn run(mut self) -> Result<Never, Error> {
+        loop {
+            self.run_one_step().await?;
+        }
+    }
+
+    async fn run_one_step(&mut self) -> Result<(), Error> {
+        let Self {
+            routes_v4_worker,
+            routes_v6_worker,
+            interfaces_worker,
+            rules_worker,
+            unified_pending_request,
+            unified_request_stream,
+            unified_event_stream,
+            route_clients,
+            interfaces_proxy,
+            v4_routes_set_provider,
+            v6_routes_set_provider,
+        } = self;
+
+        let mut unified_request_stream = unified_request_stream.chain(futures::stream::pending());
+        let request_fut = match unified_pending_request {
+            None => unified_request_stream.next().left_future(),
+            Some(unified_pending_request) => {
+                log_debug!(
+                    "not awaiting on request stream because of pending request: {:?}",
+                    unified_pending_request,
+                );
+                futures::future::pending().right_future()
+            }
+        }
+        .fuse();
+        let mut request_fut = pin!(request_fut);
+
+        futures::select! {
+            event = unified_event_stream.next() => {
+                match event.expect("event stream cannot end without error")? {
+                    // The Routes worker needs access to the intended table id
+                    // from the PendingRouteRequest.
+                    UnifiedEvent::RoutesV4Event(event) => {
+                        let pending_request_args = match unified_pending_request {
+                            Some(UnifiedPendingRequest::RoutesV4(ref req)) => Some(req.args()),
+                            _ => None,
+                        };
+
+                        routes_v4_worker.get_mut()
+                        .handle_route_watcher_event(
+                            route_clients.get_ref(),
+                            event,
+                            pending_request_args.cloned())
+                        .map_err(Error::new)
+                        .context("handle v4 routes event")?
+                    },
+                    UnifiedEvent::RoutesV6Event(event) => {
+                        let pending_request_args = match unified_pending_request {
+                            Some(UnifiedPendingRequest::RoutesV6(ref req)) => Some(req.args()),
+                            _ => None,
+                        };
+
+                        routes_v6_worker.get_mut()
+                        .handle_route_watcher_event(
+                            route_clients.get_ref(),
+                            event,
+                            pending_request_args.cloned()
+                        )
+                        .map_err(Error::new)
+                        .context("handle v6 routes event")?},
+                    UnifiedEvent::InterfacesEvent(event) => interfaces_worker.get_mut()
+                        .handle_interface_watcher_event(event).await
+                        .map_err(Error::new)
+                        .context("handle interfaces event")?,
+                }
+            }
+            request = request_fut => {
+                assert_matches!(
+                    unified_pending_request,
+                    None,
+                    "should not already have pending request if handling a new request"
+                );
+
+                match request.expect("request stream cannot end") {
+                    UnifiedRequest::InterfacesRequest(request) => {
+                        let request = interfaces_worker.get_mut()
+                            .handle_request(request).await;
+                        *unified_pending_request = request.map(UnifiedPendingRequest::Interfaces);
+                    }
+                    UnifiedRequest::RoutesV4Request(request) => {
+                        let request = routes_v4_worker.get_mut()
+                            .handle_request(interfaces_proxy.get_ref(), v4_routes_set_provider.get_ref(), request).await;
+                        *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV4);
+                    }
+                    UnifiedRequest::RoutesV6Request(request) => {
+                        let request = routes_v6_worker.get_mut()
+                            .handle_request(interfaces_proxy.get_ref(), v6_routes_set_provider.get_ref(), request).await;
+                        *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV6);
+                    }
+                    UnifiedRequest::RuleRequest(request, completer) => {
+                        completer.send(rules_worker.handle_request(request))
+                            .expect("receiving end of completer should not be dropped");
+                    }
+                }
+            }
+        };
+
+        let pending_request = unified_pending_request.take();
+        *unified_pending_request = pending_request.and_then(|pending| match pending {
+            UnifiedPendingRequest::RoutesV4(pending_request) => routes_v4_worker
+                .get_mut()
+                .handle_pending_request(pending_request)
+                .map(UnifiedPendingRequest::RoutesV4),
+            UnifiedPendingRequest::RoutesV6(pending_request) => routes_v6_worker
+                .get_mut()
+                .handle_pending_request(pending_request)
+                .map(UnifiedPendingRequest::RoutesV6),
+            UnifiedPendingRequest::Interfaces(pending_request) => interfaces_worker
+                .get_mut()
+                .handle_pending_request(pending_request)
+                .map(UnifiedPendingRequest::Interfaces),
+        });
+
+        Ok(())
+    }
+}
+
 impl<
         H: interfaces::InterfacesHandler,
         S: crate::messaging::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
@@ -114,278 +522,26 @@ impl<
             unified_request_stream,
         } = self;
 
-        let (mut routes_v4_worker, v4_route_event_stream) =
-            routes::RoutesWorkerState::<Ipv4>::create(&v4_routes_set_provider, &v4_routes_state)
-                .await
-                .context("create v4 routes worker")?;
-        let (mut routes_v6_worker, v6_route_event_stream) =
-            routes::RoutesWorkerState::<Ipv6>::create(&v6_routes_set_provider, &v6_routes_state)
-                .await
-                .context("create v6 routes worker")?;
-
-        let (mut interfaces_worker, if_event_stream) = interfaces::InterfacesWorkerState::create(
-            interfaces_handler,
-            route_clients.clone(),
-            interfaces_proxy.clone(),
-            interfaces_state_proxy,
-        )
-        .await
-        .context("create interfaces worker")?;
-
-        let mut rule_table = rules::RuleTable::new_with_defaults();
-
-        let mut unified_pending_request = None::<UnifiedPendingRequest<_>>;
-        let mut unified_request_stream = unified_request_stream.chain(futures::stream::pending());
-
-        let unified_event_stream = futures::stream::select(
-            v4_route_event_stream
-                .map(|res| {
-                    res.map(UnifiedEvent::RoutesV4Event)
-                        .map_err(|e| Error::new(EventStreamError::RoutesV4(e)))
-                })
-                .chain(futures::stream::once(futures::future::ready(Err(Error::new(
-                    EventStreamEnded::RoutesV4,
-                ))))),
-            futures::stream::select(
-                v6_route_event_stream
-                    .map(|res| {
-                        res.map(UnifiedEvent::RoutesV6Event)
-                            .map_err(|e| Error::new(EventStreamError::RoutesV6(e)))
-                    })
-                    .chain(futures::stream::once(futures::future::ready(Err(Error::new(
-                        EventStreamEnded::RoutesV6,
-                    ))))),
-                if_event_stream
-                    .map(|res| {
-                        res.map(UnifiedEvent::InterfacesEvent)
-                            .map_err(|e| Error::new(EventStreamError::Interfaces(e)))
-                    })
-                    .chain(futures::stream::once(futures::future::ready(Err(Error::new(
-                        EventStreamEnded::Interfaces,
-                    ))))),
-            ),
-        )
-        .fuse();
-        let mut unified_event_stream = pin!(unified_event_stream);
+        let state = EventLoopInputs::<_, _, AllWorkers> {
+            interfaces_proxy: EventLoopComponent::Present(interfaces_proxy),
+            interfaces_state_proxy: EventLoopComponent::Present(interfaces_state_proxy),
+            v4_routes_state: EventLoopComponent::Present(v4_routes_state),
+            v6_routes_state: EventLoopComponent::Present(v6_routes_state),
+            v4_routes_set_provider: EventLoopComponent::Present(v4_routes_set_provider),
+            v6_routes_set_provider: EventLoopComponent::Present(v6_routes_set_provider),
+            interfaces_handler: EventLoopComponent::Present(interfaces_handler),
+            route_clients: EventLoopComponent::Present(route_clients),
+            unified_request_stream,
+        }
+        .initialize(IncludedWorkers {
+            routes_v4: EventLoopComponent::Present(()),
+            routes_v6: EventLoopComponent::Present(()),
+            interfaces: EventLoopComponent::Present(()),
+        })
+        .await?;
 
         log_info!("routes and interfaces workers initialized, beginning execution");
 
-        loop {
-            let request_fut = match &unified_pending_request {
-                None => unified_request_stream.next().left_future(),
-                Some(pending_request) => {
-                    log_debug!(
-                        "not awaiting on request stream because of pending request: {:?}",
-                        pending_request,
-                    );
-                    futures::future::pending().right_future()
-                }
-            }
-            .fuse();
-            let mut request_fut = pin!(request_fut);
-
-            futures::select! {
-                event = unified_event_stream.next() => {
-                    match event.expect("event stream cannot end without error")? {
-                        // The Routes worker needs access to the intended table id
-                        // from the PendingRouteRequest.
-                        UnifiedEvent::RoutesV4Event(event) => {
-                            let pending_request_args = match unified_pending_request {
-                                Some(UnifiedPendingRequest::RoutesV4(ref req)) => Some(req.args()),
-                                _ => None,
-                            };
-
-                            routes_v4_worker
-                            .handle_route_watcher_event(
-                                &route_clients,
-                                event,
-                                pending_request_args.cloned())
-                            .map_err(Error::new)
-                            .context("handle v4 routes event")?
-                        },
-                        UnifiedEvent::RoutesV6Event(event) => {
-                            let pending_request_args = match unified_pending_request {
-                                Some(UnifiedPendingRequest::RoutesV6(ref req)) => Some(req.args()),
-                                _ => None,
-                            };
-
-                            routes_v6_worker
-                            .handle_route_watcher_event(
-                                &route_clients,
-                                event,
-                                pending_request_args.cloned()
-                            )
-                            .map_err(Error::new)
-                            .context("handle v6 routes event")?},
-                        UnifiedEvent::InterfacesEvent(event) => interfaces_worker
-                            .handle_interface_watcher_event(event).await
-                            .map_err(Error::new)
-                            .context("handle interfaces event")?,
-                    }
-                }
-                request = request_fut => {
-                    assert_matches!(
-                        unified_pending_request,
-                        None,
-                        "should not already have pending request if handling a new request"
-                    );
-
-                    match request.expect("request stream cannot end") {
-                        UnifiedRequest::InterfacesRequest(request) => {
-                            let request = interfaces_worker
-                                .handle_request(request).await;
-                            unified_pending_request = request.map(UnifiedPendingRequest::Interfaces);
-                        }
-                        UnifiedRequest::RoutesV4Request(request) => {
-                            let request = routes_v4_worker
-                                .handle_request(&interfaces_proxy, &v4_routes_set_provider, request).await;
-                            unified_pending_request = request.map(UnifiedPendingRequest::RoutesV4);
-                        }
-                        UnifiedRequest::RoutesV6Request(request) => {
-                            let request = routes_v6_worker
-                                .handle_request(&interfaces_proxy, &v6_routes_set_provider, request).await;
-                            unified_pending_request = request.map(UnifiedPendingRequest::RoutesV6);
-                        }
-                        UnifiedRequest::RuleRequest(request, completer) => {
-                            completer.send(rule_table.handle_request(request))
-                                .expect("receiving end of completer should not be dropped");
-                        }
-                    }
-                }
-            }
-
-            unified_pending_request = unified_pending_request.and_then(|pending| match pending {
-                UnifiedPendingRequest::RoutesV4(pending_request) => routes_v4_worker
-                    .handle_pending_request(pending_request)
-                    .map(UnifiedPendingRequest::RoutesV4),
-                UnifiedPendingRequest::RoutesV6(pending_request) => routes_v6_worker
-                    .handle_pending_request(pending_request)
-                    .map(UnifiedPendingRequest::RoutesV6),
-                UnifiedPendingRequest::Interfaces(pending_request) => interfaces_worker
-                    .handle_pending_request(pending_request)
-                    .map(UnifiedPendingRequest::Interfaces),
-            });
-        }
-    }
-}
-
-#[cfg(test)]
-pub(crate) mod testutil {
-    use super::*;
-    use fidl::endpoints::create_proxy;
-
-    pub(crate) struct EventLoopServerEnd {
-        pub(crate) interfaces: fidl::endpoints::ServerEnd<fnet_root::InterfacesMarker>,
-        pub(crate) interfaces_state: fidl::endpoints::ServerEnd<fnet_interfaces::StateMarker>,
-        pub(crate) v4_routes_state: fidl::endpoints::ServerEnd<fnet_routes::StateV4Marker>,
-        pub(crate) v6_routes_state: fidl::endpoints::ServerEnd<fnet_routes::StateV6Marker>,
-        pub(crate) v4_routes_set_provider:
-            fidl::endpoints::ServerEnd<fnet_routes_admin::RouteTableV4Marker>,
-        pub(crate) v6_routes_set_provider:
-            fidl::endpoints::ServerEnd<fnet_routes_admin::RouteTableV6Marker>,
-    }
-
-    pub(crate) fn event_loop_fixture<
-        H: interfaces::InterfacesHandler,
-        S: crate::messaging::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
-    >(
-        interfaces_handler: H,
-        route_clients: ClientTable<NetlinkRoute, S>,
-        unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
-    ) -> (EventLoop<H, S>, EventLoopServerEnd) {
-        let (interfaces_proxy, interfaces_server_end) =
-            create_proxy::<fnet_root::InterfacesMarker>().unwrap();
-        let (interfaces_state_proxy, interfaces_state_server_end) =
-            create_proxy::<fnet_interfaces::StateMarker>().unwrap();
-        let (v4_routes_state_proxy, v4_routes_state_server_end) =
-            create_proxy::<fnet_routes::StateV4Marker>().unwrap();
-        let (v6_routes_state_proxy, v6_routes_state_server_end) =
-            create_proxy::<fnet_routes::StateV6Marker>().unwrap();
-        let (v4_routes_set_provider_proxy, v4_routes_set_provider_server_end) =
-            create_proxy::<fnet_routes_admin::RouteTableV4Marker>().unwrap();
-        let (v6_routes_set_provider_proxy, v6_routes_set_provider_server_end) =
-            create_proxy::<fnet_routes_admin::RouteTableV6Marker>().unwrap();
-
-        (
-            EventLoop {
-                interfaces_proxy,
-                interfaces_state_proxy,
-                v4_routes_state: v4_routes_state_proxy,
-                v6_routes_state: v6_routes_state_proxy,
-                v4_routes_set_provider: v4_routes_set_provider_proxy,
-                v6_routes_set_provider: v6_routes_set_provider_proxy,
-                interfaces_handler,
-                route_clients,
-                unified_request_stream,
-            },
-            EventLoopServerEnd {
-                interfaces: interfaces_server_end,
-                interfaces_state: interfaces_state_server_end,
-                v4_routes_state: v4_routes_state_server_end,
-                v6_routes_state: v6_routes_state_server_end,
-                v4_routes_set_provider: v4_routes_set_provider_server_end,
-                v6_routes_set_provider: v6_routes_set_provider_server_end,
-            },
-        )
-    }
-
-    pub(crate) async fn serve_empty_routes<I: fnet_routes_ext::FidlRouteIpExt>(
-        server_end: fidl::endpoints::ServerEnd<I::StateMarker>,
-    ) {
-        let stream = server_end.into_stream().expect("into stream");
-        stream
-            .for_each_concurrent(None, |item| async move {
-                fnet_routes_ext::testutil::serve_state_request::<'_, I>(
-                    item,
-                    fnet_routes_ext::testutil::empty_watch_event_stream::<'_, I>(),
-                )
-                .await;
-            })
-            .await;
-    }
-
-    pub(crate) async fn serve_empty_interfaces_state(
-        server_end: fidl::endpoints::ServerEnd<fnet_interfaces::StateMarker>,
-    ) {
-        let stream = server_end.into_stream().expect("into stream");
-        stream
-            .for_each_concurrent(None, |item| async move {
-                let request = item.expect("interfaces state FIDL error");
-                match request {
-                    fnet_interfaces::StateRequest::GetWatcher {
-                        options: _,
-                        watcher,
-                        control_handle: _,
-                    } => {
-                        serve_empty_interfaces_watcher(watcher).await;
-                    }
-                }
-            })
-            .await;
-    }
-
-    async fn serve_empty_interfaces_watcher(
-        server_end: fidl::endpoints::ServerEnd<fnet_interfaces::WatcherMarker>,
-    ) {
-        let stream = server_end.into_stream().expect("into stream");
-        stream
-            .scan(false, |responded, item| {
-                let responded = std::mem::replace(responded, true);
-                let request = item.expect("interfaces watcher FIDL error");
-                match request {
-                    fnet_interfaces::WatcherRequest::Watch { responder } => {
-                        if responded {
-                            futures::future::pending().left_future()
-                        } else {
-                            responder
-                                .send(&fnet_interfaces::Event::Idle(fnet_interfaces::Empty))
-                                .expect("respond to interface watch");
-                            futures::future::ready(Some(())).right_future()
-                        }
-                    }
-                }
-            })
-            .for_each(|()| futures::future::ready(()))
-            .await;
+        state.run().await
     }
 }

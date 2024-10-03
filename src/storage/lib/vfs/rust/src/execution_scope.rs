@@ -490,7 +490,7 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn test_shutdown_waits_for_channels() {
-        use {fuchsia_async as fasync, fuchsia_zircon as zx};
+        use {fuchsia_async as fasync, zx};
 
         let scope = ExecutionScope::new();
         let (rx, tx) = zx::Channel::create();

@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -412,7 +409,7 @@ impl SomeProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<SomeProtocolEvent, fidl::Error> {
         SomeProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -421,7 +418,7 @@ impl SomeProtocolSynchronousProxy {
         &self,
         mut union_member: &UnionMember,
         mut table_member: &TableMember,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<SomeProtocolSomeMethodResult, fidl::Error> {
         let _response =
             self.client.send_query::<SomeProtocolSomeMethodRequest, fidl::encoding::ResultType<

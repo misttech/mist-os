@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context};
+use assembly_config_schema::developer_overrides::DeveloperOnlyOptions;
 use assembly_config_schema::platform_config::PlatformConfig;
 use assembly_config_schema::product_config::ProductConfig;
 use assembly_config_schema::{BoardInformation, BuildType, ExampleConfig};
@@ -75,6 +76,7 @@ pub fn define_configuration(
     board_info: &BoardInformation,
     gendir: impl AsRef<Utf8Path>,
     resource_dir: impl AsRef<Utf8Path>,
+    developer_only_options: Option<&DeveloperOnlyOptions>,
 ) -> anyhow::Result<CompletedConfiguration> {
     let icu_config = &platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
@@ -99,6 +101,7 @@ pub fn define_configuration(
                 board_info,
                 gendir,
                 resource_dir,
+                developer_only_options,
             },
         };
 
@@ -521,7 +524,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let AssemblyConfig { platform, product, .. } = util::from_reader(&mut cursor).unwrap();
         let result =
-            define_configuration(&platform, &product, &BoardInformation::default(), "", "");
+            define_configuration(&platform, &product, &BoardInformation::default(), "", "", None);
 
         assert!(result.is_err());
     }

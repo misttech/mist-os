@@ -6,7 +6,7 @@ use anyhow::Error;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo, WriteOptions};
 use std::sync::Arc;
-use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_block_volume as fvolume, zx};
 
 pub const TYPE_GUID: [u8; 16] = [1; 16];
 pub const INSTANCE_GUID: [u8; 16] = [2; 16];

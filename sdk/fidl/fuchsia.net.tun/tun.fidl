@@ -308,6 +308,13 @@ closed protocol Device {
     strict GetDevice(resource struct {
         device server_end:fuchsia.hardware.network.Device;
     });
+    /// Delegates an rx lease through the tun device.
+    ///
+    /// See documentation on [`fuchsia.hardware.network/DelegatedRxLease`] for
+    /// proper usage.
+    strict DelegateRxLease(resource struct {
+        lease fuchsia.hardware.network.DelegatedRxLease;
+    });
 };
 
 /// Provides control over a pair of network devices.

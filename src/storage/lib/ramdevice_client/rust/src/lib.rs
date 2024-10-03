@@ -17,7 +17,7 @@ use fuchsia_fs::directory::WatchEvent;
 use futures::TryStreamExt;
 use {
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_hardware_block_volume as fvolume,
-    fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio, zx,
 };
 
 const GUID_LEN: usize = 16;
@@ -421,7 +421,7 @@ impl Drop for RamdiskClient {
                 let _: Result<Result<(), _>, _> = ControllerSynchronousProxy::new(
                     ramdisk_controller.into_channel().unwrap().into(),
                 )
-                .schedule_unbind(zx::MonotonicTime::INFINITE);
+                .schedule_unbind(zx::MonotonicInstant::INFINITE);
             }
         }
     }

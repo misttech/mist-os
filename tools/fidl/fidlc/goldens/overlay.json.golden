@@ -37,6 +37,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.overlay/Overlay",
             "nullable": false,
             "type_shape_v2": {
@@ -91,6 +92,7 @@
         {
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "maybe_element_count": 16,
             "nullable": false,
             "type_shape_v2": {
@@ -145,8 +147,10 @@
         {
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "maybe_element_count": 16,
               "nullable": false,
               "type_shape_v2": {
@@ -219,6 +223,7 @@
           "name": "Primitive",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -243,6 +248,7 @@
           "name": "StringNeedsConstructor",
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -267,8 +273,10 @@
           "name": "VectorStringAlsoNeedsConstructor",
           "type": {
             "kind": "vector",
+            "kind_v2": "vector",
             "element_type": {
               "kind": "string",
+              "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
                 "inline_size": 16,
@@ -342,6 +350,7 @@
           "name": "x",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -378,6 +387,7 @@
           "name": "y",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "float64",
             "type_shape_v2": {
               "inline_size": 8,
@@ -440,6 +450,7 @@
           "name": "pizza",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.overlay/Pizza",
             "nullable": false,
             "type_shape_v2": {
@@ -465,6 +476,7 @@
           "name": "pasta",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.overlay/Pasta",
             "nullable": false,
             "type_shape_v2": {
@@ -516,6 +528,7 @@
           "name": "first",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -540,6 +553,7 @@
           "name": "second",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,

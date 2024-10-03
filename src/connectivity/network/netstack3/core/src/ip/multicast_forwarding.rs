@@ -62,7 +62,7 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::IpMulticastRout
 
     fn with_route_table<
         O,
-        F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&MulticastRouteTable<I, Self::DeviceId, BC>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         state: &MulticastForwardingEnabledState<I, Self::DeviceId, BC>,
@@ -77,7 +77,7 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::IpMulticastRout
 
     fn with_route_table_mut<
         O,
-        F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId, BC>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         state: &MulticastForwardingEnabledState<I, Self::DeviceId, BC>,
@@ -116,7 +116,7 @@ impl<
 impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>, BT>>
     for lock_ordering::IpMulticastRouteTable<I>
 {
-    type Data = MulticastRouteTable<I, DeviceId<BT>>;
+    type Data = MulticastRouteTable<I, DeviceId<BT>, BT>;
 }
 
 impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>, BT>>

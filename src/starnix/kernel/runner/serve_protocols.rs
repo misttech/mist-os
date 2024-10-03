@@ -31,7 +31,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_container as fstarcontainer, zx,
 };
 #[cfg(feature = "starnix_lite")]
 use {
@@ -53,7 +53,7 @@ where
     L: LockBefore<BeforeFsNodeAppend>,
 {
     let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
-    serve_file_at(locked, server_end.into_channel().into(), system_task, &root_file)?;
+    serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
 }
 

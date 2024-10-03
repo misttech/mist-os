@@ -32,9 +32,6 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsGlobalMode = false;
   // TODO(https://fxbug.dev/342480690): Support TLS
   static constexpr bool kSupportsTls = false;
-  // TODO(https://fxbug.dev/354786114): Update the dependency tree for a module
-  // that was loaded as a dependency of another module.
-  static constexpr bool kDepModuleHasDepTree = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
@@ -65,11 +62,6 @@ class DlImplTests : public Base {
     const RuntimeModule* root = static_cast<RuntimeModule*>(module);
     return dynamic_linker_.LookupSymbol(*root, ref);
   }
-
-  // TODO(https://fxbug.dev/354043838): Remove these when these functions can
-  // become pure wrappers in the DlSystemTests fixture.
-  void ExpectRootModuleNotLoaded(std::string_view name) {}
-  void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {}
 
   // The `dynamic_linker_` dtor will also destroy and unmap modules remaining in
   // its modules list, so there is no need to do any extra clean up operation.

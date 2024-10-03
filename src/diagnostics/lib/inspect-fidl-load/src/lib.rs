@@ -5,7 +5,7 @@
 use anyhow::{format_err, Error};
 use fidl_fuchsia_inspect_deprecated::{InspectProxy, MetricValue, PropertyValue};
 use fuchsia_inspect::reader::{DiagnosticsHierarchy, Property};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// Loads an inspect node hierarchy in the given path.
 pub async fn load_hierarchy_from_path(path: &str) -> Result<DiagnosticsHierarchy, Error> {

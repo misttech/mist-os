@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics_persist::PersistResult;
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::mpsc;
 use futures::{Future, StreamExt};
-use injectable_time::{MonotonicTime, TimeSource};
+use injectable_time::{MonotonicInstant, TimeSource};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -103,7 +103,7 @@ fn log_at_most_once_per_min_factory(
 ) -> impl FnMut(String) {
     let mut last_logged = None;
     move |message| {
-        let now = zx::MonotonicTime::from_nanos(time_source.now());
+        let now = zx::MonotonicInstant::from_nanos(time_source.now());
         let should_log = match last_logged {
             Some(last_logged) => (now - last_logged) >= zx::Duration::from_minutes(1),
             None => true,
@@ -131,7 +131,7 @@ pub fn create_persistence_req_sender(
     let fut = async move {
         let persistence_proxy = persistence_proxy.clone();
         let mut log_error =
-            log_at_most_once_per_min_factory(MonotonicTime::new(), |e| error!("{}", e));
+            log_at_most_once_per_min_factory(MonotonicInstant::new(), |e| error!("{}", e));
         while let Some(tag_name) = receiver.next().await {
             let resp = persistence_proxy.persist(&tag_name).await;
             match resp {
@@ -219,7 +219,7 @@ mod tests {
 
     #[derive(Debug)]
     struct FakeTimeSource {
-        now: Arc<RefCell<zx::MonotonicTime>>,
+        now: Arc<RefCell<zx::MonotonicInstant>>,
     }
 
     impl TimeSource for FakeTimeSource {
@@ -231,7 +231,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_at_most_once_per_min_factory() {
         let log_count = Arc::new(RefCell::new(0));
-        let now = Arc::new(RefCell::new(zx::MonotonicTime::from_nanos(0)));
+        let now = Arc::new(RefCell::new(zx::MonotonicInstant::from_nanos(0)));
         let fake_time_source = FakeTimeSource { now: now.clone() };
         let mut log =
             log_at_most_once_per_min_factory(fake_time_source, |_| *log_count.borrow_mut() += 1);

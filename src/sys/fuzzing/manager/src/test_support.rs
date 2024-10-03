@@ -22,7 +22,7 @@ use zx::HandleBased;
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_fuzzer as fuzz,
     fidl_fuchsia_mem as fmem, fidl_fuchsia_test_manager as test_manager, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -432,7 +432,7 @@ async fn serve_suite_controller(
                             let suite_events = payloads
                                 .drain(..)
                                 .map(|payload| SuiteEvent {
-                                    timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+                                    timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
                                     payload: Some(payload),
                                     ..Default::default()
                                 })
@@ -475,7 +475,7 @@ async fn serve_run_controller(
                     let run_events: Vec<RunEvent> = payloads
                         .into_iter()
                         .map(|payload| RunEvent {
-                            timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+                            timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
                             payload: Some(payload),
                             ..Default::default()
                         })

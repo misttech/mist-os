@@ -7,7 +7,7 @@ use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, PcmFormat};
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use fuchsia_inspect_derive::Inspect;
-use fuchsia_zircon::{self as zx};
+
 use futures::stream::{BoxStream, FusedStream};
 use futures::task::{Context, Poll};
 use futures::FutureExt;
@@ -21,7 +21,7 @@ pub struct SawWaveStream {
     frequency_hops: Vec<f32>,
     next_frame_timer: fasync::Timer,
     /// the last time we delivered frames.
-    last_frame_time: Option<zx::MonotonicTime>,
+    last_frame_time: Option<zx::MonotonicInstant>,
     inspect_node: inspect::Node,
 }
 
@@ -42,7 +42,7 @@ impl futures::Stream for SawWaveStream {
     type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         if self.last_frame_time.is_none() {
             self.last_frame_time = Some(now - zx::Duration::from_seconds(1));
         }

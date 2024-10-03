@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use fuchsia_component::client;
 use tracing::info;
-use {fidl_fidl_examples_routing_echo as fecho, fuchsia_zircon as zx};
+use {fidl_fidl_examples_routing_echo as fecho, zx};
 
 #[fuchsia::main]
 async fn main() {

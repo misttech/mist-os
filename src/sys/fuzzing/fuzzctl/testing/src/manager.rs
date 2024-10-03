@@ -8,7 +8,7 @@ use crate::util::create_task;
 use anyhow::{Context as _, Result};
 use fidl::endpoints::ServerEnd;
 use futures::StreamExt;
-use {fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_fuzzer as fuzz, zx_status as zx};
 
 /// Serves `fuchsia.fuzzer.Manager` on the given `server_end` of a FIDL channel.
 pub async fn serve_manager(

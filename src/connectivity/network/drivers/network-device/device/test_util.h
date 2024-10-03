@@ -428,6 +428,8 @@ class FakeNetworkDeviceIfc : public fdf::WireServer<netdriver::NetworkDeviceIfc>
                   CompleteTxCompleter::Sync& completer) override;
   void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
              SnoopCompleter::Sync& completer) override;
+  void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
+                       fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override;
 
   // If assigned, these functions are called when the corresponding FIDL call is served.
   fit::function<void(netdriver::wire::NetworkDeviceIfcPortStatusChangedRequest*, fdf::Arena&,
@@ -448,6 +450,9 @@ class FakeNetworkDeviceIfc : public fdf::WireServer<netdriver::NetworkDeviceIfc>
   fit::function<void(netdriver::wire::NetworkDeviceIfcSnoopRequest*, fdf::Arena&,
                      SnoopCompleter::Sync&)>
       snoop_;
+  fit::function<void(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest*, fdf::Arena&,
+                     DelegateRxLeaseCompleter::Sync&)>
+      delegate_rx_lease_;
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(FakeNetworkDeviceIfc);
@@ -522,6 +527,8 @@ class TxFidlReturnTransaction {
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(TxFidlReturnTransaction);
 };
+
+std::tuple<netdev::DelegatedRxLease, zx::channel> CreateDelegatedLease(uint64_t hold_until_frame);
 
 }  // namespace network::testing
 

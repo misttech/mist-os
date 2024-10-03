@@ -75,10 +75,10 @@ pub struct PlayCommand {
 #[derive(Debug, PartialEq)]
 pub enum AudioRenderUsageExtended {
     Background(fmedia::AudioRenderUsage),
-    Media(fmedia::AudioRenderUsage),
-    SystemAgent(fmedia::AudioRenderUsage),
     Communication(fmedia::AudioRenderUsage),
+    Media(fmedia::AudioRenderUsage),
     Interruption(fmedia::AudioRenderUsage),
+    SystemAgent(fmedia::AudioRenderUsage),
     Ultrasound,
 }
 
@@ -87,15 +87,15 @@ fn str_to_usage(src: &str) -> Result<AudioRenderUsageExtended, String> {
         "BACKGROUND" => {
             Ok(AudioRenderUsageExtended::Background(fmedia::AudioRenderUsage::Background))
         }
-        "MEDIA" => Ok(AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media)),
+        "COMMUNICATION" => {
+            Ok(AudioRenderUsageExtended::Communication(fmedia::AudioRenderUsage::Communication))
+        }
         "INTERRUPTION" => {
             Ok(AudioRenderUsageExtended::Interruption(fmedia::AudioRenderUsage::Interruption))
         }
+        "MEDIA" => Ok(AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media)),
         "SYSTEM-AGENT" => {
             Ok(AudioRenderUsageExtended::SystemAgent(fmedia::AudioRenderUsage::SystemAgent))
-        }
-        "COMMUNICATION" => {
-            Ok(AudioRenderUsageExtended::Communication(fmedia::AudioRenderUsage::Communication))
         }
         "ULTRASOUND" => Ok(AudioRenderUsageExtended::Ultrasound),
         _ => Err(String::from("Couldn't parse usage.")),

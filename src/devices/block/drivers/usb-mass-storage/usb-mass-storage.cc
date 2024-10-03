@@ -6,7 +6,6 @@
 
 #include <endian.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/scsi/block-device.h>
 #include <lib/scsi/controller.h>
 #include <stdio.h>
@@ -777,5 +776,3 @@ zx::result<> UsbMassStorageDevice::Start() {
 }
 
 }  // namespace ums
-
-FUCHSIA_DRIVER_EXPORT(ums::UsbMassStorageDevice);

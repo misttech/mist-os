@@ -137,8 +137,10 @@ impl RegisterTool {
         mut repo_target_info: RepositoryTarget,
     ) -> Result<()> {
         repo_target_info.aliases = match repo_target_info.aliases {
-            Some(aliases) if aliases.is_empty() => Some(info.registration_aliases.clone()),
-            None => Some(info.registration_aliases.clone()),
+            Some(aliases) if aliases.is_empty() => {
+                Some(info.aliases().iter().map(ToString::to_string).collect())
+            }
+            None => Some(info.aliases().iter().map(ToString::to_string).collect()),
             Some(aliases) => Some(aliases),
         };
 
@@ -216,6 +218,7 @@ impl RegisterTool {
 mod test {
     use super::*;
     use addr::TargetAddr;
+    use camino::Utf8PathBuf;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
@@ -226,9 +229,11 @@ mod test {
     use fidl_fuchsia_pkg::RepositoryManagerRequest;
     use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode};
     use fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest};
+    use fuchsia_repo::repository::RepositorySpec;
     use fuchsia_url::RepositoryUrl;
     use futures::channel::oneshot::{channel, Receiver};
     use futures::TryStreamExt;
+    use std::collections::BTreeSet;
     use std::net::IpAddr;
 
     const REPO_NAME: &str = "some-name";
@@ -348,8 +353,10 @@ mod test {
         mgr.write_instance(&PkgServerInfo {
             name: name.into(),
             address: ([127, 0, 0, 1], 8888).into(),
-            repo_path: pkg::PathType::File("/some/repo/path".into()),
-            registration_aliases: vec![],
+            repo_spec: RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/some/repo/path"),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut
                 .into(),

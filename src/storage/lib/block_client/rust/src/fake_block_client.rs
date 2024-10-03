@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::atomic::{self, AtomicU32};
 use std::sync::Mutex;
-use {fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_block as block, zx};
 
 type VmoRegistry = BTreeMap<u16, zx::Vmo>;
 

@@ -10,8 +10,7 @@ use fdio::service_connect;
 use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
-use fuchsia_runtime::UtcTime;
-use fuchsia_zircon::{self as zx};
+use fuchsia_runtime::UtcInstant;
 use futures::{select, FutureExt, StreamExt, TryFutureExt};
 use std::path::PathBuf;
 use thiserror::Error;
@@ -48,9 +47,9 @@ pub enum RtcCreationError {
 #[async_trait]
 pub trait Rtc: Send + Sync {
     /// Returns the current time reported by the realtime clock.
-    async fn get(&self) -> Result<UtcTime>;
+    async fn get(&self) -> Result<UtcInstant>;
     /// Sets the time of the realtime clock to `value`.
-    async fn set(&self, value: UtcTime) -> Result<()>;
+    async fn set(&self, value: UtcInstant) -> Result<()>;
 }
 
 fn get_dir() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
@@ -172,7 +171,7 @@ impl RtcImpl {
     }
 }
 
-fn fidl_time_to_zx_time(fidl_time: frtc::Time) -> Result<UtcTime> {
+fn fidl_time_to_zx_time(fidl_time: frtc::Time) -> Result<UtcInstant> {
     let chrono = Utc.with_ymd_and_hms(
         fidl_time.year as i32,
         fidl_time.month as u32,
@@ -182,13 +181,13 @@ fn fidl_time_to_zx_time(fidl_time: frtc::Time) -> Result<UtcTime> {
         fidl_time.seconds as u32,
     );
     match chrono {
-        LocalResult::Single(t) => Ok(UtcTime::from_nanos(t.timestamp_nanos_opt().unwrap())),
+        LocalResult::Single(t) => Ok(UtcInstant::from_nanos(t.timestamp_nanos_opt().unwrap())),
         _ => Err(anyhow!("Invalid RTC time: {:?}", fidl_time)),
     }
 }
 
-fn zx_time_to_fidl_time(zx_time: UtcTime) -> frtc::Time {
-    let nanos = UtcTime::into_nanos(zx_time);
+fn zx_time_to_fidl_time(zx_time: UtcInstant) -> frtc::Time {
+    let nanos = UtcInstant::into_nanos(zx_time);
     let chrono = Utc.timestamp_opt(nanos / NANOS_PER_SECOND, 0).unwrap();
     frtc::Time {
         year: chrono.year() as u16,
@@ -202,11 +201,11 @@ fn zx_time_to_fidl_time(zx_time: UtcTime) -> frtc::Time {
 
 #[async_trait]
 impl Rtc for RtcImpl {
-    async fn get(&self) -> Result<UtcTime> {
+    async fn get(&self) -> Result<UtcInstant> {
         self.proxy
             .get()
             .map_err(|err| anyhow!("FIDL error on Rtc::get: {}", err))
-            .on_timeout(zx::MonotonicTime::after(FIDL_TIMEOUT), || {
+            .on_timeout(zx::MonotonicInstant::after(FIDL_TIMEOUT), || {
                 Err(anyhow!("FIDL timeout on Rtc::get"))
             })
             .await?
@@ -214,7 +213,7 @@ impl Rtc for RtcImpl {
             .and_then(fidl_time_to_zx_time)
     }
 
-    async fn set(&self, value: UtcTime) -> Result<()> {
+    async fn set(&self, value: UtcInstant) -> Result<()> {
         let fractional_second = zx::Duration::from_nanos(value.into_nanos() % NANOS_PER_SECOND);
         // The RTC API only accepts integer seconds but we really need higher accuracy, particularly
         // for the kernel clock set by the RTC driver...
@@ -235,7 +234,7 @@ impl Rtc for RtcImpl {
             .proxy
             .set(&fidl_time)
             .map_err(|err| anyhow!("FIDL error on Rtc::set: {}", err))
-            .on_timeout(zx::MonotonicTime::after(FIDL_TIMEOUT), || {
+            .on_timeout(zx::MonotonicInstant::after(FIDL_TIMEOUT), || {
                 Err(anyhow!("FIDL timeout on Rtc::set"))
             })
             .await?;
@@ -250,15 +249,15 @@ impl Rtc for RtcImpl {
 #[derive(Clone)]
 pub struct FakeRtc {
     /// The response used for get requests.
-    value: Result<UtcTime, String>,
+    value: Result<UtcInstant, String>,
     /// The most recent value received in a set request.
-    last_set: Arc<Mutex<Option<UtcTime>>>,
+    last_set: Arc<Mutex<Option<UtcInstant>>>,
 }
 
 #[cfg(test)]
 impl FakeRtc {
     /// Returns a new `FakeRtc` that always returns the supplied time.
-    pub fn valid(time: UtcTime) -> FakeRtc {
+    pub fn valid(time: UtcInstant) -> FakeRtc {
         FakeRtc { value: Ok(time), last_set: Arc::new(Mutex::new(None)) }
     }
 
@@ -268,7 +267,7 @@ impl FakeRtc {
     }
 
     /// Returns the last time set on this clock, or none if the clock has never been set.
-    pub fn last_set(&self) -> Option<UtcTime> {
+    pub fn last_set(&self) -> Option<UtcInstant> {
         self.last_set.lock().map(|time| time.clone())
     }
 }
@@ -276,11 +275,11 @@ impl FakeRtc {
 #[cfg(test)]
 #[async_trait]
 impl Rtc for FakeRtc {
-    async fn get(&self) -> Result<UtcTime> {
+    async fn get(&self) -> Result<UtcInstant> {
         self.value.as_ref().map(|time| time.clone()).map_err(|msg| Error::msg(msg.clone()))
     }
 
-    async fn set(&self, value: UtcTime) -> Result<()> {
+    async fn set(&self, value: UtcInstant) -> Result<()> {
         let mut last_set = self.last_set.lock();
         last_set.replace(value);
         Ok(())
@@ -302,8 +301,8 @@ mod test {
     const INVALID_FIDL_TIME_2: frtc::Time =
         frtc::Time { year: 2020, month: 8, day: 14, hours: 99, minutes: 99, seconds: 99 };
     const TEST_OFFSET: zx::Duration = zx::Duration::from_millis(250);
-    const TEST_ZX_TIME: UtcTime = UtcTime::from_nanos(1_597_363_200_000_000_000);
-    const DIFFERENT_ZX_TIME: UtcTime = UtcTime::from_nanos(1_597_999_999_000_000_000);
+    const TEST_ZX_TIME: UtcInstant = UtcInstant::from_nanos(1_597_363_200_000_000_000);
+    const DIFFERENT_ZX_TIME: UtcInstant = UtcInstant::from_nanos(1_597_999_999_000_000_000);
 
     fn new_rw_rtc(proxy: frtc::DeviceProxy) -> RtcImpl {
         RtcImpl { proxy }
@@ -366,9 +365,9 @@ mod test {
                 responder.send(status.into_raw()).expect("Failed response");
             }
         });
-        let before = zx::MonotonicTime::get();
+        let before = zx::MonotonicInstant::get();
         assert!(rtc_impl.set(TEST_ZX_TIME).await.is_ok());
-        let span = zx::MonotonicTime::get() - before;
+        let span = zx::MonotonicInstant::get() - before;
         // Setting an integer second should not require any delay and therefore should complete
         // very fast - well under a millisecond typically. We did observe ~54ms very rarely.
         assert_lt!(span, RTC_SETUP_TIME);
@@ -388,9 +387,9 @@ mod test {
                 responder.send(status.into_raw()).expect("Failed response");
             }
         });
-        let before = zx::MonotonicTime::get();
+        let before = zx::MonotonicInstant::get();
         assert!(rtc_impl.set(TEST_ZX_TIME - TEST_OFFSET).await.is_ok());
-        let span = zx::MonotonicTime::get() - before;
+        let span = zx::MonotonicInstant::get() - before;
         // Setting a fractional second should cause a delay until the top of second before calling
         // the FIDL interface. We only verify half the expected time has passed to allow for some
         // slack in the timer calculation.

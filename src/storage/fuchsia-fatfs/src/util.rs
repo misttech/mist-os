@@ -5,8 +5,8 @@
 use chrono::offset::TimeZone;
 use chrono::Local;
 use fatfs::{DateTime, FatfsError};
-use fuchsia_zircon::Status;
 use std::io::{self, ErrorKind};
+use zx::Status;
 
 /// Returns the equivalent of the given DOS time as ns past the unix epoch.
 pub fn dos_to_unix_time(dos_time: DateTime) -> u64 {

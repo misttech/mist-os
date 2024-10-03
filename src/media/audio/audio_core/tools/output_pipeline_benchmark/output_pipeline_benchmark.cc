@@ -110,14 +110,14 @@ std::string OutputPipelineBenchmark::Input::ToString() const {
   switch (usage) {
     case RenderUsage::BACKGROUND:
       return "B";
-    case RenderUsage::MEDIA:
-      return "M";
-    case RenderUsage::INTERRUPTION:
-      return "I";
-    case RenderUsage::SYSTEM_AGENT:
-      return "S";
     case RenderUsage::COMMUNICATION:
       return "C";
+    case RenderUsage::INTERRUPTION:
+      return "I";
+    case RenderUsage::MEDIA:
+      return "M";
+    case RenderUsage::SYSTEM_AGENT:
+      return "S";
     case RenderUsage::ULTRASOUND:
       return "U";
     default:
@@ -158,17 +158,17 @@ OutputPipelineBenchmark::Input OutputPipelineBenchmark::Input::FromString(const 
     case 'B':
       usage = RenderUsage::BACKGROUND;
       break;
-    case 'M':
-      usage = RenderUsage::MEDIA;
+    case 'C':
+      usage = RenderUsage::COMMUNICATION;
       break;
     case 'I':
       usage = RenderUsage::INTERRUPTION;
       break;
+    case 'M':
+      usage = RenderUsage::MEDIA;
+      break;
     case 'S':
       usage = RenderUsage::SYSTEM_AGENT;
-      break;
-    case 'C':
-      usage = RenderUsage::COMMUNICATION;
       break;
     case 'U':
       usage = RenderUsage::ULTRASOUND;
@@ -302,10 +302,10 @@ void OutputPipelineBenchmark::PrintLegend(zx::duration mix_period) {
       "    streams, each of which has one of the following usages:\n"
       "\n"
       "        B: BACKGROUND\n"
-      "        M: MEDIA\n"
-      "        I: INTERRUPTION\n"
-      "        S: SYSTEM_AGENT\n"
       "        C: COMMUNICATION\n"
+      "        I: INTERRUPTION\n"
+      "        M: MEDIA\n"
+      "        S: SYSTEM_AGENT\n"
       "        U: ULTRASOUND\n"
       "\n"
       "    and VZ is a volume setting:\n"

@@ -6,7 +6,7 @@ use anyhow::Error;
 use fidl_test_policy::{ProtectedOperationsRequest, ProtectedOperationsRequestStream};
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[fasync::run_singlethreaded]
 async fn main() {

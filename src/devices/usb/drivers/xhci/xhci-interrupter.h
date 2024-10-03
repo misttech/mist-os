@@ -8,6 +8,7 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/task.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
 
@@ -73,7 +74,6 @@ class Interrupter {
 
  private:
   zx_status_t StartIrqThread();
-  void HandleWakeLease();
 
   fdf::SynchronizedDispatcher dispatcher_;
 
@@ -84,7 +84,7 @@ class Interrupter {
   async::Irq irq_handler_;
   libsync::Completion irq_shutdown_completion_;
 
-  async::Task lease_timeout_;
+  std::optional<fdf_power::WakeLease> wake_lease_;
 
   // published inspect data
   inspect::Node inspect_root_;

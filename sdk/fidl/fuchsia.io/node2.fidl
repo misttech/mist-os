@@ -10,6 +10,14 @@ using zx;
 @available(added=18)
 const MAX_ATTRIBUTE_NAME uint64 = 255;
 
+/// The maximum size for passing the SELinux context as an attribute.
+@available(added=HEAD)
+const MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN uint64 = 256;
+
+/// The name of the extended attribute accessible via the SELinux context attribute.
+@available(added=HEAD)
+const SELINUX_CONTEXT_NAME string = "security.selinux";
+
 /// The name of an extended attribute. It can not contain any null bytes. Other
 /// than that and the maximum size, no particular structure is imposed on the
 /// name.
@@ -33,6 +41,12 @@ type ExtendedAttributeValue = flexible resource union {
     1: bytes vector<uint8>:MAX_INLINE_ATTRIBUTE_VALUE;
     2: buffer zx.Handle:VMO;
 };
+
+// TODO(https://fxbug.dev/42159332): Remove the need for this.
+/// Used in places where empty structs are needed, such as empty union members, to avoid creating
+/// new struct types.
+@available(added=HEAD)
+type EmptyStruct = struct {};
 
 type NodeAttributesQuery = flexible bits : uint64 {
     /// Requests [`NodeAttributes.protocols`].
@@ -87,6 +101,10 @@ type NodeAttributesQuery = flexible bits : uint64 {
     /// accordance to the Unicode 12 NFD normalization and casefolding standard.
     @available(added=HEAD)
     CASEFOLD = 0x20000;
+
+    /// Requests [`MutableNodeAttributes.selinux_context`]. See that field for more detail.
+    @available(added=HEAD)
+    SELINUX_CONTEXT = 0x40000;
 };
 
 type MutableNodeAttributes = table {
@@ -120,6 +138,23 @@ type MutableNodeAttributes = table {
     /// The only filesystem to support this at the time of writing is Fxfs.
     @available(added=HEAD)
     8: casefold bool;
+
+    /// The value of the extended attribute "security.selinux" to be used in the context of SELinux
+    /// implementations. The value can only be set or returned if it is
+    /// [`MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN`] characters or less to constrain the size of the
+    /// response. If the value is not currently found on the node the response the field will not
+    /// be included in the repsonse. If the value is found on the node but the server is not
+    /// returning it here due to size or implementation, then it will return
+    /// `use_extended_attributes` to indicate using the ['fuchsia.io/Node.GetExtendedAttribute`]
+    /// to retreive it.
+    ///
+    /// ZX_ERR_INVALID_ARGS will be returned if there is an attempt set this attribute with the
+    /// `use_extended_attributes` member.
+    @available(added=HEAD)
+    9: selinux_context flexible union {
+        1: data vector<uint8>:MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN;
+        2: use_extended_attributes EmptyStruct;
+    };
 };
 
 // TODO(https://fxbug.dev/42057114): Inline this into its only reference when fidlgen_go is fixed.

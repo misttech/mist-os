@@ -45,6 +45,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/EmptyProtocolSendRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -77,6 +78,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/EmptyProtocolReceiveRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -107,6 +109,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/EmptyProtocolSendAndReceiveRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -122,6 +125,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/EmptyProtocolSendAndReceiveResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -185,6 +189,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/Empty",
             "nullable": false,
             "type_shape_v2": {
@@ -241,6 +246,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/Empty",
             "nullable": false,
             "type_shape_v2": {
@@ -297,6 +303,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/Empty",
             "nullable": false,
             "type_shape_v2": {
@@ -353,6 +360,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.emptystruct/Empty",
             "nullable": false,
             "type_shape_v2": {

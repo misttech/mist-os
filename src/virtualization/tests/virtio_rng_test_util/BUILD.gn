@@ -9,7 +9,7 @@ rustc_binary("virtio_rng_test_util") {
   edition = "2021"
 
   if (is_fuchsia) {
-    deps = [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+    deps = [ "//sdk/rust/zx" ]
 
     source_root = "src/fuchsia_main.rs"
     sources = [ "src/fuchsia_main.rs" ]

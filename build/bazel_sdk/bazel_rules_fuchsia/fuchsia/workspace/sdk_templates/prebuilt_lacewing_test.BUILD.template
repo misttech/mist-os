@@ -6,7 +6,7 @@ load(
 
 fuchsia_prebuilt_lacewing_test(
     name = "{{name}}",
-    test_pyz = "{{test_pyz}}",
+    test_binary = "{{test_binary}}",
     data = [{{data}}],
     deprecation = {{deprecation}},
 )

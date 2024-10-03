@@ -147,7 +147,7 @@ pub fn send_scan_completion<'h, S>(
 where
     S: 'h,
 {
-    use fuchsia_zircon::Duration;
+    use zx::Duration;
 
     const SCAN_COMPLETION_DELAY: Duration = Duration::from_seconds(2i64);
 

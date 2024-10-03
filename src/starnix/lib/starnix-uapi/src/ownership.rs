@@ -31,7 +31,7 @@
 // operation.
 
 use core::hash::Hasher;
-use fuchsia_zircon as zx;
+
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::atomic::{fence, AtomicUsize, Ordering};
@@ -688,7 +688,7 @@ impl<T> RefInner<T> {
         }
         // Otherwise, wait on the futex that will be waken up when the number of temp_ref drops
         // to 0.
-        let result = self.temp_refs_count.wait(current_value, None, zx::MonotonicTime::INFINITE);
+        let result = self.temp_refs_count.wait(current_value, None, zx::MonotonicInstant::INFINITE);
         debug_assert!(
             result == Ok(()) || result == Err(zx::Status::BAD_STATE),
             "Unexpected result: {result:?}"

@@ -15,50 +15,62 @@ pub struct Padding1ByteEnd {
     pub b: u8,
 }
 
-impl ::fidl::Encode for Padding1ByteEnd {
+impl ::fidl_next::Encodable for Padding1ByteEnd {
     type Encoded<'buf> = WirePadding1ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding1ByteEnd
+where
+    u16: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding1ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding1ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding1ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding1ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding1ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding1ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding1ByteEnd> for Padding1ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding1ByteEnd> for Padding1ByteEnd {
     fn take_from(from: &mut WirePadding1ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -66,23 +78,29 @@ impl ::fidl::TakeFrom<WirePadding1ByteEnd> for Padding1ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding1ByteEnd {
-    pub a: ::fidl::u16_le,
+    pub a: ::fidl_next::u16_le,
     pub b: u8,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding1ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -93,50 +111,62 @@ pub struct Padding1ByteMiddle {
     pub b: u16,
 }
 
-impl ::fidl::Encode for Padding1ByteMiddle {
+impl ::fidl_next::Encodable for Padding1ByteMiddle {
     type Encoded<'buf> = WirePadding1ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding1ByteMiddle
+where
+    u8: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding1ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding1ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding1ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding1ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding1ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding1ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding1ByteMiddle> for Padding1ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding1ByteMiddle> for Padding1ByteMiddle {
     fn take_from(from: &mut WirePadding1ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -145,22 +175,28 @@ impl ::fidl::TakeFrom<WirePadding1ByteMiddle> for Padding1ByteMiddle {
 #[repr(C)]
 pub struct WirePadding1ByteMiddle {
     pub a: u8,
-    pub b: ::fidl::u16_le,
+    pub b: ::fidl_next::u16_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding1ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteMiddle
+where
+    ___D: ?Sized,
+
+    u8: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -172,53 +208,66 @@ pub struct Padding2ByteAlignmentLength6 {
     pub c: u8,
 }
 
-impl ::fidl::Encode for Padding2ByteAlignmentLength6 {
+impl ::fidl_next::Encodable for Padding2ByteAlignmentLength6 {
     type Encoded<'buf> = WirePadding2ByteAlignmentLength6;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding2ByteAlignmentLength6
+where
+    u8: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
                 c,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
-        ::fidl::Encode::encode(&mut self.c, encoder, c)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding2ByteAlignmentLength6> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding2ByteAlignmentLength6>;
+impl ::fidl_next::EncodableOption for Box<Padding2ByteAlignmentLength6> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding2ByteAlignmentLength6>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding2ByteAlignmentLength6>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding2ByteAlignmentLength6: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding2ByteAlignmentLength6> for Padding2ByteAlignmentLength6 {
+impl ::fidl_next::TakeFrom<WirePadding2ByteAlignmentLength6> for Padding2ByteAlignmentLength6 {
     fn take_from(from: &mut WirePadding2ByteAlignmentLength6) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
-            c: ::fidl::TakeFrom::take_from(&mut from.c),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+            c: ::fidl_next::TakeFrom::take_from(&mut from.c),
         }
     }
 }
@@ -227,25 +276,32 @@ impl ::fidl::TakeFrom<WirePadding2ByteAlignmentLength6> for Padding2ByteAlignmen
 #[repr(C)]
 pub struct WirePadding2ByteAlignmentLength6 {
     pub a: u8,
-    pub b: ::fidl::u16_le,
+    pub b: ::fidl_next::u16_le,
     pub c: u8,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding2ByteAlignmentLength6 {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteAlignmentLength6
+where
+    ___D: ?Sized,
+
+    u8: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
                 mut c,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(c.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -256,50 +312,62 @@ pub struct Padding2ByteEnd {
     pub b: u16,
 }
 
-impl ::fidl::Encode for Padding2ByteEnd {
+impl ::fidl_next::Encodable for Padding2ByteEnd {
     type Encoded<'buf> = WirePadding2ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding2ByteEnd
+where
+    u32: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding2ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding2ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding2ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding2ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding2ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding2ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding2ByteEnd> for Padding2ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding2ByteEnd> for Padding2ByteEnd {
     fn take_from(from: &mut WirePadding2ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -307,23 +375,29 @@ impl ::fidl::TakeFrom<WirePadding2ByteEnd> for Padding2ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteEnd {
-    pub a: ::fidl::u32_le,
-    pub b: ::fidl::u16_le,
+    pub a: ::fidl_next::u32_le,
+    pub b: ::fidl_next::u16_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding2ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -334,50 +408,62 @@ pub struct Padding2ByteMiddle {
     pub b: u32,
 }
 
-impl ::fidl::Encode for Padding2ByteMiddle {
+impl ::fidl_next::Encodable for Padding2ByteMiddle {
     type Encoded<'buf> = WirePadding2ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding2ByteMiddle
+where
+    u16: ::fidl_next::Encode<___E>,
+    u32: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding2ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding2ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding2ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding2ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding2ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding2ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding2ByteMiddle> for Padding2ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding2ByteMiddle> for Padding2ByteMiddle {
     fn take_from(from: &mut WirePadding2ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -385,23 +471,29 @@ impl ::fidl::TakeFrom<WirePadding2ByteMiddle> for Padding2ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteMiddle {
-    pub a: ::fidl::u16_le,
-    pub b: ::fidl::u32_le,
+    pub a: ::fidl_next::u16_le,
+    pub b: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding2ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteMiddle
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -412,50 +504,62 @@ pub struct Padding3ByteEnd {
     pub b: u8,
 }
 
-impl ::fidl::Encode for Padding3ByteEnd {
+impl ::fidl_next::Encodable for Padding3ByteEnd {
     type Encoded<'buf> = WirePadding3ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding3ByteEnd
+where
+    u32: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding3ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding3ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding3ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding3ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding3ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding3ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding3ByteEnd> for Padding3ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding3ByteEnd> for Padding3ByteEnd {
     fn take_from(from: &mut WirePadding3ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -463,23 +567,29 @@ impl ::fidl::TakeFrom<WirePadding3ByteEnd> for Padding3ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding3ByteEnd {
-    pub a: ::fidl::u32_le,
+    pub a: ::fidl_next::u32_le,
     pub b: u8,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding3ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -490,50 +600,62 @@ pub struct Padding3ByteMiddle {
     pub b: u32,
 }
 
-impl ::fidl::Encode for Padding3ByteMiddle {
+impl ::fidl_next::Encodable for Padding3ByteMiddle {
     type Encoded<'buf> = WirePadding3ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding3ByteMiddle
+where
+    u8: ::fidl_next::Encode<___E>,
+    u32: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding3ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding3ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding3ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding3ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding3ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding3ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding3ByteMiddle> for Padding3ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding3ByteMiddle> for Padding3ByteMiddle {
     fn take_from(from: &mut WirePadding3ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -542,22 +664,28 @@ impl ::fidl::TakeFrom<WirePadding3ByteMiddle> for Padding3ByteMiddle {
 #[repr(C)]
 pub struct WirePadding3ByteMiddle {
     pub a: u8,
-    pub b: ::fidl::u32_le,
+    pub b: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding3ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteMiddle
+where
+    ___D: ?Sized,
+
+    u8: ::fidl_next::Decode<___D>,
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -570,15 +698,23 @@ pub struct Padding4ByteAlignmentLength12 {
     pub d: u16,
 }
 
-impl ::fidl::Encode for Padding4ByteAlignmentLength12 {
+impl ::fidl_next::Encodable for Padding4ByteAlignmentLength12 {
     type Encoded<'buf> = WirePadding4ByteAlignmentLength12;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding4ByteAlignmentLength12
+where
+    u32: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
@@ -586,40 +722,46 @@ impl ::fidl::Encode for Padding4ByteAlignmentLength12 {
                 d,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
-        ::fidl::Encode::encode(&mut self.c, encoder, c)?;
-        ::fidl::Encode::encode(&mut self.d, encoder, d)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
+        ::fidl_next::Encode::encode(&mut self.d, encoder, d)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding4ByteAlignmentLength12> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding4ByteAlignmentLength12>;
+impl ::fidl_next::EncodableOption for Box<Padding4ByteAlignmentLength12> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding4ByteAlignmentLength12>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding4ByteAlignmentLength12>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding4ByteAlignmentLength12: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding4ByteAlignmentLength12> for Padding4ByteAlignmentLength12 {
+impl ::fidl_next::TakeFrom<WirePadding4ByteAlignmentLength12> for Padding4ByteAlignmentLength12 {
     fn take_from(from: &mut WirePadding4ByteAlignmentLength12) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
-            c: ::fidl::TakeFrom::take_from(&mut from.c),
-            d: ::fidl::TakeFrom::take_from(&mut from.d),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+            c: ::fidl_next::TakeFrom::take_from(&mut from.c),
+            d: ::fidl_next::TakeFrom::take_from(&mut from.d),
         }
     }
 }
@@ -627,18 +769,26 @@ impl ::fidl::TakeFrom<WirePadding4ByteAlignmentLength12> for Padding4ByteAlignme
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteAlignmentLength12 {
-    pub a: ::fidl::u32_le,
+    pub a: ::fidl_next::u32_le,
     pub b: u8,
-    pub c: ::fidl::u16_le,
-    pub d: ::fidl::u16_le,
+    pub c: ::fidl_next::u16_le,
+    pub d: ::fidl_next::u16_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding4ByteAlignmentLength12 {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteAlignmentLength12
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
@@ -646,10 +796,10 @@ unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding4ByteAlignmentLength12 {
                 mut d,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(c.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(d.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(d.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -660,50 +810,62 @@ pub struct Padding4ByteEnd {
     pub b: u32,
 }
 
-impl ::fidl::Encode for Padding4ByteEnd {
+impl ::fidl_next::Encodable for Padding4ByteEnd {
     type Encoded<'buf> = WirePadding4ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding4ByteEnd
+where
+    u64: ::fidl_next::Encode<___E>,
+    u32: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding4ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding4ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding4ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding4ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding4ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding4ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding4ByteEnd> for Padding4ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding4ByteEnd> for Padding4ByteEnd {
     fn take_from(from: &mut WirePadding4ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -711,23 +873,29 @@ impl ::fidl::TakeFrom<WirePadding4ByteEnd> for Padding4ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteEnd {
-    pub a: ::fidl::u64_le,
-    pub b: ::fidl::u32_le,
+    pub a: ::fidl_next::u64_le,
+    pub b: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding4ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -738,50 +906,62 @@ pub struct Padding4ByteMiddle {
     pub b: u64,
 }
 
-impl ::fidl::Encode for Padding4ByteMiddle {
+impl ::fidl_next::Encodable for Padding4ByteMiddle {
     type Encoded<'buf> = WirePadding4ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding4ByteMiddle
+where
+    u32: ::fidl_next::Encode<___E>,
+    u64: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding4ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding4ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding4ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding4ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding4ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding4ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding4ByteMiddle> for Padding4ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding4ByteMiddle> for Padding4ByteMiddle {
     fn take_from(from: &mut WirePadding4ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -789,23 +969,29 @@ impl ::fidl::TakeFrom<WirePadding4ByteMiddle> for Padding4ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteMiddle {
-    pub a: ::fidl::u32_le,
-    pub b: ::fidl::u64_le,
+    pub a: ::fidl_next::u32_le,
+    pub b: ::fidl_next::u64_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding4ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteMiddle
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -817,53 +1003,66 @@ pub struct Padding5ByteEnd {
     pub c: u8,
 }
 
-impl ::fidl::Encode for Padding5ByteEnd {
+impl ::fidl_next::Encodable for Padding5ByteEnd {
     type Encoded<'buf> = WirePadding5ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding5ByteEnd
+where
+    u64: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
                 c,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
-        ::fidl::Encode::encode(&mut self.c, encoder, c)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding5ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding5ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding5ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding5ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding5ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding5ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding5ByteEnd> for Padding5ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding5ByteEnd> for Padding5ByteEnd {
     fn take_from(from: &mut WirePadding5ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
-            c: ::fidl::TakeFrom::take_from(&mut from.c),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+            c: ::fidl_next::TakeFrom::take_from(&mut from.c),
         }
     }
 }
@@ -871,26 +1070,33 @@ impl ::fidl::TakeFrom<WirePadding5ByteEnd> for Padding5ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteEnd {
-    pub a: ::fidl::u64_le,
-    pub b: ::fidl::u16_le,
+    pub a: ::fidl_next::u64_le,
+    pub b: ::fidl_next::u16_le,
     pub c: u8,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding5ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
                 mut c,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(c.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -902,53 +1108,66 @@ pub struct Padding5ByteMiddle {
     pub c: u64,
 }
 
-impl ::fidl::Encode for Padding5ByteMiddle {
+impl ::fidl_next::Encodable for Padding5ByteMiddle {
     type Encoded<'buf> = WirePadding5ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding5ByteMiddle
+where
+    u16: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+    u64: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
                 c,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
-        ::fidl::Encode::encode(&mut self.c, encoder, c)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding5ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding5ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding5ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding5ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding5ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding5ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding5ByteMiddle> for Padding5ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding5ByteMiddle> for Padding5ByteMiddle {
     fn take_from(from: &mut WirePadding5ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
-            c: ::fidl::TakeFrom::take_from(&mut from.c),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+            c: ::fidl_next::TakeFrom::take_from(&mut from.c),
         }
     }
 }
@@ -956,26 +1175,33 @@ impl ::fidl::TakeFrom<WirePadding5ByteMiddle> for Padding5ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteMiddle {
-    pub a: ::fidl::u16_le,
+    pub a: ::fidl_next::u16_le,
     pub b: u8,
-    pub c: ::fidl::u64_le,
+    pub c: ::fidl_next::u64_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding5ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteMiddle
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
                 mut c,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(c.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -986,50 +1212,62 @@ pub struct Padding6ByteEnd {
     pub b: u16,
 }
 
-impl ::fidl::Encode for Padding6ByteEnd {
+impl ::fidl_next::Encodable for Padding6ByteEnd {
     type Encoded<'buf> = WirePadding6ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding6ByteEnd
+where
+    u64: ::fidl_next::Encode<___E>,
+    u16: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding6ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding6ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding6ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding6ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding6ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding6ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding6ByteEnd> for Padding6ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding6ByteEnd> for Padding6ByteEnd {
     fn take_from(from: &mut WirePadding6ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -1037,23 +1275,29 @@ impl ::fidl::TakeFrom<WirePadding6ByteEnd> for Padding6ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteEnd {
-    pub a: ::fidl::u64_le,
-    pub b: ::fidl::u16_le,
+    pub a: ::fidl_next::u64_le,
+    pub b: ::fidl_next::u16_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding6ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1064,50 +1308,62 @@ pub struct Padding6ByteMiddle {
     pub b: u64,
 }
 
-impl ::fidl::Encode for Padding6ByteMiddle {
+impl ::fidl_next::Encodable for Padding6ByteMiddle {
     type Encoded<'buf> = WirePadding6ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding6ByteMiddle
+where
+    u16: ::fidl_next::Encode<___E>,
+    u64: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding6ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding6ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding6ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding6ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding6ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding6ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding6ByteMiddle> for Padding6ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding6ByteMiddle> for Padding6ByteMiddle {
     fn take_from(from: &mut WirePadding6ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -1115,23 +1371,29 @@ impl ::fidl::TakeFrom<WirePadding6ByteMiddle> for Padding6ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteMiddle {
-    pub a: ::fidl::u16_le,
-    pub b: ::fidl::u64_le,
+    pub a: ::fidl_next::u16_le,
+    pub b: ::fidl_next::u64_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding6ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteMiddle
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1142,50 +1404,62 @@ pub struct Padding7ByteEnd {
     pub b: u8,
 }
 
-impl ::fidl::Encode for Padding7ByteEnd {
+impl ::fidl_next::Encodable for Padding7ByteEnd {
     type Encoded<'buf> = WirePadding7ByteEnd;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding7ByteEnd
+where
+    u64: ::fidl_next::Encode<___E>,
+    u8: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding7ByteEnd> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding7ByteEnd>;
+impl ::fidl_next::EncodableOption for Box<Padding7ByteEnd> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding7ByteEnd>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding7ByteEnd>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding7ByteEnd: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding7ByteEnd> for Padding7ByteEnd {
+impl ::fidl_next::TakeFrom<WirePadding7ByteEnd> for Padding7ByteEnd {
     fn take_from(from: &mut WirePadding7ByteEnd) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -1193,23 +1467,29 @@ impl ::fidl::TakeFrom<WirePadding7ByteEnd> for Padding7ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding7ByteEnd {
-    pub a: ::fidl::u64_le,
+    pub a: ::fidl_next::u64_le,
     pub b: u8,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding7ByteEnd {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteEnd
+where
+    ___D: ?Sized,
+
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+    u8: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }
@@ -1220,50 +1500,62 @@ pub struct Padding7ByteMiddle {
     pub b: u64,
 }
 
-impl ::fidl::Encode for Padding7ByteMiddle {
+impl ::fidl_next::Encodable for Padding7ByteMiddle {
     type Encoded<'buf> = WirePadding7ByteMiddle;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for Padding7ByteMiddle
+where
+    u8: ::fidl_next::Encode<___E>,
+    u64: ::fidl_next::Encode<___E>,
+{
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
             } = slot;
         }
-        ::fidl::Encode::encode(&mut self.a, encoder, a)?;
-        ::fidl::Encode::encode(&mut self.b, encoder, b)?;
+        ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+        ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
         Ok(())
     }
 }
 
-impl ::fidl::EncodeOption for Box<Padding7ByteMiddle> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WirePadding7ByteMiddle>;
+impl ::fidl_next::EncodableOption for Box<Padding7ByteMiddle> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePadding7ByteMiddle>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<Padding7ByteMiddle>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Padding7ByteMiddle: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WirePadding7ByteMiddle> for Padding7ByteMiddle {
+impl ::fidl_next::TakeFrom<WirePadding7ByteMiddle> for Padding7ByteMiddle {
     fn take_from(from: &mut WirePadding7ByteMiddle) -> Self {
         Self {
-            a: ::fidl::TakeFrom::take_from(&mut from.a),
-            b: ::fidl::TakeFrom::take_from(&mut from.b),
+            a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+            b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
@@ -1272,22 +1564,28 @@ impl ::fidl::TakeFrom<WirePadding7ByteMiddle> for Padding7ByteMiddle {
 #[repr(C)]
 pub struct WirePadding7ByteMiddle {
     pub a: u8,
-    pub b: ::fidl::u64_le,
+    pub b: ::fidl_next::u64_le,
 }
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WirePadding7ByteMiddle {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteMiddle
+where
+    ___D: ?Sized,
+
+    u8: ::fidl_next::Decode<___D>,
+    ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
                 mut a,
                 mut b,
             } = slot;
         }
-        ::fidl::Decode::<'buf>::decode(a.as_mut(), decoder)?;
-        ::fidl::Decode::<'buf>::decode(b.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
         Ok(())
     }
 }

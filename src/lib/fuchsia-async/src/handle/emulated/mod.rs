@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use zx_status::Status;
-use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
+use {zx_status, zx_types};
 
 /// Invalid handle value
 const INVALID_HANDLE: u32 = 0;
@@ -2217,9 +2217,9 @@ fn hdl_close(hdl: u32) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
     use std::mem::ManuallyDrop;
+    use zx_status;
 
     /// Returns a "handle" which mimics a closed handle.
     ///

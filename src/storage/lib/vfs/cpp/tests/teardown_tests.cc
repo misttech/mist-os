@@ -83,7 +83,6 @@ void SyncStart(AsyncTearDownSync& completions, async::Loop* loop,
 
   auto vn = fbl::AdoptRef(new AsyncTearDownVnode(completions, status_for_sync));
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
-  ASSERT_EQ(vn->Open(nullptr), ZX_OK);
   ASSERT_EQ((*vfs)->Serve(vn, server_end.TakeChannel(), {}), ZX_OK);
   vn = nullptr;
 
@@ -195,7 +194,6 @@ TEST(Teardown, SynchronousTeardown) {
     auto vn = fbl::AdoptRef(new FdCountVnode());
     zx::channel server;
     ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
-    ASSERT_EQ(vn->Open(nullptr), ZX_OK);
     ASSERT_EQ(vfs->Serve(vn, std::move(server), {}), ZX_OK);
   }
 
@@ -207,7 +205,6 @@ TEST(Teardown, SynchronousTeardown) {
     auto vn = fbl::AdoptRef(new FdCountVnode());
     zx::channel server;
     ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
-    ASSERT_EQ(vn->Open(nullptr), ZX_OK);
     ASSERT_EQ(vfs->Serve(vn, std::move(server), {}), ZX_OK);
 
     loop.Shutdown();

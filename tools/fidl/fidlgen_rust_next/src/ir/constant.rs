@@ -9,7 +9,7 @@ use super::{CompIdent, Literal};
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Constant {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     #[serde(flatten)]
     pub kind: ConstantKind,
     pub value: String,
@@ -19,11 +19,11 @@ pub struct Constant {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ConstantKind {
     Identifier {
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         identifier: CompIdent,
     },
     Literal {
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         literal: Literal,
     },
     BinaryOperator,

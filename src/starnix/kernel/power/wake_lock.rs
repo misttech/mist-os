@@ -4,7 +4,6 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 
-use fuchsia_zircon as zx;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
@@ -36,7 +35,7 @@ impl BytesFileOps for PowerWakeLockFile {
         // Check if there is a timeout.
         let target_monotonic = match clean_str_split.next() {
             Some(timeout_str) => Some(
-                zx::MonotonicTime::get() // now
+                zx::MonotonicInstant::get() // now
                     + zx::Duration::from_nanos(
                         timeout_str
                             .parse()

@@ -59,7 +59,7 @@ pub async fn wait_for_device_with<T>(
                 },
             };
             let topological_path = topological_path
-                .map_err(fuchsia_zircon_status::Status::from_raw)
+                .map_err(zx_status::Status::from_raw)
                 .with_context(|| format!("failed to get topological path on \"{}\"", filename))?;
 
             Ok(predicate(DeviceInfo { filename, topological_path }))

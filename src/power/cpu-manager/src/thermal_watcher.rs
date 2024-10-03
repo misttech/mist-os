@@ -8,6 +8,7 @@ use crate::node::Node;
 use crate::types::ThermalLoad;
 use anyhow::Result;
 use async_trait::async_trait;
+use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::future::{FutureExt as _, LocalBoxFuture};
@@ -15,7 +16,7 @@ use futures::stream::FuturesUnordered;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::rc::Rc;
-use {fidl_fuchsia_thermal as fthermal, serde_json as json};
+use {fidl_fuchsia_thermal as fthermal, serde_json as json, zx};
 
 /// Node: ThermalWatcher
 ///
@@ -74,7 +75,7 @@ impl<'a> ThermalWatcherBuilder<'a> {
         self
     }
 
-    pub fn build(
+    pub async fn build(
         self,
         futures_out: &FuturesUnordered<LocalBoxFuture<'_, ()>>,
     ) -> Result<Rc<ThermalWatcher>> {
@@ -87,6 +88,9 @@ impl<'a> ThermalWatcherBuilder<'a> {
         let thermal_watcher = if let Some(watcher) = self.thermal_watcher {
             watcher
         } else {
+            // TODO(https://fxbug.dev/368440548): Remove delay when PowerManager can start early.
+            fasync::Timer::new(zx::Duration::from_seconds(15).after_now()).await;
+
             // This call will always succeed if the protocol is present in the component manifest
             // and the capability routes are correct.
             let connector = connect_to_protocol::<fthermal::ClientStateConnectorMarker>()?;
@@ -221,11 +225,13 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let (watcher_proxy, mut fake_thermal_state_provider) = FakeThermalStateProvider::new();
         let futures_out = FuturesUnordered::new();
-        let _node = ThermalWatcherBuilder::new(create_dummy_node())
-            .with_inspect_root(inspector.root())
-            .with_proxy(watcher_proxy)
-            .build(&futures_out)
-            .unwrap();
+        let _node = exec.run_until_stalled(
+            &mut ThermalWatcherBuilder::new(create_dummy_node())
+                .with_inspect_root(inspector.root())
+                .with_proxy(watcher_proxy)
+                .build(&futures_out)
+                .boxed_local(),
+        );
         let mut task = fasync::Task::local(futures_out.collect::<()>());
         // Waiting on the Watch request.
         assert_matches!(exec.run_until_stalled(&mut task), Poll::Pending);
@@ -290,9 +296,12 @@ mod tests {
         // Create the node.
         let (watcher_proxy, mut fake_thermal_state_provider) = FakeThermalStateProvider::new();
         let futures_out = FuturesUnordered::new();
-        let _node = ThermalWatcherBuilder::new(thermal_state_handler_node)
-            .with_proxy(watcher_proxy)
-            .build(&futures_out);
+        let _node = exec.run_until_stalled(
+            &mut ThermalWatcherBuilder::new(thermal_state_handler_node)
+                .with_proxy(watcher_proxy)
+                .build(&futures_out)
+                .boxed_local(),
+        );
         let mut task = fasync::Task::local(futures_out.collect::<()>());
         // Waiting on the Watch request.
         assert_matches!(exec.run_until_stalled(&mut task), Poll::Pending);

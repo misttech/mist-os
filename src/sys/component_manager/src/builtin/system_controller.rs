@@ -8,7 +8,7 @@ use crate::model::component::ComponentInstance;
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_sys2::*;
 use fuchsia_async::{self as fasync};
-use fuchsia_zircon as zx;
+
 use futures::prelude::*;
 use std::collections::VecDeque;
 use std::sync::{Arc, Weak};

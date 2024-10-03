@@ -30,7 +30,7 @@ use std::collections::HashMap;
 use std::mem::size_of;
 use thiserror::Error;
 use zerocopy::{FromBytes, IntoBytes};
-use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
+use {fidl_fuchsia_net_filter as fnet_filter, zx};
 
 const NAMESPACE_ID_PREFIX: &str = "starnix";
 
@@ -436,7 +436,7 @@ impl IpTables {
             Controller::new(
                 &control_proxy,
                 &ControllerId(NAMESPACE_ID_PREFIX.to_string()),
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .map_err(GetControllerError::ControllerCreation)?
         }))
@@ -687,7 +687,7 @@ impl IpTables {
             }
             Ok(controller) => {
                 for chunk in &changes.chunks(fnet_filter::MAX_BATCH_SIZE as usize) {
-                    match controller.push_changes(chunk.collect(), zx::MonotonicTime::INFINITE) {
+                    match controller.push_changes(chunk.collect(), zx::MonotonicInstant::INFINITE) {
                         Ok(()) => {}
                         Err(
                             e @ (PushChangesError::CallMethod(_)
@@ -710,7 +710,7 @@ impl IpTables {
                     }
                 }
 
-                match controller.commit_idempotent(zx::MonotonicTime::INFINITE) {
+                match controller.commit_idempotent(zx::MonotonicInstant::INFINITE) {
                     Ok(()) => {}
                     Err(e @ (CommitError::CallMethod(_) | CommitError::FidlConversion(_))) => {
                         log_warn!(

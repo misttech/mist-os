@@ -14,7 +14,7 @@ use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest
 use vfs::execution_scope::ExecutionScope;
 use vfs::remote::RemoteLike;
 use zx::AsHandleRef;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 use crate::model::actions::{ActionsManager, DestroyAction};
 use crate::model::component::StartReason;
@@ -86,7 +86,7 @@ async fn starting_directory_using_target_component_does_not_start_source() {
         assert_matches!(
             client_end
                 .channel()
-                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST),
+                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
             Err(zx::Status::TIMED_OUT)
         );
     }

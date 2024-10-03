@@ -746,7 +746,7 @@ where
             .collect::<Vec<_>>())
     }
 
-    async fn make_joinable(&self, _duration: fuchsia_zircon::Duration, _port: u16) -> ZxResult<()> {
+    async fn make_joinable(&self, _duration: zx::Duration, _port: u16) -> ZxResult<()> {
         warn!(tag = "api", "make_joinable: NOT_SUPPORTED");
         return Err(ZxStatus::NOT_SUPPORTED);
     }

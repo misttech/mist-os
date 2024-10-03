@@ -11,10 +11,7 @@ use serde::{Deserialize, Deserializer};
 use std::thread;
 use std::time::Duration;
 use tracing::debug;
-use {
-    fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync, zx};
 
 // Abstracts over input injection services (which are provided by input device registries).
 pub trait InputDeviceRegistry {
@@ -84,7 +81,7 @@ pub enum MediaButton {
 }
 
 fn monotonic_nanos() -> Result<u64, Error> {
-    u64::try_from(zx::MonotonicTime::get().into_nanos()).map_err(Into::into)
+    u64::try_from(zx::MonotonicInstant::get().into_nanos()).map_err(Into::into)
 }
 
 async fn repeat_with_delay(

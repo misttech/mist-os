@@ -293,28 +293,17 @@ mod tests {
             });
         }
 
-        let executed = Arc::new(Mutex::new(false));
-        let executed_clone = executed.clone();
-        spawner.spawn(move |_, _| {
-            {
-                let (lock, cvar) = &*pair;
-                let mut cont = lock.lock().unwrap();
-                *cont = true;
-                cvar.notify_all();
-            }
-            *executed_clone.lock() = true;
-        });
-
-        // Wait for some time to ensure some threads have finished running.
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        // Post a couple of new tasks. As the maximum number of idle threads is 1, it should
-        // ensures that finished threads will be cleaned up from the pool.
-        spawner.spawn(move |_, _| {});
-        spawner.spawn(move |_, _| {});
-
-        // Drop the spawner. This will wait for all thread to finish.
-        std::mem::drop(spawner);
-        assert!(*executed.lock());
+        assert_eq!(
+            spawner.spawn_and_get_result_sync(move |_, _| {
+                {
+                    let (lock, cvar) = &*pair;
+                    let mut cont = lock.lock().unwrap();
+                    *cont = true;
+                    cvar.notify_all();
+                }
+            }),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]

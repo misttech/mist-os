@@ -30,11 +30,11 @@ void WakeEvent::Acknowledge() {
   }
 }
 
-zx_boot_time_t WakeEvent::PendingState::last_triggered_boot_time() const {
+zx_instant_boot_t WakeEvent::PendingState::last_triggered_boot_time() const {
   return timer_get_ticks_to_time_ratio().Scale(last_triggered_boot_ticks());
 }
 
-void WakeEvent::Dump(FILE* f, zx_boot_time_t log_triggered_after_boot_time) {
+void WakeEvent::Dump(FILE* f, zx_instant_boot_t log_triggered_after_boot_time) {
   Guard<SpinLock, IrqSave> guard{WakeEventListLock::Get()};
 
   for (const IdlePowerThread::WakeEvent& event : list_) {

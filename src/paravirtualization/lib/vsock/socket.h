@@ -6,7 +6,7 @@
 #define SRC_PARAVIRTUALIZATION_LIB_VSOCK_SOCKET_H_
 
 #include <zircon/compiler.h>
-#include <zircon/status.h>
+#include <zircon/types.h>
 
 __BEGIN_CDECLS
 

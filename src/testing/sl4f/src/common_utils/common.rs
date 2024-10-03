@@ -5,11 +5,11 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{Status, Vmo};
 use once_cell::sync::OnceCell;
 use serde_json::Value;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
+use zx::{Status, Vmo};
 
 pub mod macros {
     pub use crate::{fx_err_and_bail, parse_arg, with_line};
@@ -173,8 +173,8 @@ pub fn read_json_from_vmo(vmo: &Vmo) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::VmoOptions;
     use serde_json::json;
+    use zx::VmoOptions;
 
     #[test]
     fn json_to_and_from_vmo() -> Result<(), Error> {

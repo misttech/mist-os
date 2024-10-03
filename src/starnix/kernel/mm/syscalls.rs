@@ -11,8 +11,7 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_runtime::UtcTime;
-use fuchsia_zircon as zx;
+use fuchsia_runtime::UtcInstant;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;
@@ -409,7 +408,7 @@ fn do_futex<Key: FutexKey>(
     let read_timespec = |current_task: &CurrentTask| {
         let utime = UserRef::<timespec>::from(timeout_or_value2);
         if utime.is_null() {
-            Ok(timespec_from_time(zx::MonotonicTime::INFINITE))
+            Ok(timespec_from_time(zx::MonotonicInstant::INFINITE))
         } else {
             current_task.read_object(utime)
         }
@@ -417,7 +416,7 @@ fn do_futex<Key: FutexKey>(
     let read_timeout = |current_task: &CurrentTask| {
         let timespec = read_timespec(current_task)?;
         let timeout = duration_from_timespec(timespec);
-        let deadline = zx::MonotonicTime::after(timeout?);
+        let deadline = zx::MonotonicInstant::after(timeout?);
         if is_realtime {
             // Since this is a timeout, waiting on the monotonic timeline before it's paused is
             // just as good as actually estimating UTC here.
@@ -430,9 +429,9 @@ fn do_futex<Key: FutexKey>(
         let mut deadline = time_from_timespec::<zx::MonotonicTimeline>(timespec)?;
         if is_realtime {
             track_stub!(TODO("https://fxbug.dev/356912301"), "FUTEX_CLOCK_REALTIME deadline");
-            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(UtcTime::from_nanos(
-                deadline.into_nanos(),
-            ));
+            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(
+                UtcInstant::from_nanos(deadline.into_nanos()),
+            );
         };
         Ok(deadline)
     };
@@ -508,7 +507,7 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
     addr: UserAddress,
     value: u32,
     mask: u32,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 ) -> Result<(), Errno> {
     let futexes = Key::get_table_from_task(current_task);
     let result = futexes.wait(current_task, addr, value, mask, deadline);

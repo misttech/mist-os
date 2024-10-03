@@ -20,8 +20,8 @@ rustc_library("syncio") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:zerocopy",

@@ -19,10 +19,7 @@ use wlan_hw_sim::{
     wait_until_client_state, Beacon, NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR,
     ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
 };
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 const PASS_PHRASE: &str = "wpa2duel";
 

@@ -14,12 +14,12 @@ use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{make_message, AppSender, MessageTarget, Point, Size, ViewKey};
 use euclid::size2;
 use fuchsia_async as fasync;
-use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{channel as pipe, Sender};
 use futures::StreamExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
+use zx::Duration;
 
 const PROGRESS_GRANULARITY: f32 = 1000.0;
 

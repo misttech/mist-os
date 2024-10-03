@@ -60,7 +60,6 @@ pub async fn recv_message<P: prost::Message + Default>(socket: &mut fasync::Sock
 mod test {
     use super::*;
 
-    use fuchsia_zircon as zx;
     use rand::{thread_rng, Rng};
     use vsh_rust_proto::vm_tools::vsh;
 

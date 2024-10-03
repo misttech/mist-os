@@ -13,7 +13,7 @@ use fidl_fuchsia_bluetooth_snoop::{
 };
 use fuchsia_async::{Channel, TestExecutor};
 use fuchsia_inspect::Inspector;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 use std::pin::pin;
 use std::task::Poll;
@@ -165,7 +165,7 @@ async fn test_packet_logs_inspect() {
         }
     });
 
-    let ts = zx::MonotonicTime::from_nanos(123 * 1_000_000_000);
+    let ts = zx::MonotonicInstant::from_nanos(123 * 1_000_000_000);
     let packet = SnoopPacket::new(false, PacketFormat::AclData, ts, vec![3, 2, 1]);
 
     // write pcap header and packet data to expected_data buffer

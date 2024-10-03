@@ -9,7 +9,7 @@ use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media::{Metadata, Property, TimelineFunction, METADATA_LABEL_ARTIST};
 use fidl_fuchsia_media_sessions2::*;
 use futures::prelude::*;
-use {fuchsia_async as fasync, fuchsia_component as component, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, fuchsia_component as component, zx};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -28,7 +28,7 @@ impl Player {
         if state == PlayerState::Playing {
             TimelineFunction {
                 subject_time: 0,
-                reference_time: zx::MonotonicTime::get().into_nanos(),
+                reference_time: zx::MonotonicInstant::get().into_nanos(),
                 subject_delta: 1,
                 reference_delta: 1,
             }

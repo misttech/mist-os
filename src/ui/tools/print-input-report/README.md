@@ -3,11 +3,9 @@
 A utility that can attach itself to an input device and read the device
 descriptors or events.
 
-## Building and testing
+## Testing
 
 ```
-fx set ... --with-base=//src/ui/tools/print-input-report
-fx build && fx ota
 fx test //src/ui/tools/print-input-report
 ```
 

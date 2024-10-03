@@ -309,13 +309,6 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let cpu_manager_to_power_manager_routes = Route::new()
-            .capability(Capability::protocol_by_name("fuchsia.component.Binder").weak());
-        realm_builder
-            .add_route(cpu_manager_to_power_manager_routes.from(&cpu_manager).to(&power_manager))
-            .await
-            .unwrap();
-
         realm_builder
             .add_route(
                 Route::new()
@@ -482,10 +475,8 @@ async fn set_fake_time_scale(realm_instance: &RealmInstance, scale: u32) {
     fake_clock_control.pause().await.expect("failed to pause fake time: FIDL error");
     fake_clock_control
         .resume_with_increments(
-            fuchsia_zircon::Duration::from_millis(1).into_nanos(),
-            &ftesting::Increment::Determined(
-                fuchsia_zircon::Duration::from_millis(scale.into()).into_nanos(),
-            ),
+            zx::Duration::from_millis(1).into_nanos(),
+            &ftesting::Increment::Determined(zx::Duration::from_millis(scale.into()).into_nanos()),
         )
         .await
         .expect("failed to set fake time scale: FIDL error")

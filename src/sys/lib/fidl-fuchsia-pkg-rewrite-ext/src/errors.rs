@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon_status as zx;
 use thiserror::Error;
+use zx_status as zx;
 
 #[allow(missing_docs)]
 #[derive(Error, Debug, PartialEq, Eq)]

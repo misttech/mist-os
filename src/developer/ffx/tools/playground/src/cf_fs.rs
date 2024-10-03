@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use component_debug::realm::{GetAllInstancesError, Instance};
-use fuchsia_zircon_status::Status;
 use futures::channel::oneshot;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
@@ -17,6 +16,7 @@ use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::node::Node;
 use vfs::{immutable_attributes, ToObjectRequest};
+use zx_status::Status;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2};
 
 /// This contains a cache of the entire component hierarchy, as a map from

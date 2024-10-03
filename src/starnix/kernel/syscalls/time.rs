@@ -7,10 +7,7 @@ use crate::signals::{RunState, SignalEvent};
 use crate::task::{ClockId, CurrentTask, Timeline, TimerId, TimerWakeup};
 use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_runtime::UtcTime;
-use fuchsia_zircon::{
-    Task, {self as zx},
-};
+use fuchsia_runtime::UtcInstant;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
 use starnix_uapi::auth::CAP_WAKE_ALARM;
@@ -26,6 +23,9 @@ use starnix_uapi::{
     CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME,
     CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS,
     TIMER_ABSTIME,
+};
+use zx::{
+    Task, {self as zx},
 };
 
 pub fn sys_clock_getres(
@@ -74,12 +74,12 @@ pub fn sys_clock_gettime(
     } else {
         match which_clock as u32 {
             CLOCK_REALTIME | CLOCK_REALTIME_COARSE => {
-                profile_duration!("GetUtcTime");
+                profile_duration!("GetUtcInstant");
                 utc_now().into_nanos()
             }
             CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
                 profile_duration!("GetMonotonic");
-                zx::MonotonicTime::get().into_nanos()
+                zx::MonotonicInstant::get().into_nanos()
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
@@ -183,7 +183,7 @@ pub fn sys_clock_nanosleep(
     let monotonic_deadline = if is_absolute {
         time_from_timespec(request)?
     } else {
-        zx::MonotonicTime::after(duration_from_timespec(request)?)
+        zx::MonotonicInstant::after(duration_from_timespec(request)?)
     };
 
     clock_nanosleep_monotonic_with_deadline(
@@ -236,8 +236,8 @@ fn clock_nanosleep_relative_to_utc(
 fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
     is_absolute: bool,
-    deadline: zx::MonotonicTime,
-    original_utc_deadline: Option<UtcTime>,
+    deadline: zx::MonotonicInstant,
+    original_utc_deadline: Option<UtcInstant>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
@@ -253,7 +253,7 @@ fn clock_nanosleep_monotonic_with_deadline(
             if !user_remaining.is_null() {
                 let remaining = match original_utc_deadline {
                     Some(original_utc_deadline) => original_utc_deadline - utc_now(),
-                    None => deadline - zx::MonotonicTime::get(),
+                    None => deadline - zx::MonotonicInstant::get(),
                 };
                 let remaining =
                     timespec_from_duration(std::cmp::max(zx::Duration::from_nanos(0), remaining));
@@ -394,9 +394,9 @@ pub fn sys_timer_create(
     let timeline = match clock_id as u32 {
         CLOCK_REALTIME => Timeline::RealTime,
         CLOCK_MONOTONIC => Timeline::Monotonic,
-        CLOCK_BOOTTIME => Timeline::BootTime,
+        CLOCK_BOOTTIME => Timeline::BootInstant,
         CLOCK_REALTIME_ALARM => Timeline::RealTime,
-        CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
+        CLOCK_BOOTTIME_ALARM => Timeline::BootInstant,
         CLOCK_TAI => {
             track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
             return error!(ENOTSUP);
@@ -533,7 +533,7 @@ pub fn sys_times(
         current_task.write_object(buf, &tms_result)?;
     }
 
-    Ok(duration_to_scheduler_clock(zx::MonotonicTime::get() - zx::MonotonicTime::ZERO))
+    Ok(duration_to_scheduler_clock(zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO))
 }
 
 #[cfg(test)]
@@ -543,11 +543,11 @@ mod test {
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
     use fuchsia_runtime::{UtcClock, UtcClockUpdate};
-    use fuchsia_zircon::HandleBased;
     use starnix_uapi::ownership::OwnedRef;
     use starnix_uapi::signals;
     use starnix_uapi::user_address::UserAddress;
     use test_util::{assert_geq, assert_leq};
+    use zx::HandleBased;
 
     #[::fuchsia::test]
     async fn test_nanosleep_without_remainder() {
@@ -632,7 +632,7 @@ mod test {
 
         // Interrupt the sleep roughly halfway through. The actual interruption might be before the
         // sleep starts, during the sleep, or after.
-        let interruption_target = zx::MonotonicTime::get() + zx::Duration::from_seconds(1);
+        let interruption_target = zx::MonotonicInstant::get() + zx::Duration::from_seconds(1);
 
         let thread_group = OwnedRef::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()

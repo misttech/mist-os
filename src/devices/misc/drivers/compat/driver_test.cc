@@ -348,13 +348,17 @@ class TestFile : public fidl::testing::WireTestBase<fio::File> {
 
 class TestDirectory : public fidl::testing::WireTestBase<fio::Directory> {
  public:
-  using OpenHandler = fit::function<void(OpenRequestView)>;
+  using OpenHandler = fit::function<void(std::string_view path, fidl::ServerEnd<fio::Node> object)>;
 
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
 
  private:
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override {
-    open_handler_(std::move(request));
+    open_handler_(request->path.get(), std::move(request->object));
+  }
+
+  void Open3(Open3RequestView request, Open3Completer::Sync& completer) override {
+    open_handler_(request->path.get(), fidl::ServerEnd<fio::Node>(std::move(request->object)));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -526,16 +530,16 @@ class IncomingNamespace {
     compat_file_ = TestFile(compat_file_response, GetVmo("/pkg/driver/compat.so"));
     v1_test_file_ = TestFile(ZX_OK, GetVmo(v1_driver_path));
     firmware_file_ = TestFile(ZX_OK, GetVmo("/pkg/lib/firmware/test"));
-    pkg_directory_.SetOpenHandler([this, dispatcher](TestDirectory::OpenRequestView request) {
-      fidl::ServerEnd<fio::File> server_end(request->object.TakeChannel());
-      if (request->path.get() == "driver/compat.so") {
+    pkg_directory_.SetOpenHandler([this, dispatcher](std::string_view path, auto object) {
+      fidl::ServerEnd<fio::File> server_end(object.TakeChannel());
+      if (path == "driver/compat.so") {
         fidl::BindServer(dispatcher, std::move(server_end), &compat_file_);
-      } else if (request->path.get() == "driver/v1_test.so") {
+      } else if (path == "driver/v1_test.so") {
         fidl::BindServer(dispatcher, std::move(server_end), &v1_test_file_);
-      } else if (request->path.get() == "lib/firmware/test") {
+      } else if (path == "lib/firmware/test") {
         fidl::BindServer(dispatcher, std::move(server_end), &firmware_file_);
       } else {
-        FAIL() << "Unexpected file: " << request->path.get();
+        FAIL() << "Unexpected file: " << path;
       }
     });
     fidl::BindServer(dispatcher, std::move(pkg_server), &pkg_directory_);
@@ -826,8 +830,7 @@ class GlobalLoggerListTest : public testing::Test {
     ZX_ASSERT(ZX_OK == ns.status_value());
 
     auto logger = fdf::Logger::Create(*ns, dispatcher(), name, FUCHSIA_LOG_INFO, false);
-    ZX_ASSERT(ZX_OK == logger.status_value());
-    return std::shared_ptr<fdf::Logger>((*logger).release());
+    return std::shared_ptr<fdf::Logger>(logger.release());
   }
   async_dispatcher_t* dispatcher() { return fdf::Dispatcher::GetCurrent()->async_dispatcher(); }
 

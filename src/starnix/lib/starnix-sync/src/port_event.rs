@@ -4,7 +4,6 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy as LazySync;
 
 /// A [`PortEvent`] is interested only in events originating from within the
@@ -94,7 +93,7 @@ impl PortEvent {
     }
 
     /// Wait for an event to occur, or the deadline has been reached.
-    pub fn wait(&self, deadline: zx::MonotonicTime) -> PortWaitResult {
+    pub fn wait(&self, deadline: zx::MonotonicInstant) -> PortWaitResult {
         let mut state = self.futex.load(ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE);
         loop {
             match state {
@@ -266,8 +265,8 @@ impl PortEvent {
 mod test {
     use std::sync::Arc;
 
-    use fuchsia_zircon::AsHandleRef as _;
     use test_case::test_case;
+    use zx::AsHandleRef as _;
 
     use super::*;
 
@@ -286,7 +285,7 @@ mod test {
         let event_clone = event.clone();
         let thread = std::thread::spawn(move || {
             assert_eq!(
-                event_clone.wait(zx::MonotonicTime::INFINITE),
+                event_clone.wait(zx::MonotonicInstant::INFINITE),
                 PortWaitResult::Signal { key: KEY, observed: ASSERTED_SIGNAL }
             );
         });
@@ -319,7 +318,7 @@ mod test {
             .unwrap();
 
         assert_eq!(
-            event.wait(zx::MonotonicTime::INFINITE_PAST),
+            event.wait(zx::MonotonicInstant::INFINITE_PAST),
             PortWaitResult::Signal { key: KEY, observed: ASSERTED_SIGNAL }
         );
     }
@@ -344,7 +343,7 @@ mod test {
             .unwrap();
 
         event.cancel(&object.as_handle_ref(), KEY);
-        assert_eq!(event.wait(zx::MonotonicTime::INFINITE_PAST), PortWaitResult::TimedOut);
+        assert_eq!(event.wait(zx::MonotonicInstant::INFINITE_PAST), PortWaitResult::TimedOut);
     }
 
     #[test_case(NotifyKind::Interrupt, true; "interrupt with object")]
@@ -371,7 +370,7 @@ mod test {
         let event_clone = event.clone();
         let thread = std::thread::spawn(move || {
             assert_eq!(
-                event_clone.wait(zx::MonotonicTime::INFINITE),
+                event_clone.wait(zx::MonotonicInstant::INFINITE),
                 PortWaitResult::Notification { kind }
             );
         });
@@ -403,16 +402,16 @@ mod test {
 
         event.notify(kind);
         assert_eq!(
-            event.wait(zx::MonotonicTime::INFINITE_PAST),
+            event.wait(zx::MonotonicInstant::INFINITE_PAST),
             PortWaitResult::Notification { kind }
         );
     }
 
-    #[test_case(true, zx::MonotonicTime::after(zx::Duration::from_millis(100)); "blocking with object")]
-    #[test_case(false, zx::MonotonicTime::after(zx::Duration::from_millis(100)); "blocking without object")]
-    #[test_case(true, zx::MonotonicTime::INFINITE_PAST; "non blocking with object")]
-    #[test_case(false, zx::MonotonicTime::INFINITE_PAST; "non blocking without object")]
-    fn test_wait_timeout(with_object: bool, deadline: zx::MonotonicTime) {
+    #[test_case(true, zx::MonotonicInstant::after(zx::Duration::from_millis(100)); "blocking with object")]
+    #[test_case(false, zx::MonotonicInstant::after(zx::Duration::from_millis(100)); "blocking without object")]
+    #[test_case(true, zx::MonotonicInstant::INFINITE_PAST; "non blocking with object")]
+    #[test_case(false, zx::MonotonicInstant::INFINITE_PAST; "non blocking without object")]
+    fn test_wait_timeout(with_object: bool, deadline: zx::MonotonicInstant) {
         const KEY: u64 = 6;
         const ASSERTED_SIGNAL: zx::Signals = zx::Signals::USER_5;
 

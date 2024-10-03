@@ -14,7 +14,7 @@ const STATE_DRIVER_NOTIFIER: &str = "notifier";
 const STATE_SAVED_STATE: &str = "saved_state";
 
 pub struct ResumedState {
-    pub notifier: Option<fuchsia_zircon::Handle>,
+    pub notifier: Option<zx::Handle>,
     pub composite_specs: CompositeNodeSpecManager,
     pub boot_repo: Option<Vec<ResolvedDriver>>,
     pub base_repo: Option<BaseRepo>,
@@ -62,7 +62,7 @@ pub fn apply_state(resume_state: ResumedState, index: Rc<Indexer>) -> bool {
 pub async fn handle_stall(
     index: Rc<Indexer>,
     lifecycle_control_handle: &flifecycle::LifecycleControlHandle,
-    outgoing_directory: fuchsia_zircon::Channel,
+    outgoing_directory: zx::Channel,
     capability_store: &fsandbox::CapabilityStoreProxy,
     id_gen: &sandbox::CapabilityIdGenerator,
     dict_id: u64,
@@ -215,8 +215,7 @@ async fn save_to_dictionary_vmo(
     key: &str,
 ) -> Result<(), anyhow::Error> {
     let size = data.len() as u64;
-    let vmo =
-        fuchsia_zircon::Vmo::create(size).map_err(|e| anyhow!("Failed to create vmo: {:?}", e))?;
+    let vmo = zx::Vmo::create(size).map_err(|e| anyhow!("Failed to create vmo: {:?}", e))?;
     vmo.write(data.as_slice(), 0).map_err(|e| anyhow!("Failed to write to vmo: {:?}", e))?;
     vmo.set_content_size(&size)
         .map_err(|e| anyhow!("Failed to set_content_size on vmo: {:?}", e))?;
@@ -284,7 +283,7 @@ async fn get_handle_from_dictionary(
     id_gen: &sandbox::CapabilityIdGenerator,
     dict_id: u64,
     key: &str,
-) -> Result<fuchsia_zircon::Handle, anyhow::Error> {
+) -> Result<zx::Handle, anyhow::Error> {
     let dest_id = id_gen.next();
     capability_store
         .dictionary_remove(dict_id, key, Some(&fsandbox::WrappedNewCapabilityId { id: dest_id }))
@@ -312,7 +311,7 @@ async fn read_vmo_from_dictionary(
 ) -> Result<Vec<u8>, anyhow::Error> {
     let handle = get_handle_from_dictionary(capability_store, id_gen, dict_id, key).await?;
 
-    let vmo = fuchsia_zircon::Vmo::from(handle);
+    let vmo = zx::Vmo::from(handle);
     let size =
         vmo.get_content_size().map_err(|e| anyhow!("Failed to get vmo content size: {:?}", e))?;
     vmo.read_to_vec(0, size).map_err(|e| anyhow!("Failed to read vmo to vector: {:?}", e))

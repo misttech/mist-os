@@ -20,7 +20,6 @@ use fuchsia_repo::repository::{
 };
 use fuchsia_repo::server::RepositoryServer;
 use fuchsia_url::RepositoryUrl;
-use fuchsia_zircon_status::Status;
 use futures::FutureExt as _;
 use protocols::prelude::Context;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -28,6 +27,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
+use zx_status::Status;
 use {fidl_fuchsia_developer_ffx as ffx, fuchsia_async as fasync};
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
@@ -368,9 +368,7 @@ pub async fn register_target_with_repo_instance(
         let aliases: BTreeSet<String> = if let Some(aliases) = &repo_target_info.aliases {
             aliases.clone()
         } else {
-            BTreeSet::<String>::from_iter(
-                repo_instance.registration_aliases.iter().map(String::to_string),
-            )
+            repo_instance.repo_spec().aliases()
         };
 
         // If the registration conflict mode is ErrorOut, read the aliases from the device

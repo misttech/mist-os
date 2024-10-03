@@ -7,7 +7,7 @@ use fidl_fuchsia_wlan_common::WlanMacRole;
 use fidl_fuchsia_wlan_device_service::{
     CreateIfaceRequest, DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
 };
-use fuchsia_zircon as zx;
+
 use ieee80211::{MacAddr, MacAddrBytes};
 
 pub mod ap;
@@ -157,9 +157,7 @@ mod tests {
             let response = fake_iface_query_response(mac, role);
             responder.send(Ok(&response)).expect("sending fake response with mac address");
         } else {
-            responder
-                .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
-                .expect("sending fake response with none")
+            responder.send(Err(zx::sys::ZX_ERR_NOT_FOUND)).expect("sending fake response with none")
         }
     }
 

@@ -11,7 +11,7 @@ use fidl_connector::{Connect, ServiceReconnector};
 use fidl_fuchsia_net_name::{LookupIpOptions, LookupMarker, LookupProxy, LookupResult};
 use fidl_fuchsia_posix_socket::{ProviderMarker, ProviderProxy};
 use fuchsia_async::net;
-use fuchsia_zircon as zx;
+
 use futures::future::{Future, FutureExt};
 use futures::io;
 use futures::task::{Context, Poll};

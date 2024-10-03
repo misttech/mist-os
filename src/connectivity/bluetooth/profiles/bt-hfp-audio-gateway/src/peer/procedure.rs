@@ -123,7 +123,7 @@ pub enum ProcedureError {
     #[error("Procedure not implemented")]
     NotImplemented,
     #[error("Error in the underlying service level connection: {:?}", .0)]
-    Channel(fuchsia_zircon::Status),
+    Channel(zx::Status),
 }
 
 impl ProcedureError {
@@ -147,8 +147,8 @@ impl ProcedureError {
     }
 }
 
-impl From<fuchsia_zircon::Status> for ProcedureError {
-    fn from(src: fuchsia_zircon::Status) -> Self {
+impl From<zx::Status> for ProcedureError {
+    fn from(src: zx::Status) -> Self {
         ProcedureError::Channel(src)
     }
 }

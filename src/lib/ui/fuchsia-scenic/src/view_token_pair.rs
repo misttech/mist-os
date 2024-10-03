@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use fidl_fuchsia_ui_views::{ViewHolderToken, ViewToken};
-use fuchsia_zircon::EventPair;
+use zx::EventPair;
 
 pub struct ViewTokenPair {
     pub view_token: ViewToken,

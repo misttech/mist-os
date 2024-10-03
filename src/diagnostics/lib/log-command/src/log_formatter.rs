@@ -523,7 +523,7 @@ mod test {
         })
         .set_message("Hello world!")
         .build();
-        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let (sender, receiver) = zx::Socket::create_stream();
         sender
             .write(serde_json::to_string(&target_log).unwrap().as_bytes())
             .expect("failed to write target log");
@@ -548,7 +548,7 @@ mod test {
     async fn test_format_multiple_messages() {
         let symbolizer = NoOpSymbolizer {};
         let mut formatter = FakeFormatter::new();
-        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let (sender, receiver) = zx::Socket::create_stream();
         let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
             timestamp: Timestamp::from_nanos(0),
@@ -616,7 +616,7 @@ mod test {
         );
         formatter.set_boot_timestamp(Timestamp::from_nanos(0));
 
-        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let (sender, receiver) = zx::Socket::create_stream();
         let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
             timestamp: Timestamp::from_nanos(0),
@@ -721,7 +721,7 @@ mod test {
         );
         formatter.set_boot_timestamp(Timestamp::from_nanos(1));
 
-        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let (sender, receiver) = zx::Socket::create_stream();
         let logs = (0..4).map(|i| make_log_with_timestamp(i)).collect::<Vec<_>>();
         sender
             .write(serde_json::to_string(&logs).unwrap().as_bytes())
@@ -814,7 +814,7 @@ mod test {
         );
     }
 
-    fn emit_log(sender: &mut fuchsia_zircon::Socket, msg: &str, timestamp: i64) -> Data<Logs> {
+    fn emit_log(sender: &mut zx::Socket, msg: &str, timestamp: i64) -> Data<Logs> {
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             moniker: "ffx".try_into().unwrap(),
             timestamp: Timestamp::from_nanos(timestamp),
@@ -833,7 +833,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_discards_when_told_by_symbolizer() {
         let mut formatter = FakeFormatter::new();
-        let (mut sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let (mut sender, receiver) = zx::Socket::create_stream();
         let mut target_log_0 = emit_log(&mut sender, "Hello world!", 0);
         emit_log(&mut sender, "Dropped world!", 1);
         let mut target_log_2 = emit_log(&mut sender, "Hello world!", 2);
@@ -892,7 +892,7 @@ mod test {
         .set_tid(2)
         .set_message("Hello world!")
         .build();
-        let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let (sender, receiver) = zx::Socket::create_stream();
         sender
             .write(serde_json::to_string(&target_log).unwrap().as_bytes())
             .expect("failed to write target log");

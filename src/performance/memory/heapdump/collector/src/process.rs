@@ -4,8 +4,8 @@
 
 use async_trait::async_trait;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
-use fuchsia_zircon::Koid;
 use std::fmt::Debug;
+use zx::Koid;
 
 /// An instrumented process.
 #[async_trait]

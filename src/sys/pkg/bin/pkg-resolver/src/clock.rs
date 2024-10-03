@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 #[cfg(not(test))]
-pub(crate) fn now() -> zx::MonotonicTime {
-    zx::MonotonicTime::get()
+pub(crate) fn now() -> zx::MonotonicInstant {
+    zx::MonotonicInstant::get()
 }
 
 #[cfg(test)]
@@ -14,18 +12,17 @@ pub(crate) use mock::now;
 
 #[cfg(test)]
 pub(crate) mod mock {
-    use super::*;
     use std::cell::Cell;
 
     thread_local!(
-        static MOCK_TIME: Cell<zx::MonotonicTime> = Cell::new(zx::MonotonicTime::get())
+        static MOCK_TIME: Cell<zx::MonotonicInstant> = Cell::new(zx::MonotonicInstant::get())
     );
 
-    pub fn now() -> zx::MonotonicTime {
+    pub fn now() -> zx::MonotonicInstant {
         MOCK_TIME.with(|time| time.get())
     }
 
-    pub fn set(new_time: zx::MonotonicTime) {
+    pub fn set(new_time: zx::MonotonicInstant) {
         MOCK_TIME.with(|time| time.set(new_time));
     }
 }

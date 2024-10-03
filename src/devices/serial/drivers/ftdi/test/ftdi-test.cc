@@ -28,6 +28,21 @@
 namespace usb_virtual_bus {
 namespace {
 
+zx_status_t WaitForAnyFile(int dirfd, int event, const char* name, void* cookie) {
+  if (std::string_view{name} == ".") {
+    return ZX_OK;
+  }
+  if (event != WATCH_EVENT_ADD_FILE) {
+    return ZX_OK;
+  }
+  if (*name) {
+    *reinterpret_cast<fbl::String*>(cookie) = fbl::String(name);
+    return ZX_ERR_STOP;
+  } else {
+    return ZX_OK;
+  }
+}
+
 using usb_virtual::BusLauncher;
 
 class FtdiTest : public zxtest::Test {

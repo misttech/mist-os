@@ -5,11 +5,8 @@
 use async_trait::async_trait;
 use ffx_command::{bug, user_error, FfxContext};
 use fuchsia_audio::dai::DaiFormat;
-use fuchsia_zircon_status::Status;
-use {
-    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
-    fuchsia_zircon_types as zx_types,
-};
+use zx_status::Status;
+use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio, zx_types};
 
 #[async_trait]
 pub trait DeviceControl {

@@ -7,11 +7,11 @@ use fuchsia_inspect::{
     UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Duration};
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
+use zx::{self as zx, Duration};
 
 pub(crate) static TRACE_CATEGORY: &CStr = c"archivist";
 
@@ -283,7 +283,7 @@ impl ProcessingTimeTracker {
 
         let make_entry = || {
             let n = parent_node.create_child(moniker.to_string());
-            n.record_int("@time", zx::BootTime::get().into_nanos());
+            n.record_int("@time", zx::BootInstant::get().into_nanos());
             n.record_double("duration_seconds", time_ns as f64 / 1e9);
             (time_ns, n)
         };

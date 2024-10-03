@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 mod beacon;
 
 /// Common message-related definitions.
@@ -16,4 +14,4 @@ pub mod messenger;
 pub mod receptor;
 
 /// Representation of time used for logging.
-pub type Timestamp = zx::MonotonicTime;
+pub type Timestamp = zx::MonotonicInstant;

@@ -34,8 +34,7 @@ use tracing::{debug, error, info, warn};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_neighbor as fnet_neighbor,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
 };
 
 const REPORT_PERIOD: zx::Duration = zx::Duration::from_seconds(60);
@@ -597,7 +596,7 @@ impl EventLoop {
         // TODO(https://fxbug.dev/42074495): Move watchdog into its own future in the eventloop to prevent
         // network check reliance on the watchdog completing.
         let () = watchdog
-            .check_interface_state(zx::MonotonicTime::get(), &SystemDispatcher {}, view)
+            .check_interface_state(zx::MonotonicInstant::get(), &SystemDispatcher {}, view)
             .await;
 
         let (system_internet, system_gateway, system_dns, system_http) = {

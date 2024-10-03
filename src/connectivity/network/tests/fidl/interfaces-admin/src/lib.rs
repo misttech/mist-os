@@ -11,7 +11,6 @@ use finterfaces_admin::GrantForInterfaceAuthorization;
 use fnet_interfaces_ext::admin::TerminalError;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, TimeoutExt as _};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
 use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
@@ -31,13 +30,14 @@ use std::convert::TryInto as _;
 use std::ops::Not as _;
 use std::pin::pin;
 use test_case::test_case;
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_posix_socket as fposix_socket, zx_status,
 };
 
 #[netstack_test]
@@ -1256,7 +1256,7 @@ async fn add_address_and_detach<N: Netstack>(
         },
     )
     .map_ok(|()| panic!("address deleted after detaching and closing channel"))
-    .on_timeout(fuchsia_async::Time::after(fuchsia_zircon::Duration::from_millis(100)), || Ok(()))
+    .on_timeout(fuchsia_async::Time::after(zx::Duration::from_millis(100)), || Ok(()))
     .await
     .expect("wait for address to not be removed");
 
@@ -2521,7 +2521,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
     async fn add_address(
         address: &fnet::Subnet,
-        valid_until: zx::MonotonicTime,
+        valid_until: zx::MonotonicInstant,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         id: u64,
         interface_state: &fidl_fuchsia_net_interfaces::StateProxy,
@@ -2535,7 +2535,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                 &fidl_fuchsia_net_interfaces_admin::AddressParameters {
                     initial_properties: Some(
                         fidl_fuchsia_net_interfaces_admin::AddressProperties {
-                            valid_lifetime_end: (valid_until != zx::MonotonicTime::INFINITE)
+                            valid_lifetime_end: (valid_until != zx::MonotonicInstant::INFINITE)
                                 .then(|| valid_until.into_nanos()),
                             ..Default::default()
                         },
@@ -2559,7 +2559,10 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                             fnet_interfaces::AddressAssignmentState::Assigned
                         );
                         if addr == *address {
-                            assert_eq!(zx::MonotonicTime::from_nanos(got_valid_until), valid_until);
+                            assert_eq!(
+                                zx::MonotonicInstant::from_nanos(got_valid_until),
+                                valid_until
+                            );
                             true
                         } else {
                             false
@@ -2578,7 +2581,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         // Add an address with infinite valid_until and explicitly remove it.
         let _address_state_provider = add_address(
             &address,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
             &interface.control(),
             id,
             &interface_state,
@@ -2615,7 +2618,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         // Add an address with finite valid_until and explicitly remove it.
         let _address_state_provider = add_address(
             &address,
-            zx::MonotonicTime::from_nanos(1234),
+            zx::MonotonicInstant::from_nanos(1234),
             &interface.control(),
             id,
             &interface_state,
@@ -2653,7 +2656,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         // the address was removed.
         let address_state_provider = add_address(
             &address,
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
             &interface.control(),
             id,
             &interface_state,

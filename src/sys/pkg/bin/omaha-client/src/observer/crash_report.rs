@@ -6,7 +6,7 @@
 
 use anyhow::anyhow;
 use fidl_fuchsia_feedback::{CrashReport, CrashReporterProxy};
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;
@@ -107,7 +107,7 @@ async fn file_report(proxy: &CrashReporterProxy, signature: &str) {
             crash_signature: Some(signature.to_owned()),
             program_name: Some("system".to_owned()),
             // Need to do syscall because `std::time::Instant` cannot be converted into nanos.
-            program_uptime: Some(zx::MonotonicTime::get().into_nanos()),
+            program_uptime: Some(zx::MonotonicInstant::get().into_nanos()),
             is_fatal: Some(false),
             ..Default::default()
         })

@@ -11,7 +11,7 @@ use futures::{StreamExt, TryStreamExt};
 use tracing::*;
 use {
     fidl_fuchsia_hwinfo as fhwinfo, fidl_fuchsia_hwinfo_mock as fhwinfo_mock,
-    fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
+    fuchsia_async as fasync, zx_status,
 };
 
 #[fuchsia::main(logging = true)]

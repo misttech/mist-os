@@ -8,7 +8,7 @@ use futures::stream::{self, StreamExt, TryStreamExt};
 use futures::FutureExt;
 use {
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
-    fidl_fuchsia_ui_input3 as ui_input3, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_input3 as ui_input3, zx,
 };
 
 pub fn default_state() -> ui_input::TextInputState {
@@ -269,7 +269,7 @@ impl From<ui_input3::NonPrintableKey> for KeyMeaningWrapper {
 
 /// Creates a `KeyEvent` with the given parameters.
 pub fn create_key_event(
-    timestamp: zx::MonotonicTime,
+    timestamp: zx::MonotonicInstant,
     event_type: ui_input3::KeyEventType,
     key: impl Into<Option<input::Key>>,
     modifiers: impl Into<Option<ui_input3::Modifiers>>,

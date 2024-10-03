@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 use anyhow::{format_err, Context as _, Error};
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::lock::Mutex;
 use futures::{future, TryStreamExt};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as ui_input3,
     fidl_fuchsia_ui_views as ui_views, fuchsia_scenic as scenic,
@@ -127,7 +127,7 @@ impl KeyboardService {
     /// #Parameters
     ///
     /// * `event_time` is the monotonic timestamp at which focus lost was detected.
-    async fn handle_focus_lost(&self, event_time: zx::MonotonicTime) {
+    async fn handle_focus_lost(&self, event_time: zx::MonotonicInstant) {
         let mut store = self.store.lock().await;
         let focused_view = match &store.focused_view {
             Some(view_ref) => view_ref,
@@ -165,7 +165,7 @@ impl KeyboardService {
 
     /// New client was focused, send SYNC events if necessary.
     /// Will lock `KeyListenerStore` and current subscriber.
-    async fn handle_client_focused(&self, focused_view: ViewRef, event_time: zx::MonotonicTime) {
+    async fn handle_client_focused(&self, focused_view: ViewRef, event_time: zx::MonotonicInstant) {
         let store = self.store.lock().await;
         let subscriber = match store.subscribers.get(&focused_view) {
             Some(subscriber) => subscriber,
@@ -212,7 +212,7 @@ impl KeyboardService {
     pub(crate) async fn handle_focus_change(
         &self,
         focused_view: ViewRef,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) {
         tracing::debug!(
             "focus change to view: {:?}, at timestamp: {:?}",
@@ -428,13 +428,13 @@ mod tests {
     struct Helper {
         service: KeyboardService,
         keyboard_proxy: ui_input3::KeyboardProxy,
-        fake_now: zx::MonotonicTime,
+        fake_now: zx::MonotonicInstant,
     }
 
     impl Helper {
         /// Starts a new Task for a new instance of Keyboard service for tests.
         fn new() -> Self {
-            let fake_now = zx::MonotonicTime::ZERO;
+            let fake_now = zx::MonotonicInstant::ZERO;
             let (keyboard_proxy, keyboard_request_stream) =
                 fidl::endpoints::create_proxy_and_stream::<ui_input3::KeyboardMarker>()
                     .expect("Failed to create KeyboardProxy and stream.");
@@ -485,7 +485,7 @@ mod tests {
     }
 
     fn create_key_event(key: input::Key, modifiers: ui_input3::Modifiers) -> ui_input3::KeyEvent {
-        let timestamp = zx::MonotonicTime::ZERO;
+        let timestamp = zx::MonotonicInstant::ZERO;
         ui_input3::KeyEvent {
             timestamp: Some(timestamp.into_nanos()),
             key: Some(key),
@@ -579,7 +579,7 @@ mod tests {
         let (_view_ref, mut listener) = helper.create_and_focus_client().await?;
 
         let dispatched_event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::A,
             None,
@@ -604,7 +604,7 @@ mod tests {
         let (_view_ref, mut listener) = helper.create_and_focus_client().await?;
 
         let dispatched_event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             None,
             None,
@@ -629,7 +629,7 @@ mod tests {
         let (_view_ref, mut listener) = helper.create_and_focus_client().await?;
 
         let dispatched_event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::A,
             None,
@@ -661,7 +661,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_switching_focus() -> Result<(), Error> {
-        let fake_now = zx::MonotonicTime::ZERO;
+        let fake_now = zx::MonotonicInstant::ZERO;
         let mut helper = Helper::new();
 
         // Create fake clients.
@@ -676,7 +676,7 @@ mod tests {
         // Scope part of the test case to release listeners and borrows once done.
         {
             let dispatched_event = test_helpers::create_key_event(
-                zx::MonotonicTime::ZERO,
+                zx::MonotonicInstant::ZERO,
                 ui_input3::KeyEventType::Pressed,
                 input::Key::A,
                 ui_input3::Modifiers::CAPS_LOCK,
@@ -701,7 +701,7 @@ mod tests {
         }
 
         // An event timestamp must be included.
-        let now = zx::MonotonicTime::ZERO;
+        let now = zx::MonotonicInstant::ZERO;
 
         // Change focus to another client, expect CANCEL for unfocused client and SYNC for focused
         // client.
@@ -828,7 +828,7 @@ mod tests {
         let mut helper = Helper::new();
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::LeftShift,
             None,
@@ -839,7 +839,7 @@ mod tests {
         assert_eq!(helper.service.get_key_meanings_pressed().await, hashset!());
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::Key5,
             None,
@@ -856,7 +856,7 @@ mod tests {
         );
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Released,
             input::Key::Key5,
             None,
@@ -867,7 +867,7 @@ mod tests {
         assert_eq!(helper.service.get_key_meanings_pressed().await, hashset!());
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Released,
             input::Key::LeftShift,
             None,
@@ -889,7 +889,7 @@ mod tests {
         let mut helper = Helper::new();
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::LeftShift,
             None,
@@ -900,7 +900,7 @@ mod tests {
         assert_eq!(helper.service.get_key_meanings_pressed().await, hashset!());
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::Key5,
             None,
@@ -917,7 +917,7 @@ mod tests {
         );
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Released,
             input::Key::LeftShift,
             None,
@@ -931,7 +931,7 @@ mod tests {
         );
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Released,
             input::Key::Key5,
             None,
@@ -953,7 +953,7 @@ mod tests {
         let mut helper = Helper::new();
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::LeftShift,
             None,
@@ -964,7 +964,7 @@ mod tests {
         assert_eq!(helper.service.get_key_meanings_pressed().await, hashset!());
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Pressed,
             None,
             None,
@@ -978,7 +978,7 @@ mod tests {
         );
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Released,
             None,
             None,
@@ -989,7 +989,7 @@ mod tests {
         assert_eq!(helper.service.get_key_meanings_pressed().await, hashset!());
 
         let event = test_helpers::create_key_event(
-            zx::MonotonicTime::ZERO,
+            zx::MonotonicInstant::ZERO,
             ui_input3::KeyEventType::Released,
             input::Key::LeftShift,
             None,

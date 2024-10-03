@@ -10,11 +10,11 @@ use fidl_fuchsia_space::{
     ManagerRequestStream as SpaceManagerRequestStream,
 };
 use fidl_fuchsia_update::CommitStatusProviderProxy;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{error, info};
+use zx::{self as zx, AsHandleRef};
 
 pub async fn serve(
     blobfs: blobfs::Client,
@@ -57,20 +57,22 @@ async fn gc(
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
 
-    event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST).map_err(|e| {
-        match e {
-            zx::Status::TIMED_OUT => {
-                info!("GC is blocked pending update.");
+    event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST).map_err(
+        |e| {
+            match e {
+                zx::Status::TIMED_OUT => {
+                    info!("GC is blocked pending update.");
+                }
+                zx::Status::CANCELED => {
+                    info!("Commit handle is closed, likely because we are rebooting.");
+                }
+                other => {
+                    error!("Got unexpected status {:?} while waiting on handle.", other);
+                }
             }
-            zx::Status::CANCELED => {
-                info!("Commit handle is closed, likely because we are rebooting.");
-            }
-            other => {
-                error!("Got unexpected status {:?} while waiting on handle.", other);
-            }
-        }
-        SpaceErrorCode::PendingCommit
-    })?;
+            SpaceErrorCode::PendingCommit
+        },
+    )?;
 
     // The primary purpose of GC is to free space to enable an OTA, so we continue if possible
     // through any errors and delete as many blobs as we can (because OTA'ing may be the only way

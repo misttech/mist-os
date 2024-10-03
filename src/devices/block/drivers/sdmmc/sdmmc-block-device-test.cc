@@ -226,8 +226,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     auto element_control_impl = std::make_unique<FakeElementControl>();
     if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
       hardware_power_element_control_ = element_control_impl.get();
-    } else if (req.element_name() == SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_element_control_ = element_control_impl.get();
     } else {
       ZX_ASSERT_MSG(0, "Unexpected power element.");
     }
@@ -242,8 +240,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     auto lessor_impl = std::make_unique<FakeLessor>();
     if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
       hardware_power_lessor_ = lessor_impl.get();
-    } else if (req.element_name() == SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_lessor_ = lessor_impl.get();
     } else {
       ZX_ASSERT_MSG(0, "Unexpected power element.");
     }
@@ -260,9 +256,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
       hardware_power_current_level_ = current_level_impl.get();
       hardware_power_required_level_ = required_level_impl.get();
-    } else if (req.element_name() == SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_current_level_ = current_level_impl.get();
-      wake_on_request_required_level_ = required_level_impl.get();
     } else {
       ZX_ASSERT_MSG(0, "Unexpected power element.");
     }
@@ -279,12 +272,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
             [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
 
-    if (wake_on_request_lessor_ && hardware_power_required_level_) {
-      wake_on_request_lessor_->AddSideEffect([&]() {
-        hardware_power_required_level_->required_level_ = SdmmcBlockDevice::kPowerLevelOn;
-      });
-    }
-
     servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
@@ -298,10 +285,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   FakeLessor* hardware_power_lessor_ = nullptr;
   FakeCurrentLevel* hardware_power_current_level_ = nullptr;
   FakeRequiredLevel* hardware_power_required_level_ = nullptr;
-  FakeElementControl* wake_on_request_element_control_ = nullptr;
-  FakeLessor* wake_on_request_lessor_ = nullptr;
-  FakeCurrentLevel* wake_on_request_current_level_ = nullptr;
-  FakeRequiredLevel* wake_on_request_required_level_ = nullptr;
 
  private:
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
@@ -2240,34 +2223,6 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
       root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
-  const auto* wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 0);
-
-  // Issue request while power is suspended.
-  awake_complete.Reset();
-  sleep_complete.Reset();
-  std::optional<block::Operation<OperationContext>> op;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op));
-  CallbackContext ctx(1);
-  FillSdmmc(1, 0x400);
-  user_.Queue(op->operation(), OperationCallback, &ctx);
-  runtime_.PerformBlockingWork([&] {
-    EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
-    EXPECT_TRUE(op->private_storage()->completed);
-    EXPECT_OK(op->private_storage()->status);
-    ASSERT_NO_FATAL_FAILURE(CheckVmo(op->private_storage()->mapper, 1));
-
-    // Return driver to suspension.
-    incoming_.SyncCall([](IncomingNamespace* incoming) {
-      incoming->power_broker.hardware_power_required_level_->required_level_ =
-          SdmmcBlockDevice::kPowerLevelOff;
-    });
-
-    awake_complete.Wait();
-    sleep_complete.Wait();
-  });
 
   inspector.ReadInspect(block_device_->inspect());
 
@@ -2277,10 +2232,6 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
-  wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 1);
 
   // Trigger power level change to kPowerLevelOn.
   awake_complete.Reset();
@@ -2298,10 +2249,6 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_FALSE(power_suspended->value());
-  wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 1);
 
   // Trigger power level change to kPowerLevelOff.
   sleep_complete.Reset();
@@ -2319,10 +2266,6 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
-  wake_on_request_count =
-      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
-  ASSERT_NOT_NULL(wake_on_request_count);
-  EXPECT_EQ(wake_on_request_count->value(), 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(SdmmcProtocolUsingFidlTest, SdmmcBlockDeviceTest, zxtest::Bool());

@@ -8,7 +8,7 @@ use std::num::NonZeroU64;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
     fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_name as fnet_name, fuchsia_zircon as zx,
+    fidl_fuchsia_net_name as fnet_name, zx,
 };
 
 use anyhow::Context as _;
@@ -51,8 +51,8 @@ impl ClientState {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(super) struct Lifetimes {
-    preferred_until: zx::MonotonicTime,
-    valid_until: zx::MonotonicTime,
+    preferred_until: zx::MonotonicInstant,
+    valid_until: zx::MonotonicInstant,
 }
 
 impl Into<fnet_dhcpv6::Lifetimes> for Lifetimes {
@@ -99,8 +99,8 @@ pub(super) fn from_fidl_prefixes(
                 Ok((
                     subnet,
                     Lifetimes {
-                        valid_until: zx::MonotonicTime::from_nanos(valid_until),
-                        preferred_until: zx::MonotonicTime::from_nanos(preferred_until),
+                        valid_until: zx::MonotonicInstant::from_nanos(valid_until),
+                        preferred_until: zx::MonotonicInstant::from_nanos(preferred_until),
                     },
                 ))
             },
@@ -362,7 +362,7 @@ impl PrefixProviderHandler {
 
 #[cfg(test)]
 mod tests {
-    use {fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_zircon as zx};
+    use {fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, zx};
 
     use const_unwrap::const_unwrap_option;
     use net_declare::{fidl_socket_addr_v6, net_subnet_v6};
@@ -376,12 +376,12 @@ mod tests {
     const ALLOWED_UPSTREAM_DEVICE_CLASS: crate::DeviceClass = crate::DeviceClass::Ethernet;
     const DISALLOWED_UPSTREAM_DEVICE_CLASS: crate::DeviceClass = crate::DeviceClass::Virtual;
     const LIFETIMES: Lifetimes = Lifetimes {
-        preferred_until: zx::MonotonicTime::from_nanos(123_000_000_000),
-        valid_until: zx::MonotonicTime::from_nanos(456_000_000_000),
+        preferred_until: zx::MonotonicInstant::from_nanos(123_000_000_000),
+        valid_until: zx::MonotonicInstant::from_nanos(456_000_000_000),
     };
     const RENEWED_LIFETIMES: Lifetimes = Lifetimes {
-        preferred_until: zx::MonotonicTime::from_nanos(777_000_000_000),
-        valid_until: zx::MonotonicTime::from_nanos(888_000_000_000),
+        preferred_until: zx::MonotonicInstant::from_nanos(777_000_000_000),
+        valid_until: zx::MonotonicInstant::from_nanos(888_000_000_000),
     };
 
     impl InterfaceState {

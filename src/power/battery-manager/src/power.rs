@@ -4,11 +4,11 @@
 
 use anyhow::{Context as _, Error};
 use fuchsia_fs::OpenFlags;
-use fuchsia_zircon::{self as zx, Signals};
 use futures::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+use zx::{self as zx, Signals};
 use {fidl_fuchsia_hardware_powersource as hpower, fuchsia_async as fasync};
 
 use crate::battery_manager::BatteryManager;

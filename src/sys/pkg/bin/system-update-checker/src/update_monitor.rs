@@ -135,7 +135,7 @@ mod test {
     use futures::task::Poll;
     use proptest::prelude::*;
     use std::sync::Arc;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     const VERSION_AVAILABLE: &str = "fake-version-available";
 

@@ -6,7 +6,7 @@ use anyhow::{Context as _, Error};
 use config::Config;
 use fidl_test_exampletester::SimpleMarker;
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 use std::{thread, time};
 
 fn main() -> Result<(), Error> {
@@ -23,7 +23,7 @@ fn main() -> Result<(), Error> {
             .context("Failed to connect to simple service")?;
         println!("Outgoing connection enabled");
 
-        let res = simple.add(config.augend, config.addend, zx::MonotonicTime::INFINITE)?;
+        let res = simple.add(config.augend, config.addend, zx::MonotonicInstant::INFINITE)?;
         println!("Response: {:?}", res);
     }
 

@@ -30,7 +30,7 @@ pub mod fidl {
     use async_trait::async_trait;
     use fidl_fuchsia_fido_report::{Message as FidoMessage, SecurityKeyDeviceProxy};
     use fuchsia_async::{Time, TimeoutExt};
-    use fuchsia_zircon as zx;
+
     use futures::TryFutureExt;
     use lazy_static::lazy_static;
     use std::convert::TryInto;

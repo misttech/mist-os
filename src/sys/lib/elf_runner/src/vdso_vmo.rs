@@ -4,9 +4,9 @@
 
 use crate::error::VdsoError;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use zx::{self as zx, AsHandleRef, HandleBased};
 
 fn take_vdso_vmos() -> Result<HashMap<zx::Name, zx::Vmo>, VdsoError> {
     let mut vmos = HashMap::new();

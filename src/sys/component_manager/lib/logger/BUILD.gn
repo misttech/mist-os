@@ -18,9 +18,9 @@ rustc_library("logger") {
 
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fdio/rust:fdio",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-log",

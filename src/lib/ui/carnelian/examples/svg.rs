@@ -13,9 +13,9 @@ use carnelian::{
 };
 use euclid::default::Point2D;
 use euclid::size2;
-use fuchsia_zircon::Event;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use zx::Event;
 
 const BACKGROUND_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 const SPACING_FRACTION: f32 = 0.8;

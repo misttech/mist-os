@@ -18,7 +18,6 @@ use carnelian::{
     ViewAssistantPtr, ViewKey,
 };
 use fuchsia_trace::duration;
-use fuchsia_zircon::Event;
 use rustc_hash::FxHashMap;
 use std::any::Any;
 use std::collections::hash_map::Entry;
@@ -27,6 +26,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use zx::Event;
 
 /// Text Grid.
 #[derive(Debug, FromArgs)]

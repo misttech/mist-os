@@ -13,7 +13,6 @@ use fidl_fuchsia_diagnostics::{
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::client;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Duration};
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::sink::SinkExt;
@@ -25,6 +24,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
+use zx::{self as zx, Duration};
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
@@ -573,10 +573,7 @@ mod tests {
     };
     use futures::TryStreamExt;
     use tracing::{error, info};
-    use {
-        fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger,
-        fuchsia_zircon as zx,
-    };
+    use {fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger, zx};
 
     const TEST_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
 

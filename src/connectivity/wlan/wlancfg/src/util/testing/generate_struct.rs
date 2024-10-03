@@ -18,7 +18,7 @@ use wlan_common::security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor}
 use {
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 pub fn generate_ssid(ssid: &str) -> types::Ssid {
@@ -88,7 +88,7 @@ pub fn generate_random_bss() -> types::Bss {
     let bssid = generate_random_bssid();
     let rssi = rng.gen_range(-100..20);
     let channel = generate_random_channel();
-    let timestamp = zx::MonotonicTime::from_nanos(rng.gen());
+    let timestamp = zx::MonotonicInstant::from_nanos(rng.gen());
     let snr_db = rng.gen_range(-20..50);
 
     types::Bss {

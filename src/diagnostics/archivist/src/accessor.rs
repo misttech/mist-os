@@ -34,7 +34,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
-use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_trace as ftrace};
 
 #[derive(Debug, Copy, Clone)]
 pub struct BatchRetrievalTimeout(i64);
@@ -400,7 +400,7 @@ pub enum IteratorError {
     #[error("Error reading from VMO: {}", source)]
     VmoReadError {
         #[from]
-        source: fuchsia_zircon::Status,
+        source: zx::Status,
     },
 }
 
@@ -684,7 +684,7 @@ where
         self.requests.maybe_respond_ready().await?;
         while self.requests.wait_for_buffer().await.is_ok() {
             self.stats.add_request();
-            let start_time = zx::MonotonicTime::get();
+            let start_time = zx::MonotonicInstant::get();
             let trace_id = ftrace::Id::random();
             let _trace_guard = ftrace::async_enter!(
                 trace_id,
@@ -726,7 +726,9 @@ where
                 }
                 self.stats.add_terminal();
             }
-            self.stats.global_stats().record_batch_duration(zx::MonotonicTime::get() - start_time);
+            self.stats
+                .global_stats()
+                .record_batch_duration(zx::MonotonicInstant::get() - start_time);
             if self.requests.write(batch).await.is_err() {
                 // Peer closed, end the stream.
                 break;
@@ -806,7 +808,6 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, BatchIteratorMarker};
     use fuchsia_inspect::{Inspector, Node};
-    use fuchsia_zircon_status as zx_status;
     use zx::AsHandleRef;
 
     #[fuchsia::test]
@@ -927,7 +928,7 @@ mod tests {
             server
                 .write(vec![FormattedContent::Text(Buffer {
                     size: 1,
-                    vmo: fuchsia_zircon::Vmo::create(1).unwrap(),
+                    vmo: zx::Vmo::create(1).unwrap(),
                 })])
                 .await,
             Err(IteratorError::PeerClosed)
@@ -936,7 +937,7 @@ mod tests {
 
     #[fuchsia::test]
     fn socket_writer_handles_text() {
-        let vmo = fuchsia_zircon::Vmo::create(1).unwrap();
+        let vmo = zx::Vmo::create(1).unwrap();
         vmo.write(&[5u8], 0).unwrap();
         let koid = vmo.get_koid().unwrap();
         let text = FormattedContent::Text(Buffer { size: 1, vmo });
@@ -950,7 +951,7 @@ mod tests {
 
     #[fuchsia::test]
     fn socket_writer_does_not_handle_cbor() {
-        let vmo = fuchsia_zircon::Vmo::create(1).unwrap();
+        let vmo = zx::Vmo::create(1).unwrap();
         vmo.write(&[5u8], 0).unwrap();
         let text = FormattedContent::Cbor(vmo);
         let result = get_buffer_from_formatted_content(text);
@@ -959,16 +960,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn socket_writer_handles_closed_socket() {
-        let (local, remote) = fuchsia_zircon::Socket::create_stream();
+        let (local, remote) = zx::Socket::create_stream();
         drop(local);
         let mut remote = fuchsia_async::Socket::from_socket(remote);
         {
             let result = ArchiveAccessorWriter::write(
                 &mut remote,
-                vec![FormattedContent::Text(Buffer {
-                    size: 1,
-                    vmo: fuchsia_zircon::Vmo::create(1).unwrap(),
-                })],
+                vec![FormattedContent::Text(Buffer { size: 1, vmo: zx::Vmo::create(1).unwrap() })],
             )
             .await;
             assert_matches!(result, Ok(()));

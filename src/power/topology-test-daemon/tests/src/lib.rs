@@ -12,7 +12,7 @@ use fuchsia_component_test::{
 use tracing::*;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
-    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync, zx,
 };
 
 // Report prolonged match delay after this many loops.
@@ -160,6 +160,15 @@ async fn create_test_env() -> TestEnv {
         .await
         .expect("Failed to add child: system-activity-governor");
 
+    let config_no_suspender_ref = builder
+        .add_child(
+            "config-no-suspender",
+            "config-no-suspender#meta/config-no-suspender.cm",
+            ChildOptions::new(),
+        )
+        .await
+        .expect("Failed to add child: config-no-suspender");
+
     // Expose capabilities from power-broker.
     builder
         .add_route(
@@ -189,6 +198,17 @@ async fn create_test_env() -> TestEnv {
                 .capability(Capability::protocol_by_name("fuchsia.power.broker.Topology"))
                 .from(&power_broker_ref)
                 .to(&component_ref),
+        )
+        .await
+        .unwrap();
+
+    // Offer capabilities from config-no-suspender to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.UseSuspender"))
+                .from(&config_no_suspender_ref)
+                .to(&system_activity_governor_ref),
         )
         .await
         .unwrap();
@@ -262,6 +282,9 @@ async fn test_system_activity_control() -> Result<()> {
                 wake_handling: {
                     power_level: 0u64,
                 },
+                cpu: {
+                    power_level: 1u64,
+                },
             },
             suspend_stats: {
                 ref fobs::SUSPEND_FAIL_COUNT: 0u64,
@@ -295,6 +318,9 @@ async fn test_system_activity_control() -> Result<()> {
                     power_level: 0u64,
                 },
                 wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
                     power_level: 0u64,
                 },
             },

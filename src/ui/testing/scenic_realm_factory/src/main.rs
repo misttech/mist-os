@@ -25,8 +25,7 @@ use fuchsia_component_test::{
 };
 use futures::{StreamExt, TryStreamExt};
 use {
-    cm_rust, fidl_fuchsia_ui_test_context as ui_test_context, fuchsia_async as fasync,
-    fuchsia_zircon_status as zx_status,
+    cm_rust, fidl_fuchsia_ui_test_context as ui_test_context, fuchsia_async as fasync, zx_status,
 };
 
 /// All FIDL services that are exposed by this component's ServiceFs.

@@ -62,7 +62,6 @@ pub fn create_rust_wrapper(
         use fidl::unpersist;
         use fuchsia_inspect::{#(#inspect_uses),*};
         use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-        use fuchsia_zircon as zx;
 
         #[derive(Debug)]
         pub struct Config {

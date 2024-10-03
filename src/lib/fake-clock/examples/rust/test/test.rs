@@ -6,7 +6,7 @@ use fidl_fuchsia_fakeclock_test::ExampleMarker;
 use fidl_fuchsia_testing::{DeadlineEventType, FakeClockControlMarker, Increment};
 use fuchsia_component::client::connect_to_protocol;
 use named_timer::DeadlineId;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const DEADLINE_NAME: DeadlineId<'static> = DeadlineId::new("fake-clock-example", "deadline");
 
@@ -28,7 +28,7 @@ async fn test_pause_advance() {
     assert_eq!(now_1, now_2);
 
     // Set a 24 hour timer then advance time 24 hours. The timer should complete.
-    let long_timeout = zx::MonotonicTime::from_nanos(now_1) + ONE_DAY;
+    let long_timeout = zx::MonotonicInstant::from_nanos(now_1) + ONE_DAY;
     let long_wait_fut = example.wait_until(long_timeout.into_nanos());
     let () = fake_time
         .advance(&Increment::Determined(ONE_DAY.into_nanos()))

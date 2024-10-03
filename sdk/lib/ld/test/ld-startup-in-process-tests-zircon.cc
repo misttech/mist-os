@@ -17,8 +17,6 @@
 namespace ld::testing {
 namespace {
 
-constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
-
 // The dynamic linker gets loaded into this same test process, but it's given
 // a sub-VMAR to consider its "root" or allocation range so hopefully it will
 // confine its pointer references to that part of the address space.  The
@@ -39,9 +37,6 @@ void* GetVdso() {
 
 }  // namespace
 
-const std::string kLdStartupName =
-    std::string("test/lib/") + std::string(kLibprefix) + std::string(ld::abi::kInterp);
-
 void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args,
                                    std::initializer_list<std::string_view> env) {
   zx_vaddr_t test_base;
@@ -60,11 +55,20 @@ void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args,
                               .SetEnv(env));
 }
 
-void LdStartupInProcessTests::Load(std::string_view executable_name) {
+void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
+  const std::string executable_name =
+      std::string(raw_executable_name) + std::string(kTestExecutableInProcessSuffix);
+
   ASSERT_TRUE(test_vmar_);  // Init must have been called already.
 
+  // This points GetLibVmo() to the right place.
+  LdsvcPathPrefix(executable_name);
+
+  // Prime the mock loader service from the Needed() calls.
+  ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
+
   std::optional<LoadResult> result;
-  ASSERT_NO_FATAL_FAILURE(Load(kLdStartupName, result, test_vmar_));
+  ASSERT_NO_FATAL_FAILURE(Load(GetLibVmo(ld::abi::kInterp), result, test_vmar_));
 
   entry_ = result->entry + result->loader.load_bias();
 
@@ -78,8 +82,7 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
   ASSERT_NO_FATAL_FAILURE(procargs_.AddSelfVmar(std::move(load_image_vmar)));
 
   // Send the executable VMO.
-  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(
-      std::string(executable_name) + std::string(kTestExecutableInProcessSuffix)));
+  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(GetExecutableVmo(executable_name)));
 
   // If a mock loader service has been set up by calls to Needed() et al, send
   // the client end over.

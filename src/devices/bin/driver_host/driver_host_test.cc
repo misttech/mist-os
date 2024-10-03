@@ -85,8 +85,11 @@ class TestDirectory : public fio::testing::Directory_TestBase {
  public:
   using OpenHandler = fit::function<void(fio::OpenFlags flags, std::string path,
                                          fidl::InterfaceRequest<fio::Node> object)>;
+  using Open3Handler =
+      fit::function<void(fio::Flags flags, std::string_view path, zx::channel object)>;
 
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
+  void SetOpen3Handler(Open3Handler open3_handler) { open3_handler_ = std::move(open3_handler); }
 
  private:
   void Open(fio::OpenFlags flags, fio::ModeType mode, std::string path,
@@ -94,11 +97,17 @@ class TestDirectory : public fio::testing::Directory_TestBase {
     open_handler_(flags, std::move(path), std::move(object));
   }
 
+  void Open3(std::string path, fio::Flags flags, fio::Options options,
+             zx::channel object) override {
+    open3_handler_(flags, path, std::move(object));
+  }
+
   void NotImplemented_(const std::string& name) override {
     printf("Not implemented: Directory::%s\n", name.data());
   }
 
   OpenHandler open_handler_;
+  Open3Handler open3_handler_;
 };
 
 class TestTransaction : public fidl::Transaction {
@@ -161,6 +170,12 @@ class DriverHostTest : public testing::Test {
           EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
           EXPECT_EQ("driver/library.so", path);
           file_binding.Bind(object.TakeChannel(), loop_.dispatcher());
+        });
+    pkg_directory.SetOpen3Handler(
+        [this, &file_binding](fio::Flags flags, std::string_view path, zx::channel object) {
+          EXPECT_EQ(fio::Flags::PERM_READ | fio::Flags::PERM_EXECUTE, flags);
+          EXPECT_EQ("driver/library.so", path);
+          file_binding.Bind(std::move(object), loop_.dispatcher());
         });
     EXPECT_EQ(ZX_OK, vfs_.ServeDirectory(svc_dir_, std::move(svc_endpoints->server)));
 
@@ -477,6 +492,12 @@ TEST_F(DriverHostTest, Start_InvalidBinary) {
         EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
         EXPECT_EQ("driver/library.so", path);
         file_binding.Bind(object.TakeChannel(), loop().dispatcher());
+      });
+  pkg_directory.SetOpen3Handler(
+      [this, &file_binding](fio::Flags flags, std::string_view path, zx::channel object) {
+        EXPECT_EQ(fio::Flags::PERM_READ | fio::Flags::PERM_EXECUTE, flags);
+        EXPECT_EQ("driver/library.so", path);
+        file_binding.Bind(std::move(object), loop().dispatcher());
       });
   std::vector<fdata::DictionaryEntry> program_entries = {{{
       .key = "binary",

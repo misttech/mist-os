@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client;
-use fuchsia_zircon::{Rights, Signals};
 use tracing::*;
+use zx::{Rights, Signals};
 use {fidl_componentmanager_test as ftest, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_minimum_severity = "warn")]

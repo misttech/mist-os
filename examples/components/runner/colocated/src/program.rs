@@ -13,9 +13,7 @@ use runner::component::{Controllable, StopInfo};
 use std::sync::Arc;
 use tracing::warn;
 use zx::{AsHandleRef, Koid};
-use {
-    fidl_fuchsia_examples_colocated as fcolocated, fuchsia_async as fasync, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_examples_colocated as fcolocated, fuchsia_async as fasync, zx};
 
 /// [`ColocatedProgram `] represents an instance of a program run by the
 /// colocated runner. Its state is held in this struct and its behavior

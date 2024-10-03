@@ -42,6 +42,7 @@ struct AdvertisementStatus {
   uint16_t interval_min;
   uint16_t interval_max;
   bool extended_pdu;
+  AdvFlags flags;
   hci::LowEnergyAdvertiser::ConnectionCallback connect_cb;
 };
 
@@ -91,6 +92,7 @@ class FakeLowEnergyAdvertiser final : public hci::LowEnergyAdvertiser {
     new_status.interval_min = options.interval.min();
     new_status.interval_max = options.interval.max();
     new_status.anonymous = options.anonymous;
+    new_status.flags = options.flags;
     new_status.extended_pdu = options.extended_pdu;
     ads_->emplace(address, std::move(new_status));
     result_callback(fit::ok());
@@ -260,7 +262,9 @@ class LowEnergyAdvertisingManagerTest : public TestingBase {
 
   void MakeAdvertisingManager() {
     adv_mgr_ = std::make_unique<LowEnergyAdvertisingManager>(
-        advertiser(), &fake_address_delegate_);
+        advertiser(),
+        &fake_address_delegate_,
+        /*simultaneous_le_and_bredr_controller=*/true);
   }
 
   LowEnergyAdvertisingManager* adv_mgr() const { return adv_mgr_.get(); }
@@ -323,6 +327,9 @@ TEST_F(LowEnergyAdvertisingManagerTest, Success) {
 
   // Verify that the advertiser uses the requested local address.
   EXPECT_EQ(kRandomAddress, ad_store().begin()->first);
+  // Verify that the advertiser set the flags correctly.
+  EXPECT_TRUE(AdvFlag::kSimultaneousLEAndBREDRController &
+              ad_store().begin()->second.flags);
 }
 
 TEST_F(LowEnergyAdvertisingManagerTest, DataSize) {

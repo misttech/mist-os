@@ -40,7 +40,6 @@
 
 use fuchsia_inspect::{Inspector, Node};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Task as _};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -48,6 +47,7 @@ use std::panic::Location;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
+use zx::{self as zx, Task as _};
 
 static PROFILING_ENABLED: AtomicBool = AtomicBool::new(false);
 
@@ -127,14 +127,14 @@ impl ProfileDuration {
 
 struct InnerGuard {
     start_runtime: zx::TaskRuntimeInfo,
-    start_monotonic_ns: zx::MonotonicTime,
+    start_monotonic_ns: zx::MonotonicInstant,
     parent_duration: Arc<ProfileDurationTree>,
 }
 
 impl InnerGuard {
     #[track_caller]
     fn enter(name: &'static str) -> Self {
-        let start_monotonic_ns = zx::MonotonicTime::get();
+        let start_monotonic_ns = zx::MonotonicInstant::get();
         let start_runtime = current_thread_runtime();
 
         // Get the location outside the below closure since it can't be track_caller on stable.
@@ -157,7 +157,7 @@ impl Drop for InnerGuard {
                 std::mem::replace(&mut *current_duration, self.parent_duration.clone());
 
             let runtime_delta = current_thread_runtime() - self.start_runtime;
-            let wall_time_delta = zx::MonotonicTime::get() - self.start_monotonic_ns;
+            let wall_time_delta = zx::MonotonicInstant::get() - self.start_monotonic_ns;
 
             completed_duration.count.fetch_add(1, Ordering::Relaxed);
             completed_duration.wall_time.fetch_add(wall_time_delta.into_nanos(), Ordering::Relaxed);

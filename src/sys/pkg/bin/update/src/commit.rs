@@ -8,7 +8,7 @@ use fuchsia_component::client::connect_to_protocol;
 use futures::future::FusedFuture;
 use futures::prelude::*;
 use std::time::Duration;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const WARNING_DURATION: Duration = Duration::from_secs(30);
 
@@ -92,9 +92,9 @@ mod tests {
     use super::*;
     use fidl_fuchsia_update::CommitStatusProviderRequest;
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::{EventPair, HandleBased, Peered};
     use futures::pin_mut;
     use futures::task::Poll;
+    use zx::{EventPair, HandleBased, Peered};
 
     struct TestObserver {
         events: Mutex<Vec<CommitEvent>>,

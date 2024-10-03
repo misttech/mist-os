@@ -549,7 +549,7 @@ fn thresholded_canceled_scan_recovery_profile(
 mod tests {
     use super::*;
     use fuchsia_async::{TestExecutor, Time};
-    use fuchsia_zircon as zx;
+
     use rand::Rng;
     use test_case::test_case;
 

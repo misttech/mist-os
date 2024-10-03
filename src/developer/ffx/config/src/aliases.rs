@@ -22,7 +22,7 @@ impl ConfigAliases for EnvironmentContext {
     // Return values at first config level for which either the key or the alias has a value
     fn get_with_alias(&self, key: &str, alias: &str) -> Option<(ConfigValue, ConfigValue)> {
         let Ok(env) = self.load() else { return None };
-        let Ok(config) = env.config_from_cache(None) else { return None };
+        let Ok(config) = env.config_from_cache() else { return None };
         let key_vec: Vec<&str> = key.split('.').collect();
         let alias_vec: Vec<&str> = alias.split('.').collect();
         // These are called only by functions that hard-code the keys, so we won't panic

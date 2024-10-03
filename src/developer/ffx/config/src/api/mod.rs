@@ -10,7 +10,7 @@ pub mod query;
 pub mod value;
 
 pub type ConfigResult = Result<ConfigValue>;
-pub use query::{BuildOverride, ConfigQuery};
+pub use query::ConfigQuery;
 pub use value::ConfigValue;
 
 #[derive(Debug, Error)]

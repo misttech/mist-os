@@ -8,10 +8,10 @@ use crate::ProtocolsExt;
 use fidl::endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl::{AsHandleRef, HandleBased};
-use fuchsia_zircon_status::Status;
 use futures::future::BoxFuture;
 use std::future::Future;
 use std::sync::Arc;
+use zx_status::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Wraps the channel provided in the open methods and provide convenience methods for sending

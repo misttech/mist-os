@@ -10,10 +10,10 @@ use anyhow::Error;
 use fatfs::{DefaultTimeProvider, FsOptions, LossyOemCpConverter};
 use fidl_fuchsia_io as fio;
 use fuchsia_async::{Task, Time, Timer};
-use fuchsia_zircon::{AsHandleRef, Duration, Event, Status};
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::sync::{Arc, LockResult, Mutex, MutexGuard};
+use zx::{AsHandleRef, Duration, Event, Status};
 
 pub struct FatFilesystemInner {
     filesystem: Option<FileSystem>,

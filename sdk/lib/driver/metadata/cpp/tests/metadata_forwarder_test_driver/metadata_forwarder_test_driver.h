@@ -43,7 +43,9 @@ class MetadataForwarderTestDriver : public fdf::DriverBase,
   fidl::ServerBindingGroup<fuchsia_hardware_test::MetadataForwarder> bindings_;
   driver_devfs::Connector<fuchsia_hardware_test::MetadataForwarder> devfs_connector_{
       fit::bind_member<&MetadataForwarderTestDriver::Serve>(this)};
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   fuchsia_hardware_test::MetadataServer metadata_server_;
+#endif
 
   std::optional<fdf::OwnedChildNode> controller_node_;
 

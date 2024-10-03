@@ -6,17 +6,15 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
+- title: "Overview"
+  path: /docs/concepts/packages/README.md
 - title: "Fuchsia packages"
   path: /docs/concepts/packages/package.md
-- title: "Developing with Fuchsia packages"
-  path: /docs/concepts/packages/package_update.md
 - title: "Fuchsia package URLs"
   path: /docs/concepts/packages/package_url.md
-- title: "Fuchsia merkle roots"
-  path:  /docs/concepts/packages/merkleroot.md
 - title: "Fuchsia package server"
-  path:  /docs/concepts/packages/fuchsia_package_server.md
-- title: "Package updates"
+  path: /docs/concepts/packages/fuchsia_package_server.md
+- title: "Software updates"
   section:
   - title: "OTA updates"
     path: /docs/concepts/packages/ota.md

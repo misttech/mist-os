@@ -15,7 +15,7 @@ use std::future::Future;
 use tracing::{debug, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 use crate::config::HandsFreeFeatureSupport;

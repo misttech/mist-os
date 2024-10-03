@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_ui_pointerinjector as pointerinjector;
-use fuchsia_zircon::MonotonicTime;
+use zx::MonotonicInstant;
 
 /// State tracking for touch events. Touch events follow a cycle of states:
 /// Add -> Change -> Remove -> Add -> ...
@@ -60,7 +60,7 @@ impl PointerState {
         self.x = (self.x + 1) % (self.display_width + 1);
 
         pointerinjector::Event {
-            timestamp: Some(MonotonicTime::get().into_nanos()),
+            timestamp: Some(MonotonicInstant::get().into_nanos()),
             data: Some(pointerinjector::Data::PointerSample(pointer_sample)),
             ..Default::default()
         }

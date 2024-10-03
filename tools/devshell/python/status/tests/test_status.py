@@ -238,7 +238,6 @@ class TestStatusCommand(unittest.TestCase):
 
 
 EXPECTED_TEXT_OUTPUT = """
-fx status
 Environment Info:
   Current build directory: <<BUILD_DIR>>
 Source Info:

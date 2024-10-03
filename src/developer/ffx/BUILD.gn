@@ -313,6 +313,7 @@ if (is_fuchsia) {
   group("package_deps_for_host_tests") {
     testonly = true
     deps = [
+      "lib:package_deps_for_host_tests",
       "plugins:package_deps_for_host_tests",
       "tools/target-package/tests:package_deps_for_host_tests",
     ]

@@ -21,7 +21,7 @@
 //!     render::{self},
 //!     App, AppAssistant, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 //! };
-//! use fuchsia_zircon::Event;
+//! use zx::Event;
 //!
 //! #[derive(Default)]
 //! struct SampleAppAssistant;

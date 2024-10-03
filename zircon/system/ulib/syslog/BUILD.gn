@@ -57,7 +57,8 @@ syslog_visibility_allowlist += [
 # Syslog code can depend on syslog.
 syslog_visibility_allowlist += [ "//zircon/system/ulib/syslog:*" ]
 
-syslog_visibility_allowlist += [ "//build/sdk:deprecated_sdk_shared_libraries_to_build_at_all_supported_api_levels" ]
+syslog_visibility_allowlist +=
+    [ "//build/sdk:partner_idk_versioned_shared_libraries" ]
 
 syslog_headers_visibility_allowlist = [
   "//src/devices/lib/iommu:*",
@@ -110,8 +111,7 @@ zx_library("syslog") {
 }
 
 zx_library("syslog-headers") {
-  sdk = "static"
-  sdk_publishable = "partner"
+  sdk = "source"
   sdk_headers = syslog_headers
   visibility = syslog_headers_visibility_allowlist
 }

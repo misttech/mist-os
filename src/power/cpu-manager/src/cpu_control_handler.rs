@@ -730,7 +730,7 @@ pub mod tests {
     use diagnostics_assertions::assert_data_tree;
     use futures::TryStreamExt;
     use std::collections::HashSet;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     // Returns a proxy to a fake CpuCtrl driver pre-baked to return a single (fake) CPU opp.
     fn fake_cpu_ctrl_driver() -> fcpuctrl::DeviceProxy {

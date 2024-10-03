@@ -14,7 +14,7 @@ use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::zx_handle_t;
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::sys::zx_handle_t;
+use zx::sys::zx_handle_t;
 
 /// A wrapper around zircon handles that allows them to be temporarily cloned. These temporary
 /// clones can be used with `unblock` below which requires callbacks with static lifetime.  This is
@@ -194,7 +194,7 @@ pub async fn unblock<T: 'static + Send>(f: impl FnOnce() -> T + Send + 'static) 
 #[cfg(test)]
 mod tests {
     use super::{clones, TempClonable};
-    use fuchsia_zircon as zx;
+
     use std::sync::Arc;
 
     #[test]

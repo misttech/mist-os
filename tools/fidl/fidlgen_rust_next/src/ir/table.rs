@@ -30,7 +30,7 @@ impl Index for Table {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TableMember {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     #[serde(flatten)]
     pub attributes: Attributes,
     pub name: String,

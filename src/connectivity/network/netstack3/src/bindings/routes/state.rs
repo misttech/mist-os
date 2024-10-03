@@ -21,7 +21,7 @@ use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
 use netstack3_core::routes::{NextHop, ResolvedRoute};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
 };
 
 use crate::bindings::routes::rules_state::RuleInterest;
@@ -107,14 +107,19 @@ where
             )
         })
         .transpose()?;
-    let ResolvedRoute { device, src_addr, local_delivery_device: _, next_hop } =
-        match ctx.api().routes::<A::Version>().resolve_route(sanitized_dst) {
-            Err(e) => {
-                info!("Resolve failed for {}, {:?}", destination, e);
-                return Err(zx::Status::ADDRESS_UNREACHABLE);
-            }
-            Ok(resolved_route) => resolved_route,
-        };
+    let ResolvedRoute {
+        device,
+        src_addr,
+        local_delivery_device: _,
+        next_hop,
+        internal_forwarding: _,
+    } = match ctx.api().routes::<A::Version>().resolve_route(sanitized_dst) {
+        Err(e) => {
+            info!("Resolve failed for {}, {:?}", destination, e);
+            return Err(zx::Status::ADDRESS_UNREACHABLE);
+        }
+        Ok(resolved_route) => resolved_route,
+    };
     let (next_hop_addr, next_hop_type) = match next_hop {
         NextHop::RemoteAsNeighbor => {
             (SpecifiedAddr::new(destination), Either::Left(fnet_routes::Resolved::Direct))

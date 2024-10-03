@@ -15,10 +15,10 @@ rustc_binary("bin") {
     "//examples/diagnostics/inspect/codelab/fidl:fuchsia.examples.inspect_rust",
 
     # CODELAB: Include inspect dependency.
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",

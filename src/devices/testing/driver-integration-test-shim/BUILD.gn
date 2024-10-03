@@ -31,7 +31,6 @@ library_headers("driver-integration-test-shim-headers") {
     "//src/storage/fvm:*",
     "//src/storage/fvm/driver/test:*",
     "//src/storage/lib/ramdevice_client/cpp:*",
-    "//zircon/system/ulib/usb-virtual-bus-launcher:*",
   ]
   testonly = true
   headers = [ "lib/driver-integration-test/fixture.h" ]
@@ -42,7 +41,6 @@ library_headers("driver-integration-test-shim-headers") {
     "//sdk/lib/async",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/fit",
     "//src/lib/ddk:ddk-metadata-headers",
@@ -78,7 +76,6 @@ source_set("driver-integration-test-shim") {
     "//src/storage/fvm:*",
     "//src/storage/fvm/driver/test:*",
     "//src/storage/lib/ramdevice_client/cpp:*",
-    "//zircon/system/ulib/usb-virtual-bus-launcher:*",
   ]
   testonly = true
 

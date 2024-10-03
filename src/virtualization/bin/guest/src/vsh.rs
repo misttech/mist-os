@@ -10,12 +10,12 @@ use anyhow::{anyhow, Context, Result};
 use blocking::Unblock;
 use fidl_fuchsia_virtualization::{GuestMarker, HostVsockEndpointMarker};
 use fuchsia_async::{self as fasync, Duration, Timer};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::future::Fuse;
 use futures::{pin_mut, select, AsyncReadExt, AsyncWriteExt, FutureExt};
 use guest_cli::platform::{GuestConsole, PlatformServices, UnbufferedStdio};
 use guest_cli_args::GuestType;
 use vsh_rust_proto::vm_tools::vsh;
+use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_device as fdevice, fidl_fuchsia_hardware_pty as fpty};
 
 // Some guest message helpers

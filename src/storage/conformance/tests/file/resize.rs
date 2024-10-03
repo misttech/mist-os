@@ -4,7 +4,7 @@
 
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn file_resize_with_sufficient_rights() {

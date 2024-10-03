@@ -195,7 +195,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::tree_builder::TreeBuilder;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     const ALPHA_TXT_FILE_NAME: &str = "txt/alpha.txt";
     const CAST_TXT_FILE_NAME: &str = "txt/cast.txt";

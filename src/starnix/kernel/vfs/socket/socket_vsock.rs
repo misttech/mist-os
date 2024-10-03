@@ -311,10 +311,10 @@ mod tests {
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::vfs::EpollFileObject;
-    use fuchsia_zircon as zx;
-    use fuchsia_zircon::HandleBased;
+
     use starnix_uapi::vfs::EpollEvent;
     use syncio::Zxio;
+    use zx::HandleBased;
 
     #[::fuchsia::test]
     async fn test_vsock_socket() {
@@ -442,8 +442,9 @@ mod tests {
             .add(&mut locked, &current_task, &socket, &epoll_object, event)
             .expect("poll_file.add");
 
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
@@ -452,8 +453,9 @@ mod tests {
             socket.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
@@ -465,8 +467,9 @@ mod tests {
             socket.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert!(fds.is_empty());
     }
 }

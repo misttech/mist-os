@@ -11,9 +11,9 @@ use crate::encoding::{
 };
 use crate::handle::HandleDisposition;
 use crate::{epitaph, AsyncChannel, Error, HandleInfo};
-use fuchsia_zircon_status as zx_status;
 use futures::task::{AtomicWaker, Context};
 use std::sync::atomic::{self, AtomicBool};
+use zx_status;
 
 /// A type used from the innards of server implementations.
 #[derive(Debug)]

@@ -13,10 +13,49 @@ use fho::{
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::ServerStatus;
 use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
-use pkg::{PathType, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode};
+use fuchsia_repo::repository::RepositorySpec;
+use pkg::{PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+
+/// PathType is an enum encapulating filesystem and URL based paths.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum PathType {
+    File(PathBuf),
+    Url(String),
+}
+
+impl From<&Path> for PathType {
+    fn from(value: &Path) -> Self {
+        PathType::File(value.into())
+    }
+}
+
+impl From<RepositorySpec> for PathType {
+    fn from(value: RepositorySpec) -> Self {
+        match value {
+            RepositorySpec::FileSystem { metadata_repo_path, .. } => {
+                PathType::File(metadata_repo_path.into())
+            }
+            RepositorySpec::Pm { path, .. } => PathType::File(path.into()),
+            RepositorySpec::Http { metadata_repo_url, .. } => PathType::Url(metadata_repo_url),
+            RepositorySpec::Gcs { metadata_repo_url, .. } => PathType::Url(metadata_repo_url),
+        }
+    }
+}
+
+impl Display for PathType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathType::File(p) => write!(f, "{}", p.display()),
+            PathType::Url(s) => write!(f, "{s}"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -34,10 +73,15 @@ pub struct PkgServerData {
 impl From<PkgServerInfo> for PkgServerData {
     fn from(value: PkgServerInfo) -> Self {
         Self {
-            name: value.name,
+            name: value.name.clone(),
             address: value.address,
-            repo_path: value.repo_path,
-            registration_aliases: value.registration_aliases,
+            repo_path: value.repo_spec().into(),
+            registration_aliases: value
+                .repo_spec()
+                .aliases()
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             registration_storage_type: value.registration_storage_type,
             registration_alias_conflict_mode: value.registration_alias_conflict_mode,
             server_mode: value.server_mode,
@@ -170,10 +214,12 @@ fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use camino::Utf8PathBuf;
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryStorageType};
     use futures::channel::oneshot::channel;
+    use std::collections::BTreeSet;
     use std::net::SocketAddr;
     use std::process;
 
@@ -217,8 +263,10 @@ mod tests {
         let s1 = PkgServerInfo {
             name: instance_name.into(),
             address: addr,
-            repo_path: pkg::PathType::File("/some/repo".into()),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/some/repo"),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
@@ -260,8 +308,10 @@ mod tests {
         let s1 = PkgServerInfo {
             name: instance_name.into(),
             address: addr,
-            repo_path: pkg::PathType::File("/some/repo".into()),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/some/repo"),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
@@ -318,8 +368,10 @@ mod tests {
         let s1 = PkgServerInfo {
             name: instance_name.into(),
             address: addr,
-            repo_path: pkg::PathType::File("/some/repo".into()),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/some/repo"),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
@@ -337,8 +389,10 @@ mod tests {
         let s2 = PkgServerInfo {
             name: "s2".into(),
             address: addr,
-            repo_path: pkg::PathType::File("/some/other/repo".into()),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/some/other/repo"),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             server_mode: pkg::ServerMode::Daemon,
@@ -379,8 +433,10 @@ mod tests {
         let s1 = PkgServerInfo {
             name: instance_name.into(),
             address: addr,
-            repo_path: pkg::PathType::File("/some/repo".into()),
-            registration_aliases: vec![],
+            repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
+                path: Utf8PathBuf::from("/some/repo"),
+                aliases: BTreeSet::new(),
+            },
             registration_storage_type: RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,

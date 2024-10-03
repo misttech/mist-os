@@ -5,8 +5,8 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::RequestStream;
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_zircon::Duration;
 use futures::{TryStream, TryStreamExt};
+use zx::Duration;
 
 /// Represents the status of an expectation over a FIDL request stream.
 pub(crate) enum Status<T> {
@@ -48,7 +48,6 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth::DeviceClass;
     use fidl_fuchsia_bluetooth_sys::{AccessMarker, AccessRequest, AccessRequestStream};
-    use fuchsia_zircon as zx;
 
     // This is a mock handler that does the following for the purposes of the unit tests below:
     // - Return success if Access.SetLocalName is called with the given `expected_name`;

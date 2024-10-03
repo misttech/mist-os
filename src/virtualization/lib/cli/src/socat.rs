@@ -8,7 +8,7 @@ use fidl_fuchsia_virtualization::{
 };
 use futures::TryStreamExt;
 use std::fmt;
-use {fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
+use {guest_cli_args as arguments, zx_status};
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SocatResult {

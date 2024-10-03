@@ -6,7 +6,7 @@ use fidl::HandleBased;
 use fidl_fuchsia_scheduler::{
     RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
 };
-use fuchsia_zircon as zx;
+
 use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
@@ -301,7 +301,7 @@ pub fn set_thread_role(
         role: Some(RoleName { role: role_name.to_string() }),
         ..Default::default()
     };
-    let _ = role_manager.set_role(request, zx::MonotonicTime::INFINITE).map_err(|err| {
+    let _ = role_manager.set_role(request, zx::MonotonicInstant::INFINITE).map_err(|err| {
         log_warn!(?err, "Unable to set thread role.");
         errno!(EINVAL)
     })?;

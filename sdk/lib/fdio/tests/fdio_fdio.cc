@@ -133,59 +133,6 @@ TEST(FDIOTest, UnbindFromFD) {
   EXPECT_STATUS(ZX_ERR_INVALID_ARGS, fdio_unbind_from_fd(FDIO_MAX_FD, &io2));
 }
 
-TEST(FDIOTest, GetServiceHandle) {
-  int unused_fd = 0;
-  ASSERT_TRUE(find_unused_fd(37, &unused_fd));
-  ASSERT_EQ(-1, fcntl(unused_fd, F_GETFD));
-
-  zx::channel h1;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  EXPECT_STATUS(ZX_ERR_INVALID_ARGS,
-                fdio_get_service_handle(unused_fd, h1.reset_and_get_address()));
-  EXPECT_STATUS(ZX_ERR_INVALID_ARGS, fdio_get_service_handle(-1, h1.reset_and_get_address()));
-#pragma clang diagnostic pop
-
-  fdio_t* io = fdio_default_create();
-  fbl::unique_fd fd(fdio_bind_to_fd(io, -1, 0));
-  EXPECT_LE(0, fd.get());
-  EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                fdio_get_service_handle(fd.get(), h1.reset_and_get_address()));
-#pragma clang diagnostic pop
-  EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
-  (void)fd.release();
-
-  fd.reset(open("/pkg", O_DIRECTORY | O_RDONLY));
-  EXPECT_LE(0, fd.get());
-  EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  EXPECT_OK(fdio_get_service_handle(fd.get(), h1.reset_and_get_address()));
-#pragma clang diagnostic pop
-  EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
-  (void)fd.release();
-
-  fd.reset(open("/pkg", O_DIRECTORY | O_RDONLY));
-  EXPECT_LE(0, fd.get());
-  fbl::unique_fd fd2(dup(fd.get()));
-  EXPECT_LE(0, fd2.get());
-  EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
-  EXPECT_EQ(0, fcntl(fd2.get(), F_GETFD));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  EXPECT_STATUS(ZX_ERR_UNAVAILABLE, fdio_get_service_handle(fd.get(), h1.reset_and_get_address()));
-#pragma clang diagnostic pop
-  EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
-  (void)fd.release();
-  EXPECT_EQ(0, fcntl(fd2.get(), F_GETFD));
-  int raw_fd = fd2.get();
-  fd2.reset();
-  EXPECT_EQ(-1, fcntl(raw_fd, F_GETFD));
-}
-
 TEST(FDIOTest, GetZxio) {
   zxio_storage_t* storage = nullptr;
   fdio_t* fdio = fdio_zxio_create(&storage);

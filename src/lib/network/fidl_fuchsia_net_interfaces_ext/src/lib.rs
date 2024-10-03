@@ -22,7 +22,7 @@ use std::num::NonZeroU64;
 use thiserror::Error;
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
-    fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon_types as zx,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, zx_types as zx,
 };
 
 /// Like [`fnet_interfaces::PortClass`], with the inner `device` flattened.
@@ -179,7 +179,7 @@ pub struct Address {
     ///
     /// Its value must be greater than 0. A value of zx.time.INFINITE indicates
     /// that the address will always be valid.
-    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicTime once there is support for custom
+    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicInstant once there is support for custom
     // conversion functions.
     pub valid_until: zx::zx_time_t,
     /// The address's assignment state.

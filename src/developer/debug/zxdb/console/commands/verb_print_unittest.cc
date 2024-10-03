@@ -80,6 +80,28 @@ TEST_F(VerbPrint, TypeOverrides) {
   EXPECT_EQ("More than one type override (-b, -c, -d, -u, -x) specified.", event.output.AsString());
 }
 
+TEST_F(VerbPrint, IntegerFormat) {
+  // Change the default integer format to something non-default.
+  console().ProcessInputLine("set integer-format hex");
+  console().GetOutputEvent();  // Eat output from the set.
+
+  console().ProcessInputLine("print 100");
+  auto event = console().GetOutputEvent();
+  EXPECT_EQ("0x64", event.output.AsString());
+
+  console().ProcessInputLine("set integer-format bin");
+  console().GetOutputEvent();  // Eat output from the set.
+
+  console().ProcessInputLine("print 100");
+  event = console().GetOutputEvent();
+  EXPECT_EQ("0b1100100", event.output.AsString());
+
+  // Options given to the print command should override the setting.
+  console().ProcessInputLine("print -d 100");
+  event = console().GetOutputEvent();
+  EXPECT_EQ("100", event.output.AsString());
+}
+
 // A client end-to-end test for vector register formats.
 TEST_F(VerbPrint, VectorRegisterFormat) {
   // Thread needs to be stopped. We can't use InjectExceptionWithStack because we want the real

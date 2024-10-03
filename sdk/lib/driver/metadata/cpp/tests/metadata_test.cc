@@ -14,6 +14,8 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 namespace fdf_metadata::test {
 
 class MetadataTest : public gtest::TestLoopFixture {
@@ -323,3 +325,5 @@ TEST_F(MetadataTest, FailMetadataTransferWithNoExposeAndNoUse) {
 }
 
 }  // namespace fdf_metadata::test
+
+#endif

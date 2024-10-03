@@ -140,9 +140,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
 
-        self._fuchsia_device_close.register_for_on_device_close(self.close)
+        self._fuchsia_device_close.register_for_on_device_close(self._close)
 
-    def close(self) -> None:
+    def _close(self) -> None:
         """Release handle on client controller.
 
         This needs to be called on test class teardown otherwise the device may
@@ -153,7 +153,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         after this one.
         """
         if self._client_controller:
-            self._cancel_task(
+            self.cancel_task(
                 self._client_controller.client_state_updates_server_task
             )
             self._client_controller = None
@@ -162,28 +162,6 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             self.loop().stop()
             self.loop().run_forever()  # Handle pending tasks
             self.loop().close()
-
-    def _cancel_task(self, task: asyncio.Task[None]) -> None:
-        """Cancel a task then verify it has been cancelled.
-
-        Args:
-            task: The task to cancel
-
-        Raises:
-            RuntimeError: failed cancel verification
-        """
-        if not task.cancel():
-            # Task was already done or cancelled, nothing else to do.
-            return
-
-        # Wait for task to completely cancel.
-        try:
-            self.loop().run_until_complete(task)
-            raise RuntimeError(
-                "Expected cancellation of task to raise CancelledError"
-            )
-        except asyncio.exceptions.CancelledError:
-            pass  # expected
 
     def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
         """Check if WLAN Policy is supported on the DUT.
@@ -262,7 +240,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             HoneydewWlanError: Error from WLAN stack.
         """
         if self._client_controller:
-            self._cancel_task(
+            self.cancel_task(
                 self._client_controller.client_state_updates_server_task
             )
             self._client_controller = None
@@ -543,7 +521,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         # API is designed to only allow a single caller to make ClientController
         # calls which would impact WLAN state. If we lose our handle to the
         # ClientController, some other component on the system could take it.
-        self._cancel_task(
+        self.cancel_task(
             self._client_controller.client_state_updates_server_task
         )
 

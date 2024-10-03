@@ -425,7 +425,7 @@ async fn load_rewrite_manager(
             match err {
                 // Given a fresh /data, it's expected the file doesn't exist.
                 LoadRulesError::FileOpen(fuchsia_fs::node::OpenError::OpenError(
-                    fuchsia_zircon::Status::NOT_FOUND,
+                    zx::Status::NOT_FOUND,
                 )) => {}
                 // Unable to open /data dir proxy.
                 LoadRulesError::DirOpen(_) => {}
@@ -443,7 +443,7 @@ async fn load_rewrite_manager(
             match err {
                 // No static rules are configured for this system version.
                 LoadRulesError::FileOpen(fuchsia_fs::node::OpenError::OpenError(
-                    fuchsia_zircon::Status::NOT_FOUND,
+                    zx::Status::NOT_FOUND,
                 )) => {}
                 // Unable to open /config/data dir proxy.
                 LoadRulesError::DirOpen(_) => {}

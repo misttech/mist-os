@@ -11,7 +11,7 @@ use moniker::ExtendedMoniker;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
-    fidl_fuchsia_logger as flogger, fuchsia_zircon as zx,
+    fidl_fuchsia_logger as flogger, zx,
 };
 
 /// Event types that contain singleton data. When these events are cloned, their singleton data
@@ -38,7 +38,7 @@ pub struct Event {
     pub payload: EventPayload,
     // TODO(https://fxbug.dev/357825314): this should be boot time ideally, but the CF API returns
     // Monotonic atm.
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
 }
 
 impl Event {
@@ -126,7 +126,7 @@ impl TryFrom<fcomponent::Event> for Event {
                                 ServerEnd::<flogger::LogSinkMarker>::new(capability)
                                     .into_stream()?;
                             Ok(Event {
-                                timestamp: zx::MonotonicTime::from_nanos(event.header.timestamp),
+                                timestamp: zx::MonotonicInstant::from_nanos(event.header.timestamp),
                                 payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                                     component: Arc::new(identity),
                                     request_stream,
@@ -140,7 +140,7 @@ impl TryFrom<fcomponent::Event> for Event {
                                 ServerEnd::<finspect::InspectSinkMarker>::new(capability)
                                     .into_stream()?;
                             Ok(Event {
-                                timestamp: zx::MonotonicTime::from_nanos(event.header.timestamp),
+                                timestamp: zx::MonotonicInstant::from_nanos(event.header.timestamp),
                                 payload: EventPayload::InspectSinkRequested(
                                     InspectSinkRequestedPayload {
                                         component: Arc::new(identity),
@@ -171,10 +171,7 @@ mod tests {
     use crate::logs::testing::create_log_sink_requested_event;
     use assert_matches::assert_matches;
     use fidl_fuchsia_logger::LogSinkMarker;
-    use {
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
-        fuchsia_zircon as zx,
-    };
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect, zx};
 
     fn create_inspect_sink_requested_event(
         target_moniker: String,
@@ -186,7 +183,7 @@ mod tests {
                 event_type: Some(fcomponent::EventType::CapabilityRequested),
                 moniker: Some(target_moniker),
                 component_url: Some(target_url),
-                timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+                timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
                 ..Default::default()
             }),
             payload: Some(fcomponent::EventPayload::CapabilityRequested(

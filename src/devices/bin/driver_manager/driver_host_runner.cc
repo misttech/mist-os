@@ -162,12 +162,13 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
 
 void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
                                        zx::channel bootstrap_receiver,
+                                       fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                                        StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
   StartDriverHostComponent(
-      name, kUrl,
+      name, kUrl, std::move(exposed_dir),
       [this, name, loader, bootstrap_receiver = std::move(bootstrap_receiver),
        callback = std::move(callback)](
           zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
@@ -266,6 +267,7 @@ void DriverHostRunner::LoadDriverHost(
 }
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,
+                                                fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                                                 StartComponentCallback callback) {
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
@@ -290,11 +292,24 @@ void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::s
       .handle = std::move(token),
       .id = kTokenId,
   };
+  auto open_callback = [moniker = std::string(moniker)](
+                           fidl::WireUnownedResult<fcomponent::Realm::OpenExposedDir>& result) {
+    if (!result.ok()) {
+      LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %s",
+           std::string(moniker).c_str(), result.FormatDescription().data());
+      return;
+    }
+    if (result->is_error()) {
+      LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %s",
+           std::string(moniker).c_str(), GetErrorString(result->error_value()));
+    }
+  };
 
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena).numbered_handles(
       fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
   auto create_callback =
-      [this, child_moniker = std::string(moniker.data()), koid = koid.value()](
+      [this, child_moniker = std::string(moniker.data()), koid = koid.value(),
+       exposed_dir = std::move(exposed_dir), open_callback = std::move(open_callback)](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         bool is_error = false;
         if (!result.ok()) {
@@ -314,6 +329,12 @@ void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::s
                  result.status_string());
           }
         }
+        fdecl::wire::ChildRef child_ref{
+            .name = fidl::StringView::FromExternal(child_moniker),
+            .collection = "driver-hosts",
+        };
+        realm_->OpenExposedDir(child_ref, std::move(exposed_dir))
+            .ThenExactlyOnce(std::move(open_callback));
       };
   realm_
       ->CreateChild(

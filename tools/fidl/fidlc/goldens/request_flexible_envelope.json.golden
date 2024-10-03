@@ -45,6 +45,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -60,6 +61,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -90,6 +92,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -105,6 +108,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -143,6 +147,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/FlexibleFoo",
             "nullable": false,
             "type_shape_v2": {
@@ -199,6 +204,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/StrictFoo",
             "nullable": false,
             "type_shape_v2": {
@@ -255,6 +261,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/StrictFoo",
             "nullable": false,
             "type_shape_v2": {
@@ -311,6 +318,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/FlexibleFoo",
             "nullable": false,
             "type_shape_v2": {
@@ -371,6 +379,7 @@
           "name": "s",
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -395,6 +404,7 @@
           "name": "i",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -446,6 +456,7 @@
           "name": "s",
           "type": {
             "kind": "string",
+            "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 16,
@@ -470,6 +481,7 @@
           "name": "i",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,

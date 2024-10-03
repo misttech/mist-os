@@ -8,7 +8,7 @@
 //! be implemented properly in this crate.
 
 use crate::prelude_internal::*;
-use fuchsia_zircon_status::Status as ZxStatus;
+use zx_status::Status as ZxStatus;
 
 impl From<ot::Error> for ZxStatus {
     fn from(err: ot::Error) -> Self {
@@ -19,7 +19,7 @@ impl From<ot::Error> for ZxStatus {
             ot::Error::NoBufs => ZxStatus::NO_MEMORY,
             ot::Error::NotFound => ZxStatus::NOT_FOUND,
             other => {
-                warn!("Unable to convert {:?} to fuchsia_zircon::Status, will use INTERNAL", other);
+                warn!("Unable to convert {:?} to zx::Status, will use INTERNAL", other);
                 ZxStatus::INTERNAL
             }
         }

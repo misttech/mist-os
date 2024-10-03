@@ -4,6 +4,7 @@
 
 //! Tests for the NAT hooks.
 
+use std::marker::PhantomData;
 use std::num::NonZeroU16;
 use std::ops::RangeInclusive;
 
@@ -16,21 +17,23 @@ use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 use crate::ip_hooks::{
-    Addrs, ExpectedConnectivity, OriginalDestination, Ports, Realms, SockAddrs, SocketType as _,
-    Subnets, TestIpExt, TestNet, TestRealm, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
+    Addrs, ExpectedConnectivity, OriginalDestination, Realms, SockAddrs, SocketType, TcpSocket,
+    TestIpExt, TestNet, TestRealm, UdpSocket, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
 };
-use crate::matchers::{Matcher, Tcp, Udp};
 
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
 // correctly.
 #[netstack_test]
 #[variant(I, Ip)]
-#[test_case(Tcp)]
-#[test_case(Udp)]
-async fn redirect_ingress_no_assigned_address<I: TestIpExt, M: Matcher>(name: &str, matcher: M) {
+#[test_case(PhantomData::<TcpSocket>)]
+#[test_case(PhantomData::<UdpSocket>)]
+async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
+    name: &str,
+    _socket_type: PhantomData<S>,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
+    let name = format!("{name}_{}", std::any::type_name::<S>().to_snake_case());
 
     let mut net = TestNet::new::<I>(
         &sandbox,
@@ -47,16 +50,16 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, M: Matcher>(name: &s
     // This has the side effect of completing neighbor resolution on the client
     // for the server, so that we can remove the address assigned to the server
     // and still expect traffic from the client to reach it.
-    let _handles = net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<I, S>(ExpectedConnectivity::TwoWay).await;
 
     // Remove the server's assigned address. Even though we have a Redirect NAT
     // rule installed, the traffic from the client should not reach the server
     // because Redirect drops the packet when there is no address assigned to
     // the incoming interface.
     let _handles = net
-        .run_test_with::<I, M::SocketType, _>(
+        .run_test_with::<I, S, _>(
             ExpectedConnectivity::None,
-            |TestNet { client: _, server }, addrs, ()| {
+            |TestNet { client: _, server }, _addrs, ()| {
                 Box::pin(async move {
                     let removed = server
                         .interface
@@ -66,11 +69,9 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, M: Matcher>(name: &s
                     assert!(removed);
 
                     server
-                        .install_nat_rule_for_incoming_traffic::<I, _>(
+                        .install_nat_rule::<I>(
                             LOW_RULE_PRIORITY,
-                            &matcher,
-                            server.incoming_subnets::<I>(),
-                            addrs.client_ports(),
+                            S::matcher::<I>(),
                             Action::Redirect { dst_port: None },
                         )
                         .await;
@@ -94,14 +95,18 @@ fn different_ephemeral_port(port: u16) -> u16 {
 // correctly.
 #[netstack_test]
 #[variant(I, Ip)]
-#[test_case(Tcp, false; "tcp")]
-#[test_case(Udp, false; "udp")]
-#[test_case(Tcp, true; "tcp to local port")]
-#[test_case(Udp, true; "udp to local port")]
-async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, change_dst_port: bool) {
+#[test_case(PhantomData::<TcpSocket>, false; "tcp")]
+#[test_case(PhantomData::<UdpSocket>, false; "udp")]
+#[test_case(PhantomData::<TcpSocket>, true; "tcp to local port")]
+#[test_case(PhantomData::<UdpSocket>, true; "udp to local port")]
+async fn redirect_ingress<I: TestIpExt, S: SocketType>(
+    name: &str,
+    _socket_type: PhantomData<S>,
+    change_dst_port: bool,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
+    let name = format!("{name}_{}", std::any::type_name::<S>().to_snake_case());
 
     let mut net = TestNet::new::<I>(
         &sandbox,
@@ -116,16 +121,14 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
     // incoming interface. This should have no effect on connectivity because
     // the incoming traffic is already destined to this address.
     let _handles = net
-        .run_test_with::<I, M::SocketType, _>(
+        .run_test_with::<I, S, _>(
             ExpectedConnectivity::TwoWay,
-            |TestNet { client: _, server }, addrs, ()| {
+            |TestNet { client: _, server }, _addrs, ()| {
                 Box::pin(async move {
                     server
-                        .install_nat_rule_for_incoming_traffic::<I, _>(
+                        .install_nat_rule::<I>(
                             LOW_RULE_PRIORITY,
-                            &matcher,
-                            server.incoming_subnets::<I>(),
-                            addrs.client_ports(),
+                            S::matcher::<I>(),
                             Action::Redirect { dst_port: None },
                         )
                         .await;
@@ -142,7 +145,7 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
     // This traffic should be redirected to the server's assigned address (and
     // optionally the local port) and received on the server socket, and the
     // traffic should be NATed such that this is transparent to the client.
-    let (sockets, sock_addrs) = M::SocketType::bind_sockets(net.realms(), net.addrs()).await;
+    let (sockets, sock_addrs) = S::bind_sockets(net.realms(), net.addrs()).await;
 
     // Replace the existing subnet route on the client's interface with a
     // default route through the server to ensure the traffic will be routed
@@ -169,22 +172,16 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
     };
     let server_port = NonZeroU16::new(sock_addrs.server.port()).unwrap();
     net.server
-        .install_nat_rule_for_incoming_traffic::<I, _>(
+        .install_nat_rule::<I>(
             MEDIUM_RULE_PRIORITY,
-            &matcher,
-            Subnets {
-                src: I::CLIENT_ADDR_WITH_PREFIX,
-                dst: I::OTHER_ADDR_WITH_PREFIX,
-                other: I::OTHER_SUBNET,
-            },
-            Ports { src: sock_addrs.client.port(), dst: original_dst.port() },
+            S::matcher::<I>(),
             Action::Redirect {
                 dst_port: change_dst_port.then_some(PortRange(server_port..=server_port)),
             },
         )
         .await;
 
-    let _handles = M::SocketType::run_test::<I>(
+    let _handles = S::run_test::<I>(
         net.realms(),
         sockets,
         SockAddrs { client: sock_addrs.client, server: original_dst },
@@ -204,24 +201,25 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
 // correctly.
 #[netstack_test]
 #[variant(I, Ip)]
-#[test_case(Tcp, false; "tcp")]
-#[test_case(Udp, false; "udp")]
-#[test_case(Tcp, true; "tcp to local port")]
-#[test_case(Udp, true; "udp to local port")]
-async fn redirect_local_egress<I: TestIpExt, M: Matcher>(
+#[test_case(PhantomData::<TcpSocket>, false; "tcp")]
+#[test_case(PhantomData::<UdpSocket>, false; "udp")]
+#[test_case(PhantomData::<TcpSocket>, true; "tcp to local port")]
+#[test_case(PhantomData::<UdpSocket>, true; "udp to local port")]
+async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
     name: &str,
-    matcher: M,
+    _socket_type: PhantomData<S>,
     change_dst_port: bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
+    let name = format!("{name}_{}", std::any::type_name::<S>().to_snake_case());
 
     let mut netstack = TestRealm::new::<I>(
         &sandbox,
         &network,
         None, /* ip_hook */
         Some(NatHook::LocalEgress),
-        name.to_owned(),
+        name,
         I::CLIENT_ADDR_WITH_PREFIX,
         I::OTHER_ADDR_WITH_PREFIX,
     )
@@ -231,7 +229,7 @@ async fn redirect_local_egress<I: TestIpExt, M: Matcher>(
     // interface, and a server socket bound to the loopback address. Send from
     // the client to a different, routable address, and optionally to a
     // different port than the server socket is bound to.
-    let (sockets, sock_addrs) = M::SocketType::bind_sockets(
+    let (sockets, sock_addrs) = S::bind_sockets(
         Realms { client: &netstack.realm, server: &netstack.realm },
         Addrs {
             client: I::CLIENT_ADDR_WITH_PREFIX.addr,
@@ -257,18 +255,16 @@ async fn redirect_local_egress<I: TestIpExt, M: Matcher>(
     };
     let server_port = NonZeroU16::new(sock_addrs.server.port()).unwrap();
     netstack
-        .install_nat_rule_for_outgoing_traffic::<I, _>(
+        .install_nat_rule::<I>(
             LOW_RULE_PRIORITY,
-            &matcher,
-            netstack.outgoing_subnets::<I>(),
-            Ports { src: sock_addrs.client.port(), dst: original_dst.port() },
+            S::matcher::<I>(),
             Action::Redirect {
                 dst_port: change_dst_port.then_some(PortRange(server_port..=server_port)),
             },
         )
         .await;
 
-    let _handles = M::SocketType::run_test::<I>(
+    let _handles = S::run_test::<I>(
         Realms { client: &netstack.realm, server: &netstack.realm },
         sockets,
         SockAddrs { client: sock_addrs.client, server: original_dst },

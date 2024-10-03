@@ -26,13 +26,13 @@ use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
 use fuchsia_async::{Task, Time, Timer};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fidl_fuchsia_settings as fsettings, fuchsia_zircon as zx};
+use zx::Duration;
+use {fidl_fuchsia_settings as fsettings, zx};
 
 /// The value range reserved for the modifier key meanings.  See the documentation for
 /// `fuchsia.ui.input3/NonPrintableKey` for details.
@@ -104,7 +104,7 @@ fn repeatability(key_meaning: Option<KeyMeaning>) -> Repeatability {
 #[derive(Debug, Clone)]
 enum AnyEvent {
     // A keyboard input event.
-    Keyboard(KeyboardEvent, InputDeviceDescriptor, zx::MonotonicTime, Handled),
+    Keyboard(KeyboardEvent, InputDeviceDescriptor, zx::MonotonicInstant, Handled),
     // An input event other than keyboard.
     NonKeyboard(InputEvent),
     // A timer event.
@@ -474,7 +474,7 @@ mod tests {
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fuchsia_async::TestExecutor;
-    use fuchsia_zircon as zx;
+
     use futures::Future;
     use pretty_assertions::assert_eq;
     use std::pin::pin;
@@ -498,7 +498,7 @@ mod tests {
             key,
             event_type,
             /*modifiers=*/ None,
-            /*event_time*/ zx::MonotonicTime::ZERO,
+            /*event_time*/ zx::MonotonicInstant::ZERO,
             &InputDeviceDescriptor::Fake,
             /*keymap=*/ None,
             key_meaning,
@@ -543,7 +543,7 @@ mod tests {
                     InputEvent {
                         device_event,
                         device_descriptor,
-                        event_time: zx::MonotonicTime::ZERO,
+                        event_time: zx::MonotonicInstant::ZERO,
                         handled,
                         trace_id: None,
                     }

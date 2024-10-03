@@ -109,11 +109,11 @@ test("usb-cdc-acm-integration") {
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher",
     "//src/lib/ddk",
     "//src/ui/input/lib/hid",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/usb-virtual-bus-launcher",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

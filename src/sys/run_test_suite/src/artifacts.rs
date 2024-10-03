@@ -228,8 +228,7 @@ async fn copy_file_to_writer<T: Write>(
     }
     let mut len = 0;
     loop {
-        let buf =
-            vector.pop_front().unwrap().await?.map_err(fuchsia_zircon_status::Status::from_raw)?;
+        let buf = vector.pop_front().unwrap().await?.map_err(zx_status::Status::from_raw)?;
         if buf.is_empty() {
             break;
         }
@@ -285,7 +284,7 @@ mod file_tests {
     use vfs::pseudo_directory;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-    async fn serve_content_over_socket(content: Vec<u8>, socket: fuchsia_zircon::Socket) {
+    async fn serve_content_over_socket(content: Vec<u8>, socket: zx::Socket) {
         let mut socket = fidl::AsyncSocket::from_socket(socket);
         socket.write_all(content.as_slice()).await.expect("Cannot serve content over socket");
     }
@@ -296,7 +295,7 @@ mod file_tests {
     ) {
         let mut served_files = vec![];
         expected_files.iter().for_each(|(path, content)| {
-            let (client, server) = fuchsia_zircon::Socket::create_stream();
+            let (client, server) = zx::Socket::create_stream();
             fasync::Task::spawn(serve_content_over_socket(content.clone(), server)).detach();
             served_files.push(ftest_manager::DebugData {
                 name: Some(path.display().to_string()),

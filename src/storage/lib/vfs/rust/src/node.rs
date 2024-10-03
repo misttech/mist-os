@@ -15,11 +15,11 @@ use crate::{node, ObjectRequestRef, ToObjectRequest};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::stream::StreamExt;
 use libc::{S_IRUSR, S_IWUSR};
 use std::future::{ready, Future};
 use std::sync::Arc;
+use zx_status::Status;
 
 /// POSIX emulation layer access attributes for all services created with service().
 #[cfg(not(target_os = "macos"))]

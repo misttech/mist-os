@@ -9,13 +9,13 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
     FileObject, FileOps,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::pid_t;
 use starnix_uapi::vfs::FdEvents;
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef};
 
 pub struct PidFdFileObject {
     // In principle, we need some way to designate a Task that is durable for
@@ -103,7 +103,7 @@ impl FileOps for PidFdFileObject {
     ) -> Result<FdEvents, Errno> {
         match self
             .terminated_event
-            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicTime::ZERO)
+            .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::ZERO)
         {
             Err(zx::Status::TIMED_OUT) => Ok(FdEvents::empty()),
             Ok(zx::Signals::EVENTPAIR_PEER_CLOSED) => Ok(FdEvents::POLLIN),

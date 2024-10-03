@@ -16,7 +16,7 @@ use netstack_testing_macros::netstack_test;
 use routes_common::TestSetup;
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
 };
 
 fn rule_set_err_stream<I: FidlRuleAdminIpExt>(
@@ -210,9 +210,7 @@ async fn bad_route_table_authentication<
         fnet_routes_ext::rules::authenticate_for_route_table::<I>(
             &rule_set,
             table_id + 1,
-            token
-                .duplicate_handle(fuchsia_zircon::Rights::SAME_RIGHTS)
-                .expect("failed to duplicate token")
+            token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed to duplicate token")
         )
         .await,
         Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))

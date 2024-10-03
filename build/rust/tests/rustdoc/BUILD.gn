@@ -4,11 +4,14 @@
 group("rustdoc") {
   testonly = true
   deps = [
-    "//build/rust/tests/rustdoc/cargo-transitive",
-    "//build/rust/tests/rustdoc/cargo-transitive-no-index",
-    "//build/rust/tests/rustdoc/single-crate-baseline",
-    "//build/rust/tests/rustdoc/single-crate-no-index",
-    "//build/rust/tests/rustdoc/working-dir-examples",
-    "//build/rust/tests/rustdoc/write-docs-somewhere-else",
+    "//build/rust/tests/rustdoc/cargo_transitive",
+    "//build/rust/tests/rustdoc/cargo_transitive_no_index",
+    "//build/rust/tests/rustdoc/proc_macro_link_separate",
+    "//build/rust/tests/rustdoc/proc_macro_use",
+    "//build/rust/tests/rustdoc/single_crate_baseline",
+    "//build/rust/tests/rustdoc/single_crate_constant",
+    "//build/rust/tests/rustdoc/single_crate_no_index",
+    "//build/rust/tests/rustdoc/working_dir_examples",
+    "//build/rust/tests/rustdoc/write_docs_somewhere_else",
   ]
 }

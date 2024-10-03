@@ -160,7 +160,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use fuchsia_zircon as zx;
 
     // Settings are arbitrary; we just need to construct an instance.
     const DUMMY_ENCODER_SETTINGS: EncoderSettings = EncoderSettings::Sbc(SbcEncoderSettings {

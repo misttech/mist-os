@@ -316,6 +316,11 @@
             to: "#agis",
         },
         {
+            protocol: [ "fuchsia.boot.Items" ],
+            from: "parent",
+            to: "#hwinfo",
+        },
+        {
             directory: "config-data",
             from: "parent",
             to: "#font_provider",

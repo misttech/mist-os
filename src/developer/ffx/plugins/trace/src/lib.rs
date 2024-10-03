@@ -388,7 +388,6 @@ pub fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> R
                     value: RawArgValue::String(StringRef::Inline(method)),
                 };
                 new_args.push(symbolized_arg);
-                continue;
             }
         }
         new_args.push(arg.clone());
@@ -535,7 +534,9 @@ pub async fn trace(
                     &trace_config,
                 )
                 .await?;
-            let target = handle_recording_result(&context, res, &output).await?;
+            let Ok(target) = res else {
+                ffx_bail!("{}", handle_recording_error(&context, res.unwrap_err(), &output).await);
+            };
             writer.print(format!(
                 "Tracing started successfully on \"{}\" for categories: [ {} ].\nWriting to {}",
                 target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
@@ -672,40 +673,36 @@ async fn stop_tracing(
     verbose: bool,
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
-    let result = match res {
-        Ok((target, terminate_result)) => {
+    let (target, output_file) = match res {
+        Ok((target, output_file, terminate_result)) => {
             for stat in terminate_result.provider_stats.unwrap_or_default() {
                 for stat_output in stats_to_print(stat, verbose) {
                     writer.line(stat_output)?;
                 }
             }
-            Ok(target)
+            (target, output_file)
         }
-        Err(e) => Err(e),
+        Err(e) => ffx_bail!("{}", handle_recording_error(context, e, &output).await),
     };
-    let target = handle_recording_result(context, result, &output).await?;
     // TODO(awdavies): Make a clickable link that auto-uploads the trace file if possible.
     writer.line(format!(
         "Tracing stopped successfully on \"{}\".\nResults written to {}",
         target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
-        output
+        output_file
     ))?;
     writer.line("Upload to https://ui.perfetto.dev/#!/ to view.")?;
     Ok(())
 }
 
-async fn handle_recording_result(
+async fn handle_recording_error(
     context: &EnvironmentContext,
-    res: Result<ffx::TargetInfo, RecordingError>,
+    err: RecordingError,
     output: &String,
-) -> Result<ffx::TargetInfo> {
+) -> String {
     let target_spec = get_target_specifier(context).await.unwrap_or(None);
-    match res {
-        Ok(t) => Ok(t),
-        Err(e) => match e {
-            RecordingError::TargetProxyOpen => {
-                ffx_bail!(
-                    "Error: ffx trace was unable to connect to trace_manager on the device.
+    match err {
+        RecordingError::TargetProxyOpen => {
+            "Error: ffx trace was unable to connect to trace_manager on the device.
 
 Note that tracing is available for eng and core products, but not user or userdebug.
 To fix general connection issues, you could also try:
@@ -714,57 +711,53 @@ $ ffx doctor
 
 For a tutorial on getting started with tracing, visit:
 https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
-                );
-            }
-            RecordingError::RecordingAlreadyStarted => {
-                // TODO(85098): Also return file info (which output file is being written to).
-                ffx_bail!(
-                    "Trace already started for target {}",
-                    target_spec.unwrap_or("".to_owned())
-                );
-            }
-            RecordingError::DuplicateTraceFile => {
-                // TODO(85098): Also return target info.
-                ffx_bail!("Trace already running for file {}", output);
-            }
-            RecordingError::RecordingStart => {
-                let log_file: String = context.get("log.dir")?;
-                ffx_bail!(
-                    "Error starting Fuchsia trace. See {}/ffx.daemon.log\n
+                .to_owned()
+        }
+        RecordingError::RecordingAlreadyStarted => {
+            // TODO(85098): Also return file info (which output file is being written to).
+            format!("Trace already started for target {}", target_spec.unwrap_or("".to_owned()))
+        }
+        RecordingError::DuplicateTraceFile => {
+            // TODO(85098): Also return target info.
+            format!("Trace already running for file {}", output)
+        }
+        RecordingError::RecordingStart => {
+            let log_file: String = context.get("log.dir").unwrap();
+            format!(
+                "Error starting Fuchsia trace. See {}/ffx.daemon.log\n
 Search for lines tagged with `ffx_daemon_service_tracing`. A common issue is a
 peer closed error from `fuchsia.tracing.controller.Controller`. If this is the
 case either tracing is not supported in the product configuration or the tracing
 package is missing from the device's system image.",
-                    log_file
-                );
-            }
-            RecordingError::RecordingStop => {
-                let log_file: String = context.get("log.dir")?;
-                ffx_bail!(
-                    "Error stopping Fuchsia trace. See {}/ffx.daemon.log\n
+                log_file
+            )
+        }
+        RecordingError::RecordingStop => {
+            let log_file: String = context.get("log.dir").unwrap();
+            format!(
+                "Error stopping Fuchsia trace. See {}/ffx.daemon.log\n
 Search for lines tagged with `ffx_daemon_service_tracing`. A common issue is a
 peer closed error from `fuchsia.tracing.controller.Controller`. If this is the
 case either tracing is not supported in the product configuration or the tracing
 package is missing from the device's system image.",
-                    log_file
-                );
-            }
-            RecordingError::NoSuchTraceFile => {
-                ffx_bail!("Could not stop trace. No active traces for {}.", output);
-            }
-            RecordingError::NoSuchTarget => {
-                ffx_bail!(
-                    "The string '{}' didn't match a trace output file, or any valid targets.",
-                    target_spec.as_deref().unwrap_or("")
-                );
-            }
-            RecordingError::DisconnectedTarget => {
-                ffx_bail!(
-                    "The string '{}' didn't match a valid target connected to the ffx daemon.",
-                    target_spec.as_deref().unwrap_or("")
-                );
-            }
-        },
+                log_file
+            )
+        }
+        RecordingError::NoSuchTraceFile => {
+            format!("Could not stop trace. No active traces for {}.", output)
+        }
+        RecordingError::NoSuchTarget => {
+            format!(
+                "The string '{}' didn't match a trace output file, or any valid targets.",
+                target_spec.as_deref().unwrap_or("")
+            )
+        }
+        RecordingError::DisconnectedTarget => {
+            format!(
+                "The string '{}' didn't match a valid target connected to the ffx daemon.",
+                target_spec.as_deref().unwrap_or("")
+            )
+        }
     }
 }
 
@@ -894,9 +887,10 @@ mod tests {
                     ..Default::default()
                 }))
                 .expect("responder err"),
-            ffx::TracingRequest::StopRecording { responder, .. } => responder
+            ffx::TracingRequest::StopRecording { responder, name, .. } => responder
                 .send(Ok((
                     &ffx::TargetInfo { nodename: Some("foo".to_owned()), ..Default::default() },
+                    &if name.is_empty() { "foo".to_owned() } else { name },
                     &generate_terminate_result(),
                 )))
                 .expect("responder err"),
@@ -1022,7 +1016,7 @@ mod tests {
         trace(ctx, proxy, controller, writer, cmd).await.unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_categories() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1038,7 +1032,7 @@ mod tests {
         assert_eq!(want, output);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_symbolize_success() {
         let env = ffx_config::test_init().await.unwrap();
         let fake_ir_json = json!({
@@ -1081,7 +1075,7 @@ mod tests {
         assert!(output.contains(want));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_symbolize_fail() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1106,7 +1100,7 @@ mod tests {
         assert!(output.contains(want));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_categories_machine() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1128,7 +1122,7 @@ mod tests {
         assert_eq!(want, output.trim_end());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_categories_peer_closed() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1142,7 +1136,7 @@ mod tests {
         assert!(test_buffers.into_stdout_str().is_empty());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_providers() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1160,7 +1154,7 @@ mod tests {
         assert_eq!(want, output);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_providers_peer_closed() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1174,7 +1168,7 @@ mod tests {
         assert!(test_buffers.into_stdout_str().is_empty());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_providers_machine() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1190,7 +1184,7 @@ mod tests {
         assert_eq!(want, output.trim_end());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1234,7 +1228,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_with_long_path() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1278,7 +1272,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_status() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1305,7 +1299,7 @@ Current tracing status:
         assert_eq!(want, output);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1327,7 +1321,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_with_long_path() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1349,7 +1343,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_verbose() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1393,7 +1387,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stop_verbose() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1422,7 +1416,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_with_duration() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1451,7 +1445,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_with_duration_foreground() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1484,7 +1478,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_start_foreground() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1517,7 +1511,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_large_buffer() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1550,7 +1544,7 @@ Current tracing status:
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_category_group() {
         let env = ffx_config::test_init().await.unwrap();
         let birds = vec!["chickens", "bald_eagle", "blue-jay", "hawk*", "goose:gosling"];
@@ -1563,7 +1557,7 @@ Current tracing status:
         assert_eq!(birds, get_category_group(&env.context, "birds").await.unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_category_group_names() {
         let env = ffx_config::test_init().await.unwrap();
         let birds = vec!["chickens", "ducks"];
@@ -1597,7 +1591,7 @@ Current tracing status:
             .contains(&"*invalid".to_owned()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_category_group_not_found() {
         let env = ffx_config::test_init().await.unwrap();
         let err = get_category_group(&env.context, "not_found").await.unwrap_err();
@@ -1611,7 +1605,7 @@ Current tracing status:
     const INVALID_CATEGORIES: &[&str] =
         &["chic*kens", "*turkeys", "golden eagle", "ha,wk*", "goose:gosl\"ing"];
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_category_group_invalid_category() {
         let env = ffx_config::test_init().await.unwrap();
         for invalid_category in INVALID_CATEGORIES {
@@ -1631,7 +1625,7 @@ Current tracing status:
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_expand_categories() {
         let env = ffx_config::test_init().await.unwrap();
         let birds = vec!["chickens", "bald_eagle", "hawk*", "goose:gosling", "blue-jay"];
@@ -1658,7 +1652,7 @@ Current tracing status:
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_expand_categories_invalid() {
         let env = ffx_config::test_init().await.unwrap();
         for invalid_category in INVALID_CATEGORIES {
@@ -1674,7 +1668,7 @@ Current tracing status:
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_curated_category_groups_valid() {
         let env = ffx_config::test_init().await.unwrap();
 
@@ -1770,5 +1764,60 @@ Current tracing status:
         expected_output = vec![];
         actual_output = stats_to_print(stats.clone(), false);
         assert_eq!(expected_output, actual_output);
+    }
+
+    #[fuchsia::test]
+    async fn test_handle_recording_error() {
+        let env = ffx_config::test_init().await.unwrap();
+        let context = &env.context;
+        let output_file = "foo_bar_bazzle_wazzle.fxt";
+        let log_dir = "important_log_file.log";
+        let target = "fuchsia-device";
+        context
+            .query("log.dir")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(log_dir.into())
+            .await
+            .unwrap();
+        context
+            .query(ffx_config::keys::TARGET_DEFAULT_KEY)
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(target.into())
+            .await
+            .unwrap();
+
+        struct Test {
+            error: RecordingError,
+            matches: Vec<&'static str>,
+        }
+
+        // Avoid being overly prescriptive about the actual contents of the errors. Just make sure
+        // the basics are included and the thing we care about is inside.
+        use RecordingError::*;
+        let tests = vec![
+            Test { error: TargetProxyOpen, matches: vec!["unable to connect", "ffx doctor"] },
+            Test { error: RecordingAlreadyStarted, matches: vec!["already", target] },
+            Test { error: DuplicateTraceFile, matches: vec!["already", output_file] },
+            Test { error: RecordingStart, matches: vec![log_dir, "starting"] },
+            Test { error: RecordingStop, matches: vec![log_dir, "stopping"] },
+            Test { error: NoSuchTraceFile, matches: vec!["stop trace", output_file] },
+            Test { error: NoSuchTarget, matches: vec![target] },
+            Test { error: DisconnectedTarget, matches: vec![target] },
+        ];
+
+        for test in tests.into_iter() {
+            let error_string = format!("{:?}", test.error);
+            let result =
+                handle_recording_error(&context, test.error, &output_file.to_owned()).await;
+            for matching_string in test.matches.into_iter() {
+                assert!(
+                    result.contains(matching_string),
+                    "Unable to find string '{}' when handling error '{}'. Error string: \"{}\"",
+                    matching_string,
+                    error_string,
+                    result
+                );
+            }
+        }
     }
 }

@@ -10,7 +10,7 @@ use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
 use fuchsia_fatfs::FatFs;
 use tracing::info;
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 const MICROSOFT_BASIC_DATA_GUID: [u8; 16] = [
     0xa2, 0xa0, 0xd0, 0xeb, 0xe5, 0xb9, 0x33, 0x44, 0x87, 0xc0, 0x68, 0xb6, 0xb7, 0x26, 0x99, 0xc7,

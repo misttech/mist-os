@@ -7,8 +7,8 @@ use super::metrics::Metrics;
 use super::PUPPET_MONIKER;
 use anyhow::{format_err, Error};
 use fuchsia_component::client as fclient;
-use fuchsia_zircon::{self as zx, Vmo};
 use serde::Serialize;
+use zx::{self as zx, Vmo};
 use {fidl_diagnostics_validate as validate, fidl_fuchsia_inspect as fidl_inspect};
 
 pub const VMO_SIZE: u64 = 4096;
@@ -206,10 +206,10 @@ pub(crate) mod tests {
     };
     use fuchsia_async as fasync;
     use fuchsia_inspect::{Inspector, InspectorConfig, IntProperty, Node};
-    use fuchsia_zircon::HandleBased;
     use futures::prelude::*;
     use std::collections::HashMap;
     use tracing::info;
+    use zx::HandleBased;
 
     #[fuchsia::test]
     async fn test_fidl_loopback() -> Result<(), Error> {

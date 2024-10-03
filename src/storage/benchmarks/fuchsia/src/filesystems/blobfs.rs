@@ -9,7 +9,7 @@ use std::path::Path;
 use storage_benchmarks::{
     BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Config object for starting Blobfs instances.
 #[derive(Clone)]

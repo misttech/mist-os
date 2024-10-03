@@ -30,7 +30,7 @@
 use anyhow::{format_err, Error};
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_sync::{MappedRwLockWriteGuard, RwLock, RwLockWriteGuard};
-use fuchsia_zircon as zx;
+
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use slab::Slab;

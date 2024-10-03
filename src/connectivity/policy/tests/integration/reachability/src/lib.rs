@@ -8,7 +8,7 @@
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_reachability as fnet_reachability,
-    fidl_fuchsia_testing as ftesting, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_testing as ftesting, fuchsia_async as fasync, zx,
 };
 
 use assert_matches::assert_matches;

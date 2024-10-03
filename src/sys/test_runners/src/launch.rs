@@ -11,7 +11,7 @@ use namespace::Namespace;
 use runtime::{HandleInfo, HandleType};
 use thiserror::Error;
 use zx::{AsHandleRef, HandleBased, Process, Rights, Task};
-use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime, fuchsia_zircon as zx};
+use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime, zx};
 
 /// Error encountered while launching a component.
 #[derive(Debug, Error)]
@@ -206,7 +206,7 @@ mod tests {
     use futures::prelude::*;
     use {
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
+        zx,
     };
 
     #[test]

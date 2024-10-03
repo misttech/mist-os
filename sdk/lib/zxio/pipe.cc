@@ -16,7 +16,7 @@
 
 namespace {
 template <typename T>
-zx_status_t set_stockopt_value(int16_t* out_code, void* output, socklen_t* output_size, T* input) {
+zx_status_t set_sockopt_value(int16_t* out_code, void* output, socklen_t* output_size, T* input) {
   if (*output_size < sizeof(T)) {
     *out_code = EINVAL;
     return ZX_ERR_INVALID_ARGS;
@@ -27,9 +27,9 @@ zx_status_t set_stockopt_value(int16_t* out_code, void* output, socklen_t* outpu
   return ZX_OK;
 }
 
-zx_status_t set_stockopt_value_int(int16_t* out_code, void* output, socklen_t* output_size,
-                                   uint32_t input) {
-  return set_stockopt_value(out_code, output, output_size, &input);
+zx_status_t set_sockopt_value_int(int16_t* out_code, void* output, socklen_t* output_size,
+                                  uint32_t input) {
+  return set_sockopt_value(out_code, output, output_size, &input);
 }
 
 // Partial implementation of getsockopt for zx::Socket interpreted as Unix
@@ -46,16 +46,16 @@ zx_status_t getsockopt(uint32_t so_type, zxio_t* io, int level, int optname, voi
   }
   switch (optname) {
     case SO_DOMAIN:
-      return set_stockopt_value_int(out_code, optval, optlen, AF_UNIX);
+      return set_sockopt_value_int(out_code, optval, optlen, AF_UNIX);
     case SO_TYPE:
-      return set_stockopt_value_int(out_code, optval, optlen, so_type);
+      return set_sockopt_value_int(out_code, optval, optlen, so_type);
     case SO_PROTOCOL:
-      return set_stockopt_value_int(out_code, optval, optlen, 0);
+      return set_sockopt_value_int(out_code, optval, optlen, 0);
     case SO_LINGER: {
       struct linger response{};
       response.l_onoff = 0;
       response.l_linger = 0;
-      return set_stockopt_value(out_code, optval, optlen, &response);
+      return set_sockopt_value(out_code, optval, optlen, &response);
     }
     default:
       *out_code = EINVAL;

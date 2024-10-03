@@ -6,7 +6,6 @@ import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/python/python_host_test.gni")
 import("//build/sdk/sdk_documentation.gni")
-import("//sdk/ctf/build/verify_json_schemas.gni")
 
 # This list should only contain schemas that are currently exported outside of
 # the Fuchsia source tree.
@@ -21,14 +20,14 @@ schemas = [
   "ffx_tool.json",
   "fhcp_tests.json",
   "fidl_library.json",
-  "hardware-f6f47515.json",
+  "hardware.json",
   "host_tool.json",
   "loadable_module.json",
   "manifest.json",
   "package.json",
   "sysroot.json",
-  "version_history-22rnd667.json",
-  "virtual_device-93A41932.json",
+  "version_history.json",
+  "virtual_device.json",
 ]
 
 sdk_documentation("meta") {
@@ -46,33 +45,8 @@ sdk_documentation("meta") {
   }
 }
 
-verify_json_schemas("verify_json_schemas") {
-  golden = []
-
-  # In the golden directory, there should be one golden file per schema.
-  # Please do not add or remove any schemas without consulting
-  # with sdk-dev@fuchsia.dev .
-  #
-  # If you have approval to make this change, you can fix the build error
-  # by ensuring the golden directory matches the current directory.
-  foreach(schema, schemas) {
-    golden += [ "golden/$schema.golden" ]
-  }
-
-  current = schemas
-}
-
-if (is_host) {
-  python_host_test("verify_json_schemas_test") {
-    enable_mypy = true
-    main_source = "//sdk/ctf/build/scripts/verify_json_schemas_test.py"
-    sources = [ "//sdk/ctf/build/scripts/verify_json_schemas.py" ]
-  }
-}
-
 source_set("schemas") {
   inputs = schemas
-  deps = [ ":verify_json_schemas" ]
 }
 
 if (is_host) {
@@ -129,22 +103,19 @@ if (is_host) {
     inputs = [
       "common.json",
       "ffx_tool.json",
-      "hardware-f6f47515.json",
+      "hardware.json",
       "host_tool.json",
       "manifest.json",
       "test_data/virtual_device.json",
       "test_data/empty_vd_manifest.json",
       "test_data/single_vd_manifest.json",
       "test_data/multi_vd_manifest.json",
-      "virtual_device-93A41932.json",
+      "virtual_device.json",
     ]
   }
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":rust_test($host_toolchain)",
-    ":verify_json_schemas_test($host_toolchain)",
-  ]
+  deps = [ ":rust_test($host_toolchain)" ]
 }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
-use fuchsia_zircon as zx;
+
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::{

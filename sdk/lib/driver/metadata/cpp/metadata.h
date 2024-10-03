@@ -10,6 +10,8 @@
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 namespace fdf_metadata {
 
 // This template class is explicitly specialized and defines `Name` so that the service that offers
@@ -170,5 +172,7 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
 }
 
 }  // namespace fdf_metadata
+
+#endif
 
 #endif  // LIB_DRIVER_METADATA_CPP_METADATA_H_

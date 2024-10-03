@@ -38,10 +38,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {
-    fidl_fuchsia_settings as fsettings, fuchsia_async as fasync, fuchsia_inspect as inspect,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_settings as fsettings, fuchsia_async as fasync, fuchsia_inspect as inspect, zx};
 
 /// Begins handling input events. The returned future will complete when
 /// input events are no longer being handled.

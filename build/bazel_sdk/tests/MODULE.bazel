@@ -7,7 +7,7 @@ module(
     version = "1.0",
 )
 
-bazel_dep(name = "platforms", version = "0.0.8")
+bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "bazel_skylib", version = "1.5.0")
 bazel_dep(name = "rules_python", version = "0.22.1")
 bazel_dep(name = "rules_license", version = "0.0.8")
@@ -21,7 +21,7 @@ local_path_override(
 bazel_dep(name = "fuchsia_sdk_common", version = "")
 local_path_override(
     module_name = "fuchsia_sdk_common",
-    path = "../../bazel/fuchsia_sdk_common",
+    path = "../../bazel/local_repositories/fuchsia_sdk_common",
 )
 
 fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")

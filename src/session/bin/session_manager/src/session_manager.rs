@@ -14,7 +14,7 @@ use zx::HandleBased;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_session as fsession,
-    fidl_fuchsia_session_power as fpower, fuchsia_zircon as zx,
+    fidl_fuchsia_session_power as fpower, zx,
 };
 
 /// Maximum number of concurrent connections to the protocols served by `SessionManager`.
@@ -46,7 +46,10 @@ struct Diagnostics {
 impl Diagnostics {
     pub fn record_session_start(&mut self) {
         self.session_started_at.add_entry(|node| {
-            node.record_int(DIAGNOSTICS_TIME_PROPERTY_NAME, zx::MonotonicTime::get().into_nanos());
+            node.record_int(
+                DIAGNOSTICS_TIME_PROPERTY_NAME,
+                zx::MonotonicInstant::get().into_nanos(),
+            );
         });
     }
 }

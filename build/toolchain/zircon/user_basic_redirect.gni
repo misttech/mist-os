@@ -46,11 +46,11 @@ template("user_basic_redirect") {
   select = defined(invoker.select) && invoker.select
   always_fuchsia = defined(invoker.fuchsia) && invoker.fuchsia
 
-  excluded = false
+  exclude_tags = []
   if (defined(invoker.exclude_toolchain_tags)) {
-    excluded = toolchain_variant.tags + invoker.exclude_toolchain_tags -
-               invoker.exclude_toolchain_tags == toolchain_variant.tags
+    exclude_tags = invoker.exclude_toolchain_tags
   }
+
   needs_abi = toolchain_variant.tags + [ "needs-compiler-abi" ] -
               [ "needs-compiler-abi" ] != toolchain_variant.tags
   no_abi = toolchain_variant.tags + [ "no-compiler-abi" ] -
@@ -58,13 +58,17 @@ template("user_basic_redirect") {
 
   if (!always_fuchsia && is_linux) {
     # For Linux tests, the equivalent of user.basic is the linux_$cpu toolchain
-    # (as opposed to the host toolchain).
+    # (as opposed to the host toolchain), and excluding instrumentation-runtime
+    # variants.
+    exclude_tags += [ "instrumentation-runtime" ]
     no_abi = !is_host
     needs_abi = is_host
     _user_basic = "//build/toolchain:linux_$current_cpu"
   }
 
-  if (excluded) {
+  if (toolchain_variant.tags + exclude_tags - exclude_tags !=
+      toolchain_variant.tags) {
+    # This variant is excluded, so select a different one.
     select = true
   }
   if (!no_abi) {
@@ -135,7 +139,7 @@ template("user_basic_redirect") {
       variant_shared_redirection = current_toolchain == shlib_toolchain ||
                                    toolchain_variant.is_pic_default
       forward_variables_from(common, "*")
-      forward_variables_from(invoker, [ "exclude_toolchain_tags" ])
+      exclude_toolchain_tags = exclude_tags
       public_deps = invoker.public_deps
     }
   }

@@ -27,9 +27,9 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//sdk/rust/zx",
     "//src/connectivity/bluetooth/lib/bt-fidl-mocks",
     "//src/lib/fuchsia",
-    "//src/lib/zircon/rust:fuchsia-zircon",
   ]
 
   sources = [

@@ -8,8 +8,6 @@
 #include <lib/sdio/hw.h>
 #include <lib/sdmmc/hw.h>
 
-#include <zxtest/zxtest.h>
-
 namespace sdmmc {
 
 zx_status_t FakeSdmmcDevice::SdmmcHostInfo(sdmmc_host_info_t* out_info) {

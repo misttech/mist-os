@@ -16,7 +16,7 @@ use net_declare::fidl_subnet;
 use tracing::error;
 use {
     fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
-    fidl_fuchsia_net_masquerade as fnet_masquerade, fuchsia_zircon as zx,
+    fidl_fuchsia_net_masquerade as fnet_masquerade, zx,
 };
 
 use crate::filter::FilterEnabledState;
@@ -29,15 +29,13 @@ const UNSPECIFIED_SUBNET: Subnet = fidl_subnet!("0.0.0.0/0");
 pub(super) enum Event {
     FactoryRequestStream(#[derivative(Debug = "ignore")] fnet_masquerade::FactoryRequestStream),
     FactoryRequest(fnet_masquerade::FactoryRequest),
-    ControlRequest(NonZeroU64, fnet_masquerade::ControlRequest),
+    ControlRequest(ValidatedConfig, fnet_masquerade::ControlRequest),
 }
 
 pub(super) type EventStream = LocalBoxStream<'static, Result<Event, fidl::Error>>;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct ValidatedConfig {
-    /// The interface carrying the network to be masqueraded.
-    pub input_interface: NonZeroU64,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) struct ValidatedConfig {
     /// The network to be masqueraded.
     pub src_subnet: fidl_fuchsia_net::Subnet,
     /// The interface through which to masquerade.
@@ -48,10 +46,9 @@ impl TryFrom<fnet_masquerade::ControlConfig> for ValidatedConfig {
     type Error = fnet_masquerade::Error;
 
     fn try_from(
-        fnet_masquerade::ControlConfig{ input_interface, src_subnet, output_interface }: fnet_masquerade::ControlConfig,
+        fnet_masquerade::ControlConfig { src_subnet, output_interface }: fnet_masquerade::ControlConfig,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
-            input_interface: NonZeroU64::new(input_interface).ok_or(Error::InvalidArguments)?,
             src_subnet,
             output_interface: NonZeroU64::new(output_interface).ok_or(Error::InvalidArguments)?,
         })
@@ -61,22 +58,18 @@ impl TryFrom<fnet_masquerade::ControlConfig> for ValidatedConfig {
 #[derive(Debug, Clone)]
 struct MasqueradeState {
     active: bool,
-    config: ValidatedConfig,
     control: Option<fnet_masquerade::ControlControlHandle>,
 }
 
 impl MasqueradeState {
-    fn new(
-        config: ValidatedConfig,
-        control: Option<fnet_masquerade::ControlControlHandle>,
-    ) -> Self {
-        Self { active: false, config, control }
+    fn new(control: Option<fnet_masquerade::ControlControlHandle>) -> Self {
+        Self { active: false, control }
     }
 }
 
 pub(super) struct Masquerade<Filter = fnet_filter_deprecated::FilterProxy> {
     filter: Filter,
-    active_controllers: HashMap<NonZeroU64, MasqueradeState>,
+    active_controllers: HashMap<ValidatedConfig, MasqueradeState>,
 }
 
 async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
@@ -117,16 +110,14 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
 
     async fn set_enabled(
         &mut self,
-        input_interface: NonZeroU64,
+        config: ValidatedConfig,
         enabled: bool,
         filter_enabled_state: &mut FilterEnabledState,
         interface_states: &HashMap<NonZeroU64, InterfaceState>,
     ) -> Result<bool, Error> {
-        let state = self
-            .active_controllers
-            .get_mut(&input_interface)
-            .ok_or_else(|| Error::InvalidArguments)?;
-        let ValidatedConfig { src_subnet, output_interface, .. } = state.config;
+        let state =
+            self.active_controllers.get_mut(&config).ok_or_else(|| Error::InvalidArguments)?;
+        let ValidatedConfig { src_subnet, output_interface } = config;
         let outgoing_nic = match u32::try_from(output_interface.get()) {
             Ok(on) => on,
             Err(e) => {
@@ -134,14 +125,6 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 return Err(Error::InvalidArguments);
             }
         };
-        update_interface(
-            &self.filter,
-            input_interface,
-            enabled,
-            filter_enabled_state,
-            interface_states,
-        )
-        .await?;
         update_interface(
             &self.filter,
             output_interface,
@@ -226,10 +209,10 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
             return Err(Error::Unsupported);
         }
 
-        match self.active_controllers.entry(config.input_interface) {
+        match self.active_controllers.entry(config) {
             std::collections::hash_map::Entry::Vacant(e) => {
                 // No need to modify the just-added state.
-                let _: &mut MasqueradeState = e.insert(MasqueradeState::new(config, control));
+                let _: &mut MasqueradeState = e.insert(MasqueradeState::new(control));
                 Ok(())
             }
             std::collections::hash_map::Entry::Occupied(_) => Err(Error::AlreadyExists),
@@ -271,7 +254,7 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 let result = self.create_control(config, Some(control));
                 let state = self
                     .active_controllers
-                    .get_mut(&config.input_interface)
+                    .get_mut(&config)
                     .expect("state was created by the previous function");
                 state.respond_and_maybe_shutdown(result, |r| {
                     let _: Result<(), fidl::Error> = responder.send(r);
@@ -286,22 +269,19 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 }
                 events.push(
                     stream
-                        .try_filter_map(move |r| {
-                            future::ok(Some(Event::ControlRequest(config.input_interface, r)))
-                        })
+                        .try_filter_map(move |r| future::ok(Some(Event::ControlRequest(config, r))))
                         .boxed(),
                 );
             }
             Event::ControlRequest(
-                input_interface,
+                config,
                 fnet_masquerade::ControlRequest::SetEnabled { enabled, responder },
             ) => {
-                let response = self
-                    .set_enabled(input_interface, enabled, filter_enabled_state, interface_states)
-                    .await;
+                let response =
+                    self.set_enabled(config, enabled, filter_enabled_state, interface_states).await;
                 let state = self
                     .active_controllers
-                    .get_mut(&input_interface)
+                    .get_mut(&config)
                     .expect("no active_controller for the given interface");
                 state.respond_and_maybe_shutdown(response, |r| responder.send(r));
             }
@@ -396,12 +376,8 @@ pub mod test {
     use super::*;
 
     impl ValidatedConfig {
-        const fn new(
-            input_interface: NonZeroU64,
-            src_subnet: fidl_fuchsia_net::Subnet,
-            output_interface: NonZeroU64,
-        ) -> Self {
-            Self { input_interface, src_subnet, output_interface }
+        const fn new(src_subnet: fidl_fuchsia_net::Subnet, output_interface: NonZeroU64) -> Self {
+            Self { src_subnet, output_interface }
         }
     }
 
@@ -413,14 +389,13 @@ pub mod test {
         fail_generations: i32,
     }
 
-    const VALID_INPUT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(10));
     const VALID_OUTPUT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(11));
     const NON_EXISTENT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(1005));
 
     const VALID_SUBNET: Subnet = fidl_subnet!("192.0.2.0/24");
 
     const DEFAULT_CONFIG: ValidatedConfig =
-        ValidatedConfig::new(VALID_INPUT_INTERFACE, VALID_SUBNET, VALID_OUTPUT_INTERFACE);
+        ValidatedConfig::new(VALID_SUBNET, VALID_OUTPUT_INTERFACE);
 
     #[derive(Default)]
     struct MockFilter {
@@ -534,32 +509,21 @@ pub mod test {
         let mut masq = Masquerade::new(filter);
         assert_matches!(masq.create_control(DEFAULT_CONFIG, None), Ok(()));
         assert_matches!(
-            masq.set_enabled(
-                VALID_INPUT_INTERFACE,
-                true,
-                &mut filter_enabled_state,
-                &interface_states
-            )
-            .await,
+            masq.set_enabled(DEFAULT_CONFIG, true, &mut filter_enabled_state, &interface_states)
+                .await,
             Ok(false)
         );
         {
             let s = state.lock().expect("lock poison");
-            assert_eq!(s.active_interfaces.len(), 2);
-            assert!(s.active_interfaces.contains(&VALID_INPUT_INTERFACE.get()));
+            assert_eq!(s.active_interfaces.len(), 1);
             assert!(s.active_interfaces.contains(&VALID_OUTPUT_INTERFACE.get()));
 
             assert_eq!(s.nat_rules.len(), 1);
             assert_eq!(s.nat_rules[0].outgoing_nic, VALID_OUTPUT_INTERFACE.get() as u32);
         }
         assert_matches!(
-            masq.set_enabled(
-                VALID_INPUT_INTERFACE,
-                false,
-                &mut filter_enabled_state,
-                &interface_states
-            )
-            .await,
+            masq.set_enabled(DEFAULT_CONFIG, false, &mut filter_enabled_state, &interface_states)
+                .await,
             Ok(true)
         );
         {
@@ -579,7 +543,7 @@ pub mod test {
     )]
     #[test_case(
         ValidatedConfig {
-            input_interface: NON_EXISTENT_INTERFACE,
+            output_interface: NON_EXISTENT_INTERFACE,
             ..DEFAULT_CONFIG
         },
         None,
@@ -619,23 +583,11 @@ pub mod test {
             create_control_response
         );
         pretty_assertions::assert_eq!(
-            masq.set_enabled(
-                config.input_interface,
-                true,
-                &mut filter_enabled_state,
-                &interface_states
-            )
-            .await,
+            masq.set_enabled(config, true, &mut filter_enabled_state, &interface_states).await,
             first_response
         );
         pretty_assertions::assert_eq!(
-            masq.set_enabled(
-                config.input_interface,
-                true,
-                &mut filter_enabled_state,
-                &interface_states
-            )
-            .await,
+            masq.set_enabled(config, true, &mut filter_enabled_state, &interface_states).await,
             second_response
         );
     }

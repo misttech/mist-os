@@ -13,7 +13,7 @@ use fidl_fuchsia_virtualization::{
 use fuchsia_fs::{file, OpenFlags};
 use serde::{de, Deserialize};
 use std::path::Path;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx, static_assertions as sa};
+use {fidl_fuchsia_io as fio, static_assertions as sa, zx};
 
 // Memory is specified by a string containing either a plain u64 value in bytes, or a u64
 // followed by an optional unit suffix.

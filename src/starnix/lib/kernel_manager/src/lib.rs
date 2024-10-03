@@ -9,7 +9,6 @@ use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
 use fidl::HandleBased;
 use fuchsia_component::client as fclient;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{AsHandleRef, Task};
 use futures::TryStreamExt;
 use kernels::Kernels;
 use rand::Rng;
@@ -17,11 +16,11 @@ use std::future::Future;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tracing::{debug, warn};
+use zx::{AsHandleRef, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
-    fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
 };
 
 /// The name of the collection that the starnix_kernel is run in.
@@ -258,12 +257,11 @@ pub async fn serve_starnix_manager(
                     }
                 };
 
-                // TODO(https://fxbug.dev/328306129): Replace this with boot time.
-                let suspend_start = zx::MonotonicTime::get();
+                let suspend_start = zx::BootInstant::get();
 
                 if let Some(wake_locks) = payload.wake_locks {
                     match wake_locks
-                        .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::ZERO)
+                        .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::ZERO)
                     {
                         Ok(_) => {
                             // There were wake locks active after suspending all processes, resume
@@ -294,7 +292,7 @@ pub async fn serve_starnix_manager(
                 // TODO: We will likely have to handle a larger number of wake sources in the
                 // future, at which point we may want to consider a Port-based approach. This
                 // would also allow us to unblock this thread.
-                match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
+                match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
                     Ok(_) => {}
                     Err(e) => {
                         warn!("error waiting for wake event {:?}", e);
@@ -304,8 +302,7 @@ pub async fn serve_starnix_manager(
                 kernels.acquire_wake_lease(&container_job).await?;
 
                 let response = fstarnixrunner::ManagerSuspendContainerResponse {
-                    // TODO(https://fxbug.dev/328306129): Replace this with boot time.
-                    suspend_time: Some((zx::MonotonicTime::get() - suspend_start).into_nanos()),
+                    suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
                     ..Default::default()
                 };
                 if let Err(e) = responder.send(Ok(&response)) {
@@ -383,7 +380,7 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
                 },
             ];
 
-            match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
+            match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
                 Ok(_) => {}
                 Err(e) => {
                     tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
@@ -454,7 +451,7 @@ fn forward_message(
 
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
-            match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicTime::INFINITE) {
+            match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicInstant::INFINITE) {
                 Ok(_) => {}
                 Err(e) => {
                     tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
@@ -534,7 +531,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
                     let thread = zx::Thread::from_handle(thread_handle);
                     match thread.wait_handle(
                         zx::Signals::THREAD_SUSPENDED,
-                        zx::MonotonicTime::after(zx::Duration::INFINITE),
+                        zx::MonotonicInstant::after(zx::Duration::INFINITE),
                     ) {
                         Err(e) => {
                             tracing::warn!("Error waiting for task suspension: {:?}", e);

@@ -8,7 +8,7 @@
 use fuchsia_bootfs::BootfsParser;
 use fuchsia_zbi::ZbiParser;
 use fuchsia_zbi::ZbiType::StorageBootfsFactory;
-use fuchsia_zircon as zx;
+
 use std::convert::TryInto;
 use std::slice;
 

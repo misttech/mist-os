@@ -6,11 +6,11 @@ use anyhow::{anyhow, Error};
 use fidl_fuchsia_boot as fboot;
 use fuchsia_zbi::ZbiType::StorageBootfsFactory;
 use fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::Arc;
+use zx::{self as zx, HandleBased};
 
 lazy_static! {
     // The default rights for an immutable VMO. For details see

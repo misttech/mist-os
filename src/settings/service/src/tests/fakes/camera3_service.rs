@@ -12,10 +12,10 @@ use fidl_fuchsia_camera3::{
     DeviceRequest, DeviceWatcherMarker, DeviceWatcherRequest, WatchDevicesEvent,
 };
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon::{self as zx, Duration};
 use futures::TryStreamExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use zx::{self as zx, Duration};
 
 pub(crate) struct Camera3Service {
     camera_sw_muted: Arc<AtomicBool>,

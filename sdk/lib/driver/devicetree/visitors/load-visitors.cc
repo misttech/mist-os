@@ -9,6 +9,7 @@
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdio/directory.h>
+#include <zircon/availability.h>
 #include <zircon/dlfcn.h>
 
 #include <memory>
@@ -42,25 +43,25 @@ zx::result<zx::vmo> SetVmoName(zx::vmo vmo, std::string_view vmo_name) {
 }
 
 zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view visitor_file) {
-  const fio::wire::VmoFlags KVisitorVmoFlag = fio::wire::VmoFlags::kRead |
-                                              fio::wire::VmoFlags::kExecute |
-                                              fio::wire::VmoFlags::kPrivateClone;
-
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::File>::Create();
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  constexpr fio::Flags kVisitorOpenFlags = fio::Flags::kPermRead | fio::Flags::kPermExecute;
+#else
+  constexpr fio::OpenFlags kVisitorOpenFlags =
+      fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightExecutable;
+#endif
+  constexpr fio::VmoFlags kVisitorVmoFlag =
+      fio::VmoFlags::kRead | fio::VmoFlags::kExecute | fio::VmoFlags::kPrivateClone;
 
   std::string full_path = std::string(kVisitorsPath) + "/" + visitor_file.data();
-  zx::result status =
-      incoming.Open(full_path.c_str(),
-                    fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable,
-                    server_end.TakeChannel());
-  if (status.is_error()) {
+  zx::result client_end = incoming.Open<fuchsia_io::File>(full_path.c_str(), kVisitorOpenFlags);
+  if (client_end.is_error()) {
     FDF_LOG(ERROR, "Failed to open visitor '%.*s': %s", static_cast<int>(visitor_file.length()),
-            visitor_file.data(), status.status_string());
-    return status.take_error();
+            visitor_file.data(), client_end.status_string());
+    return client_end.take_error();
   }
 
-  fidl::WireSyncClient file_client{std::move(client_end)};
-  fidl::WireResult file_res = file_client->GetBackingMemory(KVisitorVmoFlag);
+  fidl::WireSyncClient file_client{std::move(*client_end)};
+  fidl::WireResult file_res = file_client->GetBackingMemory(kVisitorVmoFlag);
   if (!file_res.ok()) {
     FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", static_cast<int>(visitor_file.length()),
             visitor_file.data(), file_res.FormatDescription().c_str());
@@ -79,18 +80,14 @@ zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view vi
 zx::result<std::vector<std::string>> GetVisitorFiles(fdf::Namespace& incoming) {
   std::vector<std::string> visitor_files;
 
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx::result status =
-      incoming.Open(kVisitorsPath,
-                    fio::wire::OpenFlags::kDirectory | fio::wire::OpenFlags::kRightReadable |
-                        fio::wire::OpenFlags::kRightExecutable,
-                    server_end.TakeChannel());
-  if (status.is_error()) {
+  zx::result client_end = incoming.Open<fuchsia_io::Directory>(
+      kVisitorsPath, fio::Flags::kProtocolDirectory | fio::Flags::kPermEnumerate);
+  if (client_end.is_error()) {
     FDF_LOG(ERROR, "Failed to open visitors directory");
-    return status.take_error();
+    return client_end.take_error();
   }
 
-  fidl::WireSyncClient directory{std::move(client_end)};
+  fidl::WireSyncClient directory{std::move(*client_end)};
   while (true) {
     auto result = directory->ReadDirents(fio::kMaxBuf);
     if (!result.ok()) {

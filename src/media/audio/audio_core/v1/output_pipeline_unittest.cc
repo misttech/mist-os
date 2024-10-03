@@ -77,7 +77,7 @@ class OutputPipelineTest : public testing::ThreadingModelFixture {
                         .output_channels = 2,
                     },
                     {
-                        .name = "communications",
+                        .name = "communication",
                         .input_streams =
                             {
                                 RenderUsage::COMMUNICATION,
@@ -288,10 +288,10 @@ TEST_F(OutputPipelineTest, Loopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -383,10 +383,10 @@ TEST_F(OutputPipelineTest, LoopbackWithUpsample) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -480,10 +480,10 @@ TEST_F(OutputPipelineTest, UpdateEffect) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 = {},
           .output_rate = 48000,
@@ -535,9 +535,9 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
                      .name = "default",
                      .input_streams =
                          {
+                             RenderUsage::INTERRUPTION,
                              RenderUsage::MEDIA,
                              RenderUsage::SYSTEM_AGENT,
-                             RenderUsage::INTERRUPTION,
                          },
                      .effects_v1 =
                          {
@@ -551,7 +551,7 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
                      .output_channels = 2,
                  },
                  {
-                     .name = "communications",
+                     .name = "communication",
                      .input_streams =
                          {
                              RenderUsage::COMMUNICATION,
@@ -585,11 +585,10 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
                          std::nullopt, Mixer::Resampler::SampleAndHold);
   const int64_t kMixLeadTimeFrames = default_mixer->pos_filter_width().Ceiling();
 
-  auto communications_stream =
+  auto communication_stream =
       std::make_shared<testing::FakeStream>(kDefaultFormat, context().clock_factory());
-  pipeline->AddInput(communications_stream,
-                     StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION), std::nullopt,
-                     Mixer::Resampler::SampleAndHold);
+  pipeline->AddInput(communication_stream, StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
+                     std::nullopt, Mixer::Resampler::SampleAndHold);
 
   // The pipeline itself (the root, after any MixStages or EffectsStages) requires no lead time.
   EXPECT_EQ(zx::duration(0), pipeline->GetPresentationDelay());
@@ -606,12 +605,12 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
   // COMMUNICATION streams require 902 frames of lead time. They run through an effect that
   // introduces 900 frames of delay; SampleAndHold resamplers in the 'default' and 'linearize'
   // MixStages each add 1 frame of lead time.
-  const auto communications_delay = zx::duration(
+  const auto communication_delay = zx::duration(
       zx::sec(kMixLeadTimeFrames + kEffects2LeadTimeFrames + kMixLeadTimeFrames).to_nsecs() /
       kDefaultFormat.frames_per_second());
-  EXPECT_EQ(communications_delay, communications_stream->GetPresentationDelay())
-      << communications_delay.get() << ", " << communications_stream->GetPresentationDelay().get()
-      << ", off by " << (communications_delay - communications_stream->GetPresentationDelay()).get()
+  EXPECT_EQ(communication_delay, communication_stream->GetPresentationDelay())
+      << communication_delay.get() << ", " << communication_stream->GetPresentationDelay().get()
+      << ", off by " << (communication_delay - communication_stream->GetPresentationDelay()).get()
       << " nsec";
 }
 
@@ -631,10 +630,10 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 = {},
           .loopback = true,
@@ -770,10 +769,10 @@ TEST_F(OutputPipelineTest, PipelineWithRechannelEffects) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -826,10 +825,10 @@ TEST_F(OutputPipelineTest, LoopbackClock) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v1 =
               {
@@ -908,10 +907,10 @@ TEST_F(OutputPipelineTest, PipelineWithEffectsV2) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v2 = PipelineConfig::EffectV2{.instance_name = "AddOne"},
           .loopback = true,

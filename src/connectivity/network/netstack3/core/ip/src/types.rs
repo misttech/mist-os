@@ -394,6 +394,41 @@ pub struct ResolvedRoute<I: BroadcastIpExt, D> {
     pub local_delivery_device: Option<D>,
     /// The next hop via which this destination can be reached.
     pub next_hop: NextHop<I::Addr>,
+    /// The route's internal forwarding semantics.
+    pub internal_forwarding: InternalForwarding<D>,
+}
+
+/// Internal forwarding semantics.
+///
+/// Internal forwarding allows the netstack to behave as a Weak Host when
+/// forwarding is enabled on a device.
+///
+/// In a sending context, internal forwarding allows sending a packet out of a
+/// device using a source address not assigned to that device, provided that the
+/// source address is assigned to another device, and that other device has
+/// forwarding enabled.
+///
+/// In a receiving context, internal forwarding allows receiving a packet that
+/// was destined to an address not assigned to the device that is arrived on,
+/// provided that destination address is assigned to another device and the
+/// device the packet arrived on has forwarding enabled.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum InternalForwarding<D> {
+    /// Internal forwarding is being used. The relevant address (src addr when
+    /// sending, dst addr when receiving) is assigned to the provided device.
+    Used(D),
+    /// Internal forwarding is not being used.
+    NotUsed,
+}
+
+impl<D> InternalForwarding<D> {
+    /// Applies the given callback to the held device identifier.
+    pub fn map_device<F: FnOnce(D) -> O, O>(self, cb: F) -> InternalForwarding<O> {
+        match self {
+            InternalForwarding::NotUsed => InternalForwarding::NotUsed,
+            InternalForwarding::Used(d) => InternalForwarding::Used(cb(d)),
+        }
+    }
 }
 
 /// The destination of an outbound IP packet.

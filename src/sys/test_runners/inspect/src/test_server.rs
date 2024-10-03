@@ -9,12 +9,12 @@ use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
 use fidl::endpoints::ServerEnd;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{Duration, MonotonicTime, Status};
 use futures::channel::oneshot;
 use futures::future::{abortable, select, Either};
 use futures::{pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::warn;
+use zx::{Duration, MonotonicInstant, Status};
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
@@ -28,7 +28,7 @@ macro_rules! test_stdout {
     ($logger:ident, $format:literal) => {
         let formatted_with_time = format!(
             "[{:05.3}] {}\n",
-            (MonotonicTime::get().into_nanos() as f64 / NANOS_IN_SECONDS),
+            (MonotonicInstant::get().into_nanos() as f64 / NANOS_IN_SECONDS),
             $format
         );
         $logger.write(formatted_with_time.as_bytes()).ok()
@@ -37,7 +37,7 @@ macro_rules! test_stdout {
         let formatted = format!($format, $($content, )*);
         let formatted_with_time = format!(
             "[{:05.3}] {}\n",
-            (MonotonicTime::get().into_nanos() as f64 / NANOS_IN_SECONDS),
+            (MonotonicInstant::get().into_nanos() as f64 / NANOS_IN_SECONDS),
             formatted
         );
         $logger.write(formatted_with_time.as_bytes()).ok()
@@ -80,7 +80,7 @@ impl TestServer {
     /// Output logs are written to the given socket.
     ///
     /// Returns true on pass and false on failure.
-    async fn run_case(spec: &ProgramSpec, case: &str, logs: fuchsia_zircon::Socket) -> bool {
+    async fn run_case(spec: &ProgramSpec, case: &str, logs: zx::Socket) -> bool {
         let case = match spec.cases.get(case) {
             Some(case) => case,
             None => {
@@ -105,10 +105,10 @@ impl TestServer {
             }
         };
 
-        let end_time = MonotonicTime::get() + Duration::from_seconds(spec.timeout_seconds);
+        let end_time = MonotonicInstant::get() + Duration::from_seconds(spec.timeout_seconds);
 
-        while end_time > MonotonicTime::get() {
-            let start_time = MonotonicTime::get();
+        while end_time > MonotonicInstant::get() {
+            let start_time = MonotonicInstant::get();
 
             let proxy = match client::connect_to_protocol_at_path::<
                 fdiagnostics::ArchiveAccessorMarker,
@@ -149,14 +149,14 @@ impl TestServer {
 
             let sleep_time = Duration::from_seconds(1);
 
-            if end_time - MonotonicTime::get() >= Duration::from_seconds(0) {
+            if end_time - MonotonicInstant::get() >= Duration::from_seconds(0) {
                 test_stdout!(
                     logs,
                     "Retrying after {}s, timeout after {}s",
                     sleep_time.into_seconds(),
-                    (end_time - MonotonicTime::get()).into_seconds()
+                    (end_time - MonotonicInstant::get()).into_seconds()
                 );
-                fasync::Timer::new(MonotonicTime::after(sleep_time)).await;
+                fasync::Timer::new(MonotonicInstant::after(sleep_time)).await;
             }
         }
 
@@ -221,8 +221,7 @@ impl TestServer {
                                 let spec = spec.clone();
                                 let proxy = proxy.clone();
                                 tasks.push(async move {
-                                    let (stdout_end, stdout) =
-                                        fuchsia_zircon::Socket::create_stream();
+                                    let (stdout_end, stdout) = zx::Socket::create_stream();
 
                                     let name = test.name.clone().unwrap_or_default();
 

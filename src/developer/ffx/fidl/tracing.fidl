@@ -97,13 +97,16 @@ closed protocol Tracing {
     ///
     /// Parameters:
     /// - name: A string that is first used to look up a target under which the
-    ///         trace is running. It is used the same way as
-    ///         `TargetQuery.string_matcher`. If no target can be found
-    ///         associated with a trace, this will fall back to being
-    ///         interpreted as a file name.
+    ///         trace is running. If no file can be found given the name of the
+    ///         trace, it is used the same way as
+    ///         `TargetQuery.string_matcher` to find a Fuchsia Device nodename.
+    ///         If no target can be found associated with a trace, this will
+    ///         return an error.
     ///
     /// Returns:
-    /// - the resolved target for which the trace was running.
+    /// - the resolved target for which the trace was running, as well as the
+    ///   output file being written to, and the result of the tracing
+    ///   termination.
     ///
     /// Examples:
     ///
@@ -124,6 +127,7 @@ closed protocol Tracing {
         name string:MAX_PATH_LENGTH;
     }) -> (struct {
         target TargetInfo;
+        output_file string:MAX_PATH_LENGTH;
         result fuchsia.tracing.controller.TerminateResult;
     }) error RecordingError;
 

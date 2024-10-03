@@ -5,7 +5,7 @@
 use crate::api::value::ValueStrategy;
 use crate::api::{ConfigError, ConfigValue};
 use crate::storage::{AssertNoEnv, Config};
-use crate::{is_analytics_disabled, BuildOverride, ConfigMap, ConfigQuery, Environment};
+use crate::{is_analytics_disabled, ConfigMap, ConfigQuery, Environment};
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_error;
@@ -91,10 +91,10 @@ impl EnvironmentContext {
 
     /// Initializes an environment type that is just the bare minimum, containing no ambient configuration, only
     /// the runtime args.
-    pub fn core(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
+    pub fn strict(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
         let cache = Arc::default();
         let res = Self {
-            kind: EnvironmentKind::CoreContext,
+            kind: EnvironmentKind::StrictContext,
             exe_kind: exe_kind.clone(),
             // For simplicity, the runtime_args will be kept empty.
             runtime_args: ConfigMap::new(),
@@ -397,8 +397,7 @@ impl EnvironmentContext {
         // build directory.
         // Out of tree, we will always want to pull the config from the normal config path, which
         // we can defer to the SdkRoot's mechanisms for.
-        let runtime_root: Option<PathBuf> =
-            self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().ok();
+        let runtime_root: Option<PathBuf> = self.query("sdk.root").get().ok();
 
         match (&self.kind, runtime_root) {
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
@@ -543,7 +542,7 @@ impl EnvironmentContext {
                 }
             }
         };
-        let module = self.query("sdk.module").build(Some(BuildOverride::NoBuild)).get().ok();
+        let module = self.query("sdk.module").get().ok();
         match module {
             Some(module) => {
                 debug!("Found modular Fuchsia SDK at {manifest:?} with module {module}");

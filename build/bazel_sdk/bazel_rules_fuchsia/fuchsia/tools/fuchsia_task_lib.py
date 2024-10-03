@@ -50,6 +50,9 @@ class Terminal:
     def cyan(text: str) -> str:
         return Terminal._style(text, 96)
 
+    def info(printable: Any, prefix: str = "Info") -> str:
+        return f"{Terminal.bold(f'{prefix}:')} {printable}"
+
     def warn(printable: Any, prefix: str = "Warning") -> str:
         return f"{Terminal.yellow(f'{prefix}:')} {printable}"
 
@@ -174,6 +177,18 @@ class ScopedArgumentParser:
                 ],
                 {},
             )
+        )
+
+    def parse_known_args(
+        self, *argparse_args: Any, **argparse_kwargs: Any
+    ) -> argparse.Namespace:
+        return (
+            self.parse_args(*argparse_args, **argparse_kwargs),
+            self._scoped_parsers[ArgumentScope.GLOBAL].parse_known_args(
+                *argparse_args,
+                args=self.get_arguments(ArgumentScope.GLOBAL),
+                **argparse_kwargs,
+            )[1],
         )
 
     def path_arg(self, type="file"):

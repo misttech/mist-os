@@ -5,7 +5,6 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
-use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
 use netstack_testing_common::devices::{
@@ -13,6 +12,7 @@ use netstack_testing_common::devices::{
 };
 use netstack_testing_common::realms::{Netstack, TestRealmExt as _, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
+use zx::{self as zx, AsHandleRef as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_debug as fnet_debug,

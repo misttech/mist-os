@@ -11,7 +11,7 @@ use fidl_fuchsia_input_report::{
 };
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::ArrayProperty;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
 
@@ -265,7 +265,7 @@ fn send_consumer_controls_event(
             pressed_buttons,
         )),
         device_descriptor: device_descriptor.clone(),
-        event_time: zx::MonotonicTime::get(),
+        event_time: zx::MonotonicInstant::get(),
         handled: Handled::No,
         trace_id: None,
     };

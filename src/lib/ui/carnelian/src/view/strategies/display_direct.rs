@@ -25,12 +25,12 @@ use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
-use fuchsia_zircon::{
-    self as zx, AsHandleRef, Duration, Event, HandleBased, MonotonicTime, Signals, Status,
-};
 use futures::channel::mpsc::UnboundedSender;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
+use zx::{
+    self as zx, AsHandleRef, Duration, Event, HandleBased, MonotonicInstant, Signals, Status,
+};
 
 type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
 
@@ -163,7 +163,7 @@ pub(crate) struct DisplayDirectViewStrategy {
     display_resources: Option<DisplayResources>,
     drop_display_resources_task: Option<fasync::Task<()>>,
     display_resource_release_delay: std::time::Duration,
-    vsync_phase: MonotonicTime,
+    vsync_phase: MonotonicInstant,
     vsync_interval: Duration,
     mouse_cursor_position: Option<IntPoint>,
     pub collection_id: BufferCollectionId,
@@ -220,7 +220,7 @@ impl DisplayDirectViewStrategy {
             display_resources: Some(display_resources),
             drop_display_resources_task: None,
             display_resource_release_delay: app_config.display_resource_release_delay,
-            vsync_phase: MonotonicTime::get(),
+            vsync_phase: MonotonicInstant::get(),
             vsync_interval: Duration::from_millis(16),
             mouse_cursor_position: None,
             collection_id,
@@ -234,7 +234,7 @@ impl DisplayDirectViewStrategy {
         view_details: &ViewDetails,
         image_id: Option<ImageId>,
     ) -> ViewAssistantContext {
-        let time_now = MonotonicTime::get();
+        let time_now = MonotonicInstant::get();
         // |interval_offset| is the offset from |time_now| to the next multiple
         // of vsync interval after vsync phase, possibly negative if in the past.
         let mut interval_offset = Duration::from_nanos(
@@ -476,7 +476,7 @@ impl DisplayDirectViewStrategy {
         Ok(local_event)
     }
 
-    fn handle_vsync_parameters_changed(&mut self, phase: MonotonicTime, interval: Duration) {
+    fn handle_vsync_parameters_changed(&mut self, phase: MonotonicInstant, interval: Duration) {
         self.vsync_phase = phase;
         self.vsync_interval = interval;
     }
@@ -698,7 +698,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                     100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
                 );
                 self.handle_vsync_parameters_changed(
-                    MonotonicTime::from_nanos(timestamp as i64),
+                    MonotonicInstant::from_nanos(timestamp as i64),
                     vsync_interval,
                 );
                 if cookie.value != INVALID_DISP_ID {

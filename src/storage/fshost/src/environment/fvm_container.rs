@@ -16,7 +16,7 @@ use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use fs_management::format::constants::{
     BLOBFS_PARTITION_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
 };
-use fuchsia_zircon as zx;
+
 use futures::{FutureExt, TryStreamExt};
 use hkdf::Hkdf;
 use std::future::Future;

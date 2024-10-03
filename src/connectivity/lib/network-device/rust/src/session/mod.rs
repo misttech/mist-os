@@ -16,15 +16,16 @@ use std::sync::Arc;
 use std::task::Waker;
 
 use explicit::{PollExt as _, ResultExt as _};
+use fidl_fuchsia_hardware_network::DelegatedRxLease;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_sync::Mutex;
 use futures::future::{poll_fn, Future};
-use futures::ready;
 use futures::task::{Context, Poll};
-use {fidl_fuchsia_hardware_network as netdev, fuchsia_async as fasync, fuchsia_zircon as zx};
+use futures::{ready, Stream};
+use {fidl_fuchsia_hardware_network as netdev, fuchsia_async as fasync};
 
 use crate::error::{Error, Result};
-use buffer::pool::Pool;
+use buffer::pool::{Pool, RxLeaseWatcher};
 use buffer::{
     AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
 };
@@ -139,6 +140,46 @@ impl Session {
     /// pending until the device has replied back.
     pub async fn wait_tx_idle(&self) {
         self.inner.tx_idle_listeners.wait().await;
+    }
+
+    /// Returns a stream of delegated rx leases from the device.
+    ///
+    /// Leases are yielded from the stream whenever the corresponding receive
+    /// buffer is dropped or reused for tx, which marks the end of processing
+    /// the marked buffer for the delegated lease.
+    ///
+    /// See [`fidl_fuchsia_hardware_network::DelegatedRxLease`] for more
+    /// details.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the session was not created with
+    /// [`fidl_fuchsia_hardware_network::SessionFlags::RECEIVE_RX_POWER_LEASES`]
+    /// or if `watch_rx_leases` has already been called for this session.
+    pub fn watch_rx_leases(&self) -> impl Stream<Item = Result<RxLease>> + Send + Sync {
+        let inner = Arc::clone(&self.inner);
+        let watcher = RxLeaseWatcher::new(Arc::clone(&inner.pool));
+        futures::stream::try_unfold((inner, watcher), |(inner, mut watcher)| async move {
+            let DelegatedRxLease {
+                hold_until_frame,
+                handle,
+                __source_breaking: fidl::marker::SourceBreaking,
+            } = match inner.proxy.watch_delegated_rx_lease().await {
+                Ok(lease) => lease,
+                Err(e) => {
+                    if e.is_closed() {
+                        return Ok(None);
+                    } else {
+                        return Err(Error::Fidl(e));
+                    }
+                }
+            };
+            let hold_until_frame = hold_until_frame.ok_or(Error::InvalidLease)?;
+            let handle = RxLease { handle: handle.ok_or(Error::InvalidLease)? };
+
+            watcher.wait_until(hold_until_frame).await;
+            Ok(Some((handle, (inner, watcher))))
+        })
     }
 }
 
@@ -362,16 +403,46 @@ pub struct DeviceInfo {
     pub base_info: DeviceBaseInfo,
 }
 
+/// Basic session configuration that can be given to [`DeviceInfo`] to generate
+/// [`Config`]s.
+#[derive(Debug, Copy, Clone)]
+pub struct DerivableConfig {
+    /// The desired default buffer length for the session.
+    pub default_buffer_length: usize,
+    /// Create a primary session.
+    pub primary: bool,
+    /// Enable rx lease watching.
+    pub watch_rx_leases: bool,
+}
+
+impl DerivableConfig {
+    /// A sensibly common default buffer length to be used in
+    /// [`DerivableConfig`]. Provided to ease test writing.
+    ///
+    /// Chosen to be the next power of two after the default Ethernet MTU.
+    ///
+    /// This is the value of the buffer length in the `Default` impl.
+    pub const DEFAULT_BUFFER_LENGTH: usize = 2048;
+    /// The value returned by the `Default` impl.
+    pub const DEFAULT: Self = Self {
+        default_buffer_length: Self::DEFAULT_BUFFER_LENGTH,
+        primary: true,
+        watch_rx_leases: false,
+    };
+}
+
+impl Default for DerivableConfig {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 impl DeviceInfo {
     /// Create a new session config from the device information.
     ///
     /// This method also does the boundary checks so that data_length/offset fields read
     /// from descriptors are safe to convert to [`usize`].
-    pub fn make_config(
-        &self,
-        default_buffer_length: usize,
-        options: netdev::SessionFlags,
-    ) -> Result<Config> {
+    pub fn make_config(&self, config: DerivableConfig) -> Result<Config> {
         let DeviceInfo {
             min_descriptor_length,
             descriptor_version,
@@ -401,6 +472,8 @@ impl DeviceInfo {
                 NETWORK_DEVICE_DESCRIPTOR_LENGTH, min_descriptor_length
             )));
         }
+
+        let DerivableConfig { default_buffer_length, primary, watch_rx_leases } = config;
 
         let num_rx_buffers =
             NonZeroU16::new(*rx_depth).ok_or_else(|| Error::Config("no RX buffers".to_owned()))?;
@@ -497,6 +570,10 @@ impl DeviceInfo {
             }
         };
 
+        let mut options = netdev::SessionFlags::empty();
+        options.set(netdev::SessionFlags::PRIMARY, primary);
+        options.set(netdev::SessionFlags::RECEIVE_RX_POWER_LEASES, watch_rx_leases);
+
         Ok(Config {
             buffer_stride,
             num_rx_buffers,
@@ -509,11 +586,6 @@ impl DeviceInfo {
                 min_tx_data,
             },
         })
-    }
-
-    /// Create a config for a primary session.
-    pub fn primary_config(&self, default_buffer_length: usize) -> Result<Config> {
-        self.make_config(default_buffer_length, netdev::SessionFlags::PRIMARY)
     }
 }
 
@@ -705,6 +777,37 @@ impl TxIdleListeners {
     }
 }
 
+/// An RAII lease possibly keeping the system from suspension.
+///
+/// Yielded from [`Session::watch_rx_leases`].
+///
+/// Dropping an `RxLease` relinquishes it.
+#[derive(Debug)]
+pub struct RxLease {
+    handle: netdev::DelegatedRxLeaseHandle,
+}
+
+impl Drop for RxLease {
+    fn drop(&mut self) {
+        let Self { handle } = self;
+        // Change detector in case we need any evolution on how to relinquish
+        // leases.
+        match handle {
+            netdev::DelegatedRxLeaseHandle::Channel(_channel) => {
+                // Dropping the channel is enough to relinquish the lease.
+            }
+            netdev::DelegatedRxLeaseHandle::__SourceBreaking { .. } => {}
+        }
+    }
+}
+
+impl RxLease {
+    /// Peeks the internal lease.
+    pub fn inner(&self) -> &netdev::DelegatedRxLeaseHandle {
+        &self.handle
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU32;
@@ -714,18 +817,18 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fuchsia_async::Fifo;
-    use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
     use test_case::test_case;
     use zerocopy::{FromBytes, Immutable, IntoBytes};
+    use zx::{AsHandleRef as _, HandleBased as _};
 
-    use crate::session::TxIdleListeners;
+    use crate::session::DerivableConfig;
 
     use super::buffer::{
         AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
     };
     use super::{
         BufferLayout, Config, DeviceBaseInfo, DeviceInfo, Error, Inner, Mutex, Pending, Pool,
-        ReadyBuffer, Task,
+        ReadyBuffer, Task, TxIdleListeners,
     };
 
     const DEFAULT_DEVICE_BASE_INFO: DeviceBaseInfo = DeviceBaseInfo {
@@ -825,8 +928,9 @@ mod tests {
         info: DeviceInfo,
         expected: impl Deref<Target = str>,
     ) {
+        let config = DerivableConfig { default_buffer_length: buffer_length, ..Default::default() };
         assert_matches!(
-            info.primary_config(buffer_length),
+            info.make_config(config),
             Err(Error::Config(got)) if got.as_str() == expected.deref()
         );
     }
@@ -854,7 +958,12 @@ mod tests {
         ..DEFAULT_DEVICE_INFO
     }, DEFAULT_BUFFER_LENGTH; "default in bounds")]
     fn configs_from_device_buffer_length(info: DeviceInfo, expected_length: usize) {
-        let config = info.primary_config(DEFAULT_BUFFER_LENGTH).expect("is valid");
+        let config = info
+            .make_config(DerivableConfig {
+                default_buffer_length: DEFAULT_BUFFER_LENGTH,
+                ..Default::default()
+            })
+            .expect("is valid");
         let Config {
             buffer_layout: BufferLayout { length, min_tx_data: _, min_tx_head: _, min_tx_tail: _ },
             buffer_stride: _,
@@ -865,16 +974,16 @@ mod tests {
         assert_eq!(length, expected_length);
     }
 
-    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, fuchsia_zircon::Fifo<DescId<K>>) {
-        let (handle, other_end) = fuchsia_zircon::Fifo::create(1).unwrap();
+    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, zx::Fifo<DescId<K>>) {
+        let (handle, other_end) = zx::Fifo::create(1).unwrap();
         (Fifo::from_fifo(handle), other_end)
     }
 
     fn remove_rights<T: FromBytes + IntoBytes + Immutable>(
         fifo: Fifo<T>,
-        rights_to_remove: fuchsia_zircon::Rights,
+        rights_to_remove: zx::Rights,
     ) -> Fifo<T> {
-        let fifo = fuchsia_zircon::Fifo::from(fifo);
+        let fifo = zx::Fifo::from(fifo);
         let rights = fifo.as_handle_ref().basic_info().expect("can retrieve info").rights;
 
         let fifo = fifo.replace_handle(rights ^ rights_to_remove).expect("can replace");
@@ -885,14 +994,11 @@ mod tests {
         Tx,
         Rx,
     }
-    #[test_case(TxOrRx::Tx, fuchsia_zircon::Rights::READ; "tx read")]
-    #[test_case(TxOrRx::Tx, fuchsia_zircon::Rights::WRITE; "tx write")]
-    #[test_case(TxOrRx::Rx, fuchsia_zircon::Rights::WRITE; "rx read")]
+    #[test_case(TxOrRx::Tx, zx::Rights::READ; "tx read")]
+    #[test_case(TxOrRx::Tx, zx::Rights::WRITE; "tx write")]
+    #[test_case(TxOrRx::Rx, zx::Rights::WRITE; "rx read")]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn task_as_future_poll_error(
-        which_fifo: TxOrRx,
-        right_to_remove: fuchsia_zircon::Rights,
-    ) {
+    async fn task_as_future_poll_error(which_fifo: TxOrRx, right_to_remove: zx::Rights) {
         // This is a regression test for https://fxbug.dev/42072513. The flake
         // that caused that bug occurred because the Zircon channel was closed
         // but the error returned by a failed attempt to write to it wasn't
@@ -900,9 +1006,15 @@ mod tests {
         // altering the right on the FIFOs the task uses so as to cause either
         // an attempt to write or to read to fail. For completeness, it
         // exercises all the FIFO polls that comprise Task::poll.
-        let (pool, _descriptors, _data) =
-            Pool::new(DEFAULT_DEVICE_INFO.primary_config(DEFAULT_BUFFER_LENGTH).expect("is valid"))
-                .expect("is valid");
+        let (pool, _descriptors, _data) = Pool::new(
+            DEFAULT_DEVICE_INFO
+                .make_config(DerivableConfig {
+                    default_buffer_length: DEFAULT_BUFFER_LENGTH,
+                    ..Default::default()
+                })
+                .expect("is valid"),
+        )
+        .expect("is valid");
         let (session_proxy, _session_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::SessionMarker>()
                 .expect("create proxy");

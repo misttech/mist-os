@@ -8,7 +8,7 @@ use fidl_fuchsia_testing_sl4f::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
+
 use maplit::{convert_args, hashmap};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -244,7 +244,7 @@ impl Sl4f {
             Ok(_) => {
                 let facade_iter = FacadeIteratorSynchronousProxy::new(client_end.into_channel());
                 loop {
-                    match facade_iter.get_next(zx::MonotonicTime::INFINITE) {
+                    match facade_iter.get_next(zx::MonotonicInstant::INFINITE) {
                         Ok(facades) if facades.is_empty() => break, // Indicates completion.
                         Ok(facades) => proxied_facades.extend(facades.into_iter()),
                         // A PEER_CLOSED error before any facades are read indicates that there was

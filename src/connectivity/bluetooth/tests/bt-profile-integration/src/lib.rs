@@ -117,12 +117,16 @@ fn default_address() -> Address {
     Address::Public([1, 0, 0, 0, 0, 0])
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-profile-integration-tests#meta/bt-profile-integration-tests-component.cm"
+)]
 async fn test_add_profile(profile: ProfileHarness) {
     let _ = add_service(&profile).expect("can add service for profile");
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-profile-integration-tests#meta/bt-profile-integration-tests-component.cm"
+)]
 async fn test_same_psm_twice_fails(profile: ProfileHarness) {
     let _request_stream = add_service(&profile).expect("can add service for profile");
     let mut second_request_stream =
@@ -140,7 +144,9 @@ async fn test_same_psm_twice_fails(profile: ProfileHarness) {
     }
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-profile-integration-tests#meta/bt-profile-integration-tests-component.cm"
+)]
 async fn test_add_and_remove_profile(profile: ProfileHarness) {
     let request_stream = add_service(&profile).expect("can add service for profile");
 
@@ -155,7 +161,9 @@ async fn test_add_and_remove_profile(profile: ProfileHarness) {
     }
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-profile-integration-tests#meta/bt-profile-integration-tests-component.cm"
+)]
 async fn test_connect_unknown_peer(profile: ProfileHarness) {
     let fut = profile.aux().profile.connect(
         &PeerId(0xDEAD).into(),

@@ -9,14 +9,14 @@ use async_trait::async_trait;
 use derivative::Derivative;
 use fidl::endpoints::Proxy as _;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon::{self as zx};
+
 use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use maplit::hashmap;
 use net_declare::{fidl_ip, fidl_subnet};
 use net_types::ip::{Ip, IpAddr, IpVersion};
 use netemul::RealmUdpSocket as _;
-use netstack_testing_common::interfaces;
 use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::{interfaces, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
 use netstack_testing_macros::netstack_test;
 use std::collections::HashMap;
 use test_case::test_case;
@@ -231,18 +231,21 @@ impl<'a> MulticastForwardingNetwork<'a> {
             .collect()
             .await;
 
-        let input_server = match source_device {
-            SourceDevice::Router(server) | SourceDevice::Server(server) => server,
-        };
-        let input_server_device = servers.get(&input_server).expect("input server not found");
-
-        set_multicast_forwarding(
-            input_server_device.router_interface.control(),
-            enable_multicast_forwarding,
-        )
-        .await;
+        for server in servers.keys() {
+            let device = servers.get(&server).expect("input server not found");
+            set_multicast_forwarding(
+                device.router_interface.control(),
+                enable_multicast_forwarding,
+            )
+            .await;
+        }
 
         let router_listener_socket = if listen_from_router {
+            let input_server = match source_device {
+                SourceDevice::Router(server) | SourceDevice::Server(server) => server,
+            };
+            let input_server_device = servers.get(&input_server).expect("input server not found");
+
             Some(
                 create_listener_socket(
                     router_realm,
@@ -266,8 +269,11 @@ impl<'a> MulticastForwardingNetwork<'a> {
         }
     }
 
-    /// Sends a single multicast packet from a configured device.
-    async fn send_multicast_packet(&self) {
+    /// Sends a single multicast packet with optional behavior overrides.
+    ///
+    /// If `dst_addr_type` is specified, it will be used rather than
+    /// `IpAddrType::Multicast`.
+    async fn send_multicast_packet_with_overrides(&self, dst_addr_type: Option<IpAddrType>) {
         let (realm, addr, id) = match self.options.source_device {
             SourceDevice::Router(server) => {
                 let server_device = self.get_server(server);
@@ -283,7 +289,8 @@ impl<'a> MulticastForwardingNetwork<'a> {
             }
         };
 
-        let dst_addr = create_socket_addr(IpAddrType::Multicast.address(self.version));
+        let dst_addr_type = dst_addr_type.unwrap_or(IpAddrType::Multicast);
+        let dst_addr = create_socket_addr(dst_addr_type.address(self.version));
         let server_sock = fasync::net::UdpSocket::bind_in_realm(realm, dst_addr)
             .await
             .expect("bind_in_realm failed for server socket");
@@ -316,6 +323,11 @@ impl<'a> MulticastForwardingNetwork<'a> {
         let r =
             server_sock.send_to(Self::PAYLOAD.as_bytes(), dst_addr).await.expect("send_to failed");
         assert_eq!(r, Self::PAYLOAD.as_bytes().len());
+    }
+
+    /// Like [`send_multicast_packet_with_overrides`] but without any overrides.
+    async fn send_multicast_packet(&self) {
+        self.send_multicast_packet_with_overrides(None).await
     }
 
     /// Verifies the receipt of a multicast packet against the provided
@@ -1556,13 +1568,17 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         // Queue a packet that could potentially be forwarded once a multicast route
         // is installed.
         test_network.send_multicast_packet().await;
-        // TODO(https://fxbug.dev/353328975): Wait for a "missing route" event
-        // instead of sleeping.
-        const WAIT_AFTER_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(2);
-        // After sending the packet, sleep for a few seconds to ensure that the
-        // it's actually in the Netstack's pending table before we install a
-        // route.
-        netstack_testing_common::sleep(WAIT_AFTER_SEND_DURATION.into_seconds()).await;
+        // Wait for the "Missing Route" event to ensure the packet has been
+        // queued in the pending table.
+        let RoutingEventResult { dropped_events, addresses, input_interface, event } =
+            controller.watch_routing_events().await.expect("watch_routing_events failed");
+        assert_eq!(dropped_events, 0);
+        assert_eq!(addresses, test_network.default_unicast_source_and_multicast_destination());
+        assert_eq!(input_interface, test_network.get_source_router_interface_id());
+        assert_eq!(
+            event,
+            fnet_multicast_admin::RoutingEvent::MissingRoute(fnet_multicast_admin::Empty {})
+        );
     }
 
     let route_action = action.and_then(|action| {
@@ -1779,6 +1795,65 @@ async fn watch_routing_events_already_hanging<I: Ip, N: Netstack>(name: &str) {
     // The routing table should be dropped when the controller is closed. As a
     // result, a packet should no longer be forwarded.
     test_network.wait_for_packet_to_become_unrouteable().await;
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+#[variant(N, Netstack)]
+async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let router_realm = create_router_realm::<N>(name, &sandbox);
+    let test_network = MulticastForwardingNetwork::new::<N>(
+        name,
+        I::VERSION,
+        &sandbox,
+        &router_realm,
+        vec![Server::A],
+        vec![Client::A],
+        MulticastForwardingNetworkOptions::default(),
+    )
+    .await;
+
+    let controller = test_network.create_multicast_controller();
+
+    test_network.wait_for_controller_to_start(&controller).await;
+
+    // NB: Send to two separate destination addresses. This ensures the Netstack
+    // will publish two unique events.
+    const DST_ADDRS: [IpAddrType; 2] = [IpAddrType::Multicast, IpAddrType::OtherMulticast];
+    for dst_addr in DST_ADDRS {
+        test_network.send_multicast_packet_with_overrides(Some(dst_addr)).await;
+    }
+
+    // After sending the packet, sleep for a few seconds to allow the netstack
+    // time to receive the packets and publish events. This helps reduce the
+    // rate of falsely passing.
+    const WAIT_AFTER_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(1);
+    netstack_testing_common::sleep(WAIT_AFTER_SEND_DURATION.into_seconds()).await;
+
+    // Verify both "Missing Route" events are observed in the correct order.
+    for dst_addr in DST_ADDRS {
+        let RoutingEventResult { dropped_events, addresses, input_interface, event } = controller
+            .watch_routing_events()
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+                panic!("timed out waiting for event")
+            })
+            .await
+            .expect("watch_routing_events failed");
+
+        let src_addr = test_network.get_source_address();
+        let dst_addr = dst_addr.address(test_network.version);
+        let expected_addr =
+            test_network.create_unicast_source_and_multicast_destination(src_addr, dst_addr);
+
+        assert_eq!(dropped_events, 0);
+        assert_eq!(addresses, expected_addr);
+        assert_eq!(input_interface, test_network.get_source_router_interface_id());
+        assert_eq!(
+            event,
+            fnet_multicast_admin::RoutingEvent::MissingRoute(fnet_multicast_admin::Empty {})
+        );
+    }
 }
 
 #[netstack_test]

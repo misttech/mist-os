@@ -37,6 +37,7 @@
         {
           "type": {
             "kind": "string_array",
+            "kind_v2": "string_array",
             "element_count": 100,
             "type_shape_v2": {
               "inline_size": 100,
@@ -90,6 +91,7 @@
         {
           "type": {
             "kind": "string_array",
+            "kind_v2": "string_array",
             "element_count": 2,
             "type_shape_v2": {
               "inline_size": 2,
@@ -147,6 +149,7 @@
           "ordinal": 1,
           "type": {
             "kind": "string_array",
+            "kind_v2": "string_array",
             "element_count": 100,
             "type_shape_v2": {
               "inline_size": 100,
@@ -197,6 +200,7 @@
           "ordinal": 1,
           "type": {
             "kind": "string_array",
+            "kind_v2": "string_array",
             "element_count": 2,
             "type_shape_v2": {
               "inline_size": 2,
@@ -250,6 +254,7 @@
           "name": "a",
           "type": {
             "kind": "string_array",
+            "kind_v2": "string_array",
             "element_count": 100,
             "type_shape_v2": {
               "inline_size": 100,
@@ -301,6 +306,7 @@
           "name": "a",
           "type": {
             "kind": "string_array",
+            "kind_v2": "string_array",
             "element_count": 2,
             "type_shape_v2": {
               "inline_size": 2,

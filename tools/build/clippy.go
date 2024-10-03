@@ -8,9 +8,12 @@ package build
 // clippy on the underlying Rust code.
 type ClippyTarget struct {
 	// Output is the path to the clippy output file.
-	Output string `json:"output"`
+	Output string `json:"clippy_output"`
 
 	// Sources is a list of paths to source files that compose this target,
 	// relative to the build directory.
 	Sources []string `json:"src"`
+
+	// DisableClippy when clippy is not built for a particular target.
+	DisableClippy bool `json:"disable_clippy"`
 }

@@ -16,7 +16,7 @@ use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::sync::{mpsc, Arc};
-use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics as fdiagnostics, zx};
 
 const BUFFER_SIZE: i32 = 1_049_000;
 
@@ -251,7 +251,7 @@ impl LogIterator {
         })?;
         let iterator = fdiagnostics::BatchIteratorSynchronousProxy::new(client_end.into_channel());
         if is_subscribe {
-            let () = iterator.wait_for_ready(zx::MonotonicTime::INFINITE).map_err(|err| {
+            let () = iterator.wait_for_ready(zx::MonotonicInstant::INFINITE).map_err(|err| {
                 errno!(EIO, format!("Failed to wait for BatchIterator being ready: {err}"))
             })?;
         }
@@ -300,7 +300,7 @@ impl LogIterator {
             }
             let next_batch = self
                 .iterator
-                .get_next(zx::MonotonicTime::INFINITE)
+                .get_next(zx::MonotonicInstant::INFINITE)
                 .map_err(|_| errno!(ENOENT))?
                 .map_err(|_| errno!(ENOENT))?;
             if next_batch.is_empty() {

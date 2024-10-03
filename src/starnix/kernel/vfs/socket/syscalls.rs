@@ -13,7 +13,7 @@ use crate::vfs::socket::{
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
-use fuchsia_zircon as zx;
+
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};
@@ -434,7 +434,7 @@ fn recvmsg_internal<L>(
     file: &FileHandle,
     user_message_header: UserRef<msghdr>,
     flags: u32,
-    deadline: Option<zx::MonotonicTime>,
+    deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -559,7 +559,7 @@ pub fn sys_recvmmsg(
         None
     } else {
         let ts = current_task.read_object(user_timeout)?;
-        Some(zx::MonotonicTime::after(duration_from_timespec(ts)?))
+        Some(zx::MonotonicInstant::after(duration_from_timespec(ts)?))
     };
 
     let mut index = 0usize;

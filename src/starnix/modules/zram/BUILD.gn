@@ -14,7 +14,7 @@ rustc_library("zram") {
 
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//sdk/rust/zx",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix-sync",

@@ -16,7 +16,7 @@ use fuchsia_component::client::connect_to_protocol;
 use std::sync::Arc;
 use stress_test::run_test;
 use tracing::Level;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it

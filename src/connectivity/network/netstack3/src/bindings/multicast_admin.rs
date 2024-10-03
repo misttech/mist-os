@@ -4,15 +4,20 @@
 
 //! FIDL Worker for the `fuchsia.net.multicast.admin` API.
 
+use std::collections::VecDeque;
 use std::num::NonZeroU64;
 
 use derivative::Derivative;
+use explicit::ResultExt;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream};
-use fidl_fuchsia_net_multicast_admin::{self as fnet_multicast_admin, TableControllerCloseReason};
+use fidl_fuchsia_net_multicast_admin::{
+    self as fnet_multicast_admin, RouteStats, RoutingEvent, TableControllerCloseReason,
+    WrongInputInterface, MAX_ROUTING_EVENTS,
+};
 use fidl_fuchsia_net_multicast_ext::{
-    AddRouteError, DelRouteError, FidlMulticastAdminIpExt, FidlResponder as _,
+    AddRouteError, DelRouteError, FidlMulticastAdminIpExt, FidlResponder as _, GetRouteStatsError,
     Route as FidlExtRoute, TableControllerRequest, TerminalEventControlHandle,
-    UnicastSourceAndMulticastDestination,
+    UnicastSourceAndMulticastDestination, WatchRoutingEventsResponse,
 };
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
@@ -20,16 +25,17 @@ use futures::future::OptionFuture;
 use futures::StreamExt as _;
 use log::{error, info, warn};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
-use netstack3_core::device::DeviceId;
+use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::ip::{
-    ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastRoute,
-    MulticastRouteKey, MulticastRouteTarget,
+    ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
+    MulticastRoute, MulticastRouteKey, MulticastRouteStats, MulticastRouteTarget,
 };
 use netstack3_core::IpExt;
 
+use crate::bindings::time::StackTime;
 use crate::bindings::util::{
-    DeviceNotFoundError, IntoFidl, ResultExt as _, TryFromFidl, TryFromFidlWithContext,
-    TryIntoCore as _, TryIntoCoreWithContext,
+    DeviceNotFoundError, IntoFidl, IntoFidlWithContext, ResultExt as _, TryFromFidl,
+    TryFromFidlWithContext, TryIntoCore as _, TryIntoCoreWithContext,
 };
 use crate::bindings::{BindingsCtx, ConversionContext, Ctx};
 
@@ -39,10 +45,9 @@ enum MulticastAdminEvent<I: IpExt + FidlMulticastAdminIpExt> {
     NewClient { request_stream: I::TableControllerRequestStream },
     /// A device is being removed, and references to it need to be purged from
     /// the multicast route table.
-    RemoveDevice {
-        device: netstack3_core::device::WeakDeviceId<BindingsCtx>,
-        completer: oneshot::Sender<()>,
-    },
+    RemoveDevice { device: WeakDeviceId<BindingsCtx>, completer: oneshot::Sender<()> },
+    /// An event was emitted by the multicast forwarding engine.
+    ForwardingEvent { event: MulticastForwardingEvent<I, WeakDeviceId<BindingsCtx>> },
 }
 
 /// An event sink that dispatches events to the [`MulticastAdminWorker`].
@@ -64,7 +69,7 @@ impl<I: IpExt + FidlMulticastAdminIpExt> MulticastAdminEventSink<I> {
     ) {
         self.sender
             .unbounded_send(MulticastAdminEvent::NewClient { request_stream })
-            .expect("MulticastAdmiNWorker should never close before the sink");
+            .expect("MulticastAdminWorker should never close before the sink");
     }
 
     /// Remove the devices from the IPv4/IPv6 multicast route tables.
@@ -75,15 +80,22 @@ impl<I: IpExt + FidlMulticastAdminIpExt> MulticastAdminEventSink<I> {
     /// # Panics
     ///
     /// Panics if the corresponding [`MulticastAdminWorker`] has been dropped.
-    async fn remove_multicast_routes_on_device(
-        &self,
-        device: &netstack3_core::device::WeakDeviceId<BindingsCtx>,
-    ) {
+    async fn remove_multicast_routes_on_device(&self, device: &WeakDeviceId<BindingsCtx>) {
         let (completer, waiter) = oneshot::channel();
         self.sender
             .unbounded_send(MulticastAdminEvent::RemoveDevice { device: device.clone(), completer })
             .expect("MulticastAdminWorker should never close before the sink");
         waiter.await.expect("completer should not be dropped");
+    }
+
+    /// Dispatch the given forwarding event to the [`MulticastAdminWorker`].
+    pub(crate) fn dispatch_multicast_forwarding_event(
+        &self,
+        event: MulticastForwardingEvent<I, WeakDeviceId<BindingsCtx>>,
+    ) {
+        self.sender
+            .unbounded_send(MulticastAdminEvent::ForwardingEvent { event })
+            .expect("MulticastAdminWorker should never close before the sink")
     }
 
     /// Close the sink, allowing the [`MulticastAdminWorker`] to finish.
@@ -137,8 +149,9 @@ impl<I: IpExt + FidlMulticastAdminIpExt> MulticastAdminWorker<I> {
                     close_client: Some(ClientCloseReason::WorkerExit),
                 },
                 Work::Event(Some(event)) => {
-                    handle_event(&mut ctx, event, &mut client);
-                    MaybeClose { close_worker: false, close_client: None }
+                    let close_client =
+                        handle_event(&mut ctx, event, &mut client).err_checked::<()>();
+                    MaybeClose { close_worker: false, close_client }
                 }
                 Work::Request(None) => MaybeClose {
                     close_worker: false,
@@ -150,13 +163,8 @@ impl<I: IpExt + FidlMulticastAdminIpExt> MulticastAdminWorker<I> {
                 },
                 Work::Request(Some(Ok(r))) => {
                     let c = client.as_mut().expect("`Work::Request` proves that client is `Some`");
-                    match handle_request(&mut ctx, c, r.into()) {
-                        Ok(()) => MaybeClose { close_worker: false, close_client: None },
-                        Err(e) => MaybeClose {
-                            close_worker: false,
-                            close_client: Some(ClientCloseReason::TerminatedByServer(e)),
-                        },
-                    }
+                    let close_client = handle_request(&mut ctx, c, r.into()).err_checked::<()>();
+                    MaybeClose { close_worker: false, close_client }
                 }
             };
 
@@ -205,7 +213,7 @@ impl MulticastAdminEventSinks {
     /// Like [`MulticastAdminEventSink::remove_multicast_routes_on_device`].
     pub(crate) async fn remove_multicast_routes_on_device(
         &self,
-        device: &netstack3_core::device::WeakDeviceId<BindingsCtx>,
+        device: &WeakDeviceId<BindingsCtx>,
     ) {
         futures::join!(
             self.v4_sink.remove_multicast_routes_on_device(device),
@@ -241,7 +249,7 @@ pub(crate) fn new_workers_and_sinks() -> (MulticastAdminWorkers, MulticastAdminE
 }
 
 /// An active connection to the multicast admin table controller FIDL protocol.
-struct MulticastAdminClient<I: FidlMulticastAdminIpExt> {
+struct MulticastAdminClient<I: IpExt + FidlMulticastAdminIpExt> {
     /// Stream of incoming requests.
     request_stream: futures::stream::Fuse<I::TableControllerRequestStream>,
     /// The control_handle for the connection.
@@ -251,7 +259,7 @@ struct MulticastAdminClient<I: FidlMulticastAdminIpExt> {
     watcher: MulticastRoutingEventsWatcher<I>,
 }
 
-impl<I: FidlMulticastAdminIpExt> MulticastAdminClient<I> {
+impl<I: IpExt + FidlMulticastAdminIpExt> MulticastAdminClient<I> {
     fn new(request_stream: I::TableControllerRequestStream) -> Self {
         let control_handle = request_stream.control_handle();
         MulticastAdminClient {
@@ -289,8 +297,116 @@ impl<I: FidlMulticastAdminIpExt> MulticastAdminClient<I> {
 /// State associated with the hanging-get watcher for multicast routing events.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-struct MulticastRoutingEventsWatcher<I: FidlMulticastAdminIpExt> {
+struct MulticastRoutingEventsWatcher<I: IpExt + FidlMulticastAdminIpExt> {
+    /// The pending watch request from FIDL, if any.
+    ///
+    /// If `Some`, `stashed_events` must be empty.
     parked_watch_request: Option<I::WatchRoutingEventsResponder>,
+    /// The stash of events that have been received but not yet delivered.
+    ///
+    /// If non-empty, `parked_watch_request` must be `None`.
+    stashed_events: VecDeque<MulticastForwardingEvent<I, WeakDeviceId<BindingsCtx>>>,
+    /// The number of events that have been dropped because the stash is full.
+    ///
+    /// 0, if `stashed_events` is not full.
+    dropped_events: u64,
+}
+
+impl<I: IpExt + FidlMulticastAdminIpExt> MulticastRoutingEventsWatcher<I> {
+    /// Handles the arrival of a new event from the multicast forwarding engine.
+    ///
+    /// If we have a parked watched request, respond immediately with the event.
+    /// Otherwise, attempt to stash the event for a future watch request.
+    fn on_new_event(
+        &mut self,
+        ctx: &mut Ctx,
+        event: MulticastForwardingEvent<I, WeakDeviceId<BindingsCtx>>,
+    ) -> Result<(), fidl::Error> {
+        let Self { parked_watch_request, stashed_events, dropped_events } = self;
+        if let Some(responder) = parked_watch_request.take() {
+            if let Some(event) = event.upgrade_device_id() {
+                return send_event(ctx, event, responder, 0);
+            } else {
+                // NB: If the Device IDs in the event couldn't be upgraded,
+                // ignore it, and re-park the responder.
+                *parked_watch_request = Some(responder)
+            }
+        } else {
+            if stashed_events.len() < MAX_ROUTING_EVENTS.into() {
+                stashed_events.push_back(event)
+            } else {
+                // TODO(https://fxbug.dev/352570820): Increment a counter.
+                *dropped_events += 1
+            }
+        }
+        Ok(())
+    }
+
+    /// Handles the arrival of a new `WatchRoutingEvents` request.
+    fn on_watch_request(
+        &mut self,
+        ctx: &mut Ctx,
+        responder: I::WatchRoutingEventsResponder,
+    ) -> Result<(), ClientCloseReason> {
+        let Self { parked_watch_request, stashed_events, dropped_events } = self;
+        if parked_watch_request.is_some() {
+            // NB: Teardown the client if they call watch when there is already
+            // a pending request.
+            return Err(ClientCloseReason::TerminatedByServer(
+                TableControllerCloseReason::HangingGetError,
+            ));
+        }
+
+        // Try sending an event, if we have one.
+        while let Some(event) = stashed_events.pop_front() {
+            if let Some(event) = event.upgrade_device_id() {
+                let num_dropped = std::mem::replace(dropped_events, 0);
+                return send_event(ctx, event, responder, num_dropped)
+                    .map_err(ClientCloseReason::FidlError);
+            }
+            // NB: If the Device IDs in the event couldn't be upgraded,
+            // ignore it, and try sending the next event instead.
+        }
+
+        // No event could be sent, park the responder.
+        *parked_watch_request = Some(responder);
+        Ok(())
+    }
+}
+
+/// Sends the given event on the given responder.
+fn send_event<I: IpExt + FidlMulticastAdminIpExt>(
+    ctx: &mut Ctx,
+    event: MulticastForwardingEvent<I, DeviceId<BindingsCtx>>,
+    responder: I::WatchRoutingEventsResponder,
+    num_dropped_events: u64,
+) -> Result<(), fidl::Error> {
+    let (input_interface, key, fidl_event) = match event {
+        MulticastForwardingEvent::MissingRoute { key, input_interface } => {
+            (input_interface, key, RoutingEvent::MissingRoute(fnet_multicast_admin::Empty))
+        }
+        MulticastForwardingEvent::WrongInputInterface {
+            key,
+            actual_input_interface,
+            expected_input_interface,
+        } => (
+            actual_input_interface,
+            key,
+            RoutingEvent::WrongInputInterface(WrongInputInterface {
+                expected_input_interface: Some(
+                    expected_input_interface.into_fidl_with_ctx(ctx.bindings_ctx()).get(),
+                ),
+                __source_breaking: fidl::marker::SourceBreaking,
+            }),
+        ),
+    };
+    let addresses = key.into_fidl();
+    responder.try_send(WatchRoutingEventsResponse {
+        dropped_events: num_dropped_events,
+        addresses: &addresses,
+        input_interface: input_interface.into_fidl_with_ctx(ctx.bindings_ctx()).get(),
+        event: &fidl_event,
+    })
 }
 
 /// The reason a [`MulticastAdminClient`] closed.
@@ -306,16 +422,20 @@ pub(crate) enum ClientCloseReason {
 ///
 /// The given `client` may be updated from `None` to `Some`, in the case a new
 /// client is connecting.
+///
+/// Returns `Some(reason)` when the current client should be closed with the
+/// given reason.
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 fn handle_event<I: IpExt + FidlMulticastAdminIpExt>(
     ctx: &mut Ctx,
     event: MulticastAdminEvent<I>,
     client: &mut Option<MulticastAdminClient<I>>,
-) {
+) -> Result<(), ClientCloseReason> {
     match event {
         MulticastAdminEvent::RemoveDevice { device, completer } => {
             ctx.api().multicast_forwarding::<I>().remove_references_to_device(&device);
             completer.send(()).expect("completer should be newly signaled");
+            Ok(())
         }
         MulticastAdminEvent::NewClient { request_stream } => {
             let new_client = MulticastAdminClient::new(request_stream);
@@ -324,13 +444,32 @@ fn handle_event<I: IpExt + FidlMulticastAdminIpExt>(
                 new_client.close(ClientCloseReason::TerminatedByServer(
                     fnet_multicast_admin::TableControllerCloseReason::AlreadyInUse,
                 ));
-                return;
+                Ok(())
             } else {
                 *client = Some(new_client);
                 assert!(
                     ctx.api().multicast_forwarding::<I>().enable(),
                     "multicast forwarding should be newly enabled"
                 );
+                Ok(())
+            }
+        }
+        MulticastAdminEvent::ForwardingEvent { event } => {
+            match client {
+                // NB: The multicast forwarding engine is only enabled when we
+                // have an active client connection, so in theory client
+                // should always be `Some`. However, it's possible that tearing
+                // down a client raced with dispatching an event from the
+                // engine, in which case we'll observe `None` here. Silently
+                // discard the event.
+                None => Ok(()),
+                Some(c) => match c.watcher.on_new_event(ctx, event) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        // Teardown the client on FIDL error.
+                        Err(ClientCloseReason::FidlError(e))
+                    }
+                },
             }
         }
     }
@@ -342,7 +481,7 @@ fn handle_request<I: IpExt + FidlMulticastAdminIpExt>(
     ctx: &mut Ctx,
     client: &mut MulticastAdminClient<I>,
     request: TableControllerRequest<I>,
-) -> Result<(), TableControllerCloseReason> {
+) -> Result<(), ClientCloseReason> {
     match request {
         TableControllerRequest::AddRoute { addresses, route, responder } => {
             info!("adding multicast route: addresses={addresses:?}, route={route:?}");
@@ -363,20 +502,17 @@ fn handle_request<I: IpExt + FidlMulticastAdminIpExt>(
             Ok(())
         }
         TableControllerRequest::GetRouteStats { addresses, responder } => {
-            // TODO(https://fxbug.dev/323052525): Support getting multicast route stats.
-            warn!("not getting routes stats; unimplemented: addresses={addresses:?}");
-            let stats = fnet_multicast_admin::RouteStats::default();
-            responder.try_send(Ok(&stats)).unwrap_or_log("failed to respond");
+            let result = handle_get_route_stats(ctx, addresses);
+            if let Err(e) = &result {
+                warn!("failed to get route stats: {e:?}")
+            }
+            responder
+                .try_send(result.as_ref().map_err(Clone::clone))
+                .unwrap_or_log("failed to respond");
             Ok(())
         }
         TableControllerRequest::WatchRoutingEvents { responder } => {
-            // TODO(https://fxbug.dev/323052525): Support watching multicast routing
-            // events.
-            warn!("not publishing multicast routing events; unimplemented");
-            match client.watcher.parked_watch_request.replace(responder) {
-                None => Ok(()),
-                Some(_) => Err(TableControllerCloseReason::HangingGetError),
-            }
+            client.watcher.on_watch_request(ctx, responder)
         }
     }
 }
@@ -412,7 +548,23 @@ fn handle_del_route<I: IpExt + FidlMulticastAdminIpExt>(
         Ok(None) => Err(DelRouteError::NotFound),
         Ok(Some(_route)) => Ok(()),
         Err(MulticastForwardingDisabledError {}) => {
-            unreachable!("the existance of a `MulticastAdminClient` proves the api is enabled")
+            unreachable!("the existence of a `MulticastAdminClient` proves the api is enabled")
+        }
+    }
+}
+
+/// Gets statistics for a multicast route.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_route_stats<I: IpExt + FidlMulticastAdminIpExt>(
+    ctx: &mut Ctx,
+    addresses: UnicastSourceAndMulticastDestination<I>,
+) -> Result<RouteStats, GetRouteStatsError> {
+    let key = addresses.try_into_core().map_err(IntoFidl::<GetRouteStatsError>::into_fidl)?;
+    match ctx.api().multicast_forwarding().get_route_stats(&key) {
+        Ok(None) => Err(GetRouteStatsError::NotFound),
+        Ok(Some(stats)) => Ok(stats.into_fidl()),
+        Err(MulticastForwardingDisabledError {}) => {
+            unreachable!("the existence of a `MulticastAdminClient` proves the api is enabled")
         }
     }
 }
@@ -435,6 +587,13 @@ impl IntoFidl<DelRouteError> for MulticastRouteAddressError {
     }
 }
 
+impl IntoFidl<GetRouteStatsError> for MulticastRouteAddressError {
+    fn into_fidl(self) -> GetRouteStatsError {
+        let MulticastRouteAddressError {} = self;
+        GetRouteStatsError::InvalidAddress
+    }
+}
+
 impl<I: IpExt + FidlMulticastAdminIpExt> TryFromFidl<UnicastSourceAndMulticastDestination<I>>
     for MulticastRouteKey<I>
 {
@@ -444,6 +603,17 @@ impl<I: IpExt + FidlMulticastAdminIpExt> TryFromFidl<UnicastSourceAndMulticastDe
         let UnicastSourceAndMulticastDestination { unicast_source, multicast_destination } = addrs;
         MulticastRouteKey::new(unicast_source, multicast_destination)
             .ok_or(MulticastRouteAddressError)
+    }
+}
+
+impl<I: IpExt + FidlMulticastAdminIpExt> IntoFidl<UnicastSourceAndMulticastDestination<I>>
+    for MulticastRouteKey<I>
+{
+    fn into_fidl(self) -> UnicastSourceAndMulticastDestination<I> {
+        UnicastSourceAndMulticastDestination {
+            unicast_source: self.src_addr(),
+            multicast_destination: self.dst_addr(),
+        }
     }
 }
 
@@ -486,6 +656,16 @@ impl TryFromFidlWithContext<FidlExtRoute> for MulticastRoute<DeviceId<BindingsCt
                     }
                 })
             }
+        }
+    }
+}
+
+impl IntoFidl<RouteStats> for MulticastRouteStats<StackTime> {
+    fn into_fidl(self) -> RouteStats {
+        let MulticastRouteStats { last_used } = self;
+        RouteStats {
+            last_used: Some(last_used.into_fidl()),
+            __source_breaking: fidl::marker::SourceBreaking,
         }
     }
 }

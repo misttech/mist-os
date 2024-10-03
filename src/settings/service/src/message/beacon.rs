@@ -9,11 +9,11 @@ use crate::message::messenger::Messenger;
 use crate::message::receptor::Receptor;
 use anyhow::{format_err, Error};
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::{AbortHandle, Abortable, TryFutureExt};
 use futures::lock::Mutex;
 use std::sync::Arc;
+use zx::Duration;
 
 /// Helper for creating a beacon. The builder allows chaining additional fuses
 pub struct BeaconBuilder {

@@ -50,7 +50,7 @@ mod tests {
     use crate::gestures::gesture_arena::TouchpadEvent;
     use crate::touch_binding;
     use crate::utils::Position;
-    use fuchsia_zircon as fx;
+
     use test_case::test_case;
 
     fn make_touch_contact(id: u32, position: Position) -> touch_binding::TouchContact {
@@ -59,7 +59,7 @@ mod tests {
 
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -69,7 +69,7 @@ mod tests {
         }; "previous contact stay, place new finger")]
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(2, Position{x: 5.0, y: 5.0}),
@@ -78,7 +78,7 @@ mod tests {
         }; "previous contact lift, place new finger")]
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
             filtered_palm_contacts: vec![],
@@ -86,7 +86,7 @@ mod tests {
     #[fuchsia::test]
     fn movement_from_events_no_movement(new_event: TouchpadEvent) {
         let previous_event = TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -99,7 +99,7 @@ mod tests {
 
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 6.0}),
@@ -109,7 +109,7 @@ mod tests {
         }; "contact 1 move, contact 2 stay")]
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -119,7 +119,7 @@ mod tests {
         }; "contact 2 move, contact 1 stay")]
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 6.0}),
@@ -129,7 +129,7 @@ mod tests {
         }; "contact 1 movement larger")]
     #[test_case(
         TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 6.0}),
@@ -139,7 +139,7 @@ mod tests {
     #[fuchsia::test]
     fn movement_from_events_furthest_movement(new_event: TouchpadEvent) {
         let previous_event = TouchpadEvent {
-            timestamp: fx::Time::ZERO,
+            timestamp: zx::Instant::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position { x: 1.0, y: 1.0 }),

@@ -21,8 +21,7 @@ use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use {
     fidl_fuchsia_audio_device as fadevice,
-    fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc,
-    fuchsia_zircon_types as zx_types,
+    fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, zx_types,
 };
 
 /// Serialize an value that can be converted to a string to the string.

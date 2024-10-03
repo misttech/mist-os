@@ -51,9 +51,8 @@ std::mutex kDriverGlobalsLock;
 
 namespace {
 
-constexpr auto kOpenFlags = fio::wire::OpenFlags::kRightReadable |
-                            fio::wire::OpenFlags::kRightExecutable |
-                            fio::wire::OpenFlags::kNotDirectory;
+constexpr auto kOpenFlags =
+    fio::Flags::kPermRead | fio::Flags::kPermExecute | fio::Flags::kProtocolFile;
 constexpr auto kVmoFlags =
     fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute | fio::wire::VmoFlags::kPrivateClone;
 constexpr auto kLibDriverPath = "/pkg/driver/compat.so";
@@ -63,8 +62,7 @@ std::string_view GetFilename(std::string_view path) {
   return index == std::string_view::npos ? path : path.substr(index + 1);
 }
 
-zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path,
-                            fuchsia_io::wire::OpenFlags flags) {
+zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path, fuchsia_io::Flags flags) {
   zx::result file = ns.Open<fuchsia_io::File>(path, flags);
   if (file.is_error()) {
     return file.take_error();
@@ -726,14 +724,11 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   }
 
   // Create our logger.
-  zx::result logger_result = fdf::Logger::Create(*incoming(), dispatcher(), note->payload.name);
-  if (logger_result.is_error()) {
-    return logger_result.take_error();
-  }
+  auto logger = fdf::Logger::Create(*incoming(), dispatcher(), note->payload.name);
 
   // Move the logger over into a shared_ptr instead of unique_ptr so we can pass it to the global
   // logging manager and compat::Device.
-  inner_logger_ = std::shared_ptr<fdf::Logger>(logger_result.value().release());
+  inner_logger_ = std::shared_ptr<fdf::Logger>(logger.release());
   device_.set_logger(inner_logger_);
   {
     std::lock_guard guard(kGlobalLoggerListLock);

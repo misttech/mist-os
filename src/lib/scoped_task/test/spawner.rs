@@ -14,7 +14,7 @@ use std::io::Write;
 use std::os::unix::io::FromRawFd;
 use std::sync::mpsc;
 use std::{env, panic, thread};
-use {fuchsia_runtime as runtime, fuchsia_zircon as zx};
+use {fuchsia_runtime as runtime, zx};
 
 /// Spawns a subprocess in a configurable way. Used by the scoped_task test.
 #[derive(FromArgs, Clone, Copy, Debug)]
@@ -49,7 +49,7 @@ fn main() {
     let opts: Options = argh::from_env();
     println!("spawner opts={:?}", opts);
     if opts.sleep {
-        zx::MonotonicTime::INFINITE.sleep();
+        zx::MonotonicInstant::INFINITE.sleep();
     }
 
     // This test deliberately races threads where one is shutting down the process.
@@ -77,7 +77,7 @@ fn main() {
                     assert!(!opts.wait, "sending should always succeed with --wait");
                 }
 
-                zx::MonotonicTime::INFINITE.sleep();
+                zx::MonotonicInstant::INFINITE.sleep();
             });
         } else {
             _process = Some(

@@ -15,7 +15,7 @@ pub fn emit_struct<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let s = &compiler.library.struct_declarations[ident];
+    let s = &compiler.schema.struct_declarations[ident];
 
     let is_static = compiler.query::<IsWireStatic>(ident);
 
@@ -51,21 +51,36 @@ pub fn emit_struct<W: Write>(
 
     // Write decode impl
 
+    let decode_params = if is_static { "" } else { "'buf, " };
     writeln!(
         out,
         r#"
-        unsafe impl<'buf> ::fidl::Decode<'buf> for Wire{name}{params} {{
+        unsafe impl<{decode_params}___D> ::fidl_next::Decode<___D> for Wire{name}{params}
+        where
+            ___D: ?Sized,
+        "#,
+    )?;
+
+    for member in &s.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl_next::Decode<___D>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn decode(
-                slot: ::fidl::Slot<'_, Self>,
-                decoder: &mut ::fidl::decode::Decoder<'buf>,
-            ) -> Result<(), ::fidl::decode::Error> {{
+                slot: ::fidl_next::Slot<'_, Self>,
+                decoder: &mut ___D,
+            ) -> Result<(), ::fidl_next::DecodeError> {{
         "#,
     )?;
 
     // Have to do some nasty manual formatting to get destructuring to be
     // formatted correctly
 
-    writeln!(out, "::fidl::munge! {{")?;
+    writeln!(out, "::fidl_next::munge! {{")?;
     writeln!(out, "            let Self {{")?;
 
     for member in &s.members {
@@ -78,12 +93,12 @@ pub fn emit_struct<W: Write>(
 
     for member in &s.members {
         let name = &member.name;
-        write!(out, "::fidl::Decode::<'buf>::decode({name}.as_mut(), decoder)?;")?;
+        write!(out, "::fidl_next::Decode::decode({name}.as_mut(), decoder)?;")?;
         emit_type_check(
             out,
             |out| writeln!(out, "let {name} = unsafe {{ {name}.deref_unchecked() }};"),
             name,
-            &member.ty.kind,
+            &member.ty,
         )?;
     }
 

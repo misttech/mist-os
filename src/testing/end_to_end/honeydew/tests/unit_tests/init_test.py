@@ -74,7 +74,6 @@ class InitTests(unittest.TestCase):
                     ip_port=None,
                     serial_socket=None,
                 ),
-                transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
             fuchsia_device.FuchsiaDevice,
@@ -127,7 +126,6 @@ class InitTests(unittest.TestCase):
                     ip_port=_INPUT_ARGS["target_ip_port"],
                     serial_socket=None,
                 ),
-                transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
             fuchsia_device.FuchsiaDevice,
@@ -164,7 +162,6 @@ class InitTests(unittest.TestCase):
                     ip_port=_INPUT_ARGS["target_ip_port"],
                     serial_socket=None,
                 ),
-                transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 

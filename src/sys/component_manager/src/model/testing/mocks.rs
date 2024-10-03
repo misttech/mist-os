@@ -16,7 +16,6 @@ use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_diagnostics_types::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Koid};
 use futures::channel::oneshot;
 use futures::future::{AbortHandle, Abortable};
 use futures::lock::Mutex;
@@ -31,6 +30,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
 use vfs::service::endpoint;
+use zx::{self as zx, AsHandleRef, HandleBased, Koid};
 use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[derive(Debug)]

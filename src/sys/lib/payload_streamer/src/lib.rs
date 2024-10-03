@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use block_client::{BlockClient, MutableBufferSlice, RemoteBlockClient, VmoId};
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_paver::{PayloadStreamRequest, PayloadStreamRequestStream, ReadInfo, ReadResult};
-use fuchsia_zircon as zx;
+
 use futures::lock::Mutex;
 use futures::prelude::*;
 use mapped_vmo::Mapping;
@@ -331,11 +331,11 @@ mod tests {
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fidl_fuchsia_paver::{PayloadStreamMarker, PayloadStreamProxy};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, HandleBased};
     use futures::future::try_join;
     use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
     use std::io::Cursor;
     use std::sync::{Arc, Mutex};
+    use zx::{self as zx, HandleBased};
 
     struct StatusUpdate {
         data_read: usize,

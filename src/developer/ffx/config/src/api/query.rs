@@ -11,7 +11,6 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::default::Default;
-use std::path::{Path, PathBuf};
 use tracing::debug;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -26,20 +25,10 @@ impl Default for SelectMode {
     }
 }
 
-/// Overrides the build directory search
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum BuildOverride<'a> {
-    /// Do not search a build directory, even if a 'default' one is known.
-    NoBuild,
-    /// Use a specific path to look up the build directory, ignoring the default.
-    Path(&'a Path),
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct ConfigQuery<'a> {
     pub name: Option<&'a str>,
     pub level: Option<ConfigLevel>,
-    pub build: Option<BuildOverride<'a>>,
     pub select: SelectMode,
     pub ctx: Option<&'a EnvironmentContext>,
 }
@@ -48,11 +37,10 @@ impl<'a> ConfigQuery<'a> {
     pub fn new(
         name: Option<&'a str>,
         level: Option<ConfigLevel>,
-        build: Option<BuildOverride<'a>>,
         select: SelectMode,
         ctx: Option<&'a EnvironmentContext>,
     ) -> Self {
-        Self { ctx, name, level, build, select }
+        Self { ctx, name, level, select }
     }
 
     /// Adds the given name to the query and returns a new composed query.
@@ -62,10 +50,6 @@ impl<'a> ConfigQuery<'a> {
     /// Adds the given level to the query and returns a new composed query.
     pub fn level(self, level: Option<ConfigLevel>) -> Self {
         Self { level, ..self }
-    }
-    /// Adds the given build to the query and returns a new composed query.
-    pub fn build(self, build: Option<BuildOverride<'a>>) -> Self {
-        Self { build, ..self }
     }
     /// Adds the given select mode to the query and returns a new composed query.
     pub fn select(self, select: SelectMode) -> Self {
@@ -93,7 +77,7 @@ impl<'a> ConfigQuery<'a> {
 
     fn get_config(&self, env: Environment) -> ConfigResult {
         debug!("{self}");
-        let config = env.config_from_cache(self.build)?;
+        let config = env.config_from_cache()?;
         let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
         let result = match self {
             Self { name: Some(name), level: None, select, .. } => read_guard.get(*name, *select),
@@ -196,7 +180,7 @@ impl<'a> ConfigQuery<'a> {
         tracing::debug!("Config set got environment");
         env.populate_defaults(&level).await?;
         tracing::debug!("Config set defaults populated");
-        let config = env.config_from_cache(self.build)?;
+        let config = env.config_from_cache()?;
         tracing::debug!("Config set got value from cache");
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         tracing::debug!("Config set got write guard");
@@ -211,7 +195,7 @@ impl<'a> ConfigQuery<'a> {
     pub async fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
         let env = self.get_env().await?;
-        let config = env.config_from_cache(self.build)?;
+        let config = env.config_from_cache()?;
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         write_guard.remove(key, level)?;
         write_guard.save().await
@@ -223,7 +207,7 @@ impl<'a> ConfigQuery<'a> {
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env().await?;
         env.populate_defaults(&level).await?;
-        let config = env.config_from_cache(self.build)?;
+        let config = env.config_from_cache()?;
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         if let Some(mut current) = write_guard.get_in_level(key, level) {
             if current.is_object() {
@@ -247,7 +231,7 @@ impl<'a> ConfigQuery<'a> {
 
 impl<'a> std::fmt::Display for ConfigQuery<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { name, level, build, select, .. } = self;
+        let Self { name, level, select, .. } = self;
         let mut sep = "";
         if let Some(name) = name {
             write!(f, "{sep}key='{name}'")?;
@@ -257,32 +241,7 @@ impl<'a> std::fmt::Display for ConfigQuery<'a> {
             write!(f, "{sep}level={level:?}")?;
             sep = ", ";
         }
-        if let Some(build) = build {
-            write!(f, "{sep}build_override={build:?}")?;
-            sep = ", ";
-        }
         write!(f, "{sep}select={select:?}")
-    }
-}
-
-impl<'a> From<&'a Path> for BuildOverride<'a> {
-    fn from(s: &'a Path) -> Self {
-        BuildOverride::Path(s)
-    }
-}
-impl<'a> From<&'a PathBuf> for BuildOverride<'a> {
-    fn from(s: &'a PathBuf) -> Self {
-        BuildOverride::Path(&s)
-    }
-}
-impl<'a> From<&'a str> for BuildOverride<'a> {
-    fn from(s: &'a str) -> Self {
-        BuildOverride::Path(&Path::new(s))
-    }
-}
-impl<'a> From<&'a String> for BuildOverride<'a> {
-    fn from(s: &'a String) -> Self {
-        BuildOverride::Path(&Path::new(s))
     }
 }
 
@@ -304,12 +263,5 @@ impl<'a> From<ConfigLevel> for ConfigQuery<'a> {
     fn from(value: ConfigLevel) -> Self {
         let level = Some(value);
         ConfigQuery { level, ..Default::default() }
-    }
-}
-
-impl<'a> From<BuildOverride<'a>> for ConfigQuery<'a> {
-    fn from(build: BuildOverride<'a>) -> Self {
-        let build = Some(build);
-        ConfigQuery { build, ..Default::default() }
     }
 }

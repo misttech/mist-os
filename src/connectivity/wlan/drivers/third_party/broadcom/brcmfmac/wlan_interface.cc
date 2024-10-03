@@ -21,6 +21,7 @@
 
 #include <bind/fuchsia/wlan/fullmac/cpp/bind.h>
 
+#include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
@@ -369,6 +370,14 @@ void WlanInterface::Connect(ConnectRequestView request, ConnectCompleter::Sync& 
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ != nullptr) {
     brcmf_if_connect_req(wdev_->netdev, request);
+  }
+  completer.Reply();
+}
+
+void WlanInterface::Roam(RoamRequestView request, RoamCompleter::Sync& completer) {
+  std::shared_lock<std::shared_mutex> guard(lock_);
+  if (wdev_ != nullptr) {
+    brcmf_if_roam_req(wdev_->netdev, request);
   }
   completer.Reply();
 }

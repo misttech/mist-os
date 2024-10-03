@@ -6,7 +6,6 @@ use crate::input_event_relay::{DeviceId, EventProxyMode, OpenedFiles};
 use crate::{parse_fidl_keyboard_event_to_linux_input_event, InputFile};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use fuchsia_zircon::Peered;
 use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
@@ -25,10 +24,10 @@ use starnix_uapi::time::timeval_from_time;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::Arc;
+use zx::Peered;
 use {
     fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
-    starnix_uapi as uapi,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, starnix_uapi as uapi, zx,
 };
 
 // Add a fuchsia-specific vendor ID. 0xf1ca is currently not allocated
@@ -159,7 +158,7 @@ impl InputDevice {
                     fidl::endpoints::create_request_stream::<fuiinput::KeyboardListenerMarker>()
                         .expect("Failed to create keyboard proxy and stream");
                 if keyboard
-                    .add_listener(view_ref, keyboard_listener, zx::MonotonicTime::INFINITE)
+                    .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
                     .is_err()
                 {
                     log_warn!("Could not register keyboard listener");
@@ -168,11 +167,11 @@ impl InputDevice {
                     match request {
                         fuiinput::KeyboardListenerRequest::OnKeyEvent { event, responder } => {
                             let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
+                            slf.open_files.lock().retain(|f| {
+                                let Some(file) = f.upgrade() else {
+                                    return false;
+                                };
 
-                            let mut files = slf.open_files.lock();
-                            let filtered_files: Vec<Arc<InputFile>> =
-                                files.drain(..).flat_map(|f| f.upgrade()).collect();
-                            for file in filtered_files {
                                 let mut inner = file.inner.lock();
 
                                 if !new_events.is_empty() {
@@ -180,9 +179,8 @@ impl InputDevice {
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
-                                files.push(Arc::downgrade(&file));
-                            }
-
+                                return true;
+                            });
                             responder.send(fuiinput::KeyEventStatus::Handled).expect("");
                         }
                     }
@@ -203,7 +201,7 @@ impl InputDevice {
                 let (remote_client, remote_server) =
                     fidl::endpoints::create_endpoints::<fuipolicy::MediaButtonsListenerMarker>();
                 if let Err(e) =
-                    registry_proxy.register_listener(remote_client, zx::MonotonicTime::INFINITE)
+                    registry_proxy.register_listener(remote_client, zx::MonotonicInstant::INFINITE)
                 {
                     log_warn!("Failed to register media buttons listener: {:?}", e);
                     return;
@@ -263,10 +261,11 @@ impl InputDevice {
                         }
                     };
 
-                    let mut files = self.open_files.lock();
-                    let filtered_files: Vec<Arc<InputFile>> =
-                        files.drain(..).flat_map(|f| f.upgrade()).collect();
-                    for file in filtered_files {
+                    self.open_files.lock().retain(|f| {
+                        let Some(file) = f.upgrade() else {
+                            return false;
+                        };
+
                         let mut inner = file.inner.lock();
                         match &inner.inspect_status {
                             Some(inspect_status) => {
@@ -283,8 +282,8 @@ impl InputDevice {
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
 
-                        files.push(Arc::downgrade(&file));
-                    }
+                        return true;
+                    });
 
                     responder.send().expect("media buttons responder failed to respond");
                 }
@@ -369,7 +368,7 @@ fn parse_fidl_button_event(
     power_was_pressed: bool,
     function_was_pressed: bool,
 ) -> (Vec<uapi::input_event>, bool /* power_is_pressed */, bool /* function_is_pressed */) {
-    let time = timeval_from_time(zx::MonotonicTime::get());
+    let time = timeval_from_time(zx::MonotonicInstant::get());
     let mut events = vec![];
     let sync_event = uapi::input_event {
         // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
@@ -422,10 +421,7 @@ mod test {
     use test_case::test_case;
     use test_util::assert_near;
     use zerocopy::FromBytes as _;
-    use {
-        fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy,
-        fuchsia_zircon as zx,
-    }; // for `read_from()`
+    use {fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy, zx}; // for `read_from()`
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
@@ -696,8 +692,8 @@ mod test {
                 EventHandler::None,
             );
         });
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
-        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
+        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
 
         // Reply to first `Watch` request.
         answer_next_watch_request(
@@ -710,8 +706,8 @@ mod test {
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
         // the interested waiters.
-        assert_eq!(waiter1.wait_until(&current_task, zx::MonotonicTime::ZERO), Ok(()));
-        assert_eq!(waiter2.wait_until(&current_task, zx::MonotonicTime::ZERO), Ok(()));
+        assert_eq!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Ok(()));
+        assert_eq!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Ok(()));
     }
 
     #[::fuchsia::test]
@@ -767,8 +763,8 @@ mod test {
                 EventHandler::None,
             );
         });
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
-        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
+        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
 
         // Reply to first `Watch` request with an empty set of events.
         answer_next_watch_request(&mut touch_source_stream, vec![]).await;
@@ -776,8 +772,8 @@ mod test {
         // `InputFile` should be done processing the first reply. Since there
         // were no touch_events given, `InputFile` should not have notified the
         // interested waiters.
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
-        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
+        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
     }
 
     // Note: a user program may also want to be woken if events were already ready at the
@@ -831,8 +827,8 @@ mod test {
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
         // the interested waiters.
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicTime::ZERO), Err(_));
-        assert_eq!(waiter2.wait_until(&current_task, zx::MonotonicTime::ZERO), Ok(()));
+        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_eq!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Ok(()));
     }
 
     #[::fuchsia::test]
@@ -877,7 +873,7 @@ mod test {
         time_nanos: i64,
     ) -> uapi::input_event {
         uapi::input_event {
-            time: timeval_from_time(zx::MonotonicTime::from_nanos(time_nanos)),
+            time: timeval_from_time(zx::MonotonicInstant::from_nanos(time_nanos)),
             type_: ty as u16,
             code: code as u16,
             value,

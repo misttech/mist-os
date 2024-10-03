@@ -6,9 +6,9 @@ use fuchsia_async::TaskGroup;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{Inspector, InspectorConfig};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{StreamExt, TryStreamExt};
 use inspect_runtime::PublishOptions;
+use zx::{self as zx, HandleBased};
 use {
     fidl_diagnostics_validate as validate,
     fidl_diagnostics_validate_deprecated as validate_deprecated,

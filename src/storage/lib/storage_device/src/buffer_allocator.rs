@@ -14,8 +14,8 @@ use std::task::{Context, Poll};
 #[cfg(target_os = "fuchsia")]
 mod buffer_source {
     use fuchsia_runtime::vmar_root_self;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use std::ops::Range;
+    use zx::{self as zx, AsHandleRef};
 
     /// A buffer source backed by a VMO.
     #[derive(Debug)]

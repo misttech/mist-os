@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -65,7 +64,7 @@ impl<'a> EventWaitGuard<'a> {
 
     /// Block the thread until either `deadline` expires, the event is notified, or the event is
     /// interrupted.
-    pub fn block_until(self, deadline: zx::MonotonicTime) -> Result<(), WakeReason> {
+    pub fn block_until(self, deadline: zx::MonotonicInstant) -> Result<(), WakeReason> {
         self.event.block_until(deadline)
     }
 }
@@ -99,7 +98,7 @@ impl InterruptibleEvent {
         EventWaitGuard { event: self }
     }
 
-    fn block_until(&self, deadline: zx::MonotonicTime) -> Result<(), WakeReason> {
+    fn block_until(&self, deadline: zx::MonotonicInstant) -> Result<(), WakeReason> {
         // We need to loop around the call to zx_futex_wake because we can receive spurious
         // wakeups.
         loop {
@@ -190,7 +189,7 @@ mod test {
             other_event.notify();
         });
 
-        guard.block_until(zx::MonotonicTime::INFINITE).expect("failed to be notified");
+        guard.block_until(zx::MonotonicInstant::INFINITE).expect("failed to be notified");
         thread.join().expect("failed to join thread");
     }
 
@@ -205,7 +204,7 @@ mod test {
             other_event.interrupt();
         });
 
-        let result = guard.block_until(zx::MonotonicTime::INFINITE);
+        let result = guard.block_until(zx::MonotonicInstant::INFINITE);
         assert_eq!(result, Err(WakeReason::Interrupted));
         thread.join().expect("failed to join thread");
     }
@@ -215,7 +214,7 @@ mod test {
         let event = InterruptibleEvent::new();
 
         let guard = event.begin_wait();
-        let result = guard.block_until(zx::MonotonicTime::after(zx::Duration::from_millis(20)));
+        let result = guard.block_until(zx::MonotonicInstant::after(zx::Duration::from_millis(20)));
         assert_eq!(result, Err(WakeReason::DeadlineExpired));
     }
 }

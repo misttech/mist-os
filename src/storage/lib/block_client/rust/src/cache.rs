@@ -4,7 +4,7 @@
 
 use super::{BufferSlice, MutableBufferSlice, RemoteBlockClientSync, VmoId};
 use anyhow::{ensure, Error};
-use fuchsia_zircon as zx;
+
 use linked_hash_map::LinkedHashMap;
 use std::io::{SeekFrom, Write};
 use tracing::error;

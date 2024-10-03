@@ -12,7 +12,9 @@ fn hierarchy_has_child(hierarchy: &DiagnosticsHierarchy, name: &str) -> bool {
     hierarchy.children.iter().find(|c| c.name == name).is_some()
 }
 
-#[test_harness::run_singlethreaded_test]
+#[test_harness::run_singlethreaded_test(
+    test_component = "fuchsia-pkg://fuchsia.com/bt-inspect-integration-tests#meta/bt-inspect-integration-tests-component.cm"
+)]
 async fn test_gap_hierarchy_published(harness: InspectHarness) {
     harness.write_state().moniker_to_track = vec!["bt-init".to_string(), "bt-gap".to_string()];
     let min_num_hierarchies: usize = 1;

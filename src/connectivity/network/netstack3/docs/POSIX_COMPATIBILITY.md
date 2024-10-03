@@ -112,20 +112,6 @@ treats a destination port of 0 as a wildcard, delivering packets to the socket
 regardless of the packet's source port (note that the packet's source address
 must still match the socket's remote address).
 
-### Local delivery across devices with strict device requirements
-
-Like Linux, Netstack3 is weak host when delivering packets locally. In
-particular, it's possible for a socket bound to an address on one local
-interface to send to a destination address that's assigned to a different local
-interface. Unlike Linux, Netstack3 prohibits cross-device
-local delivery when strict device requirements are in effect, due to:
-
-  1. the sending socket being bound to an interface with `SO_BINDTODEVICE`, or
-  2. at least one of the source or destination addresses requires a scope ID.
-
-It is technically possible to permit this, but doing so correctly is difficult,
-so this is forbidden for now until a clear need for this arises.
-
 ### Dualstack UDP connect/send-to mismatched IP version
 
 Netstack3 enforces that the peer address has the same IP version as the local

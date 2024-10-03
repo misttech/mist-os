@@ -11,7 +11,7 @@ use crate::vfs::{
 };
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -142,7 +142,7 @@ impl FileOps for SysRqFile {
                     // capability or there was a problem with the shutdown request.
                     let reboot_res = connect_to_protocol_sync::<AdminMarker>().unwrap().reboot(
                         RebootReason::CriticalComponentFailure,
-                        zx::MonotonicTime::INFINITE,
+                        zx::MonotonicInstant::INFINITE,
                     );
 
                     // LINT.IfChange

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <zircon/availability.h>
 
 namespace fdf {
 
@@ -84,11 +85,20 @@ Namespace& Namespace::operator=(Namespace&& other) noexcept {
   return *this;
 }
 
-zx::result<> Namespace::Open(const char* path, fuchsia_io::wire::OpenFlags flags,
-                             zx::channel server_end) const {
+zx::result<> Namespace::OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
+                                       zx::channel server_end) const {
   zx_status_t status =
       fdio_ns_open(incoming_, path, static_cast<uint32_t>(flags), server_end.release());
   return zx::make_result(status);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+zx::result<> Namespace::Open(const char* path, fuchsia_io::Flags flags,
+                             zx::channel server_end) const {
+  zx_status_t status =
+      fdio_ns_open3(incoming_, path, static_cast<uint64_t>(flags), server_end.release());
+  return zx::make_result(status);
+}
+#endif
 
 }  // namespace fdf

@@ -9,12 +9,9 @@ use crate::node::Node;
 use crate::object_request::ObjectRequestRef;
 use crate::protocols::ProtocolsExt;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::future::{ready, Future};
 use std::sync::Arc;
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status::Status;
 
 /// File nodes backed by VMOs.
 #[cfg(target_os = "fuchsia")]

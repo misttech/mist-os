@@ -61,6 +61,9 @@ group("non_hermetic_deps") {
   # See: fxrev.dev/528291
   visibility += [ "//build/rust:*" ]
 
+  # rustdoc-link merges an arbitrary tree of rustdoc `--out-dir`s
+  visibility += [ "//build/rust/tests:rustdoc-link" ]
+
   # See: https://fxbug.dev/42148579
   visibility += [ "//sdk:cts_generate" ]
 
@@ -235,6 +238,7 @@ group("non_hermetic_deps") {
     "//src/chromium:web_engine_pkg",
     "//src/chromium:web_engine_shell_pkg",
     "//src/connectivity/bluetooth/core/bt-host:bt-host-oot",
+    "//src/connectivity/bluetooth/hci/virtual:virtual",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
     "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
     "//src/devices/rtc/drivers/nxp:pcf8563",
@@ -314,6 +318,7 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/devices/testing/fake-msi:*",
     "//src/devices/testing/fake-object:*",
     "//src/devices/testing/fake-resource:*",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher:*",
     "//src/firmware/lib/abr:*",
     "//src/firmware/lib/zbi:*",
     "//src/firmware/lib/zircon_boot:*",
@@ -414,7 +419,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/trace-vthread:*",
     "//zircon/system/ulib/uart:*",
     "//zircon/system/ulib/usb-peripheral-utils:*",
-    "//zircon/system/ulib/usb-virtual-bus-launcher:*",
     "//zircon/system/ulib/virtio:*",
     "//zircon/system/ulib/xdc-host-utils:*",
     "//zircon/system/ulib/xdc-server-utils:*",
@@ -512,4 +516,38 @@ group("core_realm_shards_allowlist") {
   # Used by in-tree tests
   visibility +=
       [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
+}
+
+group("legacy_bundle_allowlist") {
+  visibility = []
+
+  # Owned closely by the assembly team.
+  visibility += [
+    "//build/images/*",
+    "//src/tests/assembly/assemble_image/*",
+    "//vendor/google/*",
+  ]
+
+  # These are all tests that should ideally not be using a legacy bundle.
+  visibility += [
+    "//build/testing/boot_tests:*",
+    "//src/developer/ffx/tools/power/system-activity/application-activity:*",
+    "//src/power/testing/system-integration/msd-arm-mali/custom-product:*",
+    "//src/power/testing/system-integration/storage/custom-product:*",
+    "//src/security/lib/scrutiny/collector:*",
+    "//src/security/lib/scrutiny/tests/route_verification:*",
+    "//src/security/lib/scrutiny/tests/structured_config:*",
+    "//src/security/tests/pkg_test/tests:*",
+    "//src/security/tests/scrutiny_ffx_integration:*",
+    "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
+    "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
+    "//src/tests/early-boot-coverage/*",
+    "//src/tests/limited_netsvc/image:*",
+    "//third_party/network-conformance/images:*",
+    "//zircon/kernel/lib/userabi/userboot/tests:*",
+    "//zircon/kernel/phys/test/debugdata-propagation:*",
+    "//zircon/system/ulib/c/test:*",
+    "//zircon/system/ulib/uart/test/interrupt-test:*",
+    "//zircon/system/utest/core:*",
+  ]
 }

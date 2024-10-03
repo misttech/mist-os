@@ -18,8 +18,6 @@
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
 
-using zx_boot_time_t = int64_t;
-
 namespace internal {
 
 // A modifier that converts a raw ticks counter value to a point on the monotonic ticks timeline.
@@ -117,7 +115,7 @@ bool platform_usermode_can_access_tick_registers();
 zx_time_t current_time();
 
 // Current boot time in nanoseconds.
-zx_boot_time_t current_boot_time();
+zx_instant_boot_t current_boot_time();
 
 // High-precision timer ticks per second.
 zx_ticks_t ticks_per_second();

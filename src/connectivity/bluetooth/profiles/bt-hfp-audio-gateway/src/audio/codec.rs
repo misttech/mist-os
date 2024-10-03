@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_audio_device as audio_device, fidl_fuchsia_hardware_audio as audio,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 use super::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID};
@@ -22,9 +22,9 @@ use crate::CodecId;
 #[derive(Default)]
 struct CodecAudioControlInner {
     start_request:
-        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>>,
+        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>>,
     stop_request:
-        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>>,
+        Option<Box<dyn FnOnce(std::result::Result<zx::MonotonicInstant, zx::Status>) + Send>>,
 }
 
 pub struct CodecAudioControl {

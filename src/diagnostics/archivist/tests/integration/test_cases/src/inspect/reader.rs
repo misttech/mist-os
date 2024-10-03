@@ -493,7 +493,7 @@ async fn retrieve_and_validate_results(
     let mut reader = ArchiveReader::new();
     reader.with_archive(accessor).add_selectors(custom_selectors.into_iter());
     if expected_results_count == 0 {
-        reader.with_timeout(fuchsia_zircon::Duration::from_seconds(10));
+        reader.with_timeout(zx::Duration::from_seconds(10));
     } else {
         reader.with_minimum_schema_count(expected_results_count);
     }

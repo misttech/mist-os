@@ -15,7 +15,6 @@ use fidl_fuchsia_io::OpenFlags;
 use fs_management::filesystem::{BlockConnector, PathBasedBlockConnector};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fuchsia_component::client::connect_to_protocol_at_path;
-use fuchsia_zircon as zx;
 
 #[async_trait]
 pub trait Device: Send + Sync {

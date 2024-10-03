@@ -11,7 +11,7 @@ use futures::{join, AsyncReadExt, AsyncWriteExt, TryStreamExt};
 use serde_json::Deserializer;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const FUZZER_URL: &str = "fuchsia-pkg://fuchsia.com/fuzz-test-runner-tests#meta/fuzzer.cm";
 const BUF_SIZE: u32 = 32768;

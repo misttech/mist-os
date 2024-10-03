@@ -22,14 +22,14 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 #[cfg(test)]
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
-use fuchsia_zircon::Duration;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
 use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
 #[cfg(test)]
-use tracing as _; // Make it easier to debug tests by always building with tracing
+use tracing as _;
+use zx::Duration; // Make it easier to debug tests by always building with tracing
 
 pub use display::display_configuration::DisplayConfiguration;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;

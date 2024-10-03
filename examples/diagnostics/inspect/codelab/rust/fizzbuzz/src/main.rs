@@ -7,7 +7,7 @@ use fidl_fuchsia_examples_inspect::{FizzBuzzRequest, FizzBuzzRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{self as inspect, component, HistogramProperty, NumericProperty};
-use fuchsia_zircon::{self as zx};
+
 use futures::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::{error, info};
@@ -65,9 +65,9 @@ impl FizzBuzzServer {
         while let Some(request) = stream.try_next().await.context("serve fizzbuzz")? {
             let FizzBuzzRequest::Execute { count, responder } = request;
             self.metrics.request_count.add(1);
-            let start_time = zx::MonotonicTime::get();
+            let start_time = zx::MonotonicInstant::get();
             responder.send(&fizzbuzz(count)).context("send execute response")?;
-            let stop_time = zx::MonotonicTime::get();
+            let stop_time = zx::MonotonicInstant::get();
             let time_micros = (stop_time - start_time).into_micros() as u64;
             self.metrics.request_time_histogram.insert(time_micros);
         }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
+use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, Kernel};
@@ -19,14 +20,12 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
-use fuchsia_runtime::UtcTime;
-use fuchsia_zircon::{HandleBased, Status};
+use fuchsia_runtime::UtcInstant;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, FileOpsToHandle, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    Unlocked,
+    FileOpsCore, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::auth::FsCred;
@@ -51,7 +50,11 @@ use syncio::{
     XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::{ProtocolsExt, ToFlags};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use zx::{HandleBased, Status};
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder,
+    fidl_fuchsia_unknown as funknown,
+};
 
 pub fn new_remote_fs(
     _locked: &mut Locked<'_, Unlocked>,
@@ -116,7 +119,7 @@ impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         let (status, info) = self
             .root_proxy
-            .query_filesystem(zx::MonotonicTime::INFINITE)
+            .query_filesystem(zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(EIO))?;
         // Not all remote filesystems support `QueryFilesystem`, many return ZX_ERR_NOT_SUPPORTED.
         if status == 0 {
@@ -226,7 +229,7 @@ impl RemoteFs {
         // caches, so we can't use remote IDs if the remote filesystem is not guaranteed to provide
         // unique IDs, or if the remote filesystem spans multiple filesystems.
         let (status, info) =
-            root_proxy.query_filesystem(zx::MonotonicTime::INFINITE).map_err(|_| errno!(EIO))?;
+            root_proxy.query_filesystem(zx::MonotonicInstant::INFINITE).map_err(|_| errno!(EIO))?;
         // Be tolerant of errors here; many filesystems return `ZX_ERR_NOT_SUPPORTED`.
         let use_remote_ids = status == 0
             && info
@@ -314,10 +317,32 @@ pub fn new_remote_file_ops(handle: zx::Handle) -> Result<Box<dyn FileOps>, Errno
 }
 
 fn remote_file_attrs_and_ops(
-    handle: zx::Handle,
+    mut handle: zx::Handle,
 ) -> Result<(zxio_node_attr, Box<dyn FileOps>), Errno> {
     let handle_type =
         handle.basic_info().map_err(|status| from_status_like_fdio!(status))?.object_type;
+
+    // Check whether the channel implements a Starnix specific protoocol.
+    if handle_type == zx::ObjectType::CHANNEL {
+        let channel = zx::Channel::from(handle);
+        let queryable = funknown::QueryableSynchronousProxy::new(channel);
+        if let Ok(name) = queryable.query(zx::MonotonicTime::INFINITE) {
+            if name == fbinder::UNIX_DOMAIN_SOCKET_PROTOCOL_NAME.as_bytes() {
+                let socket_ops = RemoteUnixDomainSocket::new(queryable.into_channel())?;
+                let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+                let file_ops = SocketFile::new(socket);
+                let attr = zxio_node_attr {
+                    has: zxio_node_attr_has_t { mode: true, ..zxio_node_attr_has_t::default() },
+                    mode: 0o777,
+                    ..zxio_node_attr::default()
+                };
+                return Ok((attr, file_ops));
+            }
+        };
+        handle = queryable.into_channel().into_handle();
+    };
+
+    // Otherwise, use zxio based objects.
     let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
     let attrs = zxio
         .attr_get(zxio_node_attr_has_t {
@@ -344,7 +369,7 @@ fn remote_file_attrs_and_ops(
         | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
             let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
             let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-            SocketFile::new(socket.clone())
+            SocketFile::new(socket)
         }
         _ => return error!(ENOTSUP),
     };
@@ -397,11 +422,11 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     }
     if attrs.has.modification_time {
         info.time_modify =
-            UtcTime::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
+            UtcInstant::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
     }
     if attrs.has.change_time {
         info.time_status_change =
-            UtcTime::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+            UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
     }
 }
 
@@ -1226,7 +1251,6 @@ impl FileOps for RemoteDirectoryObject {
 
     fn to_handle(
         &self,
-        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -1322,7 +1346,6 @@ impl FileOps for RemoteFileObject {
 
     fn to_handle(
         &self,
-        _locked: &mut Locked<'_, FileOpsToHandle>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
@@ -1424,12 +1447,12 @@ mod test {
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
     use fuchsia_fs::{directory, file};
-    use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::errors::EINVAL;
     use starnix_uapi::file_mode::{mode, AccessCheck};
     use starnix_uapi::vfs::{EpollEvent, FdEvents};
+    use zx::HandleBased;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[::fuchsia::test]
@@ -1525,8 +1548,9 @@ mod test {
             .add(&mut locked, &current_task, &pipe, &epoll_object, event)
             .expect("poll_file.add");
 
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
@@ -1535,8 +1559,9 @@ mod test {
             pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
@@ -1548,14 +1573,15 @@ mod test {
             pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
-        let fds =
-            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
+        let fds = epoll_file
+            .wait(&mut locked, &current_task, 1, zx::MonotonicInstant::ZERO)
+            .expect("wait");
         assert!(fds.is_empty());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_directory() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let pkg_channel: zx::Channel = directory::open_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -1568,12 +1594,12 @@ mod test {
         let fd = new_remote_file(&current_task, pkg_channel.into(), OpenFlags::RDWR)
             .expect("new_remote_file");
         assert!(fd.node().is_dir());
-        assert!(fd.to_handle(&mut locked, &current_task).expect("to_handle").is_some());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_file() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let content_channel: zx::Channel = file::open_in_namespace_deprecated(
             "/pkg/meta/contents",
             fio::OpenFlags::RIGHT_READABLE,
@@ -1586,17 +1612,17 @@ mod test {
         let fd = new_remote_file(&current_task, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
-        assert!(fd.to_handle(&mut locked, &current_task).expect("to_handle").is_some());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test]
     async fn test_new_remote_vmo() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
         let fd =
             new_remote_file(&current_task, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(!fd.node().is_dir());
-        assert!(fd.to_handle(&mut locked, &current_task).expect("to_handle").is_some());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[::fuchsia::test(threads = 2)]
@@ -2633,7 +2659,7 @@ mod test {
                             locked,
                             &current_task,
                             &child.mount,
-                            TimeUpdateType::Time(UtcTime::from_nanos(30)),
+                            TimeUpdateType::Time(UtcInstant::from_nanos(30)),
                             TimeUpdateType::Omit,
                         )
                         .expect("update_atime_mtime failed");
@@ -2644,7 +2670,7 @@ mod test {
                         .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update.time_modify, info_original.time_modify);
-                    assert_eq!(info_after_update.time_access, UtcTime::from_nanos(30));
+                    assert_eq!(info_after_update.time_access, UtcInstant::from_nanos(30));
 
                     child
                         .entry
@@ -2654,7 +2680,7 @@ mod test {
                             &current_task,
                             &child.mount,
                             TimeUpdateType::Omit,
-                            TimeUpdateType::Time(UtcTime::from_nanos(50)),
+                            TimeUpdateType::Time(UtcInstant::from_nanos(50)),
                         )
                         .expect("update_atime_mtime failed");
                     let info_after_update2 = child
@@ -2663,8 +2689,8 @@ mod test {
                         .fetch_and_refresh_info(&current_task)
                         .expect("fetch_and_refresh_info failed")
                         .clone();
-                    assert_eq!(info_after_update2.time_modify, UtcTime::from_nanos(50));
-                    assert_eq!(info_after_update2.time_access, UtcTime::from_nanos(30));
+                    assert_eq!(info_after_update2.time_modify, UtcInstant::from_nanos(50));
+                    assert_eq!(info_after_update2.time_access, UtcInstant::from_nanos(30));
                 }
             })
             .await

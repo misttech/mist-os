@@ -48,7 +48,7 @@ async fn filter_map_filename(
     }
 }
 
-async fn serve_file_over_socket(file: fio::FileProxy, socket: fuchsia_zircon::Socket) {
+async fn serve_file_over_socket(file: fio::FileProxy, socket: zx::Socket) {
     let mut socket = fasync::Socket::from_socket(socket);
 
     // We keep a buffer of 4.8 MB while reading the file
@@ -174,7 +174,7 @@ pub(crate) async fn serve_iterator(
                 )?;
 
                 tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
-                let (client, server) = fuchsia_zircon::Socket::create_stream();
+                let (client, server) = zx::Socket::create_stream();
                 let t = fasync::Task::spawn(serve_file_over_socket(file, server));
                 file_tasks.push(t);
                 Ok(ftest_manager::DebugData {

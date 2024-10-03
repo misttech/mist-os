@@ -15,7 +15,7 @@ use cm_util::TaskGroup;
 use errors::CapabilityProviderError;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn offer_increasing_rights() {

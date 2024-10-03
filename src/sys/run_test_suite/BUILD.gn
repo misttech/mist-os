@@ -29,6 +29,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
+    "//sdk/rust/zx-status",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
@@ -37,7 +38,6 @@ rustc_library("lib") {
     "//src/lib/fuchsia-sync",
     "//src/lib/test_diagnostics/rust:test_diagnostics",
     "//src/lib/testing/test_list",
-    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/component_debug",
     "//src/sys/lib/moniker",
@@ -64,8 +64,8 @@ rustc_library("lib") {
     deps += [ "//src/lib/trace/rust:trace" ]
 
     test_deps += [
+      "//sdk/rust/zx",
       "//src/lib/fuchsia-component",
-      "//src/lib/zircon/rust:fuchsia-zircon",
       "//src/storage/lib/vfs/rust:vfs",
     ]
   }
@@ -105,12 +105,12 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/trace/rust:trace-provider",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",

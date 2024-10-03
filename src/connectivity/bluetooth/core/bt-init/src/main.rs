@@ -202,7 +202,7 @@ mod tests {
     use super::*;
     use anyhow::format_err;
     use fuchsia_async::Channel as AsyncChannel;
-    use fuchsia_zircon as zx;
+
     use std::collections::HashSet;
     struct MockComponentClient {
         pub children_to_fail_for: HashSet<String>,

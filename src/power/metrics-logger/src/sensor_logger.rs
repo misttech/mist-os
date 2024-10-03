@@ -20,7 +20,7 @@ use tracing::{error, info, warn};
 use {
     fidl_fuchsia_hardware_power_sensor as fpower,
     fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_power_metrics as fmetrics,
-    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync, zx,
 };
 
 // The fuchsia.hardware.temperature.Device is composed into fuchsia.hardware.thermal.Device, and

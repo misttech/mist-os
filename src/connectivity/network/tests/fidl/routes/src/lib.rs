@@ -29,7 +29,7 @@ use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
 use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx_status,
 };
 
 async fn resolve(
@@ -40,7 +40,7 @@ async fn resolve(
         .resolve(&remote)
         .await
         .expect("routes/State.Resolve FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .context("routes/State.Resolve error")
         .expect("failed to resolve remote")
 }
@@ -139,8 +139,8 @@ async fn resolve_route<N: Netstack>(name: &str) {
                 .resolve(&remote)
                 .await
                 .expect("resolve FIDL error")
-                .map_err(fuchsia_zircon::Status::from_raw),
-            Err(fuchsia_zircon::Status::ADDRESS_UNREACHABLE)
+                .map_err(zx::Status::from_raw),
+            Err(zx::Status::ADDRESS_UNREACHABLE)
         )
     };
 
@@ -214,9 +214,9 @@ async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
         .resolve(&fidl_ip!("0.0.0.0"))
         .await
         .expect("routes/State.Resolve FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw);
+        .map_err(zx::Status::from_raw);
 
-    assert_eq!(resolved, Err(fuchsia_zircon::Status::ADDRESS_UNREACHABLE));
+    assert_eq!(resolved, Err(zx::Status::ADDRESS_UNREACHABLE));
 
     const EP_ADDR: fidl_fuchsia_net::Ipv4Address = fidl_ip_v4!("192.168.0.3");
     const PREFIX_LEN: u8 = 24;
@@ -243,7 +243,7 @@ async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
         .add_entry(ep.id(), &GATEWAY_ADDR, &GATEWAY_MAC)
         .await
         .expect("add_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("add_entry error");
 
     // Install a default route and try to resolve through the gateway.
@@ -253,7 +253,7 @@ async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
         .resolve(&UNSPECIFIED_IP)
         .await
         .expect("routes/State.Resolve FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw);
+        .map_err(zx::Status::from_raw);
 
     assert_eq!(
         resolved,
@@ -303,7 +303,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: Ip>(name: &str) {
         .add_entry(interface.id(), &remote, &REMOTE_MAC)
         .await
         .expect("add_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("add_entry error");
 
     let routes = realm
@@ -323,12 +323,8 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: Ip>(name: &str) {
 
     // Verify that resolving the route fails.
     assert_eq!(
-        routes
-            .resolve(&remote)
-            .await
-            .expect("resolve FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::ADDRESS_UNREACHABLE)
+        routes.resolve(&remote).await.expect("resolve FIDL error").map_err(zx::Status::from_raw),
+        Err(zx::Status::ADDRESS_UNREACHABLE)
     );
 
     // Install an address on the device.
@@ -343,7 +339,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: Ip>(name: &str) {
             .resolve(&remote)
             .await
             .expect("resolve FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .expect("resolve failed"),
         fidl_fuchsia_net_routes::Resolved::Direct(fidl_fuchsia_net_routes::Destination {
             address: Some(remote),

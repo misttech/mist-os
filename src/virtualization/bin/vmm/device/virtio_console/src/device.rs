@@ -8,7 +8,7 @@ use machina_virtio_device::{GuestMem, WrappedDescChainStream};
 use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub struct ConsoleDevice {
     // Guest end of a socket provided by the controller.

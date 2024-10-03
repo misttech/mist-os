@@ -6,7 +6,6 @@ use crate::task_metrics::constants::{COMPONENT_CPU_MAX_SAMPLES, CPU_SAMPLE_PERIO
 use crate::task_metrics::measurement::{Measurement, MeasurementsQueue};
 use crate::task_metrics::runtime_stats_source::RuntimeStatsSource;
 use fuchsia_inspect::{self as inspect, HistogramProperty, UintLinearHistogramProperty};
-use fuchsia_zircon::sys::{self as zx_sys, zx_system_get_num_cpus};
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::FutureExt;
@@ -15,7 +14,8 @@ use moniker::ExtendedMoniker;
 use std::fmt::Debug;
 use std::sync::{Arc, Weak};
 use tracing::debug;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use zx::sys::{self as zx_sys, zx_system_get_num_cpus};
+use {fuchsia_async as fasync, zx};
 
 pub(crate) fn create_cpu_histogram(
     node: &inspect::Node,
@@ -154,8 +154,8 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
         self.children.push(task);
     }
 
-    pub async fn most_recent_measurement(&self) -> Option<zx::MonotonicTime> {
-        self.most_recent_measurement_nanos.lock().await.map(|t| zx::MonotonicTime::from_nanos(t))
+    pub async fn most_recent_measurement(&self) -> Option<zx::MonotonicInstant> {
+        self.most_recent_measurement_nanos.lock().await.map(|t| zx::MonotonicInstant::from_nanos(t))
     }
 
     /// Takes the MeasurementsQueue from this task, replacing it with an empty one.
@@ -174,7 +174,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     /// Take a zero-valued measurement at timestamp `t`.
     ///
     /// Specifically meant for the very first measurement taken.
-    pub fn record_measurement_with_start_time(&mut self, t: zx::MonotonicTime) {
+    pub fn record_measurement_with_start_time(&mut self, t: zx::MonotonicInstant) {
         self.record_measurement(Measurement::empty(t));
     }
 
@@ -208,7 +208,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
             if let Ok(runtime_info) = runtime_info_res {
                 let mut measurement = Measurement::from_runtime_info(
                     runtime_info,
-                    zx::MonotonicTime::from_nanos(self.time_source.now()),
+                    zx::MonotonicInstant::from_nanos(self.time_source.now()),
                 );
                 // Subtract all child measurements.
                 let mut alive_children = vec![];
@@ -238,7 +238,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     }
 
     // Add a measurement to this task's histogram.
-    fn add_to_histogram(&mut self, cpu_time_delta: zx::Duration, timestamp: zx::MonotonicTime) {
+    fn add_to_histogram(&mut self, cpu_time_delta: zx::Duration, timestamp: zx::MonotonicInstant) {
         if let Some(histogram) = &self.histogram {
             let time_value: i64 = timestamp.into_nanos();
             let elapsed_time = time_value - self.previous_histogram_timestamp;

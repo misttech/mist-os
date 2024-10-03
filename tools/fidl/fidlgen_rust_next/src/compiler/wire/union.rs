@@ -14,7 +14,7 @@ pub fn emit_union<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let u = &compiler.library.union_declarations[ident];
+    let u = &compiler.schema.union_declarations[ident];
 
     let name = &u.name.type_name();
 
@@ -29,7 +29,7 @@ pub fn emit_union<W: Write>(
         r#"
         #[repr(transparent)]
         pub struct Wire{name}<'buf> {{
-            raw: ::fidl::RawWireUnion<'buf>,
+            raw: ::fidl_next::RawWireUnion<'buf>,
         }}
 
         pub enum Wire{name}Ref{access_params} {{
@@ -138,20 +138,34 @@ pub fn emit_union<W: Write>(
             }}
         }}
 
-        unsafe impl<'buf> ::fidl::Decode<'buf> for Wire{name}<'buf> {{
+        unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for Wire{name}<'buf>
+        where
+            ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+        "#,
+    )?;
+
+    for member in &u.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl_next::Decode<___D>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn decode(
-                mut slot: ::fidl::Slot<'_, Self>,
-                decoder: &mut ::fidl::decode::Decoder<'buf>,
-            ) -> Result<(), ::fidl::decode::Error> {{
-                ::fidl::munge!(let Self {{ mut raw }} = slot.as_mut());
-                match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {{
+                mut slot: ::fidl_next::Slot<'_, Self>,
+                decoder: &mut ___D,
+            ) -> Result<(), ::fidl_next::DecodeError> {{
+                ::fidl_next::munge!(let Self {{ mut raw }} = slot.as_mut());
+                match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {{
         "#,
     )?;
 
     for member in &u.members {
         let ord = member.ordinal;
 
-        writeln!(out, "{ord} => ::fidl::RawWireUnion::decode_as::<")?;
+        writeln!(out, "{ord} => ::fidl_next::RawWireUnion::decode_as::<___D, ")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(out, ">(raw, decoder)?,")?;
     }
@@ -160,13 +174,13 @@ pub fn emit_union<W: Write>(
         writeln!(
             out,
             r#"
-            ord => return Err(fidl::decode::Error::InvalidUnionOrdinal(
+            ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(
                 ord as usize
             )),
             "#,
         )?;
     } else {
-        writeln!(out, "_ => ::fidl::RawWireUnion::decode_unknown(raw, decoder)?,",)?;
+        writeln!(out, "_ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,",)?;
     }
 
     writeln!(
@@ -212,7 +226,7 @@ pub fn emit_union<W: Write>(
         r#"
         #[repr(transparent)]
         pub struct WireOptional{name}<'buf> {{
-            raw: ::fidl::RawWireUnion<'buf>,
+            raw: ::fidl_next::RawWireUnion<'buf>,
         }}
 
         impl<'buf> WireOptional{name}<'buf> {{
@@ -245,7 +259,7 @@ pub fn emit_union<W: Write>(
                     Some(Wire{name} {{
                         raw: ::core::mem::replace(
                             &mut self.raw,
-                            ::fidl::RawWireUnion::null(),
+                            ::fidl_next::RawWireUnion::null(),
                         )
                     }})
                 }} else {{
@@ -257,25 +271,39 @@ pub fn emit_union<W: Write>(
         impl<'buf> Default for WireOptional{name}<'buf> {{
             fn default() -> Self {{
                 Self {{
-                    raw: ::fidl::RawWireUnion::null(),
+                    raw: ::fidl_next::RawWireUnion::null(),
                 }}
             }}
         }}
 
-        unsafe impl<'buf> ::fidl::Decode<'buf> for WireOptional{name}<'buf> {{
+        unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptional{name}<'buf>
+        where
+            ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+        "#,
+    )?;
+
+    for member in &u.members {
+        emit_type(compiler, out, &member.ty)?;
+        writeln!(out, ": ::fidl_next::Decode<___D>,")?;
+    }
+
+    writeln!(
+        out,
+        r#"
+        {{
             fn decode(
-                mut slot: ::fidl::Slot<'_, Self>,
-                decoder: &mut ::fidl::decode::Decoder<'buf>,
-            ) -> Result<(), ::fidl::decode::Error> {{
-                ::fidl::munge!(let Self {{ mut raw }} = slot.as_mut());
-                match ::fidl::RawWireUnion::encoded_ordinal(raw.as_mut()) {{
+                mut slot: ::fidl_next::Slot<'_, Self>,
+                decoder: &mut ___D,
+            ) -> Result<(), ::fidl_next::DecodeError> {{
+                ::fidl_next::munge!(let Self {{ mut raw }} = slot.as_mut());
+                match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {{
         "#,
     )?;
 
     for member in &u.members {
         let ord = member.ordinal;
 
-        writeln!(out, "{ord} => ::fidl::RawWireUnion::decode_as::<")?;
+        writeln!(out, "{ord} => ::fidl_next::RawWireUnion::decode_as::<___D, ")?;
         emit_type(compiler, out, &member.ty)?;
         writeln!(out, ">(raw, decoder)?,")?;
     }
@@ -283,8 +311,8 @@ pub fn emit_union<W: Write>(
     writeln!(
         out,
         r#"
-                    0 => ::fidl::RawWireUnion::decode_absent(raw)?,
-                    _ => ::fidl::RawWireUnion::decode_unknown(
+                    0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
+                    _ => ::fidl_next::RawWireUnion::decode_unknown(
                         raw,
                         decoder,
                     )?,

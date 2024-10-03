@@ -148,6 +148,13 @@ pub trait Inspector: Sized {
         value.record(name, self)
     }
 
+    /// Records an implementor of [`Inspectable`] under `name`.
+    fn record_inspectable<V: Inspectable>(&mut self, name: &str, value: &V) {
+        self.record_child(name, |inspector| {
+            inspector.delegate_inspectable(value);
+        });
+    }
+
     /// Delegates more fields to be added by an [`Inspectable`] implementation.
     fn delegate_inspectable<V: Inspectable>(&mut self, value: &V) {
         value.record(self)

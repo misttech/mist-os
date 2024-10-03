@@ -30,11 +30,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#timesource",
-        },
-        {
             protocol: "test.time.TimeSourceControl",
             from: "parent",
             to: "#timesource",

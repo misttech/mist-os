@@ -7,10 +7,10 @@ use super::futex_address::FutexAddress;
 use super::math::round_up_to_increment;
 use super::uapi;
 use super::user_buffer::UserBuffer;
-use fuchsia_zircon::sys::zx_vaddr_t;
 use std::marker::PhantomData;
 use std::{fmt, mem, ops};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zx::sys::zx_vaddr_t;
 
 #[derive(
     Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, KnownLayout, FromBytes, Immutable,

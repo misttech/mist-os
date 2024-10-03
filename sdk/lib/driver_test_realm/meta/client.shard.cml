@@ -29,7 +29,6 @@
         {
             protocol: [
                 "fuchsia.component.resolution.Resolver-hermetic",
-                "fuchsia.logger.LogSink",
                 "fuchsia.pkg.PackageResolver-hermetic",
             ],
             from: "parent",

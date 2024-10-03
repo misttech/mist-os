@@ -137,7 +137,8 @@ impl Program {
                 locked: &mut locked.cast_locked::<BpfHelperOps>(),
                 current_task,
             };
-            Ok(vm.run(&mut context, data))
+
+            Ok(vm.run(&mut context, data, std::mem::size_of::<T>()))
         } else {
             // vm is only None when bpf is faked. Return an error on execution, as random value
             // might have stronger side effects.

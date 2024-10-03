@@ -10,7 +10,6 @@ use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
 use fatfs::validate_filename;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Status;
 use futures::future::BoxFuture;
 use std::borrow::Borrow;
 use std::cell::UnsafeCell;
@@ -30,6 +29,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::file::FidlIoConnection;
 use vfs::path::Path;
 use vfs::{attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest};
+use zx::Status;
 
 fn check_open_flags_for_existing_entry(flags: fio::OpenFlags) -> Result<(), Status> {
     if flags.intersects(fio::OpenFlags::CREATE_IF_ABSENT) {

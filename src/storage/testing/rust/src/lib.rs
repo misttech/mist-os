@@ -10,7 +10,7 @@ use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::TryStreamExt;
 use std::path::{Path, PathBuf};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 pub mod fvm;
 pub mod zxcrypt;

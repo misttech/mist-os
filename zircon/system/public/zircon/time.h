@@ -14,11 +14,44 @@
 
 __BEGIN_CDECLS
 
-// absolute time in nanoseconds (generally with respect to the monotonic clock)
+// These typedefs are used to represent quantities and points in time. They are constructed
+// as follows:
+//
+// zx_<kind>_<timeline>_[units_]t, where
+//  * <kind> is either "instant" (a point in time) or "duration"
+//  * <timeline> is either "mono" or "boot"
+//  * [units] is either "ticks" or omitted, in which case the unit is understood to be nanoseconds.
+//
+// Read https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0260_kernel_boot_time_support
+// for more information.
+//
+// These typedefs can be passed around interchangeably with the polymorphic time types declared
+// below, but code should strive to use the most specific type available to improve readability.
+// For example, a function accepting only monotonic timestamps should take an argument of type
+// zx_instant_mono_t, whereas a function accepting timestamps on either reference timeline should
+// take an argument of type zx_time_t.
+typedef int64_t zx_instant_mono_t;
+typedef int64_t zx_instant_mono_ticks_t;
+typedef int64_t zx_duration_mono_t;
+typedef int64_t zx_duration_mono_ticks_t;
+typedef int64_t zx_instant_boot_t;
+typedef int64_t zx_instant_boot_ticks_t;
+typedef int64_t zx_duration_boot_t;
+typedef int64_t zx_duration_boot_ticks_t;
+
+// The following typedefs are polymorphic types used to represent quantities or points in time
+// with ambiguous timeline references:
+//  * zx_time_t: Represents a point in time, measured in nanoseconds.
+//  * zx_duration_t: Represents a quantity of time, measured in nanoseconds.
+//  * zx_ticks_t: Represents either a point or quantity of time, measured in hardware ticks.
+//
+// As stated above, these types should only be used when a more concrete typedef is not viable.
+//
+// Note that these typedefs were introduced long before the monomorphic types above, so you may see
+// uses of these aliases in places where polymorphic types are not necessary. We are actively
+// working to transition all such uses to the more appropriate monomorphic types.
 typedef int64_t zx_time_t;
-// a duration in nanoseconds
 typedef int64_t zx_duration_t;
-// a duration in hardware ticks
 typedef int64_t zx_ticks_t;
 
 #define ZX_TIME_INFINITE INT64_MAX

@@ -8,13 +8,13 @@ use fidl::prelude::*;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_component::server::{Item, ServiceFs, ServiceFsDir};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::Either;
 use futures::prelude::*;
 use futures::StreamExt;
 use http_client_config::Config;
 use std::str::FromStr as _;
 use tracing::{debug, error, info, trace};
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_net_http as net_http,
     fidl_fuchsia_process_lifecycle as flifecycle, fuchsia_hyper as fhyper,
@@ -118,7 +118,7 @@ async fn to_success_response(
                 while offset < chunk.len() {
                     let pending = match tx.wait_handle(
                         zx::Signals::SOCKET_PEER_CLOSED | zx::Signals::SOCKET_WRITABLE,
-                        zx::MonotonicTime::INFINITE,
+                        zx::MonotonicInstant::INFINITE,
                     ) {
                         Err(status) => {
                             error!("tx.wait() failed - status: {}", status);

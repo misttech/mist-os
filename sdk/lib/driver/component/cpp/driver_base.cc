@@ -25,10 +25,9 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
     return std::move(incoming.value());
   }();
   logger_ = [&incoming, this]() {
-    zx::result logger = Logger::Create(incoming, dispatcher_, name_, FUCHSIA_LOG_INFO,
-                                       logger_wait_for_initial_interest);
-    ZX_ASSERT_MSG(logger.is_ok(), "%s", logger.status_string());
-    return std::move(logger.value());
+    auto logger = Logger::Create(incoming, dispatcher_, name_, FUCHSIA_LOG_INFO,
+                                 logger_wait_for_initial_interest);
+    return logger;
   }();
   Logger::SetGlobalInstance(logger_.get());
   std::optional outgoing_request = std::move(start_args_.outgoing_dir());

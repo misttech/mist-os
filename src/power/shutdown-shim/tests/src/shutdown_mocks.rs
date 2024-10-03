@@ -13,8 +13,7 @@ use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use tracing::{info, warn};
 use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, zx,
 };
 
 pub fn new_mocks_provider(
@@ -107,7 +106,7 @@ async fn run_activity_governor(
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             fsystem::ActivityGovernorRequest::TakeWakeLease { name: _, responder } => {
-                let (client_token, server_token) = fsystem::WakeLeaseToken::create();
+                let (client_token, server_token) = fsystem::LeaseToken::create();
                 let send_signals2 = send_signals.clone();
                 fasync::Task::spawn(async move {
                     fasync::OnSignals::new(&server_token, zx::Signals::EVENTPAIR_PEER_CLOSED)

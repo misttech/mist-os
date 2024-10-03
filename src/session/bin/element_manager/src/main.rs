@@ -94,13 +94,13 @@ mod tests {
     use crate::element_manager::{CollectionConfig, ElementManager};
     use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, Proxy};
     use fidl_connector::Connect;
-    use fuchsia_zircon::sys::ZX_OK;
     use futures::channel::mpsc;
     use futures::{SinkExt, StreamExt};
     use lazy_static::lazy_static;
     use session_testing::spawn_directory_server;
     use std::collections::HashMap;
     use test_util::Counter;
+    use zx::sys::ZX_OK;
     use {
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fuchsia_async as fasync,

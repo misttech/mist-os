@@ -11,7 +11,6 @@ use crate::fuchsia::volumes_directory::VolumesDirectory;
 use anyhow::{Context, Error};
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, Status};
 use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem};
 use fxfs::fsck::errors::FsckIssue;
 use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
@@ -22,6 +21,7 @@ use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
 use vfs::path::Path;
 use vfs::temp_clone::unblock;
+use zx::{self as zx, Status};
 
 struct State {
     filesystem: OpenFxFilesystem,

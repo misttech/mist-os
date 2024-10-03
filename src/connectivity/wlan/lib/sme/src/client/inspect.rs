@@ -12,10 +12,7 @@ use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
 use fuchsia_sync::Mutex;
 use ieee80211::Ssid;
 use wlan_common::ie::{self, wsc};
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme, zx};
 
 /// These limits are set to capture roughly 5 to 10 recent connection attempts. An average
 /// successful connection attempt would generate about 5 state events and 7 supplicant events (this
@@ -120,7 +117,7 @@ pub struct PulseNode {
 
 impl PulseNode {
     fn new(node: Node) -> Self {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         let started = node.create_time_at("started", now);
         let last_updated = node.create_time_at("last_updated", now);
         Self {
@@ -134,7 +131,7 @@ impl PulseNode {
     }
 
     pub fn update(&mut self, new_status: ClientSmeStatus) {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         self.last_updated.set_at(now);
 
         // This method is always called when there's a state transition, so even if the client is

@@ -5,7 +5,7 @@
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_media::{AudioFormat, AudioUncompressedFormat, DomainFormat, PcmFormat};
 use fuchsia_audio_codec::StreamProcessor;
-use fuchsia_zircon::{self as zx};
+
 use futures::io::AsyncWrite;
 use futures::stream::BoxStream;
 use futures::task::{Context, Poll};
@@ -170,14 +170,14 @@ struct SilenceStream {
     pcm_format: PcmFormat,
     next_frame_timer: fasync::Timer,
     /// the last time we delivered frames.
-    last_frame_time: Option<zx::MonotonicTime>,
+    last_frame_time: Option<zx::MonotonicInstant>,
 }
 
 impl futures::Stream for SilenceStream {
     type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         if self.last_frame_time.is_none() {
             self.last_frame_time = Some(now - zx::Duration::from_seconds(1));
         }

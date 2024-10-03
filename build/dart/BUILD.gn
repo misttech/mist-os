@@ -33,7 +33,6 @@ group("dart_allowlist") {
   visibility += [
     "//scripts/fxtest:*",
     "//scripts/fxutils:*",
-    "//scripts/status:*",
   ]
 
   # SL4F dart client library and tests which use it.

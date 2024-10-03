@@ -10,8 +10,6 @@ use anyhow::{anyhow, Error};
 #[cfg(not(feature = "starnix_lite"))]
 use bstr::BString;
 #[cfg(not(feature = "starnix_lite"))]
-use fuchsia_zircon as zx;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};

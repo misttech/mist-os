@@ -22,7 +22,6 @@ class LocalDriver(base.BaseDriver):
     def __init__(
         self,
         honeydew_config: dict[str, Any],
-        transport: str,
         multi_device: bool = False,
         output_path: Optional[str] = None,
         config_path: Optional[str] = None,
@@ -32,7 +31,6 @@ class LocalDriver(base.BaseDriver):
 
         Args:
           honeydew_config: Honeydew configuration.
-          transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
           output_path: absolute path to directory for storing Mobly test output.
           config_path: absolute path to the Mobly test config file.
@@ -42,7 +40,6 @@ class LocalDriver(base.BaseDriver):
         """
         super().__init__(
             honeydew_config=honeydew_config,
-            transport=transport,
             output_path=output_path,
             params_path=params_path,
         )
@@ -132,7 +129,6 @@ class LocalDriver(base.BaseDriver):
             testbed_name="GeneratedLocalTestbed",
             output_path=self._output_path,
             honeydew_config=self._honeydew_config,
-            transport=self._transport,
             mobly_controllers=mobly_controllers,
             test_params_dict={},
             botanist_honeydew_map={},
@@ -189,7 +185,6 @@ class LocalDriver(base.BaseDriver):
                 raise common.DriverException(f"Local config parse failed: {e}")
             # Add the "honeydew_config" field for every Fuchsia device, if exists.
             api_mobly.set_honeydew_config(config, self._honeydew_config)
-            api_mobly.set_transport(config, self._transport)
 
         if self._params_path:
             test_params = common.read_yaml_from_file(self._params_path)

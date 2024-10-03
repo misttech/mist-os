@@ -8,11 +8,11 @@ use fidl_fuchsia_pkg::{self as fpkg, NeededBlobsMarker};
 use fidl_fuchsia_pkg_ext::BlobId;
 use fidl_fuchsia_space::ErrorCode;
 use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
-use fuchsia_zircon::{self as zx, Status};
 use futures::TryFutureExt as _;
 use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
 use rand::prelude::*;
 use std::collections::BTreeSet;
+use zx::{self as zx, Status};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver, fuchsia_async as fasync};
 
 #[fuchsia::test]

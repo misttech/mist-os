@@ -40,7 +40,7 @@ mod tests {
     use crate::Capability;
     use assert_matches::assert_matches;
     use fidl::handle::{AsHandleRef, HandleBased};
-    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx};
+    use {fidl_fuchsia_component_sandbox as fsandbox, zx};
 
     // Tests converting the Handle to FIDL and back.
     #[fuchsia::test]

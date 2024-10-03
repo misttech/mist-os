@@ -56,7 +56,10 @@ ErrOr<ConsoleFormatOptions> GetPrintCommandFormatOptions(const Command& cmd);
   "  -c  Character\n"                                                         \
   "  -d  Signed decimal\n"                                                    \
   "  -u  Unsigned decimal\n"                                                  \
-  "  -x  Unsigned hexadecimal\n"
+  "  -x  Unsigned hexadecimal\n"                                              \
+  "\n"                                                                        \
+  "  See \"get integer-format\" to set this persistently. You can override\n" \
+  "  the setting at any time with the options above.\n"
 
 }  // namespace zxdb
 

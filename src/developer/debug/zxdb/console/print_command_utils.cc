@@ -4,11 +4,13 @@
 
 #include "src/developer/debug/zxdb/console/print_command_utils.h"
 
+#include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/format_node_console.h"
 #include "src/developer/debug/zxdb/console/verbs.h"
+#include "src/developer/debug/zxdb/expr/format_options.h"
 
 namespace zxdb {
 
@@ -90,6 +92,20 @@ ErrOr<ConsoleFormatOptions> GetPrintCommandFormatOptions(const Command& cmd) {
     if (cmd.HasSwitch(cur.first)) {
       num_type_overrides++;
       options.num_format = cur.second;
+    }
+  }
+
+  if (num_type_overrides == 0) {
+    if (cmd.target()) {
+      const auto setting =
+          cmd.target()->settings().GetString(ClientSettings::Target::kIntegerFormat);
+      if (setting == kIntegerFormatDecimal) {
+        options.num_format = FormatOptions::NumFormat::kDefault;
+      } else if (setting == kIntegerFormatHexadecimal) {
+        options.num_format = FormatOptions::NumFormat::kHex;
+      } else if (setting == kIntegerFormatBinary) {
+        options.num_format = FormatOptions::NumFormat::kBin;
+      }
     }
   }
 

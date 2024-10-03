@@ -6,7 +6,7 @@ use futures::lock::Mutex;
 use moniker::Moniker;
 use std::sync::Arc;
 use tracing::*;
-use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, zx};
 
 /// Any stored data is removed after this amount of time
 const CLEANUP_DEADLINE_SECONDS: i64 = 600;
@@ -30,7 +30,7 @@ impl Into<fsys::ComponentCrashInfo> for ComponentCrashInfo {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Record {
     // The point at which this record should be deleted
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
     // The koid of the thread a crash was observed on
     koid: zx::Koid,
     // The crash information
@@ -56,7 +56,7 @@ async fn record_cleanup_task(records: Arc<Mutex<Vec<Record>>>) {
             if records_guard.is_empty() {
                 // If we have no records, then we can sleep for as long as the timeout and check
                 // again
-                zx::MonotonicTime::after(zx::Duration::from_seconds(CLEANUP_DEADLINE_SECONDS))
+                zx::MonotonicInstant::after(zx::Duration::from_seconds(CLEANUP_DEADLINE_SECONDS))
             } else {
                 // If there's an upcoming record to delete, sleep until then
                 records_guard[0].deadline.clone()
@@ -65,7 +65,7 @@ async fn record_cleanup_task(records: Arc<Mutex<Vec<Record>>>) {
         let timer = fasync::Timer::new(sleep_until);
         timer.await;
         let mut records_guard = records.lock().await;
-        while !records_guard.is_empty() && zx::MonotonicTime::get() > records_guard[0].deadline {
+        while !records_guard.is_empty() && zx::MonotonicInstant::get() > records_guard[0].deadline {
             records_guard.remove(0);
         }
     }
@@ -84,7 +84,7 @@ impl CrashRecords {
     /// `CLEANUP_DEADLINE_SECONDS`.
     pub async fn add_report(&self, thread_koid: zx::Koid, report: ComponentCrashInfo) {
         self.records.lock().await.push(Record {
-            deadline: zx::MonotonicTime::after(zx::Duration::from_seconds(
+            deadline: zx::MonotonicInstant::after(zx::Duration::from_seconds(
                 CLEANUP_DEADLINE_SECONDS,
             )),
             koid: thread_koid.clone(),

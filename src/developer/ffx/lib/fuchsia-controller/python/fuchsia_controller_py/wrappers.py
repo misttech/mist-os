@@ -60,6 +60,28 @@ class AsyncAdapter:
         """
         return self._async_adapter_loop
 
+    def cancel_task(self, task: asyncio.Task[Any]) -> None:
+        """Cancel a task then verify it has been cancelled.
+
+        Args:
+            task: The task to cancel
+
+        Raises:
+            RuntimeError: failed cancel verification
+        """
+        if not task.cancel():
+            # Task was already done or cancelled, nothing else to do.
+            return
+
+        # Wait for task to completely cancel.
+        try:
+            self.loop().run_until_complete(task)
+            raise RuntimeError(
+                "Expected cancellation of task to raise CancelledError"
+            )
+        except asyncio.exceptions.CancelledError:
+            pass  # expected
+
 
 def asyncmethod(
     func: Callable[_Params, Coroutine[_Yield, _Send, _Ret]],

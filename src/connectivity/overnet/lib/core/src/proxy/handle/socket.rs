@@ -9,11 +9,11 @@ use super::{
 use crate::peer::PeerConnRef;
 use anyhow::Error;
 use fidl::{AsHandleRef, AsyncSocket, HandleBased, Peered, Signals};
-use fuchsia_zircon_status as zx_status;
 use futures::io::{AsyncRead, AsyncWrite};
 use futures::ready;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use zx_status;
 
 pub(crate) struct Socket {
     socket: AsyncSocket,

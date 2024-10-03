@@ -5,10 +5,10 @@
 use anyhow::Error;
 use carnelian::render::Context;
 use carnelian::{input, Message, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr};
-use fuchsia_zircon::Event;
 use recovery_util::ota::controller::SendEvent;
 use recovery_util::ota::state_machine::Event as StateMachineEvent;
 use std::collections::VecDeque;
+use zx::Event;
 
 #[cfg(feature = "debug_console")]
 use crate::console::ConsoleMessages;

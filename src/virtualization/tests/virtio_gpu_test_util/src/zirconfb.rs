@@ -8,7 +8,7 @@ use fidl::endpoints;
 use fidl_fuchsia_hardware_display::{
     CoordinatorListenerMarker, CoordinatorMarker, Info, ProviderSynchronousProxy,
 };
-use fuchsia_zircon as zx;
+
 use futures::executor::block_on;
 use futures::{future, TryStreamExt};
 use serde_json::json;
@@ -58,7 +58,7 @@ async fn read_info() -> Result<DetectResult, Error> {
                 __source_breaking: fidl::marker::SourceBreaking,
             };
         provider
-            .open_coordinator_with_listener_for_primary(payload, zx::MonotonicTime::INFINITE)?
+            .open_coordinator_with_listener_for_primary(payload, zx::MonotonicInstant::INFINITE)?
             .map_err(zx::Status::from_raw)?;
         (dc_proxy, listener_requests)
     };

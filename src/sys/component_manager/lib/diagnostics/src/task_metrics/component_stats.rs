@@ -8,7 +8,7 @@ use crate::task_metrics::task_info::TaskInfo;
 use futures::lock::Mutex;
 use std::fmt::Debug;
 use std::sync::Arc;
-use {fuchsia_inspect as inspect, fuchsia_zircon as zx};
+use {fuchsia_inspect as inspect, zx};
 
 /// Tracks the tasks associated to some component and provides utilities for measuring them.
 pub struct ComponentStats<T: RuntimeStatsSource + Debug> {
@@ -117,7 +117,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentStats<T> {
         self.tasks = final_tasks;
     }
 
-    pub async fn gather_dead_tasks(&self) -> Vec<(zx::MonotonicTime, Arc<Mutex<TaskInfo<T>>>)> {
+    pub async fn gather_dead_tasks(&self) -> Vec<(zx::MonotonicInstant, Arc<Mutex<TaskInfo<T>>>)> {
         let mut dead_tasks = vec![];
         for task in &self.tasks {
             if let Some(t) = task.lock().await.most_recent_measurement().await {

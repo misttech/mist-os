@@ -27,6 +27,7 @@
 #include "src/storage/lib/vfs/cpp/connection/remote_file_connection.h"
 #include "src/storage/lib/vfs/cpp/connection/stream_file_connection.h"
 #include "src/storage/lib/vfs/cpp/debug.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
@@ -318,9 +319,9 @@ zx_status_t FuchsiaVfs::Link(zx::event token, fbl::RefPtr<Vnode> oldparent, std:
   return ZX_OK;
 }
 
-zx_status_t FuchsiaVfs::Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
-                              VnodeConnectionOptions options) {
-  zx_status_t status = ServeImpl(vnode, server_end, options);
+zx_status_t FuchsiaVfs::ServeDeprecated(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
+                                        VnodeConnectionOptions options) {
+  zx_status_t status = ServeDeprecatedImpl(vnode, server_end, options);
   if (status != ZX_OK) {
     FS_PRETTY_TRACE_DEBUG("[FuchsiaVfs::Serve] Error: ", zx_status_get_string(status));
     if (!(options.flags & fuchsia_io::OpenFlags::kNodeReference)) {
@@ -340,8 +341,9 @@ zx_status_t FuchsiaVfs::Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel serve
   return status;
 }
 
-zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
-                                  VnodeConnectionOptions options) {
+zx_status_t FuchsiaVfs::ServeDeprecatedImpl(const fbl::RefPtr<Vnode>& vnode,
+                                            zx::channel& server_end,
+                                            VnodeConnectionOptions options) {
   if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
     return result.error_value();
   }
@@ -428,23 +430,50 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& 
 zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
                                        fidl::ServerEnd<fuchsia_io::Directory> server_end,
                                        fuchsia_io::Rights rights) {
-  VnodeConnectionOptions options;
-  options.flags |= fuchsia_io::OpenFlags::kDirectory;
-  options.rights = rights;
-  zx::result validated_options = vn->ValidateOptions(options);
-  if (validated_options.is_error()) {
-    return validated_options.status_value();
-  }
-  if (zx_status_t status = OpenVnode(&vn); status != ZX_OK) {
-    return status;
-  }
-
-  return Serve(vn, server_end.TakeChannel(), options);
+  return Serve(std::move(vn), server_end.TakeChannel(),
+               fio::Flags::kProtocolDirectory | internal::RightsToFlags(rights));
 }
 
-zx::result<> FuchsiaVfs::Serve3(Open2Result open_result, fuchsia_io::Rights rights,
-                                zx::channel& object_request, fuchsia_io::Flags flags,
-                                const fuchsia_io::wire::Options& options) {
+zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vn, zx::channel channel, fio::Flags flags) {
+  const zx_status_t status = ServeImpl(std::move(vn), channel, flags);
+  if (status != ZX_OK && channel.is_valid()) {
+    fidl::ServerEnd<fio::Node>(std::move(channel)).Close(status);
+  }
+  return status;
+}
+
+zx_status_t FuchsiaVfs::ServeImpl(fbl::RefPtr<Vnode> vn, zx::channel& server_end,
+                                  fio::Flags flags) {
+  // Disallow FLAG_*_CREATE since they require a path and type of object to create.
+  ZX_DEBUG_ASSERT(!(flags & (fio::Flags::kFlagMaybeCreate | fio::Flags::kFlagMustCreate)));
+  // Disallow FILE_TRUNCATE since that will modify the state of |vn|. Callers can call
+  // |Vnode::Truncate| on |vn| if this is required.
+  ZX_DEBUG_ASSERT(!(flags & (fio::Flags::kFileTruncate)));
+
+  // Determine if the protocols and rights specified in |flags| are compatible with |vn|.
+  const zx::result protocol = internal::NegotiateProtocol(flags, vn->GetProtocols());
+  if (protocol.is_error()) {
+    return protocol.error_value();
+  }
+  const fio::Rights rights = internal::FlagsToRights(flags);
+  if (!vn->ValidateRights(rights)) {
+    return ZX_ERR_ACCESS_DENIED;
+  }
+  // Open and serve |vn|.
+  zx::result opened_node = Open2Result::OpenVnode(std::move(vn), *protocol);
+  if (opened_node.is_error()) {
+    return opened_node.error_value();
+  }
+  zx::result result = ServeResult(std::move(*opened_node), rights, server_end, flags, {});
+  if (result.is_error()) {
+    return result.error_value();
+  }
+  return ZX_OK;
+}
+
+zx::result<> FuchsiaVfs::ServeResult(Open2Result open_result, fuchsia_io::Rights rights,
+                                     zx::channel& object_request, fuchsia_io::Flags flags,
+                                     const fuchsia_io::wire::Options& options) {
   rights = internal::DownscopeRights(rights, open_result.protocol());
   const fbl::RefPtr<fs::Vnode>& vnode = open_result.vnode();
   std::unique_ptr<internal::Connection> connection;
@@ -463,9 +492,8 @@ zx::result<> FuchsiaVfs::Serve3(Open2Result open_result, fuchsia_io::Rights righ
       if (koid.is_error()) {
         return koid.take_error();
       }
-      bool append = static_cast<bool>(flags & fio::Flags::kFileAppend);
-      // Truncate was handled when the Vnode was opened, only append mode applies to this
-      // connection. |ToStreamOptions| should handle setting the stream to append mode.
+      // |ToStreamOptions| handles setting the stream to append mode.
+      const bool append = static_cast<bool>(flags & fio::Flags::kFileAppend);
       zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(rights, append));
       if (stream.is_ok()) {
         connection = std::make_unique<internal::StreamFileConnection>(this, vnode, rights, append,
@@ -484,11 +512,7 @@ zx::result<> FuchsiaVfs::Serve3(Open2Result open_result, fuchsia_io::Rights righ
       break;
     }
     case VnodeProtocol::kService: {
-      // TODO(b/324112857): There's nothing we can do if this fails since |Vnode::ConnectService|
-      // consumes the channel. We should change it so that on failure, the channel is not consumed.
-      // We should then close the channel with an epitaph using the error.
-      [[maybe_unused]] zx_status_t status = vnode->ConnectService(std::move(object_request));
-      return zx::ok();
+      return zx::make_result(vnode->ConnectService(std::move(object_request)));
     }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     case VnodeProtocol::kSymlink: {

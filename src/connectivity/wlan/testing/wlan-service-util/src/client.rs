@@ -14,8 +14,7 @@ use wlan_common::security::wpa::credential::{Passphrase, Psk};
 use wlan_common::security::SecurityError;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 type WlanService = DeviceMonitorProxy;
@@ -1281,7 +1280,7 @@ mod tests {
     ) -> fidl_sme::ScanResult {
         fidl_sme::ScanResult {
             compatibility: compatibility.map(Box::new),
-            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+            timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
             bss_description: fake_fidl_bss_description!(
                 protection => protection,
                 bssid: bssid,

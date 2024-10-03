@@ -17,7 +17,7 @@ use fidl_fuchsia_virtualconsole::SessionManagerMarker;
 use pty::ServerPty;
 use std::collections::BTreeMap;
 use term_model::event::{Event, EventListener};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const DEBUGLOG_ID: u32 = 0;
 const FIRST_SESSION_ID: u32 = 1;

@@ -9,7 +9,7 @@
 use fidl_table_validation::*;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_neighbor as fnet_neighbor, fuchsia_zircon_types as zx,
+    fidl_fuchsia_net_neighbor as fnet_neighbor, zx_types as zx,
 };
 
 /// Information on a neighboring device in the local network.
@@ -27,7 +27,7 @@ pub struct Entry {
     #[fidl_field_type(optional)]
     pub mac: Option<fnet::MacAddress>,
     /// Timestamp when this entry has changed `state`.
-    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicTime once there is
+    // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicInstant once there is
     // support for custom conversion functions.
     pub updated_at: zx::zx_time_t,
 }

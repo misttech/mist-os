@@ -462,6 +462,7 @@ group("tests_no_e2e") {
   deps = [
     "//sdk/ctf/plasa:tests",
     "//sdk/lib:tests",
+    "//sdk/rust:tests",
     "//tools/fidl/abi-compat:check-compatibility",
   ]
 }
@@ -775,7 +776,6 @@ sdk_molecule("core_cc_prebuilt_libraries") {
     "//sdk/lib/magma_client:magma_client_sdk",
     "//sdk/lib/svc:svc_sdk",
     "//sdk/lib/vfs/internal:vfs_internal_sdk",
-    "//sdk/lib/virtgralloc:virtgralloc_headers_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/performance/memory/heapdump/instrumentation:instrumentation_sdk",
     "//third_party/Vulkan-Loader:libvulkan_sdk",
@@ -831,6 +831,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
     "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
+    "//sdk/lib/virtgralloc:virtgralloc_headers_sdk",
     "//sdk/lib/zbi-format:zbi-format_sdk",
     "//src/devices/lib/mmio:mmio_sdk",
     "//src/lib/memory_barriers:memory_barriers_sdk",
@@ -858,68 +859,8 @@ sdk_molecule("core_licenses") {
 #
 # BEGIN @internal_sdk
 # DO NOT ADD anything here! This will soon be removed.
-# See https://fxbug.dev/333907106.
+# See https://fxbug.dev/333907192.
 #
-
-sdk_molecule("platform_fidls") {
-  visibility += [ ":platform" ]
-  category = "internal"
-  deps = [
-    "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.exception:fuchsia.exception_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.powersource.test:fuchsia.hardware.powersource.test_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_sdk($fidl_toolchain)",
-  ]
-}
 
 # This SDK molecule is a collection of libraries only available to the in-tree
 # Bazel build. See //sdk:platform.
@@ -955,10 +896,7 @@ sdk_collection("platform") {
   category = "internal"
   id = sdk_id
 
-  deps = [
-    ":platform_fidls",
-    ":platform_libs",
-  ]
+  deps = [ ":platform_libs" ]
 }
 
 #

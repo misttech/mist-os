@@ -403,7 +403,7 @@ where
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
-        this.with_filter_state(|state| {
+        this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             let conn = match metadata.take_conntrack_connection() {
                 Some(c) => Some(c),
                 // It's possible that there won't be a connection in the metadata by this point;
@@ -429,7 +429,23 @@ where
                 Verdict::Accept => Verdict::Accept,
             };
 
-            if let Some(conn) = conn {
+            if let Some(mut conn) = conn {
+                // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
+                // post-NAT, but in the same hook. Currently all filter routines are run before
+                // all NAT routines in the same hook.
+                match nat::perform_nat::<nat::LocalIngressHook, _, _, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    &state.conntrack,
+                    &mut conn,
+                    &state.installed_routines.get().nat.local_ingress,
+                    packet,
+                    Interfaces { ingress: Some(interface), egress: None },
+                ) {
+                    Verdict::Drop => return Verdict::Drop,
+                    Verdict::Accept => {}
+                }
+
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
                     Ok(_) => {}
                     // TODO(https://fxbug.dev/318717702): When implementing
@@ -533,7 +549,7 @@ where
     {
         let Self(this) = self;
         (
-            this.with_filter_state(|state| {
+            this.with_filter_state_and_nat_ctx(|state, core_ctx| {
                 let conn = match metadata.take_conntrack_connection() {
                     Some(c) => Some(c),
                     // It's possible that there won't be a connection in the metadata by this point;
@@ -561,7 +577,23 @@ where
                     Verdict::Accept => Verdict::Accept,
                 };
 
-                if let Some(conn) = conn {
+                if let Some(mut conn) = conn {
+                    // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
+                    // post-NAT, but in the same hook. Currently all filter routines are run before
+                    // all NAT routines in the same hook.
+                    match nat::perform_nat::<nat::EgressHook, _, _, _, _>(
+                        core_ctx,
+                        bindings_ctx,
+                        &state.conntrack,
+                        &mut conn,
+                        &state.installed_routines.get().nat.egress,
+                        packet,
+                        Interfaces { ingress: None, egress: Some(interface) },
+                    ) {
+                        Verdict::Drop => return Verdict::Drop,
+                        Verdict::Accept => {}
+                    }
+
                     match state.conntrack.finalize_connection(bindings_ctx, conn) {
                         Ok(_) => {}
                         // TODO(https://fxbug.dev/333419001): When implementing

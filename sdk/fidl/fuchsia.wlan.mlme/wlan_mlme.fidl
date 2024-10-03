@@ -143,6 +143,33 @@ type ReconnectRequest = struct {
     peer_sta_address ieee80211.MacAddr;
 };
 
+type RoamRequest = struct {
+    selected_bss fuchsia.wlan.common.BssDescription;
+};
+
+/// Result of an SME-initiated roam attempt.
+type RoamConfirm = struct {
+    selected_bssid ieee80211.MacAddr;
+
+    status_code ieee80211.StatusCode;
+
+    /// Whether the original BSS association has been maintained through the roam attempt.
+    /// A successful roam always incurs disassociation from the original BSS, so if `status_code` is
+    /// success then this field must be set to false; a roam failure typically incurs disassociation
+    /// from the original BSS, but may not in some cases (e.g. in some Fast BSS Transition scenarios).
+    original_association_maintained bool;
+
+    /// Whether the client is authenticated with the target BSS. If `status_code` is success, then
+    /// this field must be set to true; if the roam attempt failed, this field may be true or false.
+    /// This allows higher layers to decide how to clean up connection state after a failed roam
+    /// attempt.
+    target_bss_authenticated bool;
+
+    // These fields are only valid if the result is success.
+    association_id uint16;
+    association_ies vector<uint8>:MAX;
+};
+
 /// In-progress fullmac-initiated roam attempt details.
 type RoamStartIndication = struct {
     selected_bssid ieee80211.MacAddr;
@@ -487,6 +514,16 @@ closed protocol MLME {
     });
     strict ReconnectReq(struct {
         req ReconnectRequest;
+    });
+
+    /// Initiate a roam attempt (SME-initiated).
+    strict RoamReq(struct {
+        req RoamRequest;
+    });
+
+    /// Receive the result of an SME-initiated roam attempt.
+    strict -> RoamConf(struct {
+        conf RoamConfirm;
     });
 
     /// Receive notification that a fullmac-initiated roam attempt is in-progress.

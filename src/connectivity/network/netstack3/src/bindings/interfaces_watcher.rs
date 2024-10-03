@@ -20,7 +20,7 @@ use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, zx,
 };
 
 use crate::bindings::devices::BindingId;
@@ -252,7 +252,7 @@ pub(crate) enum InterfaceUpdate {
     AddressAdded {
         addr: AddrSubnetEither,
         assignment_state: IpAddressState,
-        valid_until: zx::MonotonicTime,
+        valid_until: zx::MonotonicInstant,
     },
     AddressAssignmentStateChanged {
         addr: IpAddr,
@@ -275,7 +275,7 @@ pub(crate) enum InterfaceUpdate {
 #[cfg_attr(test, derive(Clone, Eq, PartialEq))]
 pub(crate) struct AddressPropertiesUpdate {
     /// The new value for `valid_until`.
-    pub(crate) valid_until: zx::MonotonicTime,
+    pub(crate) valid_until: zx::MonotonicInstant,
 }
 
 /// Immutable interface properties.
@@ -308,7 +308,7 @@ struct AddressProperties {
 #[derive(Debug)]
 #[cfg_attr(test, derive(Clone, Eq, PartialEq))]
 pub(crate) struct AddressState {
-    pub(crate) valid_until: zx::MonotonicTime,
+    pub(crate) valid_until: zx::MonotonicInstant,
     pub(crate) assignment_state: IpAddressState,
 }
 
@@ -1063,7 +1063,7 @@ mod tests {
         let addr1 = AddrSubnetEither::V6(
             AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
         );
-        const ADDR_VALID_UNTIL: zx::MonotonicTime = zx::MonotonicTime::from_nanos(12345);
+        const ADDR_VALID_UNTIL: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(12345);
         let base_properties =
             finterfaces::Properties { id: Some(IFACE1_ID.get()), ..Default::default() };
 
@@ -1300,7 +1300,7 @@ mod tests {
         let addr = AddrSubnetEither::V6(
             AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
         );
-        let valid_until = zx::MonotonicTime::from_nanos(1234);
+        let valid_until = zx::MonotonicInstant::from_nanos(1234);
         let (id, initial_state) = iface1_initial_state();
 
         let mut state = HashMap::from([(id, initial_state)]);
@@ -1383,7 +1383,7 @@ mod tests {
         let addr = AddrSubnetEither::V6(
             AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
         );
-        let valid_until = zx::MonotonicTime::from_nanos(1234);
+        let valid_until = zx::MonotonicInstant::from_nanos(1234);
         let (id, initial_state) = iface1_initial_state();
 
         let mut state = HashMap::from([(id, initial_state)]);
@@ -1451,7 +1451,7 @@ mod tests {
         );
         let (addr, prefix_len) = subnet.addr_prefix();
         let addr = *addr;
-        let valid_until = zx::MonotonicTime::from_nanos(1234);
+        let valid_until = zx::MonotonicInstant::from_nanos(1234);
         let address_properties = AddressProperties {
             prefix_len,
             state: AddressState { valid_until, assignment_state: IpAddressState::Tentative },
@@ -1619,7 +1619,7 @@ mod tests {
         let addr = AddrSubnetEither::<net_types::SpecifiedAddr<_>>::V6(
             AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
         );
-        let valid_until = zx::MonotonicTime::from_nanos(1234);
+        let valid_until = zx::MonotonicInstant::from_nanos(1234);
         let (ip_addr, prefix_len) = addr.addr_prefix();
 
         // Set up the initial state.
@@ -1908,7 +1908,7 @@ mod tests {
                     .notify(InterfaceUpdate::AddressAdded {
                         addr: addr.try_into_core().expect("invalid address"),
                         assignment_state: IpAddressState::Assigned,
-                        valid_until: zx::MonotonicTime::INFINITE,
+                        valid_until: zx::MonotonicInstant::INFINITE,
                     })
                     .expect("failed to notify");
                 expect.push(addr);

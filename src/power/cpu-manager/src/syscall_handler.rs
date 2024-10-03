@@ -9,9 +9,9 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_kernel as fkernel;
 use fuchsia_inspect::{self as inspect, NumericProperty as _, Property as _};
-use fuchsia_zircon::prelude::AsHandleRef;
-use fuchsia_zircon::{self as zx, sys};
 use std::rc::Rc;
+use zx::prelude::AsHandleRef;
+use zx::{self as zx, sys};
 
 /// Node: SyscallHandler
 ///

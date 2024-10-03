@@ -6,9 +6,9 @@ use super::*;
 use assert_matches::assert_matches;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Status;
 use std::io::Write as _;
 use std::time::Duration;
+use zx::Status;
 
 // merkle root of b"Hello world!\n".
 static BLOB_MERKLE: &str = "e5892a9b652ede2e19460a9103fd9cb3417f782a8d29f6c93ec0c31170a94af3";
@@ -396,7 +396,7 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         ),
         Err(zx::Status::TIMED_OUT)
     );
@@ -405,7 +405,7 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     assert_eq!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         )?,
         zx::Signals::USER_0
     );
@@ -427,7 +427,7 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         ),
         Err(zx::Status::TIMED_OUT)
     );
@@ -436,7 +436,7 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     assert_eq!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         )?,
         zx::Signals::USER_0
     );
@@ -463,7 +463,7 @@ async fn empty_blob_readable_after_resize() {
     assert_matches!(
         event.wait_handle(
             zx::Signals::all(),
-            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+            zx::MonotonicInstant::after(zx::Duration::from_seconds(0))
         ),
         Ok(zx::Signals::USER_0)
     );

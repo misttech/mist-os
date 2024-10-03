@@ -12,7 +12,6 @@ use fidl_fuchsia_pkg_ext::{self as pkg, cache, BlobId, RepositoryConfig, Reposit
 use fuchsia_pkg::PackageDirectory;
 use fuchsia_sync::{Mutex, RwLock};
 use fuchsia_url::{AbsolutePackageUrl, RepositoryUrl};
-use fuchsia_zircon::Status;
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex as AsyncMutex;
 use futures::prelude::*;
@@ -25,6 +24,7 @@ use std::time::Duration;
 use std::{fs, io};
 use thiserror::Error;
 use tracing::{error, info};
+use zx::Status;
 use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     fuchsia_inspect as inspect, fuchsia_trace as ftrace,

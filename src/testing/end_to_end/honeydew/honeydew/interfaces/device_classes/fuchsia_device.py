@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from honeydew.interfaces.affordances import (
     inspect,
+    location,
     netstack,
     rtc,
     session,
@@ -287,6 +288,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             wlan.Wlan object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def location(self) -> location.Location:
+        """Returns a Location affordance object.
+
+        Returns:
+            location.Location object
         """
 
     # List all the public methods

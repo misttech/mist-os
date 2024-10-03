@@ -8,9 +8,9 @@ use anyhow::{Context as _, Error};
 use fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{self as zx, HandleBased, Peered};
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::{self as zx, HandleBased, Peered};
 
 enum IncomingServices {
     CommitStatusProvider(CommitStatusProviderRequestStream),
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use super::*;
     use fidl_fuchsia_update::CommitStatusProviderMarker;
-    use fuchsia_zircon::AsHandleRef;
+    use zx::AsHandleRef;
 
     #[fasync::run_singlethreaded(test)]
     async fn fake_system_update_committer() {
@@ -75,7 +75,7 @@ mod tests {
 
         let result = proxy.is_current_system_committed().await.unwrap();
         assert_eq!(
-            result.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST),
+            result.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
         );
     }

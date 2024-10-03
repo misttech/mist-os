@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{Result, SessionId};
-use fuchsia_zircon as zx;
+
 use zx::AsHandleRef;
 
 /// A universally unique id.

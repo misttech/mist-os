@@ -13,13 +13,13 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use fuchsia_zircon::Duration;
 use futures::{select, StreamExt};
 use std::fmt::Debug;
 use tracing::{debug, info, trace};
+use zx::Duration;
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
-    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync, zx,
 };
 
 // Typically, AVRCP peer responds to requests within 0.2s.

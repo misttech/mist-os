@@ -23,13 +23,13 @@ rustc_library("lib") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/pty",
     "//src/lib/trace/rust:trace",
     "//src/lib/ui/carnelian",
     "//src/lib/ui/terminal",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/alacritty/alacritty_terminal:term_model",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
@@ -104,7 +104,7 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//sdk/rust/zx",
     "//third_party/rust_crates:thiserror",
   ]
 

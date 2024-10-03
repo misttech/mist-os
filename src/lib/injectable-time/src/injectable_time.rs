@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use fuchsia_sync::Mutex;
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
 use std::sync::Arc;
 
 /// TimeSource provides the current time in nanoseconds since the Unix epoch.
 /// A `&'a dyn TimeSource` can be injected into a data structure.
-/// TimeSource is implemented by UtcTime for wall-clock system time, and
+/// TimeSource is implemented by UtcInstant for wall-clock system time, and
 /// FakeTime for a clock that is explicitly set by testing code.
 pub trait TimeSource: std::fmt::Debug {
     fn now(&self) -> i64;
@@ -66,17 +64,17 @@ impl IncrementingFakeTime {
     }
 }
 
-/// UtcTime instances return the Rust system clock value each time now() is called.
+/// UtcInstant instances return the Rust system clock value each time now() is called.
 #[derive(Debug)]
-pub struct UtcTime {}
+pub struct UtcInstant {}
 
-impl UtcTime {
-    pub fn new() -> UtcTime {
-        UtcTime {}
+impl UtcInstant {
+    pub fn new() -> UtcInstant {
+        UtcInstant {}
     }
 }
 
-impl TimeSource for UtcTime {
+impl TimeSource for UtcInstant {
     fn now(&self) -> i64 {
         if cfg!(target_arch = "wasm32") {
             // TODO(https://fxbug.dev/42143658): Remove this when WASM avoids calling this method.
@@ -88,29 +86,29 @@ impl TimeSource for UtcTime {
     }
 }
 
-/// MonotonicTime instances provide a monotonic clock.
-/// On Fuchsia, MonotonicTime uses fuchsia_zircon::MonotonicTime::get().
+/// MonotonicInstant instances provide a monotonic clock.
+/// On Fuchsia, MonotonicInstant uses zx::MonotonicInstant::get().
 #[derive(Debug)]
-pub struct MonotonicTime {
+pub struct MonotonicInstant {
     #[cfg(not(target_os = "fuchsia"))]
     starting_time: std::time::Instant,
 }
 
-impl MonotonicTime {
-    pub fn new() -> MonotonicTime {
+impl MonotonicInstant {
+    pub fn new() -> MonotonicInstant {
         #[cfg(target_os = "fuchsia")]
-        let time = MonotonicTime {};
+        let time = MonotonicInstant {};
         #[cfg(not(target_os = "fuchsia"))]
-        let time = MonotonicTime { starting_time: std::time::Instant::now() };
+        let time = MonotonicInstant { starting_time: std::time::Instant::now() };
 
         time
     }
 }
 
-impl TimeSource for MonotonicTime {
+impl TimeSource for MonotonicInstant {
     fn now(&self) -> i64 {
         #[cfg(target_os = "fuchsia")]
-        let now = zx::MonotonicTime::get().into_nanos();
+        let now = zx::MonotonicInstant::get().into_nanos();
         #[cfg(not(target_os = "fuchsia"))]
         let now = (std::time::Instant::now() - self.starting_time).as_nanos() as i64;
 
@@ -118,29 +116,29 @@ impl TimeSource for MonotonicTime {
     }
 }
 
-/// BootTime instances provide a monotonic clock.
-/// On Fuchsia, BootTime uses fuchsia_zircon::BootTime::get().
+/// BootInstant instances provide a monotonic clock.
+/// On Fuchsia, BootInstant uses zx::BootInstant::get().
 #[derive(Debug)]
-pub struct BootTime {
+pub struct BootInstant {
     #[cfg(not(target_os = "fuchsia"))]
     starting_time: std::time::Instant,
 }
 
-impl BootTime {
-    pub fn new() -> BootTime {
+impl BootInstant {
+    pub fn new() -> BootInstant {
         #[cfg(target_os = "fuchsia")]
-        let time = BootTime {};
+        let time = BootInstant {};
         #[cfg(not(target_os = "fuchsia"))]
-        let time = BootTime { starting_time: std::time::Instant::now() };
+        let time = BootInstant { starting_time: std::time::Instant::now() };
 
         time
     }
 }
 
-impl TimeSource for BootTime {
+impl TimeSource for BootInstant {
     fn now(&self) -> i64 {
         #[cfg(target_os = "fuchsia")]
-        let now = zx::BootTime::get().into_nanos();
+        let now = zx::BootInstant::get().into_nanos();
         #[cfg(not(target_os = "fuchsia"))]
         let now = (std::time::Instant::now() - self.starting_time).as_nanos() as i64;
 
@@ -169,7 +167,7 @@ mod test {
 
     #[test]
     fn test_system_time() {
-        let time_source = UtcTime::new();
+        let time_source = UtcInstant::new();
         let time_holder = TimeHolder::new(&time_source);
         let first_time = time_holder.now();
         // Make sure the system time is ticking. If not, this will hang until the test times out.
@@ -178,7 +176,7 @@ mod test {
 
     #[test]
     fn test_monotonic_time() {
-        let time_source = MonotonicTime::new();
+        let time_source = MonotonicInstant::new();
         let time_holder = TimeHolder::new(&time_source);
         let first_time = time_holder.now();
         // Make sure the monotonic time is ticking. If not, this will hang until the test times out.
@@ -187,7 +185,7 @@ mod test {
 
     #[test]
     fn test_boot_time() {
-        let time_source = BootTime::new();
+        let time_source = BootInstant::new();
         let time_holder = TimeHolder::new(&time_source);
         let first_time = time_holder.now();
         // Make sure the monotonic time is ticking. If not, this will hang until the test times out.

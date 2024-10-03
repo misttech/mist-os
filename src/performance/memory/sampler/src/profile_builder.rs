@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use anyhow::Error;
 use fidl_fuchsia_memory_sampler::ModuleMap;
-use fuchsia_zircon::Vmo;
 use prost::Message;
+use zx::Vmo;
 
 use crate::crash_reporter::ProfileReport;
 use crate::pprof;

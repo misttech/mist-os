@@ -535,7 +535,7 @@ mod tests {
 
             let directory_handle = take_startup_handle(HandleType::DirectoryRequest.into())
                 .expect("cannot take startup handle");
-            let outgoing_dir = fuchsia_zircon::Channel::from(directory_handle).into();
+            let outgoing_dir = zx::Channel::from(directory_handle).into();
             let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
             let scope = vfs::execution_scope::ExecutionScope::new();

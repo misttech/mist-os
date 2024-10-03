@@ -446,7 +446,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use futures::TryStreamExt;
     use std::cell::Cell;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// Creates a fake fuchsia.hardware.cpu_ctrl.Device proxy
     fn setup_fake_cpu_ctrl_proxy(opps: Vec<OperatingPoint>) -> fcpu_ctrl::DeviceProxy {

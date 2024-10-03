@@ -6,29 +6,28 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use super::{CompIdent, DeclType, Enum, Struct, Table, Union};
+use crate::de::Index;
 
-/// Root of the JSON IR datastructure for a library.
-#[derive(Deserialize)]
+use super::{CompIdent, DeclType};
+
+#[derive(Debug, Deserialize)]
 pub struct Library {
     pub name: String,
-    // #[serde(deserialize_with = "crate::de::index")]
-    // pub const_declarations: Vec<Const>,
-    // pub bits_declarations: Vec<Bits>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub enum_declarations: HashMap<CompIdent, Enum>,
-    // pub interface_declarations: Vec<Protocol>,
-    // pub service_declarations: Vec<Service>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub struct_declarations: HashMap<CompIdent, Struct>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub external_struct_declarations: HashMap<CompIdent, Struct>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub table_declarations: HashMap<CompIdent, Table>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub union_declarations: HashMap<CompIdent, Union>,
-    // pub type_alias_declarations: Vec<TypeAlias>,
-    pub declaration_order: Vec<CompIdent>,
-    pub declarations: HashMap<CompIdent, DeclType>,
-    // pub library_dependencies: Vec<Library>,
+    pub declarations: HashMap<CompIdent, ExternalDeclaration>,
+}
+
+impl Index for Library {
+    type Key = String;
+
+    fn key(&self) -> &Self::Key {
+        &self.name
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ExternalDeclaration {
+    pub kind: DeclType,
+    #[serde(rename = "resource", default)]
+    #[expect(dead_code)]
+    pub is_resouce: bool,
 }

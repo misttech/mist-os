@@ -46,7 +46,7 @@ use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
 use fuchsia_inspect::health::Reporter;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fuchsia_zircon as zx, rust_icu_sys as usys, rust_icu_unorm2 as unorm};
+use {rust_icu_sys as usys, rust_icu_unorm2 as unorm, zx};
 
 // There probably is a more general method of determining whether the characters
 // are combining characters. But somehow it escapes me now.
@@ -84,7 +84,7 @@ fn remove_combination(c: u32) -> u32 {
 struct StoredEvent {
     event: KeyboardEvent,
     device_descriptor: InputDeviceDescriptor,
-    event_time: zx::MonotonicTime,
+    event_time: zx::MonotonicInstant,
 }
 
 impl fmt::Display for StoredEvent {
@@ -771,7 +771,7 @@ mod tests {
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fidl_fuchsia_input_report::ConsumerControlButton;
-    use fuchsia_zircon as zx;
+
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
 
@@ -785,7 +785,7 @@ mod tests {
             key,
             event_type,
             /*modifiers=*/ None,
-            /*event_time*/ zx::MonotonicTime::ZERO,
+            /*event_time*/ zx::MonotonicInstant::ZERO,
             &InputDeviceDescriptor::Fake,
             /*keymap=*/ None,
             key_meaning,
@@ -1292,7 +1292,7 @@ mod tests {
             new_event(Key::A, KeyEventType::Pressed, Some(KeyMeaning::Codepoint('A' as u32))),
             UnhandledInputEvent::try_from(testing_utilities::create_consumer_controls_event(
                 vec![ConsumerControlButton::VolumeUp],
-                zx::MonotonicTime::ZERO,
+                zx::MonotonicInstant::ZERO,
                 &testing_utilities::consumer_controls_device_descriptor(),
             ))
             .unwrap(),

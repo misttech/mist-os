@@ -26,13 +26,11 @@ if (is_host) {
     ]
   }
 
-  # This test will run using "fuchsia-controller-preferred" transport.
   # It uses "fuchsia-controller" to reboot the device. However, once device comes
   # back up, it starts SL4F server and sends an SL4F request.
   # Thus this test will ensure SL4F functionality in Honeydew is still working.
-
   # Note - To run this test in CQ, ensure builder config has SL4F as dependency.
-  python_mobly_test("soft_reboot_test_fc_preferred") {
+  python_mobly_test("soft_reboot_test_sl4f") {
     main_source = "test_soft_reboot.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -41,7 +39,19 @@ if (is_host) {
     params = {
       num_reboots = 1
     }
-    transport = "fuchsia-controller-preferred"
+
+    # FuchsiaDevice to use SL4F, include below config
+    honeydew_config = {
+      affordances = {
+        bluetooth = {
+          implementation = "sl4f"
+        }
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
+
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -49,10 +59,10 @@ if (is_host) {
   }
 }
 
-group("test_soft_reboot_fc_preferred") {
+group("test_soft_reboot_sl4f") {
   testonly = true
   deps = [
-    ":soft_reboot_test_fc_preferred($host_toolchain)",
+    ":soft_reboot_test_sl4f($host_toolchain)",
     "../../honeydew:sl4f_packages",
   ]
 }
@@ -63,6 +73,6 @@ group("tests") {
   public_deps = [
     ":soft_reboot_test_fc($host_toolchain)",
     ":soft_reboot_test_fc.hermetic($host_toolchain)",
-    ":test_soft_reboot_fc_preferred",
+    ":test_soft_reboot_sl4f",
   ]
 }

@@ -13,15 +13,17 @@
 #[derive(Clone, Debug)]
 pub struct DocCommentWithQuotes {}
 
-impl ::fidl::Encode for DocCommentWithQuotes {
+impl ::fidl_next::Encodable for DocCommentWithQuotes {
     type Encoded<'buf> = WireDocCommentWithQuotes;
+}
 
+impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes {
     fn encode(
         &mut self,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
-        ::fidl::munge! {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
             let Self::Encoded {
             } = slot;
         }
@@ -30,26 +32,32 @@ impl ::fidl::Encode for DocCommentWithQuotes {
     }
 }
 
-impl ::fidl::EncodeOption for Box<DocCommentWithQuotes> {
-    type EncodedOption<'buf> = ::fidl::WireBox<'buf, WireDocCommentWithQuotes>;
+impl ::fidl_next::EncodableOption for Box<DocCommentWithQuotes> {
+    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireDocCommentWithQuotes>;
+}
 
+impl<___E> ::fidl_next::EncodeOption<___E> for Box<DocCommentWithQuotes>
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    DocCommentWithQuotes: ::fidl_next::Encode<___E>,
+{
     fn encode_option(
         this: Option<&mut Self>,
-        encoder: &mut ::fidl::encode::Encoder,
-        slot: ::fidl::Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), ::fidl::encode::Error> {
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
-            encoder.encode(inner)?;
-            ::fidl::WireBox::encode_present(slot);
+            ::fidl_next::EncoderExt::encode(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(slot);
         } else {
-            ::fidl::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(slot);
         }
 
         Ok(())
     }
 }
 
-impl ::fidl::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
+impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
     fn take_from(from: &mut WireDocCommentWithQuotes) -> Self {
         Self {}
     }
@@ -60,12 +68,15 @@ impl ::fidl::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
 #[repr(C)]
 pub struct WireDocCommentWithQuotes {}
 
-unsafe impl<'buf> ::fidl::Decode<'buf> for WireDocCommentWithQuotes {
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireDocCommentWithQuotes
+where
+    ___D: ?Sized,
+{
     fn decode(
-        slot: ::fidl::Slot<'_, Self>,
-        decoder: &mut ::fidl::decode::Decoder<'buf>,
-    ) -> Result<(), ::fidl::decode::Error> {
-        ::fidl::munge! {
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge! {
             let Self {
             } = slot;
         }

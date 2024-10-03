@@ -9,9 +9,9 @@ use super::prelude_internal::*;
 use crate::lowpan_fidl::*;
 use crate::Driver;
 use core::future::ready;
-use fuchsia_zircon_status as zx_status;
 use futures::stream::BoxStream;
 use futures::FutureExt;
+use zx_status;
 
 /// A dummy LoWPAN Driver implementation, for testing.
 #[derive(Debug, Copy, Clone, Default)]
@@ -462,7 +462,7 @@ impl Driver for DummyDevice {
         Ok(vec![])
     }
 
-    async fn make_joinable(&self, _duration: fuchsia_zircon::Duration, _port: u16) -> ZxResult<()> {
+    async fn make_joinable(&self, _duration: zx::Duration, _port: u16) -> ZxResult<()> {
         Ok(())
     }
 

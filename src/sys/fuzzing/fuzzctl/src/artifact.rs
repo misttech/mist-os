@@ -6,9 +6,9 @@ use crate::input::Input;
 use crate::util::digest_path;
 use anyhow::{bail, Context as _, Result};
 use fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult};
-use fuchsia_zircon_status as zx;
 use std::fs;
 use std::path::{Path, PathBuf};
+use zx_status as zx;
 
 /// Combines the results of a long-running fuzzer workflow.
 pub struct Artifact {

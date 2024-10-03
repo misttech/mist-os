@@ -12,7 +12,7 @@ use carnelian::scene::layout::{
 };
 use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{Message, Point, Size, ViewAssistant, ViewAssistantContext};
-use fuchsia_zircon::Event;
+use zx::Event;
 
 const TEXT_FONT_SIZE: f32 = 24.0;
 const MAX_CONSOLE_LINE_COUNT: usize = 20;

@@ -25,7 +25,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 mod peer;

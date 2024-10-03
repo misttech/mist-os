@@ -31,10 +31,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tracing::{debug, error, warn};
-use {
-    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace,
-    fuchsia_zircon as zx,
-};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace, zx};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -147,7 +144,7 @@ impl LogsArtifactsContainer {
     ) -> PinStream<Arc<LogsData>> {
         let identity = Arc::clone(&self.identity);
         let earliest_timestamp =
-            self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(zx::BootTime::ZERO);
+            self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(zx::BootInstant::ZERO);
         Box::pin(
             self.buffer
                 .cursor(mode)
@@ -486,7 +483,7 @@ impl LogsArtifactsContainer {
     }
 
     /// Returns the timestamp of the earliest log message in this container's buffer, if any.
-    pub fn oldest_timestamp(&self) -> Option<zx::BootTime> {
+    pub fn oldest_timestamp(&self) -> Option<zx::BootInstant> {
         self.buffer.peek_front().map(|m| m.timestamp())
     }
 

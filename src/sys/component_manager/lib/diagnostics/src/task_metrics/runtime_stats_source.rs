@@ -4,9 +4,9 @@
 
 use async_trait::async_trait;
 use fidl_fuchsia_diagnostics_types::{ComponentDiagnostics, Task as DiagnosticsTask, TaskUnknown};
-use fuchsia_zircon::{self as zx, sys as zx_sys, AsHandleRef, Task};
 use futures::channel::oneshot;
 use hooks::RuntimeInfo;
+use zx::{self as zx, sys as zx_sys, AsHandleRef, Task};
 
 /// Trait that all structs that behave as Task's implement.
 /// Used for simplying testing.
@@ -43,7 +43,7 @@ where
     async fn get_receiver(&self) -> Option<oneshot::Receiver<T>>;
 
     /// Returns the reported start time.
-    fn start_time(&self) -> zx::MonotonicTime;
+    fn start_time(&self) -> zx::MonotonicInstant;
 }
 
 #[async_trait]
@@ -101,7 +101,7 @@ impl ComponentStartedInfo<ComponentDiagnostics, DiagnosticsTask> for RuntimeInfo
         receiver_guard.take()
     }
 
-    fn start_time(&self) -> zx::MonotonicTime {
+    fn start_time(&self) -> zx::MonotonicInstant {
         self.start_time
     }
 }

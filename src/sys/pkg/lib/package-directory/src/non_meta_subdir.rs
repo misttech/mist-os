@@ -16,7 +16,7 @@ use vfs::path::Path as VfsPath;
 use vfs::{
     immutable_attributes, CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 pub(crate) struct NonMetaSubdir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,

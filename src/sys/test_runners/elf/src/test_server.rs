@@ -16,7 +16,7 @@ use test_runners_lib::elf::{Component, EnumeratedTestCases, FidlError, KernelErr
 use test_runners_lib::errors::*;
 use test_runners_lib::logs::SocketLogWriter;
 use tracing::{debug, error};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 #[derive(Default)]

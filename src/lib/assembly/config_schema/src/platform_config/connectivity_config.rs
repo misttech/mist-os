@@ -55,11 +55,14 @@ pub struct PlatformNetworkConfig {
     #[schemars(schema_with = "crate::option_path_schema")]
     pub netstack_config_path: Option<FileRelativePathBuf>,
 
-    /// Number of threads used by the network stack.
+    /// Number of threads used by Netstack3.
     ///
     /// Platform default will be used if unspecified.
+    ///
+    /// NOTE: An error will be thrown if this is set and Netstack2 is selected
+    /// as the system netstack.
     #[serde(default)]
-    pub netstack_thread_count: NetstackThreadCount,
+    pub netstack_thread_count: Option<NetstackThreadCount>,
 
     #[serde(default)]
     #[file_relative_paths]
@@ -87,7 +90,7 @@ pub struct PlatformNetworkConfig {
     pub include_tun: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[derive(Debug, Serialize, Copy, Clone, Deserialize, JsonSchema, PartialEq)]
 #[serde(try_from = "u8")]
 pub struct NetstackThreadCount(NonZeroU8);
 

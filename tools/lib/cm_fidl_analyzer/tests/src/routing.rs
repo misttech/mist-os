@@ -40,7 +40,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, zx_status,
 };
 
 const TEST_URL_PREFIX: &str = "test:///";

@@ -50,6 +50,7 @@ rustc_library("carnelian") {
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//sdk/rust/zx",
     "//src/graphics/display/lib/rust/display-utils",
     "//src/graphics/lib/compute/forma",
     "//src/graphics/lib/compute/rive-rs",
@@ -67,7 +68,6 @@ rustc_library("carnelian") {
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/ui/keymaps",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:euclid",
@@ -167,9 +167,9 @@ rustc_binary("button") {
   source_root = "examples/button.rs"
   sources = [ "examples/button.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:euclid",
@@ -182,9 +182,9 @@ rustc_binary("clockface") {
   source_root = "examples/clockface.rs"
   sources = [ "examples/clockface.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:euclid",
@@ -212,11 +212,11 @@ rustc_binary("ink") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_rust",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_rust",
+    "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
     "//third_party/rust_crates:itertools",
@@ -230,10 +230,10 @@ rustc_binary("shapes") {
   source_root = "examples/shapes.rs"
   sources = [ "examples/shapes.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
     "//third_party/rust_crates:rand",
@@ -246,9 +246,9 @@ rustc_binary("designer") {
   source_root = "examples/designer.rs"
   sources = [ "examples/designer.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
   ]
@@ -260,11 +260,11 @@ rustc_binary("spinning_square") {
   source_root = "examples/spinning_square.rs"
   sources = [ "examples/spinning_square.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/testing/fidl:placeholders_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
@@ -278,9 +278,9 @@ rustc_binary("gamma") {
   source_root = "examples/gamma.rs"
   sources = [ "examples/gamma.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
   ]
@@ -325,9 +325,9 @@ rustc_binary("png") {
   source_root = "examples/png.rs"
   sources = [ "examples/png.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:euclid",
@@ -341,9 +341,9 @@ rustc_binary("svg") {
   source_root = "examples/svg.rs"
   sources = [ "examples/svg.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
   ]
@@ -355,11 +355,11 @@ rustc_binary("rive") {
   source_root = "examples/rive.rs"
   sources = [ "examples/rive.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/graphics/lib/compute/rive-rs",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
   ]
@@ -371,10 +371,10 @@ rustc_binary("textgrid") {
   source_root = "examples/textgrid.rs"
   sources = [ "examples/textgrid.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:rustc-hash",
@@ -405,8 +405,8 @@ rustc_binary("carnelian_integration_test_bin") {
   source_root = "tests/carnelian_integration_test.rs"
   sources = [ "tests/carnelian_integration_test.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 }
@@ -437,8 +437,8 @@ rustc_binary("carnelian_fb_integration_test_bin") {
   source_root = "tests/carnelian_integration_test.rs"
   sources = [ "tests/carnelian_integration_test.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/ui/carnelian",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 }

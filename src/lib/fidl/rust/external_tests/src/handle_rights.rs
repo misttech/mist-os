@@ -24,10 +24,10 @@ use fidl_test_external::{
     SendHandleProtocolRequest, SendHandleProtocolSynchronousProxy,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::{Handle, MonotonicTime, ObjectType, Rights, Signals};
 use futures::future;
 use futures::stream::StreamExt;
 use std::io::prelude::*;
+use zx::{Handle, MonotonicInstant, ObjectType, Rights, Signals};
 
 const SEND_HANDLE_REDUCED_RIGHTS_ORDINAL: u64 = 0x7675407e0eb5f825;
 const SEND_HANDLE_SAME_RIGHTS_ORDINAL: u64 = 0x1d43414e5560333a;
@@ -114,7 +114,10 @@ impl OrdinalTransformChannel {
     ) {
         let signals = in_end
             .as_handle_ref()
-            .wait(Signals::CHANNEL_READABLE | Signals::CHANNEL_PEER_CLOSED, MonotonicTime::INFINITE)
+            .wait(
+                Signals::CHANNEL_READABLE | Signals::CHANNEL_PEER_CLOSED,
+                MonotonicInstant::INFINITE,
+            )
             .unwrap();
         assert!(signals.contains(Signals::CHANNEL_READABLE));
 
@@ -337,7 +340,7 @@ fn echo_handle_sync_helper<'a>(
     send_fn: fn(
         &EchoHandleProtocolSynchronousProxy,
         fidl::Event,
-        MonotonicTime,
+        MonotonicInstant,
     ) -> Result<fidl::Event, fidl::Error>,
     mut transformable_channel: Box<dyn TransformableChannel + Send>,
 ) {
@@ -354,7 +357,7 @@ fn echo_handle_sync_helper<'a>(
         transformable_channel.reversed_transform();
     });
     let ev = Event::create();
-    let h_response = send_fn(&proxy, ev, MonotonicTime::INFINITE).unwrap();
+    let h_response = send_fn(&proxy, ev, MonotonicInstant::INFINITE).unwrap();
 
     let info = h_response.as_handle_ref().basic_info().unwrap();
     assert_eq!(ObjectType::EVENT, info.object_type);
@@ -653,7 +656,7 @@ fn error_syntax_sync_end_to_end() {
     });
 
     let proxy = ErrorSyntaxProtocolSynchronousProxy::new(client_end);
-    let h_response = proxy.test_error_syntax(MonotonicTime::INFINITE).unwrap();
+    let h_response = proxy.test_error_syntax(MonotonicInstant::INFINITE).unwrap();
 
     let info = h_response.unwrap().as_handle_ref().basic_info().unwrap();
     assert_eq!(ObjectType::EVENT, info.object_type);

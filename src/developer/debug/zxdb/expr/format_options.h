@@ -7,7 +7,13 @@
 
 #include <stdint.h>
 
+#include <string>
+
 namespace zxdb {
+
+static constexpr std::string kIntegerFormatDecimal = "dec";
+static constexpr std::string kIntegerFormatHexadecimal = "hex";
+static constexpr std::string kIntegerFormatBinary = "bin";
 
 struct FormatOptions {
   enum class NumFormat { kDefault, kUnsigned, kSigned, kHex, kChar, kBin };

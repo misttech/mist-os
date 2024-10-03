@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProtocolRequestFlexibleResponseStrictRequest {
@@ -188,7 +185,7 @@ impl ProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -196,7 +193,7 @@ impl ProtocolSynchronousProxy {
     pub fn r#request_strict_response_flexible(
         &self,
         mut s: &StrictFoo,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<FlexibleFoo, fidl::Error> {
         let _response = self.client.send_query::<
             ProtocolRequestStrictResponseFlexibleRequest,
@@ -213,7 +210,7 @@ impl ProtocolSynchronousProxy {
     pub fn r#request_flexible_response_strict(
         &self,
         mut s: &FlexibleFoo,
-        ___deadline: zx::MonotonicTime,
+        ___deadline: zx::MonotonicInstant,
     ) -> Result<StrictFoo, fidl::Error> {
         let _response = self.client.send_query::<
             ProtocolRequestFlexibleResponseStrictRequest,

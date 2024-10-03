@@ -149,9 +149,9 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
     ASSERT_TRUE(ref_clock_result.is_ok());
 
     auto numerator =
-        static_cast<double>(ref_clock_result.value().mono_to_synthetic.rate.synthetic_ticks);
+        static_cast<double>(ref_clock_result.value().reference_to_synthetic.rate.synthetic_ticks);
     auto denominator =
-        static_cast<double>(ref_clock_result.value().mono_to_synthetic.rate.reference_ticks);
+        static_cast<double>(ref_clock_result.value().reference_to_synthetic.rate.reference_ticks);
     double measured_slew_ppm = (numerator * (1e6 / denominator)) - 1'000'000.0;
 
     // Don't wait for a driver clock to fully settle (a minute or more); accept a tolerance

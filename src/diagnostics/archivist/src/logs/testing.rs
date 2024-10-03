@@ -26,10 +26,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use validating_log_listener::{validate_log_dump, validate_log_stream};
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 pub struct TestHarness {
     inspector: Inspector,
@@ -52,7 +49,7 @@ pub fn create_log_sink_requested_event(
             event_type: Some(fcomponent::EventType::CapabilityRequested),
             moniker: Some(target_moniker),
             component_url: Some(target_url),
-            timestamp: Some(zx::MonotonicTime::get().into_nanos()),
+            timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
             ..Default::default()
         }),
         payload: Some(fcomponent::EventPayload::CapabilityRequested(

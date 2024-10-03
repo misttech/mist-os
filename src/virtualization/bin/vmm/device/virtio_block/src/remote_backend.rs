@@ -149,8 +149,8 @@ impl BlockBackend for RemoteBackend {
 mod tests {
     use super::*;
     use crate::backend_test::{BackendController, BackendTest};
-    use fuchsia_zircon as zx;
-    use fuchsia_zircon::HandleBased as _;
+
+    use zx::HandleBased as _;
 
     struct RemoteBackendController {
         vmo: zx::Vmo,

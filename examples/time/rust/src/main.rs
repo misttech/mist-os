@@ -10,11 +10,10 @@ async fn main() {
 
 mod monotonic {
     // [START monotonic]
-    use fuchsia_zircon as zx;
 
     pub fn monotonic_examples() {
         // Read monotonic time.
-        let monotonic_time = zx::MonotonicTime::get();
+        let monotonic_time = zx::MonotonicInstant::get();
         println!("The monotonic time is {:?}.", monotonic_time);
     }
     // [END monotonic]
@@ -23,7 +22,7 @@ mod monotonic {
 mod utc {
     // [START utc]
     use fuchsia_runtime::duplicate_utc_clock_handle;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     pub async fn utc_examples() {
         // Obtain a UTC handle.

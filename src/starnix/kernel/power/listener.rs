@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/370526509): Remove once wake lock features has stabilized.
+#![allow(dead_code)]
+
 use crate::task::CurrentTask;
 
 use crate::power::manager::{SuspendResult, SuspendResumeManagerHandle, STARNIX_POWER_ON_LEVEL};
 use fidl::endpoints::create_request_stream;
 use futures::StreamExt;
 use starnix_logging::{log_error, log_info, log_warn};
-use {
-    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fsession,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fsession, zx};
 
 pub(super) fn init_listener(
     power_manager: &SuspendResumeManagerHandle,
@@ -39,7 +39,7 @@ fn init_session_listener(
     let (listener_client_end, mut listener_stream) =
         create_request_stream::<fsession::BlockingListenerMarker>().unwrap();
     listener_registry
-        .register_blocking_listener(listener_client_end, zx::MonotonicTime::INFINITE)?;
+        .register_blocking_listener(listener_client_end, zx::MonotonicInstant::INFINITE)?;
 
     let power_manager = power_manager.clone();
     system_task.kernel().kthreads.spawn_future(async move {
@@ -118,7 +118,7 @@ fn init_sag_listener(
             listener: Some(listener_client_end),
             ..Default::default()
         },
-        zx::MonotonicTime::INFINITE,
+        zx::MonotonicInstant::INFINITE,
     ) {
         log_error!("failed to register listener in sag {}", err)
     }

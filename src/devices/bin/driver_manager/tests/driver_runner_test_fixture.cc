@@ -299,9 +299,9 @@ void DriverRunnerTest::PrepareRealmForStartDriverHost(bool use_next_vdso) {
       });
   driver_host_dir_.SetOpenHandler([this](const std::string& path, auto object) {
     EXPECT_EQ(fidl::DiscoverableProtocolName<fdh::DriverHost>, path);
-    driver_host_binding_.emplace(dispatcher(),
-                                 fidl::ServerEnd<fdh::DriverHost>(object.TakeChannel()),
-                                 &driver_host_, fidl::kIgnoreBindingClosure);
+    driver_host_bindings_.AddBinding(dispatcher(),
+                                     fidl::ServerEnd<fdh::DriverHost>(object.TakeChannel()),
+                                     &driver_host_, fidl::kIgnoreBindingClosure);
   });
 }
 
@@ -317,6 +317,18 @@ void DriverRunnerTest::PrepareRealmForStartDriverHostDynamicLinker() {
         EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
         EXPECT_EQ(kComponentUrl, decl.url());
       });
+  realm().SetOpenExposedDirHandler(
+      [this, kCollection, kDriverHostName](fdecl::ChildRef child, auto exposed_dir) {
+        EXPECT_EQ(kCollection, child.collection().value_or(""));
+        EXPECT_EQ(kDriverHostName, child.name().substr(0, kDriverHostName.size()));
+        driver_host_dir_.Bind(std::move(exposed_dir));
+      });
+  driver_host_dir_.SetOpenHandler([this](const std::string& path, auto object) {
+    EXPECT_EQ(fidl::DiscoverableProtocolName<fdh::DriverHost>, path);
+    driver_host_bindings_.AddBinding(dispatcher(),
+                                     fidl::ServerEnd<fdh::DriverHost>(object.TakeChannel()),
+                                     &driver_host_, fidl::kIgnoreBindingClosure);
+  });
 }
 
 void DriverRunnerTest::StopDriverComponent(
@@ -476,10 +488,8 @@ zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDrive
 }
 
 void DriverRunnerTest::Unbind() {
-  if (driver_host_binding_.has_value()) {
-    driver_host_binding_.reset();
-    EXPECT_TRUE(RunLoopUntilIdle());
-  }
+  driver_host_bindings_.CloseAll(ZX_OK);
+  EXPECT_TRUE(RunLoopUntilIdle());
 }
 void DriverRunnerTest::ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
                                        std::string_view binary, std::string_view colocate,
@@ -556,6 +566,9 @@ void TestDirectory::Clone(CloneRequest& request, CloneCompleter::Sync& completer
 }
 void TestDirectory::Open(OpenRequest& request, OpenCompleter::Sync& completer) {
   open_handler_(request.path(), std::move(request.object()));
+}
+void TestDirectory::Open3(Open3Request& request, Open3Completer::Sync& completer) {
+  open_handler_(request.path(), fidl::ServerEnd<fio::Node>(std::move(request.object())));
 }
 void TestDirectory::handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
                                           fidl::UnknownMethodCompleter::Sync&) {}

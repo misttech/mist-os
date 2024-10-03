@@ -206,7 +206,6 @@ mod test {
     use super::*;
     use fidl_fuchsia_math::{RectU, SizeU};
     use fuchsia_image_format::images2_image_format_from_sysmem_image_format;
-    use fuchsia_zircon as zx;
 
     #[derive(Debug, Copy, Clone)]
     struct TestSpec {

@@ -3,7 +3,7 @@
 This document describes the steps that occur when a component attempts to
 connect to a protocol in its namespace.
 
-These steps apply to the [Components v2][glossary.components-v2] model as run
+These steps apply to the [Components][glossary.component] model as run
 under component manager.
 
 At a high level these steps are:

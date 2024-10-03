@@ -748,9 +748,12 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
         Arc::new(ConnectionShared { inner: self.inner, state: Mutex::new(self.state) })
     }
 
-    pub(crate) fn reply_tuple_and_external_data_mut(&mut self) -> (&mut Tuple<I>, &mut E) {
-        let ConnectionCommon { reply_tuple, external_data, .. } = &mut self.inner;
-        (reply_tuple, external_data)
+    pub(crate) fn external_data(&self) -> &E {
+        &self.inner.external_data
+    }
+
+    pub(crate) fn reply_tuple_mut(&mut self) -> &mut Tuple<I> {
+        &mut self.inner.reply_tuple
     }
 }
 

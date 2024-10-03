@@ -15,18 +15,21 @@ RUSTFMT_PATH = "prebuilt/third_party/rust/linux-x64/bin/rustfmt"
 BINDGEN_PATH = "prebuilt/third_party/rust_bindgen/linux-x64/bindgen"
 FX_PATH = "scripts/fx"
 
-GENERATED_FILE_HEADER = (
+FUCHSIA_NOTICE_HEADER = (
     """// Copyright %d The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(dead_code)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
 """
     % datetime.datetime.now().year
 )
+
+GENERATED_FILE_HEADER = """#![allow(dead_code)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(clippy::missing_safety_doc)]
+"""
 
 # Replacements to add to these defined by the user.
 BASE_REPLACEMENTS = [
@@ -49,12 +52,18 @@ class Bindgen:
         self.clang_target = "x86_64-unknown-linux-gnu"
         # Use the given PREFIX before raw types instead of ::std::os::raw.
         self.c_types_prefix = ""
+        # Notice header to place at the beginning of the file.
+        self.notice_header = FUCHSIA_NOTICE_HEADER
         # Additional raw lines of Rust code to add to the beginning of the generated output.
         self.raw_lines = ""
         # Mark types as an an opaque blob of bytes with a size and alignment.
         self.opaque_types = []
         # Clang: Include directories (`-I`)
         self.include_dirs = []
+        # Generate implementations for standard traits when not auto-derivable (`--impl-foo`)
+        self.std_impls = []
+        # Standard derivations (`--with-derive-foo`)
+        self.std_derives = []
         # Add extra traits to derive on generated structs/unions.
         # Only applies to `pub struct`/`pub union` that already have a #[derive()] line.
         self.auto_derive_traits = []
@@ -85,10 +94,14 @@ class Bindgen:
         self.no_default_types = []
         # Use types from Rust core instead of std.
         self.use_core = False
+        # Additional flags to pass directly to bindgen.
+        self.additional_bindgen_flags = []
         # Clang: Enable standard #include directories for the C++ standard library
         self.enable_stdlib_include_dirs = True
         # Clang: Define `__Fuchsia_API_level__`.
         self.fuchsia_api_level = ""
+        # Clang: Additional command line flags to pass to clang.
+        self.additional_clang_flags = []
 
     def set_auto_derive_traits(self, traits_map):
         self.auto_derive_traits = [(re.compile(x[0]), x[1]) for x in traits_map]
@@ -100,13 +113,13 @@ class Bindgen:
 
     def run_bindgen(self, input_file, output_file):
         # Bindgen arguments.
+        raw_lines = self.notice_header + GENERATED_FILE_HEADER + self.raw_lines
         args = [
             BINDGEN_PATH,
             "--no-layout-tests",
-            "--with-derive-default",
             "--explicit-padding",
             "--raw-line",
-            GENERATED_FILE_HEADER + self.raw_lines,
+            raw_lines,
             "-o",
             output_file,
         ]
@@ -130,6 +143,10 @@ class Bindgen:
         args += ["--no-debug=" + x for x in self.no_debug_types]
         args += ["--no-copy=" + x for x in self.no_copy_types]
         args += ["--no-default=" + x for x in self.no_default_types]
+        args += ["--impl-" + x for x in self.std_impls]
+        args += ["--with-derive-" + x for x in self.std_derives]
+
+        args += self.additional_bindgen_flags
 
         args += [input_file]
 
@@ -151,8 +168,11 @@ class Bindgen:
             args += ["-I", i]
         args += ["-I", "."]
 
+        args += self.additional_clang_flags
+
         subprocess.check_call(
-            args, env={"RUSTFMT": os.path.abspath(RUSTFMT_PATH)}
+            args,
+            env={"RUSTFMT": os.path.abspath(RUSTFMT_PATH)},
         )
 
     def get_auto_derive_traits(self, line):
@@ -164,7 +184,7 @@ class Bindgen:
             return None
 
         # The third word (after the "pub struct") is the type name.
-        split = re.split("[ <\(]", line)
+        split = re.split(r"[ <\(]", line)
         if len(split) < 3:
             return None
         type_name = split[2]
@@ -183,7 +203,7 @@ class Bindgen:
                 if extra_traits:
                     # Parse existing traits, if any.
                     if len(output_lines) > 0 and output_lines[-1].startswith(
-                        "#[derive("
+                        "#[derive(",
                     ):
                         traits = output_lines[-1][9:-3].split(", ")
                         traits.extend(
@@ -193,7 +213,7 @@ class Bindgen:
                     else:
                         traits = extra_traits
                     output_lines.append(
-                        "#[derive(" + ", ".join(traits) + ")]\n"
+                        "#[derive(" + ", ".join(traits) + ")]\n",
                     )
                 output_lines.append(line)
 

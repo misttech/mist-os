@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fuchsia_zircon::Status;
 use futures::{SinkExt as _, StreamExt as _};
 use once_cell::sync::OnceCell;
 use storage_stress_test_utils::data::FileFactory;
 use storage_stress_test_utils::io::Directory;
 use stress_test::actor::{Actor, ActorError};
 use tracing::info;
+use zx::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // TODO(https://fxbug.dev/42146417): This actor is very basic. At the moment, this is fine, since this is a

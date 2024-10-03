@@ -23,8 +23,7 @@ use wlan_frame_writer::write_frame_to_vec;
 use wlan_rsn::rsna::UpdateSink;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_softmac as fidl_wlan_softmac, zx,
 };
 
 pub mod event;
@@ -51,12 +50,12 @@ lazy_static! {
     // TODO(https://fxbug.dev/42060050): This sleep was introduced to preserve the old timing behavior
     // of scanning when hw-sim depending on the SoftMAC driver iterating through all of the
     // channels.
-    pub static ref ARTIFICIAL_SCAN_SLEEP: fuchsia_zircon::Duration = zx::Duration::from_seconds(2);
+    pub static ref ARTIFICIAL_SCAN_SLEEP: zx::Duration = zx::Duration::from_seconds(2);
 
     // Once a client interface is available for scanning, it takes up to around 30s for a scan
     // to complete (see https://fxbug.dev/42061276). Allow at least double that amount of time to reduce
     // flakiness and longer than the timeout WLAN policy should have.
-    pub static ref SCAN_RESPONSE_TEST_TIMEOUT: fuchsia_zircon::Duration = zx::Duration::from_seconds(70);
+    pub static ref SCAN_RESPONSE_TEST_TIMEOUT: zx::Duration = zx::Duration::from_seconds(70);
 }
 
 /// A client supplicant.

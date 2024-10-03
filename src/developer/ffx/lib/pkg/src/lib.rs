@@ -9,6 +9,5 @@ pub mod repo;
 mod tunnel;
 
 pub use instance::{
-    write_instance_info, PathType, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances,
-    ServerMode,
+    write_instance_info, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode,
 };

@@ -21,7 +21,7 @@ rustc_library("lib") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//sdk/rust/zx",
   ]
   test_deps = [ "//src/lib/ui/fuchsia-scenic" ]
   sources = [ "src/lib.rs" ]

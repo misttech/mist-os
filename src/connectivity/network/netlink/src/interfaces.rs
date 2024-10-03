@@ -1444,11 +1444,10 @@ pub(crate) mod testutil {
     use futures::channel::mpsc;
     use futures::future::Future;
     use futures::stream::Stream;
-    use futures::{FutureExt as _, TryStreamExt as _};
+    use futures::TryStreamExt as _;
     use net_declare::{fidl_subnet, net_addr_subnet};
-    use net_types::ip::{Ipv4, Ipv6};
-    use {fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx};
 
+    use crate::eventloop::{EventLoopComponent, IncludedWorkers, Optional, Required};
     use crate::messaging::testutil::FakeSender;
 
     pub(crate) const LO_INTERFACE_ID: u64 = 1;
@@ -1540,6 +1539,23 @@ pub(crate) mod testutil {
         }
     }
 
+    enum OnlyInterfaces {}
+    impl crate::eventloop::EventLoopSpec for OnlyInterfaces {
+        type InterfacesProxy = Required;
+        type InterfacesStateProxy = Required;
+        type InterfacesHandler = Required;
+        type RouteClients = Required;
+
+        type V4RoutesState = Optional;
+        type V6RoutesState = Optional;
+        type V4RoutesSetProvider = Optional;
+        type V6RoutesSetProvider = Optional;
+
+        type InterfacesWorker = Required;
+        type RoutesV4Worker = Optional;
+        type RoutesV6Worker = Optional;
+    }
+
     pub(crate) struct Setup<E, W> {
         pub event_loop_fut: E,
         pub watcher_stream: W,
@@ -1557,20 +1573,25 @@ pub(crate) mod testutil {
     > {
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_handler, interfaces_handler_sink) = FakeInterfacesHandler::new();
-        let (
-            event_loop,
-            crate::eventloop::testutil::EventLoopServerEnd {
-                interfaces,
-                interfaces_state,
-                v4_routes_state,
-                v6_routes_state,
-                v4_routes_set_provider,
-                v6_routes_set_provider,
-            },
-        ) = crate::eventloop::testutil::event_loop_fixture::<
-            FakeInterfacesHandler,
-            FakeSender<RouteNetlinkMessage>,
-        >(interfaces_handler, route_clients, request_stream);
+        let (interfaces_proxy, interfaces) =
+            fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>()
+                .expect("create proxy should succeed");
+        let (interfaces_state_proxy, interfaces_state) =
+            fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>()
+                .expect("create proxy should succeed");
+        let event_loop_inputs = crate::eventloop::EventLoopInputs::<_, _, OnlyInterfaces> {
+            route_clients: EventLoopComponent::Present(route_clients),
+            interfaces_handler: EventLoopComponent::Present(interfaces_handler),
+            interfaces_proxy: EventLoopComponent::Present(interfaces_proxy),
+            interfaces_state_proxy: EventLoopComponent::Present(interfaces_state_proxy),
+
+            v4_routes_state: EventLoopComponent::Absent(Optional),
+            v6_routes_state: EventLoopComponent::Absent(Optional),
+            v4_routes_set_provider: EventLoopComponent::Absent(Optional),
+            v6_routes_set_provider: EventLoopComponent::Absent(Optional),
+
+            unified_request_stream: request_stream,
+        };
 
         let interfaces_request_stream = interfaces.into_stream().unwrap();
         let if_stream = interfaces_state.into_stream().unwrap();
@@ -1587,37 +1608,14 @@ pub(crate) mod testutil {
 
         Setup {
             event_loop_fut: async move {
-                let event_loop_result = futures::select! {
-                    result = event_loop.run().fuse() => result,
-                    () = crate::eventloop::testutil::serve_empty_routes::<Ipv4>(
-                            v4_routes_state
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                    () = crate::eventloop::testutil::serve_empty_routes::<Ipv6>(
-                            v6_routes_state
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                    () = fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv4>(
-                            v4_routes_set_provider
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                    () = fnet_routes_ext::testutil::admin::serve_noop_route_sets::<Ipv6>(
-                            v6_routes_set_provider
-                            ).fuse() => {
-                        unreachable!()
-                    },
-                };
-                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
-                match event_loop_result {
-                    Ok(never) => match never {},
-                    Err(e) => {
-                        crate::logging::log_warn!("event loop exited with error: {e:?}");
-                        Err(e)
-                    }
-                }
+                let event_loop = event_loop_inputs
+                    .initialize(IncludedWorkers {
+                        interfaces: EventLoopComponent::Present(()),
+                        routes_v4: EventLoopComponent::Absent(Optional),
+                        routes_v6: EventLoopComponent::Absent(Optional),
+                    })
+                    .await?;
+                event_loop.run().await
             },
             watcher_stream,
             request_sink,
@@ -2485,6 +2483,36 @@ mod tests {
         args: impl IntoIterator<Item = RequestArgs>,
         root_handler: F,
     ) -> TestRequestResult {
+        test_request_with_initial_state(
+            args,
+            root_handler,
+            InitialState { eth_interface_online: false },
+        )
+        .await
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct InitialState {
+        eth_interface_online: bool,
+    }
+
+    /// Test helper to handle a request.
+    ///
+    /// `root_handler` returns a future that returns an iterator of
+    /// `fuchsia.net.interfaces/Event`s to feed to the netlink eventloop's
+    /// interfaces watcher after a root API request is handled.
+    /// `initial_state` parametrizes the initial state of the interfaces prior to the request being
+    /// handled.
+    async fn test_request_with_initial_state<
+        St: Stream<Item = fnet_interfaces::Event>,
+        F: FnOnce(fnet_root::InterfacesRequestStream) -> St,
+    >(
+        args: impl IntoIterator<Item = RequestArgs>,
+        root_handler: F,
+        initial_state: InitialState,
+    ) -> TestRequestResult {
+        let InitialState { eth_interface_online } = initial_state;
+
         let (mut expected_sink, expected_client) = crate::client::testutil::new_fake_client::<
             NetlinkRoute,
         >(
@@ -2526,7 +2554,7 @@ mod tests {
                     id: Some(ETH_INTERFACE_ID),
                     name: Some(ETH_NAME.to_string()),
                     port_class: Some(ETHERNET.into()),
-                    online: Some(false),
+                    online: Some(eth_interface_online),
                     addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
@@ -2535,9 +2563,9 @@ mod tests {
                 fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
             ],
         );
-        futures::select! {
-            () = watcher_stream_fut.fuse() => {},
+        futures::select_biased! {
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+            () = watcher_stream_fut.fuse() => {},
         }
         assert_eq!(&expected_sink.take_messages()[..], &[]);
         assert_eq!(&other_sink.take_messages()[..], &[]);
@@ -2568,11 +2596,11 @@ mod tests {
                 Ok::<_, std::convert::Infallible>(st)
             }),
         );
-        let waiter_results = futures::select! {
-            (results, _request_sink) = fut.fuse() => results,
+        let waiter_results = futures::select_biased! {
             res = futures::future::join(watcher_fut, event_loop_fut) => {
                 unreachable!("eventloop/watcher should not return: {res:?}")
-            }
+            },
+            (results, _request_sink) = fut.fuse() => results
         };
         assert_eq!(&other_sink.take_messages()[..], &[]);
         TestRequestResult { messages: expected_sink.take_messages(), waiter_results }
@@ -2708,6 +2736,7 @@ mod tests {
     }
 
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: None,
@@ -2715,6 +2744,7 @@ mod tests {
         Ok(true),
         Ok(()); "no_change")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(WLAN_NAME.to_string()),
             enable: None,
@@ -2722,6 +2752,7 @@ mod tests {
         Ok(true),
         Err(RequestError::UnrecognizedInterface); "no_change_name_not_found")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs {
             link: LinkSpecifier::Index(
                 NonZeroU32::new(WLAN_INTERFACE_ID.try_into().unwrap()).unwrap()),
@@ -2730,6 +2761,7 @@ mod tests {
         Ok(true),
         Err(RequestError::UnrecognizedInterface); "no_change_id_not_found")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: Some(true),
@@ -2737,6 +2769,7 @@ mod tests {
         Ok(false),
         Ok(()); "enable_no_op_succeeds")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: Some(true),
@@ -2744,6 +2777,7 @@ mod tests {
         Ok(true),
         Ok(()); "enable_newly_succeeds")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(WLAN_NAME.to_string()),
             enable: Some(true),
@@ -2751,6 +2785,7 @@ mod tests {
         Ok(true),
         Err(RequestError::UnrecognizedInterface); "enable_not_found")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: Some(true),
@@ -2758,6 +2793,7 @@ mod tests {
         Err(()),
         Err(RequestError::Unknown); "enable_fails")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: Some(false),
@@ -2765,6 +2801,7 @@ mod tests {
         Ok(false),
         Ok(()); "disable_no_op_succeeds")]
     #[test_case(
+        InitialState { eth_interface_online: true },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: Some(false),
@@ -2772,6 +2809,7 @@ mod tests {
         Ok(true),
         Ok(()); "disable_newly_succeeds")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(WLAN_NAME.to_string()),
             enable: Some(false),
@@ -2779,6 +2817,7 @@ mod tests {
         Ok(true),
         Err(RequestError::UnrecognizedInterface); "disable_not_found")]
     #[test_case(
+        InitialState { eth_interface_online: false },
         SetLinkArgs{
             link: LinkSpecifier::Name(ETH_NAME.to_string()),
             enable: Some(false),
@@ -2787,6 +2826,7 @@ mod tests {
         Err(RequestError::Unknown); "disable_fails")]
     #[fuchsia::test]
     async fn test_set_link(
+        initial_state: InitialState,
         args: SetLinkArgs,
         control_response: Result<bool, ()>,
         expected_result: Result<(), RequestError>,
@@ -2810,11 +2850,13 @@ mod tests {
                     }
                     Ok(newly_enabled) => {
                         responder.send(Ok(newly_enabled)).expect("should send response");
-                        Some(fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
-                            id: Some(ETH_INTERFACE_ID),
-                            online: Some(true),
-                            ..fnet_interfaces::Properties::default()
-                        }))
+                        newly_enabled.then_some(fnet_interfaces::Event::Changed(
+                            fnet_interfaces::Properties {
+                                id: Some(ETH_INTERFACE_ID),
+                                online: Some(true),
+                                ..fnet_interfaces::Properties::default()
+                            },
+                        ))
                     }
                 }
             };
@@ -2833,22 +2875,41 @@ mod tests {
                     }
                     Ok(newly_disabled) => {
                         responder.send(Ok(newly_disabled)).expect("should send response");
-                        Some(fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
-                            id: Some(ETH_INTERFACE_ID),
-                            online: Some(false),
-                            ..fnet_interfaces::Properties::default()
-                        }))
+                        newly_disabled.then_some(fnet_interfaces::Event::Changed(
+                            fnet_interfaces::Properties {
+                                id: Some(ETH_INTERFACE_ID),
+                                online: Some(false),
+                                ..fnet_interfaces::Properties::default()
+                            },
+                        ))
                     }
                 }
             };
 
         let test_result = match enable {
-            None => test_request([request], expect_only_get_mac_root_requests).await,
+            None => {
+                test_request_with_initial_state(
+                    [request],
+                    expect_only_get_mac_root_requests,
+                    initial_state,
+                )
+                .await
+            }
             Some(true) => {
-                test_request([request], expect_get_admin_with_handler(handle_enable)).await
+                test_request_with_initial_state(
+                    [request],
+                    expect_get_admin_with_handler(handle_enable),
+                    initial_state,
+                )
+                .await
             }
             Some(false) => {
-                test_request([request], expect_get_admin_with_handler(handle_disable)).await
+                test_request_with_initial_state(
+                    [request],
+                    expect_get_admin_with_handler(handle_disable),
+                    initial_state,
+                )
+                .await
             }
         };
 

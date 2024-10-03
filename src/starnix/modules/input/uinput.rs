@@ -11,7 +11,7 @@ use fidl_fuchsia_ui_test_input::{
     RegistryRegisterKeyboardAndGetDeviceInfoRequest,
     RegistryRegisterTouchScreenAndGetDeviceInfoRequest,
 };
-use fuchsia_zircon as zx;
+
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fileops_impl_seekless;
@@ -264,7 +264,7 @@ impl UinputDeviceFile {
                                 device: Some(key_server),
                                 ..Default::default()
                             },
-                            zx::MonotonicTime::INFINITE,
+                            zx::MonotonicInstant::INFINITE,
                         );
 
                         match register_res {
@@ -303,7 +303,7 @@ impl UinputDeviceFile {
                                 device: Some(touch_server),
                                 ..Default::default()
                             },
-                            zx::Time::INFINITE,
+                            zx::Instant::INFINITE,
                         );
 
                         match register_res {
@@ -460,7 +460,7 @@ impl FileOps for UinputDeviceFile {
                                     report: Some(keyboard_report),
                                     ..Default::default()
                                 },
-                                zx::MonotonicTime::INFINITE,
+                                zx::MonotonicInstant::INFINITE,
                             );
                             if res.is_err() {
                                 return error!(EIO);
@@ -476,8 +476,10 @@ impl FileOps for UinputDeviceFile {
                 match input_report {
                     Ok(Some(report)) => {
                         if let Some(touch_report) = report.touch {
-                            let res = proxy
-                                .simulate_touch_event(&touch_report, zx::MonotonicTime::INFINITE);
+                            let res = proxy.simulate_touch_event(
+                                &touch_report,
+                                zx::MonotonicInstant::INFINITE,
+                            );
                             if res.is_err() {
                                 return error!(EIO);
                             }

@@ -24,8 +24,8 @@ use crate::vfs::{
 };
 use extended_pstate::ExtendedPstateState;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon::sys::zx_thread_state_general_regs_t;
-use fuchsia_zircon::{self as zx};
+use zx::sys::zx_thread_state_general_regs_t;
+
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
@@ -380,7 +380,7 @@ impl CurrentTask {
     pub fn block_until(
         &self,
         guard: EventWaitGuard<'_>,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         self.run_in_state(RunState::Event(guard.event().clone()), move || {
             guard.block_until(deadline).map_err(|e| match e {

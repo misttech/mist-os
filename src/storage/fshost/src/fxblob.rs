@@ -9,10 +9,10 @@ use fidl_fuchsia_device::ControllerProxy;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use fs_management::format::DiskFormat;
 use fs_management::partition::{find_partition, PartitionMatcher};
-use fuchsia_zircon::{self as zx, Duration};
 use futures::StreamExt;
 use std::sync::Arc;
 use vfs::service;
+use zx::{self as zx, Duration};
 
 /// Make a new vfs service node that implements fuchsia.update.verify.BlobfsVerifier
 pub fn blobfs_verifier_service() -> Arc<service::Service> {

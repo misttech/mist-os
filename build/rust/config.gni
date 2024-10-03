@@ -5,10 +5,9 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
-import("//build/config/current_target_tuple.gni")
 import("//build/config/sysroot.gni")
 import("//build/fidl/toolchain.gni")
-import("//build/rust/include_rustdoc.gni")
+import("//build/rust/rust_auxiliary_args.gni")
 
 default_rustc_prefix = "//prebuilt/third_party/rust/${host_platform}"
 
@@ -66,12 +65,14 @@ declare_args() {
   # Makes clippy targets fail to build when any "deny" lints are found
   clippy_cause_failure = true
 
-  # Turns rust targets into a group with both the normal target and clippy target. This
-  # causes clippy targets to get included in the build. This gets enabled by default with
-  # `fx set`, but is defaulted off in GN so it won't be on in infra.
-  include_clippy = false
+  # See args in //build/rust/rust_auxiliary_args.gni for `include_clippy` and
+  # `include_rustdoc`
 
-  # See related config in //build/rust/include_rustdoc.gni
+  # Final destination of docs generated with `fx rustdoc-link`, as a URL. May
+  # use the file:/// scheme for local testing. Rustdoc will generate links
+  # relative to this path, appending "/host" for host toolchains.
+  rustdoc_extern_html_root_url_base =
+      "https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index"
 
   # By default building clippy targets prints lints as well as any rustc diagnostics
   # that were emitted by check-building the crate. This flag makes the output in the
@@ -80,11 +81,6 @@ declare_args() {
   # will still emit rustc diagnostics alongside clippy lints, they just wont show
   # up in ninja's stderr
   clippy_ignore_rustc = false
-
-  # Final destination of docs generated with `fx rustdoc-link`, as a URL. May
-  # use the file:/// scheme for local testing. Rustdoc will generate links
-  # relative to this path.
-  rustdoc_extern_html_root_url = "https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index/$current_target_tuple/"
 }
 
 if (rustc_prefix == default_rustc_prefix &&

@@ -300,7 +300,7 @@ impl<'a> InputReportHandler<'a> {
         context: &mut AutoRepeatContext,
     ) -> Vec<Event> {
         if let Some(key) = self.repeating.as_ref() {
-            let repeat_time = fuchsia_zircon::MonotonicTime::get();
+            let repeat_time = zx::MonotonicInstant::get();
             let modifiers = Modifiers::from_pressed_keys_3(&self.pressed_keys);
             context.continue_autorepeat_timer(&self.device_id);
             let repeat = create_keyboard_event(

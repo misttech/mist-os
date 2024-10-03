@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -37,6 +38,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
+	"go.fuchsia.dev/fuchsia/tools/lib/streams"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	sshutilconstants "go.fuchsia.dev/fuchsia/tools/net/sshutil/constants"
@@ -567,6 +569,14 @@ type FFXTester struct {
 
 	// A map of the test PackageURL to data needed for processing the test results.
 	testRuns map[string]ffxTestRun
+
+	llvmProfdata string
+	sinksPerTest map[string]runtests.DataSinkReference
+
+	// The following waitgroup and errs track the goroutines for merging profiles.
+	wg     sync.WaitGroup
+	errs   []error
+	errsMu sync.Mutex
 }
 
 type ffxTestRun struct {
@@ -576,11 +586,18 @@ type ffxTestRun struct {
 }
 
 // NewFFXTester returns an FFXTester.
-func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localOutputDir string, experimentLevel int) (*FFXTester, error) {
-	if err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
+func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localOutputDir string, experimentLevel int, llvmProfdata string) (*FFXTester, error) {
+	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
 		return ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
-	}, nil); err != nil {
+	}, nil)
+	if err != nil {
 		return nil, err
+	}
+	if llvmProfdata != "" {
+		llvmProfdata, err = filepath.Abs(llvmProfdata)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &FFXTester{
 		ffx:             ffx,
@@ -588,6 +605,11 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 		localOutputDir:  localOutputDir,
 		experimentLevel: experimentLevel,
 		testRuns:        make(map[string]ffxTestRun),
+		llvmProfdata:    llvmProfdata,
+		sinksPerTest:    make(map[string]runtests.DataSinkReference),
+		wg:              sync.WaitGroup{},
+		errs:            []error{},
+		errsMu:          sync.Mutex{},
 	}, nil
 }
 
@@ -667,6 +689,21 @@ func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, ou
 		testOutDir := testRun.result.GetTestOutputDir()
 		t.testOutDirs = append(t.testOutDirs, testOutDir)
 		testResult, err = processTestResult(testRun.result, test, testRun.totalDuration, false)
+		t.wg.Add(1)
+		go func() {
+			defer t.wg.Done()
+			// Merge profiles in the background. Use a separate context so that it doesn't get
+			// canceled when the test's context gets canceled.
+			l := logger.LoggerFromContext(ctx)
+			mergeCtx := logger.WithLogger(context.Background(), l)
+			mergeCtx, cancel := context.WithCancel(mergeCtx)
+			defer cancel()
+			t.errsMu.Lock()
+			if err := t.getSinks(mergeCtx, testOutDir, t.sinksPerTest, true); err != nil {
+				t.errs = append(t.errs, err)
+			}
+			t.errsMu.Unlock()
+		}()
 	}
 	if err != nil {
 		finalTestResult.FailReason = err.Error()
@@ -854,33 +891,30 @@ func (t *FFXTester) Close() error {
 }
 
 func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkReference, outputs *TestOutputs) error {
-	useFFXEarlyBoot := t.experimentLevel >= 1
 	if !t.EnabledForTesting() {
-		if useFFXEarlyBoot {
-			if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
-				sshTester.IgnoreEarlyBoot()
-			}
+		if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
+			sshTester.IgnoreEarlyBoot()
 		}
 		if err := t.sshTester.EnsureSinks(ctx, sinks, outputs); err != nil {
 			return err
 		}
-		if !useFFXEarlyBoot {
-			return nil
-		}
 	}
-	sinksPerTest := make(map[string]runtests.DataSinkReference)
-	for _, testOutDir := range t.testOutDirs {
-		if err := t.getSinks(ctx, testOutDir, sinksPerTest, useFFXEarlyBoot); err != nil {
-			return err
+	// Wait for all goroutines that are merging profiles.
+	t.wg.Wait()
+	t.errsMu.Lock()
+	if len(t.errs) > 0 {
+		var finalErr error
+		for _, err := range t.errs {
+			finalErr = fmt.Errorf("%w; %w", finalErr, err)
 		}
+		return finalErr
 	}
-	if useFFXEarlyBoot {
-		if err := t.getEarlyBootProfiles(ctx, sinksPerTest); err != nil {
-			// OTA tests cause this command to fail, but aren't used for collecting
-			// coverage anyway. If this fails, just log the error and continue
-			// processing the rest of the data sinks.
-			logger.Debugf(ctx, "failed to determine early boot data sinks: %s", err)
-		}
+	sinksPerTest := t.sinksPerTest
+	if err := t.getEarlyBootProfiles(ctx, sinksPerTest); err != nil {
+		// OTA tests cause this command to fail, but aren't used for collecting
+		// coverage anyway. If this fails, just log the error and continue
+		// processing the rest of the data sinks.
+		logger.Debugf(ctx, "failed to determine early boot data sinks: %s", err)
 	}
 	// If there were early boot sinks, record the "early_boot_sinks" test in the outputs
 	// so that the test result can be updated with the early boot sinks.
@@ -937,6 +971,9 @@ func (t *FFXTester) getSinks(ctx context.Context, testOutDir string, sinksPerTes
 }
 
 func (t *FFXTester) getSinksFromArtifactDir(ctx context.Context, artifactDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}, ignoreEarlyBoot bool) error {
+	// If the artifact dir contains a summary.json, parse it and copy all profiles to the
+	// localOutputDir. Otherwise, copy all contents to the localOutputDir and record them
+	// as early boot sinks.
 	summaryPath := filepath.Join(artifactDir, runtests.TestSummaryFilename)
 	f, err := os.Open(summaryPath)
 	if os.IsNotExist(err) {
@@ -954,21 +991,17 @@ func (t *FFXTester) getSinksFromArtifactDir(ctx context.Context, artifactDir str
 	if err = json.NewDecoder(f).Decode(&summary); err != nil {
 		return fmt.Errorf("failed to read test summary from %q: %w", summaryPath, err)
 	}
-	return t.getSinksPerTest(artifactDir, summary, sinksPerTest, seen)
+	return t.getSinksPerTest(ctx, artifactDir, summary, sinksPerTest, seen)
 }
 
 // getSinksPerTest moves sinks from sinkDir to the localOutputDir and records
 // the sinks in sinksPerTest.
-func (t *FFXTester) getSinksPerTest(sinkDir string, summary runtests.TestSummary, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
+func (t *FFXTester) getSinksPerTest(ctx context.Context, sinkDir string, summary runtests.TestSummary, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
 	for _, details := range summary.Tests {
 		for _, sinks := range details.DataSinks {
 			for _, sink := range sinks {
 				if _, ok := seen[sink.File]; !ok {
-					newPath := filepath.Join(t.localOutputDir, "v2", sink.File)
-					if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
-						return err
-					}
-					if err := os.Rename(filepath.Join(sinkDir, sink.File), newPath); err != nil {
+					if err := t.moveProfileToOutputDir(ctx, sinkDir, sink.File); err != nil {
 						return err
 					}
 					seen[sink.File] = struct{}{}
@@ -998,11 +1031,7 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 			return err
 		}
 		if _, ok := seen[path]; !ok {
-			newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
-			if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
-				return err
-			}
-			if err := os.Rename(path, newPath); err != nil {
+			if err := t.moveProfileToOutputDir(ctx, sinkDir, sinkFile); err != nil {
 				return err
 			}
 			seen[path] = struct{}{}
@@ -1022,6 +1051,67 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 		sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
 		return nil
 	})
+}
+
+// moveProfileToOutputDir moves the profile from the sinkDir to the local output directory.
+// If a profile of the same name already exists, then the two are merged.
+func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFile string) error {
+	oldPath := filepath.Join(sinkDir, sinkFile)
+	newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
+	if _, err := os.Stat(newPath); err == nil && t.llvmProfdata != "" {
+		// Merge profiles.
+		logger.Debugf(ctx, "merging profile %s to %s", oldPath, newPath)
+		if err := t.mergeProfiles(ctx, sinkDir, oldPath, newPath, t.llvmProfdata); err != nil {
+			return err
+		}
+		// Remove old profile.
+		if err := os.Remove(oldPath); err != nil {
+			return err
+		}
+	} else {
+		if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
+			return err
+		}
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// mergeProfiles merges raw profiles (.profraw) and returns a single indexed profile.
+// TODO(ihuh): Dedupe with code in covargs.
+func (t *FFXTester) mergeProfiles(ctx context.Context, sinkDir string, newProfile string, origProfile string, llvmProfData string) error {
+	r := newRunner(sinkDir, []string{})
+	// Make the llvm-profdata response file.
+	profdataFile, err := os.Create(filepath.Join(sinkDir, "llvm-profdata.rsp"))
+	if err != nil {
+		return fmt.Errorf("creating llvm-profdata.rsp file: %w", err)
+	}
+	defer os.Remove(profdataFile.Name())
+	for _, profile := range []string{origProfile, newProfile} {
+		fmt.Fprintf(profdataFile, "%s\n", profile)
+	}
+	if err := profdataFile.Close(); err != nil {
+		return err
+	}
+
+	// Merge new profile into old profile.
+	mergedProfileFile := origProfile
+	mergeCmd := []string{
+		llvmProfData,
+		"merge",
+		"--failure-mode=any",
+		"--sparse",
+		"--output", mergedProfileFile,
+	}
+	mergeCmd = append(mergeCmd, "@"+profdataFile.Name())
+
+	if err := r.Run(ctx, mergeCmd, subprocess.RunOptions{Stdout: streams.Stdout(ctx), Stderr: streams.Stderr(ctx)}); err != nil {
+		return fmt.Errorf("%s failed with %v", strings.Join(mergeCmd, " "), err)
+	}
+
+	return nil
 }
 
 func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error {

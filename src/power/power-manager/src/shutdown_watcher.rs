@@ -13,16 +13,14 @@ use fidl::endpoints::Proxy;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty as _};
-use fuchsia_zircon::AsHandleRef;
 use futures::prelude::*;
 use futures::TryStreamExt;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
-use {
-    fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_zircon as zx, serde_json as json,
-};
+use zx::AsHandleRef;
+use {fidl_fuchsia_hardware_power_statecontrol as fpower, serde_json as json, zx};
 
 /// Node: ShutdownWatcher
 ///

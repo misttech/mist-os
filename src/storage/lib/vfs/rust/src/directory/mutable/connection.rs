@@ -21,13 +21,13 @@ use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl::Handle;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::{pin_mut, TryStreamExt as _};
 use pin_project::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use storage_trace::{self as trace, TraceFutureExt};
+use zx_status::Status;
 
 #[pin_project]
 pub struct MutableConnection<DirectoryType: MutableDirectory> {

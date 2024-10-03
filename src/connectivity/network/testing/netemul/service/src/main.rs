@@ -31,8 +31,7 @@ use vfs::remote::RemoteLike;
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_netemul_network as fnetemul_network,
-    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_tracing_provider as ftracing_provider,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_tracing_provider as ftracing_provider, zx,
 };
 
 type Result<T = (), E = anyhow::Error> = std::result::Result<T, E>;

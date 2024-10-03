@@ -244,7 +244,7 @@ pub trait Driver: Send + Sync {
     async fn get_local_external_routes(&self) -> ZxResult<Vec<ExternalRoute>>;
 
     /// Changes the joinability status of the interface
-    async fn make_joinable(&self, duration: fuchsia_zircon::Duration, port: u16) -> ZxResult<()>;
+    async fn make_joinable(&self, duration: zx::Duration, port: u16) -> ZxResult<()>;
 
     /// Fetches and returns the active Thread operational dataset in raw
     /// TLV form. Functionally equivalent to [`otDatasetGetActiveTlvs()`][2].
@@ -1231,7 +1231,7 @@ impl<T: Driver> ServeTo<LegacyJoiningRequestStream> for T {
             match command {
                 LegacyJoiningRequest::MakeJoinable { duration, port, responder, .. } => {
                     let responder = ResponderNoShutdown::wrap(responder);
-                    self.make_joinable(fuchsia_zircon::Duration::from_nanos(duration), port)
+                    self.make_joinable(zx::Duration::from_nanos(duration), port)
                         .err_into::<Error>()
                         .and_then(|_| ready(responder.unwrap().send().map_err(Error::from)))
                         .await

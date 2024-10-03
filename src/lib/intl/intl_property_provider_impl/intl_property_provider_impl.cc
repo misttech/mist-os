@@ -306,8 +306,21 @@ fpromise::result<Profile, zx_status_t> IntlPropertyProviderImpl::GetProfileInter
 bool IntlPropertyProviderImpl::IsRawDataInitialized() { return raw_profile_data_.has_value(); }
 
 bool IntlPropertyProviderImpl::UpdateRawData(fuchsia::intl::merge::Data new_raw_data) {
+  // Skip if we happened to get an early update that is the same as the data
+  // defaults. We never want to revert to the default value, as it is specially
+  // marked to denote that it is the never-before-changed pristine setting.
+  // See DataDefaults() above for details.
+  if (fidl::Equals(DataDefaults(), new_raw_data)) {
+    FX_LOGS(WARNING) << "Received a default locale value as an update. "
+                     << "This is not disallowed, but is unusual.";
+    return false;
+  }
+  // If we received an update that does not change the locale data value, then
+  // return early and do not emit OnChange.
   if (IsRawDataInitialized() && raw_profile_data_.has_value() &&
       fidl::Equals(*raw_profile_data_, new_raw_data)) {
+    FX_LOGS(DEBUG) << "Received new locale that is the same as current locale. "
+                   << "Returning early.";
     return false;
   }
   raw_profile_data_ = std::move(new_raw_data);

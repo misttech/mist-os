@@ -14,7 +14,7 @@ use std::io::Write;
 use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::Arc;
-use {fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio, zx_status as zx};
 
 async fn read_input_device(
     input_device_proxy: fir::InputDeviceProxy,

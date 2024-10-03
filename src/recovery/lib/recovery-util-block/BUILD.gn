@@ -12,8 +12,8 @@ rustc_library("recovery-util-block") {
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

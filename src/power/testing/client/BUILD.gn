@@ -31,4 +31,8 @@ test("power_testing_client_test_bin") {
 fuchsia_unittest_package("power_testing_client_test") {
   manifest = "meta/test.cml"
   deps = [ ":power_testing_client_test_bin" ]
+  subpackages = [
+    "//src/power/system-activity-governor/fake:package",
+    "//src/power/system-activity-governor:config-use-suspender",
+  ]
 }

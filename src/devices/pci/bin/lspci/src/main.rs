@@ -8,7 +8,6 @@ use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_hardware_pci::{Address, BusMarker, BusProxy, HeaderType};
 use fuchsia_fs::directory::{dir_contains, open_in_namespace_deprecated, readdir, DirentKind};
 use fuchsia_fs::OpenFlags;
-use fuchsia_zircon::Status;
 use lspci::bridge::Bridge;
 use lspci::device::Device;
 use lspci::filter::Filter;
@@ -16,6 +15,7 @@ use lspci::util::Hexdumper;
 use lspci::{db, Args, SubCommand};
 use std::fs::File;
 use std::io::prelude::*;
+use zx::Status;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {

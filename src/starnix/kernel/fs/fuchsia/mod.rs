@@ -4,12 +4,13 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
-use fuchsia_zircon as zx;
+
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 
 mod remote;
 mod remote_bundle;
+mod remote_unix_domain_socket;
 mod syslog;
 mod timer;
 
@@ -18,6 +19,7 @@ pub mod zxio;
 
 pub use remote::*;
 pub use remote_bundle::RemoteBundle;
+pub use remote_unix_domain_socket::*;
 pub use syslog::*;
 pub use timer::*;
 

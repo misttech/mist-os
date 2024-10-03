@@ -16,7 +16,7 @@ use std::sync::Arc;
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_memory_attribution as fattribution, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_memory_attribution as fattribution, fuchsia_async as fasync, zx,
 };
 
 use tracing::{info, warn};

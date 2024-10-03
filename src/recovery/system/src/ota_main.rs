@@ -131,7 +131,7 @@ async fn main() -> Result<(), Error> {
     main_internal(
         wipe_storage,
         &ota_progress_proxy,
-        fuchsia_zircon::Channel::from(directory_handle).into(),
+        zx::Channel::from(directory_handle).into(),
         move |blobfs_proxy, outgoing_dir| run_wellknown_ota(blobfs_proxy, outgoing_dir),
     )
     .await

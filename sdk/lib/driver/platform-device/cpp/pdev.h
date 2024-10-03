@@ -6,6 +6,8 @@
 #define LIB_DRIVER_PLATFORM_DEVICE_CPP_PDEV_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/driver/power/cpp/power-support.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/fidl/cpp/natural_types.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/bti.h>
@@ -85,9 +87,21 @@ class PDev {
   };
   zx::result<BoardInfo> GetBoardInfo() const;
 
-  bool is_valid() const { return pdev_.is_valid(); }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  zx::result<std::vector<fdf_power::PowerElementConfiguration>> GetPowerConfiguration();
 
-  // TODO(b/358361345): Add function to retrieve and apply power configuration.
+  /// Uses the provided namespace and platform device instance to get a power
+  /// configuration, add corresponding power elements to the power topology, and
+  /// return `fdf_power::ElementDesc` objects equivalent to the power configuration.
+  ///
+  /// This function retrieves the config via |dev| and then calls
+  /// `fdf_power::ApplyPowerConfiguration`, see its documentation for additional
+  /// information.
+  fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> GetAndApplyPowerConfiguration(
+      const fdf::Namespace& ns);
+#endif
+
+  bool is_valid() const { return pdev_.is_valid(); }
 
  private:
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;

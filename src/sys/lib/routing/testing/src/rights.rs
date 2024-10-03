@@ -6,7 +6,7 @@ use crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder}
 use cm_rust::*;
 use cm_rust_testing::*;
 use std::marker::PhantomData;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 pub struct CommonRightsTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

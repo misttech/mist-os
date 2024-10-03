@@ -27,7 +27,7 @@ aead = { version = "0.4.2", features = ["std"] }
 aes = "0.8.4"
 aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
-ahash = { version = "0.8.6", default-features = false, features = [ "runtime-rng" ] }
+ahash = "0.8.6"
 ansi_term = "0.12.0"
 anyhow = "1.0.86"
 arbitrary = { version = "1.0.3", features = ["derive"] }
@@ -101,6 +101,8 @@ event-listener = "5.3.1"
 fancy-regex = "0.8"
 fatfs = "0.3.6"
 flate2 = { version = "1.0.14", default-features = false, features = ["rust_backend"] }
+foreign-types = "0.3.1"
+foreign-types-shared = "0.1.0"
 fragile = "=1.0.0"
 futures = "=0.3.30"
 futures-executor = "=0.3.30"
@@ -241,7 +243,7 @@ utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
 which = "4.0.2"
-zerocopy = { version = "0.8.0-alpha.25", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.0-alpha.26", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
@@ -539,9 +541,10 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 [gn.package.generator."0.7.5"]
 visibility = [
   ":loom-v0_7_1",
+  ":loom-v0_7_1.clippy",
   ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.rustdoc.deps",
-  ":loom-v0_7_1.rustdoc.transdeps",
+  ":loom-v0_7_1.aux.deps",
+  ":loom-v0_7_1.aux.transdeps",
 ]
 testonly = true
 deps = [
@@ -752,26 +755,37 @@ visibility = [
   ":tuf-v0_3_0-beta12",
   ":webpki-v0_21_0",
 
+  ":ring.clippy",
+  ":rustls-v0_21_7.clippy",
+  ":rustls-webpki-v0_101_6.clippy",
+  ":sct-v0_6_0.clippy",
+  ":trust-dns-proto-v0_21_2.clippy",
+  ":tuf-v0_3_0-beta12.clippy",
+  ":webpki-v0_21_0.clippy",
+
   ":ring.rustdoc",
   ":rustls-v0_21_7.rustdoc",
+  ":rustls-webpki-v0_101_6.rustdoc",
   ":sct-v0_7_0.rustdoc",
   ":trust-dns-proto-v0_21_2.rustdoc",
   ":tuf-v0_3_0-beta12.rustdoc",
   ":webpki-v0_21_0.rustdoc",
 
-  ":ring.rustdoc.deps",
-  ":rustls-v0_21_7.rustdoc.deps",
-  ":sct-v0_7_0.rustdoc.deps",
-  ":trust-dns-proto-v0_21_2.rustdoc.deps",
-  ":tuf-v0_3_0-beta12.rustdoc.deps",
-  ":webpki-v0_21_0.rustdoc.deps",
+  ":ring.aux.deps",
+  ":rustls-v0_21_7.aux.deps",
+  ":rustls-webpki-v0_101_6.aux.deps",
+  ":sct-v0_7_0.aux.deps",
+  ":trust-dns-proto-v0_21_2.aux.deps",
+  ":tuf-v0_3_0-beta12.aux.deps",
+  ":webpki-v0_21_0.aux.deps",
 
-  ":ring.rustdoc.transdeps",
-  ":rustls-v0_21_7.rustdoc.transdeps",
-  ":sct-v0_7_0.rustdoc.transdeps",
-  ":trust-dns-proto-v0_21_2.rustdoc.transdeps",
-  ":tuf-v0_3_0-beta12.rustdoc.transdeps",
-  ":webpki-v0_21_0.rustdoc.transdeps",
+  ":ring.aux.transdeps",
+  ":rustls-v0_21_7.aux.transdeps",
+  ":rustls-webpki-v0_101_6.aux.transdeps",
+  ":sct-v0_7_0.aux.transdeps",
+  ":trust-dns-proto-v0_21_2.aux.transdeps",
+  ":tuf-v0_3_0-beta12.aux.transdeps",
+  ":webpki-v0_21_0.aux.transdeps",
 ]
 deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
@@ -827,9 +841,10 @@ deps = [ "//build/validate:non_production_tag" ]
 visibility = [
   ":loom-v0_7_1",
   ":loom-v0_7_1",
+  ":loom-v0_7_1.clippy",
   ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.rustdoc.deps",
-  ":loom-v0_7_1.rustdoc.transdeps",
+  ":loom-v0_7_1.aux.deps",
+  ":loom-v0_7_1.aux.transdeps",
 ]
 testonly = true
 
@@ -1012,7 +1027,7 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.0-alpha.25"]
+[gn.package.zerocopy."0.8.0-alpha.26"]
 rustflags = [
   "--cfg=zerocopy_core_error",
   "--cfg=zerocopy_diagnostic_on_unimplemented",

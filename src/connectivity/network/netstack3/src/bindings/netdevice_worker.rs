@@ -7,14 +7,10 @@ use std::convert::{TryFrom as _, TryInto as _};
 use std::num::TryFromIntError;
 use std::sync::Arc;
 
-use super::devices::TxTask;
 use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
-
-use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext};
-
 use futures::lock::Mutex;
-use futures::{FutureExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, StreamExt, TryStreamExt as _};
 use log::{debug, error, info, warn};
 use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet};
@@ -26,11 +22,16 @@ use netstack3_core::device::{
 };
 use netstack3_core::ip::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
+    SlaacConfiguration, TemporarySlaacAddressConfiguration,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fuchsia_async as fasync,
+};
 
+use crate::bindings::devices::TxTask;
 use crate::bindings::util::NeedsDataNotifier;
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
@@ -72,6 +73,7 @@ pub(crate) struct NetdeviceWorker {
     ctx: Ctx,
     task: netdevice_client::Task,
     inner: Inner,
+    watch_rx_leases: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -109,11 +111,25 @@ impl NetdeviceWorker {
     ) -> Result<Self, Error> {
         let device =
             netdevice_client::Client::new(device.into_proxy().expect("must be in executor"));
+        // Enable rx lease watching when suspension is enabled.
+        let watch_rx_leases = ctx.bindings_ctx().config.suspend_enabled;
         let (session, task) = device
-            .primary_session("netstack3", DEFAULT_BUFFER_LENGTH)
+            .new_session_with_derivable_config(
+                "netstack3",
+                netdevice_client::DerivableConfig {
+                    default_buffer_length: DEFAULT_BUFFER_LENGTH,
+                    primary: true,
+                    watch_rx_leases,
+                },
+            )
             .await
             .map_err(Error::Client)?;
-        Ok(Self { ctx, inner: Inner { device, session, state: Default::default() }, task })
+        Ok(Self {
+            ctx,
+            inner: Inner { device, session, state: Default::default() },
+            task,
+            watch_rx_leases,
+        })
     }
 
     pub(crate) fn new_handler(&self) -> DeviceHandler {
@@ -121,9 +137,39 @@ impl NetdeviceWorker {
     }
 
     pub(crate) async fn run(self) -> Result<std::convert::Infallible, Error> {
-        let Self { mut ctx, inner: Inner { device: _, session, state }, task } = self;
+        let Self { mut ctx, inner: Inner { device: _, session, state }, task, watch_rx_leases } =
+            self;
         // Allow buffer shuttling to happen in other threads.
         let mut task = fuchsia_async::Task::spawn(task).fuse();
+
+        // Watch rx leases in a separate task if configured to do so.
+        //
+        // We need not poll this task to observe its completion, it suffices
+        // that it goes away when we stop serving the device (executor polls the
+        // future for us). Any leases held in the stream will be safely dropped,
+        // but before netstack executes any logic on them.
+        let _watch_rx_leases_task = watch_rx_leases.then(|| {
+            let ctx = ctx.clone();
+            let fut = session
+                .watch_rx_leases()
+                .map(move |r| {
+                    let lease = match r {
+                        Ok(l) => l,
+                        Err(e) => {
+                            error!("error watching rx leases: {e:?}");
+                            return;
+                        }
+                    };
+                    // NB: Increment the counter before dropping the lease so
+                    // the side effects are synchronized. Useful for tests to
+                    // synchronize on lease drop
+                    debug!("dropping delegated rx power lease");
+                    ctx.bindings_ctx().counters.power.dropped_rx_leases.increment();
+                    std::mem::drop(lease);
+                })
+                .collect::<()>();
+            fasync::Task::spawn(fut)
+        });
 
         let mut buff = [0u8; DEFAULT_BUFFER_LENGTH];
         loop {
@@ -508,10 +554,6 @@ impl DeviceHandler {
             });
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
-            // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
-            // one) to generate stable opaque interface identifiers.
-            let secret_key = StableIidSecret::new_random(&mut ctx.rng());
-
             let ip_config = IpDeviceConfigurationUpdate {
                 ip_enabled: Some(false),
                 unicast_forwarding_enabled: Some(false),
@@ -534,9 +576,7 @@ impl DeviceHandler {
                         slaac_config: Some(SlaacConfiguration {
                             enable_stable_addresses: true,
                             temporary_address_configuration: Some(
-                                TemporarySlaacAddressConfiguration::default_with_secret_key(
-                                    secret_key,
-                                ),
+                                TemporarySlaacAddressConfiguration::rfc_default(),
                             ),
                         }),
                         ip_config,
@@ -585,7 +625,7 @@ async fn get_mac(
     // don't really plumb through multicast filtering.
     // TODO(https://fxbug.dev/42136929): Remove this when multicast filtering
     // is available.
-    fuchsia_zircon::Status::ok(
+    zx::Status::ok(
         mac_proxy
             .set_mode(fhardware_network::MacFilterMode::MulticastPromiscuous)
             .await

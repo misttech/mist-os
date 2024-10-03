@@ -11,6 +11,7 @@ Symbols:
   - { Name: vfs_internal_lazy_dir_create, Type: Func }
   - { Name: vfs_internal_node_destroy, Type: Func }
   - { Name: vfs_internal_node_serve, Type: Func }
+  - { Name: vfs_internal_node_serve3, Type: Func }
   - { Name: vfs_internal_node_shutdown, Type: Func }
   - { Name: vfs_internal_pseudo_file_create, Type: Func }
   - { Name: vfs_internal_remote_directory_create, Type: Func }

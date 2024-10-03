@@ -412,10 +412,10 @@ mod tests {
     use crate::testutil::internal as internal_testutil;
     use crate::{get_watcher, watch};
     use assert_matches::assert_matches;
-    use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
     use ip_test_macro::ip_test;
     use test_case::test_case;
+    use zx_status;
 
     // Tests the `fake_watcher_impl` with various "shapes". The test parameter
     // is a vec of ranges, where each range corresponds to the batch of events

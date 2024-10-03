@@ -71,7 +71,7 @@ mod tests {
         ];
         for subdir in subdirs {
             let tempdir = tempfile::tempdir().unwrap();
-            let fqdir = tempdir.into_path().join(subdir);
+            let fqdir = tempdir.path().join(subdir);
             let root = Utf8Path::from_path(fqdir.as_path()).unwrap();
 
             // Creates repo, including generating keys.

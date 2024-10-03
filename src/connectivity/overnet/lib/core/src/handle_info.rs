@@ -13,7 +13,7 @@ use fidl::AsHandleRef;
 use fidl::EmulatedHandleRef;
 
 #[cfg(target_os = "fuchsia")]
-pub(crate) type HandleKey = fuchsia_zircon::Koid;
+pub(crate) type HandleKey = zx::Koid;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub(crate) type HandleKey = u64;
@@ -53,8 +53,6 @@ pub(crate) fn handle_info(hdl: HandleRef<'_>) -> Result<HandleInfo, Error> {
 
 #[cfg(target_os = "fuchsia")]
 pub(crate) fn handle_info(handle: HandleRef<'_>) -> Result<HandleInfo, Error> {
-    use fuchsia_zircon as zx;
-
     let basic_info = handle.basic_info()?;
 
     let handle_type = match basic_info.object_type {
@@ -99,7 +97,6 @@ pub(crate) trait WithRights {
 impl WithRights for fidl::Channel {
     type Rights = ChannelRights;
     fn with_rights(self, rights: ChannelRights) -> Result<Self, Error> {
-        use fuchsia_zircon as zx;
         use zx::HandleBased;
         let mut zx_rights = self.basic_info()?.rights;
         zx_rights.set(zx::Rights::READ, rights.contains(ChannelRights::READ));
@@ -113,7 +110,6 @@ impl WithRights for fidl::Channel {
 impl WithRights for fidl::Socket {
     type Rights = SocketRights;
     fn with_rights(self, rights: SocketRights) -> Result<Self, Error> {
-        use fuchsia_zircon as zx;
         use zx::HandleBased;
         let mut zx_rights = self.basic_info()?.rights;
         zx_rights.set(zx::Rights::READ, rights.contains(SocketRights::READ));

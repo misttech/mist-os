@@ -15,11 +15,12 @@ use async_ringbuf::traits::{
     AsyncConsumer as _, AsyncProducer, Consumer as _, Observer as _, Producer as _, Split as _,
 };
 use fuchsia_async::{self as fasync, ReadableHandle as _, WritableHandle as _};
-use fuchsia_zircon as zx;
+
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt as _, StreamExt as _};
+use netstack3_core::socket::ShutdownType;
 use netstack3_core::tcp::{
-    Buffer, BufferLimits, FragmentedPayload, Payload, ReceiveBuffer, SendBuffer,
+    Buffer, BufferLimits, FragmentedPayload, NoConnection, Payload, ReceiveBuffer, SendBuffer,
 };
 use netstack3_core::IpExt;
 
@@ -89,11 +90,6 @@ impl CoreReceiveBuffer {
                 }
             }
         }
-    }
-
-    /// Discards all pending bytes and effectively closes the buffer.
-    fn close(&mut self) {
-        *self = Self::Zero;
     }
 }
 
@@ -218,8 +214,7 @@ impl ReceiveBuffer for CoreReceiveBuffer {
 ///
 /// [`ReceiveTaskArgs`] is the proper production impl.
 pub(super) trait ReceiveTaskOps {
-    fn with_receive_buffer<R, F: FnOnce(&mut CoreReceiveBuffer) -> R>(&mut self, f: F)
-        -> Option<R>;
+    fn shutdown_recv(&mut self) -> Result<bool, NoConnection>;
 }
 
 pub(super) struct ReceiveTaskArgs<I: IpExt> {
@@ -229,12 +224,9 @@ pub(super) struct ReceiveTaskArgs<I: IpExt> {
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I: IpExt> ReceiveTaskOps for ReceiveTaskArgs<I> {
-    fn with_receive_buffer<R, F: FnOnce(&mut CoreReceiveBuffer) -> R>(
-        &mut self,
-        f: F,
-    ) -> Option<R> {
+    fn shutdown_recv(&mut self) -> Result<bool, NoConnection> {
         let Self { ctx, id } = self;
-        ctx.api().tcp().with_receive_buffer(id, f)
+        ctx.api().tcp().shutdown(id, ShutdownType::Receive)
     }
 }
 
@@ -268,7 +260,7 @@ pub(super) async fn receive_task<O: ReceiveTaskOps>(
                 continue;
             }
             let a_written = if a.len() != 0 {
-                let written = futures::future::poll_fn(|ctx| loop {
+                futures::future::poll_fn(|ctx| loop {
                     let res = handle.get_ref().write(a).map_err(SocketErrorAction::from);
                     match res {
                         Err(SocketErrorAction::Wait) => {
@@ -280,43 +272,32 @@ pub(super) async fn receive_task<O: ReceiveTaskOps>(
                         Ok(written) => return Poll::Ready(Some(written)),
                     }
                 })
-                .await;
-                match written {
-                    Some(w) => w,
-                    // No more bytes can be written, shutdown the task.
-                    None => {
-                        // Close the receive buffer so our peer knows we can't
-                        // read anymore.
-                        //
-                        // TODO(https://fxbug.dev/42063684): Deal with read
-                        // shutdown in core instead.
-                        let _: Option<()> = ops.with_receive_buffer(|b| b.close());
-                        return;
-                    }
-                }
+                .await
             } else {
-                0
+                Some(0)
             };
-            let b_written = if a_written == a.len() && b.len() != 0 {
+            let b_written = if a_written == Some(a.len()) && b.len() != 0 {
                 // If we wrote everything into the socket then attempt a
                 // non-waiting write from b.
                 match handle.get_ref().write(b).map_err(SocketErrorAction::from) {
-                    Ok(v) => v,
-                    Err(SocketErrorAction::Wait) => 0,
-                    Err(SocketErrorAction::Shutdown) => {
-                        // Close the receive buffer so our peer knows we can't
-                        // read anymore.
-                        //
-                        // TODO(https://fxbug.dev/42063684): Deal with read
-                        // shutdown in core instead.
-                        let _: Option<()> = ops.with_receive_buffer(|b| b.close());
-                        return;
-                    }
+                    Ok(v) => Some(v),
+                    Err(SocketErrorAction::Wait) => Some(0),
+                    Err(SocketErrorAction::Shutdown) => None,
                 }
             } else {
-                0
+                Some(0)
             };
-            let total_written = a_written + b_written;
+
+            let total_written = match (a_written, b_written) {
+                (Some(a_written), Some(b_written)) => a_written + b_written,
+                _ => {
+                    // No more bytes can be written. Close the receive buffer, so our peer
+                    // knows we can't read anymore. Then shutdown the task.
+                    let _ = ops.shutdown_recv();
+                    return;
+                }
+            };
+
             // NB: `skip` is a weird name for this method, it calls drop for all
             // the consumed bytes and then advances the read index.
             assert_eq!(
@@ -1390,11 +1371,8 @@ mod test {
     }
 
     impl ReceiveTaskOps for () {
-        fn with_receive_buffer<R, F: FnOnce(&mut CoreReceiveBuffer) -> R>(
-            &mut self,
-            _f: F,
-        ) -> Option<R> {
-            None
+        fn shutdown_recv(&mut self) -> Result<bool, NoConnection> {
+            Ok(true)
         }
     }
 

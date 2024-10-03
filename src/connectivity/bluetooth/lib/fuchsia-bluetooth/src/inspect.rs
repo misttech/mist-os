@@ -6,7 +6,7 @@ use fuchsia_inspect::{self as inspect, Node, NumericProperty, Property};
 use fuchsia_inspect_contrib::nodes::NodeExt;
 use fuchsia_inspect_derive::Inspect;
 use std::fmt;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const FALSE_VALUE: u64 = 0;
 const TRUE_VALUE: u64 = 1;
@@ -243,7 +243,6 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon as zx;
 
     #[test]
     fn bool_to_property() {

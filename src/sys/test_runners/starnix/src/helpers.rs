@@ -14,7 +14,7 @@ use namespace::Namespace;
 use tracing::debug;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime, fuchsia_zircon as zx,
+    fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime, zx,
 };
 
 #[derive(Copy, Clone, Eq, PartialEq)]

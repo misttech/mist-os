@@ -58,23 +58,24 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   // Create a new object referring to the object at |path|.
   //
   // This object may represent either a local node, or a remote object.
-  zx::result<fbl::RefPtr<fdio>> Open(fbl::RefPtr<LocalVnode> vn, std::string_view path,
-                                     fuchsia_io::wire::OpenFlags flags) const;
+  // TODO(https://fxbug.dev/324111518): Remove this after a replacement using Open3 is available.
+  zx::result<fbl::RefPtr<fdio>> OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn, std::string_view path,
+                                                 fuchsia_io::wire::OpenFlags flags) const;
 
-  // Connect to a remote object within the namespace via fuchsia.io/Directory.Open1.
+  // Open a remote object within the namespace using deprecated fuchsia.io/Directory.Open1.
   //
   // Returns an error if |path| does not exist.
   // Returns an error if |path| references a non-remote object.
-  // TODO(https://fxbug.dev/324111518): Remove this after all callers are migrated to |Connect|.
-  zx_status_t ConnectDeprecated(std::string_view path, fuchsia_io::wire::OpenFlags flags,
-                                fidl::ServerEnd<fuchsia_io::Node> server_end) const;
+  // TODO(https://fxbug.dev/324111518): Remove this after all callers are migrated to |OpenRemote|.
+  zx_status_t OpenRemoteDeprecated(std::string_view path, fuchsia_io::wire::OpenFlags flags,
+                                   fidl::ServerEnd<fuchsia_io::Node> server_end) const;
 
-  // Connect to a remote object within the namespace via fuchsia.io/Directory.Open3.
+  // Open a remote node at |path| within the namespace using |flags|. |path| must be an absolute
+  // path starting from /.
   //
   // Returns an error if |path| does not exist.
   // Returns an error if |path| references a non-remote object.
-  zx_status_t Connect(std::string_view path, fuchsia_io::wire::Flags flags,
-                      zx::channel object) const;
+  zx_status_t OpenRemote(std::string_view path, fuchsia_io::Flags flags, zx::channel object) const;
 
   // Attaches a local node defined by |on_open| to |path| within the current namespace.
   zx_status_t Bind(std::string_view path, fdio_open_local_func_t on_open, void* context);

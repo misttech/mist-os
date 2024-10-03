@@ -27,7 +27,7 @@ use zerocopy::IntoBytes;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_math as fmath,
     fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_display_singleton as fuidisplay,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_views as fuiviews, zx,
 };
 
 #[derive(Default, Debug)]
@@ -154,7 +154,7 @@ impl Framebuffer {
         let singleton_display_info =
             connect_to_protocol_sync::<fuidisplay::InfoMarker>().map_err(|_| errno!(ENOENT))?;
         let metrics = singleton_display_info
-            .get_metrics(zx::MonotonicTime::INFINITE)
+            .get_metrics(zx::MonotonicInstant::INFINITE)
             .map_err(|_| errno!(EINVAL))?;
         let extent_in_px =
             metrics.extent_in_px.ok_or("Failed to get extent_in_px").map_err(|_| errno!(EINVAL))?;

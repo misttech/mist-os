@@ -5,9 +5,9 @@
 use anyhow::Error;
 use fidl_fuchsia_boot as fuchsia_boot;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::Channel;
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::Channel;
 
 pub struct SvcStashCapability {
     channel: Mutex<Option<fidl::endpoints::ServerEnd<fuchsia_boot::SvcStashMarker>>>,
@@ -29,7 +29,7 @@ impl SvcStashCapability {
             let channel = self.channel.lock().take();
             match channel {
                 Some(channel) => responder.send(Ok(channel))?,
-                None => responder.send(Err(fuchsia_zircon::Status::UNAVAILABLE.into_raw()))?,
+                None => responder.send(Err(zx::Status::UNAVAILABLE.into_raw()))?,
             }
         }
         Ok(())
@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{sys, AsHandleRef};
+    use zx::{sys, AsHandleRef};
 
     // Just need a channel to stash.
     async fn get_svc_stash_handle() -> Result<Channel, Error> {

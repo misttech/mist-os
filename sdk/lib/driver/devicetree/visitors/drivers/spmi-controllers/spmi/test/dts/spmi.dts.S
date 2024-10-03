@@ -29,13 +29,11 @@
 				reg = <0x1000 0x1000>;
 			};
 
-			gpio@2000 {
-				compatible = "vendor2,pmic-gpio";
+			gpio: gpio@2000 {
 				reg = <0x2000 0x800>;
 			};
 
-			i2c@3000 {
-				compatible = "vendor2,pmic-i2c";
+			i2c: i2c@3000 {
 				reg = <0x3000 0x400>, <0xffff 1>;
 				reg-names = "i2c-core", "i2c-config";
 			};
@@ -51,6 +49,8 @@
 	not-spmi@abce0000 {
 		compatible = "vendor1,not-spmi-controller";
 		reg = <0xabce0000 0x1000>;
+		/* The duplicate gpio entry should be ignored. */
+		spmis = <&gpio>, <&i2c>, <&gpio>;
 	};
 
 	spmi@abcf0000 {

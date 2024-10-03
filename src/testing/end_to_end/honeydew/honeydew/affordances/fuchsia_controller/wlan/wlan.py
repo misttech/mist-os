@@ -7,9 +7,13 @@ import asyncio
 import logging
 
 import fidl.fuchsia_location_namedplace as f_location_namedplace
+import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
+import fidl.fuchsia_wlan_ieee80211 as f_wlan_ieee80211
 import fidl.fuchsia_wlan_sme as f_wlan_sme
+from fidl._client import FidlClient
 from fuchsia_controller_py import Channel, ZxStatus
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
 from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan
@@ -18,7 +22,9 @@ from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
 from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.wlan import (
+    Authentication,
     BssDescription,
+    ClientStatusConnected,
     ClientStatusResponse,
     CountryCode,
     MacAddress,
@@ -44,7 +50,7 @@ _REGULATORY_REGION_CONFIGURATOR_PROXY = FidlEndpoint(
 )
 
 
-class Wlan(wlan.Wlan):
+class Wlan(AsyncAdapter, wlan.Wlan):
     """WLAN affordance implemented with Fuchsia Controller."""
 
     def __init__(
@@ -53,6 +59,7 @@ class Wlan(wlan.Wlan):
         ffx: ffx_transport.FFX,
         fuchsia_controller: fc_transport.FuchsiaController,
         reboot_affordance: affordances_capable.RebootCapableDevice,
+        fuchsia_device_close: affordances_capable.FuchsiaDeviceClose,
     ) -> None:
         """Create a WLAN Fuchsia Controller affordance.
 
@@ -61,14 +68,30 @@ class Wlan(wlan.Wlan):
             ffx: FFX transport.
             fuchsia_controller: Fuchsia Controller transport.
             reboot_affordance: Object that implements RebootCapableDevice.
+            fuchsia_device_close: Object that implements FuchsiaDeviceClose.
         """
+        super().__init__()
         self._verify_supported(device_name, ffx)
 
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
+        self._fuchsia_device_close = fuchsia_device_close
 
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
+
+        self._fuchsia_device_close.register_for_on_device_close(self.close)
+
+    def close(self) -> None:
+        """Clean up async tasks.
+
+        This is idempotent and irreversible. No other methods should be called
+        after this one.
+        """
+        if not self.loop().is_closed():
+            self.loop().stop()
+            self.loop().run_forever()  # Handle pending tasks
+            self.loop().close()
 
     def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
         """Check if WLAN is supported on the DUT.
@@ -102,22 +125,25 @@ class Wlan(wlan.Wlan):
             self._fc_transport.connect_device_proxy(_DEVICE_MONITOR_PROXY)
         )
 
-    def connect(
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def connect(
         self,
         ssid: str,
+        # TODO(http://b/356234331): Remove the password field once
+        # authentication is used everywhere.
         password: str | None,
         bss_desc: BssDescription,
-        # TODO(http://b/324949922): Uncomment once the WLAN affordance API is
-        # changed to include the desired authentication in every call to
-        # connect().
-        # authentication: Authentication,
+        authentication: Authentication | None = None,
     ) -> bool:
         """Trigger connection to a network.
 
         Args:
             ssid: The network to connect to.
-            password: The password for the network.
+            password: The password for the network. Deprecated; use
+                authentication instead.
             bss_desc: The basic service set for target network.
+            authentication: Authentication to connect with.
 
         Returns:
             True on success otherwise false.
@@ -125,14 +151,88 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
             NetworkInterfaceNotFoundError: No client WLAN interface found.
+            TypeError: When authentication is not provided.
         """
-        # TODO(http://b/324949922): Uncomment once the WLAN affordance API is
-        # changed to include the desired authentication in every call to
-        # connect().
-        # TODO(http://b/324949815): Implement server to ConnectTransaction
-        raise NotImplementedError()
+        if authentication is None:
+            raise TypeError(
+                "authentication is required for the WLAN FC affordance"
+            )
 
-    def create_iface(
+        iface_id = await self._get_first_sme(WlanMacRole.CLIENT)
+        sme = await self._get_client_sme(iface_id)
+
+        client, server = Channel.create()
+        connect_transaction_client = f_wlan_sme.ConnectTransaction.Client(
+            client.take()
+        )
+
+        req = f_wlan_sme.ConnectRequest(
+            ssid=list(ssid.encode("utf-8")),
+            bss_description=bss_desc.to_fidl(),
+            multiple_bss_candidates=False,  # only used for metrics, selected arbitrarily
+            authentication=authentication.to_fidl(),
+            deprecated_scan_type=f_wlan_common.ScanType.ACTIVE,
+        )
+
+        # Run an event handler in the background before starting the connect.
+        results: asyncio.Queue[f_wlan_sme.ConnectResult] = asyncio.Queue()
+        event_handler = ConnectTransactionEventHandler(
+            connect_transaction_client, results
+        )
+        event_handler_task = self.loop().create_task(event_handler.serve())
+
+        try:
+            # Initiate the connect.
+            sme.connect(req=req, txn=server.take())
+
+            # Wait for the driver to finish connecting.
+            response = await asyncio.wait_for(results.get(), timeout=60)
+            result = response.result
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientSme.Connect() error {status}"
+            ) from status
+        except TimeoutError as e:
+            raise errors.HoneydewWlanError(
+                f'Timed out waiting for the WLAN SME to connect to "{ssid}"'
+            ) from e
+        finally:
+            event_handler_task.cancel()
+            try:
+                await event_handler_task
+            except asyncio.exceptions.CancelledError:
+                pass  # expected
+
+        # Verify the connection.
+        if result.code != f_wlan_ieee80211.StatusCode.SUCCESS:
+            code = f_wlan_ieee80211.StatusCode(result.code)
+            raise errors.HoneydewWlanError(
+                f'Failed to connect to "{ssid}", received {code.name}'
+                f"({code.value})"
+            )
+        if result.is_credential_rejected:
+            raise errors.HoneydewWlanError(
+                f'Failed to connect to "{ssid}", credentials were rejected.'
+            )
+
+        client_status = await self._status(sme)
+        if isinstance(client_status, ClientStatusConnected):
+            got_ssid = bytes(client_status.ssid).decode("utf-8")
+            if got_ssid != ssid:
+                raise errors.HoneydewWlanError(
+                    "Connected to wrong network. "
+                    f'Expected "{ssid}", got "{got_ssid}".'
+                )
+        else:
+            raise errors.HoneydewWlanError(
+                f"Expected ClientStatusConnected, got {client_status}"
+            )
+
+        return True
+
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def create_iface(
         self, phy_id: int, role: WlanMacRole, sta_addr: str | None = None
     ) -> int:
         """Create a new WLAN interface.
@@ -161,8 +261,8 @@ class Wlan(wlan.Wlan):
             sta_addr=MacAddress(sta_addr).bytes(),
         )
         try:
-            create_iface = asyncio.run(
-                self._device_monitor_proxy.create_iface(req=req)
+            create_iface = await self._device_monitor_proxy.create_iface(
+                req=req
             )
             if create_iface.status != ZxStatus.ZX_OK:
                 raise ZxStatus(create_iface.status)
@@ -173,7 +273,9 @@ class Wlan(wlan.Wlan):
 
         return create_iface.resp.iface_id
 
-    def destroy_iface(self, iface_id: int) -> None:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def destroy_iface(self, iface_id: int) -> None:
         """Destroy WLAN interface by ID.
 
         Args:
@@ -184,8 +286,8 @@ class Wlan(wlan.Wlan):
         """
         req = f_wlan_device_service.DestroyIfaceRequest(iface_id=iface_id)
         try:
-            destroy_iface = asyncio.run(
-                self._device_monitor_proxy.destroy_iface(req=req)
+            destroy_iface = await self._device_monitor_proxy.destroy_iface(
+                req=req
             )
             if destroy_iface.status != ZxStatus.ZX_OK:
                 raise ZxStatus(destroy_iface.status)
@@ -194,30 +296,32 @@ class Wlan(wlan.Wlan):
                 f"DeviceMonitor.DestroyIface() error {status}"
             ) from status
 
-    def disconnect(self) -> None:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def disconnect(self) -> None:
         """Disconnect all client WLAN connections.
 
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        iface_ids = self.get_iface_id_list()
+        iface_ids = await self._get_iface_id_list()
 
         for iface_id in iface_ids:
-            info = self.query_iface(iface_id)
+            info = await self._query_iface(iface_id)
             if info.role == WlanMacRole.CLIENT:
-                sme = self._get_client_sme(iface_id)
+                sme = await self._get_client_sme(iface_id)
                 try:
-                    asyncio.run(
-                        sme.disconnect(
-                            reason=f_wlan_sme.UserDisconnectReason.WLAN_SERVICE_UTIL_TESTING,
-                        )
+                    await sme.disconnect(
+                        reason=f_wlan_sme.UserDisconnectReason.WLAN_SERVICE_UTIL_TESTING,
                     )
                 except ZxStatus as status:
                     raise errors.HoneydewWlanError(
                         f"SmeClient.Disconnect() error {status}"
                     ) from status
 
-    def get_country(self, phy_id: int) -> CountryCode:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
 
         Args:
@@ -230,8 +334,8 @@ class Wlan(wlan.Wlan):
             HoneydewWlanError: Error from WLAN stack
         """
         try:
-            get_country = asyncio.run(
-                self._device_monitor_proxy.get_country(phy_id=phy_id)
+            get_country = await self._device_monitor_proxy.get_country(
+                phy_id=phy_id
             )
             if get_country.err is not None:
                 raise ZxStatus(get_country.err)
@@ -244,7 +348,9 @@ class Wlan(wlan.Wlan):
             bytes(get_country.response.resp.alpha2).decode("utf-8")
         )
 
-    def get_iface_id_list(self) -> list[int]:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def get_iface_id_list(self) -> list[int]:
         """Get list of wlan iface IDs on device.
 
         Returns:
@@ -253,15 +359,20 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
+        return await self._get_iface_id_list()
+
+    async def _get_iface_id_list(self) -> list[int]:
         try:
-            resp = asyncio.run(self._device_monitor_proxy.list_ifaces())
+            resp = await self._device_monitor_proxy.list_ifaces()
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
                 f"DeviceMonitor.ListIfaces() error {status}"
             ) from status
         return resp.iface_list
 
-    def get_phy_id_list(self) -> list[int]:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def get_phy_id_list(self) -> list[int]:
         """Get list of phy ids on device.
 
         Returns:
@@ -271,14 +382,16 @@ class Wlan(wlan.Wlan):
             HoneydewWlanError: Error from WLAN stack
         """
         try:
-            resp = asyncio.run(self._device_monitor_proxy.list_phys())
+            resp = await self._device_monitor_proxy.list_phys()
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
                 f"DeviceMonitor.ListPhys() error {status}"
             ) from status
         return resp.phy_list
 
-    def query_iface(self, iface_id: int) -> QueryIfaceResponse:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def query_iface(self, iface_id: int) -> QueryIfaceResponse:
         """Retrieves interface info for given wlan iface id.
 
         Args:
@@ -290,9 +403,12 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: DeviceMonitor.QueryIface error
         """
+        return await self._query_iface(iface_id)
+
+    async def _query_iface(self, iface_id: int) -> QueryIfaceResponse:
         try:
-            query = asyncio.run(
-                self._device_monitor_proxy.query_iface(iface_id=iface_id)
+            query = await self._device_monitor_proxy.query_iface(
+                iface_id=iface_id
             )
             if query.err is not None:
                 raise query.err
@@ -302,7 +418,9 @@ class Wlan(wlan.Wlan):
             ) from status
         return QueryIfaceResponse.from_fidl(query.response.resp)
 
-    def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
         """Scans and returns BSS info.
 
         Returns:
@@ -313,15 +431,15 @@ class Wlan(wlan.Wlan):
             HoneydewWlanError: Error from WLAN stack
             NetworkInterfaceNotFoundError: No client WLAN interface found.
         """
-        iface_id = self._get_first_sme(WlanMacRole.CLIENT)
-        client_sme = self._get_client_sme(iface_id)
+        iface_id = await self._get_first_sme(WlanMacRole.CLIENT)
+        client_sme = await self._get_client_sme(iface_id)
 
         # Perform a passive scan
         req = f_wlan_sme.ScanRequest()
         req.passive = f_wlan_sme.PassiveScanRequest()
 
         try:
-            scan = asyncio.run(client_sme.scan_for_controller(req=req))
+            scan = await client_sme.scan_for_controller(req=req)
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
                 f"ClientSme.ScanForController() error {status}"
@@ -349,7 +467,7 @@ class Wlan(wlan.Wlan):
 
         return results
 
-    def _get_first_sme(self, role: WlanMacRole) -> int:
+    async def _get_first_sme(self, role: WlanMacRole) -> int:
         """Find a WLAN interface running with the specified role.
 
         Args:
@@ -363,14 +481,14 @@ class Wlan(wlan.Wlan):
             ID of the first WLAN interface found running with the specified
             role. The others are discarded.
         """
-        iface_ids = self.get_iface_id_list()
+        iface_ids = await self._get_iface_id_list()
         if len(iface_ids) == 0:
             raise errors.NetworkInterfaceNotFoundError(
                 "No WLAN interface found"
             )
 
         for iface_id in iface_ids:
-            info = self.query_iface(iface_id)
+            info = await self._query_iface(iface_id)
             if info.role == role:
                 return iface_id
 
@@ -378,7 +496,9 @@ class Wlan(wlan.Wlan):
             f"WLAN interface with role {role} not found"
         )
 
-    def _get_client_sme(self, iface_id: int) -> f_wlan_sme.ClientSme.Client:
+    async def _get_client_sme(
+        self, iface_id: int
+    ) -> f_wlan_sme.ClientSme.Client:
         """Get a handle to ClientSme for performing SME actions.
 
         Args:
@@ -395,10 +515,8 @@ class Wlan(wlan.Wlan):
         sme_client = f_wlan_sme.ClientSme.Client(client)
 
         try:
-            asyncio.run(
-                self._device_monitor_proxy.get_client_sme(
-                    iface_id=iface_id, sme_server=server.take()
-                )
+            await self._device_monitor_proxy.get_client_sme(
+                iface_id=iface_id, sme_server=server.take()
             )
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
@@ -438,7 +556,9 @@ class Wlan(wlan.Wlan):
                 f"RegulatoryRegionConfigurator.SetRegion() error {status}"
             ) from status
 
-    def status(self) -> ClientStatusResponse:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def status(self) -> ClientStatusResponse:
         """Request connection status
 
         Returns:
@@ -450,14 +570,72 @@ class Wlan(wlan.Wlan):
             NetworkInterfaceNotFoundError: No client WLAN interface found.
             TypeError: If any of the return values are not of the expected type.
         """
-        iface_id = self._get_first_sme(WlanMacRole.CLIENT)
-        sme = self._get_client_sme(iface_id)
+        iface_id = await self._get_first_sme(WlanMacRole.CLIENT)
+        sme = await self._get_client_sme(iface_id)
+        return await self._status(sme)
 
+    async def _status(
+        self, sme: f_wlan_sme.ClientSme.Client
+    ) -> ClientStatusResponse:
         try:
-            resp = asyncio.run(sme.status())
+            resp = await sme.status()
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
                 f"ClientSme.Status() error {status}"
             ) from status
 
         return ClientStatusResponse.from_fidl(resp.resp)
+
+
+class ConnectTransactionEventHandler(
+    f_wlan_sme.ConnectTransaction.EventHandler
+):
+    """Event handler for ClientSme.Connect()."""
+
+    def __init__(
+        self,
+        client: FidlClient,
+        connect_results: asyncio.Queue[f_wlan_sme.ConnectResult],
+    ) -> None:
+        super().__init__(client)
+        self._connect_results = connect_results
+
+    async def on_connect_result(
+        self, req: f_wlan_sme.ConnectTransactionOnConnectResultRequest
+    ) -> None:
+        """Return the result of the initial connection request or later
+        SME-initiated reconnection."""
+        _LOGGER.debug(
+            "ConnectTransaction.OnConnectResult() called with %s", req
+        )
+        await self._connect_results.put(req)
+
+    def on_disconnect(
+        self, req: f_wlan_sme.ConnectTransactionOnDisconnectRequest
+    ) -> None:
+        """Notify that the client has disconnected.
+
+        If req.disconnect_info indicates that SME is attempting to reconnect by
+        itself, there's not need for caller to intervene for now.
+        """
+        _LOGGER.debug("ConnectTransaction.OnDisconnect() called with %s", req)
+
+    def on_roam_result(
+        self, req: f_wlan_sme.ConnectTransactionOnRoamResultRequest
+    ) -> None:
+        """Report the result of a roam attempt."""
+        _LOGGER.debug("ConnectTransaction.OnRoamResult() called with %s", req)
+
+    def on_signal_report(
+        self, req: f_wlan_sme.ConnectTransactionOnSignalReportRequest
+    ) -> None:
+        """Give an update of the latest signal report."""
+        _LOGGER.debug("ConnectTransaction.OnSignalReport() called with %s", req)
+
+    def on_channel_switched(
+        self, req: f_wlan_sme.ConnectTransactionOnChannelSwitchedRequest
+    ) -> None:
+        """Give an update of the channel switching."""
+        _LOGGER.debug(
+            "ConnectTransaction.OnChannelSwitched() called with %s", req
+        )

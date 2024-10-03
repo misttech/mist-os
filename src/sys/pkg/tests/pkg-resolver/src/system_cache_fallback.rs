@@ -10,11 +10,11 @@ use fidl_fuchsia_pkg_rewrite_ext::Rule;
 use fuchsia_hash::Hash;
 use fuchsia_pkg_testing::serve::responder;
 use fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder};
-use fuchsia_zircon::Status;
 use lib::{TestEnvBuilder, EMPTY_REPO_PATH};
 use rand::prelude::*;
 use std::io::Read;
 use std::sync::Arc;
+use zx::Status;
 
 async fn test_package(name: &str, contents: &str) -> Package {
     PackageBuilder::new(name)

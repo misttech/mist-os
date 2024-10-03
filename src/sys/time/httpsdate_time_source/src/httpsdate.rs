@@ -20,7 +20,7 @@ use httpdate_hyper::{HttpsDateError, HttpsDateErrorType};
 use push_source::Update;
 use rand::Rng;
 use tracing::{debug, error, info};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// A definition of how long an algorithm should wait between polls. Defines fixed wait durations
 /// following successful poll attempts, and a capped exponential backoff following failed poll
@@ -231,9 +231,9 @@ where
         }
     }
 
-    async fn next_possible_sample_time(&self) -> zx::MonotonicTime {
+    async fn next_possible_sample_time(&self) -> zx::MonotonicInstant {
         // TODO(https://fxbug.dev/42065019): Implement rate limiting if required.
-        zx::MonotonicTime::get()
+        zx::MonotonicInstant::get()
     }
 }
 
@@ -325,15 +325,15 @@ mod test {
 
     lazy_static! {
         static ref TEST_SAMPLE_1: HttpsSample = HttpsSample {
-            utc: zx::MonotonicTime::from_nanos(111_222_333_444_555),
-            monotonic: zx::MonotonicTime::from_nanos(666_777_888_999_000),
+            utc: zx::MonotonicInstant::from_nanos(111_222_333_444_555),
+            monotonic: zx::MonotonicInstant::from_nanos(666_777_888_999_000),
             standard_deviation: zx::Duration::from_millis(101),
             final_bound_size: zx::Duration::from_millis(20),
             polls: vec![],
         };
         static ref TEST_SAMPLE_2: HttpsSample = HttpsSample {
-            utc: zx::MonotonicTime::from_nanos(999_999_999_999_999),
-            monotonic: zx::MonotonicTime::from_nanos(777_777_777_777_777),
+            utc: zx::MonotonicInstant::from_nanos(999_999_999_999_999),
+            monotonic: zx::MonotonicInstant::from_nanos(777_777_777_777_777),
             standard_deviation: zx::Duration::from_millis(102),
             final_bound_size: zx::Duration::from_millis(30),
             polls: vec![Poll { round_trip_time: zx::Duration::from_millis(23) }],

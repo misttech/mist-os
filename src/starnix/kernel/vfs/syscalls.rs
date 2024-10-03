@@ -12,6 +12,7 @@ use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
+use crate::vfs::io_uring::IoUringFileObject;
 use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
@@ -23,7 +24,7 @@ use crate::vfs::{
     SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
     XattrOp,
 };
-use fuchsia_zircon as zx;
+
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -61,19 +62,19 @@ use starnix_uapi::{
     F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB,
-    MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE,
-    PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM,
-    POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
-    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
-    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
-    XATTR_REPLACE,
+    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
+    IORING_UNREGISTER_BUFFERS, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
+    MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
+    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
+    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
+    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
+    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 use std::usize;
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -1910,7 +1911,7 @@ pub fn sys_timerfd_create(
 ) -> Result<FdNumber, Errno> {
     let timeline = match clock_id {
         CLOCK_MONOTONIC => Timeline::Monotonic,
-        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
+        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => Timeline::BootInstant,
         CLOCK_REALTIME | CLOCK_REALTIME_ALARM => Timeline::RealTime,
         _ => return error!(EINVAL),
     };
@@ -2004,7 +2005,7 @@ fn select<L>(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno>
 where
@@ -2136,10 +2137,10 @@ pub fn sys_pselect6(
     timeout_addr: UserRef<timespec>,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
-    let start_time = zx::MonotonicTime::get();
+    let start_time = zx::MonotonicInstant::get();
 
     let deadline = if timeout_addr.is_null() {
-        zx::MonotonicTime::INFINITE
+        zx::MonotonicInstant::INFINITE
     } else {
         let timespec = current_task.read_object(timeout_addr)?;
         start_time + duration_from_timespec(timespec)?
@@ -2159,7 +2160,7 @@ pub fn sys_pselect6(
     if !timeout_addr.is_null()
         && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
     }
@@ -2177,10 +2178,10 @@ pub fn sys_select(
     exceptfds_addr: UserRef<__kernel_fd_set>,
     timeout_addr: UserRef<starnix_uapi::timeval>,
 ) -> Result<i32, Errno> {
-    let start_time = zx::MonotonicTime::get();
+    let start_time = zx::MonotonicInstant::get();
 
     let deadline = if timeout_addr.is_null() {
-        zx::MonotonicTime::INFINITE
+        zx::MonotonicInstant::INFINITE
     } else {
         let timeval = current_task.read_object(timeout_addr)?;
         start_time + starnix_uapi::time::duration_from_timeval(timeval)?
@@ -2200,7 +2201,7 @@ pub fn sys_select(
     if !timeout_addr.is_null()
         && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task
             .write_object(timeout_addr, &starnix_uapi::time::timeval_from_duration(remaining))?;
@@ -2278,7 +2279,7 @@ fn do_epoll_pwait<L>(
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno>
 where
@@ -2322,7 +2323,7 @@ pub fn sys_epoll_pwait(
     timeout: i32,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let deadline = zx::MonotonicTime::after(duration_from_poll_timeout(timeout)?);
+    let deadline = zx::MonotonicInstant::after(duration_from_poll_timeout(timeout)?);
     do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
@@ -2336,10 +2337,10 @@ pub fn sys_epoll_pwait2(
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let deadline = if user_timespec.is_null() {
-        zx::MonotonicTime::INFINITE
+        zx::MonotonicInstant::INFINITE
     } else {
         let ts = current_task.read_object(user_timespec)?;
-        zx::MonotonicTime::after(duration_from_timespec(ts)?)
+        zx::MonotonicInstant::after(duration_from_timespec(ts)?)
     };
     do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
@@ -2394,7 +2395,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
         &self,
         current_task: &mut CurrentTask,
         signal_mask: Option<SigSet>,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         if self.ready_items.lock().is_empty() {
             // When wait_until() returns Ok() it means there was a wake up; however there may not
@@ -2427,7 +2428,7 @@ pub fn poll<L>(
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
     mask: Option<SigSet>,
-    deadline: zx::MonotonicTime,
+    deadline: zx::MonotonicInstant,
 ) -> Result<usize, Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
@@ -2490,7 +2491,7 @@ pub fn sys_ppoll(
     user_mask: UserRef<SigSet>,
     sigset_size: usize,
 ) -> Result<usize, Errno> {
-    let start_time = zx::MonotonicTime::get();
+    let start_time = zx::MonotonicInstant::get();
 
     let timeout = if user_timespec.is_null() {
         // Passing -1 to poll is equivalent to an infinite timeout.
@@ -2518,7 +2519,7 @@ pub fn sys_ppoll(
         return poll_result;
     }
 
-    let now = zx::MonotonicTime::get();
+    let now = zx::MonotonicInstant::get();
     let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
     let remaining_timespec = timespec_from_duration(remaining);
 
@@ -3064,34 +3065,108 @@ pub fn sys_io_destroy(
 
 pub fn sys_io_uring_setup(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _entries: u32,
-    _params: UserRef<io_uring_params>,
+    current_task: &CurrentTask,
+    entries: u32,
+    user_params: UserRef<io_uring_params>,
 ) -> Result<FdNumber, Errno> {
-    error!(ENOSYS)
+    if !current_task.kernel().features.io_uring {
+        return error!(ENOSYS);
+    }
+
+    // Apply policy from /proc/sys/kernel/io_uring_disabled
+    let limits = &current_task.kernel().system_limits;
+    match limits.io_uring_disabled.load(atomic::Ordering::Relaxed) {
+        0 => (),
+        1 => {
+            if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+                let io_uring_group = limits
+                    .io_uring_group
+                    .load(atomic::Ordering::Relaxed)
+                    .try_into()
+                    .map_err(|_| errno!(EPERM))?;
+                if !current_task.creds().is_in_group(io_uring_group) {
+                    return error!(EPERM);
+                }
+            }
+        }
+        _ => {
+            return error!(EPERM);
+        }
+    }
+
+    if entries == 0 {
+        return error!(EINVAL);
+    }
+
+    let mut params = current_task.read_object(user_params)?;
+    for byte in params.resv {
+        if byte != 0 {
+            return error!(EINVAL);
+        }
+    }
+
+    const SUPPORTED_FLAGS: u32 = IORING_SETUP_CQSIZE;
+    let unsupported_flags = params.flags & !SUPPORTED_FLAGS;
+    if unsupported_flags != 0 {
+        track_stub!(TODO("https://fxbug.dev/297431387"), "io_uring flags", unsupported_flags);
+        return error!(EINVAL);
+    }
+
+    let file = IoUringFileObject::new_file(current_task, entries, &mut params)?;
+
+    // io_uring file descriptors are always created with CLOEXEC.
+    let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
+    current_task.write_object(user_params, &params)?;
+    Ok(fd)
 }
 
 pub fn sys_io_uring_enter(
-    _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _fd: FdNumber,
-    _to_submit: u32,
-    _min_complete: u32,
-    _flags: u32,
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    to_submit: u32,
+    min_complete: u32,
+    flags: u32,
     _sig: UserRef<sigset_t>,
-) -> Result<FdNumber, Errno> {
-    error!(ENOSYS)
+) -> Result<u32, Errno> {
+    if !current_task.kernel().features.io_uring {
+        return error!(ENOSYS);
+    }
+    let file = current_task.files.get(fd)?;
+    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EOPNOTSUPP))?;
+    // TODO(https://fxbug.dev/297431387): Use `_sig` to change the signal mask for `current_task`.
+    io_uring.enter(locked, current_task, to_submit, min_complete, flags)
 }
 
 pub fn sys_io_uring_register(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _fd: FdNumber,
-    _opcode: u32,
-    _arg: UserAddress,
-    _nr_args: usize,
-) -> Result<FdNumber, Errno> {
-    error!(ENOSYS)
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    opcode: u32,
+    arg: UserAddress,
+    nr_args: UserValue<i32>,
+) -> Result<SyscallResult, Errno> {
+    if !current_task.kernel().features.io_uring {
+        return error!(ENOSYS);
+    }
+    let file = current_task.files.get(fd)?;
+    let io_uring = file.downcast_file::<IoUringFileObject>().ok_or_else(|| errno!(EOPNOTSUPP))?;
+    match opcode {
+        IORING_REGISTER_BUFFERS => {
+            // TODO(https://fxbug.dev/297431387): Check nr_args for zero and return EINVAL here.
+            let buffers = current_task.read_iovec(arg, nr_args)?;
+            io_uring.register_buffers(buffers);
+            return Ok(SUCCESS);
+        }
+        IORING_UNREGISTER_BUFFERS => {
+            if !arg.is_null() {
+                return error!(EINVAL);
+            }
+            io_uring.unregister_buffers();
+            return Ok(SUCCESS);
+        }
+        _ => return error!(EINVAL),
+    }
 }
 
 #[cfg(test)]

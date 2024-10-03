@@ -196,6 +196,8 @@ impl Statistic for ArithmeticMean<f32> {
 /// The sum directly computes the aggregation in the domain of samples.
 ///
 /// This statistic is sensitive to overflow in the sum of samples.
+///
+/// TODO(https://fxbug.dev/370821318): Implement Statistic for Sum<i64>
 #[derive(Clone, Debug)]
 pub struct Sum<T> {
     /// The sum of samples.

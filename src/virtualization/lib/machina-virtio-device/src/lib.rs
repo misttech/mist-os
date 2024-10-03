@@ -23,7 +23,7 @@ use fidl_fuchsia_virtualization_hardware::{
     StartInfo, VirtioDeviceReadyResponder, VirtioDeviceRequest, VirtioDeviceRequestStream,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use futures::task::AtomicWaker;
 use futures::{Stream, TryFutureExt, TryStreamExt};
 use std::collections::{hash_map, HashMap};

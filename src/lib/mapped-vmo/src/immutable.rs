@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use std::ptr::NonNull;
 
 /// Provides a safe byte slice view of a VMO through a `Deref<Target=[u8]>` implementation.
@@ -174,20 +173,20 @@ mod tests {
     #[test_case(true; "immediately-page")]
     #[test_case(false; "do-not-immediately-page")]
     fn drop_cleans_up(immediately_page: bool) {
-        use fuchsia_zircon::AsHandleRef as _;
+        use zx::AsHandleRef as _;
         let vmo = zx::Vmo::create(7).unwrap();
         assert!(vmo
-            .wait_handle(zx::Signals::VMO_ZERO_CHILDREN, zx::MonotonicTime::INFINITE_PAST)
+            .wait_handle(zx::Signals::VMO_ZERO_CHILDREN, zx::MonotonicInstant::INFINITE_PAST)
             .is_ok());
 
         let mapping = ImmutableMapping::create_from_vmo(&vmo, immediately_page).unwrap();
         assert!(vmo
-            .wait_handle(zx::Signals::VMO_ZERO_CHILDREN, zx::MonotonicTime::INFINITE_PAST)
+            .wait_handle(zx::Signals::VMO_ZERO_CHILDREN, zx::MonotonicInstant::INFINITE_PAST)
             .is_err());
 
         drop(mapping);
         assert!(vmo
-            .wait_handle(zx::Signals::VMO_ZERO_CHILDREN, zx::MonotonicTime::INFINITE_PAST)
+            .wait_handle(zx::Signals::VMO_ZERO_CHILDREN, zx::MonotonicInstant::INFINITE_PAST)
             .is_ok());
     }
 

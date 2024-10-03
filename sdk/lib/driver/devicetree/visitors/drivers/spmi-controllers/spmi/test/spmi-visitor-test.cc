@@ -121,7 +121,7 @@ TEST(SpmiVisitorTest, TwoControllers) {
   ASSERT_TRUE(controller_0.is_ok());
 
   ASSERT_TRUE(controller_0->id());
-  EXPECT_EQ(*controller_0->id(), 1u);
+  const uint32_t controller_0_id = *controller_0->id();
 
   ASSERT_TRUE(controller_0->targets());
   ASSERT_EQ(controller_0->targets()->size(), 2u);
@@ -183,12 +183,13 @@ TEST(SpmiVisitorTest, TwoControllers) {
   ASSERT_TRUE(vreg_1000->parents());
   ASSERT_EQ(vreg_1000->parents()->size(), 2u);
 
-  // Skip the devictree node with the compatible string.
+  // The 0th composite parent has the `compatible` string and is added by the default visitor. Start
+  // at index 1 to skip this parent and validate only the parents added by the SPMI visitor.
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
       {
           fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
                                   bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, 1u),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_0_id),
           fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
           fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x1000u),
       },
@@ -203,99 +204,13 @@ TEST(SpmiVisitorTest, TwoControllers) {
       },
       (*vreg_1000->parents())[1].properties(), false));
 
+  // gpio@2000 and i2c@3000 are referenced by another node, so no composite node specs should be
+  // added for them.
   const auto gpio_2000 = spmi_tester->FindMgrRequest("gpio-2000_group");
-  ASSERT_TRUE(gpio_2000);
-
-  ASSERT_TRUE(gpio_2000->parents());
-  ASSERT_EQ(gpio_2000->parents()->size(), 2u);
-
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-      {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, 1u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x2000u),
-      },
-      (*gpio_2000->parents())[1].bind_rules(), false));
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-      {
-          fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                            bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 0u),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "target-a"),
-          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x2000u),
-      },
-      (*gpio_2000->parents())[1].properties(), false));
+  EXPECT_FALSE(gpio_2000);
 
   const auto i2c_3000 = spmi_tester->FindMgrRequest("i2c-3000_group");
-  ASSERT_TRUE(i2c_3000);
-
-  ASSERT_TRUE(i2c_3000->parents());
-  ASSERT_EQ(i2c_3000->parents()->size(), 3u);
-
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-      {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, 1u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x3000u),
-      },
-      (*i2c_3000->parents())[1].bind_rules(), false));
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-      {
-          fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                            bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 0u),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "target-a"),
-          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x3000u),
-          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_NAME, "i2c-core"),
-      },
-      (*i2c_3000->parents())[1].properties(), false));
-
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-      {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, 1u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0xffffu),
-      },
-      (*i2c_3000->parents())[2].bind_rules(), false));
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-      {
-          fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
-                            bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 0u),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "target-a"),
-          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0xffffu),
-          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_NAME, "i2c-config"),
-      },
-      (*i2c_3000->parents())[2].properties(), false));
-
-  const auto target_b_3 = spmi_tester->FindMgrRequest("target-b-3_group");
-  ASSERT_TRUE(target_b_3);
-
-  ASSERT_TRUE(target_b_3->parents());
-  ASSERT_EQ(target_b_3->parents()->size(), 2u);
-
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-      {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::TARGETSERVICE,
-                                  bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, 1u),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 3u),
-      },
-      (*target_b_3->parents())[1].bind_rules(), false));
-  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-      {
-          fdf::MakeProperty(bind_fuchsia_hardware_spmi::TARGETSERVICE,
-                            bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 3u),
-          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "vreg"),
-      },
-      (*target_b_3->parents())[1].properties(), false));
+  EXPECT_FALSE(i2c_3000);
 
   // Second controller metadata
   const auto pbus_node_1 = spmi_tester->FindPbusNode("spmi-abcf0000");
@@ -316,7 +231,7 @@ TEST(SpmiVisitorTest, TwoControllers) {
   ASSERT_TRUE(controller_1.is_ok());
 
   ASSERT_TRUE(controller_1->id());
-  EXPECT_EQ(*controller_1->id(), 2u);
+  const uint32_t controller_1_id = *controller_1->id();
 
   ASSERT_TRUE(controller_1->targets());
   ASSERT_EQ(controller_1->targets()->size(), 1u);
@@ -337,7 +252,7 @@ TEST(SpmiVisitorTest, TwoControllers) {
       {
           fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::TARGETSERVICE,
                                   bind_fuchsia_hardware_spmi::TARGETSERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, 2u),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_1_id),
           fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
       },
       (*target_c_0->parents())[1].bind_rules(), false));
@@ -349,10 +264,77 @@ TEST(SpmiVisitorTest, TwoControllers) {
       },
       (*target_c_0->parents())[1].properties(), false));
 
-  // The third pbus node should have been ignored by the SPMI visitor
+  // The second pbus node is not an SPMI controller and should not have metadata. It does have an
+  // "spmis" property and should have composite parents for the SPMI sub-targets that it references.
+
   const auto pbus_node_ignored = spmi_tester->FindPbusNode("not-spmi-abce0000");
   ASSERT_TRUE(pbus_node_ignored);
   EXPECT_FALSE(pbus_node_ignored->metadata());
+
+  const auto not_spmi = spmi_tester->FindMgrRequest("not-spmi-abce0000_group");
+  ASSERT_TRUE(not_spmi);
+
+  ASSERT_TRUE(not_spmi->parents());
+  ASSERT_EQ(not_spmi->parents()->size(), 4u);
+
+  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+      {
+          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_0_id),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x2000u),
+      },
+      (*not_spmi->parents())[1].bind_rules(), false));
+  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+      {
+          fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                            bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 0u),
+          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "target-a"),
+          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x2000u),
+      },
+      (*not_spmi->parents())[1].properties(), false));
+
+  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+      {
+          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_0_id),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x3000u),
+      },
+      (*not_spmi->parents())[2].bind_rules(), false));
+  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+      {
+          fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                            bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 0u),
+          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "target-a"),
+          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0x3000u),
+          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_NAME, "i2c-core"),
+      },
+      (*not_spmi->parents())[2].properties(), false));
+
+  EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+      {
+          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                                  bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::CONTROLLER_ID, controller_0_id),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::TARGET_ID, 0u),
+          fdf::MakeAcceptBindRule(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0xffffu),
+      },
+      (*not_spmi->parents())[3].bind_rules(), false));
+  EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+      {
+          fdf::MakeProperty(bind_fuchsia_hardware_spmi::SUBTARGETSERVICE,
+                            bind_fuchsia_hardware_spmi::SUBTARGETSERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_ID, 0u),
+          fdf::MakeProperty(bind_fuchsia_spmi::TARGET_NAME, "target-a"),
+          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_ADDRESS, 0xffffu),
+          fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_NAME, "i2c-config"),
+      },
+      (*not_spmi->parents())[3].properties(), false));
 }
 
 TEST(SpmiVisitorTest, DuplicateTargetId) {
@@ -376,6 +358,45 @@ TEST(SpmiVisitorTest, SubTargetSpmiAddressOutOfRange) {
 
   SpmiVisitorTester* const spmi_tester =
       new SpmiVisitorTester("/pkg/test-data/spmi-sub-target-spmi-address-out-of-range.dtb");
+  ASSERT_TRUE(visitors.RegisterVisitor(std::unique_ptr<SpmiVisitorTester>{spmi_tester}).is_ok());
+
+  EXPECT_FALSE(spmi_tester->manager()->Walk(visitors).is_ok());
+}
+
+TEST(SpmiVisitorTest, PropertyReferencesTarget) {
+  fdf_devicetree::VisitorRegistry visitors;
+  ASSERT_TRUE(
+      visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
+
+  SpmiVisitorTester* const spmi_tester =
+      new SpmiVisitorTester("/pkg/test-data/spmi-reference-target.dtb");
+  ASSERT_TRUE(visitors.RegisterVisitor(std::unique_ptr<SpmiVisitorTester>{spmi_tester}).is_ok());
+
+  EXPECT_FALSE(spmi_tester->manager()->Walk(visitors).is_ok());
+}
+
+TEST(SpmiVisitorTest, TwoNodesReferenceSubTarget) {
+  fdf_devicetree::VisitorRegistry visitors;
+  ASSERT_TRUE(
+      visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
+
+  SpmiVisitorTester* const spmi_tester =
+      new SpmiVisitorTester("/pkg/test-data/spmi-two-nodes-reference-sub-target.dtb");
+  ASSERT_TRUE(visitors.RegisterVisitor(std::unique_ptr<SpmiVisitorTester>{spmi_tester}).is_ok());
+
+  EXPECT_FALSE(spmi_tester->manager()->Walk(visitors).is_ok());
+}
+
+TEST(SpmiVisitorTest, ReferenceSubTargetHasCompatibleProperty) {
+  fdf_devicetree::VisitorRegistry visitors;
+  ASSERT_TRUE(
+      visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
+
+  SpmiVisitorTester* const spmi_tester =
+      new SpmiVisitorTester("/pkg/test-data/spmi-reference-has-compatible-property.dtb");
   ASSERT_TRUE(visitors.RegisterVisitor(std::unique_ptr<SpmiVisitorTester>{spmi_tester}).is_ok());
 
   EXPECT_FALSE(spmi_tester->manager()->Walk(visitors).is_ok());

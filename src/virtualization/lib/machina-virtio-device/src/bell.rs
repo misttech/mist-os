@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_async::{self as fasync, PacketReceiver, ReceiverRegistration};
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::mpsc;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::pin::Pin;

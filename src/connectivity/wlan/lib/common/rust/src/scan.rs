@@ -9,7 +9,7 @@ use fidl_fuchsia_wlan_sme as fidl_sme;
 use std::collections::HashSet;
 
 #[cfg(target_os = "fuchsia")]
-use {anyhow::Context as _, fuchsia_zircon as zx};
+use {anyhow::Context as _, zx};
 
 /// Compatibility of a BSS with respect to a scanning interface.
 ///
@@ -100,7 +100,7 @@ pub struct ScanResult {
     // Time of the scan result relative to when the system was powered on.
     // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support?hl=en#monotonic_time
     #[cfg(target_os = "fuchsia")]
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
     pub bss_description: BssDescription,
 }
 
@@ -141,7 +141,7 @@ impl TryFrom<fidl_sme::ScanResult> for ScanResult {
                 .transpose()
                 .map_err(|_| format_err!("failed to convert FIDL `Compatibility`"))?,
             #[cfg(target_os = "fuchsia")]
-            timestamp: zx::MonotonicTime::from_nanos(timestamp_nanos),
+            timestamp: zx::MonotonicInstant::from_nanos(timestamp_nanos),
             bss_description: bss_description.try_into()?,
         })
     }

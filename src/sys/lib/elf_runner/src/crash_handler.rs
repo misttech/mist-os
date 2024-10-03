@@ -5,10 +5,10 @@
 use crate::crash_info::{ComponentCrashInfo, CrashRecords};
 use crate::error::ExceptionError;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use moniker::Moniker;
 use tracing::error;
+use zx::{self as zx, AsHandleRef};
 
 // Registers with the job to catch exceptions raised by it. Whenever we see an exception from this
 // job, record that the crash happened, and inform zircon that it should proceed to the next crash
@@ -79,8 +79,8 @@ mod tests {
     use super::*;
     use anyhow::{Context as _, Error};
     use fuchsia_component::client as fclient;
-    use fuchsia_zircon::HandleBased;
     use std::sync::Arc;
+    use zx::HandleBased;
     use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime};
 
     #[fuchsia::test]

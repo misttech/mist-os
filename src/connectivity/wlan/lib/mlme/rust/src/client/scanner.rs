@@ -19,7 +19,7 @@ use wlan_frame_writer::write_frame_to_vec;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, fuchsia_zircon as zx, wlan_trace as wtrace,
+    fuchsia_trace as trace, wlan_trace as wtrace, zx,
 };
 
 // TODO(https://fxbug.dev/42171393): Currently hardcoded until parameters supported.
@@ -525,7 +525,7 @@ fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_common::BssDescription,
         .send_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
                 txn_id,
-                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
+                timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
                 bss,
             },
         })
@@ -733,7 +733,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::MonotonicTime::get().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicInstant::get().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -840,7 +840,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::MonotonicTime::get().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicInstant::get().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -962,7 +962,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::MonotonicTime::get().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicInstant::get().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -1007,7 +1007,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::MonotonicTime::get().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicInstant::get().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -1051,7 +1051,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::MonotonicTime::get().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicInstant::get().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -1087,7 +1087,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::MonotonicTime::get().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicInstant::get().into_nanos();
 
         scanner
             .bind(&mut ctx)

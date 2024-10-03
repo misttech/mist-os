@@ -7,7 +7,6 @@ use crate::volume::VolumeConnection;
 use crate::volume_actor::VolumeActor;
 use crate::Args;
 use async_trait::async_trait;
-use fuchsia_zircon::Vmo;
 use futures::lock::Mutex;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -17,6 +16,7 @@ use storage_stress_test_utils::fvm::{FvmInstance, Guid};
 use stress_test::actor::ActorRunner;
 use stress_test::environment::Environment;
 use stress_test::random_seed;
+use zx::Vmo;
 
 // All partitions in this test have their type set to this arbitrary GUID.
 const TYPE_GUID: Guid =

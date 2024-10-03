@@ -8,7 +8,7 @@ use fidl_fuchsia_sysinfo::{InterruptControllerInfo, SysInfoMarker, SysInfoProxy}
 use fuchsia_component::client::connect_to_protocol;
 use std::fmt::Debug;
 use std::io::Write;
-use {fuchsia_zircon as zx, futures as _};
+use {futures as _, zx};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum SystemInfo {

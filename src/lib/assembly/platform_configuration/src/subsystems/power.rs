@@ -16,16 +16,6 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         config: &PowerConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
-            builder
-                .bootfs()
-                .file(FileEntry {
-                    source: cpu_manager_config.as_utf8_pathbuf().into(),
-                    destination: BootfsDestination::CpuManagerNodeConfig,
-                })
-                .context("Adding cpu_manager config file")?;
-        }
-
         if let Some(energy_model_config) = &context.board_info.configuration.energy_model {
             builder
                 .bootfs()
@@ -72,6 +62,15 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             if config.suspend_enabled {
                 ensure!(*context.build_type != BuildType::User);
                 builder.platform_bundle("power_framework");
+
+                match context.feature_set_level {
+                    FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
+                    FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {
+                        // Include only when the base package set is available
+                        builder.platform_bundle("power_framework_development_support");
+                    }
+                }
+
                 match config.testing_sag_enabled {
                     true => {
                         builder.platform_bundle("power_framework_testing_sag");
@@ -82,7 +81,18 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                     }
                 }
             }
+            if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
+                builder.platform_bundle("cpu_manager");
+                builder
+                    .bootfs()
+                    .file(FileEntry {
+                        source: cpu_manager_config.as_utf8_pathbuf().into(),
+                        destination: BootfsDestination::CpuManagerNodeConfig,
+                    })
+                    .context("Adding cpu_manager config file")?;
+            }
         }
+
         builder.set_config_capability(
             "fuchsia.power.SuspendEnabled",
             Config::new(ConfigValueType::Bool, config.suspend_enabled.into()),

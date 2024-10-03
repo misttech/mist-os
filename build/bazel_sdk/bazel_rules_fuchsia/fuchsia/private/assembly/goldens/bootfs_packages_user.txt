@@ -13,7 +13,7 @@ clock
 ?config
 ?console
 ?console-launcher
-cpu-manager
+?cpu-manager
 critical-services
 devfs
 device-name-provider

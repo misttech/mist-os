@@ -123,10 +123,30 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             "test-list.json",
             "package-repositories.json",
             "package-targets.json",
+            "all_package_manifests.list",
         ]:
             shutil.copy(
                 os.path.join(self.test_data_path, name),
                 os.path.join(self.out_dir, name),
+            )
+
+        # Simulate the generated package metadata to test merging.
+        gen_dir = os.path.join(
+            self.out_dir, "gen", "build", "images", "updates"
+        )
+        os.makedirs(gen_dir)
+        with open(
+            os.path.join(
+                gen_dir, "package_manifests_from_metadata.list.package_metadata"
+            ),
+            "w",
+        ) as f:
+            f.writelines(
+                [
+                    "obj/foo/package_manifest.json",
+                    "obj/bar/package_manifest.json",
+                    "obj/baz/package_manifest.json",
+                ]
             )
 
         self._mock_get_device_environment(
@@ -478,7 +498,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsSubset(
             {
-                ("fx", "ffx", "test", "run"),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "test",
+                    "run",
+                ),
             },
             call_prefixes,
         )
@@ -523,6 +550,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 [
                     [
                         "fx",
+                        "--dir",
+                        self.out_dir,
                         "search-tests",
                         f"--max-results={expected_suggestion_count}",
                         "--no-color",
@@ -559,15 +588,33 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 (
                     "fx",
                     "--dir",
-                    os.path.join(self.fuchsia_dir.name, "out/default"),
+                    self.out_dir,
                     "build",
                     "--default",
                     "//src/sys:foo_test_package",
                     "--toolchain=//build/toolchain/host:x64",
                     "//src/sys:bar_test",
+                    "//src/sys:baz_test",
+                    "//src/tests/end_to_end:example_e2e_test",
+                    "--default",
+                    "updates",
                 ),
-                ("fx", "ffx", "repository", "publish"),
-                ("fx", "ffx", "test", "run"),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "repository",
+                    "publish",
+                ),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "test",
+                    "run",
+                ),
             },
             call_prefixes,
         )
@@ -640,7 +687,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     "--default",
                     "updates",
                 ),
-                ("fx", "ffx", "repository", "publish"),
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ffx",
+                    "repository",
+                    "publish",
+                ),
             },
             call_prefixes,
         )
@@ -666,14 +720,17 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             command_mock.call_args_list
         )
 
-        self.assertFalse(("fx", "build") in call_prefixes)
         self.assertFalse(
-            ("fx", "ffx", "repository", "publish") in call_prefixes
+            ("fx", "--dir", self.out_dir, "build") in call_prefixes
+        )
+        self.assertFalse(
+            ("fx", "--dir", self.out_dir, "ffx", "repository", "publish")
+            in call_prefixes
         )
 
         self.assertIsSubset(
             {
-                ("fx", "ffx", "test", "run"),
+                ("fx", "--dir", self.out_dir, "ffx", "test", "run"),
             },
             call_prefixes,
         )
@@ -853,7 +910,18 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         call_prefixes = self._make_call_args_prefix_set(
             command_mock.call_args_list
         )
-        self.assertIsSubset({("fx", "ota", "--no-build")}, call_prefixes)
+        self.assertIsSubset(
+            {
+                (
+                    "fx",
+                    "--dir",
+                    self.out_dir,
+                    "ota",
+                    "--no-build",
+                )
+            },
+            call_prefixes,
+        )
 
     async def test_print_logs_success(self) -> None:
         """Test that print_logs searches for logs, can be given a log,

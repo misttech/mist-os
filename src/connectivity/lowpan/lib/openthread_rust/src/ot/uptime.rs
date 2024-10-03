@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
-use fuchsia_zircon as zx;
 
 /// Uptime-related methods from the [OpenThread "Instance" Module][1].
 ///

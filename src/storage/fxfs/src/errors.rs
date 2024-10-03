@@ -76,7 +76,7 @@ impl FxfsError {
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
     use super::*;
-    use fuchsia_zircon::Status;
+    use zx::Status;
 
     impl From<FxfsError> for Status {
         fn from(err: FxfsError) -> Status {

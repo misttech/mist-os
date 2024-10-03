@@ -10,9 +10,9 @@ use fidl_fuchsia_vsock::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::io::{AsyncReadExt, AsyncWriteExt};
 use futures::StreamExt;
+use zx::{self as zx, AsHandleRef};
 
 const TEST_DATA_LEN: u64 = 60000;
 
@@ -27,7 +27,7 @@ fn make_socket_pair() -> Result<(fasync::Socket, zx::Socket), Error> {
 fn wait_socket_empty(socket: &fasync::Socket) {
     socket
         .as_handle_ref()
-        .wait(zx::Signals::SOCKET_WRITE_THRESHOLD, zx::MonotonicTime::INFINITE)
+        .wait(zx::Signals::SOCKET_WRITE_THRESHOLD, zx::MonotonicInstant::INFINITE)
         .unwrap();
 }
 
@@ -79,7 +79,7 @@ async fn main() -> Result<(), Error> {
     client_end.shutdown()?;
     data_stream
         .as_handle_ref()
-        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE)?;
+        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)?;
 
     // Wait for a connection
     let AcceptorRequest::Accept { addr: _, responder } =
@@ -91,7 +91,7 @@ async fn main() -> Result<(), Error> {
     test_read_write(&mut data_stream, &client_end).await?;
     data_stream
         .as_handle_ref()
-        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE)?;
+        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)?;
 
     // Get next connection
     let AcceptorRequest::Accept { addr: _, responder } =

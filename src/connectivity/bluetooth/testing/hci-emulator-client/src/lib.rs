@@ -11,7 +11,7 @@ use fidl_fuchsia_hardware_bluetooth::{
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_bluetooth::constants::{DEV_DIR, HCI_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT};
-use fuchsia_zircon as zx;
+
 use futures::TryFutureExt as _;
 use tracing::error;
 
@@ -245,10 +245,27 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_publish_lifecycle() {
+        // We need to resolve our test component manually. Eventually component framework could provide
+        // an introspection way of resolving your own component.
+        // This isn't exactly correct because if the test is running in ctf, the root package will not
+        // be called "hci-emulator-client-tests".
+        let resolved = {
+            let client = fuchsia_component::client::connect_to_protocol_at_path::<
+                fidl_fuchsia_component_resolution::ResolverMarker,
+            >("/svc/fuchsia.component.resolution.Resolver-hermetic")
+            .unwrap();
+            client
+            .resolve(
+                "fuchsia-pkg://fuchsia.com/hci-emulator-client-tests#meta/hci-emulator-client-tests.cm",
+            )
+            .await
+            .unwrap()
+            .expect("Failed to resolve root component")
+        };
+
         // We use these watchers to verify the addition and removal of these devices as tied to the
         // lifetime of the Emulator instance we create below.
         let emul_dev: EmulatorProxy;
-
         let realm = RealmBuilder::new().await.expect("realm builder");
         let _: &RealmBuilder =
             realm.driver_test_realm_setup().await.expect("driver test realm setup");
@@ -259,7 +276,7 @@ mod tests {
                 device_name: "bt-hci-emulator".to_string(),
                 device_id: 48,
             }]),
-
+            test_component: Some(resolved),
             ..Default::default()
         };
         realm.driver_test_realm_start(args).await.expect("driver test realm start");

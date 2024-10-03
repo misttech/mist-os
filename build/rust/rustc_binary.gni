@@ -226,7 +226,7 @@ template("rustc_binary") {
   if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
     rustc_test_internal("${target_name}_test") {
       output_name = "${_output_name}_bin_test"
-      original_target_name = _original_target_name
+      original_target_name = target_name
 
       if (defined(invoker.test_args)) {
         args = invoker.test_args
@@ -270,7 +270,7 @@ template("rustc_binary") {
   rustc_artifact(target_name) {
     target_type = "executable"
     crate_root = source_root
-    clippy_crate_type = "bin"
+    rust_crate_type = "bin"
     crate_name = _crate_name
     original_target_name = _original_target_name
 

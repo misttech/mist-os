@@ -161,7 +161,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         self.network_config_iterator: asyncio.Task[None] | None = None
 
     def tearDown(self) -> None:
-        self.wlan_policy_obj.close()
+        self.wlan_policy_obj._close()
         return super().tearDown()
 
     @contextmanager
@@ -367,7 +367,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             )
 
             assert self.network_config_iterator is not None
-            self.wlan_policy_obj._cancel_task(self.network_config_iterator)
+            self.wlan_policy_obj.cancel_task(self.network_config_iterator)
 
     def test_get_update(self) -> None:
         """Test if get_update works."""
@@ -488,7 +488,7 @@ class WlanPolicyFCTests(unittest.TestCase):
 
             # Cleanup
             assert self.network_config_iterator is not None
-            self.wlan_policy_obj._cancel_task(self.network_config_iterator)
+            self.wlan_policy_obj.cancel_task(self.network_config_iterator)
 
     def test_remove_network_passes(self) -> None:
         """Test if remove_network works."""
@@ -631,7 +631,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             )
 
             assert self.scan_result_iterator is not None
-            self.wlan_policy_obj._cancel_task(self.scan_result_iterator)
+            self.wlan_policy_obj.cancel_task(self.scan_result_iterator)
 
     def test_set_new_update_listener_without_client_controller(self) -> None:
         """Test if set_new_update_listener creates a client controller if it

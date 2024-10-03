@@ -7,7 +7,7 @@ use event_listener::Event;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, Weak};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub type Device = DeviceImpl<RemoteBlockClient>;
 

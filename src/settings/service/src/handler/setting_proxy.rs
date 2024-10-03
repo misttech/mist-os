@@ -18,12 +18,12 @@ use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, MessageEvent, MessengerType, Status};
 use crate::{clock, event, service, trace, trace_guard};
 use anyhow::Error;
-use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use std::collections::VecDeque;
 use std::sync::Arc;
+use zx::Duration;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Maximum number of errors tracked per setting proxy before errors are rolled over.

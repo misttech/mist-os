@@ -23,10 +23,7 @@ use futures::stream::TryStreamExt;
 use std::fs::File;
 use std::io;
 use std::process::exit;
-use {
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync, zx};
 
 mod args;
 mod error;

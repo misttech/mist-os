@@ -325,11 +325,11 @@ class MixerSourceClockTest : public testing::Test {
     zx_clock_details_v1_t clock_details;
     clock.get_details(&clock_details);
 
-    const auto offset = clock_details.mono_to_synthetic.synthetic_offset -
-                        clock_details.mono_to_synthetic.reference_offset;
+    const auto offset = clock_details.reference_to_synthetic.synthetic_offset -
+                        clock_details.reference_to_synthetic.reference_offset;
     return TimelineFunction(clock_realm_->now().get(), clock_realm_->now().get() + offset,
-                            clock_details.mono_to_synthetic.rate.reference_ticks,
-                            clock_details.mono_to_synthetic.rate.synthetic_ticks);
+                            clock_details.reference_to_synthetic.rate.reference_ticks,
+                            clock_details.reference_to_synthetic.rate.synthetic_ticks);
   }
 
   std::shared_ptr<MixerSource> mixer_source_;

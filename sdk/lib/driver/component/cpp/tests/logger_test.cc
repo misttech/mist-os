@@ -131,7 +131,7 @@ TEST(LoggerTest, CreateAndLog) {
   svc_binding2.Bind(svc.server.TakeChannel(), loop.dispatcher());
 
   auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
-  ASSERT_TRUE(logger.is_ok());
+  ASSERT_FALSE(logger->IsNoOp());
   loop.RunUntilIdle();
 
   // Check initial state of logger.
@@ -139,17 +139,17 @@ TEST(LoggerTest, CreateAndLog) {
   CheckLogUnreadable(log_socket);
 
   // Check state of logger after writing logs that were below |min_severity|.
-  FDF_LOGL(TRACE, *logger.value(), kMessage);
+  FDF_LOGL(TRACE, *logger, kMessage);
   CheckLogUnreadable(log_socket);
-  FDF_LOGL(DEBUG, *logger.value(), kMessage);
+  FDF_LOGL(DEBUG, *logger, kMessage);
   CheckLogUnreadable(log_socket);
 
   // Check state of logger after writing logs.
-  FDF_LOGL(INFO, *logger.value(), kMessage);
+  FDF_LOGL(INFO, *logger, kMessage);
   CheckLogReadable(log_socket, flogger::LogLevelFilter::INFO);
-  FDF_LOGL(WARNING, *logger.value(), kMessage);
+  FDF_LOGL(WARNING, *logger, kMessage);
   CheckLogReadable(log_socket, flogger::LogLevelFilter::WARN);
-  FDF_LOGL(ERROR, *logger.value(), kMessage);
+  FDF_LOGL(ERROR, *logger, kMessage);
   CheckLogReadable(log_socket, flogger::LogLevelFilter::ERROR);
 }
 
@@ -173,7 +173,7 @@ TEST(LoggerTest, Create_NoLogSink) {
 
   // Setup logger.
   auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
-  ASSERT_TRUE(logger.is_error());
+  ASSERT_TRUE(logger->IsNoOp());
 }
 
 TEST(LoggerTest, SetSeverity) {
@@ -207,7 +207,7 @@ TEST(LoggerTest, SetSeverity) {
   svc_binding2.Bind(svc.server.TakeChannel(), loop.dispatcher());
 
   auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
-  ASSERT_TRUE(logger.is_ok());
+  ASSERT_FALSE(logger->IsNoOp());
   loop.RunUntilIdle();
 
   // Check initial state of logger.
@@ -215,23 +215,23 @@ TEST(LoggerTest, SetSeverity) {
   CheckLogUnreadable(log_socket);
 
   // Check severity after setting it.
-  logger.value()->SetSeverity(FUCHSIA_LOG_INFO);
-  ASSERT_EQ(FUCHSIA_LOG_INFO, logger.value()->GetSeverity());
+  logger->SetSeverity(FUCHSIA_LOG_INFO);
+  ASSERT_EQ(FUCHSIA_LOG_INFO, logger->GetSeverity());
 
   // Check state of logger after writing logs that were above or equal to min
   // severity.
-  FDF_LOGL(INFO, *logger.value(), kMessage);
+  FDF_LOGL(INFO, *logger, kMessage);
   CheckLogReadable(log_socket, flogger::LogLevelFilter::INFO);
-  FDF_LOGL(WARNING, *logger.value(), kMessage);
+  FDF_LOGL(WARNING, *logger, kMessage);
   CheckLogReadable(log_socket, flogger::LogLevelFilter::WARN);
 
   // Check severity after setting it.
-  logger.value()->SetSeverity(FUCHSIA_LOG_WARNING);
-  ASSERT_EQ(FUCHSIA_LOG_WARNING, logger.value()->GetSeverity());
+  logger->SetSeverity(FUCHSIA_LOG_WARNING);
+  ASSERT_EQ(FUCHSIA_LOG_WARNING, logger->GetSeverity());
 
   // Check state of logger after writing logs that were below min severity.
-  FDF_LOGL(INFO, *logger.value(), kMessage);
+  FDF_LOGL(INFO, *logger, kMessage);
   CheckLogUnreadable(log_socket);
-  FDF_LOGL(WARNING, *logger.value(), kMessage);
+  FDF_LOGL(WARNING, *logger, kMessage);
   CheckLogReadable(log_socket, flogger::LogLevelFilter::WARN);
 }

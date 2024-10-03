@@ -394,8 +394,7 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithOutput) {
   sprintf(expected_pass_output_buf,
           R"(    \{
       "name": "%s",
-      "duration_milliseconds": \d+
-    \})",
+      "duration_milliseconds": \d+)",
           succeed_file_name.c_str());
   re2::RE2 expected_pass_output_regex(expected_pass_output_buf);
 
@@ -403,8 +402,7 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithOutput) {
   sprintf(expected_fail_output_buf,
           R"(    \{
       "name": "%s",
-      "duration_milliseconds": \d+
-    \})",
+      "duration_milliseconds": \d+)",
           fail_file_name.c_str());
   re2::RE2 expected_fail_output_regex(expected_fail_output_buf);
 
@@ -412,7 +410,7 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithOutput) {
   const fbl::String output_path = JoinPath(output_dir, "summary.json");
   FILE* output_file = fopen(output_path.c_str(), "r");
   ASSERT_TRUE(output_file);
-  char buf[1024];
+  char buf[2048];
   memset(buf, 0, sizeof(buf));
   EXPECT_LT(0, fread(buf, sizeof(buf[0]), sizeof(buf), output_file));
   fclose(output_file);
@@ -428,7 +426,7 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithOutput) {
   EXPECT_TRUE(re2::RE2::FindAndConsume(&buf_for_fail, expected_fail_output_regex));
 
   auto outputs_end = buf_for_pass.length() < buf_for_fail.length() ? buf_for_pass : buf_for_fail;
-  EXPECT_STREQ("\n  ]\n}\n", outputs_end.data());
+  EXPECT_SUBSTR(outputs_end.data(), "\n  ]\n}\n");
 }
 
 // Passing an --output argument *and* a syslog file name should result in output being

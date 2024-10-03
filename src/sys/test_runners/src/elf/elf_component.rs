@@ -15,7 +15,6 @@ use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::job_default;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::{abortable, BoxFuture};
 use futures::prelude::*;
 use namespace::Namespace;
@@ -30,7 +29,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::tree_builder::TreeBuilder;
-use zx::{HandleBased, Task};
+use zx::{self as zx, AsHandleRef, HandleBased, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
@@ -287,7 +286,7 @@ impl Component {
             None => Ok(None),
             Some(vmo) => Ok(Some(
                 vmo.as_handle_ref()
-                    .duplicate(fuchsia_zircon::Rights::SAME_RIGHTS)
+                    .duplicate(zx::Rights::SAME_RIGHTS)
                     .map_err(|_| {
                         ComponentError::VmoChild(
                             self.url.clone(),

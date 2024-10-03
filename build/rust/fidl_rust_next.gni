@@ -128,7 +128,7 @@ template("fidl_rust_next") {
       edition = "2018"
       disable_clippy = true
 
-      deps = [ "//src/lib/fidl/rust_next/fidl" ]
+      deps = [ "//src/lib/fidl/rust_next/fidl_next" ]
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
@@ -145,7 +145,7 @@ template("fidl_rust_next") {
         foreach(dep, invoker.public_deps) {
           label = get_label_info(dep, "label_no_toolchain")
           if (label == "//zircon/vdso/zx:zx") {
-            deps += [ "//src/lib/zircon/rust/fuchsia-zircon-types" ]
+            deps += [ "//sdk/rust/zx-types" ]
           } else {
             deps += [ "${label}_rust" ]
           }

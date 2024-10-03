@@ -1,15 +1,18 @@
 # fx workflows
 
-`fx` is the entry-point for a set of subcommands that make many tasks
-related to Fuchsia development easier. Run `fx help` to see all the available
-subcommands. If you use `bash` or `zsh` as a shell, source
-`scripts/fx-env.sh` to get some auto-completion.
+This document covers the essential workflows for using the `fx` tool in
+the Fuchsia development environment.
 
-## Setting up fx {#setting-up-fx}
+## Setting up fx {:#setting-up-fx}
 
-It is strongly recommended that you `source scripts/fx-env.sh` into your
-shell. This is tested and regularly used with Bash and ZSH. It may work for
-other compatible shells.
+`fx` is the entry point for a set of subcommands that make many tasks
+related to Fuchsia development easier. (Run `fx help` to see all the
+available subcommands.)
+
+If you use `bash` or `zsh` as a shell, it is strongly recommended to run
+`source scripts/fx-env.sh` to enable auto-completion in your shell.
+This setup is tested and regularly used with `bash` and `zsh`, and
+it may also work for other compatible shells.
 
 ```none {:.devsite-disable-click-to-copy}
 # In your fuchsia checkout:
@@ -38,7 +41,7 @@ supported methods:
   `$FUCHSIA_DIR/.jiri_root/bin` to your `$PATH` while working in a particular
   Fuchsia directory.
 
-Caution: Do not copy `fx` outside of `$FUCHSIA_DIR/scripts/` (such as to
+Important: Do not copy `fx` outside of `$FUCHSIA_DIR/scripts/` (such as to
 `~/bin/`) since this will prevent future updates of `fx` on your system.
 Additionally, do not add `$FUCHSIA_DIR/scripts` to your `$PATH`. Since the
 `$FUCHSIA_DIR/scripts` directory contains binaries with generic names (e.g.

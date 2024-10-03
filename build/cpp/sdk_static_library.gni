@@ -77,7 +77,7 @@ template("sdk_static_library") {
   valid_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333125197): Disable once allowlisted
+    "internal",  # TODO(https://fxbug.dev/333907192): Disable once allowlisted
                  # uses below are removed.
 
     # "cts" is only for ABI compatibility and thus not applicable.
@@ -97,9 +97,9 @@ template("sdk_static_library") {
 
   is_internal = invoker.category == "internal"
 
-  # TODO(https://fxbug.dev/331961405): Remove "internal" support once these
-  # libraries are moved to the core IDK or the "internal IDK" is eliminated.
-  # TODO(https://fxbug.dev/326252240): Remove fake-* once the existing deps are
+  # TODO(https://fxbug.dev/333907192): Remove "internal" support once these
+  # libraries are moved to the core IDK or @internal_sdk is eliminated.
+  # TODO(https://fxbug.dev/366517646): Remove fake-* once the existing deps are
   # switched to the new targets in //sdk and the ones on //src are deleted.
   assert(!is_internal || target_name == "devicetree" ||
              target_name == "fake-bti" || target_name == "fake-object",
@@ -219,6 +219,16 @@ template("sdk_static_library") {
         forward_variables_from(invoker.metadata, "*")
       }
     }
+
+    # Ensure that 'sdk_static_library()' targets are included in the allowlist.
+    # The allowlist target's `visibility` list ensures that the target using
+    # this template is in the allowlist.
+    if (!is_internal) {
+      assert(
+          invoker.category == "partner",
+          "Create a separate allowlist when adding support for other categories.")
+      deps += [ "//build/sdk:partner_idk_static_libraries_allowlist" ]
+    }
   }
 
   # Identify dependencies and their metadata files.
@@ -230,9 +240,7 @@ template("sdk_static_library") {
   }
   if (defined(invoker.public_deps)) {
     build_deps += invoker.public_deps
-  }
 
-  if (defined(invoker.public_deps)) {
     foreach(dep, invoker.public_deps) {
       full_label = get_label_info(dep, "label_no_toolchain")
       sdk_dep = "${full_label}_sdk"
@@ -244,6 +252,7 @@ template("sdk_static_library") {
   if (defined(invoker.runtime_deps)) {
     sdk_deps += invoker.runtime_deps
   }
+
   foreach(sdk_dep, sdk_deps) {
     gen_dir = get_label_info(sdk_dep, "target_gen_dir")
     name = get_label_info(sdk_dep, "name")

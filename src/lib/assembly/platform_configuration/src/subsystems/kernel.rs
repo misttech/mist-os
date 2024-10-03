@@ -76,6 +76,10 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.platform_bundle("kernel_contiguous_physical_pages");
         }
 
+        if context.board_info.kernel.scheduler_prefer_little_cpus {
+            builder.kernel_arg("kernel.scheduler.prefer-little-cpus=true".to_owned());
+        }
+
         if context.board_info.kernel.quiet_early_boot {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
@@ -91,6 +95,27 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             );
             let arg = format!("kernel.serial={}", serial);
             builder.kernel_arg(arg);
+        }
+
+        if let Some(oom) = &context.board_info.kernel.oom {
+            if oom.evict_at_warning {
+                builder.kernel_arg("kernel.oom.evict-at-warning=true".to_owned());
+            }
+            if oom.evict_continuous {
+                builder.kernel_arg("kernel.oom.evict-continuous=true".to_owned());
+            }
+            if let Some(outofmemory_mb) = oom.out_of_memory_mb {
+                let arg = format!("kernel.oom.outofmemory-mb={}", outofmemory_mb);
+                builder.kernel_arg(arg);
+            }
+            if let Some(critical_mb) = oom.critical_mb {
+                let arg = format!("kernel.oom.critical-mb={}", critical_mb);
+                builder.kernel_arg(arg);
+            }
+            if let Some(warning_mb) = oom.warning_mb {
+                let arg = format!("kernel.oom.warning-mb={}", warning_mb);
+                builder.kernel_arg(arg);
+            }
         }
 
         if context.board_info.kernel.halt_on_panic {
@@ -140,6 +165,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            developer_only_options: Default::default(),
         };
         let platform_kernel_config: PlatformKernelConfig = Default::default();
         let mut builder: ConfigurationBuilderImpl = Default::default();
@@ -157,6 +183,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            developer_only_options: Default::default(),
         };
         let platform_kernel_config =
             PlatformKernelConfig { aslr_entropy_bits: Some(12), ..Default::default() };
@@ -175,6 +202,7 @@ mod test {
             board_info: &Default::default(),
             gendir: Default::default(),
             resource_dir: Default::default(),
+            developer_only_options: Default::default(),
         };
         let mut builder: ConfigurationBuilderImpl = Default::default();
         let result =

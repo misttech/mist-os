@@ -81,6 +81,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -163,6 +164,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -321,6 +323,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/Allowed_Denied_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -337,6 +340,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/Allowed_Denied_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -351,6 +355,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -471,6 +476,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DeniedShouldNeverAppearInAnyBindingRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -549,6 +555,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyCppRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -564,6 +571,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -580,6 +588,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -594,6 +603,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -654,6 +664,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -669,6 +680,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -685,6 +697,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -699,6 +712,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -759,6 +773,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyGoRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -774,6 +789,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -790,6 +806,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -804,6 +821,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -864,6 +882,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -879,6 +898,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -895,6 +915,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -909,6 +930,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -969,6 +991,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyRustRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -984,6 +1007,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1000,6 +1024,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1014,6 +1039,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1074,6 +1100,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1089,6 +1116,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1105,6 +1133,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1119,6 +1148,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1214,6 +1244,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.dependent/ContainsDeniedAlwaysDeniedRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1425,6 +1456,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding4",
             "nullable": false,
             "type_shape_v2": {
@@ -1453,6 +1485,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding5",
             "nullable": false,
             "type_shape_v2": {
@@ -1481,6 +1514,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding6",
             "nullable": false,
             "type_shape_v2": {
@@ -1568,6 +1602,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding7",
             "nullable": false,
             "type_shape_v2": {
@@ -1596,6 +1631,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding8",
             "nullable": false,
             "type_shape_v2": {
@@ -1624,6 +1660,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding9",
             "nullable": false,
             "type_shape_v2": {
@@ -1680,6 +1717,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding1",
             "nullable": false,
             "type_shape_v2": {
@@ -1708,6 +1746,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding2",
             "nullable": false,
             "type_shape_v2": {
@@ -1736,6 +1775,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/ShouldNeverAppearInAnyBinding3",
             "nullable": false,
             "type_shape_v2": {
@@ -1792,6 +1832,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -1847,6 +1888,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -1902,6 +1944,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -1957,6 +2000,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2012,6 +2056,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2067,6 +2112,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2123,6 +2169,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2179,6 +2226,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2235,6 +2283,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2291,6 +2340,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2347,6 +2397,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2403,6 +2454,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2457,6 +2509,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2510,6 +2563,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/MemberOnlyAppearsInImportingLibrary",
             "nullable": false,
             "type_shape_v2": {
@@ -2625,6 +2679,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2682,6 +2737,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2736,6 +2792,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2793,6 +2850,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.dependent/OnlyAppearsInImportingLibrary",
             "nullable": false,
             "type_shape_v2": {
@@ -2911,6 +2969,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2965,6 +3024,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -3016,6 +3076,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -3071,6 +3132,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/Allowed_Denied_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3096,6 +3158,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3149,6 +3212,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3174,6 +3238,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3227,6 +3292,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3252,6 +3318,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3305,6 +3372,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3330,6 +3398,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3383,6 +3452,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3408,6 +3478,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3461,6 +3532,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3486,6 +3558,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3539,6 +3612,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -3564,6 +3638,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3648,6 +3723,7 @@
           "name": "x",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -3702,6 +3778,7 @@
           "name": "a",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -3757,6 +3834,7 @@
           "name": "a",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -3809,6 +3887,7 @@
           "name": "a",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,

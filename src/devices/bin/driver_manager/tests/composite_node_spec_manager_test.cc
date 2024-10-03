@@ -138,7 +138,7 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
   std::shared_ptr<driver_manager::Node> CreateNode(const char* name) {
     return std::make_shared<driver_manager::Node>(
         "node", std::vector<std::weak_ptr<driver_manager::Node>>{}, nullptr, loop_.dispatcher(),
-        inspect_.CreateDevice(name, zx::vmo(), 0));
+        inspect_.CreateDevice(name, 0));
   }
 
   void VerifyRemoveInvokedForSpec(bool expected, const std::string& name) {

@@ -14,9 +14,9 @@ use fidl_fuchsia_mem::Buffer;
 use fuchsia_async as fasync;
 use fuchsia_inspect::reader::ReadableTree;
 use fuchsia_inspect::Inspector;
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::warn;
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
 /// Runs a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
 /// associated with the given tree on `get_content` and allows to open linked trees (lazy nodes).
@@ -141,7 +141,7 @@ mod tests {
     use fidl_fuchsia_inspect::{TreeNameIteratorMarker, TreeNameIteratorProxy, TreeProxy};
     use fuchsia_async::DurationExt;
     use fuchsia_inspect::reader::{read_with_timeout, DiagnosticsHierarchy, PartialNodeHierarchy};
-    use fuchsia_zircon as zx;
+
     use futures::FutureExt;
     use std::time::Duration;
 

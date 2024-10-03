@@ -40,7 +40,6 @@
 //!     - these loggers are configured with project_id and customer_id
 //!  - Poll rate
 //!  - Inspect stats (struct ProjectSamplerStats)
-//!  - moniker_to_selector_map (see below * )
 //!
 //! [`ProjectSampler`] is stored in:
 //!  - [`TaskCancellation`]:     execution_context: fasync::Task<Vec<ProjectSampler>>,
@@ -66,35 +65,23 @@
 //! [`ProjectSamplerTaskExit::RebootTriggered(self)`].
 //!
 //!
-//! * moniker_to_selector_map
-//!
-//! When a [`ProjectSampler`] retrieves data, the data arrives from the Archivist organized by
-//! moniker. For each moniker, we need to visit the selectors that may find data in it. Those
-//! selectors may be scattered throughout the [`MetricConfig`]'s in the [`ProjectSampler`].
-//! moniker_to_selector_map contains a map from moniker to [`SelectorIndexes`], a struct containing
-//! the index of the [`MetricConfig`] in the [`ProjectSampler`]'s list, and the selector in the
-//! [`MetricConfig`]'s list.
-//!
-//! **NOTE:** The moniker portion of the selectors must match exactly the moniker returned from
-//! the Archivist. No wildcards.
+//! **NOTE:** Selectors are expected to match one value each. Wildcards are only allowed in the
+//! moniker segment of a selector when it is a driver in the driver collections.
 //!
 //! Selectors will become unused, either because of upload_once, or because data was found by a
-//! different selector. Rather than implement deletion in the moniker_to_selector_map and the vec's,
+//! different selector. Rather than implement deletion in the vecs,
 //! which would add lots of bug surface and maintenance debt, each selector is an Option<> so that
 //! selectors can be deleted/disabled without changing the rest of the data structure.
 //! Once all Diagnostic data is processed, the structure is rebuilt if any selectors
 //! have been disabled; rebuilding less often would be
 //! premature optimization at this point.
 //!
-//! perform_reboot_cleanup() builds a moniker_to_project_map for use by the
-//! [`RebootSnapshotProcessor`]. This has a similar purpose to moniker_to_selector_map, since
-//! monikers' data may be relevant to any number of projects. When not rebooting, each project
-//! fetches its own data from Archivist, so there's no need for a moniker_to_project_map. But
-//! on reboot, all projects' data is fetched at once, and needs to be sorted out.
+//! perform_reboot_cleanup() builds an ArchiveReader for [`RebootSnapshotProcessor`].
+//! When not rebooting, each project fetches its own data from Archivist.
 
 use crate::diagnostics::*;
 use anyhow::{format_err, Context, Error};
-use diagnostics_data::{Data, ExtendedMoniker, InspectHandleName};
+use diagnostics_data::{Data, InspectHandleName};
 use diagnostics_hierarchy::{
     ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
 };
@@ -110,13 +97,14 @@ use futures::channel::oneshot;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
-use sampler_config::{
-    DataType, MetricConfig, ParsedSelector, ProjectConfig, SamplerConfig, SelectorList,
-};
-use std::collections::{HashMap, HashSet};
+use moniker::ExtendedMoniker;
+use sampler_config::{DataType, MetricConfig, ProjectConfig, SamplerConfig, SelectorList};
+use selectors::SelectorExt;
+use std::cell::{Ref, RefCell, RefMut};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// An event to be logged to the cobalt logger. Events are generated first,
 /// then logged. (This permits unit-testing the code that generates events from
@@ -149,32 +137,21 @@ impl TaskCancellation {
         // cache with the most recent values for all the metrics we need to sample and diff!
         let project_samplers: Vec<ProjectSampler> = self.execution_context.await;
 
-        // Maps a selector to the indices of the project_samplers vec which contain configurations
-        // that transform the property defined by the selector.
-        let mut moniker_to_projects_map: HashMap<ExtendedMoniker, HashSet<usize>> = HashMap::new();
-        // Set of all selectors from all projects
-        let mut mondo_selectors_set = Vec::new();
+        let mut reader = ArchiveReader::new();
 
-        for (index, project_sampler) in project_samplers.iter().enumerate() {
+        for project_sampler in &project_samplers {
             for metric in &project_sampler.metrics {
-                for selector_opt in metric.selectors.iter() {
+                for selector_opt in metric.borrow().selectors.iter() {
                     if let Some(selector) = selector_opt {
-                        if moniker_to_projects_map.get(&selector.moniker).is_none() {
-                            moniker_to_projects_map
-                                .insert(selector.moniker.clone(), HashSet::new());
-                        }
-                        moniker_to_projects_map.get_mut(&selector.moniker).unwrap().insert(index);
-                        mondo_selectors_set.push(selector.selector_string.clone());
+                        reader.add_selector(selector.selector_string.as_str());
                     }
                 }
             }
         }
 
-        let mut reader = ArchiveReader::new();
-        reader.retry(RetryConfig::never()).add_selectors(mondo_selectors_set.into_iter());
+        reader.retry(RetryConfig::never());
 
-        let mut reboot_processor =
-            RebootSnapshotProcessor { reader, project_samplers, moniker_to_projects_map };
+        let mut reboot_processor = RebootSnapshotProcessor { reader, project_samplers };
         // Log errors encountered in final snapshot, but always swallow errors so we can gracefully
         // notify RebootMethodsWatcherRegister that we yield our remaining time.
         reboot_processor
@@ -191,10 +168,6 @@ struct RebootSnapshotProcessor {
     /// Vector of mutable [`ProjectSampler`] objects that will
     /// process their final samples.
     project_samplers: Vec<ProjectSampler>,
-    /// Mapping from a moniker to a vector of indices into
-    /// the project_samplers, where each indexed [`ProjectSampler`] has
-    /// at least one selector that uses that moniker.
-    moniker_to_projects_map: HashMap<ExtendedMoniker, HashSet<usize>>,
 }
 
 impl RebootSnapshotProcessor {
@@ -217,30 +190,44 @@ impl RebootSnapshotProcessor {
     async fn process_single_payload(
         &mut self,
         hierarchy: DiagnosticsHierarchy<String>,
-        diagnostics_filename: &InspectHandleName,
+        inspect_handle_name: &InspectHandleName,
         moniker: &ExtendedMoniker,
     ) {
-        if let Some(project_indexes) = self.moniker_to_projects_map.get(moniker) {
-            for index in project_indexes {
-                let project_sampler = &mut self.project_samplers[*index];
-                // If processing the final sample failed, just log the
-                // error and proceed, everything's getting shut down
-                // soon anyway.
-                let maybe_err = match project_sampler
-                    .process_component_data(&hierarchy, diagnostics_filename, moniker)
-                    .await
-                {
-                    Err(err) => Some(err),
-                    Ok((_selector_changes, events_to_log)) => {
-                        project_sampler.log_events(events_to_log).await.err()
-                    }
-                };
-                if let Some(err) = maybe_err {
-                    warn!(?err, "A project sampler failed to process a reboot sample");
+        let mut projects = self
+            .project_samplers
+            .iter_mut()
+            .filter(|p| {
+                p.filter_metrics_by_moniker_and_tree_name(moniker, inspect_handle_name.as_ref())
+                    .next()
+                    .is_some()
+            })
+            .peekable();
+        if projects.peek().is_none() {
+            warn!(
+                %moniker,
+                tree_name = inspect_handle_name.as_ref(),
+                "no metrics found for moniker and tree_name combination"
+            );
+            return;
+        }
+
+        for project_sampler in projects {
+            // If processing the final sample failed, just log the
+            // error and proceed, everything's getting shut down
+            // soon anyway.
+            let maybe_err = match project_sampler.process_component_data(
+                &hierarchy,
+                inspect_handle_name,
+                moniker,
+            ) {
+                Err(err) => Some(err),
+                Ok((_selector_changes, events_to_log)) => {
+                    project_sampler.log_events(events_to_log).await.err()
                 }
+            };
+            if let Some(err) = maybe_err {
+                warn!(?err, "A project sampler failed to process a reboot sample");
             }
-        } else {
-            warn!(%moniker, "A moniker was not found in the project_samplers map");
         }
     }
 }
@@ -333,7 +320,7 @@ impl SamplerExecutor {
             })
             .unzip();
 
-        let execution_context = fasync::Task::spawn(async move {
+        let execution_context = fasync::Task::local(async move {
             let mut healthily_exited_samplers = Vec::new();
             while let Some(sampler_result) = spawned_tasks.next().await {
                 match sampler_result {
@@ -367,16 +354,14 @@ impl SamplerExecutor {
 
 pub struct ProjectSampler {
     archive_reader: ArchiveReader,
-    /// The metrics used by this Project. Indexed by moniker_to_selector_map.
-    metrics: Vec<MetricConfig>,
+    /// The metrics used by this Project.
+    metrics: Vec<RefCell<MetricConfig>>,
     /// Cache from Inspect selector to last sampled property. This is the selector from
     /// [`MetricConfig`]; it may contain wildcards.
-    metric_cache: HashMap<MetricCacheKey, Property>,
+    metric_cache: RefCell<HashMap<MetricCacheKey, Property>>,
     /// Cobalt logger proxy using this ProjectSampler's project id. It's an Option so it doesn't
     /// have to be created for unit tests; it will always be Some() outside unit tests.
     metric_loggers: HashMap<u32, MetricEventLoggerProxy>,
-    /// Map from moniker to relevant selectors.
-    moniker_to_selector_map: HashMap<ExtendedMoniker, Vec<SelectorIndexes>>,
     /// The frequency with which we snapshot Inspect properties
     /// for this project.
     poll_rate_sec: i64,
@@ -387,20 +372,15 @@ pub struct ProjectSampler {
     /// The id of the project.
     /// Project ID that metrics are being sampled and forwarded on behalf of.
     project_id: u32,
+    /// Records whether there are any known selectors left.
+    /// Reset in rebuild_selector_data_structures().
+    all_done: bool,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 struct MetricCacheKey {
     handle_name: InspectHandleName,
     selector: String,
-}
-
-#[derive(Clone, Debug)]
-struct SelectorIndexes {
-    /// The index of the metric in [`ProjectSampler`]'s `metrics` list.
-    metric_index: usize,
-    /// The index of the selector in the [`MetricConfig`]'s `selectors` list.
-    selector_index: usize,
 }
 
 pub enum ProjectSamplerTaskExit {
@@ -468,7 +448,6 @@ impl ProjectSampler {
                 .map_err(|e| format_err!("error response for project {}: {:?}", project_id, e))?;
             metric_loggers.insert(project_id, metric_logger_proxy);
         }
-        let mut all_selectors = Vec::<String>::new();
         for metric in &config.metrics {
             if let Some(metric_project_id) = metric.project_id {
                 if metric_loggers.get(&metric_project_id).is_none() {
@@ -480,27 +459,29 @@ impl ProjectSampler {
                     metric_logger_factory
                         .create_metric_event_logger(&project_spec, metrics_server_end)
                         .await?
-                        .map_err(|e| format_err!("error response for project {} while creating metric logger {}: {:?}", project_id, metric_project_id, e))?;
+                        .map_err(|e|
+                            format_err!(
+                                "error response for project {} while creating metric logger {}: {:?}",
+                                project_id,
+                                metric_project_id,
+                                e
+                            ))?;
                     metric_loggers.insert(metric_project_id, metric_logger_proxy);
                 }
             }
-            for selector_opt in metric.selectors.iter() {
-                if let Some(selector) = selector_opt {
-                    all_selectors.push(selector.selector_string.clone());
-                }
-            }
         }
+
         let mut project_sampler = ProjectSampler {
             project_id,
             archive_reader: ArchiveReader::new(),
-            moniker_to_selector_map: HashMap::new(),
-            metrics: config.metrics.clone(),
-            metric_cache: HashMap::new(),
+            metrics: config.metrics.iter().map(|m| RefCell::new(m.clone())).collect(),
+            metric_cache: RefCell::new(HashMap::new()),
             metric_loggers,
             poll_rate_sec,
             project_sampler_stats,
+            all_done: true,
         };
-        // Fill in archive_reader and moniker_to_selector_map
+        // Fill in archive_reader
         project_sampler.rebuild_selector_data_structures();
         Ok(project_sampler)
     }
@@ -509,7 +490,7 @@ impl ProjectSampler {
         mut self,
         mut reboot_oneshot: oneshot::Receiver<()>,
     ) -> fasync::Task<Result<ProjectSamplerTaskExit, Error>> {
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let mut periodic_timer =
                 fasync::Interval::new(zx::Duration::from_seconds(self.poll_rate_sec));
             loop {
@@ -589,13 +570,11 @@ impl ProjectSampler {
                     process_schema_errors(&data_packet.metadata.errors, &data_packet.moniker);
                 }
                 Some(payload) => {
-                    let (selector_outcome, mut events) = self
-                        .process_component_data(
-                            payload,
-                            &data_packet.metadata.name,
-                            &data_packet.moniker,
-                        )
-                        .await?;
+                    let (selector_outcome, mut events) = self.process_component_data(
+                        payload,
+                        &data_packet.metadata.name,
+                        &data_packet.moniker,
+                    )?;
                     if selector_outcome == SnapshotOutcome::SelectorsChanged {
                         selectors_changed = true;
                     }
@@ -610,116 +589,115 @@ impl ProjectSampler {
     }
 
     fn is_all_done(&self) -> bool {
-        self.moniker_to_selector_map.is_empty()
+        self.all_done
     }
 
     fn rebuild_selector_data_structures(&mut self) {
-        let mut all_selectors = vec![];
-        for metric in &mut self.metrics {
+        self.archive_reader = ArchiveReader::new();
+        for metric in &self.metrics {
             // TODO(https://fxbug.dev/42168860): Using Box<ParsedSelector> could reduce copying.
             let active_selectors = metric
+                .borrow()
                 .selectors
                 .iter()
-                .filter(|selector| selector.is_some())
-                .map(|selector| selector.to_owned())
+                .filter_map(|s| if s.is_some() { Some(s.as_ref().cloned()) } else { None })
                 .collect::<Vec<_>>();
-            for selector in active_selectors.iter() {
-                // unwrap() is OK since we filtered for Some
-                all_selectors.push(selector.as_ref().unwrap().selector_string.to_owned());
+
+            for selector in &active_selectors {
+                let Some(selector) = selector.as_ref() else {
+                    continue;
+                };
+                self.archive_reader.add_selector(selector.selector_string.as_str());
+                self.all_done = false;
             }
-            metric.selectors = SelectorList(active_selectors);
+            metric.borrow_mut().selectors = SelectorList::from(active_selectors);
         }
-        self.archive_reader = ArchiveReader::new();
-        self.archive_reader.retry(RetryConfig::never()).add_selectors(all_selectors.into_iter());
-        self.moniker_to_selector_map = HashMap::new();
-        for (metric_index, metric) in self.metrics.iter().enumerate() {
-            for (selector_index, selector) in metric.selectors.iter().enumerate() {
-                let moniker = &selector.as_ref().unwrap().moniker;
-                if self.moniker_to_selector_map.get(moniker).is_none() {
-                    self.moniker_to_selector_map.insert(moniker.clone(), Vec::new());
-                }
-                self.moniker_to_selector_map
-                    .get_mut(moniker)
-                    .unwrap()
-                    .push(SelectorIndexes { metric_index, selector_index });
-            }
-        }
+        self.archive_reader.retry(RetryConfig::never());
     }
 
-    async fn process_component_data(
+    fn filter_metrics_by_moniker_and_tree_name<'a>(
+        &'a self,
+        moniker: &'a ExtendedMoniker,
+        tree_name: &'a str,
+    ) -> impl Iterator<Item = &'a RefCell<MetricConfig>> {
+        self.metrics.iter().filter(|metric| {
+            moniker
+                .match_against_selectors_and_tree_name(
+                    tree_name,
+                    metric
+                        .borrow()
+                        .selectors
+                        .iter()
+                        .filter_map(|s| s.as_ref())
+                        .map(|s| &s.selector),
+                )
+                .next()
+                .is_some()
+        })
+    }
+
+    fn process_component_data(
         &mut self,
         payload: &DiagnosticsHierarchy,
-        diagnostics_filename: &InspectHandleName,
+        inspect_handle_name: &InspectHandleName,
         moniker: &ExtendedMoniker,
     ) -> Result<(SnapshotOutcome, Vec<EventToLog>), Error> {
-        let indexes_opt = &self.moniker_to_selector_map.get(moniker);
-        let selector_indexes = match indexes_opt {
-            None => {
-                warn!(%moniker, "Moniker not found in map");
-                return Ok((SnapshotOutcome::SelectorsUnchanged, vec![]));
-            }
-            Some(indexes) => indexes.to_vec(),
-        };
-        // We cloned the selector indexes. Whatever we do in this function must not invalidate them.
+        let filtered_metrics =
+            self.filter_metrics_by_moniker_and_tree_name(moniker, inspect_handle_name.as_ref());
         let mut snapshot_outcome = SnapshotOutcome::SelectorsUnchanged;
         let mut events_to_log = vec![];
-        for index_info in selector_indexes.iter() {
-            let SelectorIndexes { metric_index, selector_index } = index_info;
-            let metric = &self.metrics[*metric_index];
-            let project_id = metric.project_id.unwrap_or(self.project_id);
-            // It's fine if a selector has been removed and is None.
-            if let Some(ParsedSelector { selector, selector_string, .. }) =
-                &metric.selectors[*selector_index]
-            {
-                let found_properties =
-                    diagnostics_hierarchy::select_from_hierarchy(&payload, &selector)?;
+        for metric in filtered_metrics {
+            let mut selector_to_keep = None;
+            let project_id = metric.borrow().project_id.unwrap_or(self.project_id);
+            for (selector_idx, selector) in metric.borrow().selectors.iter().enumerate() {
+                // It's fine if a selector has been removed and is None.
+                let Some(parsed_selector) = selector else {
+                    continue;
+                };
+                let found_properties = diagnostics_hierarchy::select_from_hierarchy(
+                    &payload,
+                    &parsed_selector.selector,
+                )?;
                 match found_properties.len() {
                     // Maybe the data hasn't been published yet. Maybe another selector in this
                     // metric is the correct one to find the data. Either way, not-found is fine.
                     0 => {}
                     1 => {
-                        // export_sample() needs mut self, so we can't pass in values directly from
-                        // metric, since metric is a ref into data contained in self;
-                        // we have to copy them out first.
-                        let metric_type = metric.metric_type;
-                        let metric_id = metric.metric_id;
-                        let codes = metric.event_codes.clone();
                         let metric_cache_key = MetricCacheKey {
-                            handle_name: diagnostics_filename.clone(),
-                            selector: selector_string.to_string(),
+                            handle_name: inspect_handle_name.clone(),
+                            selector: parsed_selector.selector_string.to_string(),
                         };
-                        if let Some(event) = self
-                            .prepare_sample(
-                                metric_type,
-                                metric_id,
-                                codes,
-                                metric_cache_key,
-                                &found_properties[0],
-                            )
-                            .await?
-                        {
-                            if let Some(parsed_selector) =
-                                &self.metrics[*metric_index].selectors[*selector_index]
-                            {
-                                parsed_selector.increment_upload_count();
-                            }
+                        if let Some(event) = Self::prepare_sample(
+                            metric.borrow(),
+                            self.metric_cache.borrow_mut(),
+                            metric_cache_key,
+                            &found_properties[0],
+                        )? {
+                            parsed_selector.increment_upload_count();
                             events_to_log.push((project_id, event));
                         }
-                        if self.update_metric_selectors(index_info) {
-                            snapshot_outcome = SnapshotOutcome::SelectorsChanged;
-                        }
+                        selector_to_keep = Some(selector_idx);
+                        break;
                     }
-                    too_many => warn!(%too_many, %selector_string, "Too many matches for selector"),
+                    too_many => {
+                        warn!(%too_many, %parsed_selector.selector_string, "Too many matches for selector")
+                    }
+                }
+            }
+
+            if let Some(selector_idx) = selector_to_keep {
+                if Self::update_selectors_for_metric(metric.borrow_mut(), selector_idx) {
+                    snapshot_outcome = SnapshotOutcome::SelectorsChanged;
                 }
             }
         }
         Ok((snapshot_outcome, events_to_log))
     }
 
-    /// Handle selectors that may be removed (e.g. if upload_once is set). Return true if the
-    /// selector was changed/removed, false otherwise.
-    fn update_metric_selectors(&mut self, index_info: &SelectorIndexes) -> bool {
-        let metric = &mut self.metrics[index_info.metric_index];
+    fn update_selectors_for_metric<'a>(
+        mut metric: RefMut<'a, MetricConfig>,
+        selector_idx: usize,
+    ) -> bool {
         if let Some(true) = metric.upload_once {
             for selector in metric.selectors.iter_mut() {
                 *selector = None;
@@ -728,7 +706,7 @@ impl ProjectSampler {
         }
         let mut deleted = false;
         for (index, selector) in metric.selectors.iter_mut().enumerate() {
-            if index != index_info.selector_index && *selector != None {
+            if index != selector_idx && *selector != None {
                 *selector = None;
                 deleted = true;
             }
@@ -736,24 +714,31 @@ impl ProjectSampler {
         return deleted;
     }
 
-    async fn prepare_sample(
-        &mut self,
-        metric_type: DataType,
-        metric_id: u32,
-        event_codes: Vec<u32>,
+    fn prepare_sample<'a>(
+        metric: Ref<'a, MetricConfig>,
+        metric_cache: RefMut<'a, HashMap<MetricCacheKey, Property>>,
         metric_cache_key: MetricCacheKey,
         new_sample: &Property,
     ) -> Result<Option<MetricEvent>, Error> {
-        let previous_sample_opt: Option<&Property> = self.metric_cache.get(&metric_cache_key);
+        let previous_sample_opt: Option<&Property> = metric_cache.get(&metric_cache_key);
 
         if let Some(payload) = process_sample_for_data_type(
             new_sample,
             previous_sample_opt,
             &metric_cache_key,
-            &metric_type,
+            &metric.metric_type,
         ) {
-            self.maybe_update_cache(new_sample, &metric_type, metric_cache_key);
-            Ok(Some(MetricEvent { metric_id, event_codes, payload }))
+            Self::maybe_update_cache(
+                metric_cache,
+                new_sample,
+                &metric.metric_type,
+                metric_cache_key,
+            );
+            Ok(Some(MetricEvent {
+                metric_id: metric.metric_id,
+                event_codes: metric.event_codes.clone(),
+                payload,
+            }))
         } else {
             Ok(None)
         }
@@ -773,18 +758,25 @@ impl ProjectSampler {
         Ok(())
     }
 
-    fn maybe_update_cache(
-        &mut self,
+    fn maybe_update_cache<'a>(
+        mut cache: RefMut<'a, HashMap<MetricCacheKey, Property>>,
         new_sample: &Property,
         data_type: &DataType,
         metric_cache_key: MetricCacheKey,
     ) {
         match data_type {
             DataType::Occurrence | DataType::IntHistogram => {
-                self.metric_cache.insert(metric_cache_key, new_sample.clone());
+                cache.insert(metric_cache_key, new_sample.clone());
             }
             DataType::Integer | DataType::String => (),
         }
+    }
+}
+
+#[cfg(test)]
+impl ProjectSampler {
+    fn push_metric(&mut self, metric: MetricConfig) {
+        self.metrics.push(RefCell::new(metric));
     }
 }
 
@@ -1212,7 +1204,132 @@ mod tests {
     use super::*;
     use diagnostics_data::{InspectDataBuilder, Timestamp};
     use diagnostics_hierarchy::hierarchy;
-    use futures::executor;
+
+    #[fuchsia::test]
+    fn test_filter_metrics() {
+        let mut sampler = ProjectSampler {
+            archive_reader: ArchiveReader::new(),
+            metrics: vec![],
+            metric_cache: RefCell::new(HashMap::new()),
+            metric_loggers: HashMap::new(),
+            project_id: 1,
+            poll_rate_sec: 3600,
+            project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+            all_done: true,
+        };
+        let selector_foo: String = "core/foo:[name=foo]root/path:value".to_string();
+        let selector_bar: String = "core/foo:[name=bar]root/path:value".to_string();
+
+        sampler.push_metric(MetricConfig {
+            project_id: None,
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
+                &selector_foo,
+            )]),
+            metric_id: 1,
+            // Occurrence type with a value of zero will not attempt to use any loggers.
+            metric_type: DataType::Occurrence,
+            event_codes: Vec::new(),
+            // upload_once means that process_component_data will return SelectorsChanged if
+            // it is found in the map.
+            upload_once: Some(true),
+        });
+        sampler.push_metric(MetricConfig {
+            project_id: None,
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
+                &selector_bar,
+            )]),
+            metric_id: 2,
+            // Occurrence type with a value of zero will not attempt to use any loggers.
+            metric_type: DataType::Occurrence,
+            event_codes: Vec::new(),
+            // upload_once means that process_component_data will return SelectorsChanged if
+            // it is found in the map.
+            upload_once: Some(true),
+        });
+
+        sampler.rebuild_selector_data_structures();
+
+        let moniker = ExtendedMoniker::try_from("core/foo").unwrap();
+
+        let filtered_metrics =
+            sampler.filter_metrics_by_moniker_and_tree_name(&moniker, "foo").collect::<Vec<_>>();
+        assert_eq!(1, filtered_metrics.len());
+        assert_eq!(1, filtered_metrics[0].borrow().metric_id);
+    }
+
+    #[fuchsia::test]
+    fn test_filter_metrics_with_wildcards() {
+        let mut sampler = ProjectSampler {
+            archive_reader: ArchiveReader::new(),
+            metrics: vec![],
+            metric_cache: RefCell::new(HashMap::new()),
+            metric_loggers: HashMap::new(),
+            project_id: 1,
+            poll_rate_sec: 3600,
+            project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+            all_done: true,
+        };
+        let selector_foo: String = r"bootstrap/*-drivers\:*:[name=foo]root/path:value".to_string();
+        let selector_bar1: String =
+            r"bootstrap/*-drivers\:*:[name=bar]root/path:value1".to_string();
+        let selector_bar2: String =
+            r"bootstrap/*-drivers\:*:[name=bar]root/path:value2".to_string();
+
+        sampler.push_metric(MetricConfig {
+            project_id: None,
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
+                &selector_foo,
+            )]),
+            metric_id: 1,
+            // Occurrence type with a value of zero will not attempt to use any loggers.
+            metric_type: DataType::Occurrence,
+            event_codes: Vec::new(),
+            // upload_once means that process_component_data will return SelectorsChanged if
+            // it is found in the map.
+            upload_once: Some(true),
+        });
+        sampler.push_metric(MetricConfig {
+            project_id: None,
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
+                &selector_bar1,
+            )]),
+            metric_id: 2,
+            // Occurrence type with a value of zero will not attempt to use any loggers.
+            metric_type: DataType::Occurrence,
+            event_codes: Vec::new(),
+            // upload_once means that process_component_data will return SelectorsChanged if
+            // it is found in the map.
+            upload_once: Some(true),
+        });
+        sampler.push_metric(MetricConfig {
+            project_id: None,
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
+                &selector_bar2,
+            )]),
+            metric_id: 3,
+            // Occurrence type with a value of zero will not attempt to use any loggers.
+            metric_type: DataType::Occurrence,
+            event_codes: Vec::new(),
+            // upload_once means that process_component_data will return SelectorsChanged if
+            // it is found in the map.
+            upload_once: Some(true),
+        });
+
+        sampler.rebuild_selector_data_structures();
+
+        let moniker = ExtendedMoniker::try_from("bootstrap/boot-drivers:098098").unwrap();
+
+        let filtered_metrics =
+            sampler.filter_metrics_by_moniker_and_tree_name(&moniker, "foo").collect::<Vec<_>>();
+        assert_eq!(1, filtered_metrics.len());
+        assert_eq!(1, filtered_metrics[0].borrow().metric_id);
+
+        let filtered_metrics =
+            sampler.filter_metrics_by_moniker_and_tree_name(&moniker, "bar").collect::<Vec<_>>();
+        assert_eq!(2, filtered_metrics.len());
+        assert_eq!(2, filtered_metrics[0].borrow().metric_id);
+        assert_eq!(3, filtered_metrics[1].borrow().metric_id);
+    }
 
     /// Test inserting a string into the hierarchy that requires escaping.
     #[fuchsia::test]
@@ -1229,18 +1346,18 @@ mod tests {
 
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
-            metric_cache: HashMap::new(),
+            metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
             project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+            all_done: true,
         };
         let selector: String = "my/component:root/path\\/to:value".to_string();
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: None,
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(&selector)]),
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(&selector)]),
             metric_id: 1,
             // Occurrence type with a value of zero will not attempt to use any loggers.
             metric_type: DataType::Occurrence,
@@ -1250,11 +1367,11 @@ mod tests {
             upload_once: Some(true),
         });
         sampler.rebuild_selector_data_structures();
-        match executor::block_on(sampler.process_component_data(
+        match sampler.process_component_data(
             &hierarchy,
             &InspectHandleName::filename("a_filename"),
             &"my/component".try_into().unwrap(),
-        )) {
+        ) {
             // This selector will be found and removed from the map, resulting in a
             // SelectorsChanged response.
             Ok((SnapshotOutcome::SelectorsChanged, _events)) => (),
@@ -1263,9 +1380,9 @@ mod tests {
 
         let selector_with_escaped_property: String =
             "my/component:root/path\\/to:value\\/with\\:escapes".to_string();
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: None,
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
                 &selector_with_escaped_property,
             )]),
             metric_id: 1,
@@ -1277,11 +1394,11 @@ mod tests {
             upload_once: Some(true),
         });
         sampler.rebuild_selector_data_structures();
-        match executor::block_on(sampler.process_component_data(
+        match sampler.process_component_data(
             &hierarchy,
             &InspectHandleName::filename("a_filename"),
             &"my/component".try_into().unwrap(),
-        )) {
+        ) {
             // This selector will be found and removed from the map, resulting in a
             // SelectorsChanged response.
             Ok((SnapshotOutcome::SelectorsChanged, _events)) => (),
@@ -1289,9 +1406,9 @@ mod tests {
         }
 
         let selector_unfound: String = "my/component:root/path/to:value".to_string();
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: None,
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
                 &selector_unfound,
             )]),
             metric_id: 1,
@@ -1303,11 +1420,11 @@ mod tests {
             upload_once: Some(true),
         });
         sampler.rebuild_selector_data_structures();
-        match executor::block_on(sampler.process_component_data(
+        match sampler.process_component_data(
             &hierarchy,
             &InspectHandleName::filename("a_filename"),
             &"my/component".try_into().unwrap(),
-        )) {
+        ) {
             // This selector will not be found and removed from the map, resulting in SelectorsUnchanged.
             Ok((SnapshotOutcome::SelectorsUnchanged, _events)) => (),
             _ => panic!("Expecting SelectorsUnchanged from process_component_data."),
@@ -1357,17 +1474,17 @@ mod tests {
 
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
-            metric_cache: HashMap::new(),
+            metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
             project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+            all_done: true,
         };
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: None,
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
                 "my/component:root:value_one",
             )]),
             metric_id: 1,
@@ -1375,9 +1492,9 @@ mod tests {
             event_codes: Vec::new(),
             upload_once: Some(true),
         });
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: None,
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(
                 "my/component:root:value_two",
             )]),
             metric_id: 2,
@@ -1388,22 +1505,20 @@ mod tests {
         sampler.rebuild_selector_data_structures();
 
         // Both selectors should be found and removed from the map.
-        match executor::block_on(sampler.process_component_data(
+        match sampler.process_component_data(
             &hierarchy,
             &InspectHandleName::filename("a_filename"),
             &"my/component".try_into().unwrap(),
-        )) {
+        ) {
             Ok((SnapshotOutcome::SelectorsChanged, _events)) => (),
             _ => panic!("Expecting SelectorsChanged from process_component_data."),
         }
 
-        let selector_indices =
-            sampler.moniker_to_selector_map.get(&"my/component".try_into().unwrap()).unwrap();
-        for index_info in selector_indices {
-            let metric = &sampler.metrics[index_info.metric_index];
-            let selector = &metric.selectors[index_info.selector_index];
-            assert!(selector.is_none());
-        }
+        let moniker: ExtendedMoniker = "my_component".try_into().unwrap();
+        assert!(sampler
+            .filter_metrics_by_moniker_and_tree_name(&moniker, "a_filename")
+            .collect::<Vec<_>>()
+            .is_empty());
     }
 
     struct EventCountTesterParams {
@@ -1965,20 +2080,20 @@ mod tests {
     async fn test_filename_distinguishes_data() {
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
-            metric_cache: HashMap::new(),
+            metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
             project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+            all_done: true,
         };
         let selector: String = "my/component:root/branch:leaf".to_string();
         let metric_id = 1;
         let event_codes = vec![];
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: None,
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(&selector)]),
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(&selector)]),
             metric_id,
             metric_type: DataType::Occurrence,
             event_codes,
@@ -2051,20 +2166,20 @@ mod tests {
     async fn project_id_can_be_overwritten_by_the_metric_project_id() {
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
-            metric_cache: HashMap::new(),
+            metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
             project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+            all_done: true,
         };
         let selector: String = "my/component:root/branch:leaf".to_string();
         let metric_id = 1;
         let event_codes = vec![];
-        sampler.metrics.push(MetricConfig {
+        sampler.push_metric(MetricConfig {
             project_id: Some(2),
-            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(&selector)]),
+            selectors: SelectorList::from(vec![sampler_config::parse_selector_for_test(&selector)]),
             metric_id,
             metric_type: DataType::Occurrence,
             event_codes,

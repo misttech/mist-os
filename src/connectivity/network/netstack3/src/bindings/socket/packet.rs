@@ -12,7 +12,6 @@ use {
 
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _, RequestStream as _};
 use fidl::Peered as _;
-use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
 use log::{error, warn};
 use net_types::ethernet::Mac;
@@ -28,6 +27,7 @@ use netstack3_core::device_socket::{
 use netstack3_core::sync::Mutex;
 use packet::Buf;
 use packet_formats::ethernet::EtherType;
+use zx::{self as zx, HandleBased as _};
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};

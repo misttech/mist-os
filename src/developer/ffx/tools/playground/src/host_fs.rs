@@ -4,7 +4,6 @@
 
 use anyhow::Result;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::future::BoxFuture;
 use std::any::Any;
 use std::future::ready;
@@ -23,6 +22,7 @@ use vfs::file::{File, FileIo, FileLike, FileOptions, SyncMode};
 use vfs::node::Node;
 use vfs::path::Path as VfsPath;
 use vfs::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use zx_status::Status;
 
 /// Convert a Rust [`std::fs::Metadata`] to a [`fio::NodeAttributes2`] FIDL struct.
 fn metadata_to_node_attributes2(

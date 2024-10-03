@@ -11,7 +11,7 @@ use std::path::Path;
 use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
 use tuf::pouf::Pouf;
 use tuf::repository::{RepositoryProvider, RepositoryStorage};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {

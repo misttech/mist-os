@@ -11,9 +11,9 @@ use crate::vfs::{
 };
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
-use fuchsia_runtime::UtcTime;
+use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
-use starnix_logging::track_stub;
+use starnix_logging::{log_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -28,44 +28,49 @@ use vfs::directory::{self};
 use vfs::{
     attributes, execution_scope, file, path, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
-pub fn serve_file<L>(
-    locked: &mut Locked<'_, L>,
+pub fn serve_file(
     current_task: &CurrentTask,
     file: &FileObject,
-) -> Result<(ClientEnd<fio::NodeMarker>, execution_scope::ExecutionScope), Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
+) -> Result<(ClientEnd<fio::NodeMarker>, execution_scope::ExecutionScope), Errno> {
     let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-    let scope = serve_file_at(locked, server_end, current_task, file)?;
+    let scope = serve_file_at(server_end, current_task, file)?;
     Ok((client_end, scope))
 }
 
-pub fn serve_file_at<L>(
-    locked: &mut Locked<'_, L>,
+pub fn serve_file_at(
     server_end: ServerEnd<fio::NodeMarker>,
     current_task: &CurrentTask,
     file: &FileObject,
-) -> Result<execution_scope::ExecutionScope, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
-    // Reopen file object to not share state with the given FileObject.
-    let file = file.name.open(locked, current_task, file.flags(), AccessCheck::skip())?;
-    let open_flags = file.flags();
-    let kernel = current_task.kernel();
-    let starnix_file = StarnixNodeConnection::new(Arc::downgrade(kernel), file);
+) -> Result<execution_scope::ExecutionScope, Errno> {
+    let kernel = current_task.kernel().clone();
     let scope = execution_scope::ExecutionScope::new();
-    // TODO(security): Switching to the `system_task` here loses track of the credentials from
-    //                 `current_task`. Do we need to retain these credentials?
-    kernel.kthreads.spawn_future({
+    current_task.kernel().kthreads.spawn_future({
+        let file = file.weak_handle.upgrade().unwrap();
         let scope = scope.clone();
         async move {
+            let open_flags = file.flags();
+            let starnix_file = {
+                let current_task = SystemTaskRef { kernel: kernel.clone() };
+                // Reopen file object to not share state with the given FileObject.
+                // TODO(security): Switching to the `system_task` here loses track of the credentials from
+                //                 `current_task`. Do we need to retain these credentials?
+                let file = match file.name.open(
+                    kernel.kthreads.unlocked_for_async().deref_mut(),
+                    &current_task,
+                    file.flags(),
+                    AccessCheck::skip(),
+                ) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        log_error!("Unable to reopen file: {e:?}");
+                        return;
+                    }
+                };
+                StarnixNodeConnection::new(Arc::downgrade(&kernel), file)
+            };
             starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
             scope.wait().await;
         }
@@ -399,10 +404,10 @@ impl StarnixNodeConnection {
     fn update_attributes(&self, attributes: fio::MutableNodeAttributes) {
         self.file.node().update_info(|info| {
             if let Some(time) = attributes.creation_time {
-                info.time_status_change = UtcTime::from_nanos(time as i64);
+                info.time_status_change = UtcInstant::from_nanos(time as i64);
             }
             if let Some(time) = attributes.modification_time {
-                info.time_modify = UtcTime::from_nanos(time as i64);
+                info.time_modify = UtcInstant::from_nanos(time as i64);
             }
             if let Some(mode) = attributes.mode {
                 info.mode = FileMode::from_bits(mode);
@@ -709,7 +714,7 @@ mod tests {
 
         let file =
             &fs.root().open_anonymous(&mut locked, &current_task, OpenFlags::RDWR).expect("open");
-        let (root_handle, scope) = serve_file(&mut locked, &current_task, file).expect("serve");
+        let (root_handle, scope) = serve_file(&current_task, file).expect("serve");
 
         // Capture information from the filesystem in the main thread. The filesystem must not be
         // transferred to the other thread.
@@ -829,6 +834,9 @@ mod tests {
         })
         .await;
         scope.shutdown();
+        // Yield once to let task in scope in the current thread finish.
+        futures_lite::future::yield_now().await;
+        scope.wait().await;
         // This ensures fs cannot be captures in the thread.
         std::mem::drop(fs);
     }
@@ -842,8 +850,7 @@ mod tests {
             .root()
             .open_anonymous(&mut locked, &current_task, OpenFlags::RDWR)
             .expect("open_anonymous failed");
-        let (root_handle, scope) =
-            serve_file(&mut locked, &current_task, file).expect("serve_file failed");
+        let (root_handle, scope) = serve_file(&current_task, file).expect("serve_file failed");
 
         fasync::unblock(move || {
             let root_zxio = Zxio::create(root_handle.into_handle()).expect("zxio create failed");
@@ -909,6 +916,9 @@ mod tests {
         })
         .await;
         scope.shutdown();
+        // Yield once to let task in scope in the current thread finish.
+        futures_lite::future::yield_now().await;
+        scope.wait().await;
 
         // This ensures fs cannot be captured in the thread.
         std::mem::drop(fs);

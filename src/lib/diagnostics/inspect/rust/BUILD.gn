@@ -77,8 +77,8 @@ rustc_library("fuchsia-inspect") {
   if (is_fuchsia || is_mistos) {
     deps += [
       "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
+      "//sdk/rust/zx",
       "//src/lib/fidl/rust/fidl",
-      "//src/lib/zircon/rust:fuchsia-zircon",
     ]
 
     sources += [ "src/component.rs" ]

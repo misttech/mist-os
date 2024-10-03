@@ -10,7 +10,7 @@ use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateProxy, PairingMarker, PairingOptions,
     PairingProxy, PairingRequest, PairingRequestStream,
 };
-use fuchsia_zircon::Duration;
+use zx::Duration;
 
 /// Provides a simple mock implementation of `fuchsia.bluetooth.sys.Pairing`.
 pub struct PairingMock {

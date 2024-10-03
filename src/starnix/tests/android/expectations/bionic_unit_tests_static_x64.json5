@@ -15,6 +15,9 @@
         {
             type: "skip",
             matchers: [
+                "cpu_target_features.has_expected_aarch64_compiler_values",
+                "cpu_target_features.has_expected_x86_compiler_values",
+
                 // Test for a RISC-V syscall. Skipped on other architectures.
                 "sys_cachectl.__riscv_flush_icache",
                 "sys_hwprobe.__riscv_hwprobe",

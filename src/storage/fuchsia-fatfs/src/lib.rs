@@ -6,12 +6,12 @@ use crate::node::Node;
 use anyhow::Error;
 use fatfs::FsOptions;
 use fidl_fuchsia_fs::{AdminRequest, AdminShutdownResponder};
-use fuchsia_zircon::Status;
 use std::pin::Pin;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
+use zx::Status;
 
 mod directory;
 mod file;

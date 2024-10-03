@@ -17,14 +17,14 @@ The steps are:
 1.  [Start the Fuchsia emulator][start-the-fuchsia-emulator].
 1.  [Explore Fuchsia][explore-fuchsia].
 
-## Appendices
+## Additional resources
+
+If you're new to Fuchsia, see [Fuchsia fundamentals][fuchsia-fundamentals]
+to explore the platform and development workflows.
 
 ### Learn more about Fuchsia
 
-If you are new to Fuchsia, explore [Fuchsia fundamentals][fuchsia-fundamentals]
-to gain a better understanding of the platform and developer tools.
-
-If you're ready to go deeper into Fuchsia concepts and start contributing,
+If you're ready to delve into Fuchsia concepts and start contributing,
 check out the following resources:
 
 *   [Fuchsia's software model][software-model]

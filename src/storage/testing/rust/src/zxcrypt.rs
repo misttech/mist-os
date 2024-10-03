@@ -7,7 +7,7 @@ use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory}
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_block_encrypted::DeviceManagerMarker;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 const ZXCRYPT_DRIVER_PATH: &str = "zxcrypt.cm";
 

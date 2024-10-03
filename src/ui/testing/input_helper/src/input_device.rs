@@ -627,7 +627,7 @@ mod tests {
                 Axis, ContactInputDescriptor, InputDeviceProxy, InputReportsReaderProxy, Range,
                 TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType,
             },
-            //fuchsia_zircon as zx,
+            //zx as zx,
         };
 
         /// Creates a `DeviceDescriptor` for a touchscreen that spans [-1000, 1000] on both axes.

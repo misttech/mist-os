@@ -13,8 +13,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_settings as fsettings, fidl_fuchsia_starnix_runner as fstarnixrunner,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_settings as fsettings, fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
 };
 
 enum Services {
@@ -34,7 +33,7 @@ async fn main() -> Result<(), Error> {
                 user_data_sharing_consent: Some(true),
                 ..Default::default()
             };
-            match privacy.set(&privacy_settings, zx::MonotonicTime::INFINITE) {
+            match privacy.set(&privacy_settings, zx::MonotonicInstant::INFINITE) {
                 Ok(Ok(())) => info!("Successfully set user data sharing consent."),
                 Ok(Err(err)) => warn!("Could not set user data sharing consent: {err:?}"),
                 Err(err) => warn!("Could not set user data sharing consent: {err:?}"),

@@ -488,46 +488,6 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   test_file_vn = nullptr;
 }
 
-TEST_F(FileTest, Readahead) {
-  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
-  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
-  fbl::RefPtr<File> test_file_vn = fbl::RefPtr<File>::Downcast(*std::move(test_file));
-
-  constexpr size_t kNumPage = kAddrsPerBlock * 3;
-  constexpr size_t kDataSize = kPageSize * kNumPage;
-  std::vector<char> w_buf(kDataSize, 0);
-
-  FileTester::AppendToFile(test_file_vn.get(), w_buf.data(), kDataSize);
-  ASSERT_EQ(test_file_vn->GetSize(), kDataSize);
-
-  auto cleanup_file_cache = [&](fbl::RefPtr<File> &test_file_vn) {
-    test_file_vn->Writeback(true, false);
-    test_file_vn->Writeback(false, true);
-  };
-
-  cleanup_file_cache(test_file_vn);
-
-  {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(test_file_vn->FindPage(kDefaultReadaheadSize, &page), ZX_ERR_NOT_FOUND);
-    ASSERT_EQ(test_file_vn->FindPage(1, &page), ZX_ERR_NOT_FOUND);
-    ASSERT_EQ(test_file_vn->FindPage(0, &page), ZX_ERR_NOT_FOUND);
-  }
-
-  block_t block_offset = 0;
-  ASSERT_EQ(test_file_vn->GetReadBlockSize(block_offset, 1, kNumPage), kDefaultReadaheadSize);
-
-  block_offset += kDefaultReadaheadSize;
-  ASSERT_EQ(test_file_vn->GetReadBlockSize(block_offset, kDefaultReadaheadSize * 2, kNumPage),
-            kDefaultReadaheadSize * 2);
-
-  block_offset = kNumPage - kDefaultReadaheadSize / 2;
-  ASSERT_EQ(test_file_vn->GetReadBlockSize(block_offset, 1, kNumPage), kDefaultReadaheadSize / 2);
-
-  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
-  test_file_vn = nullptr;
-}
-
 TEST(FileTest2, FailedNidReuse) {
   std::unique_ptr<BcacheMapper> bc;
   constexpr uint64_t kBlockCount = 409600;

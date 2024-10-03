@@ -79,12 +79,45 @@ resource("spmi-sub-target-spmi-address-out-of-range-dtb-file") {
   deps = [ ":spmi-sub-target-spmi-address-out-of-range-dtb" ]
 }
 
+dtb("spmi-reference-target-dtb") {
+  sources = [ "test/dts/spmi-reference-target.dts.S" ]
+}
+
+resource("spmi-reference-target-dtb-file") {
+  sources = get_target_outputs(":spmi-reference-target-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":spmi-reference-target-dtb" ]
+}
+
+dtb("spmi-two-nodes-reference-sub-target-dtb") {
+  sources = [ "test/dts/spmi-two-nodes-reference-sub-target.dts.S" ]
+}
+
+resource("spmi-two-nodes-reference-sub-target-dtb-file") {
+  sources = get_target_outputs(":spmi-two-nodes-reference-sub-target-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":spmi-two-nodes-reference-sub-target-dtb" ]
+}
+
+dtb("spmi-reference-has-compatible-property-dtb") {
+  sources = [ "test/dts/spmi-reference-has-compatible-property.dts.S" ]
+}
+
+resource("spmi-reference-has-compatible-property-dtb-file") {
+  sources = get_target_outputs(":spmi-reference-has-compatible-property-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":spmi-reference-has-compatible-property-dtb" ]
+}
+
 fuchsia_unittest_package("spmi-visitor-test") {
   component_name = "spmi-visitor-test"
   deps = [
     ":spmi-dtb-file",
     ":spmi-duplicate-target-id-dtb-file",
+    ":spmi-reference-has-compatible-property-dtb-file",
+    ":spmi-reference-target-dtb-file",
     ":spmi-sub-target-spmi-address-out-of-range-dtb-file",
+    ":spmi-two-nodes-reference-sub-target-dtb-file",
     ":spmi-visitor-test-bin",
   ]
   test_specs = {

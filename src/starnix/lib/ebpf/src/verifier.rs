@@ -2723,12 +2723,12 @@ impl BpfVisitor for DataDependencies {
         Ok(())
     }
 
-    fn load_from_sk_buf_data<'a>(
+    fn load_from_packet<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        _offset: u16,
+        _offset: i16,
         register_offset: Option<Register>,
         _width: DataWidth,
     ) -> Result<(), String> {
@@ -3881,12 +3881,12 @@ impl BpfVisitor for ComputationContext {
         Ok(())
     }
 
-    fn load_from_sk_buf_data<'a>(
+    fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        offset: u16,
+        offset: i16,
         register_offset: Option<Register>,
         width: DataWidth,
     ) -> Result<(), String> {
@@ -3901,10 +3901,11 @@ impl BpfVisitor for ComputationContext {
         let Some(memory_id) = context.calling_context.packet_memory_id.clone() else {
             return Err(format!("incorrect packet access at pc {}", self.pc));
         };
-        let src = self.reg(src)?;
-        if !matches!(src, Type::PtrToMemory { offset: 0, id: memory_id, .. }) {
-            return Err(format!("parameter is not a packet at pc {}", self.pc));
+
+        if !matches!(self.reg(src)?, Type::PtrToMemory { offset: 0, id, .. } if id == memory_id ) {
+            return Err(format!("R{} is not a packet at pc {}", src, self.pc));
         }
+
         if let Some(reg) = register_offset {
             let reg = self.reg(reg)?;
             if !matches!(reg, Type::ScalarValue { unwritten_mask: 0, .. }) {

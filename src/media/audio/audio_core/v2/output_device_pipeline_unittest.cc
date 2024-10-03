@@ -142,10 +142,10 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
                               {
                                   // We assume that `root` enables these usages.
                                   StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND),
+                                  StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
+                                  StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
                                   StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
                                   StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT),
-                                  StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
-                                  StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
                               },
                               VolumeCurve::DefaultForMinGain(VolumeCurve::kDefaultGainForMinVolume),
                               /*independent_volume_control=*/true, PipelineConfig(root),
@@ -164,17 +164,17 @@ std::shared_ptr<OutputDevicePipeline> CreatePipeline(TestHarness& h, const Forma
   }
 
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::BACKGROUND));
-  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::MEDIA));
-  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::INTERRUPTION));
-  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::SYSTEM_AGENT));
   EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::COMMUNICATION));
+  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::INTERRUPTION));
+  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::MEDIA));
+  EXPECT_TRUE(pipeline->SupportsUsage(RenderUsage::SYSTEM_AGENT));
   EXPECT_FALSE(pipeline->SupportsUsage(RenderUsage::ULTRASOUND));
 
   EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::BACKGROUND));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::COMMUNICATION));
+  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::INTERRUPTION));
   EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::MEDIA));
   EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::SYSTEM_AGENT));
-  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::INTERRUPTION));
-  EXPECT_TRUE(pipeline->UsageVolumeForUsage(RenderUsage::COMMUNICATION));
   EXPECT_FALSE(pipeline->UsageVolumeForUsage(RenderUsage::ULTRASOUND));
 
   return pipeline;
@@ -225,18 +225,22 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
       .input_streams =
           {
               RenderUsage::BACKGROUND,
+              RenderUsage::COMMUNICATION,
+              RenderUsage::INTERRUPTION,
               RenderUsage::MEDIA,
               RenderUsage::SYSTEM_AGENT,
-              RenderUsage::INTERRUPTION,
-              RenderUsage::COMMUNICATION,
           },
       .loopback = false,
       .output_rate = 48000,
       .output_channels = 2,
   };
 
-  const auto kMixerFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 48000});
-  const auto kDeviceFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kInt32, 2, 48000});
+  const auto kMixerFormat = Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                                                 .channels = 2,
+                                                 .frames_per_second = 48000});
+  const auto kDeviceFormat = Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kInt32,
+                                                  .channels = 2,
+                                                  .frames_per_second = 48000});
 
   TestHarness h;
   auto pipeline = CreatePipeline(h, kDeviceFormat, std::move(root));
@@ -258,10 +262,10 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixerId);
 
   // No loopback.
   ASSERT_FALSE(pipeline->loopback());
@@ -314,10 +318,10 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .effects_v2 = PipelineConfig::EffectV2{.instance_name = "NoOp"},
           .loopback = true,
@@ -329,10 +333,17 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
       .output_channels = 2,
   };
 
-  const auto kLoopbackFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 48000});
+  const auto kLoopbackFormat =
+      Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                           .channels = 2,
+                           .frames_per_second = 48000});
   const auto kLinearizeFormat =
-      Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 48000});
-  const auto kDeviceFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kInt32, 2, 48000});
+      Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                           .channels = 2,
+                           .frames_per_second = 48000});
+  const auto kDeviceFormat = Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kInt32,
+                                                  .channels = 2,
+                                                  .frames_per_second = 48000});
 
   TestHarness h;
   auto pipeline = CreatePipeline(h, kDeviceFormat, std::move(root));
@@ -358,10 +369,10 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixMixerId);
 
   auto loopback = pipeline->loopback();
   ASSERT_TRUE(loopback);
@@ -468,10 +479,10 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::COMMUNICATION,
+                  RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
                   RenderUsage::SYSTEM_AGENT,
-                  RenderUsage::INTERRUPTION,
-                  RenderUsage::COMMUNICATION,
               },
           .loopback = true,
           .output_rate = 48000,
@@ -482,10 +493,17 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
       .output_channels = 2,
   };
 
-  const auto kLoopbackFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 48000});
+  const auto kLoopbackFormat =
+      Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                           .channels = 2,
+                           .frames_per_second = 48000});
   const auto kLinearizeFormat =
-      Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 96000});
-  const auto kDeviceFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kInt32, 2, 96000});
+      Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                           .channels = 2,
+                           .frames_per_second = 96000});
+  const auto kDeviceFormat = Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kInt32,
+                                                  .channels = 2,
+                                                  .frames_per_second = 96000});
 
   TestHarness h;
   auto pipeline = CreatePipeline(h, kDeviceFormat, std::move(root));
@@ -509,10 +527,10 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixMixerId);
 
   auto loopback = pipeline->loopback();
   ASSERT_TRUE(loopback);
@@ -592,10 +610,10 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
       .input_streams =
           {
               RenderUsage::BACKGROUND,
+              RenderUsage::COMMUNICATION,
+              RenderUsage::INTERRUPTION,
               RenderUsage::MEDIA,
               RenderUsage::SYSTEM_AGENT,
-              RenderUsage::INTERRUPTION,
-              RenderUsage::COMMUNICATION,
           },
       .effects_v2 = PipelineConfig::EffectV2{.instance_name = "NoOpRechannel2To4"},
       .loopback = true,
@@ -603,9 +621,16 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
       .output_channels = 2,
   };
 
-  const auto kMixFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 2, 48000});
-  const auto kLoopbackFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kFloat32, 4, 48000});
-  const auto kDeviceFormat = Format::CreateOrDie({fuchsia_audio::SampleType::kInt32, 4, 48000});
+  const auto kMixFormat = Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                                               .channels = 2,
+                                               .frames_per_second = 48000});
+  const auto kLoopbackFormat =
+      Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kFloat32,
+                           .channels = 4,
+                           .frames_per_second = 48000});
+  const auto kDeviceFormat = Format::CreateOrDie({.sample_type = fuchsia_audio::SampleType::kInt32,
+                                                  .channels = 4,
+                                                  .frames_per_second = 48000});
 
   TestHarness h;
   auto pipeline = CreatePipeline(h, kDeviceFormat, std::move(root));
@@ -629,10 +654,10 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
 
   EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixerId);
+  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::INTERRUPTION), kMixerId);
-  EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::COMMUNICATION), kMixerId);
 
   auto loopback = pipeline->loopback();
   ASSERT_TRUE(loopback);

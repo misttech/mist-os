@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
-use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
+use {fidl_fuchsia_memory_attribution as fattribution, zx};
 
 /// Function of this type returns a vector of attribution updates, and is used
 /// as the type of the callback in [AttributionServer::new].
@@ -361,7 +361,7 @@ mod tests {
     use super::*;
     use fidl::endpoints::RequestStream;
     use futures::TryStreamExt;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// Tests that the ELF runner can tell us about the resources used by the component it runs.
     #[test]

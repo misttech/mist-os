@@ -11,18 +11,12 @@
             name: "power-broker",
             url: "fuchsia-boot:///power-broker#meta/power-broker.cm",
         },
-        {
-            name: "cpu_manager",
-            url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
-            on_terminate: "reboot",
-        },
     ],
     offer: [
         {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: [
-                "#cpu_manager",
                 "#power-broker",
                 "#power_manager",
             ],
@@ -35,19 +29,6 @@
             to: [ "#power_manager" ],
             rights: [ "r*" ],
             subdir: "config/power_manager",
-        },
-        {
-            directory: "boot",
-            from: "parent",
-            as: "config",
-            to: [ "#cpu_manager" ],
-            rights: [ "r*" ],
-            subdir: "config/cpu_manager",
-        },
-        {
-            protocol: [ "fuchsia.thermal.ClientStateConnector" ],
-            from: "#power_manager",
-            to: "#cpu_manager",
         },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
@@ -63,34 +44,9 @@
             to: "#power_manager",
         },
         {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#cpu_manager",
-            to: "#power_manager",
-
-            // cpu_manager uses fuchsia.thermal.ClientStateConnector from power_manage
-            // Weak to resolve dependency cycles
-            dependency: "weak",
-        },
-        {
-            protocol: [
-                "fuchsia.kernel.CpuResource",
-                "fuchsia.kernel.Stats",
-            ],
-            from: "parent",
-            to: [ "#cpu_manager" ],
-        },
-        {
-            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
-            from: "#boot-drivers",
-            to: [ "#cpu_manager" ],
-        },
-        {
             directory: "dev-topological",
             from: "#devfs-with-pkg",
-            to: [
-                "#cpu_manager",
-                "#power_manager",
-            ],
+            to: [ "#power_manager" ],
             dependency: "weak",
         },
         {
@@ -120,7 +76,6 @@
             ],
             from: "#archivist",
             to: [
-                "#cpu_manager",
                 "#power-broker",
                 "#power_manager",
             ],

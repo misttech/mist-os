@@ -21,33 +21,23 @@ def main() -> None:
         help="Unprocessed version of version_history.json",
     )
 
-    # TODO(https://fxbug.dev/324892812): Delete this.
-    parser.add_argument(
-        "--legacy-unstable-abi-revisions",
-        action="store_true",
-        help=(
-            "When passed, uses the 'legacy' way of assigning an ABI revision "
-            "to unstable API levels (e.g., `HEAD`, `PLATFORM`)"
-        ),
-    )
-
     parser.add_argument(
         "--daily-commit-hash-file",
         type=pathlib.Path,
+        required=True,
         help=(
             "File containing the hash of the latest commit to integration.git "
-            "before today, as a hexadecimal UTF-8 string. Required unless "
-            "--legacy-unstable-abi-revisions is specified."
+            "before today, as a hexadecimal UTF-8 string."
         ),
     )
 
     parser.add_argument(
         "--daily-commit-timestamp-file",
         type=pathlib.Path,
+        required=True,
         help=(
             "File containing the commit timestamp of the latest commit to "
-            "integration.git before today, as a decimal UNIX timestamp. "
-            "Required unless --legacy-unstable-abi-revisions is specified."
+            "integration.git before today, as a decimal UNIX timestamp."
         ),
     )
 
@@ -62,21 +52,16 @@ def main() -> None:
 
     with args.input.open() as f:
         version_history = json.load(f)
+    with args.daily_commit_hash_file.open() as f:
+        daily_commit_hash = f.read().strip()
+    with args.daily_commit_timestamp_file.open() as f:
+        daily_commit_timestamp = datetime.datetime.fromtimestamp(
+            int(f.read().strip()), datetime.UTC
+        )
 
-    if args.legacy_unstable_abi_revisions:
-        generate_version_history.replace_special_abi_revisions_using_latest_numbered(
-            version_history
-        )
-    else:
-        with args.daily_commit_hash_file.open() as f:
-            daily_commit_hash = f.read().strip()
-        with args.daily_commit_timestamp_file.open() as f:
-            daily_commit_timestamp = datetime.datetime.fromtimestamp(
-                int(f.read().strip()), datetime.UTC
-            )
-        generate_version_history.replace_special_abi_revisions_using_commit_hash_and_date(
-            version_history, daily_commit_hash, daily_commit_timestamp
-        )
+    generate_version_history.replace_special_abi_revisions(
+        version_history, daily_commit_hash, daily_commit_timestamp
+    )
 
     with args.output.open("w") as f:
         json.dump(version_history, f, indent=2)

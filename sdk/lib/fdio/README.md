@@ -12,20 +12,16 @@ open](/docs/concepts/filesystems/life_of_an_open.md).
 
 ### Converting between FDs and kernel handles
 
-The main functions to convert between channels and file descriptors are:
+The [fdio_fd_create()] function can be used to create a file descriptor
+from a Zircon channel.
 
-  * [fdio_fd_create()] creates a file descriptor from a channel.
-  * [fdio_get_service_handle()] converts from a file descriptor to a kernel
-    handle. This is normally used to connect to FIDL services in the `/svc`
-    directory.
-
-These other variants also create handles from file descriptors. A "transfer"
+The following variants also create handles from file descriptors. A "transfer"
 means that the source file descriptor is closed and ownership transferred to the
-`out_handle` (this is identical to [fdio_get_service_handle()]. However, if a
-file descriptor has been `dup()`ed and there are more than one descriptor
-representing the kernel handle, it can not be simply closed. In these cases, the
-file descriptor can be "cloned" meaning that the original file descriptor is not
-modified. The output handle is a new handle that the caller owns.
+`out_handle`. However, if a file descriptor has been `dup()`ed, and there is
+more than one descriptor representing the kernel handle, it can not be simply
+closed. In these cases, the file descriptor can be "cloned", meaning the
+original file descriptor is not modified. The output handle is a new handle that
+the caller owns.
 
   * [fdio_fd_clone()] creates a handle for the given FD.
   * [fdio_fd_transfer()] closes the FD (if possible) and returns the handle.
@@ -98,8 +94,6 @@ client end as a file descriptor in the current process.
   * [fdio_open_at()]
   * [fdio_open_fd()]
   * [fdio_open_fd_at()]
-  * [fdio_service_clone()]
-  * [fdio_service_clone_to()]
 
 ### Namespaces
 

@@ -17,7 +17,7 @@ pub mod partition;
 use fidl_fuchsia_fs_startup::{
     CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
 };
-use fuchsia_zircon as zx;
+
 use std::convert::From;
 use std::sync::Arc;
 

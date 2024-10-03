@@ -50,6 +50,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -123,6 +124,7 @@
       ],
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,
@@ -262,6 +264,7 @@
           ],
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.placementofattributes/ExampleProtocolMethodRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -301,6 +304,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.exampleusing/Empty",
             "nullable": false,
             "type_shape_v2": {
@@ -367,6 +371,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -448,6 +453,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -525,6 +531,7 @@
           "name": "variant",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -600,6 +607,7 @@
       },
       "type": {
         "kind": "primitive",
+        "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
           "inline_size": 4,

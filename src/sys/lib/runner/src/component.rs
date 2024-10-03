@@ -8,7 +8,6 @@ use fidl::endpoints::ServerEnd;
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl::prelude::*;
 use fuchsia_runtime::{job_default, HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, HandleBased, Status};
 use futures::future::{BoxFuture, Either};
 use futures::prelude::*;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -17,6 +16,7 @@ use lazy_static::lazy_static;
 use namespace::Namespace;
 use thiserror::Error;
 use tracing::*;
+use zx::{self as zx, HandleBased, Status};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
@@ -259,16 +259,16 @@ pub enum LaunchError {
     DirectoryToChannel,
 
     #[error("cannot create channels: {}", _0)]
-    ChannelCreation(fuchsia_zircon_status::Status),
+    ChannelCreation(zx_status::Status),
 
     #[error("error loading 'lib' in /pkg: {:?}", _0)]
     LibLoadError(String),
 
     #[error("cannot create job: {}", _0)]
-    JobCreation(fuchsia_zircon_status::Status),
+    JobCreation(zx_status::Status),
 
     #[error("cannot duplicate job: {}", _0)]
-    DuplicateJob(fuchsia_zircon_status::Status),
+    DuplicateJob(zx_status::Status),
 
     #[error("cannot add args to launcher: {:?}", _0)]
     AddArgs(String),
@@ -474,12 +474,12 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
     use fidl_fuchsia_component_runner::{self as fcrunner, ComponentControllerProxy};
     use fuchsia_runtime::{HandleInfo, HandleType};
-    use fuchsia_zircon::{self as zx, HandleBased};
     use futures::future::BoxFuture;
     use futures::poll;
     use namespace::{Namespace, NamespaceError};
     use std::pin::Pin;
     use std::task::Poll;
+    use zx::{self as zx, HandleBased};
     use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
     #[test]

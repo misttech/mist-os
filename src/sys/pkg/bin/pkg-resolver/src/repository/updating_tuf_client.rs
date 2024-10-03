@@ -24,7 +24,7 @@ use tuf::error::Error as TufError;
 use tuf::metadata::{Metadata, TargetDescription, TargetPath};
 use tuf::pouf::Pouf1;
 use tuf::repository::{RepositoryProvider, RepositoryStorageProvider};
-use {cobalt_sw_delivery_registry as metrics, fuchsia_zircon as zx};
+use {cobalt_sw_delivery_registry as metrics, zx};
 
 type TufClient = tuf::client::Client<
     Pouf1,
@@ -37,7 +37,7 @@ pub struct UpdatingTufClient {
 
     /// Time that this repository was last successfully checked for an update, or None if the
     /// repository has never successfully fetched target metadata.
-    last_update_successfully_checked_time: InspectableDebugString<Option<zx::MonotonicTime>>,
+    last_update_successfully_checked_time: InspectableDebugString<Option<zx::MonotonicInstant>>,
 
     /// `Some` if there is an AutoClient task, dropping it stops the task.
     _auto_client_aborter: Option<AbortHandleOnDrop>,

@@ -17,7 +17,7 @@ use crate::vfs::{
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
-use fuchsia_zircon::{self as zx};
+
 use once_cell::sync::Lazy;
 use range_map::RangeMap;
 use smallvec::SmallVec;
@@ -253,9 +253,6 @@ pub enum MappingName {
     /// This mapping is the heap.
     Heap,
 
-    /// This is an address range we keep reserved to be able to grow the heap.
-    ReservedForHeap,
-
     /// This mapping is the vdso.
     Vdso,
 
@@ -441,10 +438,6 @@ struct ProgramBreak {
     // The addresses from [base, current.round_up(*PAGE_SIZE)) are mapped into the
     // client address space from the underlying |memory|.
     current: UserAddress,
-
-    #[cfg(not(feature = "alternate_anon_allocs"))]
-    /// Placeholder memory object mapped to pages reserved for program break growth.
-    placeholder_memory: Arc<MemoryObject>,
 }
 
 /// The policy about whether the address space can be dumped.
@@ -553,7 +546,7 @@ impl PrivateAnonymousMemoryManager {
         let source_memory_offset = source.start.ptr() as u64;
         self.backing
             .memmove(
-                fuchsia_zircon::TransferDataOptions::empty(),
+                zx::TransferDataOptions::empty(),
                 dest_memory_offset,
                 source_memory_offset,
                 length.try_into().unwrap(),
@@ -638,10 +631,8 @@ fn map_in_vmar(
             // be within the first 2 GB of the process address space.
             (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
         }
-        DesiredAddress::Any => unreachable!(),
-        DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
-            (addr - base_addr, zx::VmarFlags::SPECIFIC)
-        }
+        DesiredAddress::Hint(_) | DesiredAddress::Any => unreachable!(),
+        DesiredAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
         DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
     };
 
@@ -671,17 +662,7 @@ fn map_in_vmar(
         | vmar_maybe_map_range;
 
     profile.pivot("VmarMapSyscall");
-    let mut map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
-
-    // Retry mapping if the target address was a Hint.
-    profile.pivot("MapInVmarResults");
-    if map_result.is_err() {
-        if let DesiredAddress::Hint(_) = addr {
-            let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
-            map_result = memory.map_in_vmar(vmar, 0, memory_offset, length, vmar_flags);
-        }
-    }
-
+    let map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
     let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
 
     Ok(UserAddress::from_ptr(mapped_addr))
@@ -711,30 +692,51 @@ impl MemoryManagerState {
         }
     }
 
+    // Accept the hint if the range is unused and does not wrap around.
+    fn is_hint_acceptable(&self, hint_addr: UserAddress, length: usize) -> bool {
+        let Some(hint_end) = hint_addr.checked_add(length) else {
+            return false;
+        };
+        self.mappings.intersection(&(hint_addr..hint_end)).next().is_none()
+    }
+
     // Map the memory without updating `self.mappings`.
     fn map_internal(
         &self,
-        addr: DesiredAddress,
+        mut addr: DesiredAddress,
         memory: &MemoryObject,
         memory_offset: u64,
         length: usize,
         flags: MappingFlags,
         populate: bool,
     ) -> Result<UserAddress, Errno> {
-        let new_addr = match addr {
-            DesiredAddress::Any if !flags.contains(MappingFlags::LOWER_32BIT) => {
-                profile_duration!("FindAddressForMmap");
-                let new_addr: UserAddress = self
-                    .find_next_unused_range(round_up_to_system_page_size(length)?)
-                    .ok_or_else(|| errno!(ENOMEM))?;
-                DesiredAddress::Fixed(new_addr)
-            }
-            _ => addr,
-        };
+        let adjusted_length = round_up_to_system_page_size(length)?;
+
+        // If the hint is not acceptable, strip it.
+        if let DesiredAddress::Hint(mut hint_addr) = addr {
+            // Round down to page size
+            hint_addr =
+                UserAddress::from_ptr(hint_addr.ptr() - hint_addr.ptr() % *PAGE_SIZE as usize);
+            addr = if self.is_hint_acceptable(hint_addr, adjusted_length) {
+                DesiredAddress::Fixed(hint_addr)
+            } else {
+                DesiredAddress::Any
+            };
+        }
+
+        // If the address is not known at this point, choose an available one. If LOWER_32BIT is
+        // set, defer the decision to Zircon.
+        if addr == DesiredAddress::Any && !flags.contains(MappingFlags::LOWER_32BIT) {
+            profile_duration!("FindAddressForMmap");
+            let new_addr = self
+                .find_next_unused_range(round_up_to_system_page_size(length)?)
+                .ok_or_else(|| errno!(ENOMEM))?;
+            addr = DesiredAddress::Fixed(new_addr)
+        }
         map_in_vmar(
             &self.user_vmar,
             &self.user_vmar_info,
-            new_addr,
+            addr,
             memory,
             memory_offset,
             length,
@@ -983,22 +985,14 @@ impl MemoryManagerState {
             return Ok(Some(old_addr));
         }
 
+        if self.mappings.intersection(old_range.end..new_range_in_place.end).next().is_some() {
+            // There is some mapping in the growth range prevening an in-place growth.
+            return Ok(None);
+        }
+
         // There is space to grow in-place. The old range must be one contiguous mapping.
         let (original_range, mapping) =
             self.mappings.get(&old_addr).ok_or_else(|| errno!(EINVAL))?;
-
-        for (_, intersect_mapping) in
-            self.mappings.intersection(old_range.end..new_range_in_place.end)
-        {
-            // There is some mapping in the growth range prevening an in-place growth. Allow
-            // growing over it only in case we're remapping the heap on the range that was reserved
-            // for it.
-            if !(mapping.name == MappingName::Heap
-                && intersect_mapping.name == MappingName::ReservedForHeap)
-            {
-                return Ok(None);
-            }
-        }
 
         if old_range.end > original_range.end {
             return error!(EFAULT);
@@ -2174,7 +2168,7 @@ pub unsafe fn read_to_array<T: FromBytes, E, const N: usize>(
 ///
 /// # Safety
 ///
-/// THe read function must only return `Ok(())` if all the bytes were read to.
+/// The read function must only return `Ok(())` if all the bytes were read to.
 #[inline]
 pub unsafe fn read_to_object_as_bytes<T: FromBytes, E>(
     read_fn: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<(), E>,
@@ -2800,7 +2794,6 @@ impl MemoryManager {
         // See mm/README.md.
         let mut state = self.state.write();
 
-        // Ensure that there is address-space set aside for the program break.
         let brk = match state.brk.clone() {
             None => {
                 let memory = Arc::new(MemoryObject::from(
@@ -2808,30 +2801,7 @@ impl MemoryManager {
                 ));
                 memory.set_zx_name(b"starnix-brk");
 
-                // Map the whole program-break memory object to prevent other mappings using the
-                // range, unless they do so deliberately. Pages in this range are made writable as
-                // the caller grows the program break.
-                let origin = state.brk_origin;
-                let base = state.map_memory(
-                    self,
-                    DesiredAddress::Fixed(origin),
-                    memory.clone(),
-                    0u64,
-                    PROGRAM_BREAK_LIMIT as usize,
-                    MappingFlags::ANONYMOUS,
-                    /* populate= */ false,
-                    MappingName::ReservedForHeap,
-                    FileWriteGuardRef(None),
-                    &mut released_mappings,
-                )?;
-                assert!(released_mappings.is_empty());
-
-                let brk = ProgramBreak {
-                    base,
-                    current: base,
-                    #[cfg(not(feature = "alternate_anon_allocs"))]
-                    placeholder_memory: memory,
-                };
+                let brk = ProgramBreak { base: state.brk_origin, current: state.brk_origin };
                 state.brk = Some(brk.clone());
                 brk
             }
@@ -2854,55 +2824,17 @@ impl MemoryManager {
                 // break pages, or other mappings.
                 let delta = old_end - new_end;
 
-                // Overwrite the released range with a placeholder mapping.
-                #[cfg(feature = "alternate_anon_allocs")]
-                {
-                    if state
-                        .private_anonymous
-                        .allocate_address_range(
-                            &state.user_vmar,
-                            &state.user_vmar_info,
-                            DesiredAddress::FixedOverwrite(new_end),
-                            delta,
-                            MappingOptions::ANONYMOUS,
-                        )
-                        .is_err()
-                    {
-                        return Ok(brk.current);
-                    }
-                }
-                #[cfg(not(feature = "alternate_anon_allocs"))]
-                {
-                    let memory_offset = (new_end - brk.base) as u64;
-                    if state
-                        .map_memory(
-                            self,
-                            DesiredAddress::FixedOverwrite(new_end),
-                            brk.placeholder_memory.clone(),
-                            memory_offset,
-                            delta,
-                            MappingFlags::ANONYMOUS,
-                            /* populate= */ false,
-                            MappingName::ReservedForHeap,
-                            FileWriteGuardRef(None),
-                            &mut released_mappings,
-                        )
-                        .is_err()
-                    {
-                        return Ok(brk.current);
-                    }
+                if state.unmap(self, new_end, delta, &mut released_mappings).is_err() {
+                    return Ok(brk.current);
                 }
             }
             std::cmp::Ordering::Greater => {
                 let range = old_end..new_end;
                 let delta = new_end - old_end;
 
-                // Check for mappings over the program break region. The space reserved for heap is
-                // ok, we can overwrite it.
-                for (_, mapping) in state.mappings.intersection(&range) {
-                    if mapping.name != MappingName::ReservedForHeap {
-                        return Ok(brk.current);
-                    }
+                // Check for mappings over the program break region.
+                if state.mappings.intersection(&range).next().is_some() {
+                    return Ok(brk.current);
                 }
 
                 // TODO(b/310255065): Call `map_anonymous()` directly once
@@ -3332,6 +3264,7 @@ impl MemoryManager {
         result
     }
 
+    /// Map the stack into a pre-selected address region
     pub fn map_stack(
         self: &Arc<Self>,
         length: usize,
@@ -3339,13 +3272,27 @@ impl MemoryManager {
     ) -> Result<UserAddress, Errno> {
         assert!(length <= MAX_STACK_SIZE);
         let addr = self.state.read().stack_origin;
-        self.map_anonymous(
-            DesiredAddress::Fixed(addr),
+        // The address range containing stack_origin should normally be available: it's above the
+        // mmap_top, and this method is called early enough in the process lifetime that only the
+        // main ELF and the interpreter are already loaded. However, in the rare case that the
+        // static position-independent executable is overlapping the chosen address, mapping as Hint
+        // will make mmap choose a new place for it.
+        // TODO(https://fxbug.dev/370027241): Consider a more robust approach
+        let stack_addr = self.map_anonymous(
+            DesiredAddress::Hint(addr),
             length,
             prot_flags,
             MappingOptions::ANONYMOUS,
             MappingName::Stack,
-        )
+        )?;
+        if stack_addr != addr {
+            log_warn!(
+                "An address designated for stack ({}) was unavailable, mapping at {} instead.",
+                addr,
+                stack_addr
+            );
+        }
+        Ok(stack_addr)
     }
 
     pub fn remap(
@@ -3784,7 +3731,7 @@ impl MemoryManager {
 }
 
 /// The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DesiredAddress {
     /// Map at any address chosen by the kernel.
     Any,
@@ -3848,10 +3795,6 @@ fn write_map(
         MappingName::Heap => {
             fill_to_name(sink);
             sink.write(b"[heap]");
-        }
-        MappingName::ReservedForHeap => {
-            // TODO(https://fxbug.dev/365834029): Don't reserve space for heap growth
-            unreachable!("Pages reserved for heap should not be visible");
         }
         MappingName::Vdso => {
             fill_to_name(sink);
@@ -3928,10 +3871,6 @@ impl SequenceFileSource for ProcMapsFile {
         let state = task.mm().state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
-            // Pages reserved for heap should not be displayed as mapped.
-            if map.name == MappingName::ReservedForHeap {
-                return Ok(Some(range.end));
-            }
             write_map(&task, sink, range, map)?;
             return Ok(Some(range.end));
         }
@@ -3960,10 +3899,6 @@ impl SequenceFileSource for ProcSmapsFile {
         let state = task.mm().state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
-            // Pages reserved for heap should not be displayed as mapped.
-            if map.name == MappingName::ReservedForHeap {
-                return Ok(Some(range.end));
-            }
             write_map(&task, sink, range, map)?;
 
             let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
@@ -4086,10 +4021,8 @@ mod tests {
             .expect("failed to set initial program break");
         assert!(base_addr > UserAddress::default());
 
-        // Page containing the program break address should be reserved.
-        let (_, mapping) =
-            get_range(base_addr).expect("base_addr should point to a reserved range");
-        assert_eq!(mapping.name, MappingName::ReservedForHeap);
+        // Page containing the program break address should not be mapped.
+        assert_eq!(get_range(base_addr), None);
 
         // Growing it by a single byte results in that page becoming mapped.
         let addr0 = mm.set_brk(&current_task, base_addr + 1u64).expect("failed to grow brk");
@@ -4127,13 +4060,11 @@ mod tests {
         assert_eq!(range4.start, base_addr);
         assert_eq!(range4.end, addr4.round_up(*PAGE_SIZE).unwrap());
 
-        // Shrink the program break to zero and observe that the mapping is gone and replaced by a reserved memory.
+        // Shrink the program break to zero and observe that the mapping is entirely gone.
         let addr5 =
             mm.set_brk(&current_task, base_addr).expect("failed to drastically shrink brk to zero");
         assert_eq!(addr5, base_addr);
-        let (_, mapping) =
-            get_range(base_addr).expect("base_addr should point to a reserved range");
-        assert_eq!(mapping.name, MappingName::ReservedForHeap);
+        assert_eq!(get_range(base_addr), None);
     }
 
     #[::fuchsia::test]
@@ -5131,7 +5062,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_snapshot_paged_memory() {
-        use fuchsia_zircon::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
+        use zx::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
 
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
@@ -5152,7 +5083,7 @@ mod tests {
 
         // Create a thread to service the port where we will receive pager requests.
         let thread = std::thread::spawn(move || loop {
-            let packet = port_clone.wait(zx::MonotonicTime::INFINITE).expect("wait failed");
+            let packet = port_clone.wait(zx::MonotonicInstant::INFINITE).expect("wait failed");
             match packet.contents() {
                 zx::PacketContents::Pager(contents) => {
                     if contents.command() == ZX_PAGER_VMO_READ {

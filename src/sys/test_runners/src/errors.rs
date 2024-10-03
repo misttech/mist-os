@@ -7,7 +7,7 @@
 use crate::elf::{ComponentError, KernelError};
 use crate::launch::LaunchError;
 use crate::logs::LogError;
-use fuchsia_zircon as zx;
+
 use namespace::NamespaceError;
 use std::sync::Arc;
 use thiserror::Error;

@@ -8,7 +8,7 @@ use std::ffi::CStr;
 use std::ops::Deref;
 use std::panic;
 use tracing::error;
-use {fuchsia_runtime as runtime, fuchsia_zircon as zx};
+use {fuchsia_runtime as runtime, zx};
 
 lazy_static! {
     static ref SCOPED_JOB: Scoped<zx::Job> = initialize();
@@ -176,7 +176,7 @@ impl<T: zx::Task> Deref for Scoped<T> {
 fn kill<T: zx::Task>(process: &T, what: &'static str) {
     let result: Result<(), zx::Status> = (|| {
         process.kill()?;
-        process.wait_handle(zx::Signals::TASK_TERMINATED, zx::MonotonicTime::INFINITE)?;
+        process.wait_handle(zx::Signals::TASK_TERMINATED, zx::MonotonicInstant::INFINITE)?;
         Ok(())
     })();
     match result {

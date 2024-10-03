@@ -40,25 +40,12 @@ LdLoadTestsBase::~LdLoadTestsBase() {
 }
 
 void LdLoadTestsBase::Needed(std::initializer_list<std::string_view> names) {
-  // The POSIX dynamic linker will just do `open` system calls to find files.
-  // It runs chdir'd to the directory where they're found.  Nothing else done
-  // here in the test harness affects the lookups it does or verifies that it
-  // does the expected set in the expected order.  So this just verifies that
-  // each SONAME in the list is an existing test file.
-  for (std::string_view name : names) {
-    ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
-  }
+  needed_libs_.insert(needed_libs_.end(), names.begin(), names.end());
 }
 
 void LdLoadTestsBase::Needed(
     std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
-  for (auto [name, found] : name_found_pairs) {
-    if (found) {
-      ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
-    } else {
-      ASSERT_FALSE(elfldltl::testing::TryGetTestLib(name)) << name;
-    }
-  }
+  needed_libs_.insert(needed_libs_.end(), name_found_pairs.begin(), name_found_pairs.end());
 }
 
 }  // namespace ld::testing

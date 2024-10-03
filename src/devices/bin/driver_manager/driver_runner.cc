@@ -233,9 +233,9 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
     : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
-      root_node_(std::make_shared<Node>(
-          kRootDeviceName, std::vector<std::weak_ptr<Node>>{}, this, dispatcher,
-          inspect.CreateDevice(std::string(kRootDeviceName), zx::vmo(), 0))),
+      root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<std::weak_ptr<Node>>{}, this,
+                                        dispatcher,
+                                        inspect.CreateDevice(std::string(kRootDeviceName), 0))),
       composite_node_spec_manager_(this),
       bind_manager_(this, this, dispatcher),
       runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)),
@@ -522,6 +522,16 @@ void DriverRunner::CreateDriverHostDynamicLinker(
     return;
   }
 
+  auto endpoints = fidl::Endpoints<fio::Directory>::Create();
+
+  auto client_end = component::ConnectAt<fdh::DriverHost>(endpoints.client);
+  if (client_end.is_error()) {
+    LOGF(ERROR, "Failed to connect to service '%s': %s",
+         fidl::DiscoverableProtocolName<fdh::DriverHost>, client_end.status_string());
+    completion_cb(client_end.take_error());
+    return;
+  }
+
   zx::channel bootstrap_sender, bootstrap_receiver;
   zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
   if (status != ZX_OK) {
@@ -532,27 +542,18 @@ void DriverRunner::CreateDriverHostDynamicLinker(
 
   dynamic_linker_args_->driver_host_runner->StartDriverHost(
       dynamic_linker_service_client.get(), std::move(bootstrap_receiver),
+      std::move(endpoints.server),
       [this, linker = std::move(dynamic_linker_service_client),
-       bootstrap_sender = std::move(bootstrap_sender), completion_cb = std::move(completion_cb)](
+       bootstrap_sender = std::move(bootstrap_sender), completion_cb = std::move(completion_cb),
+       client_end = std::move(client_end)](
           zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) mutable {
         if (result.is_error()) {
           completion_cb(result.take_error());
           return;
         }
         auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
-            std::move(*result), dispatcher_, std::move(bootstrap_sender), std::move(linker),
-            &dynamic_linker_driver_hosts_);
-
-        // This listens for when the driver host closes it's bootstrap channel,
-        // so that the driver host component object can remove itself from the
-        // |dynamic_linker_driver_hosts_| list.
-        // This is safe to do before adding it to the list, as the listener is
-        // registered to the same dispatcher that the driver runner is running on.
-        zx_status_t status = driver_host->StartBootstrapCloseListener();
-        if (status != ZX_OK) {
-          completion_cb(zx::error(status));
-          return;
-        }
+            std::move(*client_end), std::move(*result), dispatcher_, std::move(bootstrap_sender),
+            std::move(linker), &dynamic_linker_driver_hosts_);
 
         auto driver_host_ptr = driver_host.get();
         dynamic_linker_driver_hosts_.push_back(std::move(driver_host));

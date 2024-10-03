@@ -12,7 +12,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 use tracing::{error, warn};
 use url::Url;
-use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, zx};
 
 enum ProviderStatus {
     Stopped,
@@ -235,7 +235,7 @@ mod tests {
     use super::*;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
     use futures::{join, Future, TryStreamExt};
-    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, zx};
 
     // Test fixtures and helpers.
 

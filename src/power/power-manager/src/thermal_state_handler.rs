@@ -12,7 +12,6 @@ use crate::{log_if_err, ok_or_default_err};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::hanging_get::server as hanging_get;
-use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::prelude::*;
@@ -148,10 +147,6 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
             metrics_tracker: RefCell::new(metrics_tracker),
             _inspect: inspect,
         });
-
-        if self.enable_cpu_thermal_state_connector {
-            let _connector = connect_to_protocol::<fidl_fuchsia_component::BinderMarker>()?;
-        }
 
         // Publish the Controller service only if both enable_client_state_connector = true
         // and we were provided with a ServiceFs

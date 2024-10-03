@@ -8,8 +8,7 @@ use fullmac_helpers::config::FullmacDriverConfig;
 use fullmac_helpers::recorded_request_stream::RecordedRequestStream;
 use {
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_test_wlan_testcontroller as fidl_testcontroller, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_test_wlan_testcontroller as fidl_testcontroller, fuchsia_async as fasync, zx,
 };
 
 mod ap;
@@ -58,7 +57,7 @@ impl Drop for FullmacDriverFixture {
         tracing::info!("FullmacDriverFixture deleting fullmac driver {:?}...", self.id);
         let testcontroller_sync_proxy = self.realm.take_sync_testcontroller_proxy();
         testcontroller_sync_proxy
-            .delete_fullmac(self.id, zx::MonotonicTime::INFINITE)
+            .delete_fullmac(self.id, zx::MonotonicInstant::INFINITE)
             .expect("FIDL error when calling DeleteFullmac")
             .expect("TestController error when calling DeleteFullmac");
     }

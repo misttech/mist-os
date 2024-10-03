@@ -651,7 +651,7 @@ fn format_dispatch_arg_rust(arg: &ast::Arg) -> Cow<'_, str> {
             }
         }
         ArgKind::Array => "Array".into(),
-        ArgKind::Fd => "fuchsia_zircon::Handle".into(),
+        ArgKind::Fd => "zx::Handle".into(),
     }
 }
 
@@ -667,7 +667,7 @@ fn format_wire_arg_rust(arg: &ast::Arg) -> Cow<'_, str> {
         ArgKind::Object => "ObjectId",
         ArgKind::NewId => "NewId",
         ArgKind::Array => "Array",
-        ArgKind::Fd => "fuchsia_zircon::Handle",
+        ArgKind::Fd => "zx::Handle",
     }
     .into()
 }

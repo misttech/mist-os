@@ -7,7 +7,7 @@ use crate::act_structured::StructuredActionContext;
 use crate::metrics::metric_value::MetricValue;
 use crate::metrics::MetricState;
 use anyhow::{bail, Error};
-use injectable_time::{MonotonicTime, TimeSource};
+use injectable_time::{MonotonicInstant, TimeSource};
 use regex::Regex;
 
 pub(crate) mod act; // Perform appropriate actions and collect results as strings.
@@ -107,7 +107,7 @@ pub fn snapshots(
     parse_result: &ParseResult,
 ) -> (Vec<SnapshotTrigger>, act::WarningVec) {
     parse_result.reset_state();
-    let now = Some(MonotonicTime::new().now());
+    let now = Some(MonotonicInstant::new().now());
     let evaluator = ActionContext::new(&parse_result.metrics, &parse_result.actions, data, now);
     evaluator.into_snapshots()
 }

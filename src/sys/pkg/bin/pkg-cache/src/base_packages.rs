@@ -84,8 +84,19 @@ impl FrozenIndex<Cache> {
         blobfs: &blobfs::Client,
         cache_packages: &system_image::CachePackages,
     ) -> Result<Self, anyhow::Error> {
-        let root_package_urls_and_hashes =
-            cache_packages.contents().cloned().map(|url| (url.into_unpinned_and_hash())).collect();
+        let root_package_urls_and_hashes = cache_packages
+            .contents()
+            .cloned()
+            .map(|url| {
+                let (mut url, hash) = url.into_unpinned_and_hash();
+                // TODO(https://fxbug.dev/42131375) Remove variant checks when variant concept is deleted.
+                if matches!(url.variant(), Some(v) if !v.is_zero()) {
+                    panic!("cache package variants must be zero: {url}");
+                }
+                url.clear_variant();
+                (url, hash)
+            })
+            .collect();
         Self::from_urls(blobfs, root_package_urls_and_hashes, OnPackageLoadError::Log).await
     }
 }
@@ -539,8 +550,8 @@ mod tests {
         assert_eq!(
             cache_packages.root_package_urls_and_hashes(),
             &HashMap::from_iter([
-                ("fuchsia-pkg://fuchsia.com/present/0".parse().unwrap(), *present.hash()),
-                ("fuchsia-pkg://fuchsia.com/absent/0".parse().unwrap(), *absent.hash())
+                ("fuchsia-pkg://fuchsia.com/present".parse().unwrap(), *present.hash()),
+                ("fuchsia-pkg://fuchsia.com/absent".parse().unwrap(), *absent.hash())
             ])
         );
     }

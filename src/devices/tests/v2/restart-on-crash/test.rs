@@ -10,7 +10,7 @@ use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_crashdriver_test as fcdt,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_test as fdt, fuchsia_zircon as zx,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_test as fdt, zx,
 };
 
 fn send_get_device_info_request(

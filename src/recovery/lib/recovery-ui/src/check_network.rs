@@ -215,7 +215,7 @@ impl ViewAssistant for CheckNetworkViewAssistant {
     fn render(
         &mut self,
         render_context: &mut RenderContext,
-        ready_event: fuchsia_zircon::Event,
+        ready_event: zx::Event,
         context: &ViewAssistantContext,
     ) -> Result<(), Error> {
         let mut scene_details =

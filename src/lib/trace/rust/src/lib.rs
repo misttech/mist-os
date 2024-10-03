@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use pin_project::pin_project;
 use std::ffi::CStr;
 use std::future::Future;
@@ -89,7 +88,7 @@ impl Id {
     /// TODO(https://fxbug.dev/42054669) Delete this and migrate clients to `Id::new` once UIs stop grouping
     /// async durations with the same trace id but different process ids.
     pub fn random() -> Self {
-        let ts = zx::MonotonicTime::get().into_nanos() as u64;
+        let ts = zx::MonotonicInstant::get().into_nanos() as u64;
         let high_order = ts << 16;
         let low_order = rand::random::<u16>() as u64;
         Self(high_order | low_order)
@@ -1379,7 +1378,7 @@ unsafe impl Send for ProlongedContext {}
 
 mod sys {
     #![allow(non_camel_case_types, unused)]
-    use fuchsia_zircon::sys::{zx_handle_t, zx_koid_t, zx_obj_type_t, zx_status_t, zx_ticks_t};
+    use zx::sys::{zx_handle_t, zx_koid_t, zx_obj_type_t, zx_status_t, zx_ticks_t};
 
     pub type trace_ticks_t = zx_ticks_t;
     pub type trace_counter_id_t = u64;

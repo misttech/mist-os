@@ -66,8 +66,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -693,7 +692,7 @@ impl ComponentInstance {
                 };
             }
 
-            let stop_time = zx::MonotonicTime::get();
+            let stop_time = zx::MonotonicInstant::get();
             let event = self.new_event(EventPayload::Stopped {
                 status: disposition.stop_info().termination_status,
                 exit_code: disposition.stop_info().exit_code,
@@ -1279,13 +1278,13 @@ impl ComponentInstance {
     }
 
     pub fn new_event(&self, payload: EventPayload) -> Event {
-        self.new_event_with_timestamp(payload, zx::MonotonicTime::get())
+        self.new_event_with_timestamp(payload, zx::MonotonicInstant::get())
     }
 
     pub fn new_event_with_timestamp(
         &self,
         payload: EventPayload,
-        timestamp: zx::MonotonicTime,
+        timestamp: zx::MonotonicInstant,
     ) -> Event {
         Event {
             target_moniker: self.moniker.clone().into(),
@@ -1490,14 +1489,14 @@ impl std::fmt::Debug for ComponentInstance {
 #[cfg(test)]
 pub mod testing {
     use crate::model::events::stream::EventStream;
-    use fuchsia_zircon as zx;
+
     use hooks::EventType;
     use moniker::Moniker;
 
     pub async fn wait_until_event_get_timestamp(
         event_stream: &mut EventStream,
         event_type: EventType,
-    ) -> zx::MonotonicTime {
+    ) -> zx::MonotonicInstant {
         event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
     }
 }
@@ -1526,7 +1525,6 @@ pub mod tests {
     use errors::{AddChildError, DynamicCapabilityError};
     use fasync::TestExecutor;
     use fidl::endpoints::DiscoverableProtocolMarker;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::channel::mpsc;
     use futures::{FutureExt, StreamExt, TryStreamExt};
     use hooks::EventType;
@@ -1538,6 +1536,7 @@ pub mod tests {
     use vfs::path::Path as VfsPath;
     use vfs::service::host;
     use vfs::ToObjectRequest;
+    use zx::{self as zx, AsHandleRef};
     use {fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
     #[fuchsia::test]

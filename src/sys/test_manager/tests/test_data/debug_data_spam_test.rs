@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_debugdata::PublisherMarker;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 
 async fn publish_debug_data(num_vmos: usize, vmo_size: usize) {
     let vmo_contents = "a".repeat(vmo_size);

@@ -8,8 +8,7 @@ use fidl::endpoints::{ProtocolMarker as _, ServerEnd};
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, warn};
 use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug, zx,
 };
 
 use crate::bindings::devices::BindingId;
@@ -164,7 +163,7 @@ impl DiagnosticsHandler {
 #[cfg(test)]
 mod tests {
     use super::DiagnosticsHandler;
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt as _;
     use test_case::test_case;
 

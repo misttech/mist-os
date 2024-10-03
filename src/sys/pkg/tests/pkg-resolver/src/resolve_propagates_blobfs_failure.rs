@@ -15,10 +15,10 @@ use {
     fuchsia_async::Task,
     fuchsia_merkle::Hash,
     fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder},
-    fuchsia_zircon::Status,
     futures::{future::BoxFuture, prelude::*},
     lib::{extra_blob_contents, make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH},
     std::sync::{atomic::AtomicU64, Arc},
+    zx::Status,
 };
 
 trait FileStreamHandler: Send + Sync + 'static {

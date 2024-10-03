@@ -11,7 +11,6 @@ use anyhow::Context;
 use cm_types::NamespacePath;
 use fidl_connector::Connect;
 use fuchsia_runtime::{HandleInfo, HandleInfoError};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use process_builder::{
@@ -22,7 +21,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, info, warn};
-use zx::sys;
+use zx::{self as zx, sys, AsHandleRef};
 use {fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
 /// Internal error type for ProcessLauncher which conveniently wraps errors that might

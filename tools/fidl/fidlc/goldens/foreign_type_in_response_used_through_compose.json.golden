@@ -112,6 +112,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.middle/MiddleGetFooResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -151,6 +152,7 @@
         {
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.bottom/Foo",
             "nullable": false,
             "type_shape_v2": {

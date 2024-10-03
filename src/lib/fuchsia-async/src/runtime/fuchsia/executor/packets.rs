@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use rustc_hash::FxHashMap as HashMap;
 use std::ops::Deref;
 use std::sync::Arc;

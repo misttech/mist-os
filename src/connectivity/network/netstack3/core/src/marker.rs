@@ -154,7 +154,7 @@ pub trait IpBindingsContext<I: IpExt>:
     + FilterBindingsContext
     + IcmpBindingsContext
     + IcmpEchoBindingsContext<I, DeviceId<Self>>
-    + MulticastForwardingBindingsContext
+    + MulticastForwardingBindingsContext<I, DeviceId<Self>>
     + RawIpSocketsBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
@@ -177,7 +177,7 @@ where
         + FilterBindingsContext
         + IcmpBindingsContext
         + IcmpEchoBindingsContext<I, DeviceId<Self>>
-        + MulticastForwardingBindingsContext
+        + MulticastForwardingBindingsContext<I, DeviceId<Self>>
         + RawIpSocketsBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>

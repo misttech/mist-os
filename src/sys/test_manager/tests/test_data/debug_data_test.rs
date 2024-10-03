@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_debugdata::PublisherMarker;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
+
 use std::thread::sleep;
 use std::time::Duration;
 use zx::{AsHandleRef, HandleBased};

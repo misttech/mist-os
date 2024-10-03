@@ -46,7 +46,7 @@ pub mod device {
         DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef,
         DadTimerId,
     };
-    pub use crate::internal::device::opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret};
+    pub use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
     pub use crate::internal::device::route_discovery::{
         Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryBindingsContext,
         Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,
@@ -189,8 +189,8 @@ pub mod multicast_forwarding {
     };
     pub use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
     pub use crate::internal::multicast_forwarding::route::{
-        ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
-        MulticastRouteTargets,
+        ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteStats,
+        MulticastRouteTarget, MulticastRouteTargets,
     };
     pub use crate::internal::multicast_forwarding::state::{
         MulticastForwardingEnabledState, MulticastForwardingPendingPacketsContext,
@@ -199,7 +199,7 @@ pub mod multicast_forwarding {
     };
     pub use crate::internal::multicast_forwarding::{
         MulticastForwardingBindingsContext, MulticastForwardingBindingsTypes,
-        MulticastForwardingDeviceContext, MulticastForwardingTimerId,
+        MulticastForwardingDeviceContext, MulticastForwardingEvent, MulticastForwardingTimerId,
     };
 }
 
@@ -242,7 +242,7 @@ pub use internal::routing::{
 };
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
-    Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
+    InternalForwarding, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
 };
 
 /// IP layer test utilities.

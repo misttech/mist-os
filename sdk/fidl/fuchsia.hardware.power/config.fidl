@@ -100,6 +100,13 @@ type SagElement = strict enum {
     APPLICATION_ACTIVITY = 4;
 };
 
+/// Represents the power elements related to controlling the CPU. This is an
+/// enum with a single variant to add flexibility for future addition of more
+/// elements related to CPU power state.
+type CpuPowerElement = strict enum {
+    CPU = 1;
+};
+
 /// Identifier for an element that is another element's parent, in other words
 /// an element that the other element depends upon.
 type ParentElement = strict union {
@@ -110,6 +117,10 @@ type ParentElement = strict union {
     /// The parent element's access token should be available from
     /// `/svc/fuchsia.hardware.power.PowerTokenProvider/{instance_name}`.
     2: instance_name string:MAX_NAME_LENGTH;
+
+    /// The parent element comes from the fuchsia.power.system/CpuElementManager
+    /// protocol.
+    3: cpu_control CpuPowerElement;
 };
 
 @discoverable

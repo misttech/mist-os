@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/370526509): Remove once wake lock features has stabilized.
+#![allow(dead_code, unused_imports)]
+
 use crate::power::{listener, SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 use crate::vfs::EpollKey;
@@ -13,16 +16,16 @@ use anyhow::{anyhow, Context};
 use fidl::endpoints::create_sync_proxy;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use fuchsia_zircon::{HandleBased, Peered};
 use once_cell::sync::OnceCell;
-use starnix_logging::{log_info, log_warn};
+use starnix_logging::log_warn;
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
+use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
-    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, zx,
 };
 
 cfg_if::cfg_if! {
@@ -31,7 +34,7 @@ cfg_if::cfg_if! {
         use fidl_fuchsia_power_suspend as fsuspend;
         use fuchsia_component::client::connect_to_protocol;
         use futures::StreamExt;
-        use starnix_logging::log_error;
+        use starnix_logging::{log_error, log_info};
     }
 }
 
@@ -186,15 +189,35 @@ impl SuspendResumeManager {
         self: &SuspendResumeManagerHandle,
         system_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
-        let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()?;
         let handoff = system_task
             .kernel()
             .connect_to_protocol_at_container_svc::<fpower::HandoffMarker>()?
             .into_sync_proxy();
-        self.init_power_element(&activity_governor, &handoff, system_task)?;
-        listener::init_listener(self, &activity_governor, system_task);
         #[cfg(not(feature = "wake_locks"))]
-        self.init_stats_watcher(system_task);
+        {
+            let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()?;
+            self.init_power_element(&activity_governor, &handoff, system_task)?;
+            listener::init_listener(self, &activity_governor, system_task);
+            self.init_stats_watcher(system_task);
+        }
+        #[cfg(feature = "wake_locks")]
+        {
+            match handoff.take(zx::MonotonicInstant::INFINITE) {
+                Ok(parent_lease) => {
+                    let parent_lease = parent_lease.map_err(|e| {
+                        anyhow!("Failed to take lessor and lease from parent: {e:?}")
+                    })?;
+                    drop(parent_lease)
+                }
+                Err(e) => {
+                    if e.is_closed() {
+                        log_warn!("Failed to send the fuchsia.session.power/Handoff.Take request. Assuming no Handoff protocol exists and moving on...");
+                    } else {
+                        return Err(e).context("Handoff::Take");
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -208,7 +231,7 @@ impl SuspendResumeManager {
 
         // Create the PowerMode power element depending on the Application Activity of SAG.
         let power_elements = activity_governor
-            .get_power_elements(zx::MonotonicTime::INFINITE)
+            .get_power_elements(zx::MonotonicInstant::INFINITE)
             .context("cannot get Activity Governor element from SAG")?;
         if let Some(Some(application_activity_token)) = power_elements
             .application_activity
@@ -246,13 +269,13 @@ impl SuspendResumeManager {
                         level_control_channels: Some(level_control_channels),
                         ..Default::default()
                     },
-                    zx::MonotonicTime::INFINITE,
+                    zx::MonotonicInstant::INFINITE,
                 )?
                 .map_err(|e| anyhow!("PowerBroker::AddElementError({e:?})"))?;
 
             // Power on by holding a lease.
             let power_on_control = lessor
-                .lease(STARNIX_POWER_ON_LEVEL, zx::MonotonicTime::INFINITE)?
+                .lease(STARNIX_POWER_ON_LEVEL, zx::MonotonicInstant::INFINITE)?
                 .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?
                 .into_channel();
             self.lock().lease_control_channel = Some(power_on_control);
@@ -267,14 +290,14 @@ impl SuspendResumeManager {
 
             let self_ref = self.clone();
             system_task.kernel().kthreads.spawn(move |_, _| {
-                while let Ok(Ok(level)) = required_level.watch(zx::MonotonicTime::INFINITE) {
+                while let Ok(Ok(level)) = required_level.watch(zx::MonotonicInstant::INFINITE) {
                     if let Err(e) = self_ref
                         .power_mode()
                         .expect("Starnix should have a power mode")
                         .level_proxy
                         .as_ref()
                         .expect("Starnix power mode should have a current level proxy")
-                        .update(level, zx::MonotonicTime::INFINITE)
+                        .update(level, zx::MonotonicInstant::INFINITE)
                     {
                         log_warn!("Failed to update current level: {e:?}");
                         break;
@@ -283,7 +306,7 @@ impl SuspendResumeManager {
             });
 
             // We may not have a session manager to take a lease from in tests.
-            match handoff.take(zx::MonotonicTime::INFINITE) {
+            match handoff.take(zx::MonotonicInstant::INFINITE) {
                 Ok(parent_lease) => {
                     let parent_lease = parent_lease.map_err(|e| {
                         anyhow!("Failed to take lessor and lease from parent: {e:?}")
@@ -443,14 +466,14 @@ impl SuspendResumeManager {
         // Before the old lease is dropped, a new lease must be created to transit to the
         // new level. This ensures a smooth transition without going back to the initial
         // power level.
-        match power_mode.lessor_proxy.lease(level, zx::MonotonicTime::INFINITE) {
+        match power_mode.lessor_proxy.lease(level, zx::MonotonicInstant::INFINITE) {
             Ok(Ok(lease_client)) => {
                 // Wait until the lease is satisfied.
                 let lease_control = lease_client.into_sync_proxy();
                 let mut lease_status = fbroker::LeaseStatus::Unknown;
                 while lease_status != fbroker::LeaseStatus::Satisfied {
                     lease_status = lease_control
-                        .watch_status(lease_status, zx::MonotonicTime::INFINITE)
+                        .watch_status(lease_status, zx::MonotonicInstant::INFINITE)
                         .map_err(|_| errno!(EINVAL))?;
                 }
                 self.lock().lease_control_channel = Some(lease_control.into_channel());
@@ -467,7 +490,7 @@ impl SuspendResumeManager {
             .level_proxy
             .as_ref()
             .expect("Starnix PowerMode should have power level proxy")
-            .update(level, zx::MonotonicTime::INFINITE)
+            .update(level, zx::MonotonicInstant::INFINITE)
         {
             Ok(Ok(_)) => Ok(()),
             Ok(Err(err)) => error!(EINVAL, format!("power level update error {:?}", err)),
@@ -483,7 +506,7 @@ impl SuspendResumeManager {
             .open_status_channel(element_status_server)
             .map_err(|e| errno!(EINVAL, format!("Status channel failed to open: {e}")))?;
         while element_status
-            .watch_power_level(zx::MonotonicTime::INFINITE)
+            .watch_power_level(zx::MonotonicInstant::INFINITE)
             .map_err(|err| errno!(EINVAL, format!("power element status watch error {err}")))?
             .map_err(|err| {
                 errno!(EINVAL, format!("power element status watch fidl error {:?}", err))
@@ -505,11 +528,65 @@ impl SuspendResumeManager {
         });
     }
 
+    #[cfg(feature = "wake_locks")]
+    pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
+        let suspend_start_time = zx::BootInstant::get();
+
+        self.lock().inspect_node.add_entry(|node| {
+            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, suspend_start_time.clone().into_nanos());
+            node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
+        });
+
+        let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
+            .expect("Failed to connect to manager");
+        match manager.suspend_container(
+            frunner::ManagerSuspendContainerRequest {
+                container_job: Some(
+                    fuchsia_runtime::job_default()
+                        .duplicate(zx::Rights::SAME_RIGHTS)
+                        .expect("Failed to dup handle"),
+                ),
+                wake_locks: Some(self.duplicate_lock_event()),
+                ..Default::default()
+            },
+            zx::Instant::INFINITE,
+        ) {
+            Ok(Ok(res)) => {
+                let wake_time = zx::BootInstant::get();
+                self.update_suspend_stats(|suspend_stats| {
+                    suspend_stats.success_count += 1;
+                    suspend_stats.last_time_in_suspend_operations =
+                        (wake_time - suspend_start_time).into();
+                    suspend_stats.last_time_in_sleep =
+                        zx::Duration::from_nanos(res.suspend_time.unwrap_or(0));
+                });
+                self.lock().inspect_node.add_entry(|node| {
+                    node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
+                });
+            }
+            _ => {
+                let wake_time = zx::BootInstant::get();
+                self.update_suspend_stats(|suspend_stats| {
+                    suspend_stats.fail_count += 1;
+                    suspend_stats.last_failed_errno = Some(errno!(EINVAL));
+                });
+                self.lock().inspect_node.add_entry(|node| {
+                    node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
+                    node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
+                });
+                return error!(EINVAL);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Executed on suspend.
+    #[cfg(not(feature = "wake_locks"))]
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
+            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicInstant::get().into_nanos());
             node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_string());
         });
 
@@ -525,21 +602,17 @@ impl SuspendResumeManager {
 
         // Starnix will wait here on suspend.
         let suspend_result = waiter.wait();
-
-        #[cfg(not(feature = "wake_locks"))]
-        {
-            // Synchronously update the stats after performing suspend so that a later
-            // query of stats is guaranteed to reflect the current suspend operation.
-            let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
-                .expect("connection to fuchsia.power.suspend.Stats");
-            match stats_proxy.watch(zx::MonotonicTime::INFINITE) {
-                Ok(stats) => self.update_stats(stats),
-                Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
-            }
+        // Synchronously update the stats after performing suspend so that a later
+        // query of stats is guaranteed to reflect the current suspend operation.
+        let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
+            .expect("connection to fuchsia.power.suspend.Stats");
+        match stats_proxy.watch(zx::MonotonicInstant::INFINITE) {
+            Ok(stats) => self.update_stats(stats),
+            Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
         }
 
         // Use the same "now" for all subsequent stats.
-        let now = zx::MonotonicTime::get();
+        let now = zx::MonotonicInstant::get();
 
         match suspend_result {
             SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?,
@@ -581,15 +654,19 @@ impl WakeLease {
     }
 
     pub fn activate(&self) -> Result<(), Errno> {
-        let mut guard = self.lease.lock();
-        if guard.is_none() {
-            let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
-                .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
-            *guard = Some(
-                activity_governor
-                    .take_wake_lease(&self.name, zx::MonotonicTime::INFINITE)
-                    .map_err(|_| errno!(EINVAL, "Failed to take wake lease"))?,
-            );
+        #[cfg(not(feature = "wake_locks"))]
+        {
+            let mut guard = self.lease.lock();
+            if guard.is_none() {
+                let activity_governor =
+                    connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
+                        .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
+                *guard = Some(
+                    activity_governor
+                        .take_wake_lease(&self.name, zx::MonotonicInstant::INFINITE)
+                        .map_err(|_| errno!(EINVAL, "Failed to take wake lease"))?,
+                );
+            }
         }
         Ok(())
     }

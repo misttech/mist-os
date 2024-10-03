@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::compiler::Compiler;
-use crate::ir::{Enum, Struct, Table, Type, TypeKind, Union};
+use crate::ir::{Enum, Struct, Table, Type, Union};
 
 #[derive(Default)]
 pub struct Properties {
@@ -54,14 +54,15 @@ impl Property for IsWireStatic {
     }
 
     fn calculate_type(compiler: &mut Compiler<'_>, ty: &Type) -> Self::Type {
-        match &ty.kind {
-            TypeKind::Primitive { .. } | TypeKind::Handle { .. } => true,
-            TypeKind::Vector { .. } | TypeKind::String { .. } => false,
-            TypeKind::Array { element_type, .. } => Self::calculate_type(compiler, element_type),
-            TypeKind::Identifier { identifier, nullable, .. } => {
+        match &ty {
+            Type::Primitive { .. } | Type::Handle { .. } => true,
+            Type::Vector { .. } | Type::String { .. } => false,
+            Type::Array { element_type, .. } => Self::calculate_type(compiler, element_type),
+            Type::Identifier { identifier, nullable, .. } => {
                 !nullable && compiler.query::<Self>(identifier)
             }
-            TypeKind::Request { .. } => todo!(),
+            Type::Request { .. } => todo!(),
+            Type::Internal { .. } => true,
         }
     }
 }

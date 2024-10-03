@@ -9,14 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                // TODO(https://fxbug.dev/368343873): Support weak host
-                // semantics in Netstack3 when configured as a router.
-                "ping_other_router_addr_ns3::ipv4_with_forwarding",
-                "ping_other_router_addr_ns3::ipv6_with_forwarding",
-            ],
-        },
     ],
 }

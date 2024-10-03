@@ -8,9 +8,9 @@
 use super::errors::{error, Errno};
 use super::restricted_aspace::RESTRICTED_ASPACE_HIGHEST_ADDRESS;
 use super::user_address::UserAddress;
-use fuchsia_zircon::sys::zx_vaddr_t;
 use std::fmt;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zx::sys::zx_vaddr_t;
 
 #[derive(
     Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, KnownLayout, FromBytes, Immutable,

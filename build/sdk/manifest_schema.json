@@ -53,8 +53,6 @@
                     "description": "Publication level of this atom",
                     "type": "string",
                     "enum": [
-                        "excluded",
-                        "experimental",
                         "internal",
                         "cts",
                         "partner",

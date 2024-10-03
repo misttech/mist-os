@@ -172,6 +172,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocolOneWayAnonComposedRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -203,6 +204,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocolTwoWayAnonComposedRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -218,6 +220,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocolTwoWayAnonComposedResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -248,6 +251,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocolTwoWayAnonComposedWithErrorRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -263,6 +267,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocol_TwoWayAnonComposedWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -279,6 +284,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocol_TwoWayAnonComposedWithError_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -293,6 +299,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -321,6 +328,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocolOnAnonComposedRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -351,6 +359,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -382,6 +391,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -397,6 +407,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -427,6 +438,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -442,6 +454,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedProtocol_TwoWayNamedComposedWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -458,6 +471,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -472,6 +486,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -500,6 +515,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -530,6 +546,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -561,6 +578,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -576,6 +594,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -606,6 +625,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -621,6 +641,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayImportWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -637,6 +658,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -651,6 +673,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -679,6 +702,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -709,6 +733,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -740,6 +765,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -755,6 +781,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -785,6 +812,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalTablePayload",
             "nullable": false,
             "type_shape_v2": {
@@ -800,6 +828,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayLocalWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -816,6 +845,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -830,6 +860,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -858,6 +889,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -888,6 +920,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocolOneWayAnonRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -919,6 +952,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocolTwoWayAnonRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -934,6 +968,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocolTwoWayAnonResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -964,6 +999,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocolTwoWayAnonWithErrorRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -979,6 +1015,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayAnonWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -995,6 +1032,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayAnonWithError_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1009,6 +1047,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1037,6 +1076,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocolOnAnonRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1092,6 +1132,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolFlexibleOneWayRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1123,6 +1164,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolFlexibleTwoWayNoErrorRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1138,6 +1180,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayNoError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1154,6 +1197,7 @@
           "has_error": false,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayNoError_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1182,6 +1226,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolFlexibleTwoWayWithErrorRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1197,6 +1242,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1213,6 +1259,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayWithError_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1227,6 +1274,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1255,6 +1303,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolFlexibleEventRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1285,6 +1334,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolStrictOneWayRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1316,6 +1366,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolStrictTwoWayNoErrorRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1331,6 +1382,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolStrictTwoWayNoErrorResponse",
             "nullable": false,
             "type_shape_v2": {
@@ -1361,6 +1413,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolStrictTwoWayWithErrorRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1376,6 +1429,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocol_StrictTwoWayWithError_Result",
             "nullable": false,
             "type_shape_v2": {
@@ -1392,6 +1446,7 @@
           "has_error": true,
           "maybe_response_success_type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocol_StrictTwoWayWithError_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -1406,6 +1461,7 @@
           },
           "maybe_response_err_type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1434,6 +1490,7 @@
           "has_response": true,
           "maybe_response_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ComposedOpenProtocolStrictEventRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1464,6 +1521,7 @@
           "has_request": true,
           "maybe_request_payload": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportStructPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -1504,6 +1562,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1559,6 +1618,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1614,6 +1674,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1669,6 +1730,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1724,6 +1786,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1779,6 +1842,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1834,6 +1898,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1889,6 +1954,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -1944,6 +2010,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2000,6 +2067,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2056,6 +2124,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2112,6 +2181,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2165,6 +2235,7 @@
         {
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2221,6 +2292,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -2273,6 +2345,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -2325,6 +2398,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -2377,6 +2451,7 @@
           "ordinal": 1,
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
               "inline_size": 2,
@@ -2430,6 +2505,7 @@
           "name": "b",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2483,6 +2559,7 @@
           "name": "b",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2536,6 +2613,7 @@
           "name": "b",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2590,6 +2668,7 @@
           "name": "b",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
               "inline_size": 1,
@@ -2643,6 +2722,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/MainProtocol_TwoWayAnonWithError_Response",
             "nullable": false,
             "type_shape_v2": {
@@ -2668,6 +2748,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2721,6 +2802,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts.imported/ImportUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -2746,6 +2828,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,
@@ -2799,6 +2882,7 @@
           "name": "response",
           "type": {
             "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.protocollayouts/LocalUnionPayload",
             "nullable": false,
             "type_shape_v2": {
@@ -2824,6 +2908,7 @@
           "name": "err",
           "type": {
             "kind": "primitive",
+            "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
               "inline_size": 4,

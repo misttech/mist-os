@@ -178,6 +178,9 @@ zx::result<fdf_power::ParentElement> CreateParentElement(
       }
       return zx::ok(fdf_power::ParentElement::WithInstanceName(fidl_instance_name.value()));
     }
+    case fuchsia_hardware_power::ParentElement::Tag::kCpuControl: {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
   }
 }
 
@@ -205,6 +208,9 @@ zx::result<fdf_power::ParentElement> CreateParentElement(
     case fuchsia_hardware_power::wire::ParentElement::Tag::kInstanceName: {
       return zx::ok(
           fdf_power::ParentElement::WithInstanceName(std::string{src.instance_name().get()}));
+    }
+    case fuchsia_hardware_power::wire::ParentElement::Tag::kCpuControl: {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
   }
 }

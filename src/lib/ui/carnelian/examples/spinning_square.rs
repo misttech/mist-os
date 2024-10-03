@@ -20,10 +20,10 @@ use euclid::{point2, size2, vec2, Angle, Transform2D};
 use fidl::prelude::*;
 use fidl_test_placeholders::{EchoMarker, EchoRequest, EchoRequestStream};
 use fuchsia_async as fasync;
-use fuchsia_zircon::MonotonicTime;
 use futures::prelude::*;
 use std::f32::consts::PI;
 use std::path::PathBuf;
+use zx::MonotonicInstant;
 
 struct SpinningSquareAppAssistant {
     app_sender: AppSender,
@@ -133,13 +133,13 @@ struct SpinningSquareFacet {
     direction: Direction,
     square_color: Color,
     rounded: bool,
-    start: MonotonicTime,
+    start: MonotonicInstant,
     square_path: Option<Path>,
     size: Size,
 }
 
 impl SpinningSquareFacet {
-    fn new(square_color: Color, start: MonotonicTime, size: Size, direction: Direction) -> Self {
+    fn new(square_color: Color, start: MonotonicInstant, size: Size, direction: Direction) -> Self {
         Self { direction, square_color, rounded: false, start, square_path: None, size }
     }
 
@@ -235,7 +235,7 @@ struct SpinningSquareViewAssistant {
     view_key: ViewKey,
     background_color: Color,
     square_color: Color,
-    start: MonotonicTime,
+    start: MonotonicInstant,
     app_sender: AppSender,
     scene_details: Option<SceneDetails>,
     face: FontFace,
@@ -251,7 +251,7 @@ impl SpinningSquareViewAssistant {
     ) -> Result<ViewAssistantPtr, Error> {
         let square_color = Color { r: 0xbb, g: 0x00, b: 0xff, a: 0xbb };
         let background_color = Color { r: 0x3f, g: 0x8a, b: 0x99, a: 0xff };
-        let start = MonotonicTime::get();
+        let start = MonotonicInstant::get();
         let face = load_font(PathBuf::from("/pkg/data/fonts/RobotoSlab-Regular.ttf"))?;
 
         Ok(Box::new(SpinningSquareViewAssistant {

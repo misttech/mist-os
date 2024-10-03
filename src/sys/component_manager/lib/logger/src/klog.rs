@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, ObjectType};
 use std::fmt::{Debug, Write};
 use std::os::fd::AsFd;
 use tracing::field::Field;
@@ -12,6 +11,7 @@ use tracing_subscriber::field::Visit;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{Layer, Registry};
+use zx::{self as zx, AsHandleRef, ObjectType};
 
 /// KernelLogger is a subscriber implementation for the tracing crate.
 pub struct KernelLogger {
@@ -146,10 +146,10 @@ mod tests {
     use anyhow::Context;
     use fidl_fuchsia_boot as fboot;
     use fuchsia_component::client::connect_channel_to_protocol;
-    use fuchsia_zircon::HandleBased;
     use rand::Rng;
     use std::panic;
     use tracing::{error, info, warn};
+    use zx::HandleBased;
 
     const MAX_INFO_LINE_LEN: usize =
         zx::sys::ZX_LOG_RECORD_DATA_MAX - "[component_manager] INFO: ".len();
@@ -158,7 +158,7 @@ mod tests {
         let (client_end, server_end) = zx::Channel::create();
         connect_channel_to_protocol::<fboot::ReadOnlyLogMarker>(server_end).unwrap();
         let service = fboot::ReadOnlyLogSynchronousProxy::new(client_end);
-        let log = service.get(zx::MonotonicTime::INFINITE).expect("couldn't get read only log");
+        let log = service.get(zx::MonotonicInstant::INFINITE).expect("couldn't get read only log");
         log
     }
 
@@ -178,7 +178,7 @@ mod tests {
                 }
                 Err(status) if status == zx::Status::SHOULD_WAIT => {
                     debuglog
-                        .wait_handle(zx::Signals::LOG_READABLE, zx::MonotonicTime::INFINITE)
+                        .wait_handle(zx::Signals::LOG_READABLE, zx::MonotonicInstant::INFINITE)
                         .expect("Failed to wait for log readable");
                     continue;
                 }

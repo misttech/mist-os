@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use ffx_debug_limbo_args::{LimboCommand, LimboSubCommand};
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_exception::ProcessLimboProxy;
-use fuchsia_zircon_status::Status;
-use fuchsia_zircon_types::{ZX_ERR_NOT_FOUND, ZX_ERR_UNAVAILABLE};
+use zx_status::Status;
+use zx_types::{ZX_ERR_NOT_FOUND, ZX_ERR_UNAVAILABLE};
 
 #[derive(FfxTool)]
 pub struct LimboTool {

@@ -12,8 +12,6 @@ use fidl_fuchsia_ui_brightness::{
     ControlWatchAutoBrightnessResponder, ControlWatchCurrentBrightnessResponder,
 };
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon::sys::ZX_ERR_NOT_SUPPORTED;
-use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::{AbortHandle, Abortable};
 use futures::lock::Mutex;
@@ -22,6 +20,8 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use splines::{Interpolation, Key, Spline};
 use watch_handler::{Sender, WatchHandler};
+use zx::sys::ZX_ERR_NOT_SUPPORTED;
+use zx::Duration;
 
 use crate::sender_channel::SenderChannel;
 use lib::backlight::BacklightControl;
@@ -726,7 +726,7 @@ mod tests {
     use anyhow::format_err;
     use async_trait::async_trait;
     use fuchsia_async::TestExecutor;
-    use fuchsia_zircon as zx;
+
     use futures::executor::block_on;
     use futures::pin_mut;
 

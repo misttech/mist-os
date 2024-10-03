@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     AccessibilityRequest, AccessibilitySetResponder, AccessibilitySetResult, AccessibilitySettings,
     AccessibilityWatchResponder,
 };
-use fuchsia_zircon as zx;
 
 impl ErrorResponder for AccessibilitySetResponder {
     fn id(&self) -> &'static str {

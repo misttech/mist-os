@@ -104,6 +104,7 @@ test("test_bin") {
     ":test_util",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//src/connectivity/network/drivers/network-device/mac:test_util",
+    "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",

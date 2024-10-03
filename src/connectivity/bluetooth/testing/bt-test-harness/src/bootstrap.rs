@@ -8,7 +8,7 @@ use fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable};
 use futures::future::{self, BoxFuture, FutureExt};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use test_harness::{SharedState, TestHarness};
+use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
 use crate::host_watcher::ActivatedFakeHost;
@@ -39,8 +39,11 @@ impl TestHarness for BootstrapHarness {
     ) -> BoxFuture<'static, Result<(Self, Self::Env, Self::Runner), Error>> {
         let shared_state = shared_state.clone();
         async move {
-            let realm =
-                shared_state.get_or_insert_with(SHARED_STATE_INDEX, CoreRealm::create).await?;
+            let test_component: Arc<String> = shared_state
+                .get(SHARED_STATE_TEST_COMPONENT_INDEX)
+                .expect("SharedState must have TEST-COMPONENT")?;
+            let inserter = move || CoreRealm::create(test_component.to_string());
+            let realm = shared_state.get_or_insert_with(SHARED_STATE_INDEX, inserter).await?;
             let fake_host = ActivatedFakeHost::new(realm.clone()).await?;
             let proxy = realm
                 .instance()

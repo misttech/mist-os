@@ -11,6 +11,7 @@
 #[cfg(test)]
 mod integration_tests;
 
+mod counters;
 mod debug_fidl_worker;
 mod devices;
 mod filter;
@@ -28,23 +29,23 @@ mod routes;
 mod socket;
 mod stack_fidl_worker;
 
+mod time;
 mod timers;
 mod util;
 mod verifier_worker;
 
 use std::collections::HashMap;
-use std::convert::{Infallible as Never, TryFrom as _};
+use std::convert::Infallible as Never;
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
-use std::num::TryFromIntError;
 use std::ops::Deref;
 use std::pin::pin;
 use std::sync::Arc;
-use std::time::Duration;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
+use fidl_fuchsia_net_multicast_ext::FidlMulticastAdminIpExt;
 use fuchsia_inspect::health::Reporter as _;
 use futures::channel::mpsc;
 use futures::{select, FutureExt as _, StreamExt as _};
@@ -57,8 +58,7 @@ use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync, zx,
 };
 
 use devices::{
@@ -70,7 +70,9 @@ use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceU
 use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
+use crate::bindings::counters::BindingsCounters;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
+use crate::bindings::time::{AtomicStackTime, StackTime};
 use crate::bindings::util::TaskWaitGroup;
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -88,8 +90,8 @@ use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpS
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
-    Lifetime, SlaacConfiguration,
+    IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfiguration,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -160,12 +162,6 @@ mod ctx {
 
         pub(crate) fn bindings_ctx(&self) -> &BindingsCtx {
             &self.bindings_ctx
-        }
-
-        // Gets a new `RngImpl` as if we have an implementation of `RngContext`,
-        // but without needing `&mut self`.
-        pub(crate) fn rng(&self) -> RngImpl {
-            RngImpl::new()
         }
 
         /// Destroys the last standing clone of [`Ctx`].
@@ -280,15 +276,15 @@ impl DeviceIdExt for PureIpDeviceId<BindingsCtx> {
 
 /// Extends the methods available to [`Lifetime`].
 trait LifetimeExt {
-    /// Converts `self` to `zx::MonotonicTime`.
-    fn into_zx_time(self) -> zx::MonotonicTime;
+    /// Converts `self` to `zx::MonotonicInstant`.
+    fn into_zx_time(self) -> zx::MonotonicInstant;
 }
 
 impl LifetimeExt for Lifetime<StackTime> {
-    fn into_zx_time(self) -> zx::MonotonicTime {
+    fn into_zx_time(self) -> zx::MonotonicInstant {
         match self {
-            Lifetime::Finite(StackTime(time)) => time.into_zx(),
-            Lifetime::Infinite => zx::MonotonicTime::INFINITE,
+            Lifetime::Finite(time) => time.into_zx(),
+            Lifetime::Infinite => zx::MonotonicInstant::INFINITE,
         }
     }
 }
@@ -324,6 +320,7 @@ pub(crate) struct BindingsCtxInner {
     resource_removal: ResourceRemovalSink,
     multicast_admin: MulticastAdminEventSinks,
     config: GlobalConfig,
+    counters: BindingsCounters,
 }
 
 impl BindingsCtxInner {
@@ -340,6 +337,7 @@ impl BindingsCtxInner {
             resource_removal,
             multicast_admin,
             config,
+            counters: Default::default(),
         }
     }
 }
@@ -363,52 +361,14 @@ where
     }
 }
 
-/// A thin wrapper around `fuchsia_async::Time` that implements `core::Instant`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
-pub(crate) struct StackTime(fasync::Time);
-
-impl netstack3_core::Instant for StackTime {
-    fn checked_duration_since(&self, earlier: StackTime) -> Option<Duration> {
-        match u64::try_from(self.0.into_nanos() - earlier.0.into_nanos()) {
-            Ok(nanos) => Some(Duration::from_nanos(nanos)),
-            Err(TryFromIntError { .. }) => None,
-        }
-    }
-
-    fn checked_add(&self, duration: Duration) -> Option<StackTime> {
-        Some(StackTime(fasync::Time::from_nanos(
-            self.0.into_nanos().checked_add(i64::try_from(duration.as_nanos()).ok()?)?,
-        )))
-    }
-
-    fn checked_sub(&self, duration: Duration) -> Option<StackTime> {
-        Some(StackTime(fasync::Time::from_nanos(
-            self.0.into_nanos().checked_sub(i64::try_from(duration.as_nanos()).ok()?)?,
-        )))
-    }
-}
-
-impl std::fmt::Display for StackTime {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self(time) = *self;
-        write!(f, "{:.6}", time.into_nanos() as f64 / 1_000_000_000f64)
-    }
-}
-
-impl InspectableValue for StackTime {
-    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
-        let Self(inner) = self;
-        inspector.record_int(name, inner.into_nanos())
-    }
-}
-
 impl InstantBindingsTypes for BindingsCtx {
     type Instant = StackTime;
+    type AtomicInstant = AtomicStackTime;
 }
 
 impl InstantContext for BindingsCtx {
     fn now(&self) -> StackTime {
-        StackTime(fasync::Time::now())
+        StackTime::now()
     }
 }
 
@@ -496,10 +456,10 @@ impl TimerContext for BindingsCtx {
 
     fn schedule_timer_instant(
         &mut self,
-        StackTime(time): Self::Instant,
+        time: Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
-        timer.schedule(time).map(Into::into)
+        timer.schedule(time.into_fuchsia_time()).map(Into::into)
     }
 
     fn cancel_timer(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
@@ -710,29 +670,28 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
     }
 }
 
-impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>>
+impl<I: IpExt + FidlMulticastAdminIpExt> EventContext<IpLayerEvent<DeviceId<BindingsCtx>, I>>
     for BindingsCtx
 {
-    fn on_event(&mut self, event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>, I>) {
-        // Core dispatched a routes-change request but has no expectation of
-        // observing the result, so we just discard the result receiver.
+    fn on_event(&mut self, event: IpLayerEvent<DeviceId<BindingsCtx>, I>) {
+        // NB: Downgrade the device ID immediately because we're about to stash
+        // the event in a channel.
+        let event = event.map_device(|d| d.downgrade());
         match event {
-            netstack3_core::ip::IpLayerEvent::AddRoute(entry) => {
+            IpLayerEvent::AddRoute(entry) => {
                 self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
-                    routes::RouteOp::Add(entry.map_device_id(|d| d.downgrade())),
+                    routes::RouteOp::Add(entry),
                     routes::SetMembership::CoreNdp,
                 ))
             }
-            netstack3_core::ip::IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
+            IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
                 self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
-                    routes::RouteOp::RemoveMatching {
-                        subnet,
-                        device: device.downgrade(),
-                        gateway,
-                        metric: None,
-                    },
+                    routes::RouteOp::RemoveMatching { subnet, device, gateway, metric: None },
                     routes::SetMembership::CoreNdp,
                 ))
+            }
+            IpLayerEvent::MulticastForwarding(event) => {
+                self.multicast_admin.sink::<I>().dispatch_multicast_forwarding_event(event);
             }
         };
     }

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use heapdump_vmo::allocations_table_v1::{AllocationsTableWriter, ResourceKey};
+use zx::{self as zx, AsHandleRef, HandleBased};
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
 /// Actual memory for each page will only be committed when we first write to that page.

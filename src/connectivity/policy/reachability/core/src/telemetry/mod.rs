@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{info, warn};
 use windowed_stats::aggregations::SumAndCount;
-use {fuchsia_async as fasync, fuchsia_zircon as zx, network_policy_metrics_registry as metrics};
+use {fuchsia_async as fasync, network_policy_metrics_registry as metrics, zx};
 
 pub async fn create_metrics_logger(
     factory_proxy: fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
@@ -511,7 +511,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::MetricEventPayload;
     use fuchsia_inspect::Inspector;
-    use fuchsia_zircon as zx;
+
     use futures::task::Poll;
     use std::pin::Pin;
     use test_case::test_case;

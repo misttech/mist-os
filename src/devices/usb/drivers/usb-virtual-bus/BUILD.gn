@@ -159,10 +159,10 @@ test("usb-virtual-bus-test-bin") {
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
+    "//src/devices/usb/testing/usb-virtual-bus-launcher",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/usb-virtual-bus-launcher",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

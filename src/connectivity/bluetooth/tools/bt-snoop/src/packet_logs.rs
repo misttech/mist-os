@@ -229,7 +229,6 @@ mod tests {
     use super::*;
 
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_zircon as zx;
 
     /// An empty log tests that the most basic inspect data is plumbed through the lazy generation
     /// function. See top level tests module for more integrated tests.
@@ -258,7 +257,7 @@ mod tests {
     #[test]
     fn test_pcap_formatting() {
         // cmd packet
-        let ts = zx::MonotonicTime::from_nanos(123 * 1_000_000_000);
+        let ts = zx::MonotonicInstant::from_nanos(123 * 1_000_000_000);
         let pkt = SnoopPacket::new(false, PacketFormat::Command, ts, vec![0, 1, 2, 3, 4]);
         let mut output = vec![];
         append_pcap(&mut output, &pkt).expect("write to succeed");
@@ -267,7 +266,7 @@ mod tests {
         assert_eq!(output, expected);
 
         // truncated data packet
-        let ts = zx::MonotonicTime::from_nanos(0);
+        let ts = zx::MonotonicInstant::from_nanos(0);
         let mut pkt = SnoopPacket::new(false, PacketFormat::AclData, ts, vec![0, 1, 2, 3, 4]);
         pkt.original_len = 10;
         let mut output = vec![];
@@ -277,7 +276,7 @@ mod tests {
         assert_eq!(output, expected);
 
         // empty event packet
-        let ts = zx::MonotonicTime::from_nanos(10i64.pow(9) - 1);
+        let ts = zx::MonotonicInstant::from_nanos(10i64.pow(9) - 1);
         let pkt = SnoopPacket::new(false, PacketFormat::Event, ts, vec![]);
         let mut output = vec![];
         append_pcap(&mut output, &pkt).expect("write to succeed");

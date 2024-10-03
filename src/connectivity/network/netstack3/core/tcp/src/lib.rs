@@ -27,9 +27,7 @@ pub use internal::base::{
     BufferSizes, ConnectionError, SocketOptions, TcpCounters, TcpCountersInner, TcpState,
     DEFAULT_FIN_WAIT2_TIMEOUT,
 };
-pub use internal::buffer::{
-    Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer,
-};
+pub use internal::buffer::{Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 pub use internal::socket::accept_queue::ListenerNotifier;
 pub use internal::socket::isn::IsnGenerator;
 pub use internal::socket::{
@@ -45,6 +43,6 @@ pub use internal::socket::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::buffer::testutil::{
-        ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers,
+        ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer, WriteBackClientBuffers,
     };
 }

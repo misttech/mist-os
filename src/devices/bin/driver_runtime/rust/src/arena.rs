@@ -12,7 +12,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr::{null_mut, slice_from_raw_parts_mut, NonNull};
 use std::sync::{Arc, Weak};
 
-use fuchsia_zircon::Status;
+use zx::Status;
 
 use crate::fdf_sys::*;
 

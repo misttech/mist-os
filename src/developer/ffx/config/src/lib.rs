@@ -30,7 +30,7 @@ pub use aliases::{
     is_analytics_disabled, is_mdns_autoconnect_disabled, is_mdns_discovery_disabled,
     is_usb_discovery_disabled,
 };
-pub use api::query::{BuildOverride, ConfigQuery, SelectMode};
+pub use api::query::{ConfigQuery, SelectMode};
 pub use config_macros::FfxConfigBacked;
 
 pub use environment::{test_init, test_init_in_tree, Environment, EnvironmentContext, TestEnv};
@@ -208,7 +208,7 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
 }
 
 pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
-    let config = ctx.load()?.config_from_cache(None)?;
+    let config = ctx.load()?.config_from_cache()?;
     let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }

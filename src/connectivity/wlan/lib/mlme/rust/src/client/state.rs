@@ -31,7 +31,7 @@ use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_zircon as zx, wlan_trace as wtrace,
+    wlan_trace as wtrace, zx,
 };
 
 /// Reconnect timeout in Beacon periods.
@@ -514,7 +514,7 @@ impl Qos {
 
 #[derive(Debug)]
 pub struct StatusCheckTimeout {
-    last_fired: zx::MonotonicTime,
+    last_fired: zx::MonotonicInstant,
     next_id: Option<EventId>,
 }
 
@@ -1494,10 +1494,7 @@ mod tests {
     use wlan_common::timer::{self, create_timer};
     use wlan_common::{assert_variant, fake_bss_description, mgmt_writer};
     use wlan_frame_writer::append_frame_to;
-    use {
-        fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx,
-        wlan_statemachine as statemachine,
-    };
+    use {fidl_fuchsia_wlan_common as fidl_common, wlan_statemachine as statemachine, zx};
 
     lazy_static! {
         static ref BSSID: Bssid = [6u8; 6].into();

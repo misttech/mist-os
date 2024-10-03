@@ -9,11 +9,11 @@ use fidl::prelude::*;
 use fidl_fuchsia_diagnostics::{
     BatchIteratorControlHandle, BatchIteratorRequest, BatchIteratorRequestStream, FormattedContent,
 };
-use fuchsia_zircon as zx;
-use fuchsia_zircon_status::Status as ZxStatus;
+
 use futures::prelude::*;
 use thiserror::Error;
 use tracing::warn;
+use zx_status::Status as ZxStatus;
 
 pub struct AccessorServer {
     requests: BatchIteratorRequestStream,

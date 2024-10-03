@@ -10,10 +10,10 @@ use std::sync::{mpsc, Arc, Weak};
 
 use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::AsHandleRef;
-use fuchsia_zircon::HandleBased;
 use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
-use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
+use zx::HandleBased;
+use {fidl_fuchsia_memory_attribution as fattribution, zx};
 
 use crate::mm::MemoryManager;
 use crate::task::{Kernel, ThreadGroup};
@@ -135,7 +135,7 @@ impl MemoryAttributionManager {
                 _ = publisher.on_update(updates);
             }
 
-            zx::MonotonicTime::after(MINIMUM_RESCAN_INTERVAL).sleep();
+            zx::MonotonicInstant::after(MINIMUM_RESCAN_INTERVAL).sleep();
         }
     }
 }

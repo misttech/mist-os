@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon_status::Status;
 use thiserror::Error;
+use zx_status::Status;
 
 #[cfg(target_os = "fuchsia")]
-use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, zx};
 
 /// An error encountered while opening an image.
 #[derive(Debug, Error)]

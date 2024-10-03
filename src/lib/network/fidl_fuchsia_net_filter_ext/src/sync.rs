@@ -7,7 +7,7 @@ use crate::{
     ControllerCreationError, ControllerId, PushChangesError,
 };
 use fidl::marker::SourceBreaking;
-use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
+use {fidl_fuchsia_net_filter as fnet_filter, zx};
 
 /// A controller for filtering state with blocking methods.
 pub struct Controller {
@@ -31,7 +31,7 @@ impl Controller {
     pub fn new(
         control: &fnet_filter::ControlSynchronousProxy,
         ControllerId(id): &ControllerId,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<Self, ControllerCreationError> {
         let (controller, server_end) = fidl::endpoints::create_sync_proxy();
         control.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
@@ -48,7 +48,7 @@ impl Controller {
     pub fn push_changes(
         &mut self,
         changes: Vec<Change>,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), PushChangesError> {
         let fidl_changes = changes.iter().cloned().map(Into::into).collect::<Vec<_>>();
         let result = self
@@ -66,18 +66,18 @@ impl Controller {
     pub fn commit_with_options(
         &mut self,
         options: fnet_filter::CommitOptions,
-        deadline: zx::MonotonicTime,
+        deadline: zx::MonotonicInstant,
     ) -> Result<(), CommitError> {
         let committed_changes = std::mem::take(&mut self.pending_changes);
         let result = self.controller.commit(options, deadline).map_err(CommitError::CallMethod)?;
         handle_commit_result(result, committed_changes)
     }
 
-    pub fn commit(&mut self, deadline: zx::MonotonicTime) -> Result<(), CommitError> {
+    pub fn commit(&mut self, deadline: zx::MonotonicInstant) -> Result<(), CommitError> {
         self.commit_with_options(fnet_filter::CommitOptions::default(), deadline)
     }
 
-    pub fn commit_idempotent(&mut self, deadline: zx::MonotonicTime) -> Result<(), CommitError> {
+    pub fn commit_idempotent(&mut self, deadline: zx::MonotonicInstant) -> Result<(), CommitError> {
         self.commit_with_options(
             fnet_filter::CommitOptions {
                 idempotent: Some(true),
@@ -119,7 +119,7 @@ mod tests {
         let mut controller = Controller::new(
             &control_sync,
             &ControllerId(String::from("test")),
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         )
         .expect("create controller");
         let result = controller.push_changes(
@@ -128,7 +128,7 @@ mod tests {
                 Change::Create(invalid_resource()),
                 Change::Remove(test_resource_id()),
             ],
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         );
 
         assert_matches!(
@@ -168,7 +168,7 @@ mod tests {
         let mut controller = Controller::new(
             &control_sync,
             &ControllerId(String::from("test")),
-            zx::MonotonicTime::INFINITE,
+            zx::MonotonicInstant::INFINITE,
         )
         .expect("create controller");
         controller
@@ -178,11 +178,11 @@ mod tests {
                     Change::Remove(unknown_resource_id()),
                     Change::Remove(test_resource_id()),
                 ],
-                zx::MonotonicTime::INFINITE,
+                zx::MonotonicInstant::INFINITE,
             )
             .expect("push changes");
 
-        let result = controller.commit(zx::MonotonicTime::INFINITE);
+        let result = controller.commit(zx::MonotonicInstant::INFINITE);
         assert_matches!(
             result,
             Err(CommitError::ErrorOnChange(errors)) if errors == vec![(

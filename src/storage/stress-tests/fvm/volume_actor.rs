@@ -5,7 +5,6 @@
 use crate::volume::VolumeConnection;
 use crate::vslice::{VSliceRange, VSliceRanges};
 use async_trait::async_trait;
-use fuchsia_zircon::Status;
 use rand::prelude::IteratorRandom;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -13,6 +12,7 @@ use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use stress_test::actor::{Actor, ActorError};
 use tracing::{debug, info};
+use zx::Status;
 
 #[derive(Clone, Debug)]
 enum VolumeOperation {

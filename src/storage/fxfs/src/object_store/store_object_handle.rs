@@ -28,6 +28,7 @@ use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{try_join, TryStreamExt};
 use fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet};
 use fxfs_trace::trace;
+use static_assertions::const_assert;
 use std::cmp::min;
 use std::future::Future;
 use std::ops::Range;
@@ -434,6 +435,22 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         node_attributes: Option<&fio::MutableNodeAttributes>,
         change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
+        if let Some(&fio::MutableNodeAttributes { selinux_context: Some(ref context), .. }) =
+            node_attributes
+        {
+            if let fio::SelinuxContext::Data(context) = context {
+                self.set_extended_attribute_impl(
+                    "security.selinux".into(),
+                    context.clone(),
+                    SetExtendedAttributeMode::Set,
+                    transaction,
+                )
+                .await?;
+            } else {
+                return Err(anyhow!(FxfsError::InvalidArgs)
+                    .context("Only set SELinux context with `data` member."));
+            }
+        }
         self.store()
             .update_attributes(transaction, self.object_id, node_attributes, change_time)
             .await
@@ -508,9 +525,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     ///
     /// This doesn't update the size stored in the attribute value - the caller is responsible for
     /// doing that to keep the size up to date.
-    pub async fn shrink<'a>(
-        &'a self,
-        transaction: &mut Transaction<'a>,
+    pub async fn shrink(
+        &self,
+        transaction: &mut Transaction<'_>,
         attribute_id: u64,
         size: u64,
     ) -> Result<NeedsTrim, Error> {
@@ -995,9 +1012,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     // Writes to multiple ranges with data provided in `buf`.  The buffer can be modified in place
     // if encryption takes place.  The ranges must all be aligned and no change to content size is
     // applied; the caller is responsible for updating size if required.
-    pub async fn multi_write<'a>(
-        &'a self,
-        transaction: &mut Transaction<'a>,
+    pub async fn multi_write(
+        &self,
+        transaction: &mut Transaction<'_>,
         attribute_id: u64,
         ranges: &[Range<u64>],
         mut buf: MutableBufferRef<'_>,
@@ -1353,9 +1370,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     /// the end of the new size, but if there were too many for a single transaction, a commit
     /// needs to be made before trimming again, so the responsibility is left to the caller so as
     /// to not accidentally split the transaction when it's not in a consistent state.
-    pub async fn write_attr<'a>(
-        &'a self,
-        transaction: &mut Transaction<'a>,
+    pub async fn write_attr(
+        &self,
+        transaction: &mut Transaction<'_>,
         attribute_id: u64,
         data: &[u8],
     ) -> Result<NeedsTrim, Error> {
@@ -1425,6 +1442,39 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         Ok(out)
     }
 
+    /// Looks up the values for the extended attribute `fio::SELINUX_CONTEXT_NAME`, returning it
+    /// if it is found inline. If it is not inline, it will request use of the
+    /// `get_extended_attributes` method. If the entry doesn't exist at all, returns None.
+    pub async fn get_inline_selinux_context(&self) -> Result<Option<fio::SelinuxContext>, Error> {
+        // This optimization is only useful as long as the attribute is smaller than inline sizes.
+        // Avoid reading the data out of the attributes.
+        const_assert!(fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize <= MAX_INLINE_XATTR_SIZE);
+        let item = match self
+            .store()
+            .tree()
+            .find(&ObjectKey::extended_attribute(
+                self.object_id(),
+                fio::SELINUX_CONTEXT_NAME.into(),
+            ))
+            .await?
+        {
+            Some(item) => item,
+            None => return Ok(None),
+        };
+        match item.value {
+            ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value)) => {
+                Ok(Some(fio::SelinuxContext::Data(value)))
+            }
+            ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(_)) => {
+                Ok(Some(fio::SelinuxContext::UseExtendedAttributes(fio::EmptyStruct {})))
+            }
+            _ => {
+                bail!(anyhow!(FxfsError::Inconsistent)
+                    .context("get_inline_extended_attribute: Expected ExtendedAttribute value"))
+            }
+        }
+    }
+
     pub async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Error> {
         let item = self
             .store()
@@ -1435,8 +1485,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         match item.value {
             ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value)) => Ok(value),
             ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(id)) => {
-                let data = self.read_attr(id).await?.ok_or(FxfsError::NotFound)?;
-                Ok(data.into_vec())
+                Ok(self.read_attr(id).await?.ok_or(FxfsError::Inconsistent)?.into_vec())
             }
             _ => {
                 bail!(anyhow!(FxfsError::Inconsistent)
@@ -1451,17 +1500,28 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         value: Vec<u8>,
         mode: SetExtendedAttributeMode,
     ) -> Result<(), Error> {
-        ensure!(name.len() <= MAX_XATTR_NAME_SIZE, FxfsError::TooBig);
-        ensure!(value.len() <= MAX_XATTR_VALUE_SIZE, FxfsError::TooBig);
         let store = self.store();
         let fs = store.filesystem();
-        let tree = store.tree();
-        let object_key = ObjectKey::extended_attribute(self.object_id(), name);
-
         // NB: We need to take this lock before we potentially look up the value to prevent racing
         // with another set.
         let keys = lock_keys![LockKey::object(store.store_object_id(), self.object_id())];
         let mut transaction = fs.new_transaction(keys, Options::default()).await?;
+        self.set_extended_attribute_impl(name, value, mode, &mut transaction).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    async fn set_extended_attribute_impl(
+        &self,
+        name: Vec<u8>,
+        value: Vec<u8>,
+        mode: SetExtendedAttributeMode,
+        transaction: &mut Transaction<'_>,
+    ) -> Result<(), Error> {
+        ensure!(name.len() <= MAX_XATTR_NAME_SIZE, FxfsError::TooBig);
+        ensure!(value.len() <= MAX_XATTR_VALUE_SIZE, FxfsError::TooBig);
+        let tree = self.store().tree();
+        let object_key = ObjectKey::extended_attribute(self.object_id(), name);
 
         let existing_attribute_id = {
             let (found, existing_attribute_id) = match tree.find(&object_key).await? {
@@ -1496,7 +1556,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             // worry about trimming here for the same reason we don't need to worry about it when
             // we delete xattrs - they simply aren't large enough to ever need more than one
             // transaction.
-            let _ = self.write_attr(&mut transaction, attribute_id, &value).await?;
+            let _ = self.write_attr(transaction, attribute_id, &value).await?;
         } else if value.len() <= MAX_INLINE_XATTR_SIZE {
             transaction.add(
                 self.store().store_object_id(),
@@ -1554,7 +1614,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             }
 
             // We know this won't need trimming because it's a new attribute.
-            let _ = self.write_attr(&mut transaction, attribute_id, &value).await?;
+            let _ = self.write_attr(transaction, attribute_id, &value).await?;
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -1564,7 +1624,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             );
         }
 
-        transaction.commit().await?;
         Ok(())
     }
 

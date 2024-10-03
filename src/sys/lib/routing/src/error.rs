@@ -11,7 +11,7 @@ use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::{DowncastErrorForTest, Explain, RouterError};
 use std::sync::Arc;
 use thiserror::Error;
-use {fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_component as fcomponent, zx_status as zx};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

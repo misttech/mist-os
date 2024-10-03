@@ -20,6 +20,7 @@ syscall_tests = [
   "ashmem_test",
   "aspace_test",
   "bpf_test",
+  "capabilities_test",
   "custom_artifact_test",
   "epoll_test",
   "extended_pstate_test",
@@ -109,12 +110,15 @@ if (is_host) {
                      "root_out_dir") + "/ptrace_test_exec_child",
       get_label_info(":suid_test_exec_child($_host_linux_toolchain)",
                      "root_out_dir") + "/suid_test_exec_child",
+      get_label_info("test_programs:print_helper($_host_linux_toolchain)",
+                     "root_out_dir") + "/print_helper",
     ]
     deps = [
       ":extended_pstate_initial_state_child($_host_linux_toolchain)",
       ":ptrace_test_exec_child($_host_linux_toolchain)",
       ":suid_test_exec_child($_host_linux_toolchain)",
       ":syscall_test_exec_child($_host_linux_toolchain)",
+      "test_programs:print_helper($_host_linux_toolchain)",
     ]
   }
 }
@@ -123,6 +127,8 @@ source_set("test_utils") {
   testonly = true
 
   sources = [
+    "capabilities_helper.cc",
+    "capabilities_helper.h",
     "fault_test.h",
     "fault_test_suite.h",
     "proc_test_base.h",
@@ -276,6 +282,7 @@ template("syscall_test") {
       ":simple_ext4_image",
       ":suid_test_exec_child_resource($target_linux_toolchain)",
       ":syscall_test_exec_child_resource($target_linux_toolchain)",
+      "test_programs:print_helper_resource($target_linux_toolchain)",
     ]
     uses_expectations = true
     generated_expectations = ":syscalls_cpp_test_expectations"

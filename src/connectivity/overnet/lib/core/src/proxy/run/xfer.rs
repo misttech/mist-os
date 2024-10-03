@@ -9,11 +9,11 @@ use crate::labels::{generate_transfer_key, Endpoint, NodeId, TransferKey};
 use crate::peer::{FramedStreamReader, FramedStreamWriter};
 use crate::router::OpenedTransfer;
 use anyhow::{bail, format_err, Error};
-use fuchsia_zircon_status as zx_status;
 use futures::future::Either;
 use futures::prelude::*;
 use futures::task::{noop_waker_ref, Context, Poll};
 use std::sync::{Arc, Weak};
+use zx_status;
 
 // Follow a transfer that was initated elsewhere to the destination.
 pub(crate) async fn follow<Hdl: 'static + for<'a> ProxyableRW<'a>>(

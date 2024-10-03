@@ -20,6 +20,12 @@
             dependency: "weak",
         },
         {
+            config: [ "fuchsia.power.UseSuspender" ],
+            from: "void",
+            to: "#system-activity-governor",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

@@ -38,14 +38,14 @@ TEST(ClockUtilsTest, DuplicateClockIsIdentical) {
             clock_details_dupe.last_rate_adjust_update_ticks);
   EXPECT_EQ(clock_details.generation_counter, clock_details_dupe.generation_counter);
 
-  EXPECT_EQ(clock_details.mono_to_synthetic.reference_offset,
-            clock_details_dupe.mono_to_synthetic.reference_offset);
-  EXPECT_EQ(clock_details.mono_to_synthetic.synthetic_offset,
-            clock_details_dupe.mono_to_synthetic.synthetic_offset);
-  EXPECT_EQ(clock_details.mono_to_synthetic.rate.synthetic_ticks,
-            clock_details_dupe.mono_to_synthetic.rate.synthetic_ticks);
-  EXPECT_EQ(clock_details.mono_to_synthetic.rate.reference_ticks,
-            clock_details_dupe.mono_to_synthetic.rate.reference_ticks);
+  EXPECT_EQ(clock_details.reference_to_synthetic.reference_offset,
+            clock_details_dupe.reference_to_synthetic.reference_offset);
+  EXPECT_EQ(clock_details.reference_to_synthetic.synthetic_offset,
+            clock_details_dupe.reference_to_synthetic.synthetic_offset);
+  EXPECT_EQ(clock_details.reference_to_synthetic.rate.synthetic_ticks,
+            clock_details_dupe.reference_to_synthetic.rate.synthetic_ticks);
+  EXPECT_EQ(clock_details.reference_to_synthetic.rate.reference_ticks,
+            clock_details_dupe.reference_to_synthetic.rate.reference_ticks);
 }
 
 TEST(ClockUtilsTest, DuplicateClockReadable) {
@@ -140,10 +140,11 @@ TEST(ClockUtilsTest, SnapshotClock) {
   auto snapshot = snapshot_result.take_value();
   EXPECT_EQ(clock_details.generation_counter, snapshot.generation);
   auto mono_to_ref = snapshot.reference_to_monotonic.Inverse();
-  EXPECT_EQ(clock_details.mono_to_synthetic.synthetic_offset, mono_to_ref.subject_time());
-  EXPECT_EQ(clock_details.mono_to_synthetic.reference_offset, mono_to_ref.reference_time());
-  EXPECT_EQ(clock_details.mono_to_synthetic.rate.synthetic_ticks, mono_to_ref.subject_delta());
-  EXPECT_EQ(clock_details.mono_to_synthetic.rate.reference_ticks, mono_to_ref.reference_delta());
+  EXPECT_EQ(clock_details.reference_to_synthetic.synthetic_offset, mono_to_ref.subject_time());
+  EXPECT_EQ(clock_details.reference_to_synthetic.reference_offset, mono_to_ref.reference_time());
+  EXPECT_EQ(clock_details.reference_to_synthetic.rate.synthetic_ticks, mono_to_ref.subject_delta());
+  EXPECT_EQ(clock_details.reference_to_synthetic.rate.reference_ticks,
+            mono_to_ref.reference_delta());
 }
 
 // Bracket a call to reference_clock.read, with two get_monotonic calls.

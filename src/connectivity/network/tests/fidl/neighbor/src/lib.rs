@@ -610,16 +610,16 @@ async fn neigh_wrong_interface<N: Netstack>(
         fidl_method(&controller, loopback_id)
             .await
             .expect("clear_entries FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_SUPPORTED)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_SUPPORTED)
     );
     // Clearing neighbors on non-existing interface returns the proper error.
     assert_eq!(
         fidl_method(&controller, ep.id() + 100)
             .await
             .expect("clear_entries FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_FOUND)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_FOUND)
     );
 }
 
@@ -669,7 +669,7 @@ async fn neigh_clear_entries<N: Netstack, I: Ip>(name: &str) {
         .clear_entries(alice.ep.id(), I::VERSION.into_ext())
         .await
         .expect("clear_entries FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("clear_entries failed");
 
     assert_entries(
@@ -694,7 +694,7 @@ async fn neigh_clear_entries<N: Netstack, I: Ip>(name: &str) {
         .add_entry(bob.ep.id(), &alice_ip, &ALICE_MAC)
         .await
         .expect("add_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
 
     // Exchange datagrams again and assert that new solicitation requests were
@@ -740,8 +740,8 @@ async fn neigh_add_remove_entry_invalid_addr<N: Netstack>(
             .add_entry(alice.ep.id(), &invalid_addr, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::INVALID_ARGS),
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::INVALID_ARGS),
         "{} is an invalid neighbor addr and add_entry should fail",
         net_types::ip::IpAddr::from_ext(invalid_addr)
     );
@@ -750,8 +750,8 @@ async fn neigh_add_remove_entry_invalid_addr<N: Netstack>(
             .remove_entry(alice.ep.id(), &invalid_addr)
             .await
             .expect("remove_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::INVALID_ARGS),
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::INVALID_ARGS),
         "{} is an invalid neighbor addr and remove_entry should fail",
         net_types::ip::IpAddr::from_ext(invalid_addr)
     );
@@ -789,8 +789,8 @@ async fn neigh_add_entry_invalid_mac<N: Netstack>(
                 .add_entry(alice.ep.id(), &valid_addr, &invalid_mac)
                 .await
                 .expect("add_entry FIDL error")
-                .map_err(fuchsia_zircon::Status::from_raw),
-            Err(fuchsia_zircon::Status::INVALID_ARGS),
+                .map_err(zx::Status::from_raw),
+            Err(zx::Status::INVALID_ARGS),
             "{} is not a unicast mac addr and add_entry should fail",
             net_types::ethernet::Mac::from_ext(invalid_mac)
         );
@@ -826,8 +826,8 @@ async fn neigh_remove_entry_not_found<N: Netstack>(name: &str) {
             .remove_entry(alice.ep.id(), &BOB_IP)
             .await
             .expect("remove_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_FOUND)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_FOUND)
     );
 }
 
@@ -872,16 +872,16 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
             .add_entry(alice.loopback_id, &BOB_IP, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_SUPPORTED)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_SUPPORTED)
     );
     assert_eq!(
         controller
             .remove_entry(alice.loopback_id, &BOB_IP)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_SUPPORTED)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_SUPPORTED)
     );
     // Add entry and remove entry return not found on non-existing interface.
     assert_eq!(
@@ -889,16 +889,16 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
             .add_entry(alice.ep.id() + 100, &BOB_IP, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_FOUND)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_FOUND)
     );
     assert_eq!(
         controller
             .remove_entry(alice.ep.id() + 100, &BOB_IP)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_FOUND)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_FOUND)
     );
     // Remove entry returns not found for non-existing entry.
     assert_eq!(
@@ -906,8 +906,8 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
             .remove_entry(alice.ep.id(), &BOB_IP)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw),
-        Err(fuchsia_zircon::Status::NOT_FOUND)
+            .map_err(zx::Status::from_raw),
+        Err(zx::Status::NOT_FOUND)
     );
 
     // Add static entries and verify that they're listable.
@@ -915,13 +915,13 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
         .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
     let () = controller
         .add_entry(alice.ep.id(), &bob.ipv6, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
 
     let static_entry_ipv4 = EntryMatch {
@@ -960,13 +960,13 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
         .remove_entry(alice.ep.id(), &BOB_IP)
         .await
         .expect("remove_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("remove_entry failed");
     let () = controller
         .remove_entry(alice.ep.id(), &bob.ipv6)
         .await
         .expect("remove_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("remove_entry failed");
 
     assert_entries(
@@ -1141,13 +1141,13 @@ async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
             .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .expect("add_entry failed");
         controller
             .remove_entry(alice.ep.id(), &BOB_IP)
             .await
             .expect("remove_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .expect("remove_entry failed");
     };
 
@@ -1196,7 +1196,7 @@ async fn remove_device_clears_neighbors<N: Netstack>(name: &str) {
         .add_entry(ep.id(), &BOB_IP, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
 
     let interface = ep.id();
@@ -1279,7 +1279,7 @@ async fn neighbor_with_many_addresses_disconnects<N: Netstack>(name: &str) {
                 .add_entry(ep.id(), &addr, &BOB_MAC)
                 .await
                 .expect("add_entry FIDL error")
-                .map_err(fuchsia_zircon::Status::from_raw)
+                .map_err(zx::Status::from_raw)
                 .expect("add_entry failed");
             assert_entries(
                 &mut iter,

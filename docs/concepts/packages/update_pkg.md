@@ -74,7 +74,7 @@ The structure of the update package, `fuchsia-pkg://fuchsia.com/update`, contain
     ```
 
 *   `/version`
-    Same format as the [`/config/build-info/version`](/docs/development/build/build_information.md) file.
+    Same format as the [`/config/build-info/version`][build_info] file.
 *   `/zbi[.signed]`
     Kernel image. Must not be present if the `update-mode` is `force-recovery`. `zbi` or `zbi.signed`
     is required to be present if the `update-mode` is `normal`.
@@ -96,3 +96,6 @@ The structure of the update package, `fuchsia-pkg://fuchsia.com/update`, contain
         }
     }
     ```
+<!-- Reference links -->
+
+[build_info]: /docs/development/build/build_system/build_information.md

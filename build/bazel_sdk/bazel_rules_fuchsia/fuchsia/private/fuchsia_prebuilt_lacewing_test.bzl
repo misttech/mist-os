@@ -16,10 +16,8 @@ def _fuchsia_prebuilt_lacewing_test_impl(ctx):
         ctx,
         py_toolchain.py3_runtime.interpreter,
         ctx.attr._run_lacewing_test_tool,
-        "--test-pyz",
-        ctx.attr.test_pyz,
-        "--cwd",
-        "./%s/%s" % (ctx.label.workspace_root, ctx.label.package),
+        "--test-binary",
+        ctx.attr.test_binary,
         "--ffx",
         sdk.ffx,
         "--name",
@@ -43,8 +41,8 @@ fuchsia_prebuilt_lacewing_test = rule(
         "@rules_python//python:toolchain_type",
     ],
     attrs = {
-        "test_pyz": attr.label(
-            doc = "A path to the prebuilt lacewing test's pyz.",
+        "test_binary": attr.label(
+            doc = "A path to the prebuilt lacewing test's binary.",
             allow_single_file = True,
             mandatory = True,
         ),

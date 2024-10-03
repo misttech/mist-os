@@ -12,9 +12,10 @@
 #include <string>
 #include <vector>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "ld-load-tests-base.h"
+#include "ld-load-tests-posix-base.h"
 
 // The spawned-process tests work by using the normal system program loader
 // such that it loads the executable and finds the dynamic linker as its
@@ -25,7 +26,7 @@ namespace ld::testing {
 // On POSIX-like systems this means using posix_spawn.  There is just one big
 // operation, really.  So all the methods before Run() just collect details of
 // what to do.
-class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsBase {
+class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsPosixBase {
  public:
   static constexpr int64_t kRunFailureForTrap = 128 + SIGILL;
   static constexpr int64_t kRunFailureForBadPointer = 128 + SIGSEGV;

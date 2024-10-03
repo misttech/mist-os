@@ -6,7 +6,7 @@ use crate::task::CurrentTask;
 use starnix_uapi::errors::Errno;
 
 use core::marker::PhantomData;
-use fuchsia_zircon as zx;
+
 use starnix_sync::{InterruptibleEvent, LockBefore, Locked, Mutex};
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -45,7 +45,7 @@ impl<L> RwQueue<L> {
 
             std::mem::drop(inner);
 
-            current_task.block_until(guard, zx::MonotonicTime::INFINITE).map_err(|e| {
+            current_task.block_until(guard, zx::MonotonicInstant::INFINITE).map_err(|e| {
                 self.inner.lock().remove_waiter(&event);
                 e
             })?;
@@ -89,7 +89,7 @@ impl<L> RwQueue<L> {
 
             std::mem::drop(inner);
 
-            current_task.block_until(guard, zx::MonotonicTime::INFINITE).map_err(|e| {
+            current_task.block_until(guard, zx::MonotonicInstant::INFINITE).map_err(|e| {
                 self.inner.lock().remove_waiter(&event);
                 e
             })?;

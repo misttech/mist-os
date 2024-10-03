@@ -79,7 +79,7 @@ mod tests {
     use fidl::endpoints;
     use fidl_fuchsia_input_report::{InputReportsReaderMarker, MAX_DEVICE_REPORT_COUNT};
     use futures::future;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     mod report_count {
         use super::*;

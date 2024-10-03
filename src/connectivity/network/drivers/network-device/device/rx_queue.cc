@@ -217,6 +217,9 @@ void RxQueue::CompleteRxList(
   SharedAutoLock control_lock(&parent_->control_lock());
   device_buffer_count_ -= rx_buffer_list.count();
   for (const auto& rx_buffer : rx_buffer_list.get()) {
+    // Always increment frame index for anything the device sends us. Sessions
+    // get their local indices for frames that make their way through.
+    rx_completed_frame_index_++;
     ZX_ASSERT_MSG(rx_buffer.data.count() <= MAX_BUFFER_PARTS,
                   "too many buffer parts in rx buffer: %ld", rx_buffer.data.count());
     std::array<SessionRxBuffer, MAX_BUFFER_PARTS> session_parts;
@@ -298,6 +301,7 @@ void RxQueue::CompleteRxList(
   if (device_buffer_count_ <= parent_->rx_notify_threshold()) {
     TriggerRxWatch();
   }
+  parent_->TryDelegateRxLease(rx_completed_frame_index_);
 }
 
 int RxQueue::WatchThread(

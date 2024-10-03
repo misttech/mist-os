@@ -10,7 +10,7 @@ use futures::prelude::*;
 use std::collections::HashMap;
 use std::str::from_utf8;
 use std::sync::Arc;
-use {fidl_fuchsia_boot as fboot, fuchsia_zircon as zx};
+use {fidl_fuchsia_boot as fboot, zx};
 
 pub struct Items {
     zbi_parser: ZbiParser,

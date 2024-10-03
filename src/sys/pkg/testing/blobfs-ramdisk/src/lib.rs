@@ -14,8 +14,8 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_merkle::Hash;
-use fuchsia_zircon::prelude::*;
-use fuchsia_zircon::{self as zx};
+use zx::prelude::*;
+
 use futures::prelude::*;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -583,7 +583,7 @@ async fn blobfs_corrupt_blob(
     res
 }
 
-async fn wait_for_process_async(proc: fuchsia_zircon::Process) -> Result<(), Error> {
+async fn wait_for_process_async(proc: zx::Process) -> Result<(), Error> {
     let signals =
         fuchsia_async::OnSignals::new(&proc.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
             .await

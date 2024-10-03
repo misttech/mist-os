@@ -24,7 +24,7 @@ use wlan_sme::serve::create_sme;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -66,6 +66,7 @@ enum FullmacDriverEvent {
     OnScanResult { result: fidl_mlme::ScanResult },
     OnScanEnd { end: fidl_mlme::ScanEnd },
     ConnectConf { resp: fidl_mlme::ConnectConfirm },
+    RoamConf { conf: fidl_mlme::RoamConfirm },
     RoamStartInd { ind: fidl_mlme::RoamStartIndication },
     RoamResultInd { ind: fidl_mlme::RoamResultIndication },
     AuthInd { ind: fidl_mlme::AuthenticateIndication },

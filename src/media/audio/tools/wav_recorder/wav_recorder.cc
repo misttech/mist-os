@@ -148,7 +148,7 @@ void WavRecorder::Run(sys::ComponentContext* app_context) {
         kCaptureUsages.cbegin(), kCaptureUsages.cend(),
         [&opt](auto usage_string_and_usage) { return opt == usage_string_and_usage.first; });
     if (it == kCaptureUsages.cend()) {
-      fprintf(stderr, "Unrecognized AudioRenderUsage %s\n\n", opt.c_str());
+      fprintf(stderr, "Unrecognized AudioCaptureUsage %s\n\n", opt.c_str());
       Usage();
       exit(1);
     }

@@ -151,7 +151,7 @@ mod tests {
     use super::*;
     use crate::Command;
     use fidl::endpoints;
-    use fuchsia_zircon as zx;
+
     use tracing::debug;
 
     // Returns immediately.

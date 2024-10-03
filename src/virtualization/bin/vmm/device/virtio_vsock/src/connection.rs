@@ -17,7 +17,7 @@ use std::rc::Rc;
 use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ConnectionCredit {

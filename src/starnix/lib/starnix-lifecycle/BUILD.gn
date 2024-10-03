@@ -20,9 +20,9 @@ rustc_library("starnix-lifecycle") {
   ]
 
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:paste",
   ]

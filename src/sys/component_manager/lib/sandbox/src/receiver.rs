@@ -46,10 +46,9 @@ impl Receiver {
 mod tests {
     use crate::Connector;
     use assert_matches::assert_matches;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::future::{self, Either};
     use std::pin::pin;
-    use zx::Peered;
+    use zx::{self as zx, AsHandleRef, Peered};
     use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
     use super::*;
@@ -65,7 +64,7 @@ mod tests {
 
         // Check connectivity.
         message.channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
-        ch2.wait_handle(zx::Signals::USER_1, zx::MonotonicTime::INFINITE).unwrap();
+        ch2.wait_handle(zx::Signals::USER_1, zx::MonotonicInstant::INFINITE).unwrap();
     }
 
     #[fuchsia::test]
@@ -136,7 +135,7 @@ mod tests {
             fsandbox::ReceiverRequest::Receive { channel, .. } => {
                 // Check connectivity.
                 channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
-                ch2.wait_handle(zx::Signals::USER_1, zx::MonotonicTime::INFINITE).unwrap();
+                ch2.wait_handle(zx::Signals::USER_1, zx::MonotonicInstant::INFINITE).unwrap();
             }
             _ => panic!("Unexpected message"),
         }

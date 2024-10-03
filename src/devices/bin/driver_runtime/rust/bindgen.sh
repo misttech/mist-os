@@ -30,7 +30,7 @@ readonly RAW_LINES="// Copyright 2024 The Fuchsia Authors. All rights reserved.
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-pub use fuchsia_zircon_types::*;
+pub use zx_types::*;
 "
 
 readonly FUCHSIA_API_LEVEL_HEAD=4292870144

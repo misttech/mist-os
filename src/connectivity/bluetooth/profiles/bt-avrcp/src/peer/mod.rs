@@ -20,7 +20,7 @@ use std::sync::Arc;
 use tracing::{info, trace, warn};
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 mod controller;
@@ -938,7 +938,6 @@ pub(crate) mod tests {
     };
     use fuchsia_async::{self as fasync, DurationExt};
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon as zx;
 
     fn setup_remote_peer(
         id: PeerId,

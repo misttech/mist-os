@@ -15,10 +15,10 @@ use crate::object_request::Representation;
 use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use fidl::endpoints::{ControlHandle as _, Responder, ServerEnd};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::StreamExt;
 use std::future::{ready, Future};
 use std::sync::Arc;
+use zx_status::Status;
 
 pub trait Symlink: Node {
     fn read_target(&self) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
@@ -328,10 +328,10 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon_status::Status;
     use futures::StreamExt;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
+    use zx_status::Status;
 
     const TARGET: &[u8] = b"target";
 

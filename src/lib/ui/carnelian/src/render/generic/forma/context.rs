@@ -22,7 +22,7 @@ use fidl_fuchsia_sysmem2::{
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_framebuffer::sysmem::set_allocator_name;
 use fuchsia_trace::{duration_begin, duration_end};
-use fuchsia_zircon::sys;
+use zx::sys;
 
 use crate::drawing::DisplayRotation;
 use crate::render::generic::forma::image::VmoImage;

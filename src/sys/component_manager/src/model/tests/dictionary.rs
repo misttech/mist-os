@@ -16,8 +16,7 @@ use routing_test_helpers::RoutingTestModel;
 use std::path::PathBuf;
 use test_case::test_case;
 use {
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx,
 };
 
 #[fuchsia::test]

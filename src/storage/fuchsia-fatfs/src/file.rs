@@ -9,7 +9,6 @@ use crate::refs::FatfsFileRef;
 use crate::types::File;
 use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, Status};
 use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::io::{Read, Seek, Write};
@@ -19,6 +18,7 @@ use vfs::directory::entry::EntryInfo;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
 use vfs::{attributes, ObjectRequestRef};
+use zx::{self as zx, Status};
 
 fn extend(file: &mut File<'_>, mut current: u64, target: u64) -> Result<(), Status> {
     let zeros = vec![0; 8192];

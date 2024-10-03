@@ -67,7 +67,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 /// The mutable state of a component instance.
@@ -572,7 +572,7 @@ impl ResolvedInstanceState {
                 self.resolved_component.package.as_ref(),
                 &component,
                 &self.resolved_component.decl,
-                &self.sandbox.program_input.namespace,
+                &self.sandbox.program_input.namespace(),
                 component.execution_scope.clone(),
             )
             .await?;
@@ -1073,7 +1073,7 @@ pub struct StartedInstanceState {
     program: Option<ProgramRuntime>,
 
     /// Approximates when the component was started.
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
 
     /// Describes why the component instance was started
     pub start_reason: StartReason,
@@ -1105,7 +1105,7 @@ impl StartedInstanceState {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
-        let timestamp = zx::MonotonicTime::get();
+        let timestamp = zx::MonotonicInstant::get();
         StartedInstanceState {
             program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
@@ -1149,7 +1149,7 @@ impl StartedInstanceState {
 
     /// Gets a [`Koid`] that will uniquely identify the program.
     #[cfg(test)]
-    pub fn program_koid(&self) -> Option<fuchsia_zircon::Koid> {
+    pub fn program_koid(&self) -> Option<zx::Koid> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.koid())
     }
 }

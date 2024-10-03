@@ -7,7 +7,7 @@
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fidl_fuchsia_net_tun as fnet_tun,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 use assert_matches::assert_matches;

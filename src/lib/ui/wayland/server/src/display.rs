@@ -17,7 +17,7 @@ use futures::channel::mpsc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use wayland_server_protocol::*;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// When the connection is created it is initialized with a 'wl_display' object
 /// that the client can immediately interact with.

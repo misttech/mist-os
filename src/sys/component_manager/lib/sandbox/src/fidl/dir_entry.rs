@@ -37,7 +37,7 @@ mod tests {
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     struct MockDir(Counter);
     impl DirectoryEntry for MockDir {

@@ -15,8 +15,7 @@ use wlan_metrics_registry::{
 };
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 #[cfg(test)]
@@ -115,7 +114,7 @@ pub struct Bss {
     /// Channel for this network.
     pub channel: WlanChan,
     /// Realtime timestamp for this scan result entry.
-    pub timestamp: zx::MonotonicTime,
+    pub timestamp: zx::MonotonicInstant,
     /// The scanning mode used to observe the BSS.
     pub observation: ScanObservation,
     /// Compatibility with this device's network stack.

@@ -6,7 +6,7 @@
 
 use crate::{Data, Logs};
 use fidl_fuchsia_logger::LogMessage;
-use fuchsia_zircon as zx;
+
 use std::fmt::Write;
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.

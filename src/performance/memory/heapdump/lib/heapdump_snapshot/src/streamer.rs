@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
-use fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES;
 use measure_tape_for_snapshot_element::Measurable;
+use zx_types::ZX_CHANNEL_MAX_MSG_BYTES;
 
 use crate::Error;
 

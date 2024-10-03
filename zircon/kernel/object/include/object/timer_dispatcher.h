@@ -18,8 +18,8 @@
 
 class TimerDispatcher final : public SoloDispatcher<TimerDispatcher, ZX_DEFAULT_TIMER_RIGHTS> {
  public:
-  static zx_status_t Create(uint32_t options, KernelHandle<TimerDispatcher>* handle,
-                            zx_rights_t* rights);
+  static zx_status_t Create(uint32_t options, zx_clock_t clock_id,
+                            KernelHandle<TimerDispatcher>* handle, zx_rights_t* rights);
 
   ~TimerDispatcher() final;
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_TIMER; }
@@ -35,12 +35,16 @@ class TimerDispatcher final : public SoloDispatcher<TimerDispatcher, ZX_DEFAULT_
   void GetInfo(zx_info_timer_t* info) const;
 
  private:
-  explicit TimerDispatcher(uint32_t options);
+  explicit TimerDispatcher(uint32_t options, zx_clock_t clock_id);
   void SetTimerLocked(bool cancel_first) TA_REQ(get_lock());
   bool CancelTimerLocked() TA_REQ(get_lock());
 
   const uint32_t options_;
+  const zx_clock_t clock_id_;
   Dpc timer_dpc_;
+  // The deadline should be interpreted as:
+  // * zx_instant_mono_t if clock_id_ equals ZX_CLOCK_MONOTONIC.
+  // * zx_instant_boot_t if clock_id_ equals ZX_CLOCK_BOOT.
   zx_time_t deadline_ TA_GUARDED(get_lock());
   zx_duration_t slack_amount_ TA_GUARDED(get_lock());
   bool cancel_pending_ TA_GUARDED(get_lock());

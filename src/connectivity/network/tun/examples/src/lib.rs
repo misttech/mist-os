@@ -149,7 +149,7 @@ async fn tap_like_over_network_tun() {
         })
         .await
         .expect("write_frame FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("write_frame failed");
 
     // Read frames until we see the echo response.
@@ -170,7 +170,7 @@ async fn tap_like_over_network_tun() {
             .read_frame()
             .await
             .expect("read_frame FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .expect("read_frame failed");
         let data = data.expect("received Frame with missing data field");
         assert_eq!(port, Some(PORT_ID));
@@ -194,7 +194,7 @@ async fn tap_like_over_network_tun() {
                         })
                         .await
                         .expect("write_frame FIDL error")
-                        .map_err(fuchsia_zircon::Status::from_raw)
+                        .map_err(zx::Status::from_raw)
                         .expect("write_frame failed");
                 }
             }
@@ -269,7 +269,7 @@ async fn tun_like_over_network_tun() {
         })
         .await
         .expect("write_frame FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
+        .map_err(zx::Status::from_raw)
         .expect("write_frame failed");
 
     // Read frames until we see the echo response.
@@ -289,7 +289,7 @@ async fn tun_like_over_network_tun() {
             .read_frame()
             .await
             .expect("read_frame FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .expect("read_frame failed");
         assert_eq!(port, Some(PORT_ID));
         match frame_type {

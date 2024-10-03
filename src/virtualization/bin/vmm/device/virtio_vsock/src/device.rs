@@ -25,7 +25,7 @@ use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
 use zerocopy::{FromBytes, IntoBytes};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub struct VsockDevice {
     // Device configuration. This currently only stores the guest CID, which should not change

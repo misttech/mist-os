@@ -29,6 +29,11 @@ class Directory : public fuchsia::io::testing::Directory_TestBase {
     open_handler_(std::move(path), std::move(object));
   }
 
+  void Open3(std::string path, fuchsia::io::Flags flags, fuchsia::io::Options options,
+             zx::channel object) override {
+    open_handler_(std::move(path), fidl::InterfaceRequest<fuchsia::io::Node>(std::move(object)));
+  }
+
   void NotImplemented_(const std::string& name) override {
     printf("Not implemented: Directory::%s\n", name.data());
   }

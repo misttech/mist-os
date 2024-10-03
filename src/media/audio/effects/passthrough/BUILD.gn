@@ -8,3 +8,7 @@ loadable_module("audio_effects") {
 
   deps = [ "//sdk/lib/media/audio/effects" ]
 }
+
+group("passthrough") {
+  deps = [ ":audio_effects" ]
+}

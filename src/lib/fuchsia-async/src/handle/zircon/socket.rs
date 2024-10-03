@@ -4,7 +4,6 @@
 
 use super::on_signals::OnSignalsRef;
 use super::rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::poll_fn;
 use futures::io::{self, AsyncRead, AsyncWrite};
 use futures::ready;
@@ -13,6 +12,7 @@ use futures::task::Context;
 use std::fmt;
 use std::pin::Pin;
 use std::task::Poll;
+use zx::{self as zx, AsHandleRef};
 
 /// An I/O object representing a `Socket`.
 pub struct Socket(RWHandle<zx::Socket>);
@@ -256,7 +256,7 @@ impl Stream for DatagramStream<&Socket> {
 mod tests {
     use super::*;
     use crate::{TestExecutor, Time, TimeoutExt, Timer};
-    use fuchsia_zircon as zx;
+
     use futures::future::{self, join};
     use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
     use futures::stream::TryStreamExt;

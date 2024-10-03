@@ -656,6 +656,7 @@ func TestBuild(t *testing.T) {
 							"../../src/foo/x.rs",
 							"../../src/foo/y.rs",
 						},
+						DisableClippy: false,
 					},
 					{
 						Output: "gen/src/bar.clippy",
@@ -663,6 +664,7 @@ func TestBuild(t *testing.T) {
 							"../../src/bar/x.rs",
 							"../../src/bar/y.rs",
 						},
+						DisableClippy: false,
 					},
 				},
 			},
@@ -687,6 +689,7 @@ func TestBuild(t *testing.T) {
 							"../../src/foo/x.rs",
 							"../../src/foo/y.rs",
 						},
+						DisableClippy: false,
 					},
 					{
 						Output: "gen/src/bar.clippy",
@@ -694,6 +697,7 @@ func TestBuild(t *testing.T) {
 							"../../src/bar/x.rs",
 							"../../src/bar/y.rs",
 						},
+						DisableClippy: false,
 					},
 				},
 			},

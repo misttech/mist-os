@@ -15,7 +15,7 @@ pub fn emit_enum<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    let e = &compiler.library.enum_declarations[ident];
+    let e = &compiler.schema.enum_declarations[ident];
 
     let name = &e.name.type_name();
     let natural_ty = int_type_natural_name(e.ty);
@@ -54,15 +54,20 @@ pub fn emit_enum<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::Encode for {name} {{
+        impl ::fidl_next::Encodable for {name} {{
             type Encoded<'buf> = Wire{name};
+        }}
 
+        impl<___E> ::fidl_next::Encode<___E> for {name}
+        where
+            ___E: ?Sized,
+        {{
             fn encode(
                 &mut self,
-                encoder: &mut ::fidl::encode::Encoder,
-                slot: ::fidl::Slot<'_, Self::Encoded<'_>>,
-            ) -> Result<(), ::fidl::encode::Error> {{
-                ::fidl::munge!(let Wire{name} {{ mut value }} = slot);
+                _: &mut ___E,
+                slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+            ) -> Result<(), ::fidl_next::EncodeError> {{
+                ::fidl_next::munge!(let Wire{name} {{ mut value }} = slot);
                 *value = {wire_ty}::from(match *self {{
         "#,
     )?;
@@ -127,7 +132,7 @@ pub fn emit_enum<W: Write>(
     writeln!(
         out,
         r#"
-        impl ::fidl::TakeFrom<Wire{name}> for {name} {{
+        impl ::fidl_next::TakeFrom<Wire{name}> for {name} {{
             fn take_from(from: &mut Wire{name}) -> Self {{
                 {name}::from(*from)
             }}

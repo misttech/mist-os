@@ -20,8 +20,9 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
-    AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, MarkDomain, MarkMatcher,
-    MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, Rule, RuleAction, RuleMatcher,
+    AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, InternalForwarding,
+    MarkDomain, MarkMatcher, MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, Rule,
+    RuleAction, RuleMatcher,
 };
 
 #[ip_test(I)]
@@ -307,6 +308,7 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
         device: device_id_1.clone(),
         local_delivery_device: None,
         next_hop: netstack3_ip::NextHop::RemoteAsNeighbor,
+        internal_forwarding: InternalForwarding::NotUsed,
     };
 
     let expected_route_with_gateway = ResolvedRoute {
@@ -314,6 +316,7 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
         device: device_id_1,
         local_delivery_device: None,
         next_hop: netstack3_ip::NextHop::Gateway(gateway),
+        internal_forwarding: InternalForwarding::NotUsed,
     };
 
     // We need to lookup the route again and in this case the destination address matches the
@@ -438,6 +441,7 @@ fn route_resolution_with_marks<I: TestIpExt + netstack3_core::IpExt>() {
             device: device_id_2,
             local_delivery_device: None,
             next_hop: netstack3_ip::NextHop::RemoteAsNeighbor,
+            internal_forwarding: InternalForwarding::NotUsed,
         })
     );
     assert_eq!(
@@ -450,6 +454,7 @@ fn route_resolution_with_marks<I: TestIpExt + netstack3_core::IpExt>() {
             device: device_id_1,
             local_delivery_device: None,
             next_hop: netstack3_ip::NextHop::RemoteAsNeighbor,
+            internal_forwarding: InternalForwarding::NotUsed,
         })
     );
 }

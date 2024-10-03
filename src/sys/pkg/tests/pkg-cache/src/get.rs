@@ -11,8 +11,8 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker};
 use fidl_fuchsia_pkg_ext::{self as fpkg_ext, BlobId};
 use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
-use fuchsia_zircon::Status;
 use futures::prelude::*;
+use zx::Status;
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn get_multiple_packages_with_no_content_blobs() {

@@ -1,0 +1,38 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("fidl_driver") {
+  edition = "2021"
+  sources = [
+    "src/encoding.rs",
+    "src/endpoints.rs",
+    "src/lib.rs",
+  ]
+  deps = [
+    "//sdk/rust/zx",
+    "//src/devices/bin/driver_runtime/rust:fdf_rust_lib",
+    "//src/lib/fidl/rust/fidl",
+  ]
+  with_unit_tests = true
+
+  # Rust fidl driver transport support is currently experimental, and restricted by a visibility
+  # list. Please check with the driver framework team before adding your fidl library to this list.
+  visibility = [
+    ":*",
+    "//sdk/fidl/fuchsia.driver.framework:*",
+    "//tools/fidl/fidlc/testdata/*",
+  ]
+}
+
+fuchsia_unittest_package("fidl_driver_tests") {
+  deps = [ ":fidl_driver_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":fidl_driver_tests" ]
+}

@@ -31,6 +31,8 @@ pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 /// Errors surfaced to the user.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ConnectionError {
+    /// The connection was refused, RST segment received while in SYN_SENT state.
+    ConnectionRefused,
     /// The connection was reset because of a RST segment.
     ConnectionReset,
     /// The connection was closed because the network is unreachable.

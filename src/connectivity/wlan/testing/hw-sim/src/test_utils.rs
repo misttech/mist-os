@@ -7,8 +7,8 @@ use crate::wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBui
 use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
 use fuchsia_async::{DurationExt, Time, TimeoutExt, Timer};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
-use fuchsia_zircon::prelude::*;
-use fuchsia_zircon::{self as zx};
+use zx::prelude::*;
+
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
 use ieee80211::{MacAddr, MacAddrBytes};
@@ -416,7 +416,7 @@ impl Drop for TestHelper {
         // first shutdown the phy to prevent any automated CreateIface
         // calls from wlancfg after removing the iface.
         sync_proxy
-            .shutdown(zx::MonotonicTime::INFINITE)
+            .shutdown(zx::MonotonicInstant::INFINITE)
             .expect("Failed to shutdown WlantapPhy gracefully.");
     }
 }

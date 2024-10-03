@@ -188,7 +188,7 @@ template("rustc_library") {
       if (defined(invoker.name)) {
         name = invoker.name + "_lib_test"
       }
-      original_target_name = _original_target_name
+      original_target_name = target_name
 
       # It's valid for the test to use dependencies that were declared
       # `assert_no_deps`.
@@ -223,7 +223,7 @@ template("rustc_library") {
   rustc_artifact(target_name) {
     target_type = "rust_library"
     crate_root = source_root
-    clippy_crate_type = "rlib"
+    rust_crate_type = "rlib"
     crate_name = _crate_name
     original_target_name = _original_target_name
     pass_through = {
@@ -263,6 +263,7 @@ template("rustc_library") {
                              "disable_rbe",
                              "edition",
                              "enforce_source_listing",
+                             "define_rustdoc_test_override",
                              "features",
                              "inputs",
                              "pool",

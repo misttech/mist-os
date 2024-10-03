@@ -11,7 +11,7 @@ use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_inspect::health::Reporter;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
-use {fidl_fuchsia_ui_input3 as fidl_ui_input3, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_ui_input3 as fidl_ui_input3, fuchsia_async as fasync, zx};
 
 /// A [`KeyboardEvent`] represents an input event from a keyboard device.
 ///
@@ -203,7 +203,7 @@ impl KeyboardEvent {
     #[cfg(test)]
     pub(crate) fn from_key_event_at_time(
         &self,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> fidl_ui_input3::KeyEvent {
         fidl_ui_input3::KeyEvent {
             timestamp: Some(event_time.into_nanos()),
@@ -481,7 +481,7 @@ impl KeyboardBinding {
             &new_keys,
             &previous_keys,
             device_descriptor.clone(),
-            zx::MonotonicTime::get(),
+            zx::MonotonicInstant::get(),
             input_event_sender.clone(),
             inspect_sender,
             metrics_logger,
@@ -519,7 +519,7 @@ impl KeyboardBinding {
         new_keys: &Vec<fidl_fuchsia_input::Key>,
         previous_keys: &Vec<fidl_fuchsia_input::Key>,
         device_descriptor: input_device::InputDeviceDescriptor,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         inspect_sender: UnboundedSender<input_device::InputEvent>,
         metrics_logger: &metrics::MetricsLogger,
@@ -530,7 +530,7 @@ impl KeyboardBinding {
         fn dispatch_events(
             key_events: Vec<(fidl_fuchsia_input::Key, fidl_fuchsia_ui_input3::KeyEventType)>,
             device_descriptor: input_device::InputDeviceDescriptor,
-            event_time: zx::MonotonicTime,
+            event_time: zx::MonotonicInstant,
             input_event_sender: UnboundedSender<input_device::InputEvent>,
             inspect_sender: UnboundedSender<input_device::InputEvent>,
             metrics_logger: metrics::MetricsLogger,
@@ -607,7 +607,7 @@ mod tests {
     use super::*;
     use crate::testing_utilities;
     use futures::StreamExt;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// Tests that a key that is present in the new report, but was not present in the previous report
     /// is propagated as pressed.
@@ -801,7 +801,7 @@ mod tests {
             .into_with_repeat_sequence(42)
             .into_with_key_meaning(Some(KeyMeaning::NonPrintableKey(NonPrintableKey::Tab)));
 
-        let actual = event.from_key_event_at_time(zx::MonotonicTime::from_nanos(42));
+        let actual = event.from_key_event_at_time(zx::MonotonicInstant::from_nanos(42));
         assert_eq!(
             actual,
             fidl_fuchsia_ui_input3::KeyEvent {

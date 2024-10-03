@@ -10,7 +10,7 @@ use crate::encoding::{
 };
 use crate::error::Error;
 use crate::{AsyncChannel, Channel, HandleDisposition};
-use fuchsia_zircon_status as zx_status;
+use zx_status;
 
 /// Extension trait that provides Channel-like objects with the ability to send a FIDL epitaph.
 pub trait ChannelEpitaphExt {

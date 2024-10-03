@@ -20,6 +20,8 @@ type flagsDef struct {
 	outputFilenamePath *string
 	rustfmtPath        *string
 	rustfmtConfigPath  *string
+	fdomain            *bool
+	includeDrivers     *bool
 }
 
 var flags = flagsDef{
@@ -31,6 +33,8 @@ var flags = flagsDef{
 		"path to the rustfmt tool."),
 	rustfmtConfigPath: flag.String("rustfmt-config", "",
 		"path to rustfmt.toml."),
+	fdomain:        flag.Bool("fdomain", false, "if given, generate FDomain bindings."),
+	includeDrivers: flag.Bool("include-drivers", false, "whether to include driver transport protocols or not"),
 }
 
 // valid returns true if the parsed flags are valid.
@@ -66,7 +70,7 @@ func main() {
 
 	generator := codegen.NewGenerator(*flags.rustfmtPath, *flags.rustfmtConfigPath)
 	err = generator.GenerateFidl(
-		root, *flags.outputFilenamePath)
+		root, *flags.outputFilenamePath, *flags.includeDrivers)
 	if err != nil {
 		log.Fatalf("Error running generator: %v", err)
 	}

@@ -14,7 +14,7 @@ use wlan_common::bss::Protection;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_hw_sim::event::{action, Handler};
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 lazy_static! {
     static ref BSSID: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);

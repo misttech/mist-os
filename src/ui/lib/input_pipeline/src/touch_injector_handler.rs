@@ -20,7 +20,7 @@ use std::rc::Rc;
 use {
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config, zx,
 };
 
 /// An input handler that parses touch events and forwards them to Scenic through the
@@ -306,7 +306,7 @@ impl TouchInjectorHandler {
         &self,
         touch_event: &touch_binding::TouchScreenEvent,
         touch_descriptor: &touch_binding::TouchScreenDeviceDescriptor,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> Result<(), anyhow::Error> {
         // The order in which events are sent to clients.
         let ordered_phases = vec![
@@ -369,7 +369,7 @@ impl TouchInjectorHandler {
         contact: &touch_binding::TouchContact,
         touch_descriptor: &touch_binding::TouchScreenDeviceDescriptor,
         display_size: &Size,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> pointerinjector::Event {
         let position =
             Self::display_coordinate_from_contact(&contact, &touch_descriptor, display_size);
@@ -437,7 +437,7 @@ impl TouchInjectorHandler {
     /// Reports the given event_time to the activity service.
     async fn report_touch_activity(
         &self,
-        event_time: zx::MonotonicTime,
+        event_time: zx::MonotonicInstant,
     ) -> Result<(), fidl::Error> {
         self.aggregator_proxy.report_discrete_activity(event_time.into_nanos()).await
     }
@@ -501,7 +501,7 @@ mod tests {
     use std::ops::Add;
     use {
         fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, zx,
     };
 
     const TOUCH_ID: u32 = 1;
@@ -773,7 +773,7 @@ mod tests {
         let touch_handler = touch_handler_res.expect("Failed to create touch handler.");
 
         // Create touch event.
-        let event_time = zx::MonotonicTime::get();
+        let event_time = zx::MonotonicInstant::get();
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
         let input_event = input_device::UnhandledInputEvent::try_from(create_touch_screen_event(
@@ -868,7 +868,7 @@ mod tests {
         });
 
         // Create touch event.
-        let event_time = zx::MonotonicTime::get();
+        let event_time = zx::MonotonicInstant::get();
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
         let input_event = input_device::UnhandledInputEvent::try_from(create_touch_screen_event(
@@ -980,7 +980,7 @@ mod tests {
         });
 
         // Create touch event.
-        let event_time = zx::MonotonicTime::get();
+        let event_time = zx::MonotonicInstant::get();
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touchpad_device_descriptor();
         let input_event = input_device::UnhandledInputEvent::try_from(create_touchpad_event(
@@ -1073,9 +1073,9 @@ mod tests {
 
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
-        let event_time1 = zx::MonotonicTime::get();
-        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
-        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time1 = zx::MonotonicInstant::get();
+        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
+        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
 
         let input_events = vec![
             create_touch_screen_event(

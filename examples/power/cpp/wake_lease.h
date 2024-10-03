@@ -23,7 +23,7 @@ class WakeLease {
   static fpromise::promise<WakeLease, Error> Take(
       const fidl::Client<fuchsia_power_system::ActivityGovernor>& client, const std::string& name);
 
-  // Destroying this WakeLease will destroy the underlying WakeLeaseToken, thereby removing the
+  // Destroying this WakeLease will destroy the underlying LeaseToken, thereby removing the
   // lease with the server.
   ~WakeLease() = default;
 
@@ -32,9 +32,9 @@ class WakeLease {
   WakeLease& operator=(WakeLease&&) = default;
 
  private:
-  explicit WakeLease(fuchsia_power_system::WakeLeaseToken token) : token_(std::move(token)) {}
+  explicit WakeLease(fuchsia_power_system::LeaseToken token) : token_(std::move(token)) {}
 
-  fuchsia_power_system::WakeLeaseToken token_;
+  fuchsia_power_system::LeaseToken token_;
 };
 
 }  // namespace examples::power

@@ -14,6 +14,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4, Ipv6};
 use net_types::{UnicastAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
+use netstack3_core::inspect::Inspector as _;
 use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 
 use crate::bindings::devices::{
@@ -191,9 +192,9 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
 
 pub(crate) fn counters(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    ctx.api()
-        .counters()
-        .inspect_stack_counters(&mut FuchsiaInspector::<BindingsCtx>::new(inspector.root()));
+    let mut fuchsia_inspector = FuchsiaInspector::<BindingsCtx>::new(inspector.root());
+    ctx.api().counters().inspect_stack_counters(&mut fuchsia_inspector);
+    fuchsia_inspector.record_inspectable("Bindings", &ctx.bindings_ctx().counters);
     inspector
 }
 

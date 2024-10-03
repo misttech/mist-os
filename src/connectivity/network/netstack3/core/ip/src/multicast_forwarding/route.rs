@@ -6,12 +6,14 @@
 
 use alloc::fmt::Debug;
 use alloc::sync::Arc;
+use core::hash::Hash;
+use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope};
 use net_types::{
     MulticastAddr, MulticastAddress as _, NonMappedAddr, ScopeableAddress as _, SpecifiedAddr,
     SpecifiedAddress as _, UnicastAddr,
 };
-use netstack3_base::{IpExt, StrongDeviceIdentifier};
+use netstack3_base::{InstantBindingsTypes, IpExt, StrongDeviceIdentifier};
 
 /// A witness type wrapping [`Ipv4Addr`], proving the following properties:
 /// * the inner address is specified, and
@@ -22,7 +24,7 @@ use netstack3_base::{IpExt, StrongDeviceIdentifier};
 /// be used. This is because "unicastness" is not an absolute property of an
 /// IPv4 address: it requires knowing the subnet in which the address is being
 /// used.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ipv4SourceAddr {
     addr: Ipv4Addr,
 }
@@ -52,7 +54,7 @@ impl From<Ipv4SourceAddr> for Ipv4Addr {
 /// A witness type wrapping [`Ipv4Addr`], proving the following properties:
 /// * the inner address is multicast, and
 /// * the inner address's scope is greater than link local.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ipv4DestinationAddr {
     addr: MulticastAddr<Ipv4Addr>,
 }
@@ -83,7 +85,7 @@ impl From<Ipv4DestinationAddr> for SpecifiedAddr<Ipv4Addr> {
 /// * the inner address is unicast, and
 /// * the inner address's scope is greater than link local.
 /// * the inner address is non-mapped.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ipv6SourceAddr {
     addr: NonMappedAddr<UnicastAddr<Ipv6Addr>>,
 }
@@ -114,7 +116,7 @@ impl From<Ipv6SourceAddr> for net_types::ip::Ipv6SourceAddr {
 /// A witness type wrapping [`Ipv6Addr`], proving the following properties:
 /// * the inner address is multicast, and
 /// * the inner address's scope is greater than link local.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ipv6DestinationAddr {
     addr: MulticastAddr<Ipv6Addr>,
 }
@@ -144,11 +146,19 @@ impl From<Ipv6DestinationAddr> for SpecifiedAddr<Ipv6Addr> {
 /// IP extension trait for multicast routes.
 pub trait MulticastRouteIpExt: IpExt {
     /// The type of source address used in [`MulticastRouteKey`].
-    type SourceAddress: Clone + Debug + Eq + Ord + PartialEq + PartialOrd + Into<Self::RecvSrcAddr>;
+    type SourceAddress: Clone
+        + Debug
+        + Eq
+        + Hash
+        + Ord
+        + PartialEq
+        + PartialOrd
+        + Into<Self::RecvSrcAddr>;
     /// The type of destination address used in [`MulticastRouteKey`].
     type DestinationAddress: Clone
         + Debug
         + Eq
+        + Hash
         + Ord
         + PartialEq
         + PartialOrd
@@ -166,7 +176,7 @@ impl MulticastRouteIpExt for Ipv6 {
 }
 
 /// The attributes of a multicast route that uniquely identify it.
-#[derive(Clone, Debug, Eq, GenericOverIp, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, GenericOverIp, Hash, Ord, PartialEq, PartialOrd)]
 #[generic_over_ip(I, Ip)]
 pub struct MulticastRouteKey<I: MulticastRouteIpExt> {
     /// The source address packets must have in order to use this route.
@@ -197,15 +207,25 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn src_addr(&self) -> I::Addr {
+    /// Returns the source address, stripped of all its witnesses.
+    pub fn src_addr(&self) -> I::Addr {
         I::map_ip(self, |key| key.src_addr.addr, |key| **key.src_addr.addr)
     }
 
-    #[cfg(test)]
-    pub(crate) fn dst_addr(&self) -> I::Addr {
+    /// Returns the destination address, stripped of all its witnesses.
+    pub fn dst_addr(&self) -> I::Addr {
         I::map_ip(self, |key| *key.dst_addr.addr, |key| *key.dst_addr.addr)
     }
+}
+
+/// An entry in the multicast route table.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub struct MulticastRouteEntry<D: StrongDeviceIdentifier, BT: InstantBindingsTypes> {
+    pub(crate) route: MulticastRoute<D>,
+    // NB: Hold the statistics as an AtomicInstant so that they can be updated
+    // without write-locking the multicast route table.
+    pub(crate) stats: MulticastRouteStats<BT::AtomicInstant>,
 }
 
 /// All attributes of a multicast route, excluding the [`MulticastRouteKey`].
@@ -295,6 +315,20 @@ impl<D: StrongDeviceIdentifier> MulticastRoute<D> {
 
         Ok(MulticastRoute { input_interface, action: Action::Forward(targets) })
     }
+}
+
+/// Statistics about a [`MulticastRoute`].
+#[derive(Debug, Eq, PartialEq)]
+pub struct MulticastRouteStats<Instant> {
+    /// The last time the route was used to route a packet.
+    ///
+    /// This value is initialized to the current time when a route is installed
+    /// in the route table, and updated every time the route is selected during
+    /// multicast route lookup. Notably, it is updated regardless of whether the
+    /// packet is actually forwarded; it might be dropped after the routing
+    /// decision for a number reasons (e.g. dropped by the filtering engine,
+    /// dropped at the device layer, etc).
+    pub last_used: Instant,
 }
 
 #[cfg(test)]

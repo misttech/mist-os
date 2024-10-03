@@ -5,10 +5,10 @@
 //! Typesafe wrappers around parsing the update-mode file.
 
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use thiserror::Error;
+use zx_status::Status;
 
 /// An error encountered while parsing the update-mode file.
 #[derive(Debug, Error)]

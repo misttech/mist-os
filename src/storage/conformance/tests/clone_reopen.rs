@@ -8,7 +8,7 @@ use futures::TryStreamExt as _;
 use io_conformance_util::flags::Rights;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn clone_file_with_same_or_fewer_rights() {

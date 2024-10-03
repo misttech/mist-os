@@ -72,7 +72,8 @@ enum class AdvertisingInterval {
 class LowEnergyAdvertisingManager {
  public:
   LowEnergyAdvertisingManager(hci::LowEnergyAdvertiser* advertiser,
-                              hci::LocalAddressDelegate* local_addr_delegate);
+                              hci::LocalAddressDelegate* local_addr_delegate,
+                              bool simultaneous_le_and_bredr_controller);
   virtual ~LowEnergyAdvertisingManager();
 
   // Returns true if the controller is currently advertising.
@@ -139,6 +140,9 @@ class LowEnergyAdvertisingManager {
   // Used to obtain the local device address for advertising. Must outlive this
   // advertising manager.
   hci::LocalAddressDelegate* local_addr_delegate_;  // weak
+
+  // Default flags to use when advertising
+  AdvFlags default_flags_;
 
   // Note: Should remain the last member so it'll be destroyed and
   // invalidate it's pointers before other members are destroyed.

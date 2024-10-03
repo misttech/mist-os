@@ -5,7 +5,6 @@
 use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
-use fuchsia_zircon::{self as zx, HandleBased, Status};
 use fxfs_testing::{close_file_checked, open_dir_checked, open_file_checked, TestFixture};
 use std::sync::Arc;
 use syncio::{
@@ -21,6 +20,7 @@ use vfs::path::Path;
 use vfs::remote::RemoteLike;
 use vfs::symlink::Symlink;
 use vfs::{pseudo_directory, ObjectRequestRef, ToFlags, ToObjectRequest};
+use zx::{self as zx, HandleBased, Status};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::test]

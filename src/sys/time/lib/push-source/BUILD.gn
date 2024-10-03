@@ -18,9 +18,9 @@ rustc_library("push-source") {
 
   deps = [
     "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/watch_handler",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",

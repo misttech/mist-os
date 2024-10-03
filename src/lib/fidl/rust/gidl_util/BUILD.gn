@@ -7,12 +7,12 @@ import("//build/rust/rustc_library.gni")
 rustc_library("gidl_util") {
   edition = "2021"
   deps = [
+    "//sdk/rust/zx-status",
+    "//sdk/rust/zx-types",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/zircon/rust/fuchsia-zircon-status",
-    "//src/lib/zircon/rust/fuchsia-zircon-types",
   ]
   if (is_fuchsia) {
-    deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+    deps += [ "//sdk/rust/zx" ]
   }
   sources = [ "src/lib.rs" ]
 }

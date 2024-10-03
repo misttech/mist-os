@@ -79,3 +79,31 @@ service TargetService {
 service SubTargetService {
     device client_end:Device;
 };
+
+open protocol Debug {
+    /// Connects to the target device with the given ID. Equivalent to connecting to `TargetService`
+    /// via the corresponding driver node.
+    ///
+    /// Returns `INVALID_ARGS` if `target_id` is greater than or equal to `MAX_TARGETS`.
+    /// May return an error if there is no such target on the bus; otherwise errors will be returned
+    /// when attempting to access the client.
+    strict ConnectTarget(resource struct {
+        target_id uint8;
+        server server_end:Device;
+    }) -> () error DriverError;
+
+    /// Returns the properties of the host SPMI controller.
+    strict GetControllerProperties() -> (table {
+        /// User friendly string for the controller name. If not set, the controller name is
+        /// unknown. If included, this string must be non-empty.
+        ///
+        /// Optional.
+        1: name string:MAX_SPMI_NAME_LEN;
+    });
+};
+
+/// This service can be used by command-line utilities and tests to connect to any target device on
+/// the SPMI bus. It is not exposed to drivers.
+service DebugService {
+    device client_end:Debug;
+};

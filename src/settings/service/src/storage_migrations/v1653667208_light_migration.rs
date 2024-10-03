@@ -11,7 +11,7 @@ use fidl_fuchsia_io::FileProxy;
 use fidl_fuchsia_settings::LightGroup as LightGroupFidl;
 use fidl_fuchsia_settings_storage::LightGroups;
 use fidl_fuchsia_stash::{StoreProxy, Value};
-use fuchsia_zircon as zx;
+
 use settings_storage::fidl_storage::FidlStorageConvertible;
 
 const LIGHT_KEY: &str = "settings_light_info";

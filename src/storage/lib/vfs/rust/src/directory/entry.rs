@@ -18,10 +18,10 @@ use crate::{ObjectRequestRef, ToObjectRequest};
 
 use fidl::endpoints::{create_endpoints, ClientEnd};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
+use zx_status::Status;
 
 /// Information about a directory entry, used to populate ReadDirents() output.
 /// The first element is the inode number, or INO_UNKNOWN (from fuchsia.io) if not set, and the second
@@ -423,9 +423,9 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon_status::Status;
     use futures::StreamExt;
     use std::sync::Arc;
+    use zx_status::Status;
 
     #[fuchsia::test]
     async fn sub_node() {

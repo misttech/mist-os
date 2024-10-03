@@ -17,10 +17,10 @@ use carnelian::{
 };
 use core::cell::RefCell;
 use euclid::{point2, size2};
-use fuchsia_zircon::Event;
 use std::collections::{HashSet, VecDeque};
 use std::f32;
 use std::rc::Rc;
+use zx::Event;
 
 const BACKGROUND_COLOR: Color = Color { r: 235, g: 255, b: 255, a: 255 };
 

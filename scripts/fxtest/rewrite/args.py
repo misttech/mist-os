@@ -8,6 +8,7 @@ from datetime import datetime
 import enum
 import os
 import pathlib
+import re
 import sys
 import typing
 
@@ -172,6 +173,17 @@ class Flags:
                 self.style = termout.is_valid()
             if self.status is None:
                 self.status = termout.is_valid()
+
+    def update_artifacts_directory_with_out_path(self, path: str) -> None:
+        if (
+            self.artifact_output_directory is not None
+            and "FUCHSIA_OUT" in self.artifact_output_directory
+        ):
+            self.artifact_output_directory = re.sub(
+                r"(\$FUCHSIA_OUT|\$\{FUCHSIA_OUT\})",
+                path,
+                self.artifact_output_directory,
+            )
 
     def has_debugger(self) -> bool:
         """Determine if this set of flags enables debugging.

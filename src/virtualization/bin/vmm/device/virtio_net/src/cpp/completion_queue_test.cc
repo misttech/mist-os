@@ -65,6 +65,9 @@ class FakeNetDevice : public ddk::NetworkDeviceIfcProtocol<FakeNetDevice> {
   void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
     FAIL() << "Not supported by the FakeNetDevice";
   }
+  void NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {
+    FAIL() << "Not supported by the FakeNetDevice";
+  }
 
   std::vector<std::vector<tx_result_t>> tx_batches_;
   std::vector<std::vector<rx_buffer_part_t>> rx_batches_;

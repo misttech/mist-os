@@ -4,9 +4,9 @@
 
 use delivery_blob::compression::ChunkedArchiveError;
 use delivery_blob::DeliveryBlobError;
-use fuchsia_zircon::Status;
 use fxfs::errors::FxfsError;
 use fxfs::log::*;
+use zx::Status;
 
 pub fn map_to_status(error: anyhow::Error) -> Status {
     if let Some(status) = error.root_cause().downcast_ref::<Status>() {

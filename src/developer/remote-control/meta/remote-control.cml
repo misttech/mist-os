@@ -6,7 +6,6 @@
     program: {
         runner: "elf",
         binary: "bin/remote_control_bin",
-        args: [ "remote-control" ],
     },
     capabilities: [
         { protocol: "fuchsia.developer.remotecontrol.RemoteControl" },

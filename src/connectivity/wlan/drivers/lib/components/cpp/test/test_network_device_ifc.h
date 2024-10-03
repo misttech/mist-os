@@ -79,6 +79,14 @@ class TestNetworkDeviceIfc
     }
   }
 
+  void DelegateRxLease(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
+      fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override {
+    if (delegate_rx_lease_) {
+      delegate_rx_lease_(request, arena, completer);
+    }
+  }
+
   std::function<void(
       fuchsia_hardware_network_driver::wire::NetworkDeviceIfcPortStatusChangedRequest*, fdf::Arena&,
       PortStatusChangedCompleter::Sync&)>
@@ -98,6 +106,9 @@ class TestNetworkDeviceIfc
   std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcSnoopRequest*,
                      fdf::Arena&, SnoopCompleter::Sync&)>
       snoop_;
+  fit::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcDelegateRxLeaseRequest*,
+                     fdf::Arena&, DelegateRxLeaseCompleter::Sync&)>
+      delegate_rx_lease_;
 
  private:
   std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::NetworkDeviceIfc>> binding_;

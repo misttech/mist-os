@@ -93,7 +93,7 @@ mod fuchsia {
     use block_client::{Cache, RemoteBlockClientSync};
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_hardware_block::BlockMarker;
-    use fuchsia_zircon as zx;
+
     use std::sync::{Arc, Mutex};
     use tracing::error;
 

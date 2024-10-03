@@ -19,10 +19,8 @@ lock_ordering! {
     TaskRelease => ProcessGroupState,
     // Artificial level for ResourceAccessor.add_file_with_flags(..)
     Unlocked => ResourceAccessorAddFile,
-    // Artificial level for FileOps.to_handle(..)
-    ResourceAccessorAddFile => FileOpsToHandle,
     // Artificial level for DeviceOps.open(..)
-    FileOpsToHandle => DeviceOpen,
+    ResourceAccessorAddFile => DeviceOpen,
     // Artificial level for several FileOps and FsNodeOps method forming a connected group
     // because of dependencies between them: FileOps.read, FsNode.create_file_ops, ...
     DeviceOpen => FileOpsCore,

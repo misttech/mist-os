@@ -1,5 +1,12 @@
 # bt-host
 
+## !!! NOTICE !!!
+
+bt-host now uses a prebuilt, and changes to bt-host in fuchsia.git will not
+have an effect! See
+[pw_bluetooth_sapphire](https://pigweed.dev/pw_bluetooth_sapphire) for
+documentation on bt-host's new home in pigweed.git.
+
 ## Test
 
 `$ fx test //src/connectivity/bluetooth/core/bt-host`
@@ -23,16 +30,9 @@ for a more in depth guide.
 
 ## Inspect
 
-`bt-host` uses the [standard driver processes](https://fuchsia.googlesource.com/fuchsia/+/57edce1df72b148c33e8f219bddbd038cdbb861b/zircon/system/ulib/inspect/) to expose its inspect hierarchy
-to the Fuchsia system.
-
 ### Usage
 
-To query the current state of the `bt-host` ***driver*** Inspect hierarchy through `ffx` tooling, run:
-
-`ffx inspect show bootstrap/driver_manager --file class/bt-host/000.inspect`
-
-To query the current state of the `bt-host` ***component*** Inspect hierarchy, run:
+To query the current state of the `bt-host` component Inspect hierarchy, run:
 
 1. `ffx inspect list | grep bt-host` to find the component's `<moniker>`
 2. `ffx inspect show "<moniker>"`

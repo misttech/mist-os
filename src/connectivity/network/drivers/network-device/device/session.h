@@ -106,6 +106,7 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   bool IsPrimary() const;
   bool IsListen() const;
   bool IsPaused() const;
+  bool AllowRxLeaseDelegation() const;
   // Checks if this session is eligible to take over the primary session from `current_primary`.
   // `current_primary` can be null, meaning there's no current primary session.
   bool ShouldTakeOverPrimary(const Session* current_primary) const;
@@ -140,6 +141,7 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   void Attach(AttachRequestView request, AttachCompleter::Sync& _completer) override;
   void Detach(DetachRequestView request, DetachCompleter::Sync& _completer) override;
   void Close(CloseCompleter::Sync& _completer) override;
+  void WatchDelegatedRxLease(WatchDelegatedRxLeaseCompleter::Sync& completer) override;
 
   zx_status_t AttachPort(const netdev::wire::PortId& port_id,
                          cpp20::span<const netdev::wire::FrameType> frame_types);
@@ -223,6 +225,12 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // Binds |channel| to this session. Must only be called once.
   void Bind(fidl::ServerEnd<netdev::Session> channel);
 
+  // Delegates an rx lease to this session. The lease is assumed to be already
+  // fulfilled during rx queue processing, the hold until frame is updated to
+  // the latest frame delivered to this session and the lease is delegated up.
+  void DelegateRxLease(netdev::DelegatedRxLease lease) __TA_EXCLUDES(rx_lease_lock_)
+      __TA_REQUIRES(parent_->rx_lock());
+
  private:
   inline void RxReturned(size_t count) { ZX_ASSERT(in_flight_rx_.fetch_sub(count) >= count); }
   inline void TxReturned(size_t count) { ZX_ASSERT(in_flight_tx_.fetch_sub(count) >= count); }
@@ -267,6 +275,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // Unowned pointer to data VMO stored in DeviceInterface.
   // Set by Session::Create.
   DataVmoStore::StoredVmo* data_vmo_ = nullptr;
+  std::optional<WatchDelegatedRxLeaseCompleter::Async> rx_lease_completer_
+      __TA_GUARDED(rx_lease_lock_);
   std::optional<fidl::ServerBindingRef<netdev::Session>> binding_;
   // The control channel is only set by the session teardown process if an epitaph must be sent when
   // all the buffers are properly reclaimed. It is set to the channel that was previously bound in
@@ -295,11 +305,15 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // True if the session is currently being destroyed, i.e. session is unbound
   // and waiting for its buffers to be returned from the device.
   bool dying_ __TA_GUARDED(parent_->control_lock()) = false;
+  uint64_t rx_delivered_frame_index_ __TA_GUARDED(parent_->rx_lock()) = 0;
 
   std::atomic<size_t> in_flight_tx_ = 0;
   std::atomic<size_t> in_flight_rx_ = 0;
   std::atomic<bool> scheduled_destruction_ = false;
   std::optional<TxQueue::SessionKey> tx_ticket_ __TA_GUARDED(parent_->tx_lock());
+
+  fbl::Mutex rx_lease_lock_;
+  std::optional<netdev::DelegatedRxLease> rx_lease_pending_ __TA_GUARDED(rx_lease_lock_);
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Session);
 };

@@ -13,8 +13,8 @@ rustc_staticlib("fastboot-c") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/recovery/lib/installer",
     "//src/recovery/lib/recovery-util-block",
     "//third_party/rust_crates:anyhow",

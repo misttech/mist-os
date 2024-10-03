@@ -5,8 +5,8 @@
 use anyhow::{Context, Result};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_hardware_pty as fpty;
-use fuchsia_zircon::{self as zx, HandleBased};
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd};
+use zx::{self as zx, HandleBased};
 
 /// This function attempts to determine whether the given `fd` is a pty. If it is a pty then the
 /// corresponding fuchsia.hardware.pty.Device proxy is returned as well as an eventpair for
@@ -118,7 +118,7 @@ impl Drop for RawPty {
                 std::mem::replace(&mut self.pty, zx::Channel::from_handle(zx::Handle::invalid()));
             let pty = fpty::DeviceSynchronousProxy::new(pty_chan);
             let (status, _) =
-                pty.clr_set_feature(fpty::FEATURE_RAW, 0, zx::MonotonicTime::INFINITE).unwrap();
+                pty.clr_set_feature(fpty::FEATURE_RAW, 0, zx::MonotonicInstant::INFINITE).unwrap();
             if zx::Status::from_raw(status) != zx::Status::OK {
                 // eprintln instead of tracing here since the user might want to know more
                 // immediately why their terminal is not acting as expected.

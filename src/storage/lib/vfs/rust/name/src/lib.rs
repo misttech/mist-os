@@ -10,12 +10,12 @@
 //! These should be aligned with the library comments in sdk/fidl/fuchsia.io/io.fidl.
 
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use static_assertions::const_assert_eq;
 use std::borrow::Borrow;
 use std::fmt::Display;
 use std::ops::Deref;
 use thiserror::Error;
+use zx_status::Status;
 
 /// The type for the name of a node, i.e. a single path component, e.g. `foo`.
 ///

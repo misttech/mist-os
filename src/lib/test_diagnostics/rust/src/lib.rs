@@ -249,7 +249,7 @@ mod tests {
     mod stdout {
         use super::*;
         use fuchsia_async::TestExecutor;
-        use fuchsia_zircon as zx;
+
         use pretty_assertions::assert_eq;
         use std::ops::Add;
 

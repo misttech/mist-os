@@ -50,7 +50,7 @@ use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::Explain;
 use sandbox::{Capability, Data, Dict, Request, Routable};
 use std::sync::Arc;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as zx};
 
 pub use bedrock::dict_ext::DictExt;
 pub use bedrock::lazy_get::LazyGet;
@@ -366,7 +366,7 @@ where
         }
         RouteRequest::UseProtocol(use_protocol_decl) => {
             route_capability_inner(
-                &target.component_sandbox().await?.program_input.namespace,
+                &target.component_sandbox().await?.program_input.namespace(),
                 &use_protocol_decl.target_path,
                 protocol_metadata(use_protocol_decl.availability),
                 target,
@@ -381,7 +381,7 @@ where
         }
         RouteRequest::UseRunner(_use_runner_decl) => {
             let router =
-                target.component_sandbox().await?.program_input.runner.lock().unwrap().as_ref().expect("we have a use declaration for a runner but the program input dictionary has no runner, this should be impossible").clone();
+                target.component_sandbox().await?.program_input.runner().expect("we have a use declaration for a runner but the program input dictionary has no runner, this should be impossible");
             perform_route(router, runner_metadata(Availability::Required), target).await
         }
         RouteRequest::UseConfig(use_config_decl) => {

@@ -9,7 +9,6 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 
-use fuchsia_zircon as zx;
 use std::sync::Arc;
 use syncio::{zxio, Zxio, ZxioSignals};
 
@@ -99,7 +98,7 @@ pub fn zxio_query_events(zxio: &Arc<Zxio>) -> Result<FdEvents, Errno> {
     let observed_signals = if handle.is_invalid() {
         zx::Signals::empty()
     } else {
-        match handle.wait(signals, zx::MonotonicTime::INFINITE_PAST) {
+        match handle.wait(signals, zx::MonotonicInstant::INFINITE_PAST) {
             Ok(signals) => signals,
             Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
             Err(e) => return error!(EIO, e),

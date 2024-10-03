@@ -6,7 +6,7 @@
 
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd, ServiceRequest};
 use std::marker::PhantomData;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// `Service` connects channels to service instances.
 ///

@@ -9,7 +9,7 @@ use fidl_fuchsia_kms::{
     AsymmetricKeyAlgorithm, AsymmetricPrivateKeyRequest, Error, KeyOrigin, KeyProvider,
 };
 use fidl_fuchsia_mem::Buffer;
-use fuchsia_zircon as zx;
+
 use serde::{Deserialize, Serialize};
 use tracing::error;
 

@@ -405,7 +405,7 @@ TEST(LibcBacktraceTests, C11ThreadBacktraceMethodsMatch) {
   Collector unw(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(unw.CollectC11Thread());
 
-  ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw));
+  ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw, 0, kIncompleteFramePointers));
 }
 
 TEST(LibcBacktraceTests, PThreadBacktraceMethodsMatch) {
@@ -418,7 +418,7 @@ TEST(LibcBacktraceTests, PThreadBacktraceMethodsMatch) {
   Collector unw(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(unw.CollectPThread());
 
-  ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw));
+  ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw, 0, kIncompleteFramePointers));
 }
 
 TEST(LibcBacktraceTests, CppThreadBacktraceMethodsMatch) {
@@ -431,7 +431,7 @@ TEST(LibcBacktraceTests, CppThreadBacktraceMethodsMatch) {
   Collector unw(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(unw.CollectCppThread());
 
-  ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw));
+  ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw, 0, kIncompleteFramePointers));
 }
 
 }  // namespace

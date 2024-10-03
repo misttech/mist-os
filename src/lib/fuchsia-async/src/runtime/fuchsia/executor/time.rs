@@ -4,13 +4,13 @@
 
 use super::common::EHandle;
 use crate::runtime::DurationExt;
-use fuchsia_zircon as zx;
+
 use std::ops;
 
 /// A time relative to the executor's clock.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Time(zx::MonotonicTime);
+pub struct Time(zx::MonotonicInstant);
 
 pub use zx::Duration;
 
@@ -23,7 +23,7 @@ impl Time {
     }
 
     /// Compute a deadline for the time in the future that is the
-    /// given `Duration` away. Similarly to `zx::MonotonicTime::after`,
+    /// given `Duration` away. Similarly to `zx::MonotonicInstant::after`,
     /// saturates on overflow instead of wrapping around.
     ///
     /// This function requires that an executor has been set up.
@@ -31,19 +31,19 @@ impl Time {
         Self::now() + duration
     }
 
-    /// Convert from `zx::MonotonicTime`.
-    pub const fn from_zx(t: zx::MonotonicTime) -> Self {
+    /// Convert from `zx::MonotonicInstant`.
+    pub const fn from_zx(t: zx::MonotonicInstant) -> Self {
         Time(t)
     }
 
-    /// Convert into `zx::MonotonicTime`.
-    pub const fn into_zx(self) -> zx::MonotonicTime {
+    /// Convert into `zx::MonotonicInstant`.
+    pub const fn into_zx(self) -> zx::MonotonicInstant {
         self.0
     }
 
     /// Convert from nanoseconds.
     pub const fn from_nanos(nanos: i64) -> Self {
-        Self::from_zx(zx::MonotonicTime::from_nanos(nanos))
+        Self::from_zx(zx::MonotonicInstant::from_nanos(nanos))
     }
 
     /// Convert to nanoseconds.
@@ -52,20 +52,20 @@ impl Time {
     }
 
     /// The maximum time.
-    pub const INFINITE: Time = Time(zx::MonotonicTime::INFINITE);
+    pub const INFINITE: Time = Time(zx::MonotonicInstant::INFINITE);
 
     /// The minimum time.
-    pub const INFINITE_PAST: Time = Time(zx::MonotonicTime::INFINITE_PAST);
+    pub const INFINITE_PAST: Time = Time(zx::MonotonicInstant::INFINITE_PAST);
 }
 
-impl From<zx::MonotonicTime> for Time {
-    fn from(t: zx::MonotonicTime) -> Time {
+impl From<zx::MonotonicInstant> for Time {
+    fn from(t: zx::MonotonicInstant) -> Time {
         Time(t)
     }
 }
 
-impl From<Time> for zx::MonotonicTime {
-    fn from(t: Time) -> zx::MonotonicTime {
+impl From<Time> for zx::MonotonicInstant {
+    fn from(t: Time) -> zx::MonotonicInstant {
         t.0
     }
 }
@@ -119,15 +119,18 @@ impl DurationExt for zx::Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{self as zx};
 
-    fn time_operations_param(zxt1: zx::MonotonicTime, zxt2: zx::MonotonicTime, d: zx::Duration) {
+    fn time_operations_param(
+        zxt1: zx::MonotonicInstant,
+        zxt2: zx::MonotonicInstant,
+        d: zx::Duration,
+    ) {
         let t1 = Time::from_zx(zxt1);
         let t2 = Time::from_zx(zxt2);
         assert_eq!(t1.into_zx(), zxt1);
 
-        assert_eq!(Time::from_zx(zx::MonotonicTime::INFINITE), Time::INFINITE);
-        assert_eq!(Time::from_zx(zx::MonotonicTime::INFINITE_PAST), Time::INFINITE_PAST);
+        assert_eq!(Time::from_zx(zx::MonotonicInstant::INFINITE), Time::INFINITE);
+        assert_eq!(Time::from_zx(zx::MonotonicInstant::INFINITE_PAST), Time::INFINITE_PAST);
         assert_eq!(zxt1 - zxt2, t1 - t2);
         assert_eq!(zxt1 + d, (t1 + d).into_zx());
         assert_eq!(d + zxt1, (d + t1).into_zx());
@@ -146,13 +149,13 @@ mod tests {
     #[test]
     fn time_operations() {
         time_operations_param(
-            zx::MonotonicTime::from_nanos(0),
-            zx::MonotonicTime::from_nanos(1000),
+            zx::MonotonicInstant::from_nanos(0),
+            zx::MonotonicInstant::from_nanos(1000),
             zx::Duration::from_seconds(12),
         );
         time_operations_param(
-            zx::MonotonicTime::from_nanos(-100000),
-            zx::MonotonicTime::from_nanos(65324),
+            zx::MonotonicInstant::from_nanos(-100000),
+            zx::MonotonicInstant::from_nanos(65324),
             zx::Duration::from_hours(-785),
         );
     }

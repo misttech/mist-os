@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx};
-
 use ieee80211::{Bssid, MacAddr};
 use wlan_common::timer::TimeoutDuration;
 

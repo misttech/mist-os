@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::{ensure, Context, Error};
-use fuchsia_zircon_types::{
+use serde_derive::Deserialize;
+use std::fs::File;
+use std::io::Read as _;
+use std::path::Path;
+use zx_types::{
     zx_cpu_set_t, zx_processor_power_level_t, zx_processor_power_level_transition_t,
     ZX_CPU_SET_BITS_PER_WORD, ZX_CPU_SET_MAX_CPUS, ZX_MAX_NAME_LEN,
     ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI, ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
     ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER, ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI,
     ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI, ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT,
 };
-use serde_derive::Deserialize;
-use std::fs::File;
-use std::io::Read as _;
-use std::path::Path;
 
 /// This library is used to parse a processor energy model JSON file into a data structure which
 /// also implements some convenience methods for accessing and consuming the data.

@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fuchsia_task_lib import FuchsiaTask, TaskExecutionException, Terminal
 
-Arguments = namedtuple(
+WorkflowArguments = namedtuple(
     "WorkflowArguments",
     [
         "manifest",
@@ -26,49 +26,11 @@ Arguments = namedtuple(
         "dry_run",
         "verbose",
         "help",
-        "workflow_arguments",
+        "global_arguments",
     ],
 )
 
 ARGUMENTS = None
-
-
-class WorkflowArgumentException(Exception):
-    pass
-
-
-class WorkflowArguments:
-    def __init__(self, arguments: List[str]) -> None:
-        self._global_args = []
-        self._entity_args = {}
-        for i, arg in enumerate(arguments):
-            if "=" in arg:
-                k, v = arg.split("=", 1)
-                args = self._entity_args.get(k, {}).get("args", []) + [(i, v)]
-                self._entity_args[k] = {
-                    "args": args,
-                    "consumed": False,
-                }
-            else:
-                self._global_args.append((i, arg))
-
-    @property
-    def global_arguments(self) -> List[Tuple[float, str]]:
-        return self._global_args
-
-    def get_entity_arguments(
-        self, *mnemonics: str, type: str = None
-    ) -> List[Tuple[float, str]]:
-        args = []
-        for mnemonic in (*mnemonics, f"entity.{type}"):
-            if mnemonic in self._entity_args:
-                self._entity_args[mnemonic]["consumed"] = True
-                args.extend(self._entity_args[mnemonic]["args"])
-        return args
-
-    @property
-    def unused_mnemonics(self) -> None:
-        return [k for k, v in self._entity_args.items() if not v["consumed"]]
 
 
 def parse_workflow_args() -> None:
@@ -119,9 +81,7 @@ def parse_workflow_args() -> None:
     else:
         raise Exception(f"Expected argument --workflow-manifest")
 
-    ARGUMENTS = Arguments(
-        workflow_arguments=WorkflowArguments(workflow_arguments), **args
-    )
+    ARGUMENTS = WorkflowArguments(global_arguments=workflow_arguments, **args)
 
 
 def run(*command: Union[Path, str], **kwargs: Dict[str, Any]) -> None:
@@ -253,7 +213,6 @@ class Task(Entity):
     def create(
         cls,
         entity: Dict[str, Any],
-        explicit_args: List[Tuple[float, str]] = [],
         **entity_kwargs,
     ) -> "Task":
         return Task(
@@ -262,8 +221,7 @@ class Task(Entity):
             explicit_args=[
                 (i - len(entity["args"]), arg)
                 for i, arg in enumerate(entity["args"])
-            ]
-            + explicit_args,
+            ],
             **entity_kwargs,
         )
 
@@ -292,12 +250,9 @@ class Task(Entity):
             for arg in ["__META_ARGUMENT__", meta_arg]
         ]
         global_args = [
-            (idx, arg)
-            for orig_idx, orig_arg in self._global_args
-            for idx, arg in [
-                (orig_idx - 0.5, "__GLOBAL_ARGUMENT__"),
-                (orig_idx, orig_arg),
-            ]
+            arg
+            for orig_arg in self._global_args
+            for arg in ["__GLOBAL_ARGUMENT__", orig_arg]
         ]
         workflow_args = [
             (idx, arg)
@@ -309,9 +264,8 @@ class Task(Entity):
         ]
         return [
             *meta_args,
-            *self.sort_arguments(
-                global_args + workflow_args + self._explicit_args
-            ),
+            *self.sort_arguments(workflow_args + self._explicit_args)
+            + global_args,
         ]
 
     def run(self, total_tasks: int = 1) -> None:
@@ -352,7 +306,6 @@ class Workflow(Entity):
         cls,
         entity_collection: "EntityCollection",
         entity: Dict[str, Any],
-        explicit_args: List[Tuple[float, str]],
         propagated_args: List[Tuple[float, str]],
         task_num: int = 1,
         **entity_kwargs,
@@ -360,7 +313,7 @@ class Workflow(Entity):
         explicit_args = [
             (i - len(entity["args"]), arg)
             for i, arg in enumerate(entity["args"])
-        ] + explicit_args
+        ]
         child_task_num = task_num
         sequence = []
         for step in entity["sequence"]:
@@ -399,7 +352,7 @@ class EntityCollection:
         self,
         entities: Dict[str, Dict[str, Any]],
         entrypoint: str,
-        args: WorkflowArguments,
+        args: List[str],
         global_working_dir: Path,
     ) -> None:
         self._data_entities = entities
@@ -445,11 +398,8 @@ class EntityCollection:
             label=label,
             mnemonic=mnemonic,
             mnemonic_suffix=suffix,
-            explicit_args=self._args.get_entity_arguments(
-                mnemonic, mnemonic + suffix, type=entity_type
-            ),
             propagated_args=propagated_args,
-            global_args=self._args.global_arguments,
+            global_args=self._args,
             entity=self._data_entities[label],
             task_num=task_num,
         )
@@ -473,7 +423,7 @@ class EntityCollection:
     def from_manifest(
         entities: Dict[str, Dict[str, Any]],
         entrypoint: str,
-        args: WorkflowArguments,
+        args: List[str],
         global_working_dir: Path,
     ) -> Entity:
         return EntityCollection(
@@ -486,21 +436,14 @@ class WorkflowRunner:
         self,
         entities: Dict[str, Dict[str, Any]],
         entrypoint: str,
-        args: WorkflowArguments,
+        args: List[str],
     ) -> None:
-        self._args = args
         self._working_directory = Path(tempfile.gettempdir()) / (
             "workflow.%s" % re.search(r"[\w\.\-_]+$", entrypoint)[0]
         )
         self.entrypoint = EntityCollection.from_manifest(
             entities, entrypoint, args, self._working_directory
         )
-
-    def validate_arguments(self):
-        if self._args.unused_mnemonics:
-            raise WorkflowArgumentException(
-                f'{Terminal.bold(Terminal.red("Error:"))} Unrecognized workflow or task: {self._args.unused_mnemonics}'
-            )
 
     def run(self) -> None:
         if self._working_directory.exists():
@@ -588,16 +531,8 @@ def main():
     runner = WorkflowRunner(
         workflow_spec["entities"],
         workflow_spec["entrypoint"],
-        ARGUMENTS.workflow_arguments,
+        ARGUMENTS.global_arguments,
     )
-
-    # Validate user arguments.
-    try:
-        runner.validate_arguments()
-    except WorkflowArgumentException as e:
-        print(e)
-        runner.dump_workflow_tree()
-        return 2
 
     if ARGUMENTS.dump or ARGUMENTS.verbose or ARGUMENTS.help:
         runner.dump_workflow_tree()

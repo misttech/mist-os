@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
-use fuchsia_zircon::VmoChildOptions;
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
@@ -33,6 +32,7 @@ use starnix_uapi::{
 };
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::sync::Arc;
+use zx::VmoChildOptions;
 
 // See LOOP_SET_BLOCK_SIZE in <https://man7.org/linux/man-pages/man4/loop.4.html>.
 const MIN_BLOCK_SIZE: u32 = 512;
@@ -773,7 +773,7 @@ mod tests {
     use starnix_core::vfs::{
         Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps,
     };
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);

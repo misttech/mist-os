@@ -11,9 +11,7 @@ use fuchsia_component::client::connect_to_protocol;
 use manifest::v2;
 use std::fs::File;
 use std::path::Path;
-use {
-    fidl_fuchsia_io as io, fidl_fuchsia_mem as mem, fuchsia_trace as trace, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_io as io, fidl_fuchsia_mem as mem, fuchsia_trace as trace, zx};
 
 /// A trait that covers the interactions of the font service with `fuchsia.pkg.FontResolver` and
 /// font asset VMOs. Intended for easier testing.

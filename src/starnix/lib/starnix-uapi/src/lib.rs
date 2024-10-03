@@ -57,6 +57,5 @@ pub use riscv64::*;
 
 pub use uapi::*;
 
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);

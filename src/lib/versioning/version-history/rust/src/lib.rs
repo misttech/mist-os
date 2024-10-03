@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use tracing::warn;
 
-const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-22rnd667.json";
+const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";
 const VERSION_HISTORY_TYPE: &str = "version_history";
 
@@ -644,7 +644,7 @@ mod tests {
                     }
                 }
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history.json"
         }"#;
 
         assert_eq!(
@@ -693,7 +693,7 @@ mod tests {
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            r#"expected schema_id = "https://fuchsia.dev/schema/version_history-22rnd667.json"; got "some-schema""#
+            r#"expected schema_id = "https://fuchsia.dev/schema/version_history.json"; got "some-schema""#
         );
     }
 
@@ -706,7 +706,7 @@ mod tests {
                 "api_levels": {},
                 "special_api_levels": {}
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history.json"
         }"#;
 
         assert_eq!(
@@ -724,7 +724,7 @@ mod tests {
                 "api_levels": {},
                 "special_api_levels": {}
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history.json"
         }"#;
 
         assert_eq!(
@@ -792,7 +792,7 @@ mod tests {
                     }
                 }
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history.json"
         }"#;
 
         assert_eq!(
@@ -816,7 +816,7 @@ mod tests {
                     }
                 }
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history.json"
         }"#;
 
         assert_eq!(

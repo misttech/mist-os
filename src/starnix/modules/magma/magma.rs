@@ -38,7 +38,7 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx, vk_sys as vk,
+    fidl_fuchsia_ui_composition as fuicomp, vk_sys as vk, zx,
 };
 
 /// Reads a magma command and its type from user space.
@@ -323,7 +323,7 @@ pub fn init_sysmem(
         })
         .map_err(|_| errno!(EINVAL))?;
 
-    buffer_token_proxy.sync(zx::MonotonicTime::INFINITE).map_err(|_| errno!(EINVAL))?;
+    buffer_token_proxy.sync(zx::MonotonicInstant::INFINITE).map_err(|_| errno!(EINVAL))?;
 
     Ok((
         BufferCollectionTokens { buffer_token_proxy, scenic_token, vulkan_token },
@@ -344,7 +344,7 @@ pub fn get_image_info(
     height: u32,
 ) -> Result<(zx::Vmo, magma_image_info_t), Errno> {
     let mut collection_info = buffer_collection
-        .wait_for_all_buffers_allocated(zx::MonotonicTime::INFINITE)
+        .wait_for_all_buffers_allocated(zx::MonotonicInstant::INFINITE)
         .map_err(|err| {
             log_warn!("wait_for_all_buffers_allocated failed (fidl layer): {}", err);
             errno!(EINVAL)

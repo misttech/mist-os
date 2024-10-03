@@ -5,7 +5,6 @@
 // Don't complain if one of info/warn/err/debug are unused.
 #![allow(unused)]
 
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,7 +18,7 @@ struct RateLimiter<C: Clock> {
 
 // Each period, we reset tokens to tokens_per_period.
 struct TokenBucket<C: Clock> {
-    last_update: zx::MonotonicTime,
+    last_update: zx::MonotonicInstant,
     period: zx::Duration,
     tokens_per_period: i64,
     tokens: i64,
@@ -27,7 +26,7 @@ struct TokenBucket<C: Clock> {
 }
 
 trait Clock {
-    fn now(&self) -> zx::MonotonicTime;
+    fn now(&self) -> zx::MonotonicInstant;
 }
 
 impl<C: Clock> RateLimiter<C> {
@@ -67,8 +66,8 @@ impl<C: Clock> RateLimiter<C> {
 struct Monotonic;
 
 impl Clock for Monotonic {
-    fn now(&self) -> zx::MonotonicTime {
-        zx::MonotonicTime::get()
+    fn now(&self) -> zx::MonotonicInstant {
+        zx::MonotonicInstant::get()
     }
 }
 
@@ -135,43 +134,43 @@ mod tests {
 
     #[derive(Clone)]
     struct FakeClock {
-        t: Rc<RefCell<zx::MonotonicTime>>,
+        t: Rc<RefCell<zx::MonotonicInstant>>,
     }
 
     impl FakeClock {
-        fn new(t: zx::MonotonicTime) -> Self {
+        fn new(t: zx::MonotonicInstant) -> Self {
             Self { t: Rc::new(RefCell::new(t)) }
         }
     }
 
     impl Clock for FakeClock {
-        fn now(&self) -> zx::MonotonicTime {
+        fn now(&self) -> zx::MonotonicInstant {
             *self.t.borrow()
         }
     }
 
     #[fuchsia::test]
     fn test() {
-        let clock = FakeClock::new(zx::MonotonicTime::from_nanos(0));
+        let clock = FakeClock::new(zx::MonotonicInstant::from_nanos(0));
         let limiter = RateLimiter::<FakeClock>::new(clock.clone(), 2, zx::Duration::from_nanos(2));
 
         // Starts empty.
         assert!(!limiter.acquire_one());
 
         // No updates until one full period.
-        *clock.t.borrow_mut() = zx::MonotonicTime::from_nanos(1);
+        *clock.t.borrow_mut() = zx::MonotonicInstant::from_nanos(1);
         assert!(!limiter.acquire_one());
 
         // Expected 2 tokens per period.
-        *clock.t.borrow_mut() = zx::MonotonicTime::from_nanos(2);
+        *clock.t.borrow_mut() = zx::MonotonicInstant::from_nanos(2);
         assert!(limiter.acquire_one());
         assert!(limiter.acquire_one());
         assert!(!limiter.acquire_one());
 
         // Unused tokens don't carry over to the next period.
-        *clock.t.borrow_mut() = zx::MonotonicTime::from_nanos(4);
+        *clock.t.borrow_mut() = zx::MonotonicInstant::from_nanos(4);
         assert!(limiter.acquire_one());
-        *clock.t.borrow_mut() = zx::MonotonicTime::from_nanos(6);
+        *clock.t.borrow_mut() = zx::MonotonicInstant::from_nanos(6);
         assert!(limiter.acquire_one());
         assert!(limiter.acquire_one());
         assert!(!limiter.acquire_one());

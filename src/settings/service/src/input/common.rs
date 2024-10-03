@@ -15,10 +15,10 @@ use fidl_fuchsia_ui_policy::{
     DeviceListenerRegistryMarker, MediaButtonsListenerMarker, MediaButtonsListenerRequest,
 };
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon::Duration;
 use futures::future::Fuse;
 use futures::{FutureExt, StreamExt};
 use std::sync::Arc;
+use zx::Duration;
 
 /// The amount of time in milliseconds to wait for a camera device to be detected.
 pub const CAMERA_WATCHER_TIMEOUT: i64 = 30_000;

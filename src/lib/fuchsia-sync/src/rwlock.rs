@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use std::sync::atomic::Ordering;
 
 pub struct RawSyncRwLock {
@@ -283,7 +282,7 @@ impl RawSyncRwLock {
                 .wait(
                     desired_sleep_state,
                     None, // We don't integrate with priority inheritance yet.
-                    zx::MonotonicTime::INFINITE,
+                    zx::MonotonicInstant::INFINITE,
                 )
                 .ok();
             state = self.state.load(Ordering::Relaxed);
@@ -350,7 +349,7 @@ impl RawSyncRwLock {
                 .wait(
                     generation_number,
                     None, // We don't integrate with priority inheritance yet.
-                    zx::MonotonicTime::INFINITE,
+                    zx::MonotonicInstant::INFINITE,
                 )
                 .ok();
 
@@ -607,7 +606,7 @@ mod test {
         fn wait_for_gate(&self) {
             while self.gate.load(Ordering::Acquire) == 0 {
                 // Ignore failures, we'll retry anyways.
-                self.gate.wait(0, None, zx::MonotonicTime::INFINITE).ok();
+                self.gate.wait(0, None, zx::MonotonicInstant::INFINITE).ok();
             }
         }
 

@@ -8,10 +8,7 @@ use futures::channel::mpsc;
 use futures::stream::{FlattenUnordered, FuturesUnordered};
 use futures::{ready, select, Future, StreamExt};
 use tracing::{info, warn};
-use {
-    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_deviceid as di,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_deviceid as di, zx};
 
 use crate::device_id::service_record::DeviceIdentificationService;
 use crate::device_id::token::DeviceIdRequestToken;

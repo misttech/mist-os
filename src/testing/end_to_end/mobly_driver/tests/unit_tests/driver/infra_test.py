@@ -37,7 +37,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             params_path="params/path",
             output_path="",
         )
@@ -63,7 +62,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="",
         )
         ret = driver.generate_test_config()
@@ -84,7 +82,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="",
         )
         with self.assertRaises(common.InvalidFormatException):
@@ -102,7 +99,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="tb/json/path",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             params_path="params/path",
             output_path="",
         )
@@ -119,7 +115,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="/does/not/exist",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="",
         )
         with self.assertRaises(common.DriverException):
@@ -135,7 +130,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="/does/not/exist",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             params_path="params/path",
             output_path="",
         )
@@ -161,7 +155,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="",
         )
         driver.teardown()
@@ -183,7 +176,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra.InfraDriver(
             tb_json_path="",
             honeydew_config=_HONEYDEW_CONFIG,
-            transport="transport",
             output_path="",
         )
         driver.teardown()

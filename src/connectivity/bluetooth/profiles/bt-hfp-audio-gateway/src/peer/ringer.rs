@@ -5,7 +5,7 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon as zx;
+
 use futures::stream::{FusedStream, Stream};
 use futures::FutureExt;
 

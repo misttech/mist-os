@@ -11,7 +11,6 @@ use {
     fidl_fuchsia_pkg_rewrite_ext::Rule,
     fuchsia_async as fasync,
     fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder, RepositoryBuilder},
-    fuchsia_zircon::Status,
     futures::future::BoxFuture,
     futures::prelude::*,
     lib::{
@@ -22,6 +21,7 @@ use {
         atomic::{AtomicBool, AtomicU64},
         Arc,
     },
+    zx::Status,
 };
 
 trait OpenRequestHandler: Sized {

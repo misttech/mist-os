@@ -48,6 +48,7 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
+    "//sdk/rust/zx",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
@@ -58,7 +59,6 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/extended_pstate:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
@@ -141,6 +141,7 @@ rustc_library("starnix_core") {
     "fs/fuchsia/mod.rs",
     "fs/fuchsia/remote.rs",
     "fs/fuchsia/remote_bundle.rs",
+    "fs/fuchsia/remote_unix_domain_socket.rs",
     "fs/fuchsia/sync_file.rs",
     "fs/fuchsia/syslog.rs",
     "fs/fuchsia/timer.rs",
@@ -255,6 +256,7 @@ rustc_library("starnix_core") {
     "vfs/fs_registry.rs",
     "vfs/fsverity.rs",
     "vfs/inotify.rs",
+    "vfs/io_uring.rs",
     "vfs/memory_file.rs",
     "vfs/mod.rs",
     "vfs/namespace.rs",
@@ -347,6 +349,8 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netlink",
     "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
@@ -372,7 +376,6 @@ rustc_library("starnix_core") {
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/vulkan",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/memory/attribution/server",
     "//src/starnix/lib/ebpf",
     "//src/starnix/lib/expando",
@@ -471,6 +474,7 @@ rustc_library("starnix_core") {
     "//src/storage/ext4/tests:test_img",
     "//src/storage/fxfs/platform:fxfs-testing",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-mutex",
@@ -499,13 +503,14 @@ rustc_library("starnix_core") {
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
-  if (is_asan || target_cpu == "riscv64") {
-    # At least for ASan and riscv64, remote execution requires more memory,
-    # particularly in the test linking phase.
-    _concurrent_jobs = concurrent_jobs.rust_highmem
-    test_configs = _concurrent_jobs.configs
-    test_vars = _concurrent_jobs.vars
-  }
+  # Linking the lib tests requires a lot of memory.
+  # Notes: if (is_asan || target_cpu == "riscv64"), linking is known to
+  # OOM on n2-standard-2.
+  # For other configurations, building on n2-standard-8 is significantly
+  # faster due to the memory usage.
+  _concurrent_jobs = concurrent_jobs.rust_highmem
+  test_configs = _concurrent_jobs.configs
+  test_vars = _concurrent_jobs.vars
 }
 
 rustc_library("starnix_kernel_runner") {
@@ -547,6 +552,7 @@ rustc_library("starnix_kernel_runner") {
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//sdk/rust/zx",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
@@ -555,7 +561,6 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
     "//src/lib/ui/fuchsia-scenic",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/modules",
@@ -623,10 +628,10 @@ rustc_library("starnix_logging") {
   ]
 
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/trace/rust:trace",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",

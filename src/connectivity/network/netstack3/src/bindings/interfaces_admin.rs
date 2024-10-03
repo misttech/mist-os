@@ -40,7 +40,6 @@ use std::pin::pin;
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
-use fuchsia_zircon::{self as zx, HandleBased, Rights};
 use futures::future::FusedFuture as _;
 use futures::stream::FusedStream as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -58,6 +57,7 @@ use netstack3_core::ip::{
     Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
     UpdateIpConfigurationError,
 };
+use zx::{self as zx, HandleBased, Rights};
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
@@ -71,11 +71,12 @@ use crate::bindings::devices::{
 };
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
+use crate::bindings::time::StackTime;
 use crate::bindings::util::{
     IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
     TryIntoCore,
 };
-use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime};
+use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack};
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
     req.filter_map(|req| {
@@ -313,7 +314,8 @@ async fn create_interface(
                     | netdevice_client::Error::InvalidPortId(_)
                     | netdevice_client::Error::Attach(_, _)
                     | netdevice_client::Error::Detach(_, _)
-                    | netdevice_client::Error::TooSmall { size: _, offset: _, length: _ } => None,
+                    | netdevice_client::Error::TooSmall { size: _, offset: _, length: _ }
+                    | netdevice_client::Error::InvalidLease => None,
                 },
                 netdevice_worker::Error::AlreadyInstalled(_) => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::PortAlreadyBound)
@@ -1153,7 +1155,7 @@ fn add_address(
     if params.temporary.unwrap_or(false) {
         todo!("https://fxbug.dev/42056881: support adding temporary addresses");
     }
-    const INFINITE_NANOS: i64 = zx::MonotonicTime::INFINITE.into_nanos();
+    const INFINITE_NANOS: i64 = zx::MonotonicInstant::INFINITE.into_nanos();
     let initial_properties =
         params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
     let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);
@@ -1178,7 +1180,7 @@ fn add_address(
     let valid_until = if valid_lifetime_end == INFINITE_NANOS {
         Lifetime::Infinite
     } else {
-        Lifetime::Finite(StackTime(fasync::Time::from_nanos(valid_lifetime_end)))
+        Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(valid_lifetime_end)))
     };
 
     let addr_subnet_either = match addr_subnet_either {
@@ -1710,7 +1712,9 @@ fn dispatch_address_state_provider_request(
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
             let valid_lifetime_end = valid_lifetime_end_nanos
-                .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
+                .map(|nanos| {
+                    Lifetime::Finite(StackTime::from_zx(zx::MonotonicInstant::from_nanos(nanos)))
+                })
                 .unwrap_or(Lifetime::Infinite);
             let result = match address.into() {
                 IpAddr::V4(address) => ctx.api().device_ip::<Ipv4>().set_addr_properties(

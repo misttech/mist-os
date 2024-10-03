@@ -42,17 +42,7 @@ class LinkingSession {
     // The root module for the dlopen-ed file is always the first module
     // enqueued in this list.
     RuntimeModule& root_module = runtime_modules_.front();
-    // Traverse the root module's tree to construct the list of modules whose
-    // symbols are used for relocations. On success, persist the list to the
-    // root module for future lookups by dlsym(), etc.
-    if (auto resolution_list = root_module.TraverseDeps(diag, root_module);
-        !resolution_list.is_empty()) {
-      if (Relocate(diag, resolution_list)) {
-        root_module.set_module_tree(std::move(resolution_list));
-        return true;
-      }
-    }
-    return false;
+    return root_module.ReifyModuleTree(diag) && Relocate(diag, root_module.module_tree());
   }
 
   // The caller calls Commit() to finalize the LinkingSession after it has

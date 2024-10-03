@@ -146,14 +146,14 @@ impl<T: PartialEq> Event<T> {
 
 pub struct EventHistory<T: PartialEq> {
     events: Vec<Event<T>>,
-    retention_time: fuchsia_zircon::Duration,
+    retention_time: zx::Duration,
 }
 
 impl<T: PartialEq> EventHistory<T> {
     fn new(retention_seconds: u32) -> Self {
         EventHistory {
             events: Vec::new(),
-            retention_time: fuchsia_zircon::Duration::from_seconds(retention_seconds as i64),
+            retention_time: zx::Duration::from_seconds(retention_seconds as i64),
         }
     }
 
@@ -169,7 +169,7 @@ impl<T: PartialEq> EventHistory<T> {
         self.events.iter().filter(|event| event.value == value).count()
     }
 
-    fn time_since_last_event(&mut self, value: T) -> Option<fuchsia_zircon::Duration> {
+    fn time_since_last_event(&mut self, value: T) -> Option<zx::Duration> {
         let curr_time = fasync::Time::now();
         self.retain_unexpired_events(curr_time);
 

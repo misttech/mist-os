@@ -584,4 +584,21 @@ void FakeNetworkDeviceIfc::Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* 
   }
 }
 
+void FakeNetworkDeviceIfc::DelegateRxLease(
+    netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request, fdf::Arena& arena,
+    DelegateRxLeaseCompleter::Sync& completer) {
+  if (delegate_rx_lease_) {
+    delegate_rx_lease_(request, arena, completer);
+  }
+}
+
+std::tuple<netdev::DelegatedRxLease, zx::channel> CreateDelegatedLease(uint64_t hold_until_frame) {
+  zx::channel a, b;
+  EXPECT_OK(zx::channel::create(0, &a, &b));
+  netdev::DelegatedRxLease lease;
+  lease.hold_until_frame(hold_until_frame);
+  lease.handle(netdev::DelegatedRxLeaseHandle::WithChannel(std::move(a)));
+  return std::make_tuple(std::move(lease), std::move(b));
+}
+
 }  // namespace network::testing
