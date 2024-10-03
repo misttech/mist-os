@@ -61,7 +61,7 @@ impl Property for IsWireStatic {
             Type::Identifier { identifier, nullable, .. } => {
                 !nullable && compiler.query::<Self>(identifier)
             }
-            Type::Request { .. } => todo!(),
+            Type::Endpoint { .. } => todo!(),
             Type::Internal { .. } => true,
         }
     }

@@ -6,8 +6,15 @@ use serde::Deserialize;
 
 use crate::ir::{CompIdent, HandleRights, HandleSubtype, ObjectType, PrimSubtype};
 
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointRole {
+    Client,
+    Server,
+}
+
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind_v2", rename_all = "snake_case")]
 pub enum Type {
     Array {
         element_type: Box<Type>,
@@ -35,10 +42,12 @@ pub enum Type {
         #[expect(dead_code)]
         resource_identifier: String,
     },
-    Request {
+    Endpoint {
         nullable: bool,
         #[expect(dead_code)]
-        subtype: CompIdent,
+        role: EndpointRole,
+        #[expect(dead_code)]
+        protocol: CompIdent,
         #[expect(dead_code)]
         protocol_transport: String,
     },
