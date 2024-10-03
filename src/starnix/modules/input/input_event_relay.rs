@@ -13,7 +13,7 @@ use starnix_core::power::{
     create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
 };
 use starnix_core::task::Kernel;
-use starnix_logging::{log_error, log_warn};
+use starnix_logging::log_warn;
 use starnix_sync::Mutex;
 use starnix_uapi::uapi;
 use starnix_uapi::vfs::FdEvents;
@@ -151,12 +151,7 @@ impl InputEventsRelay {
                 resume_event.as_ref().map(|e| {
                     // The proxy may have dropped the signal peer by now, so disregard errors.
                     // In the future we may need a better way to check that this is expected.
-                    match e.signal_peer(clear_mask, set_mask) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            log_error!("Failed to signal the runner proxy: {:?}", e);
-                        }
-                    }
+                    let _ = e.signal_peer(clear_mask, set_mask);
                 });
 
                 match watch_future.await {
