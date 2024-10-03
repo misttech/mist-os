@@ -455,8 +455,9 @@ template("python_mobly_test") {
     forward_variables_from(invoker,
                            [
                              "isolated",
-                             "visibility",
+                             "product_bundle",
                              "timeout_secs",
+                             "visibility",
                            ])
 
     binary_path = python_exe_src

@@ -132,13 +132,15 @@ template("python_perf_test") {
 
       forward_variables_from(invoker,
                              [
+                               "honeydew_config",
+                               "isolated",
                                "local_config_source",
                                "main_source",
-                               "params",
                                "params_source",
+                               "params",
+                               "product_bundle",
                                "test_data_deps",
                                "timeout_secs",
-                               "honeydew_config",
                              ])
       data_sources = _data_sources
       data_package_name = _data_package_name
