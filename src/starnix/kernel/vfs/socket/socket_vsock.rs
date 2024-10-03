@@ -311,10 +311,10 @@ mod tests {
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::vfs::EpollFileObject;
-    use fuchsia_zircon as zx;
-    use fuchsia_zircon::HandleBased;
+
     use starnix_uapi::vfs::EpollEvent;
     use syncio::Zxio;
+    use zx::HandleBased;
 
     #[::fuchsia::test]
     async fn test_vsock_socket() {

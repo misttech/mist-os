@@ -137,8 +137,8 @@ pub(crate) mod testing {
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async::TestExecutor;
-    use fuchsia_zircon::MonotonicInstant;
     use serde::Deserialize;
+    use zx::MonotonicInstant;
 
     #[derive(Clone, Debug, Deserialize)]
     struct TestConfigData {

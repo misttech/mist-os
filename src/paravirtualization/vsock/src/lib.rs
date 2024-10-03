@@ -23,7 +23,7 @@ mod tests {
         ConnectorMarker, ConnectorProxy, ListenerMarker,
     };
     use futures::{channel, future, FutureExt, StreamExt, TryFutureExt};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
     struct MockDriver {
         client: DeviceRequestStream,
         callbacks: CallbacksProxy,

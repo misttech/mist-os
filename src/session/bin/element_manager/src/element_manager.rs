@@ -34,8 +34,7 @@ use tracing::{error, info, warn};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_element as felement, fidl_fuchsia_element_manager_persistence as persistence,
-    fidl_fuchsia_io as fio, fidl_fuchsia_ui_app as fuiapp, fuchsia_scenic as scenic,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_ui_app as fuiapp, fuchsia_scenic as scenic, zx,
 };
 
 const DEFAULT_PERSISTENT_ELEMENTS_PATH: &str = "/data/persistent_elements";
@@ -841,7 +840,7 @@ mod tests {
     use session_testing::spawn_directory_server;
     use {
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-        fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, zx,
     };
 
     fn example_collection_config() -> CollectionConfig {

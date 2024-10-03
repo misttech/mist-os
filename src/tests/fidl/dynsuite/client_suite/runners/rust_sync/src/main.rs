@@ -13,10 +13,10 @@ use fidl_fidl_clientsuite::{
     UnknownEvent, CLIENT_SUITE_VERSION,
 };
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef;
+
 use futures::prelude::*;
 use rust_util::{classify_error, method_name};
+use zx::AsHandleRef;
 
 const DISABLED_TESTS: &[Test] = &[
     // No disabled tests!

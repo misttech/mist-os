@@ -153,10 +153,10 @@ impl TryFrom<Snapshot> for PartialNodeHierarchy {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl TryFrom<&fuchsia_zircon::Vmo> for PartialNodeHierarchy {
+impl TryFrom<&zx::Vmo> for PartialNodeHierarchy {
     type Error = ReaderError;
 
-    fn try_from(vmo: &fuchsia_zircon::Vmo) -> Result<Self, Self::Error> {
+    fn try_from(vmo: &zx::Vmo) -> Result<Self, Self::Error> {
         let snapshot = Snapshot::try_from(vmo)?;
         read_snapshot(&snapshot)
     }

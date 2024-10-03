@@ -104,7 +104,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// An event to be logged to the cobalt logger. Events are generated first,
 /// then logged. (This permits unit-testing the code that generates events from

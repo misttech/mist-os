@@ -16,8 +16,8 @@ use fidl_fuchsia_sysmem2::{
     CPU_USAGE_READ_OFTEN, CPU_USAGE_WRITE_OFTEN, NONE_USAGE,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::AsHandleRef;
 use std::cmp;
+use zx::AsHandleRef;
 
 fn linear_image_format_constraints(
     width: u32,

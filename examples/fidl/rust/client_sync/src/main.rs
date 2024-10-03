@@ -6,7 +6,7 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_examples::{EchoEvent, EchoMarker};
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 // [END imports]
 
 // [START main]

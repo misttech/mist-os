@@ -16,10 +16,10 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl::HandleBased;
 use fuchsia_audio::device::Selector;
 use fuchsia_audio::Registry;
-use fuchsia_zircon_status::Status;
 use futures::{AsyncWrite, FutureExt};
 use serde::Serialize;
 use std::io::{Read, Write};
+use zx_status::Status;
 use {
     fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
     fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_io as fio, fidl_fuchsia_media as fmedia,

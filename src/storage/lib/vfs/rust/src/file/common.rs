@@ -6,7 +6,7 @@
 
 use crate::file::FileOptions;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 
 /// Validate that the requested flags for a new connection are valid. This includes permission
 /// handling, only allowing certain operations.
@@ -106,7 +106,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon_status::Status;
+    use zx_status::Status;
 
     fn io_flags_to_rights(flags: fio::OpenFlags) -> (bool, bool, bool) {
         return (

@@ -11,7 +11,7 @@ use fidl_fuchsia_net_dhcpv6::{
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use std::net::Ipv6Addr;
 use std::pin::Pin;
 use std::sync::Arc;

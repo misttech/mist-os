@@ -6,7 +6,7 @@
 
 use anyhow::anyhow;
 use fidl_fuchsia_feedback::{CrashReport, CrashReporterProxy};
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;

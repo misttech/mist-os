@@ -14,12 +14,12 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::channel::mpsc;
 use futures::{future, TryStreamExt};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use zx::{self as zx, HandleBased};
 
 use crate::config::{DisplayConfig, LayerConfig};
 use crate::error::{ConfigError, Error, Result};

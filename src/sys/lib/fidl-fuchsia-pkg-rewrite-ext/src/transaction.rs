@@ -5,8 +5,8 @@
 use crate::errors::EditTransactionError;
 use crate::rule::Rule;
 use fidl_fuchsia_pkg_rewrite::{EditTransactionProxy, EngineProxy};
-use fuchsia_zircon_status as zx;
 use std::future::Future;
+use zx_status as zx;
 
 const RETRY_ATTEMPTS: usize = 100;
 

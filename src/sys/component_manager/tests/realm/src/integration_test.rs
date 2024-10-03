@@ -8,7 +8,7 @@ use fuchsia_async::DurationExt;
 use fuchsia_component::client::*;
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {

@@ -20,11 +20,11 @@ rustc_test("bin") {
   deps = [
     "../testing/fidl:test.rolemanager_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
   ]

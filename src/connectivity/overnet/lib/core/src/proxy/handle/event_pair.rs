@@ -9,8 +9,8 @@ use super::{
 use crate::peer::PeerConnRef;
 use anyhow::{format_err, Error};
 use fidl::{AsHandleRef, HandleBased, Peered, Signals};
-use fuchsia_zircon_status as zx_status;
 use std::task::{Context, Poll};
+use zx_status;
 
 pub(crate) struct EventPair {
     event_pair: fidl::EventPair,

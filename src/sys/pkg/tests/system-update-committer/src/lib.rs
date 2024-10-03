@@ -15,7 +15,6 @@ use fuchsia_async::{self as fasync, OnSignals, TimeoutExt};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
@@ -26,6 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
+use zx::{self as zx, AsHandleRef};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_update_verify as fupdate_verify};
 
 const SYSTEM_UPDATE_COMMITTER_CM: &str = "#meta/system-update-committer.cm";

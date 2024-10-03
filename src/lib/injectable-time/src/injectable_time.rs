@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use fuchsia_sync::Mutex;
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
 use std::sync::Arc;
 
 /// TimeSource provides the current time in nanoseconds since the Unix epoch.
@@ -89,7 +87,7 @@ impl TimeSource for UtcInstant {
 }
 
 /// MonotonicInstant instances provide a monotonic clock.
-/// On Fuchsia, MonotonicInstant uses fuchsia_zircon::MonotonicInstant::get().
+/// On Fuchsia, MonotonicInstant uses zx::MonotonicInstant::get().
 #[derive(Debug)]
 pub struct MonotonicInstant {
     #[cfg(not(target_os = "fuchsia"))]
@@ -119,7 +117,7 @@ impl TimeSource for MonotonicInstant {
 }
 
 /// BootInstant instances provide a monotonic clock.
-/// On Fuchsia, BootInstant uses fuchsia_zircon::BootInstant::get().
+/// On Fuchsia, BootInstant uses zx::BootInstant::get().
 #[derive(Debug)]
 pub struct BootInstant {
     #[cfg(not(target_os = "fuchsia"))]

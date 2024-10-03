@@ -13,7 +13,6 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{AncillaryData, FileHandle, MessageReadInfo, UnixControlData};
 use fidl::endpoints::SynchronousProxy;
-use fuchsia_zircon::AsHandleRef;
 use linux_uapi::{SOL_SOCKET, SO_LINGER};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
@@ -22,7 +21,8 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, from_status_like_fdio, uapi, ucred};
 use std::sync::Arc;
 use zerocopy::IntoBytes;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder, fuchsia_zircon as zx};
+use zx::AsHandleRef;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder};
 
 static READABLE_SIGNAL: zx::Signals =
     zx::Signals::from_bits_retain(fio::FileSignal::READABLE.bits());
@@ -294,9 +294,9 @@ mod tests {
     use crate::vfs::socket::SocketFile;
     use crate::vfs::{VecInputBuffer, VecOutputBuffer};
     use fidl::endpoints::RequestStream;
-    use fuchsia_zircon::HandleBased;
     use futures::StreamExt;
     use starnix_sync::Mutex;
+    use zx::HandleBased;
     use {fidl_fuchsia_unknown as funknown, fuchsia_async as fasync};
 
     #[derive(Debug)]

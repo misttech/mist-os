@@ -5,7 +5,7 @@
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_media::{AudioFormat, AudioUncompressedFormat, DomainFormat, PcmFormat};
 use fuchsia_audio_codec::StreamProcessor;
-use fuchsia_zircon::{self as zx};
+
 use futures::io::AsyncWrite;
 use futures::stream::BoxStream;
 use futures::task::{Context, Poll};

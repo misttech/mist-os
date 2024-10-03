@@ -13,8 +13,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
 };
 use fidl::HandleBased;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef;
+
 use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
@@ -28,6 +27,7 @@ use starnix_uapi::{
 };
 use std::collections::HashSet;
 use std::sync::Arc;
+use zx::AsHandleRef;
 
 // Implementation of the sync framework described at:
 // https://source.android.com/docs/core/graphics/sync

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::rwhandle::{RWHandle, ReadableHandle as _, WritableHandle as _};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::ready;
 use std::fmt;
 use std::future::Future;
@@ -12,6 +11,7 @@ use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use zerocopy::{FromBytes, Immutable, IntoBytes};
+use zx::{self as zx, AsHandleRef};
 
 /// Marker trait for types that can be read/written with a `Fifo`.
 ///
@@ -447,10 +447,10 @@ impl<'a, T: FifoEntry, F: FifoReadable<T>> Future for ReadOne<'a, F, T> {
 mod tests {
     use super::*;
     use crate::{DurationExt, TestExecutor, TimeoutExt, Timer};
-    use fuchsia_zircon::prelude::*;
     use futures::future::try_join;
     use futures::prelude::*;
     use zerocopy::{Immutable, KnownLayout};
+    use zx::prelude::*;
 
     #[derive(
         Copy, Clone, Debug, PartialEq, Eq, Default, IntoBytes, KnownLayout, FromBytes, Immutable,

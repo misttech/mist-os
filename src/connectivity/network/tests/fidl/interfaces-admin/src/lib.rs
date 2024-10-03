@@ -11,7 +11,6 @@ use finterfaces_admin::GrantForInterfaceAuthorization;
 use fnet_interfaces_ext::admin::TerminalError;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, TimeoutExt as _};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
 use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
@@ -31,13 +30,14 @@ use std::convert::TryInto as _;
 use std::ops::Not as _;
 use std::pin::pin;
 use test_case::test_case;
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_posix_socket as fposix_socket, zx_status,
 };
 
 #[netstack_test]
@@ -1256,7 +1256,7 @@ async fn add_address_and_detach<N: Netstack>(
         },
     )
     .map_ok(|()| panic!("address deleted after detaching and closing channel"))
-    .on_timeout(fuchsia_async::Time::after(fuchsia_zircon::Duration::from_millis(100)), || Ok(()))
+    .on_timeout(fuchsia_async::Time::after(zx::Duration::from_millis(100)), || Ok(()))
     .await
     .expect("wait for address to not be removed");
 

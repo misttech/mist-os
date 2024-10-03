@@ -8,13 +8,13 @@ use fidl::prelude::*;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_component::server::{Item, ServiceFs, ServiceFsDir};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::Either;
 use futures::prelude::*;
 use futures::StreamExt;
 use http_client_config::Config;
 use std::str::FromStr as _;
 use tracing::{debug, error, info, trace};
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_net_http as net_http,
     fidl_fuchsia_process_lifecycle as flifecycle, fuchsia_hyper as fhyper,

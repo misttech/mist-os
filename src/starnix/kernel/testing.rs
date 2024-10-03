@@ -22,7 +22,7 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::{mpsc, Arc};
 use zerocopy::{Immutable, IntoBytes};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;

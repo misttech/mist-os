@@ -15,9 +15,9 @@ use {
     fuchsia_async as fasync,
     fuchsia_criterion::criterion::{BatchSize, Bencher, black_box},
     futures::{future, stream::StreamExt},
-    fuchsia_zircon as zx,
     gidl_util::{HandleDef, HandleSubtype, copy_handle, create_handles, select_handle_infos},
-    std::mem::ManuallyDrop
+    std::mem::ManuallyDrop,
+    zx as _,
 };
 
 // BENCHMARKS is aggregated by a generated benchmark_suite.rs file, which is ultimately

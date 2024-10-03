@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotMarker, ScreenshotTakeRequest};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
+
 use std::convert::TryInto;
 use std::fs;
 use std::io::BufWriter;

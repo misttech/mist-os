@@ -9,12 +9,12 @@ use crate::{sequencer, throttled_log, wire, wire_convert};
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{FutureExt, TryStreamExt};
 use mapped_vmo::Mapping;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::ops::Range;
+use zx::{self as zx, AsHandleRef};
 
 /// Parameters needed to construct an AudioStream.
 #[derive(Debug, Copy, Clone)]

@@ -17,7 +17,6 @@ use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::stream::StreamExt;
 use static_assertions::assert_eq_size;
 use std::convert::TryInto as _;
@@ -25,13 +24,14 @@ use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use storage_trace::{self as trace, TraceFutureExt};
+use zx_status::Status;
 
 #[cfg(target_os = "fuchsia")]
 use {
     crate::file::common::get_backing_memory_validate_flags,
     crate::temp_clone::{unblock, TempClonable},
-    fuchsia_zircon::{self as zx, HandleBased},
     std::io::SeekFrom,
+    zx::{self as zx, HandleBased},
 };
 
 /// Initializes a file connection and returns a future which will process the connection.
@@ -1048,9 +1048,6 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::prelude::*;
     use std::sync::Mutex;
-
-    #[cfg(target_os = "fuchsia")]
-    use fuchsia_zircon::{self as zx};
 
     const RIGHTS_R: fio::Operations =
         fio::Operations::READ_BYTES.union(fio::Operations::GET_ATTRIBUTES);

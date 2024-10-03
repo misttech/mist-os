@@ -13,13 +13,13 @@ rustc_library("log-command") {
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/rust/zx-types",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust/fuchsia-zircon-types",
     "//src/sys/lib/component_debug",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
@@ -35,8 +35,8 @@ rustc_library("log-command") {
   ]
 
   test_deps = [
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:assert_matches",
   ]
 

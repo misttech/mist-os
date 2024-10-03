@@ -5,8 +5,8 @@
 #![allow(unused)]
 use crate::geometry::{IntPoint, IntSize};
 use crate::input::*;
-use fuchsia_zircon::MonotonicInstant;
 use std::collections::{BTreeMap, VecDeque};
+use zx::MonotonicInstant;
 
 #[derive(Clone, Copy)]
 struct ContactDetails {

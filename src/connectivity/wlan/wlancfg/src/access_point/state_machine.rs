@@ -17,7 +17,7 @@ use fuchsia_inspect::{Node as InspectNode, StringReference};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::{mpsc, oneshot};
 use futures::future::FutureExt;
 use futures::select;

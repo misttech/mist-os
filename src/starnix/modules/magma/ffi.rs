@@ -9,9 +9,6 @@ use crate::file::{
 use crate::image_file::{ImageFile, ImageInfo};
 use crate::magma::create_drm_image;
 use bstr::BString;
-use fuchsia_zircon::{
-    AsHandleRef, HandleBased, {self as zx},
-};
 use magma::{
     magma_buffer_export, magma_buffer_get_handle, magma_buffer_id_t, magma_buffer_t,
     magma_command_descriptor, magma_connection_execute_command,
@@ -60,6 +57,9 @@ use starnix_uapi::user_buffer::UserBuffer;
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zx::{
+    AsHandleRef, HandleBased, {self as zx},
+};
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned
 /// Vec.

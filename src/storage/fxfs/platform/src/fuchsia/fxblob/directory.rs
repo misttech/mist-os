@@ -21,7 +21,6 @@ use fidl_fuchsia_fxfs::{
 use fidl_fuchsia_io::{self as fio, FilesystemInfo, NodeMarker, WatchMask};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
-use fuchsia_zircon::Status;
 use futures::TryStreamExt;
 use fxfs::errors::FxfsError;
 use fxfs::object_handle::ReadObjectHandle;
@@ -43,6 +42,7 @@ use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::{ObjectRequestRef, ToObjectRequest};
+use zx::Status;
 
 /// A flat directory containing content-addressable blobs (names are their hashes).
 /// It is not possible to create sub-directories.
@@ -516,7 +516,7 @@ mod tests {
     use fuchsia_fs::directory::{
         readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
     };
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt as _;
     use std::path::PathBuf;
 

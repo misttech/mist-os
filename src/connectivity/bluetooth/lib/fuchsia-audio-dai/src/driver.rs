@@ -5,7 +5,7 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_hardware_audio::*;
-use fuchsia_zircon as zx;
+
 use futures::future::{self, Either};
 use futures::{Future, FutureExt, TryFutureExt};
 use std::path::{Path, PathBuf};

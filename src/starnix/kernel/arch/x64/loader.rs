@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::sys::zx_thread_state_general_regs_t;
+use zx::sys::zx_thread_state_general_regs_t;
 
 use crate::loader::ThreadStartInfo;
 

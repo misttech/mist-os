@@ -8,9 +8,9 @@ use crate::directory::FatDirectory;
 use crate::filesystem::FatFilesystemInner;
 use crate::node::Node;
 use crate::types::{Dir, File};
-use fuchsia_zircon::Status;
 use scopeguard::defer;
 use std::sync::Arc;
+use zx::Status;
 
 pub struct FatfsDirRef {
     inner: Option<Dir<'static>>,

@@ -13,11 +13,11 @@ use fidl_fuchsia_feedback::{
 use fidl_fuchsia_mem::Buffer;
 use fuchsia_async::{Interval, Task};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{Duration, Vmo};
 use futures::channel::mpsc;
 use futures::stream::once;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
+use zx::{Duration, Vmo};
 
 const CRASH_PRODUCT_NAME: &str = "FuchsiaHeapProfile";
 const CRASH_PROGRAM_NAME: &str = "memory_sampler";

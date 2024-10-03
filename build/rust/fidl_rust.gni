@@ -142,8 +142,8 @@ template("fidl_rust") {
       disable_clippy = true
 
       deps = [
+        "//sdk/rust/zx-status",
         "//src/lib/fidl/rust/fidl",
-        "//src/lib/zircon/rust/fuchsia-zircon-status",
         "//third_party/rust_crates:bitflags",
         "//third_party/rust_crates:futures",
       ]
@@ -163,7 +163,7 @@ template("fidl_rust") {
       configs += [ "//build/config/rust/lints:allow_unused_crate_dependencies" ]
 
       if (is_fuchsia) {
-        deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+        deps += [ "//sdk/rust/zx" ]
         if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
           deps += [ "//src/lib/fidl/rust/fidl_driver" ]
 
@@ -179,7 +179,7 @@ template("fidl_rust") {
         foreach(dep, invoker.public_deps) {
           label = get_label_info(dep, "label_no_toolchain")
           if (label == "//zircon/vdso/zx:zx") {
-            deps += [ "//src/lib/zircon/rust/fuchsia-zircon-types" ]
+            deps += [ "//sdk/rust/zx-types" ]
           } else if (fdomain) {
             deps += [ "${label}_fdomain" ]
           } else {

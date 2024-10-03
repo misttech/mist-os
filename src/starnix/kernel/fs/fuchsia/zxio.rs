@@ -9,7 +9,6 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 
-use fuchsia_zircon as zx;
 use std::sync::Arc;
 use syncio::{zxio, Zxio, ZxioSignals};
 

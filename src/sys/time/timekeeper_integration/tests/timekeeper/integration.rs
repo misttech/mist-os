@@ -9,7 +9,7 @@ use fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy};
 use fidl_fuchsia_time_external::TimeSample;
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client;
-use fuchsia_zircon::{self as zx};
+
 use futures::stream::StreamExt;
 use futures::Future;
 use std::sync::Arc;

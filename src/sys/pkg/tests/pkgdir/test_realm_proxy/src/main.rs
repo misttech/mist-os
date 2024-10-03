@@ -13,7 +13,7 @@ use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use realm_proxy::service::serve_with_proxy;
 use tracing::{error, info};
-use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, zx};
 
 // When this feature is enabled, the pkgdir tests will start Fxblob.
 #[cfg(feature = "use_fxblob")]

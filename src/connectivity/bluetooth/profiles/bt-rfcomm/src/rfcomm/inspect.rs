@@ -163,7 +163,6 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon as zx;
 
     use crate::rfcomm::session::channel::Credits;
 

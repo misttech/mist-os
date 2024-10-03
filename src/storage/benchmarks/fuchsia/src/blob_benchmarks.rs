@@ -16,7 +16,7 @@ use std::ops::Range;
 use storage_benchmarks::{
     Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 

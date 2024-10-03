@@ -13,7 +13,7 @@ use crate::vfs::socket::{
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
-use fuchsia_zircon as zx;
+
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};

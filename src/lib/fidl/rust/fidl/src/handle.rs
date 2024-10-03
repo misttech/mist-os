@@ -15,7 +15,6 @@ pub use fuchsia_async::{Channel as AsyncChannel, OnSignalsRef, Socket as AsyncSo
 /// Fuchsia implementation of handles just aliases the zircon library
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia_handles {
-    use fuchsia_zircon as zx;
 
     pub use zx::{
         AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef,
@@ -65,7 +64,7 @@ pub mod non_fuchsia_handles {
         AsHandleRef, EmulatedHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo,
         HandleOp, HandleRef, MessageBufEtc, ObjectType, Peered, Rights, Signals, SocketOpts,
     };
-    pub use fuchsia_zircon_status::Status;
+    pub use zx_status::Status;
 
     pub use fuchsia_async::invoke_for_handle_types;
 

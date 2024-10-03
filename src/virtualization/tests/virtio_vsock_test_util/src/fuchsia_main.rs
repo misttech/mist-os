@@ -10,9 +10,9 @@ use fidl_fuchsia_vsock::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::io::{AsyncReadExt, AsyncWriteExt};
 use futures::StreamExt;
+use zx::{self as zx, AsHandleRef};
 
 const TEST_DATA_LEN: u64 = 60000;
 

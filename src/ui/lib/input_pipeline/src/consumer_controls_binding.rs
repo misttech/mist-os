@@ -11,7 +11,7 @@ use fidl_fuchsia_input_report::{
 };
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::ArrayProperty;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
 

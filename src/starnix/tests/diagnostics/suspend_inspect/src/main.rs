@@ -12,7 +12,7 @@ use tracing::info;
 use {
     fidl_fuchsia_test_suspend as fftsu, fidl_fuchsia_test_syscalls as ffts,
     fuchsia_async as fasync, fuchsia_component as fxc, fuchsia_component_test as fxct,
-    fuchsia_driver_test as _, fuchsia_zircon as zx,
+    fuchsia_driver_test as _, zx,
 };
 
 // Wait at most this long for a suspender device to appear in the service

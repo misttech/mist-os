@@ -196,7 +196,6 @@ type Config = struct {
             use fidl::unpersist;
             use fuchsia_inspect::{Node};
             use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-            use fuchsia_zircon as zx;
 
             #[derive(Debug)]
             pub struct Config {

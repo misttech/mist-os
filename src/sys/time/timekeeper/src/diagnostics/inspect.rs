@@ -14,7 +14,7 @@ use fuchsia_inspect::{
 };
 use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcInstant};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use futures::FutureExt;
 use inspect_writable::{InspectWritable, InspectWritableNode};
 use lazy_static::lazy_static;

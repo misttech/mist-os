@@ -22,7 +22,7 @@ use fuchsia_sync::Mutex;
 use futures::future::{poll_fn, Future};
 use futures::task::{Context, Poll};
 use futures::{ready, Stream};
-use {fidl_fuchsia_hardware_network as netdev, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_network as netdev, fuchsia_async as fasync};
 
 use crate::error::{Error, Result};
 use buffer::pool::{Pool, RxLeaseWatcher};
@@ -817,9 +817,9 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fuchsia_async::Fifo;
-    use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
     use test_case::test_case;
     use zerocopy::{FromBytes, Immutable, IntoBytes};
+    use zx::{AsHandleRef as _, HandleBased as _};
 
     use crate::session::DerivableConfig;
 
@@ -974,16 +974,16 @@ mod tests {
         assert_eq!(length, expected_length);
     }
 
-    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, fuchsia_zircon::Fifo<DescId<K>>) {
-        let (handle, other_end) = fuchsia_zircon::Fifo::create(1).unwrap();
+    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, zx::Fifo<DescId<K>>) {
+        let (handle, other_end) = zx::Fifo::create(1).unwrap();
         (Fifo::from_fifo(handle), other_end)
     }
 
     fn remove_rights<T: FromBytes + IntoBytes + Immutable>(
         fifo: Fifo<T>,
-        rights_to_remove: fuchsia_zircon::Rights,
+        rights_to_remove: zx::Rights,
     ) -> Fifo<T> {
-        let fifo = fuchsia_zircon::Fifo::from(fifo);
+        let fifo = zx::Fifo::from(fifo);
         let rights = fifo.as_handle_ref().basic_info().expect("can retrieve info").rights;
 
         let fifo = fifo.replace_handle(rights ^ rights_to_remove).expect("can replace");
@@ -994,14 +994,11 @@ mod tests {
         Tx,
         Rx,
     }
-    #[test_case(TxOrRx::Tx, fuchsia_zircon::Rights::READ; "tx read")]
-    #[test_case(TxOrRx::Tx, fuchsia_zircon::Rights::WRITE; "tx write")]
-    #[test_case(TxOrRx::Rx, fuchsia_zircon::Rights::WRITE; "rx read")]
+    #[test_case(TxOrRx::Tx, zx::Rights::READ; "tx read")]
+    #[test_case(TxOrRx::Tx, zx::Rights::WRITE; "tx write")]
+    #[test_case(TxOrRx::Rx, zx::Rights::WRITE; "rx read")]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn task_as_future_poll_error(
-        which_fifo: TxOrRx,
-        right_to_remove: fuchsia_zircon::Rights,
-    ) {
+    async fn task_as_future_poll_error(which_fifo: TxOrRx, right_to_remove: zx::Rights) {
         // This is a regression test for https://fxbug.dev/42072513. The flake
         // that caused that bug occurred because the Zircon channel was closed
         // but the error returned by a failed attempt to write to it wasn't

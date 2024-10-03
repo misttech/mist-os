@@ -13,10 +13,10 @@ use crate::{ObjectRequestRef, ProtocolsExt};
 
 use fidl_fuchsia_io as fio;
 use fio::DirectoryRequest;
-use fuchsia_zircon_status::Status;
 use futures::TryStreamExt as _;
 use std::future::Future;
 use std::sync::Arc;
+use zx_status::Status;
 
 pub struct ImmutableConnection<DirectoryType: Directory> {
     base: BaseConnection<DirectoryType>,

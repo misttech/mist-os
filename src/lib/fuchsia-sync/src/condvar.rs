@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::MutexGuard;
-use fuchsia_zircon as zx;
+
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 

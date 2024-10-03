@@ -4,8 +4,6 @@
 
 //! Definition of possible errors in this crate.
 
-use fuchsia_zircon as zx;
-
 /// Possible errors in the crate.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]

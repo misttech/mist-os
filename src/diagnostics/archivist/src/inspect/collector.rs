@@ -11,7 +11,7 @@ use futures::stream::StreamExt;
 use std::pin::pin;
 use std::sync::{Arc, Weak};
 use tracing::error;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Pairs a diagnostics data-object's name to the underlying encoding of that data.
 pub type InspectHandleDeque = std::collections::VecDeque<(Option<InspectHandleName>, InspectData)>;
@@ -180,10 +180,10 @@ mod tests {
     use fidl::endpoints::create_request_stream;
     use fuchsia_component::server::ServiceFs;
     use fuchsia_inspect::{reader, Inspector};
-    use fuchsia_zircon::Peered;
     use inspect_runtime::service::spawn_tree_server_with_stream;
     use inspect_runtime::TreeServerSendPreference;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::Peered;
+    use {fuchsia_async as fasync, zx};
 
     fn get_vmo(text: &[u8]) -> zx::Vmo {
         let vmo = zx::Vmo::create(4096).unwrap();

@@ -13,7 +13,7 @@ use crate::service_context::ServiceContext;
 use crate::setup::types::SetupInfo;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
-use fuchsia_zircon as zx;
+
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::{NoneT, StorageAccess};
 

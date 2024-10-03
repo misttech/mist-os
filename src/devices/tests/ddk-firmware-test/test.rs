@@ -32,9 +32,6 @@ async fn load_package_firmware_test() -> Result<(), Error> {
     driver_proxy.load_firmware("test-firmware").await?.unwrap();
 
     // Check that loading unknown name fails.
-    assert_eq!(
-        driver_proxy.load_firmware("test-bad").await?,
-        Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND)
-    );
+    assert_eq!(driver_proxy.load_firmware("test-bad").await?, Err(zx::sys::ZX_ERR_NOT_FOUND));
     Ok(())
 }

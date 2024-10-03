@@ -14,7 +14,7 @@ use wlan_common::security::wep::WepKey;
 use wlan_common::security::wpa::credential::{Passphrase, Psk};
 use wlan_common::security::wpa::WpaDescriptor;
 use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
-use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, zx};
 
 /// The max number of connection results we will store per BSS at a time. For now, this number is
 /// chosen arbitartily.

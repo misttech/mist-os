@@ -7,7 +7,6 @@ use crate::types::Disk;
 use crate::FatFs;
 use anyhow::Error;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Status;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use scopeguard::defer;
@@ -20,6 +19,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::file::{File, FileIo};
 use vfs::node::Node as _;
+use zx::Status;
 
 impl Disk for std::io::Cursor<Box<[u8]>> {
     fn is_present(&self) -> bool {

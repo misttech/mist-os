@@ -6,7 +6,7 @@ use crate::filesystems::FsManagementFilesystemInstance;
 use async_trait::async_trait;
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol_at_dir_root};
-use fuchsia_zircon as zx;
+
 use std::path::Path;
 use std::sync::{Arc, Once};
 use storage_benchmarks::{

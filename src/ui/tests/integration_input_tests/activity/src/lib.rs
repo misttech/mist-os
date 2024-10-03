@@ -21,9 +21,9 @@ use fidl_fuchsia_ui_test_input::{
 use fidl_fuchsia_vulkan_loader::LoaderMarker;
 use fuchsia_async::{Time, Timer};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-use fuchsia_zircon::Duration;
 use futures::{future, StreamExt};
 use test_case::test_case;
+use zx::Duration;
 
 const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "#meta/test-ui-stack.cm";

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon as zx;
+
 use ieee80211::MacAddrBytes;
 use wlan_hw_sim::{
     default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper, test_utils,

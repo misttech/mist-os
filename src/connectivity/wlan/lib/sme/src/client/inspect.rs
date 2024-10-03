@@ -12,10 +12,7 @@ use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
 use fuchsia_sync::Mutex;
 use ieee80211::Ssid;
 use wlan_common::ie::{self, wsc};
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme, zx};
 
 /// These limits are set to capture roughly 5 to 10 recent connection attempts. An average
 /// successful connection attempt would generate about 5 state events and 7 supplicant events (this

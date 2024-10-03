@@ -64,7 +64,7 @@ pub mod tests {
     use futures::StreamExt;
     use moniker::ExtendedMoniker;
     use std::collections::BTreeSet;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn event_stream() {

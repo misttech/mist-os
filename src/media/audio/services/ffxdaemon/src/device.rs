@@ -11,7 +11,7 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use fuchsia_audio::device::{DevfsSelector, RegistrySelector, Selector};
 use fuchsia_audio::{stop_listener, Format};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
-use fuchsia_zircon::{self as zx};
+
 use futures::{AsyncWriteExt, StreamExt};
 use std::collections::{btree_map, BTreeMap};
 use std::sync::atomic::{AtomicBool, Ordering};

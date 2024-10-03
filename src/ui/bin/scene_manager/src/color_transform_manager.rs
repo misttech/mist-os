@@ -16,7 +16,7 @@ use futures::stream::TryStreamExt;
 use scene_management::SceneManagerTrait;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fidl_fuchsia_ui_display_color as fidl_color, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_ui_display_color as fidl_color, fuchsia_async as fasync, zx};
 
 const ZERO_OFFSET: [f32; 3] = [0., 0., 0.];
 

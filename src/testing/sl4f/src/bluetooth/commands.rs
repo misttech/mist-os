@@ -884,7 +884,7 @@ impl Facade for HfpFacade {
             "SetDialResult" => {
                 let number = parse_arg!(args, as_str, "number")?.to_string();
                 let status = parse_arg!(args, as_i64, "status")?.try_into()?;
-                let status = fuchsia_zircon::Status::from_raw(status);
+                let status = zx::Status::from_raw(status);
                 self.set_dial_result(number, status).await;
                 Ok(to_value(())?)
             }

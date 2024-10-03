@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::types::{OperatingPoint, ThermalLoad};
-use fuchsia_zircon::sys;
+use zx::sys;
 
 /// Defines the message types and arguments to be used for inter-node communication
 #[derive(Debug, PartialEq)]

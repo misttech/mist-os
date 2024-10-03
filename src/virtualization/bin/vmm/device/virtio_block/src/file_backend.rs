@@ -10,7 +10,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io::{FileMarker, FileProxy, MAX_BUF};
 use futures::future::try_join_all;
 use virtio_device::mem::DeviceRange;
-use {fuchsia_trace as ftrace, fuchsia_zircon_status as zx_status};
+use {fuchsia_trace as ftrace, zx_status};
 
 const MAX_INFLIGHT_REQUESTS: usize = 64;
 

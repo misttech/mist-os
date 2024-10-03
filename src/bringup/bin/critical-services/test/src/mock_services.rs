@@ -8,7 +8,6 @@ use anyhow::Error;
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fuchsia_component::server as fserver;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use tracing::{info, warn};
@@ -16,6 +15,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as pfsPath;
 use vfs::{pseudo_directory, service};
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_hardware_hidbus as fhidbus, fidl_fuchsia_hardware_input as finput,
     fidl_fuchsia_hardware_power_statecontrol as statecontrol, fidl_fuchsia_io as fio,

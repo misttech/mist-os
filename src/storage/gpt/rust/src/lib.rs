@@ -180,7 +180,7 @@ mod tests {
     use gpt_testing::{format_gpt, PartitionDescriptor};
     use std::ops::Range;
     use std::sync::Arc;
-    use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_zircon as zx};
+    use {fidl_fuchsia_hardware_block_volume as fvolume, zx};
 
     #[fuchsia::test]
     async fn load_unformatted_gpt() {

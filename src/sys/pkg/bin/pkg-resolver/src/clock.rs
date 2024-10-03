@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 #[cfg(not(test))]
 pub(crate) fn now() -> zx::MonotonicInstant {
     zx::MonotonicInstant::get()
@@ -14,7 +12,6 @@ pub(crate) use mock::now;
 
 #[cfg(test)]
 pub(crate) mod mock {
-    use super::*;
     use std::cell::Cell;
 
     thread_local!(

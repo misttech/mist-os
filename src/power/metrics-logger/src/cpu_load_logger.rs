@@ -19,7 +19,7 @@ use tracing::{error, info};
 use zerocopy::FromBytes;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_kernel as fkernel,
-    fidl_fuchsia_power_metrics as fmetrics, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_power_metrics as fmetrics, fuchsia_async as fasync, zx,
 };
 
 pub const ZBI_TOPOLOGY_NODE_SIZE: usize = mem::size_of::<ZbiTopologyNode>();

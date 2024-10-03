@@ -8,7 +8,7 @@ use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirTyp
 use fidl_fuchsia_fs_realm::ControllerMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use fuchsia_zircon as zx;
+
 use std::path::Path;
 
 #[derive(FromArgs)]

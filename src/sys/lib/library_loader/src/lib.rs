@@ -8,7 +8,7 @@ use fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream};
 use futures::{TryFutureExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::*;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 /// Helper function to load `object_name` from `search_dirs`.
 /// This function looks in the given directories, and returns the

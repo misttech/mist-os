@@ -11,7 +11,7 @@ use stream_processor_encoder_factory::*;
 use stream_processor_test::*;
 use tracing::info;
 use video_frame_stream::*;
-use {fidl_fuchsia_sysmem as sysmem, fuchsia_zircon as zx};
+use {fidl_fuchsia_sysmem as sysmem, zx};
 
 use crate::h265::*;
 

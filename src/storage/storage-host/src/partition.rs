@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use crate::gpt::GptPartition;
 use block_client::{VmoId, WriteOptions};
-use fuchsia_zircon as zx;
+
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 

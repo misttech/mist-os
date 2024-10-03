@@ -24,11 +24,11 @@ use carnelian::{
     MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
-use fuchsia_zircon::MonotonicInstant;
 use std::f32::consts::PI;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
+use zx::MonotonicInstant;
 
 /// Button Sample
 #[derive(Debug, FromArgs)]

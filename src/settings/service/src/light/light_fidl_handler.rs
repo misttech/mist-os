@@ -11,7 +11,7 @@ use fidl_fuchsia_settings::{
     LightSetLightGroupValuesResult, LightState, LightWatchLightGroupResponder,
     LightWatchLightGroupsResponder,
 };
-use fuchsia_zircon::Status;
+use zx::Status;
 
 use crate::base::{SettingInfo, SettingType};
 use crate::handler;
@@ -21,8 +21,8 @@ use crate::job::source::Error as JobError;
 use crate::job::Job;
 use crate::light::light_controller::ARG_NAME;
 
-impl watch::Responder<Vec<LightGroup>, fuchsia_zircon::Status> for LightWatchLightGroupsResponder {
-    fn respond(self, response: Result<Vec<LightGroup>, fuchsia_zircon::Status>) {
+impl watch::Responder<Vec<LightGroup>, zx::Status> for LightWatchLightGroupsResponder {
+    fn respond(self, response: Result<Vec<LightGroup>, zx::Status>) {
         match response {
             Ok(light_groups) => {
                 let _ = self.send(&light_groups);
@@ -34,8 +34,8 @@ impl watch::Responder<Vec<LightGroup>, fuchsia_zircon::Status> for LightWatchLig
     }
 }
 
-impl watch::Responder<Vec<LightGroup>, fuchsia_zircon::Status> for IndividualLightGroupResponder {
-    fn respond(self, response: Result<Vec<LightGroup>, fuchsia_zircon::Status>) {
+impl watch::Responder<Vec<LightGroup>, zx::Status> for IndividualLightGroupResponder {
+    fn respond(self, response: Result<Vec<LightGroup>, zx::Status>) {
         let light_group_name = self.light_group_name;
         match response {
             Ok(light_groups) => {

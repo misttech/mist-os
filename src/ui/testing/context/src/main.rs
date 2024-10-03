@@ -19,8 +19,7 @@ use futures::{StreamExt, TryStreamExt};
 use {
     fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_sysmem2 as fsysmem2,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
-    fidl_fuchsia_ui_test_scene as test_scene, fuchsia_async as fasync,
-    fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_ui_test_scene as test_scene, fuchsia_async as fasync, zx_status,
 };
 
 // TODO(https://fxbug.dev/42069041): Use subpackages here.

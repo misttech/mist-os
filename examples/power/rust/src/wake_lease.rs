@@ -26,7 +26,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use futures::channel::mpsc;
     use futures::prelude::*;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     struct FakeActivityGovernor {
         // Sends updates in server wake lease state (active, inactive).

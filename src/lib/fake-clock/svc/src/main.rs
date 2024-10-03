@@ -10,10 +10,10 @@ use fidl_fuchsia_testing::{
 use fidl_fuchsia_testing_deadline::DeadlineId;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::FutureExt;
 use tracing::{debug, error, trace, warn};
+use zx::{self as zx, AsHandleRef, Peered};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -555,10 +555,10 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use super::*;
     use fidl_fuchsia_testing::{FakeClockControlMarker, FakeClockMarker};
-    use fuchsia_zircon::Koid;
     use futures::channel::mpsc;
     use futures::pin_mut;
     use named_timer::DeadlineId;
+    use zx::Koid;
 
     const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("component_1", "code_1");
     const DEADLINE_ID_2: DeadlineId<'static> = DeadlineId::new("component_1", "code_2");

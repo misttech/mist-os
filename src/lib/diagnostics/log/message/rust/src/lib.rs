@@ -10,7 +10,7 @@ use diagnostics_data::{
 };
 use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
 use flyweights::FlyStr;
-use fuchsia_zircon as zx;
+
 use libc::{c_char, c_int};
 use std::{mem, str};
 

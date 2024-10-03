@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use fidl_fuchsia_boot as fboot;
-use fuchsia_zircon::{self as zx, HandleBased};
+use zx::{self as zx, HandleBased};
 
 pub async fn init() -> Result<(), Error> {
     let write_only_log_proxy =

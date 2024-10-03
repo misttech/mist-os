@@ -12,14 +12,14 @@
 
 #![deny(missing_docs)]
 
-use fuchsia_zircon::sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID};
-use fuchsia_zircon::{
-    Clock, ClockDetails, ClockTransformation, ClockUpdate, Handle, HandleBased, Instant, Job,
-    MonotonicTimeline, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
-};
 use num_derive::FromPrimitive;
 use num_traits::cast::FromPrimitive;
 use thiserror::Error;
+use zx::sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID};
+use zx::{
+    Clock, ClockDetails, ClockTransformation, ClockUpdate, Handle, HandleBased, Instant, Job,
+    MonotonicTimeline, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
+};
 
 // TODO(https://fxbug.dev/42139436): Document these.
 #[allow(missing_docs)]
@@ -417,7 +417,7 @@ mod tests {
         let mut randbuf = [0; 2];
         for type_val in 0..0xFF {
             if let Some(htype) = HandleType::from_u8(type_val as u8) {
-                fuchsia_zircon::cprng_draw(&mut randbuf);
+                zx::cprng_draw(&mut randbuf);
                 let arg = u16::from_le_bytes(randbuf);
 
                 let info = HandleInfo::new(htype, arg);

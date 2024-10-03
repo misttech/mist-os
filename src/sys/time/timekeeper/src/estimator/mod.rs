@@ -11,7 +11,7 @@ use crate::time_source::Sample;
 use crate::{Config, UtcTransform};
 use chrono::prelude::*;
 use frequency::FrequencyEstimator;
-use fuchsia_zircon as zx;
+
 use kalman_filter::KalmanFilter;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -140,7 +140,6 @@ mod test {
     use crate::diagnostics::FakeDiagnostics;
     use crate::make_test_config;
     use fuchsia_runtime::UtcInstant;
-    use fuchsia_zircon::{self as zx};
     use test_util::assert_near;
 
     // Note: we need to ensure the absolute times are not near the January 1st leap second.

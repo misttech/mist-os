@@ -5,10 +5,10 @@
 use crate::power::OnWakeOps;
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use std::sync::{Arc, Weak};
+use zx::{self as zx, AsHandleRef, HandleRef};
 
 pub struct ZxTimer {
     timer: Arc<zx::Timer>,

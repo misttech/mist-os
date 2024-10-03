@@ -35,7 +35,7 @@ def main():
     with open(output_file, "w") as fo:
         # TODO(https://fxbug.dev/326330182): clean up unused imports.
         fo.write("#![allow(unused_imports)]")
-        fo.write("use fuchsia_criterion::criterion::Bencher;\n\n")
+        fo.write("use fuchsia_criterion::criterion::Bencher;\n")
         for package in packages:
             fo.write("use %s;\n" % package)
         fo.write(

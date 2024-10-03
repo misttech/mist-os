@@ -4,11 +4,11 @@
 
 use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Status;
 use storage_stress_test_utils::data::FileFactory;
 use storage_stress_test_utils::io::Directory;
 use stress_test::actor::{Actor, ActorError};
 use tracing::info;
+use zx::Status;
 
 // Performs operations on blobs expected to exist on disk
 pub struct BlobActor {

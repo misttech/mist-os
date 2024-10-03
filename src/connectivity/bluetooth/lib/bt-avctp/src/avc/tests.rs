@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, Status};
 use futures::executor::block_on;
 use std::result;
 use std::task::Poll;
+use zx::{self as zx, Status};
 
 use super::*;
 use crate::avctp::MessageType as AvctpMessageType;

@@ -9,7 +9,7 @@ use tracing::*;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fidl_test_components as ftest,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, zx,
 };
 
 #[fuchsia::main]

@@ -12,7 +12,7 @@ use crate::protocol::{FidlCompatible, FromFidlExt, IntoFidlExt};
 use anyhow::{Context as _, Error};
 
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::Status;
+use zx::Status;
 
 #[cfg(target_os = "fuchsia")]
 use tracing::info;
@@ -770,7 +770,7 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
         if let Some(store) = self.store.as_mut() {
             store.store_parameters(&self.params).map_err(|e| {
                 warn!("store_parameters({:?}) in stash failed: {}", self.params, e);
-                fuchsia_zircon::Status::INTERNAL
+                zx::Status::INTERNAL
             })
         } else {
             Ok(())
@@ -1048,7 +1048,7 @@ impl<DS: DataStore, TS: SystemTimeSource> ServerDispatcher for Server<DS, TS> {
         if let Some(store) = self.store.as_mut() {
             let () = store.store_options(&opts).map_err(|e| {
                 warn!("store_options({:?}) in stash failed: {}", opts, e);
-                fuchsia_zircon::Status::INTERNAL
+                zx::Status::INTERNAL
             })?;
         }
         Ok(())
@@ -1174,7 +1174,7 @@ impl<DS: DataStore, TS: SystemTimeSource> ServerDispatcher for Server<DS, TS> {
         if let Some(store) = self.store.as_mut() {
             let () = store.store_options(&opts).map_err(|e| {
                 warn!("store_options({:?}) in stash failed: {}", opts, e);
-                fuchsia_zircon::Status::INTERNAL
+                zx::Status::INTERNAL
             })?;
         }
         Ok(())
@@ -1199,7 +1199,7 @@ impl<DS: DataStore, TS: SystemTimeSource> ServerDispatcher for Server<DS, TS> {
             if let Some(store) = store {
                 let () = store.delete(&id).map_err(|e| {
                     warn!("delete({}) failed: {:?}", id, e);
-                    fuchsia_zircon::Status::INTERNAL
+                    zx::Status::INTERNAL
                 })?;
             }
         }
@@ -1523,7 +1523,6 @@ pub mod tests {
     use datastore::{ActionRecordingDataStore, DataStoreAction};
     use dhcp_protocol::{AtLeast, AtMostBytes};
     use fidl_fuchsia_net_ext::IntoExt as _;
-    use fuchsia_zircon::Status;
     use net_declare::net::prefix_length_v4;
     use net_declare::{fidl_ip_v4, std_ip_v4};
     use net_types::ethernet::Mac as MacAddr;
@@ -1536,6 +1535,7 @@ pub mod tests {
     use std::rc::Rc;
     use std::time::{Duration, SystemTime};
     use test_case::test_case;
+    use zx::Status;
 
     mod datastore {
         use crate::protocol::{DhcpOption, OptionCode};
@@ -3921,15 +3921,12 @@ pub mod tests {
         );
         assert_eq!(
             server.dispatch_set_parameter(empty_lease_length),
-            Err(fuchsia_zircon::Status::INVALID_ARGS)
+            Err(zx::Status::INVALID_ARGS)
         );
-        assert_eq!(
-            server.dispatch_set_parameter(bad_prefix_length),
-            Err(fuchsia_zircon::Status::INVALID_ARGS)
-        );
+        assert_eq!(server.dispatch_set_parameter(bad_prefix_length), Err(zx::Status::INVALID_ARGS));
         assert_eq!(
             server.dispatch_set_parameter(duplicated_static_assignment),
-            Err(fuchsia_zircon::Status::INVALID_ARGS)
+            Err(zx::Status::INVALID_ARGS)
         );
         assert_matches::assert_matches!(
             server.store.expect("missing store").actions().as_slice(),

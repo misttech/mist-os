@@ -21,7 +21,7 @@ use crate::viewporter::*;
 use crate::xdg_shell::*;
 use anyhow::{Error, Result};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use std::io::Read;
 use std::sync::Arc;
 use wayland_server_protocol::{

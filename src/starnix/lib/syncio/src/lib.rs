@@ -11,7 +11,6 @@ use bstr::BString;
 use fidl::encoding::const_assert_eq;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::mem::{size_of, size_of_val};
@@ -19,6 +18,7 @@ use std::num::TryFromIntError;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::pin::Pin;
 use zerocopy::{FromBytes, IntoBytes};
+use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
     zxio_seek_origin_t, zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,

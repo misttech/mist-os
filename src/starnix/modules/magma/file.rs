@@ -11,8 +11,7 @@ use crate::ffi::{
 };
 use crate::image_file::{ImageFile, ImageInfo};
 use crate::magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem};
-use fuchsia_zircon as zx;
-use fuchsia_zircon::HandleBased;
+
 use magma::{
     magma_buffer_clean_cache, magma_buffer_get_cache_policy, magma_buffer_get_info,
     magma_buffer_id_t, magma_buffer_info_t, magma_buffer_set_cache_policy, magma_buffer_set_name,
@@ -152,6 +151,7 @@ use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{errno, error};
 use std::collections::HashMap;
 use std::sync::{Arc, Once};
+use zx::HandleBased;
 
 #[derive(Clone)]
 pub enum BufferInfo {

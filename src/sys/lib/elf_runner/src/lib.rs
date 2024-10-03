@@ -32,7 +32,6 @@ use fidl_fuchsia_diagnostics_types::{
 use fidl_fuchsia_process_lifecycle::LifecycleMarker;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType, UtcClock};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
 use moniker::Moniker;
@@ -41,6 +40,7 @@ use runner::StartInfo;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::warn;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
@@ -679,12 +679,12 @@ mod tests {
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::LifecycleProxy;
     use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-    use fuchsia_zircon::{self as zx, Task};
     use futures::channel::mpsc;
     use futures::lock::Mutex;
     use futures::{join, StreamExt};
     use runner::component::Controllable;
     use std::task::Poll;
+    use zx::{self as zx, Task};
     use {
         fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,

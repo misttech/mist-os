@@ -453,8 +453,8 @@ mod tests {
     use crate::display::types::SetDisplayInfo;
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
     use diagnostics_assertions::{assert_data_tree, TreeAssertion};
-    use fuchsia_zircon::MonotonicInstant;
     use std::collections::HashSet;
+    use zx::MonotonicInstant;
 
     /// The `RequestProcessor` handles sending a request through a MessageHub
     /// From caller to recipient. This is useful when testing brokers in

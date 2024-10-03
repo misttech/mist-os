@@ -13,7 +13,7 @@ use futures::AsyncBufReadExt;
 use gtest_runner_lib::parser::*;
 use std::collections::HashMap;
 use test_runners_lib::cases::TestCaseInfo;
-use {fidl_fuchsia_component_runner as frunner, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_component_runner as frunner, fuchsia_async as fasync, zx};
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
 

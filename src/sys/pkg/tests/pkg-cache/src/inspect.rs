@@ -14,7 +14,7 @@ use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 use futures::prelude::*;
 use std::collections::HashMap;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn system_image_hash_present() {

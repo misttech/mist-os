@@ -4,7 +4,7 @@
 
 use futures::channel::mpsc;
 use futures::{FutureExt, Stream, StreamExt};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 use crate::sink::UnboundedSink;
 
@@ -92,7 +92,7 @@ mod tests {
     use super::*;
     use crate::assert_variant;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx};
+
     use futures::channel::mpsc::UnboundedSender;
     use std::pin::pin;
     use std::task::Poll;

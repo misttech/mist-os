@@ -8,8 +8,8 @@ use crate::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMod
 use crate::node::Node;
 use crate::ObjectRequestRef;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::sync::Arc;
+use zx_status::Status;
 
 #[cfg(test)]
 mod tests;

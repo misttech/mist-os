@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::Status;
 use std::ffi::{c_char, c_void, CStr, CString};
 use url::Url;
+use zx::Status;
 
 /// Parse a URL, returning success/failure as a status code. On success, `out` will contain a
 /// pointer to the parsed URL.

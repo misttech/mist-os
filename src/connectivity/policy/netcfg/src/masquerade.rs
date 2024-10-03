@@ -16,7 +16,7 @@ use net_declare::fidl_subnet;
 use tracing::error;
 use {
     fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
-    fidl_fuchsia_net_masquerade as fnet_masquerade, fuchsia_zircon as zx,
+    fidl_fuchsia_net_masquerade as fnet_masquerade, zx,
 };
 
 use crate::filter::FilterEnabledState;

@@ -11,11 +11,11 @@ use cm_config::{
     AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
     DebugCapabilityKey, SecurityPolicy,
 };
-use fuchsia_zircon_status as zx;
 use moniker::{ExtendedMoniker, Moniker};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, warn};
+use zx_status as zx;
 
 use cm_rust::CapabilityTypeName;
 #[cfg(feature = "serde")]

@@ -11,7 +11,7 @@ use cm_rust_testing::*;
 use moniker::Moniker;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 pub struct CommonAvailabilityTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

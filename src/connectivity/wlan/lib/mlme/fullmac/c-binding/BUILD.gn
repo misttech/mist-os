@@ -13,10 +13,10 @@ rustc_staticlib("wlan-fullmac-mlme-c") {
 
   deps = [
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/wlan/lib/ffi-transport:wlan-ffi-transport",
     "//src/connectivity/wlan/lib/mlme/fullmac:wlan-fullmac-mlme",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:tracing",
   ]
 

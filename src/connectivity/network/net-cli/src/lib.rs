@@ -35,7 +35,7 @@ use {
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_neighbor_ext as fneighbor_ext,
     fidl_fuchsia_net_root as froot, fidl_fuchsia_net_routes as froutes,
     fidl_fuchsia_net_routes_ext as froutes_ext, fidl_fuchsia_net_stack as fstack,
-    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_zircon_status as zx,
+    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, zx_status as zx,
 };
 
 pub use opts::{
@@ -2575,7 +2575,7 @@ mod tests {
                 .map(|(addr, assignment_state)| finterfaces_ext::Address {
                     addr,
                     assignment_state,
-                    valid_until: fuchsia_zircon_types::ZX_TIME_INFINITE,
+                    valid_until: zx_types::ZX_TIME_INFINITE,
                 })
                 .collect(),
             has_default_ipv4_route: false,

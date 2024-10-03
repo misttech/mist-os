@@ -20,7 +20,6 @@ use fuchsia_audio::sigproc::{
     TypeSpecificElementState, VendorSpecific, VendorSpecificElementState,
 };
 use fuchsia_audio::Registry;
-use fuchsia_zircon_status::Status;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use prettytable::{cell, format, row, Table};
@@ -28,10 +27,11 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::fmt::{Display, Write};
+use zx_status::Status;
 use {
     fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
     fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, fidl_fuchsia_io as fio,
-    fuchsia_zircon_types as zx_types,
+    zx_types,
 };
 
 lazy_static! {

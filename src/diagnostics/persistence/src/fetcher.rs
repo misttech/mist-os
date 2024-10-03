@@ -7,7 +7,7 @@ use diagnostics_data::{Data, DiagnosticsHierarchy, ExtendedMoniker, Inspect};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_diagnostics::{ArchiveAccessorProxy, Selector};
 use fuchsia_async::{self as fasync, Task};
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{self, UnboundedSender};
 use futures::StreamExt;
 use persistence_config::{Config, ServiceName, Tag, TagConfig};

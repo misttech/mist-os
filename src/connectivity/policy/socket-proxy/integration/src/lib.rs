@@ -21,7 +21,7 @@ use socket_proxy_testing::{ToDnsServerList as _, ToNetwork as _};
 use std::sync::Arc;
 use {
     fidl_fuchsia_netpol_socketproxy as fnp_socketproxy, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_zircon as zx,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, zx,
 };
 
 enum IncomingService {

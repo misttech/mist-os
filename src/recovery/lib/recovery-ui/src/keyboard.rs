@@ -30,11 +30,11 @@ use carnelian::{
     ViewAssistantContext, ViewKey,
 };
 use euclid::{size2, Size2D};
-use fuchsia_zircon::{Duration, Event, MonotonicInstant};
 #[cfg(feature = "ota_ui")]
 use recovery_util::ota::state_machine::Event as StateMachineEvent;
 use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
+use zx::{Duration, Event, MonotonicInstant};
 
 type FieldName = String;
 type InputText = String;

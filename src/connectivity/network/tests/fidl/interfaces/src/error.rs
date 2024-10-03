@@ -11,7 +11,7 @@ use std::num::NonZeroU64;
 
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
-use fuchsia_zircon as zx;
+
 use net_declare::fidl_subnet;
 use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;

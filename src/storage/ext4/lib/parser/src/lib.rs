@@ -7,7 +7,7 @@ use ext4_read_only::readers::{BlockDeviceReader, Reader, VmoReader};
 use ext4_read_only::structs::{self, MIN_EXT4_SIZE};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_block::BlockMarker;
-use fuchsia_zircon as zx;
+
 use std::sync::Arc;
 use tracing::error;
 
@@ -63,9 +63,9 @@ mod tests {
 
     use ext4_read_only::structs::MIN_EXT4_SIZE;
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon::Vmo;
     use std::fs;
     use vfs::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
+    use zx::Vmo;
 
     #[fuchsia::test]
     fn image_too_small() {

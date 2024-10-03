@@ -4,9 +4,9 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_kernel as fkernel;
-use fuchsia_zircon::{self as zx, HandleBased, Resource};
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::{self as zx, HandleBased, Resource};
 
 /// An implementation of fuchsia.kernel.HypervisorResource protocol.
 pub struct HypervisorResource {

@@ -1243,7 +1243,7 @@ async fn sync_package_cache(pkg_cache: &fpkg::PackageCacheProxy) -> Result<(), E
             .sync()
             .await
             .context("while performing sync call")?
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .context("sync responded with")
     }
     .await
@@ -1500,7 +1500,7 @@ mod test_sha256_buffer {
     use assert_matches::assert_matches;
 
     fn make_buffer(payload: Vec<u8>) -> fmem::Buffer {
-        let vmo = fuchsia_zircon::Vmo::create(payload.len().try_into().unwrap()).unwrap();
+        let vmo = zx::Vmo::create(payload.len().try_into().unwrap()).unwrap();
         let () = vmo.write(&payload, 0).unwrap();
         fmem::Buffer { vmo, size: payload.len().try_into().unwrap() }
     }

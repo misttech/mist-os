@@ -31,11 +31,11 @@ async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
 mod tests {
     #![allow(unused_imports)]
     use super::*;
-    use fuchsia_zircon::{self as zx, HandleBased};
     use futures::channel::mpsc;
     use futures::future::FutureExt;
     use futures::{pin_mut, StreamExt};
     use std::sync::Arc;
+    use zx::{self as zx, HandleBased};
 
     const OFF: fpb::PowerLevel = fpb::BinaryPowerLevel::Off.into_primitive();
     const ON: fpb::PowerLevel = fpb::BinaryPowerLevel::On.into_primitive();

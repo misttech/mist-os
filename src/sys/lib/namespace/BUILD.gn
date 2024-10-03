@@ -28,8 +28,8 @@ rustc_library("namespace") {
 
   if (is_fuchsia) {
     deps += [
+      "//sdk/rust/zx",
       "//src/lib/process_builder",
-      "//src/lib/zircon/rust:fuchsia-zircon",
       "//src/storage/lib/vfs/rust:vfs",
     ]
     test_deps += [

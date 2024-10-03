@@ -26,7 +26,7 @@ use fuchsia_inspect_contrib::log::{InspectBytes, InspectList};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log, make_inspect_loggable};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};

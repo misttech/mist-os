@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics_persist::PersistResult;
-use fuchsia_zircon::{self as zx};
+
 use futures::channel::mpsc;
 use futures::{Future, StreamExt};
 use injectable_time::{MonotonicInstant, TimeSource};

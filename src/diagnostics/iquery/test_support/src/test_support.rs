@@ -9,7 +9,6 @@ use fidl_fuchsia_component_decl::{
 };
 use fidl_fuchsia_io::{self as fio, DirectoryMarker};
 use fidl_fuchsia_sys2 as fsys2;
-use fuchsia_zircon_status::Status;
 use futures::{StreamExt, TryStreamExt};
 use moniker::Moniker;
 use std::collections::HashMap;
@@ -18,6 +17,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use zx_status::Status;
 
 /// Builder struct for `RealmQueryResult`/
 /// This is an builder interface meant to simplify building of test fixtures.

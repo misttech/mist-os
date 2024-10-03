@@ -35,11 +35,11 @@ rustc_binary("maintainer_bin") {
   deps = [
     ":componentmanager.test_rust",
     "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/test_util",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
@@ -54,11 +54,11 @@ rustc_binary("time_client_bin") {
   name = "utc_time_client_bin"
   deps = [
     ":componentmanager.test_rust",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:tracing",
   ]
 

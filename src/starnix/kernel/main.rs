@@ -25,7 +25,7 @@ use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KER
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_starnix_container as fstarcontainer,
-    fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_runtime as fruntime, zx,
 };
 
 /// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.

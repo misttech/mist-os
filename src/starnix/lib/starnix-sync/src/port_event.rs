@@ -4,7 +4,6 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy as LazySync;
 
 /// A [`PortEvent`] is interested only in events originating from within the
@@ -266,8 +265,8 @@ impl PortEvent {
 mod test {
     use std::sync::Arc;
 
-    use fuchsia_zircon::AsHandleRef as _;
     use test_case::test_case;
+    use zx::AsHandleRef as _;
 
     use super::*;
 

@@ -10,13 +10,13 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, Time, TimeoutExt};
 use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
-use fuchsia_zircon::{self as zx, Duration};
 use futures::{TryFutureExt, TryStreamExt};
 use keymaps::usages::input3_key_to_hid_usage;
 use std::collections::HashSet;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use zx::{self as zx, Duration};
 
 #[derive(Debug)]
 pub(crate) enum UserInputMessage {

@@ -8,7 +8,7 @@ use fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy};
 use fidl_fuchsia_testing::Increment;
 use fidl_fuchsia_time_external::{Status, TimeSample};
 use fuchsia_component::client;
-use fuchsia_zircon::{self as zx};
+
 use futures::{Future, StreamExt};
 use std::sync::Arc;
 use test_util::assert_geq;

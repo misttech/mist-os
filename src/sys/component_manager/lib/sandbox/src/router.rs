@@ -4,13 +4,13 @@
 
 use crate::{Capability, Dict, WeakInstanceToken};
 use async_trait::async_trait;
-use fuchsia_zircon_status::Status;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use thiserror::Error;
+use zx_status::Status;
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.

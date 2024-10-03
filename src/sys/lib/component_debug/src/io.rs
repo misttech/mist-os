@@ -14,10 +14,10 @@ use fuchsia_fs::directory::{
     readdir, DirEntry,
 };
 use fuchsia_fs::file::{close, read, read_to_string, write};
-use fuchsia_zircon_status::Status;
 use futures::lock::Mutex;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use zx_status::Status;
 
 pub enum DirentKind {
     File,

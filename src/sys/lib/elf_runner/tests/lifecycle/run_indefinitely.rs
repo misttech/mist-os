@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[fasync::run_singlethreaded]
 /// Simple program that never exits and logs every 5 minutes

@@ -4,7 +4,6 @@
 
 //! Provides an atomic wrapper around [`zx::MonotonicInstant`].
 
-use fuchsia_zircon as zx;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 /// An atomic wrapper around [`zx::MonotonicInstant`].

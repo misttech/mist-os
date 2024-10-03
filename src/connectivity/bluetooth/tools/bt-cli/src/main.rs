@@ -777,9 +777,9 @@ mod tests {
     use fidl::endpoints::Proxy;
     use fidl_fuchsia_bluetooth_sys::{InputCapability, OutputCapability};
     use fuchsia_bluetooth::types::Address;
-    use fuchsia_zircon::Duration;
     use futures::join;
     use std::task::Poll;
+    use zx::Duration;
     use {fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys};
 
     fn peer(connected: bool, bonded: bool) -> Peer {

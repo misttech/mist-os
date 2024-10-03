@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};

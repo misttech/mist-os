@@ -84,7 +84,7 @@ pub(crate) async fn serve_request_stream(
                     package_url
                 );
                 let () = responder
-                    .send(Err(fuchsia_zircon::Status::NOT_SUPPORTED.into_raw()))
+                    .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                     .context("sending fuchsia.pkg/PackageResolver.GetHash response")?;
             }
         }

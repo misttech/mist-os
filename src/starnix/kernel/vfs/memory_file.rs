@@ -13,7 +13,7 @@ use crate::vfs::{
     FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode, XattrStorage as _,
     MAX_LFS_FILESIZE,
 };
-use fuchsia_zircon as zx;
+
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;

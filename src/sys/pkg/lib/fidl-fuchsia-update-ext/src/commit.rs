@@ -4,7 +4,7 @@
 
 use anyhow::anyhow;
 use fidl_fuchsia_update::CommitStatusProviderProxy;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use zx::{self as zx, AsHandleRef};
 
 /// Whether the current system version is pending commit.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -33,8 +33,8 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderRequest};
     use fuchsia_async::{self as fasync};
-    use fuchsia_zircon::{HandleBased, Peered};
     use futures::StreamExt;
+    use zx::{HandleBased, Peered};
 
     // Verifies that query_commit_status returns the expected CommitStatus.
     #[fasync::run_singlethreaded(test)]

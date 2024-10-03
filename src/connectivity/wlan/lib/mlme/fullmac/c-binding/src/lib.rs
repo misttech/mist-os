@@ -7,7 +7,7 @@ use tracing::error;
 use wlan_ffi_transport::completers::Completer;
 use wlan_fullmac_mlme::device::FullmacDevice;
 use wlan_fullmac_mlme::{start_and_serve_on_separate_thread, FullmacMlmeHandle};
-use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, zx};
 
 /// Starts and runs the FullMAC MLME and SME futures on a separate thread. MLME will call the given
 /// `run_shutdown_completer` when it exits.

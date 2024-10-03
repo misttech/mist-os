@@ -12,13 +12,13 @@ use crate::xdg_shell::XdgSurface;
 use anyhow::{format_err, Error};
 use fidl_fuchsia_math::{Rect, RectF, Size, SizeU, Vec_};
 use fidl_fuchsia_ui_composition::{BlendMode, TransformId};
-use fuchsia_zircon::{self as zx, HandleBased};
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use wayland_server_protocol::{
     WlBufferEvent, WlCompositor, WlCompositorRequest, WlRegion, WlRegionRequest, WlSurface,
     WlSurfaceRequest,
 };
+use zx::{self as zx, HandleBased};
 use {fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl};
 
 static NEXT_IMAGE_INSTANCE_ID: AtomicUsize = AtomicUsize::new(1);

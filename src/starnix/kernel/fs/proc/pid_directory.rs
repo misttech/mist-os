@@ -15,7 +15,7 @@ use crate::vfs::{
     SeekTarget, SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile,
     SymlinkTarget, VecDirectory, VecDirectoryEntry,
 };
-use fuchsia_zircon as zx;
+
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;

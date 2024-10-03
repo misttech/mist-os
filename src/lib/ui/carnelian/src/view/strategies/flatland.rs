@@ -26,11 +26,11 @@ use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_trace::{duration, instant};
-use fuchsia_zircon::{self as zx, Event, HandleBased, MonotonicInstant, Signals};
 use futures::channel::mpsc::UnboundedSender;
 use futures::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use zx::{self as zx, Event, HandleBased, MonotonicInstant, Signals};
 
 fn setup_handle_flatland_events(
     event_stream: flatland::FlatlandEventStream,
@@ -234,7 +234,7 @@ impl FlatlandViewStrategy {
         // Flatland session within Scenic.
         {
             use fidl::endpoints::Proxy;
-            use fuchsia_zircon::AsHandleRef;
+            use zx::AsHandleRef;
 
             let koid = flatland.as_channel().get_koid().unwrap().raw_koid();
             instant!(

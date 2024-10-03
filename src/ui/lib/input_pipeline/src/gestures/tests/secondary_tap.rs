@@ -7,7 +7,7 @@ mod test {
     use crate::gestures::args;
     use crate::{input_device, mouse_binding, touch_binding, Position};
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+
     use maplit::hashset;
     use pretty_assertions::assert_eq;
 

@@ -11,7 +11,7 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
     FileObject, FileOps, WeakFileHandle,
 };
-use fuchsia_zircon as zx;
+
 use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -566,13 +566,13 @@ mod tests {
     use crate::vfs::eventfd::{new_eventfd, EventFdType};
     use crate::vfs::pipe::new_pipe;
     use crate::vfs::socket::{SocketDomain, SocketType, UnixSocket};
-    use fuchsia_zircon::{
-        HandleBased, {self as zx},
-    };
     use starnix_lifecycle::AtomicUsizeCounter;
     use starnix_sync::Unlocked;
     use starnix_uapi::vfs::{EpollEvent, FdEvents};
     use syncio::Zxio;
+    use zx::{
+        HandleBased, {self as zx},
+    };
 
     #[::fuchsia::test]
     async fn test_epoll_read_ready() {

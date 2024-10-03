@@ -5,7 +5,7 @@
 use anyhow::Error;
 use fuchsia_runtime::job_default;
 use futures::TryStreamExt;
-use {fidl_fuchsia_kernel as fkernel, fuchsia_zircon as zx};
+use {fidl_fuchsia_kernel as fkernel, zx};
 
 /// An implementation of the `fuchsia.kernel.RootJob` protocol.
 pub struct RootJob;
@@ -27,8 +27,8 @@ impl RootJob {
 mod tests {
     use super::*;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::AsHandleRef;
     use futures::TryFutureExt;
+    use zx::AsHandleRef;
 
     #[fuchsia::test]
     async fn has_correct_rights() -> Result<(), Error> {

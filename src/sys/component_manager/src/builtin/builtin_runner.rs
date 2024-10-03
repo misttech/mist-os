@@ -11,7 +11,7 @@ use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::NamespaceConnector;
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
 use fuchsia_runtime::UtcClock;
-use fuchsia_zircon::{self as zx};
+
 use futures::future::BoxFuture;
 use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
@@ -84,7 +84,7 @@ enum BuiltinRunnerError {
     MissingProgramType,
 
     #[error("cannot create job: {}", _0)]
-    JobCreation(fuchsia_zircon_status::Status),
+    JobCreation(zx_status::Status),
 
     #[error("unsupported \"program.type\": {}", _0)]
     UnsupportedProgramType(String),

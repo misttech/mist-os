@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -1943,7 +1940,7 @@ impl UnknownInteractionsAjarDriverProtocolRequest {
     #[allow(irrefutable_let_patterns)]
     pub fn read_from(
         bytes: &[u8],
-        _handles: &mut [fuchsia_zircon::HandleInfo],
+        _handles: &mut [zx::HandleInfo],
     ) -> Result<Self, fidl::Error> {
         let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
@@ -4689,7 +4686,7 @@ impl UnknownInteractionsClosedDriverProtocolRequest {
     #[allow(irrefutable_let_patterns)]
     pub fn read_from(
         bytes: &[u8],
-        _handles: &mut [fuchsia_zircon::HandleInfo],
+        _handles: &mut [zx::HandleInfo],
     ) -> Result<Self, fidl::Error> {
         let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
@@ -7646,7 +7643,7 @@ impl UnknownInteractionsDriverProtocolRequest {
     #[allow(irrefutable_let_patterns)]
     pub fn read_from(
         bytes: &[u8],
-        _handles: &mut [fuchsia_zircon::HandleInfo],
+        _handles: &mut [zx::HandleInfo],
     ) -> Result<Self, fidl::Error> {
         let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 

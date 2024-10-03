@@ -19,7 +19,7 @@ use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
-use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
+use {zx_status, zx_types};
 
 mod commands;
 mod env_context;

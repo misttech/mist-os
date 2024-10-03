@@ -7,11 +7,11 @@ use anyhow::{anyhow, Context};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::prelude::*;
 use std::ffi::{CStr, CString};
 use std::{iter, mem};
 use thiserror::Error;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc};
 
 /// Error type returned by ProcessBuilder methods.

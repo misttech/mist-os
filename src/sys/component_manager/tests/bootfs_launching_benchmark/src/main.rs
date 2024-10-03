@@ -8,12 +8,12 @@ use fuchsia_component::client;
 use fuchsia_component_test::ScopedInstance;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use std::fs::File;
 use std::io::Read;
 use std::time::Duration;
+use zx::{self as zx, HandleBased};
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process as fprocess,

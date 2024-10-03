@@ -229,7 +229,6 @@ impl fmt::Display for Timestamp {
 #[cfg(target_os = "fuchsia")]
 mod zircon {
     use super::*;
-    use fuchsia_zircon as zx;
 
     impl From<zx::BootInstant> for Timestamp {
         fn from(t: zx::BootInstant) -> Timestamp {

@@ -13,6 +13,7 @@ network_unified_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
@@ -24,7 +25,6 @@ network_unified_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia_nix",
     "//src/lib/network/packet",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",

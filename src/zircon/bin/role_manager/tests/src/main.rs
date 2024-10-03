@@ -10,7 +10,7 @@ use fidl_fuchsia_scheduler::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use realm_proxy_client::RealmProxyClient;
-use {fidl_test_rolemanager as ftest, fuchsia_zircon as zx};
+use {fidl_test_rolemanager as ftest, zx};
 
 async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;

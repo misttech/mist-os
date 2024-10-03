@@ -10,7 +10,7 @@ use std::convert::TryInto as _;
 use std::future::Future as _;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 /// Wraps a `fidl_fuchsia_io::FileProxy` and implements `futures::io::AsyncRead`, which allows one
 /// to perform asynchronous file reads that don't block the current thread while waiting for data.

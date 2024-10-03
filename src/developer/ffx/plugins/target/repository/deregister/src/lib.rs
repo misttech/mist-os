@@ -17,8 +17,8 @@ use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
-use fuchsia_zircon_status::Status;
 use pkg::{PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
+use zx_status::Status;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 #[derive(FfxTool)]

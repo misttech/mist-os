@@ -4,7 +4,7 @@
 
 use bounded_node::BoundedNode;
 use fuchsia_inspect::Node;
-use fuchsia_zircon::MonotonicInstant;
+use zx::MonotonicInstant;
 
 #[derive(Debug)]
 pub enum Event<'a> {

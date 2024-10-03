@@ -47,9 +47,9 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{ControlHandle as _, Responder as _};
-    use fuchsia_zircon_status::Status;
     use futures::future::join;
     use futures::stream::{StreamExt as _, TryStreamExt as _};
+    use zx_status::Status;
 
     struct MockIteratorServer {
         reqs: fpkg::BlobInfoIteratorRequestStream,

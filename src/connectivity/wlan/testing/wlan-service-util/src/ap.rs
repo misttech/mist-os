@@ -84,7 +84,7 @@ mod tests {
     use futures::task::Poll;
     use ieee80211::Ssid;
     use std::pin::pin;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     use wlan_common::assert_variant;
 

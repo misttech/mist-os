@@ -4,7 +4,7 @@
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
-    pub use fuchsia_zircon::{BootInstant, MonotonicInstant};
+    pub use zx::{BootInstant, MonotonicInstant};
 }
 #[cfg(target_os = "fuchsia")]
 pub use fuchsia::*;
@@ -13,8 +13,8 @@ pub use fuchsia::*;
 mod host {
     // This module provides a small subset of our Zircon Time bindings for the purposes of
     // encoding/decoding times in the host without losing the type safety we get on the target.
-    use fuchsia_zircon_types::zx_time_t;
     use std::marker::PhantomData;
+    use zx_types::zx_time_t;
 
     /// A marker type representing nanoseconds.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

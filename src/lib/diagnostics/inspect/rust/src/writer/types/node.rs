@@ -939,8 +939,8 @@ mod fuchsia_tests {
     use crate::hierarchy::DiagnosticsHierarchy;
     use crate::{reader, NumericProperty};
     use diagnostics_assertions::assert_json_diff;
-    use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
     use std::sync::Arc;
+    use zx::{self as zx, AsHandleRef, Peered};
 
     #[fuchsia::test]
     async fn atomic_update_reader() {

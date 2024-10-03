@@ -16,7 +16,6 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdNumber,
     FileHandle, FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
-use fuchsia_zircon as zx;
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;

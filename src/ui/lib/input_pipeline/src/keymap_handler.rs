@@ -10,7 +10,7 @@ use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use crate::{input_device, keyboard_binding};
 use async_trait::async_trait;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon as zx;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -130,7 +130,7 @@ mod tests {
     use std::convert::TryFrom as _;
     use {
         fidl_fuchsia_input as finput, fidl_fuchsia_ui_input3 as finput3, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
+        zx,
     };
 
     // A mod-specific version of `testing_utilities::create_keyboard_event`.

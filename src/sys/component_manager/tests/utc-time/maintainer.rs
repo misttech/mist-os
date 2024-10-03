@@ -4,10 +4,10 @@
 
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::{client, server};
-use fuchsia_zircon::{ClockUpdate, Duration, MonotonicInstant, Signals, Status};
 use futures::StreamExt;
 use test_util::assert_geq;
 use tracing::*;
+use zx::{ClockUpdate, Duration, MonotonicInstant, Signals, Status};
 use {fidl_componentmanager_test as ftest, fidl_fuchsia_time as ftime};
 
 enum ExposedServices {

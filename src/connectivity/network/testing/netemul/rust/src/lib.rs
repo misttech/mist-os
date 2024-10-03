@@ -32,7 +32,7 @@ use {
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_netemul_network as fnetemul_network,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_ext as fposix_socket_ext,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
-    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_zircon as zx,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, zx,
 };
 
 use anyhow::{anyhow, Context as _};

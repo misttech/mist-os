@@ -141,7 +141,7 @@ fn get_log_level(level: i32) -> String {
 }
 
 // Assume monotonic time is sufficient for debug logs in recovery.
-fn format_time(timestamp: fuchsia_zircon::sys::zx_time_t) -> String {
+fn format_time(timestamp: zx::sys::zx_time_t) -> String {
     format!("{:05}.{:06}", timestamp / 1000000000, (timestamp / 1000) % 1000000)
 }
 

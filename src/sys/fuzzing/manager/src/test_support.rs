@@ -22,7 +22,7 @@ use zx::HandleBased;
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_fuzzer as fuzz,
     fidl_fuchsia_mem as fmem, fidl_fuchsia_test_manager as test_manager, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 ////////////////////////////////////////////////////////////////////////////////

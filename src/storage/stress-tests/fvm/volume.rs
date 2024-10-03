@@ -6,7 +6,7 @@ use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClie
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
 use fuchsia_component::client::connect_to_protocol_at_path;
-use fuchsia_zircon as zx;
+
 use storage_stress_test_utils::fvm::{get_volume_path, Guid};
 
 fn fidl_to_status(result: Result<i32, fidl::Error>) -> Result<(), zx::Status> {

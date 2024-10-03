@@ -11,7 +11,7 @@ use moniker::ExtendedMoniker;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
-    fidl_fuchsia_logger as flogger, fuchsia_zircon as zx,
+    fidl_fuchsia_logger as flogger, zx,
 };
 
 /// Event types that contain singleton data. When these events are cloned, their singleton data
@@ -171,10 +171,7 @@ mod tests {
     use crate::logs::testing::create_log_sink_requested_event;
     use assert_matches::assert_matches;
     use fidl_fuchsia_logger::LogSinkMarker;
-    use {
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
-        fuchsia_zircon as zx,
-    };
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect, zx};
 
     fn create_inspect_sink_requested_event(
         target_moniker: String,

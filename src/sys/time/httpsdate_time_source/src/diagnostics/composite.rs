@@ -33,7 +33,7 @@ mod test {
     use super::*;
     use crate::datatypes::{HttpsSample, Phase};
     use crate::diagnostics::FakeDiagnostics;
-    use fuchsia_zircon as zx;
+
     use httpdate_hyper::HttpsDateErrorType;
     use lazy_static::lazy_static;
     use std::sync::Arc;

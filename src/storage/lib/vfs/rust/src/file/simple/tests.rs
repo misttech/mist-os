@@ -15,8 +15,8 @@ use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
-use fuchsia_zircon_status::Status;
 use futures::StreamExt;
+use zx_status::Status;
 
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
 
@@ -112,7 +112,7 @@ fn read_only_read_with_describe() {
             .handle(|object_request| vfs::file::serve(server, scope, &flags, object_request));
 
         assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
-            assert_eq!(s, fuchsia_zircon_status::Status::OK.into_raw());
+            assert_eq!(s, zx_status::Status::OK.into_raw());
             let info = *info.expect("Empty fio::NodeInfoDeprecated");
             assert!(matches!(
                 info,

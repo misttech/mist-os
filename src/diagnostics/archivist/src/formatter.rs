@@ -7,7 +7,7 @@ use fidl_fuchsia_diagnostics::{
     DataType, Format, FormattedContent, StreamMode, MAXIMUM_ENTRIES_PER_BATCH,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use futures::prelude::*;
 use serde::Serialize;
 use std::io::{BufWriter, Result as IoResult, Write};

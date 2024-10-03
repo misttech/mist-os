@@ -21,7 +21,6 @@ use starnix_core::vfs::{
     StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
 
-use fuchsia_zircon::{self as zx, HandleBased as _};
 use selinux::policy::SUPPORTED_POLICY_VERSION;
 use selinux::{
     InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
@@ -39,6 +38,7 @@ use std::borrow::Cow;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use zerocopy::{Immutable, IntoBytes};
+use zx::{self as zx, HandleBased as _};
 
 /// The version of the SELinux "status" file this implementation implements.
 const SELINUX_STATUS_VERSION: u32 = 1;
@@ -853,9 +853,9 @@ pub fn selinux_fs(
 mod tests {
     use super::*;
 
-    use fuchsia_zircon::{self as zx, AsHandleRef as _};
     use selinux::SecurityServer;
     use zerocopy::{FromBytes, KnownLayout};
+    use zx::{self as zx, AsHandleRef as _};
 
     #[fuchsia::test]
     fn status_vmo_has_correct_size_and_rights() {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fuchsia_zircon as zx;
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 

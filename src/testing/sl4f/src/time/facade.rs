@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::time::SystemTime;
+use zx::{self as zx, AsHandleRef};
 
 const NANOS_IN_MILLIS: u64 = 1000000;
 

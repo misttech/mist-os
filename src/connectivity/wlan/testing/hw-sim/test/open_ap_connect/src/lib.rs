@@ -8,7 +8,7 @@ use std::panic;
 use wlan_hw_sim::event::buffered::{ActionFrame, AssocRespFrame, AuthFrame, Buffered, MgmtFrame};
 use wlan_hw_sim::event::{branch, Handler};
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, zx};
 
 /// Test WLAN AP implementation by simulating a client that sends out authentication and
 /// association *request* frames. Verify AP responds correctly with authentication and

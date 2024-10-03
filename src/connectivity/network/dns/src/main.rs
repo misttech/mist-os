@@ -37,7 +37,7 @@ use trust_dns_resolver::lookup;
 use unicode_xid::UnicodeXID as _;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as net_ext,
-    fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync, zx,
 };
 
 struct SharedResolver<T>(RwLock<Rc<T>>);

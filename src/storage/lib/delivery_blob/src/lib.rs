@@ -28,9 +28,6 @@ use static_assertions::assert_eq_size;
 use thiserror::Error;
 use zerocopy::{IntoBytes, Ref};
 
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
-
 pub mod compression;
 mod format;
 

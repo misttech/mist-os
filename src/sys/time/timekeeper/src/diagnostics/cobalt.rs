@@ -36,7 +36,7 @@ use time_metrics_registry::{
     TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID,
 };
 use time_util::time_at_monotonic;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// The number of parts in a million.
 const ONE_MILLION: i64 = 1_000_000;

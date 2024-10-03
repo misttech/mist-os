@@ -8,7 +8,7 @@ use crate::task_metrics::task_info::TaskInfo;
 use futures::lock::Mutex;
 use std::fmt::Debug;
 use std::sync::Arc;
-use {fuchsia_inspect as inspect, fuchsia_zircon as zx};
+use {fuchsia_inspect as inspect, zx};
 
 /// Tracks the tasks associated to some component and provides utilities for measuring them.
 pub struct ComponentStats<T: RuntimeStatsSource + Debug> {

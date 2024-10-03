@@ -12,10 +12,7 @@ use netemul::{TestRealm, TestSandbox};
 use netstack_testing_common::realms::{constants, Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use std::borrow::Cow;
-use {
-    fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket, zx};
 
 const MOCK_SERVICES_NAME: &str = "mock";
 const CONFIG_PATH: &str = "/pkg/data/netstack.persist";

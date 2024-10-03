@@ -46,7 +46,7 @@ use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
 use fuchsia_inspect::health::Reporter;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fuchsia_zircon as zx, rust_icu_sys as usys, rust_icu_unorm2 as unorm};
+use {rust_icu_sys as usys, rust_icu_unorm2 as unorm, zx};
 
 // There probably is a more general method of determining whether the characters
 // are combining characters. But somehow it escapes me now.
@@ -771,7 +771,7 @@ mod tests {
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fidl_fuchsia_input_report::ConsumerControlButton;
-    use fuchsia_zircon as zx;
+
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
 

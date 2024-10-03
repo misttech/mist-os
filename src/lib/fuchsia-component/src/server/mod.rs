@@ -30,7 +30,7 @@ use vfs::path::Path;
 use vfs::remote::remote_dir;
 use vfs::service::endpoint;
 use zx::Duration;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 mod service;
 pub use service::{

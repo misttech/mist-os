@@ -20,7 +20,7 @@ use vfs::directory::entry::{
     serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 pub trait RouteRequestExt {
     fn into_capability(self, target: &Arc<ComponentInstance>) -> Capability;

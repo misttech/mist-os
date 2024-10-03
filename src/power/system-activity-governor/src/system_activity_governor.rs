@@ -20,7 +20,6 @@ use fuchsia_inspect::{
     UintProperty as IUint,
 };
 use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::lock::Mutex;
 use futures::prelude::*;
@@ -30,6 +29,7 @@ use power_broker_client::{
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend,

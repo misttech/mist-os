@@ -25,12 +25,12 @@ use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
-use fuchsia_zircon::{
-    self as zx, AsHandleRef, Duration, Event, HandleBased, MonotonicInstant, Signals, Status,
-};
 use futures::channel::mpsc::UnboundedSender;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
+use zx::{
+    self as zx, AsHandleRef, Duration, Event, HandleBased, MonotonicInstant, Signals, Status,
+};
 
 type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
 

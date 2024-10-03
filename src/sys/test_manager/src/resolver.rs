@@ -266,14 +266,14 @@ async fn serve_pkg_resolver(
                 )
                 .await
                 {
-                    Err(fuchsia_zircon::Status::INTERNAL.into_raw())
+                    Err(zx::Status::INTERNAL.into_raw())
                 } else {
                     let subscriber = subscriber.clone();
                     pkg_resolver.get_hash(&package_url).await.unwrap_or_else(|err| {
                         tracing::subscriber::with_default(subscriber, || {
                             warn!("failed to resolve pkg {}: {:?}", package_url.url.as_str(), err);
                         });
-                        Err(fuchsia_zircon::Status::INTERNAL.into_raw())
+                        Err(zx::Status::INTERNAL.into_raw())
                     })
                 };
                 let result_ref = result.as_ref();

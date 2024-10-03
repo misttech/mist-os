@@ -9,13 +9,13 @@ use fidl_fuchsia_stash::{
     ListItem, ListIteratorMarker, ListIteratorRequest, ListIteratorRequestStream, Value,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::lock::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
 use measure_tape_for_stash::Measurable as _;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
 use crate::store;
 

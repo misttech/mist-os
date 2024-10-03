@@ -19,7 +19,7 @@ rustc_library("gralloc") {
 
   deps = [
     "//sdk/fidl/fuchsia.starnix.gralloc:fuchsia.starnix.gralloc_rust",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//sdk/rust/zx",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix-sync",

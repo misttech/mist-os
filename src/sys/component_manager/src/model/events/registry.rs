@@ -407,7 +407,7 @@ mod tests {
     use crate::model::testing::test_helpers::*;
     use assert_matches::assert_matches;
     use cm_rust::{Availability, UseSource};
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload};
     use sandbox::Message;

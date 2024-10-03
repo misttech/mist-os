@@ -21,7 +21,7 @@ use tracing::error;
 use wlan_common::scan::write_vmo;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, zx,
 };
 
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;

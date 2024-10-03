@@ -12,7 +12,7 @@ use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol
 #[cfg(test)]
 use mockall::automock;
 use tracing::error;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[cfg_attr(test, automock)]
 pub trait Cobalt {

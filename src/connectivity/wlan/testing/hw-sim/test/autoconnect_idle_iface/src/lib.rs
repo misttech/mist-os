@@ -7,10 +7,7 @@ use tracing::info;
 use wlan_common::assert_variant;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 /// Tests that an idle interface is automatically connected to a saved network, if present and
 /// available, when client connections are enabled.

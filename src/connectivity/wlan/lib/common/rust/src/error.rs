@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::append;
-use fuchsia_zircon as zx;
+
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq)]

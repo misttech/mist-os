@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_bluetooth_power::{Information, ReporterRequest, ReporterRequestStream};
 use fuchsia_bluetooth::types::PeerId;
-use fuchsia_zircon as zx;
+
 use futures::{Future, TryStreamExt};
 use std::sync::Arc;
 use tracing::debug;

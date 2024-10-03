@@ -13,7 +13,7 @@ use fidl_fuchsia_bluetooth_snoop::{
 };
 use fuchsia_async::{Channel, TestExecutor};
 use fuchsia_inspect::Inspector;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 use std::pin::pin;
 use std::task::Poll;

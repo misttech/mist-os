@@ -16,7 +16,7 @@ use tracing::{error, info};
 use zerocopy::FromBytes;
 use {
     fidl_fuchsia_gpu_magma as fgpu, fidl_fuchsia_power_metrics as fmetrics,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 const GPU_SERVICE_DIRS: [&str; 1] = ["/dev/class/gpu"];

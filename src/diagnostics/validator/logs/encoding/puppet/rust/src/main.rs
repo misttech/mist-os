@@ -7,10 +7,10 @@ use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, EncodingError};
 use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_validate_logs::{EncodingPuppetRequest, EncodingPuppetRequestStream, PuppetError};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::Vmo;
 use futures::prelude::*;
 use std::io::Cursor;
 use tracing::*;
+use zx::Vmo;
 
 const BUFFER_SIZE: usize = 1024;
 

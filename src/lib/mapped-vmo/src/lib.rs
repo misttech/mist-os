@@ -7,9 +7,9 @@
 #![deny(missing_docs)]
 
 use fuchsia_runtime::vmar_root_self;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use shared_buffer::SharedBuffer;
 use std::ops::{Deref, DerefMut};
+use zx::{self as zx, AsHandleRef};
 
 mod immutable;
 pub use immutable::{Error as ImmutableMappingError, ImmutableMapping};
@@ -121,7 +121,6 @@ impl Drop for Mapping {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon as zx;
 
     const PAGE_SIZE: usize = 4096;
 

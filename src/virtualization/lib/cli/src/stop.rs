@@ -7,9 +7,9 @@ use anyhow::{anyhow, Error};
 use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, GuestProxy, GuestStatus};
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon_status::Status;
 use guest_cli_args as arguments;
 use std::fmt;
+use zx_status::Status;
 
 #[derive(Default, serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub enum StopStatus {

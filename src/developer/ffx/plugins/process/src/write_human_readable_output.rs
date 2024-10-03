@@ -6,9 +6,9 @@
 
 use crate::{processes_data, Writer};
 use anyhow::Result;
-use fuchsia_zircon_types as zx_types;
 use processes_data::processed;
 use std::io::Write;
+use zx_types;
 
 /// Print to 'w' a human-readable presentation of `processes_data`.
 pub fn pretty_print_processes_data(

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::marker::PhantomData;
 use std::mem::{align_of, size_of};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use zerocopy::{Immutable, IntoBytes};
+use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 
 /// Declare an instance of [`SeqLock`] by supplying header([`H`]) and value([`T`]) types,
 /// which should be configured with C-style layout & alignment.

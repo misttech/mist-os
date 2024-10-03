@@ -6,7 +6,7 @@ use crate::task::CurrentTask;
 use starnix_uapi::errors::Errno;
 
 use core::marker::PhantomData;
-use fuchsia_zircon as zx;
+
 use starnix_sync::{InterruptibleEvent, LockBefore, Locked, Mutex};
 use std::collections::VecDeque;
 use std::sync::Arc;

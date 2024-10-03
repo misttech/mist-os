@@ -4,7 +4,7 @@
 
 use async_utils::hanging_get::error::HangingGetServerError;
 use fidl_fuchsia_bluetooth_power::{Identifier, Information};
-use fuchsia_zircon as zx;
+
 use thiserror::Error;
 
 /// Errors that occur during the operation of the component.

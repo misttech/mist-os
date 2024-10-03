@@ -9,7 +9,7 @@ use super::gesture_arena::{
 };
 use crate::mouse_binding::{MouseEvent, MouseLocation, MousePhase, RelativeLocation};
 use crate::utils::{euclidean_distance, Position};
-use fuchsia_zircon as zx;
+
 use maplit::hashset;
 
 /// The initial state of this recognizer, before a tap has been detected.

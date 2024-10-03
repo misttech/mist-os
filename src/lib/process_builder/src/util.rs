@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::system_get_page_size;
+use zx::system_get_page_size;
 
 /// Returns the starting address of the page that contains this address. For example, if page size
 /// is 0x1000, page_start(0x3001) == page_start(0x3FAB) == 0x3000.

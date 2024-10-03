@@ -18,7 +18,7 @@ use fuchsia_bluetooth::types::{Peer, PeerId};
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use fuchsia_zircon as zx;
+
 use futures::future::BoxFuture;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt};
 use futures::{Future, FutureExt};

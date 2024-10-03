@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_time_external::TimeSample;
-use fuchsia_zircon as zx;
+
 use push_source::Update;
 use time_metrics_registry::HttpsdateBoundSizeMigratedMetricDimensionPhase as CobaltPhase;
 

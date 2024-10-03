@@ -17,7 +17,7 @@ use crate::task::{
     StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
     TimerTable, WaitQueue, ZombiePtraces,
 };
-use fuchsia_zircon as zx;
+
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};

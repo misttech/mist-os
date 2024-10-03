@@ -14,12 +14,12 @@ use fuchsia_component_test::{
     Capability, ChildOptions, DirectoryContents, LocalComponentHandles, RealmBuilder,
     RealmBuilderParams, Ref, Route,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
 use futures::future::pending;
 use futures::lock::Mutex;
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_test as ftest,
     fidl_fuchsia_data as fdata, fidl_fuchsia_examples_services as fex_services,

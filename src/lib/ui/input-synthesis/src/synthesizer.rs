@@ -11,10 +11,7 @@ use serde::{Deserialize, Deserializer};
 use std::thread;
 use std::time::Duration;
 use tracing::debug;
-use {
-    fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync, zx};
 
 // Abstracts over input injection services (which are provided by input device registries).
 pub trait InputDeviceRegistry {

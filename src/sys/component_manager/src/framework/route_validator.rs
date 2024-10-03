@@ -29,7 +29,7 @@ use std::sync::{Arc, Weak};
 use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_sys2 as fsys, zx,
 };
 
 lazy_static! {

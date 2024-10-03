@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 
 pub(crate) trait Clock {
     fn now(&self) -> zx::MonotonicInstant;

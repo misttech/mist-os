@@ -6,7 +6,7 @@ use fidl_fuchsia_paver::{BootManagerMarker, Configuration, PaverMarker, PaverPro
 use fidl_fuchsia_update_installer::{InstallerMarker, InstallerProxy, RebootControllerMarker};
 use fidl_fuchsia_update_installer_ext::options::{Initiator, Options};
 use fidl_fuchsia_update_installer_ext::{start_update, UpdateAttempt};
-use fuchsia_zircon as zx;
+
 use futures::prelude::*;
 
 pub const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";

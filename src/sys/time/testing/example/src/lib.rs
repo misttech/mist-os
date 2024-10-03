@@ -9,7 +9,7 @@ use fuchsia_component::client;
 use lazy_static::lazy_static;
 use {
     fidl_fuchsia_testing_harness as ftth, fidl_fuchsia_time as fft, fidl_test_time_realm as fttr,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 lazy_static! {

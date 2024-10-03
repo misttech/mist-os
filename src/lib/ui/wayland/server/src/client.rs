@@ -14,10 +14,7 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use wayland_server_protocol::WlDisplayEvent;
-use {
-    fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
-    fuchsia_zircon as zx,
-};
+use {fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl, zx};
 
 type Task = Box<dyn FnMut(&mut Client) -> Result<(), Error> + 'static>;
 

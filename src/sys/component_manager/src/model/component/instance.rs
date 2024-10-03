@@ -67,7 +67,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 /// The mutable state of a component instance.
@@ -1149,7 +1149,7 @@ impl StartedInstanceState {
 
     /// Gets a [`Koid`] that will uniquely identify the program.
     #[cfg(test)]
-    pub fn program_koid(&self) -> Option<fuchsia_zircon::Koid> {
+    pub fn program_koid(&self) -> Option<zx::Koid> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.koid())
     }
 }

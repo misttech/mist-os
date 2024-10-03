@@ -15,9 +15,6 @@ use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
     FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
-use fuchsia_zircon::{
-    cprng_draw_uninit, {self as zx},
-};
 use starnix_logging::{log_info, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
@@ -29,6 +26,9 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use std::mem::MaybeUninit;
+use zx::{
+    cprng_draw_uninit, {self as zx},
+};
 
 #[derive(Default)]
 pub struct DevNull;

@@ -10,7 +10,7 @@ use fuchsia_inspect::{
     self as inspect, ExponentialHistogramParams, HistogramProperty, Inspector, NumericProperty,
     Property,
 };
-use fuchsia_zircon as zx;
+
 use futures::lock::Mutex;
 use futures::FutureExt;
 use inspect::Node;

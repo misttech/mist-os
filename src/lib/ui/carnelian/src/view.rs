@@ -16,9 +16,9 @@ use anyhow::{ensure, Error};
 use euclid::size2;
 use fuchsia_framebuffer::ImageId;
 use fuchsia_trace::instant;
-use fuchsia_zircon::{Event, MonotonicInstant};
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use std::fmt::{Display, Formatter};
+use zx::{Event, MonotonicInstant};
 
 pub(crate) mod strategies;
 
@@ -380,7 +380,7 @@ pub trait ViewAssistant {
     /// # };
     /// # #[derive(Default)]
     /// # struct SampleViewAssistant {}
-    /// use fuchsia_zircon::MonotonicInstant;
+    /// use zx::MonotonicInstant;
     /// pub enum SampleMessages {
     ///     Pressed(MonotonicInstant),
     /// }

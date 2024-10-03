@@ -8,7 +8,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-pub use fuchsia_zircon_types::*;
+pub use zx_types::*;
 
 pub const DRIVER_REGISTRATION_VERSION_1: u32 = 1;
 pub const DRIVER_REGISTRATION_VERSION_MAX: u32 = 1;

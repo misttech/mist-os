@@ -9,8 +9,6 @@ use cm_rust::{ChildRef, EventScope};
 use cm_types::{LongName, Name};
 use cm_util::io::clone_dir;
 use fidl::endpoints::Proxy;
-use fuchsia_zircon::sys::{ZX_CHANNEL_MAX_MSG_BYTES, ZX_CHANNEL_MAX_MSG_HANDLES};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::stream::Peekable;
 use futures::{stream, Stream, StreamExt};
 use hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType};
@@ -20,6 +18,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
 use tracing::{error, warn};
+use zx::sys::{ZX_CHANNEL_MAX_MSG_BYTES, ZX_CHANNEL_MAX_MSG_HANDLES};
+use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
 // Number of bytes the header of a vector occupies in a fidl message.

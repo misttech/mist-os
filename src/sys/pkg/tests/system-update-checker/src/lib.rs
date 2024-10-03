@@ -33,7 +33,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver, fidl_fuchsia_pkg as fpkg,
     fidl_fuchsia_space as fspace, fidl_fuchsia_update_installer as finstaller,
     fidl_fuchsia_update_installer_ext as installer, fidl_fuchsia_update_verify as fupdate_verify,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 struct Mounts {

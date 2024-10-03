@@ -14,7 +14,7 @@ use fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerPr
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
 use fs_management::filesystem::BlockConnector;
 use fs_management::format::DiskFormat;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Fetches a FIDL proxy for accessing zxcrypt management protocol for a given Device.
 async fn device_to_device_manager_proxy(device: &dyn Device) -> Result<DeviceManagerProxy, Error> {

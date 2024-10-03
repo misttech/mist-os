@@ -11,7 +11,6 @@ use fdio::{SpawnAction, SpawnOptions};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker, ServiceMarker, Success};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use maplit::hashmap;
 use ramdevice_client::RamdiskClient;
 use sha2::{Digest, Sha256};
@@ -20,6 +19,7 @@ use std::ffi::CString;
 use std::fs;
 use std::io::{self, Read, Seek};
 use test_case::test_case;
+use zx::{self as zx, AsHandleRef};
 
 const RAMDISK_BLOCK_SIZE: u64 = 1024;
 const RAMDISK_BLOCK_COUNT: u64 = 16 * 1024;

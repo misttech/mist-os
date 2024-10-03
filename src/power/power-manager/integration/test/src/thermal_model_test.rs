@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
     fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_testing as ftesting, fuchsia_async as fasync,
-    fuchsia_zircon as zx, serde_json as json,
+    serde_json as json, zx,
 };
 
 const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("power-manager", "thermal-policy-timer");
@@ -192,10 +192,8 @@ impl Simulator {
 
         fake_clock_control
             .resume_with_increments(
-                fuchsia_zircon::Duration::from_millis(1).into_nanos(),
-                &ftesting::Increment::Determined(
-                    fuchsia_zircon::Duration::from_millis(1).into_nanos(),
-                ),
+                zx::Duration::from_millis(1).into_nanos(),
+                &ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
             )
             .await
             .expect("failed to set fake time scale: FIDL error")
@@ -273,7 +271,7 @@ impl Simulator {
 
         self.fake_clock_control
             .advance(&ftesting::Increment::Determined(
-                fuchsia_zircon::Duration::from_seconds(self.sample_interval.0 as i64).into_nanos(),
+                zx::Duration::from_seconds(self.sample_interval.0 as i64).into_nanos(),
             ))
             .await
             .expect("failed to advance fake time: FIDL error")

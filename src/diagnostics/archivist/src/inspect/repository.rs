@@ -17,7 +17,7 @@ use futures::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
-use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, zx};
 
 static INSPECT_ESCROW_NAME: zx::Name = zx::Name::new_lossy("InspectEscrowedVmo");
 
@@ -196,10 +196,7 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(fuchsia_zircon::MonotonicInstant::after(
-                fuchsia_zircon::Duration::from_millis(100),
-            ))
-            .await;
+            fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(100))).await;
         }
     }
 
@@ -210,10 +207,7 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(fuchsia_zircon::MonotonicInstant::after(
-                fuchsia_zircon::Duration::from_millis(100),
-            ))
-            .await;
+            fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(100))).await;
         }
     }
 }
@@ -304,7 +298,7 @@ mod tests {
     use moniker::ExtendedMoniker;
     use selectors::FastError;
     use std::sync::LazyLock;
-    use {fidl_fuchsia_inspect as finspect, fuchsia_zircon as zx};
+    use {fidl_fuchsia_inspect as finspect, zx};
 
     const TEST_URL: &str = "fuchsia-pkg://test";
     static ESCROW_TEST_RIGHTS: LazyLock<zx::Rights> = LazyLock::new(|| {

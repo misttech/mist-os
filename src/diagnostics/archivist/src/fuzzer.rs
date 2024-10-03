@@ -8,7 +8,7 @@ use arbitrary::{Arbitrary, Result, Unstructured};
 use archivist_lib::identity::ComponentIdentity;
 use archivist_lib::logs::stored_message::StoredMessage;
 use diagnostics_data::LogsData;
-use fuchsia_zircon as zx;
+
 use fuzz::fuzz;
 
 #[derive(Clone, Debug)]

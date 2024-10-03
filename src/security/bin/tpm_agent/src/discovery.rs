@@ -8,7 +8,7 @@ use fidl_fuchsia_tpm::{TpmDeviceMarker, TpmDeviceProxy};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_fs::OpenFlags;
 use std::path::Path;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 use tracing;
 

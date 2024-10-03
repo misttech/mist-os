@@ -20,7 +20,6 @@ use fuchsia_component::client::{
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_hash::Hash;
 use fuchsia_runtime::vmar_root_self;
-use fuchsia_zircon::{self as zx, HandleBased};
 use gpt::{partition_types, GptConfig};
 use key_bag::Aes256Key;
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
@@ -30,6 +29,7 @@ use storage_isolated_driver_manager::fvm::{create_fvm_volume, set_up_fvm};
 use storage_isolated_driver_manager::zxcrypt;
 use uuid::Uuid;
 use zerocopy::{Immutable, IntoBytes};
+use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger};
 
 const GPT_DRIVER_PATH: &str = "gpt.cm";

@@ -30,8 +30,8 @@ impl request::Responder<Scoped<InputSetResult>> for InputSetResponder {
     }
 }
 
-impl watch::Responder<InputSettings, fuchsia_zircon::Status> for InputWatchResponder {
-    fn respond(self, response: Result<InputSettings, fuchsia_zircon::Status>) {
+impl watch::Responder<InputSettings, zx::Status> for InputWatchResponder {
+    fn respond(self, response: Result<InputSettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings);

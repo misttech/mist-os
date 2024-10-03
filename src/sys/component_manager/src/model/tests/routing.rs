@@ -47,7 +47,6 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{
         channel::{mpsc, oneshot},
         join,
@@ -74,6 +73,7 @@ use {
     },
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
+    zx::{self as zx, AsHandleRef},
 };
 
 instantiate_common_routing_tests! { RoutingTestBuilder }

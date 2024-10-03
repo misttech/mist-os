@@ -43,9 +43,9 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::Status;
     use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
     use std::sync::Arc;
+    use zx::Status;
 
     /// Helper fn to verify that do_commit succeeds.
     async fn run_success_test(current_config: &Configuration) {

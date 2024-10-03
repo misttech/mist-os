@@ -14,7 +14,7 @@ use fidl_fuchsia_tracing_controller::{
 };
 use fuchsia_component::{self as app};
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
+
 use futures::io::AsyncReadExt;
 use serde_json::{from_value, to_value, Value};
 

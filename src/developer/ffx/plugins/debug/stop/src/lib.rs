@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use ffx_debug_stop_args::StopCommand;
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger::DebugAgentProxy;
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 
 #[derive(FfxTool)]
 pub struct StopTool {

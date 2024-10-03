@@ -15,7 +15,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple::Simple as PseudoDirectory;
 use vfs::file::vmo;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, zx};
 
 // The location of the added trampolines. The path will be of the form:
 // `/.dash/tools/<package-name>/<trampoline-name>`.

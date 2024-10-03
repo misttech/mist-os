@@ -9,7 +9,7 @@ use fidl_fuchsia_update_config::{
     OptOutAdminMarker, OptOutAdminSynchronousProxy, OptOutMarker, OptOutSynchronousProxy,
 };
 use fuchsia_component::client::connect_channel_to_protocol;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_basic() -> Result<(), Error> {

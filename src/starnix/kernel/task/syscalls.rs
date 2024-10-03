@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use starnix_sync::{LockBefore, Locked, RwLock, Unlocked};
 use starnix_uapi::auth::CAP_SYS_RESOURCE;
@@ -754,7 +753,7 @@ const CPU_AFFINITY_MASK_SIZE: u32 = std::mem::size_of::<CpuAffinityMask>() as u3
 const NUM_CPUS_MAX: u32 = CPU_AFFINITY_MASK_SIZE * 8;
 
 fn get_default_cpumask() -> CpuAffinityMask {
-    match fuchsia_zircon::system_get_num_cpus() {
+    match zx::system_get_num_cpus() {
         num_cpus if num_cpus > NUM_CPUS_MAX => {
             log_error!("num_cpus={}, greater than the {} max supported.", num_cpus, NUM_CPUS_MAX);
             CpuAffinityMask::MAX

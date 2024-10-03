@@ -10,11 +10,11 @@ use fuchsia_vulkan::{
     BufferCollectionFUCHSIA, FuchsiaExtensionPointers, ImageConstraintsInfoFUCHSIA,
     STRUCTURE_TYPE_BUFFER_COLLECTION_CREATE_INFO_FUCHSIA,
 };
-use fuchsia_zircon::AsHandleRef;
 use std::mem;
+use zx::AsHandleRef;
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx, vk_sys as vk,
+    fidl_fuchsia_ui_composition as fuicomp, vk_sys as vk, zx,
 };
 
 /// `BufferCollectionTokens` contains all the buffer collection tokens required to initialize a

@@ -6,11 +6,11 @@ use crate::log_formatter::{LogData, LogEntry};
 use crate::LogCommand;
 use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_diagnostics::LogInterestSelector;
-use fuchsia_zircon_types::zx_koid_t;
 use moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use selectors::SelectorExt;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use zx_types::zx_koid_t;
 
 static KLOG_MONIKER: LazyLock<ExtendedMoniker> =
     LazyLock::new(|| ExtendedMoniker::try_from("klog").unwrap());

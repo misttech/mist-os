@@ -10,7 +10,7 @@ use std::convert::TryInto as _;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 /// Trait for reading at a given offset asynchronously.
 /// This is basically `futures::io::AsyncRead` with an extra offset.

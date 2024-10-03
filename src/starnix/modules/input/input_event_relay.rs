@@ -9,7 +9,6 @@ use fidl_fuchsia_ui_pointer::{
     TouchResponseType, {self as fuipointer},
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::Peered;
 use starnix_core::power::{
     create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
 };
@@ -20,6 +19,7 @@ use starnix_uapi::uapi;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
+use zx::Peered;
 
 pub enum EventProxyMode {
     /// Don't proxy input events at all.

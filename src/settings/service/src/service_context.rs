@@ -13,7 +13,7 @@ use glob::glob;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::future::Future;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub type GenerateService =
     Box<dyn Fn(&str, zx::Channel) -> BoxFuture<'static, Result<(), Error>> + Send + Sync>;

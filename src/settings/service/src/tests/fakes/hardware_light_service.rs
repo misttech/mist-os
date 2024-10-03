@@ -9,11 +9,11 @@ use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
 use fidl_fuchsia_hardware_light::{Info, LightMarker, LightRequest, Rgb};
 use fuchsia_async as fasync;
-use fuchsia_zircon::Channel;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
+use zx::Channel;
 
 /// An implementation of fuchsia.hardware.light for testing use.
 pub(crate) struct HardwareLightService {

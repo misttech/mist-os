@@ -7,11 +7,11 @@ use fuchsia_inspect::{
     UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Duration};
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
+use zx::{self as zx, Duration};
 
 pub(crate) static TRACE_CATEGORY: &CStr = c"archivist";
 

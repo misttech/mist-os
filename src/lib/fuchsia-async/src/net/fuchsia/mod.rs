@@ -10,10 +10,10 @@ pub use self::tcp::*;
 mod udp;
 pub use self::udp::*;
 
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::io::{self, AsyncRead, AsyncWrite};
 use futures::ready;
 use futures::task::{AtomicWaker, Context};
+use zx::{self as zx, AsHandleRef};
 
 use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -352,8 +352,8 @@ where
 
 mod syscall {
     #![allow(non_camel_case_types, improper_ctypes)]
-    pub use fuchsia_zircon::sys::{zx_handle_t, zx_signals_t};
     use std::os::unix::io::RawFd;
+    pub use zx::sys::{zx_handle_t, zx_signals_t};
 
     // This is the "improper" c type
     pub type fdio_t = ();

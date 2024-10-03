@@ -8,8 +8,8 @@ use super::errors::{
 };
 use crate::config::{Config as ComponentConfig, Mode};
 use fidl_fuchsia_paver as paver;
-use fuchsia_zircon::Status;
 use tracing::info;
+use zx::Status;
 
 /// After gathering state from the BootManager, the PolicyEngine can answer whether we
 /// should verify and commit.

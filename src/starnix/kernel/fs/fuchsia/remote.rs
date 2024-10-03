@@ -21,7 +21,6 @@ use crate::vfs::{
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon::{HandleBased, Status};
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
@@ -51,9 +50,10 @@ use syncio::{
     XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::{ProtocolsExt, ToFlags};
+use zx::{HandleBased, Status};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder,
-    fidl_fuchsia_unknown as funknown, fuchsia_zircon as zx,
+    fidl_fuchsia_unknown as funknown,
 };
 
 pub fn new_remote_fs(
@@ -1447,12 +1447,12 @@ mod test {
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
     use fuchsia_fs::{directory, file};
-    use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::errors::EINVAL;
     use starnix_uapi::file_mode::{mode, AccessCheck};
     use starnix_uapi::vfs::{EpollEvent, FdEvents};
+    use zx::HandleBased;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[::fuchsia::test]

@@ -15,10 +15,7 @@ use wlan_hw_sim::event::action::{self, AuthenticationControl, AuthenticationTap}
 use wlan_hw_sim::event::{branch, Handler};
 use wlan_hw_sim::*;
 use wlan_rsn::rsna::UpdateSink;
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap, zx};
 
 fn scan_and_connect<'h>(
     phy: &'h fidl_tap::WlantapPhyProxy,

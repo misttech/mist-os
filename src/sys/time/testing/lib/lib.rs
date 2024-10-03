@@ -22,7 +22,6 @@ use fuchsia_component_test::{
     Route,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, HandleBased, Rights};
 use futures::channel::mpsc::Sender;
 use futures::stream::{Stream, StreamExt, TryStreamExt};
 use futures::{Future, FutureExt, SinkExt};
@@ -34,6 +33,7 @@ use time_metrics_registry::PROJECT_ID;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::pseudo_directory;
+use zx::{self as zx, HandleBased, Rights};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// URL for timekeeper.

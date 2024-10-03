@@ -15,7 +15,7 @@ use fidl_fuchsia_metrics::{
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use futures::{future, Future, FutureExt as _};
 use time_metrics_registry::{
     HttpsdateBoundSizeMigratedMetricDimensionPhase as CobaltPhase,

@@ -14,9 +14,7 @@ use futures::{AsyncWrite, AsyncWriteExt, FutureExt};
 use std::collections::{HashMap, VecDeque};
 use std::io::Cursor;
 use tracing::{debug, info, warn};
-use {
-    at_commands as at, fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_zircon as zx,
-};
+use {at_commands as at, fuchsia_async as fasync, fuchsia_inspect as inspect, zx};
 
 use super::indicators::{AgIndicators, AgIndicatorsReporting, HfIndicators};
 use super::procedure::{IProcedure, Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};

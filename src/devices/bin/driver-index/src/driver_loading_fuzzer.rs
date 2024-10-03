@@ -7,7 +7,7 @@ use futures::{SinkExt, StreamExt};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub struct Session {
     sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
@@ -56,7 +56,7 @@ impl Session {
                 let delay = if max_load_delay.into_millis() == 0 {
                     max_load_delay
                 } else {
-                    fuchsia_zircon::Duration::from_millis(
+                    zx::Duration::from_millis(
                         (self.rng.next_u32() as i64) % max_load_delay.into_millis(),
                     )
                 };
@@ -129,7 +129,7 @@ mod tests {
         let session = Session::new(
             sender,
             test_boot_repo.clone(),
-            fuchsia_zircon::Duration::from_millis(10),
+            zx::Duration::from_millis(10),
             Some(test_seed),
         );
         session.run().await;

@@ -10,11 +10,11 @@ use std::task::Poll;
 use diagnostics_assertions::assert_data_tree;
 use fuchsia_async as fasync;
 use fuchsia_inspect::Inspector;
-use fuchsia_zircon::{Duration, MonotonicInstant};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::StreamExt;
+use zx::{Duration, MonotonicInstant};
 
 use async_trait::async_trait;
 
@@ -1116,7 +1116,7 @@ fn test_timeout() {
     loop {
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()
-                + fuchsia_zircon::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
+                + zx::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(x) => break x,
@@ -1184,7 +1184,7 @@ fn test_timeout_no_retry() {
     loop {
         let new_time = fuchsia_async::Time::from_nanos(
             executor.now().into_nanos()
-                + fuchsia_zircon::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
+                + zx::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(x) => break x,

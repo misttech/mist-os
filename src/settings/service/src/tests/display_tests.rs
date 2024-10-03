@@ -20,10 +20,10 @@ use fidl::prelude::*;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{DisplayMarker, DisplayProxy, IntlMarker};
 use fuchsia_async::{Task, TestExecutor};
-use fuchsia_zircon::{self as zx, Status};
 use futures::future::{self, BoxFuture};
 use futures::lock::Mutex;
 use std::sync::Arc;
+use zx::{self as zx, Status};
 
 const ENV_NAME: &str = "settings_service_display_test_environment";
 const AUTO_BRIGHTNESS_LEVEL: f32 = 0.9;

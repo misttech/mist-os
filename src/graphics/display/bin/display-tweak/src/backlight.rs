@@ -82,7 +82,7 @@ impl BacklightCmd {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+
     use futures::{future, StreamExt};
 
     #[fuchsia::test]

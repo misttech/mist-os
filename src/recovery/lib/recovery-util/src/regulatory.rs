@@ -65,9 +65,9 @@ fn validate_region_code(region_code: &str) -> Result<(), Error> {
 mod tests {
     use super::*;
     use fuchsia_async::TimeoutExt;
-    use fuchsia_zircon::Duration;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
+    use zx::Duration;
     use {
         fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_location_namedplace as regulatory,
         fuchsia_async as fasync,

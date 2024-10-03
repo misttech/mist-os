@@ -241,7 +241,7 @@ mod tests {
     use fidl_fuchsia_paver::BootManagerRequest;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     // A mock BootManager service that stores an initial last_active_config and reports the queries
     // it receives to mpsc::Receivers for the test to listen and consume.

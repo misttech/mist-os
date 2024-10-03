@@ -11,7 +11,7 @@ use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
 use anyhow::Error;
-use fuchsia_zircon as zx;
+
 use once_cell::sync::OnceCell;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};

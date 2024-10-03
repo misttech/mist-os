@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, ObjectType};
 use std::fmt::{Debug, Write};
 use std::os::fd::AsFd;
 use tracing::field::Field;
@@ -12,6 +11,7 @@ use tracing_subscriber::field::Visit;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{Layer, Registry};
+use zx::{self as zx, AsHandleRef, ObjectType};
 
 /// KernelLogger is a subscriber implementation for the tracing crate.
 pub struct KernelLogger {
@@ -146,10 +146,10 @@ mod tests {
     use anyhow::Context;
     use fidl_fuchsia_boot as fboot;
     use fuchsia_component::client::connect_channel_to_protocol;
-    use fuchsia_zircon::HandleBased;
     use rand::Rng;
     use std::panic;
     use tracing::{error, info, warn};
+    use zx::HandleBased;
 
     const MAX_INFO_LINE_LEN: usize =
         zx::sys::ZX_LOG_RECORD_DATA_MAX - "[component_manager] INFO: ".len();

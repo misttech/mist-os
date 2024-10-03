@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon as zx;
+
 use keymaps::{LockStateChecker, ModifierChecker};
 use metrics_registry::*;
 use std::rc::Rc;
@@ -215,7 +215,7 @@ mod tests {
     use test_case::test_case;
     use {
         fidl_fuchsia_input as fidl_input, fidl_fuchsia_ui_input3 as fidl_ui_input3,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, zx,
     };
 
     fn handle_events(

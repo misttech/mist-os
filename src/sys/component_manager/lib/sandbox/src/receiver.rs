@@ -46,10 +46,9 @@ impl Receiver {
 mod tests {
     use crate::Connector;
     use assert_matches::assert_matches;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::future::{self, Either};
     use std::pin::pin;
-    use zx::Peered;
+    use zx::{self as zx, AsHandleRef, Peered};
     use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
     use super::*;

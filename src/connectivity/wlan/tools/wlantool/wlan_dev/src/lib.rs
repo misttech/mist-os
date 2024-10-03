@@ -21,8 +21,7 @@ use wlan_common::security::SecurityError;
 use {
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon_status as zx_status,
-    fuchsia_zircon_types as zx_sys,
+    fidl_fuchsia_wlan_sme as fidl_sme, zx_status, zx_types as zx_sys,
 };
 
 #[cfg(target_os = "fuchsia")]

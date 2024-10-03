@@ -4,7 +4,6 @@
 
 use crate::diagnostics::{any_time, Diagnostics, Event, ANY_DURATION};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 
 /// A fake `Diagnostics` implementation useful for verifying unittest.
 pub struct FakeDiagnostics {

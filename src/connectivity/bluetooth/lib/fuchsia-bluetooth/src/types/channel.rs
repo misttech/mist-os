@@ -12,7 +12,7 @@ use std::task::{Context, Poll};
 use tracing::warn;
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 use crate::error::Error;

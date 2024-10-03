@@ -52,10 +52,10 @@ rustc_library("netlink") {
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/lib/ip-test-macro",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:test-case",
   ]

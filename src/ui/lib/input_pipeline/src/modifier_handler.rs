@@ -172,7 +172,7 @@ mod tests {
     use fidl_fuchsia_input::Key;
     use fidl_fuchsia_ui_input3::{KeyEventType, LockState};
     use pretty_assertions::assert_eq;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     fn get_unhandled_input_event(event: KeyboardEvent) -> UnhandledInputEvent {
         UnhandledInputEvent {

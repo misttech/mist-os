@@ -8,11 +8,11 @@ use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_net_ext::FromExt as _;
 use fidl_fuchsia_net_multicast_admin as fnet_mcast;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon_status::Status as ZxStatus;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use zx_status::Status as ZxStatus;
 
 // min_ttl value to be used for all routes added.
 const MIN_TTL: u8 = 1;

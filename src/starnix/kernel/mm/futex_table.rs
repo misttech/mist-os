@@ -5,7 +5,7 @@
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
 use crate::task::{CurrentTask, Task};
-use fuchsia_zircon as zx;
+
 use futures::channel::oneshot;
 use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, Mutex};

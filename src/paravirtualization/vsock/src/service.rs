@@ -56,7 +56,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 use thiserror::Error;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const ZXIO_SIGNAL_INCOMING: zx::Signals =
     const_unwrap_option(zx::Signals::from_bits(SIGNAL_STREAM_INCOMING));

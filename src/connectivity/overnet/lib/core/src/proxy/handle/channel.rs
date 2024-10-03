@@ -10,11 +10,11 @@ use crate::peer::PeerConnRef;
 use anyhow::{Context as _, Error};
 use fidl::{AsHandleRef, AsyncChannel, HandleBased, Peered, Signals};
 use fidl_fuchsia_overnet_protocol::{ZirconChannelMessage, ZirconHandle};
-use fuchsia_zircon_status as zx_status;
 use futures::prelude::*;
 use futures::ready;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use zx_status;
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::ChannelProxyProtocol;

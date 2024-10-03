@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
-use fuchsia_zircon_status::Status;
 use thiserror::Error;
 use version_history::AbiRevision;
+use zx_status::Status;
 use {fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio};
 
 #[derive(Error, Debug)]

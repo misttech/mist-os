@@ -31,7 +31,7 @@ use vfs::path::Path as VfsPath;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_sync as fsync, fuchsia_zircon as zx,
+    fuchsia_sync as fsync, zx,
 };
 
 #[fuchsia::test]

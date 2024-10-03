@@ -9,9 +9,9 @@ use anyhow::Result;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance, open_service};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon::Duration;
 use futures::{TryFutureExt, TryStreamExt};
 use sag_config::Config;
+use zx::Duration;
 use {fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker};
 
 const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(10);

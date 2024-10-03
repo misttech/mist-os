@@ -37,8 +37,7 @@ use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
     fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync, zx,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -3401,7 +3400,7 @@ mod tests {
     fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
         fnet_interfaces::Address {
             addr: Some(addr),
-            valid_until: Some(fuchsia_zircon::MonotonicInstant::INFINITE.into_nanos()),
+            valid_until: Some(zx::MonotonicInstant::INFINITE.into_nanos()),
             assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
             ..Default::default()
         }

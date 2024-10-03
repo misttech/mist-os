@@ -20,7 +20,7 @@ use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, zx,
 };
 
 use crate::bindings::devices::BindingId;

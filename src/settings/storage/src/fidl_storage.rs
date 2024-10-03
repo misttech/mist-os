@@ -12,7 +12,7 @@ use fuchsia_async::{Task, Time, Timer};
 use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
 use fuchsia_fs::OpenFlags;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::future::OptionFuture;
 use futures::lock::{Mutex, MutexGuard};

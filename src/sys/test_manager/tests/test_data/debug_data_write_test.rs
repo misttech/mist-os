@@ -5,7 +5,6 @@
 use fidl::AsHandleRef;
 use fidl_fuchsia_debugdata::PublisherMarker;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 
 const VMO_CONTENTS: &[u8] = b"Debug data from test\n";
 const VMO_NAME: zx::Name = zx::Name::new_lossy("vmo_name");

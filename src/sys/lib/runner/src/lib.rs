@@ -13,7 +13,7 @@ use std::path::Path;
 use thiserror::Error;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, zx,
 };
 
 const ARGS_KEY: &str = "args";

@@ -6,7 +6,7 @@ use anyhow::Error;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_examples_inspect::ReverserMarker;
 use fuchsia_component::client;
-use fuchsia_zircon as zx;
+
 use tracing::{error, info};
 
 struct Args {

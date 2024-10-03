@@ -10,13 +10,13 @@ rustc_library("ffx_zxdb") {
 
   deps = [
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_rust",
+    "//sdk/rust/zx-status",
+    "//sdk/rust/zx-types",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/symbol-index",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust/fuchsia-zircon-status",
-    "//src/lib/zircon/rust/fuchsia-zircon-types",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-io",
     "//third_party/rust_crates:async-net",

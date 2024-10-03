@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use crate::uapi;
-use fuchsia_zircon as zx;
+
 use static_assertions::const_assert_eq;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -383,7 +383,6 @@ macro_rules! from_status_like_fdio {
         $crate::from_status_like_fdio!($status, "")
     }};
     ($status:expr, $context:expr) => {{
-        use fuchsia_zircon as zx;
         match $status {
             zx::Status::NOT_FOUND => $crate::errno!(ENOENT, $context),
             zx::Status::NO_MEMORY => $crate::errno!(ENOMEM, $context),

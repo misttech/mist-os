@@ -5,8 +5,8 @@
 use anyhow::{Context, Result};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_hardware_pty as fpty;
-use fuchsia_zircon::{self as zx, HandleBased};
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd};
+use zx::{self as zx, HandleBased};
 
 /// This function attempts to determine whether the given `fd` is a pty. If it is a pty then the
 /// corresponding fuchsia.hardware.pty.Device proxy is returned as well as an eventpair for

@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
-    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, zx,
 };
 
 pub mod async_interface;
@@ -535,7 +535,6 @@ mod tests {
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
     use fuchsia_async::{FifoReadable as _, FifoWritable as _};
-    use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
     use futures::channel::oneshot;
     use futures::future::BoxFuture;
     use futures::FutureExt as _;
@@ -544,10 +543,8 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
-    use {
-        fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
-    };
+    use zx::{AsHandleRef as _, HandleBased as _};
+    use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, zx};
 
     #[derive(Default)]
     struct MockInterface {

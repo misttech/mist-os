@@ -11,7 +11,7 @@ use fidl_fuchsia_hardware_bluetooth::{
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_bluetooth::constants::{DEV_DIR, HCI_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT};
-use fuchsia_zircon as zx;
+
 use futures::TryFutureExt as _;
 use tracing::error;
 

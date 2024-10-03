@@ -6,7 +6,7 @@ use diagnostics_log_encoding::{FromSeverity as _, Severity, SeverityExt};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
-use fuchsia_zircon as zx;
+
 use std::future::Future;
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::subscriber::Subscriber;

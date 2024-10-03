@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client::connect_to_protocol;
-use {fidl_fuchsia_dash as fdash, fuchsia_zircon as zx};
+use {fidl_fuchsia_dash as fdash, zx};
 
 #[fuchsia::test]
 pub async fn unknown_tools_package() {

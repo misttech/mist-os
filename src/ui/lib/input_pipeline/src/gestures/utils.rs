@@ -50,7 +50,7 @@ mod tests {
     use crate::gestures::gesture_arena::TouchpadEvent;
     use crate::touch_binding;
     use crate::utils::Position;
-    use fuchsia_zircon as zx;
+
     use test_case::test_case;
 
     fn make_touch_contact(id: u32, position: Position) -> touch_binding::TouchContact {

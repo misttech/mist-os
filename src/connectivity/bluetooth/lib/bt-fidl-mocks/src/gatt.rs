@@ -10,7 +10,7 @@ use fidl_fuchsia_bluetooth_gatt::{
     RemoteServiceRequestStream,
 };
 use fuchsia_bluetooth::types::Uuid;
-use fuchsia_zircon::Duration;
+use zx::Duration;
 
 /// Provides a simple mock implementation of `fuchsia.bluetooth.gatt.RemoteService`.
 pub struct RemoteServiceMock {

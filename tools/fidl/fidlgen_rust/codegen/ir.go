@@ -588,7 +588,7 @@ func isZirconIdentifier(ci fidlgen.CompoundIdentifier) bool {
 var zirconNames = map[fidlgen.EncodedCompoundIdentifier]string{
 	"zx/Rights":                "fidl::Rights",
 	"zx/ObjType":               "fidl::ObjectType",
-	"zx/CHANNEL_MAX_MSG_BYTES": "fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES",
+	"zx/CHANNEL_MAX_MSG_BYTES": "zx_types::ZX_CHANNEL_MAX_MSG_BYTES",
 }
 
 // compileDeclIdentifier returns a Rust path expression referring to the given

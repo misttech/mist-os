@@ -4,7 +4,7 @@
 
 use crate::{layout, socket};
 use fidl::endpoints::ClientEnd;
-use {fidl_fuchsia_dash as fdash, fidl_fuchsia_hardware_pty as pty, fuchsia_zircon as zx};
+use {fidl_fuchsia_dash as fdash, fidl_fuchsia_hardware_pty as pty, zx};
 
 pub async fn explore_over_socket(
     fuchsia_pkg_resolver: fdash::FuchsiaPkgResolver,

@@ -23,7 +23,7 @@ use {
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_ext as fnetext, fidl_fuchsia_net_interfaces_admin as fnetifadmin,
     fidl_fuchsia_net_interfaces_ext as fnetifext, fidl_fuchsia_net_stack as fnetstack,
-    fidl_fuchsia_net_tun as ftun, fuchsia_zircon as zx,
+    fidl_fuchsia_net_tun as ftun, zx,
 };
 
 const TUN_PORT_ID: u8 = 0;
@@ -164,7 +164,7 @@ impl NetworkInterface for TunNetworkInterface {
             .read_frame()
             .await
             .context("FIDL error on read_frame")?
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .context("Error calling read_frame")?;
 
         if let Some(packet) = frame.data.as_ref() {
@@ -192,7 +192,7 @@ impl NetworkInterface for TunNetworkInterface {
                 ..Default::default()
             })
             .await?
-            .map_err(fuchsia_zircon::Status::from_raw)?)
+            .map_err(zx::Status::from_raw)?)
     }
 
     async fn set_online(&self, online: bool) -> Result<(), Error> {

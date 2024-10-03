@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl::prelude::*;
-use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_mac, std_ip_v6};
@@ -24,6 +23,7 @@ use std::num::NonZeroU16;
 use test_case::test_case;
 use zerocopy::byteorder::native_endian::U32;
 use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, Unaligned};
+use zx::{self as zx, HandleBased as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_tun as fnet_tun,
     fidl_fuchsia_netemul_network as fnetemul_network,

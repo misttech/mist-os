@@ -12,7 +12,7 @@ use fidl::endpoints::ServerEnd;
 use fuchsia_hash::{Hash, ParseHashError};
 use thiserror::Error;
 use version_history::AbiRevision;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 // re-export wrapped fuchsia_fs errors.
 pub use fuchsia_fs::file::ReadError;

@@ -18,12 +18,12 @@ use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
-use fuchsia_zircon::sys::ZX_OK;
-use fuchsia_zircon::Vmo;
-use fuchsia_zircon_status::Status;
 use futures::channel::oneshot;
 use futures::StreamExt;
 use libc::S_IRUSR;
+use zx::sys::ZX_OK;
+use zx::Vmo;
+use zx_status::Status;
 
 /// Verify that [`read_only`] works with static and owned data. Compile-time test.
 #[test]

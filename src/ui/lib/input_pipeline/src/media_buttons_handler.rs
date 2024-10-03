@@ -8,17 +8,17 @@ use anyhow::{Context, Error};
 use async_trait::async_trait;
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon::AsHandleRef;
 use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use zx::AsHandleRef;
 use {
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, zx,
 };
 
 /// A [`MediaButtonsHandler`] tracks MediaButtonListeners and sends media button events to them.
@@ -338,10 +338,7 @@ mod tests {
     use futures::channel::oneshot;
     use pretty_assertions::assert_eq;
     use std::task::Poll;
-    use {
-        fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
-    };
+    use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync, zx};
 
     fn spawn_device_listener_registry_server(
         handler: Rc<MediaButtonsHandler>,

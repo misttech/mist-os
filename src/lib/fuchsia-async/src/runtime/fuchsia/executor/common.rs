@@ -9,7 +9,7 @@ use super::time::Time;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use std::any::Any;
 use std::cell::RefCell;
 use std::future::Future;

@@ -185,7 +185,7 @@ mod test_util {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Connector::new();
@@ -239,7 +239,6 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_fs::directory::DirEntry;
-    use fuchsia_zircon::{AsHandleRef, HandleBased, MonotonicInstant, Peered, Signals};
     use futures::TryStreamExt;
     use maplit::hashmap;
     use sandbox::Handle;
@@ -247,7 +246,8 @@ mod tests {
     use std::str::FromStr;
     use test_util::{mock_dir, multishot};
     use vfs::directory::entry::serve_directory;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::{AsHandleRef, HandleBased, MonotonicInstant, Peered, Signals};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {

@@ -9,7 +9,7 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::{StreamExt, TryStreamExt};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_process_lifecycle as flifecycle, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 /// See the `stop_with_pending_request` test case.

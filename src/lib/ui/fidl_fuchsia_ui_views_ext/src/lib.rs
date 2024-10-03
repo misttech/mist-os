@@ -5,7 +5,7 @@
 //! Extensions for `fidl_fuchsia_ui_view`.
 
 use fidl_fuchsia_ui_views::ViewRef;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use zx::{self as zx, AsHandleRef};
 
 /// Extension trait for [fidl_fuchsia_ui_view::ViewRef].
 pub trait ViewRefExt {

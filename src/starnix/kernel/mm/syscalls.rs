@@ -12,7 +12,6 @@ use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutpu
 use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;

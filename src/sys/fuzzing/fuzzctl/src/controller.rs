@@ -13,12 +13,12 @@ use fidl::endpoints::create_request_stream;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_fuzzer::{self as fuzz, Artifact as FidlArtifact};
 use fuchsia_async::Timer;
-use fuchsia_zircon_status as zx;
 use futures::future::{pending, Either};
 use futures::{pin_mut, select, try_join, Future, FutureExt};
 use std::cell::RefCell;
 use std::cmp::max;
 use std::path::Path;
+use zx_status as zx;
 
 /// Represents a `fuchsia.fuzzer.Controller` connection to a fuzzer.
 #[derive(Debug)]
@@ -425,7 +425,7 @@ mod tests {
     use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
     use fuchsia_fuzzctl::{Controller, Input, InputPair};
     use fuchsia_fuzzctl_test::{create_task, serve_controller, verify_saved, FakeController, Test};
-    use {fuchsia_async as fasync, fuchsia_zircon_status as zx};
+    use {fuchsia_async as fasync, zx_status as zx};
 
     // Creates a test setup suitable for unit testing `Controller`.
     fn perform_test_setup(

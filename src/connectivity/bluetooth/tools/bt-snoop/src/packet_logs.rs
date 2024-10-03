@@ -229,7 +229,6 @@ mod tests {
     use super::*;
 
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_zircon as zx;
 
     /// An empty log tests that the most basic inspect data is plumbed through the lazy generation
     /// function. See top level tests module for more integrated tests.

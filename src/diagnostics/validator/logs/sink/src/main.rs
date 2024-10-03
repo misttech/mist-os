@@ -21,7 +21,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc;
 use futures::prelude::*;
 use proptest::collection::vec;

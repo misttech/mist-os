@@ -5,7 +5,6 @@
 use fuchsia_async::{DurationExt, Task, TimeoutExt};
 use fuchsia_bluetooth::types::{A2dpDirection, Channel};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{Duration, Status};
 use futures::stream::Stream;
 use futures::{io, FutureExt};
 use std::fmt;
@@ -13,6 +12,7 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock, Weak};
 use std::task::{Context, Poll};
 use tracing::warn;
+use zx::{Duration, Status};
 
 use crate::types::{
     EndpointType, Error, ErrorCode, MediaCodecType, MediaType, Result as AvdtpResult,
@@ -554,7 +554,7 @@ mod tests {
     use futures::stream::StreamExt;
     use {
         fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, zx,
     };
 
     const REMOTE_ID_VAL: u8 = 1;

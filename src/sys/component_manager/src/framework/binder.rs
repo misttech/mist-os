@@ -10,7 +10,7 @@ use ::routing::RouteRequest;
 use async_trait::async_trait;
 use cm_types::Name;
 use errors::ModelError;
-use fuchsia_zircon as zx;
+
 use lazy_static::lazy_static;
 use routing::capability_source::InternalCapability;
 use tracing::warn;
@@ -127,7 +127,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,

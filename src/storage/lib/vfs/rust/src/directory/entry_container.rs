@@ -13,11 +13,11 @@ use crate::object_request::ObjectRequestRef;
 use crate::path::Path;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use futures::future::BoxFuture;
 use std::any::Any;
 use std::future::{ready, Future};
 use std::sync::Arc;
+use zx_status::Status;
 
 mod private {
     use fidl_fuchsia_io as fio;
@@ -37,7 +37,7 @@ mod private {
     }
 
     impl TryFrom<fidl::endpoints::ServerEnd<fio::DirectoryWatcherMarker>> for DirectoryWatcher {
-        type Error = fuchsia_zircon_status::Status;
+        type Error = zx_status::Status;
 
         fn try_from(
             server_end: fidl::endpoints::ServerEnd<fio::DirectoryWatcherMarker>,

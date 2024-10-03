@@ -7,7 +7,7 @@ use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_inspect::{
     IntProperty, Node, NumericProperty as _, Property as _, StringProperty, UintProperty,
 };
-use fuchsia_zircon as zx;
+
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU32, Ordering};
 

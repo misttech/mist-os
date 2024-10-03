@@ -31,7 +31,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync, zx};
 
 /// Responsible for initializing an `Archivist` instance. Supports multiple configurations by
 /// either calling or not calling methods on the builder like `serve_test_controller_protocol`.
@@ -575,7 +575,7 @@ mod tests {
         let accessor =
             connect_to_protocol_at_dir_svc::<fhost::ArchiveAccessorMarker>(&directory).unwrap();
         loop {
-            let (local, remote) = fuchsia_zircon::Socket::create_stream();
+            let (local, remote) = zx::Socket::create_stream();
             let mut reader = fuchsia_async::Socket::from_socket(local);
             accessor
                 .stream_diagnostics(

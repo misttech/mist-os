@@ -4,7 +4,7 @@
 
 use crate::errors::{error, Errno};
 use crate::{itimerspec, timespec, timeval};
-use fuchsia_zircon as zx;
+
 use linux_uapi::itimerval;
 use static_assertions::const_assert_eq;
 

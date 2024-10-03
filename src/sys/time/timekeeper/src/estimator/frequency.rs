@@ -7,7 +7,6 @@ use crate::time_source::Sample;
 use crate::Config;
 use chrono::{Datelike, Duration, TimeZone, Utc};
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 use std::mem;
 use std::sync::Arc;
 

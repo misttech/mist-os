@@ -7,7 +7,7 @@
 use crate::node::{CloseError, OpenError};
 use fidl::{persist, unpersist, Persistable};
 use thiserror::Error;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 mod async_reader;
 pub use async_reader::AsyncReader;
@@ -26,7 +26,6 @@ pub use fuchsia::*;
 mod fuchsia {
     use super::*;
     use crate::node::{take_on_open_event, Kind};
-    use fuchsia_zircon::{self as zx};
 
     /// An error encountered while reading a named file
     #[derive(Debug, Error)]
@@ -466,13 +465,13 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fidl_test_schema::{DataTable1, DataTable2};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, HandleBased as _};
     use std::path::Path;
     use std::sync::Arc;
     use tempfile::TempDir;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::{read_only, VmoFile};
     use vfs::ToObjectRequest;
+    use zx::{self as zx, HandleBased as _};
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 

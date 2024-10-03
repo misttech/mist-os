@@ -28,7 +28,7 @@ use vfs::directory::{self};
 use vfs::{
     attributes, execution_scope, file, path, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(

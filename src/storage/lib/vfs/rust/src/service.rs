@@ -15,9 +15,9 @@ use crate::{immutable_attributes, ProtocolsExt};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::Channel;
-use fuchsia_zircon_status::Status;
 use futures::future::Future;
 use std::sync::Arc;
+use zx_status::Status;
 
 /// Objects that behave like services should implement this trait.
 pub trait ServiceLike: Node {

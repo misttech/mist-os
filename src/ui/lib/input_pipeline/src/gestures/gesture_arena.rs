@@ -16,7 +16,7 @@ use fuchsia_inspect::{ArrayProperty, Node as InspectNode};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use std::any::Any;
 use std::fmt::Debug;
-use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
+use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
 struct GestureArenaInitialContenders {}
 
@@ -1287,7 +1287,7 @@ mod tests {
         use maplit::hashset;
         use std::cell::{Cell, RefCell};
         use std::rc::Rc;
-        use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
+        use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
         /// The gesture arena is mostly agnostic to the event details. Consequently, most
         /// tests can use the same lightly populated touchpad event.
@@ -1738,7 +1738,7 @@ mod tests {
         use crate::utils::Size;
         use crate::{input_device, touch_binding, Position};
         use assert_matches::assert_matches;
-        use fuchsia_zircon as zx;
+
         use maplit::hashset;
         use std::cell::RefCell;
         use std::rc::Rc;
@@ -2155,7 +2155,7 @@ mod tests {
         use crate::input_handler::InputHandlerStatus;
         use crate::{input_device, mouse_binding, touch_binding, Position};
         use assert_matches::assert_matches;
-        use fuchsia_zircon as zx;
+
         use maplit::hashset;
         use pretty_assertions::assert_eq;
         use std::cell::RefCell;
@@ -2725,7 +2725,7 @@ mod tests {
         use crate::input_handler::InputHandlerStatus;
         use crate::{input_device, mouse_binding, touch_binding, Position};
         use assert_matches::assert_matches;
-        use fuchsia_zircon as zx;
+
         use maplit::hashset;
         use pretty_assertions::assert_eq;
         use std::cell::RefCell;
@@ -3167,7 +3167,7 @@ mod tests {
         use crate::{input_device, touch_binding, Position};
         use assert_matches::assert_matches;
         use fidl_fuchsia_input_report::{self as fidl_input_report, UnitType};
-        use fuchsia_zircon as zx;
+
         use maplit::hashset;
         use std::rc::Rc;
         use test_case::test_case;
@@ -3533,10 +3533,7 @@ mod tests {
         use maplit::hashset;
         use std::rc::Rc;
         use test_case::test_case;
-        use {
-            fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
-            fuchsia_zircon as zx,
-        };
+        use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync, zx};
 
         struct EmptyContenderFactory {}
 

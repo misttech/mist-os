@@ -14,7 +14,6 @@ use cm_types::{Name, Url};
 use errors::OpenExposedDirError;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use measure_tape_for_instance::Measurable;
@@ -27,9 +26,10 @@ use tracing::warn;
 use vfs::directory::entry::OpenRequest;
 use vfs::directory::entry_container::Directory;
 use vfs::ToObjectRequest;
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, zx,
 };
 
 lazy_static! {
@@ -712,7 +712,7 @@ mod tests {
     use fidl::endpoints;
     use fidl::endpoints::{create_endpoints, create_proxy};
     use routing_test_helpers::component_id_index::make_index_file;
-    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, zx};
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
         handle

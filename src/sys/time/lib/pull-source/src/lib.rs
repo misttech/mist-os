@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_time_external::{
     self as ftexternal, Properties, PullSourceRequest, PullSourceRequestStream, TimeSample, Urgency,
 };
-use fuchsia_zircon as zx;
+
 use futures::lock::Mutex;
 use futures::TryStreamExt;
 use tracing::warn;

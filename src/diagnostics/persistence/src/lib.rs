@@ -19,7 +19,6 @@ use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::BootInstant;
 use futures::future::join;
 use futures::StreamExt;
 use persist_server::PersistServer;
@@ -27,6 +26,7 @@ use persistence_config::Config;
 use scheduler::Scheduler;
 use std::sync::Arc;
 use tracing::*;
+use zx::BootInstant;
 
 /// The name of the subcommand and the logs-tag.
 pub const PROGRAM_NAME: &str = "persistence";

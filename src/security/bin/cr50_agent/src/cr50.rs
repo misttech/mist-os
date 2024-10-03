@@ -30,7 +30,7 @@ use fidl_fuchsia_tpm_cr50::{
 use futures::TryStreamExt;
 use std::sync::Arc;
 use tracing::warn;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub struct Cr50 {
     proxy: TpmDeviceProxy,

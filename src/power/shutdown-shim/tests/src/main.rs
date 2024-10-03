@@ -14,7 +14,7 @@ use test_case::test_case;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_hardware_power_statecontrol as fstatecontrol,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_system_state as fdevicemanager, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_system_state as fdevicemanager, fuchsia_async as fasync, zx,
 };
 
 mod shutdown_mocks;

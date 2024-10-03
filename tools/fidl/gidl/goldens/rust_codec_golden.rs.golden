@@ -9,8 +9,8 @@ use {
     fidl::{AsHandleRef, Handle, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights},
     fidl::encoding::{Context, Decode, Decoder, Encoder, WireFormatVersion},
     fidl_codec::{Value, Error},
-    fuchsia_zircon_status::Status,
-    fuchsia_zircon_types as zx_types,
+    zx_status::Status,
+    zx_types as zx_types,
     gidl_util::{
         HandleDef, HandleSubtype, copy_handle, create_handles, decode_value,
         get_handle_koid, get_info_handle_valid, repeat, select_handle_infos,

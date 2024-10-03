@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tracing::{error, warn};
 use {
     fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 enum Services {

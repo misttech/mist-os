@@ -34,7 +34,7 @@ use vfs::directory::watchers::Watchers;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::{attributes, symlink, ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[derive(ToWeakNode)]
 pub struct FxDirectory {
@@ -976,7 +976,7 @@ mod tests {
     use vfs::node::Node;
     use vfs::path::Path;
     use vfs::ObjectRequest;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn test_open_root_dir() {

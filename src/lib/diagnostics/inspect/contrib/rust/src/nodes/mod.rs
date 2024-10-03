@@ -14,7 +14,6 @@ pub use list::BoundedListNode;
 pub use lru_cache::LruCacheNode;
 
 use fuchsia_inspect::{InspectType, IntProperty, Node, Property, StringReference};
-use fuchsia_zircon as zx;
 
 /// Extension trait that allows to manage timestamp properties.
 pub trait NodeExt {

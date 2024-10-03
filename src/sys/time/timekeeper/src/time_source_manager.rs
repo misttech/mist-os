@@ -11,7 +11,6 @@ use crate::time_source::{
 use fidl_fuchsia_time_external::{Status, Urgency};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};

@@ -106,7 +106,7 @@ mod tests {
     use super::*;
     use crate::config::base::ConfigLoadStatus;
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_zircon::MonotonicInstant;
+    use zx::MonotonicInstant;
 
     #[fuchsia::test]
     fn test_listener_logger() {

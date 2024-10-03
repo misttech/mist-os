@@ -13,7 +13,7 @@ use crate::render::{Context as RenderContext, Path, PathBuilder, Raster, RasterB
 use anyhow::{anyhow, Context, Error};
 use euclid::default::{Box2D, Size2D, Transform2D, Vector2D};
 use euclid::{point2, size2, vec2, Angle};
-use fuchsia_zircon::{self as zx};
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -743,7 +743,7 @@ mod tests {
     use fuchsia_framebuffer::FrameUsage;
     use once_cell::sync::Lazy;
 
-    const DEFAULT_TIMEOUT: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(5);
+    const DEFAULT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 
     // This font creation method isn't ideal. The correct method would be to ask the Fuchsia
     // font service for the font data.

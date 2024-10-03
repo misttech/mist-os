@@ -130,7 +130,7 @@ async fn run<DS: DataStore>(server: Server<DS>) -> Result<(), Error> {
             // Sending here should never fail; we just created the stream above.
             let () = socket_sink.try_send(socket_collection)?;
         }
-        Err(e @ fuchsia_zircon::Status::INVALID_ARGS) => {
+        Err(e @ zx::Status::INVALID_ARGS) => {
             info!("server not configured for serving leases: {:?}", e)
         }
         Err(e) => warn!("could not enable server on startup: {:?}", e),
@@ -260,9 +260,7 @@ impl<S: SocketServerDispatcher> ServerDispatcherRuntime<S> {
     /// fails, maintaining the server in the disabled state.
     ///
     /// If the server is already enabled, `enable` returns `Ok(None)`.
-    fn enable(
-        &mut self,
-    ) -> Result<Option<ServerSocketCollection<S::Socket>>, fuchsia_zircon::Status> {
+    fn enable(&mut self) -> Result<Option<ServerSocketCollection<S::Socket>>, zx::Status> {
         if self.abort_handle.is_some() {
             // Server already running.
             return Ok(None);
@@ -283,11 +281,11 @@ impl<S: SocketServerDispatcher> ServerDispatcherRuntime<S> {
                 }
                 Some(_) | None => error!("Failed to create server sockets: {}", e),
             };
-            fuchsia_zircon::Status::IO
+            zx::Status::IO
         })?;
         if sockets.is_empty() {
             error!("No sockets to run server on");
-            return Err(fuchsia_zircon::Status::INVALID_ARGS);
+            return Err(zx::Status::INVALID_ARGS);
         }
         self.abort_handle = Some(abort_handle);
         Ok(Some(ServerSocketCollection { sockets, abort_registration }))
@@ -301,14 +299,14 @@ impl<S: SocketServerDispatcher> ServerDispatcherRuntime<S> {
     /// Runs the closure `f` only if the server is currently disabled.
     ///
     /// Returns `BAD_STATE` error otherwise.
-    fn if_disabled<R, F: FnOnce(&mut S) -> Result<R, fuchsia_zircon::Status>>(
+    fn if_disabled<R, F: FnOnce(&mut S) -> Result<R, zx::Status>>(
         &mut self,
         f: F,
-    ) -> Result<R, fuchsia_zircon::Status> {
+    ) -> Result<R, zx::Status> {
         if self.abort_handle.is_none() {
             f(&mut self.server)
         } else {
-            Err(fuchsia_zircon::Status::BAD_STATE)
+            Err(zx::Status::BAD_STATE)
         }
     }
 }
@@ -586,7 +584,7 @@ where
                                     error!("Failed to send sockets to sink: {:?}", e);
                                     // Disable the server again to keep a consistent state.
                                     let () = server.borrow_mut().disable();
-                                    fuchsia_zircon::Status::INTERNAL
+                                    zx::Status::INTERNAL
                                 })
                             }
                             Ok(None) => {
@@ -595,7 +593,7 @@ where
                             }
                             Err(status) => Err(status),
                         }
-                        .map_err(fuchsia_zircon::Status::into_raw),
+                        .map_err(zx::Status::into_raw),
                     )
                 }
                 fidl_fuchsia_net_dhcp::Server_Request::StopServing { responder } => {
@@ -639,10 +637,7 @@ where
                         .map_err(|e| e.into_raw()),
                 ),
                 fidl_fuchsia_net_dhcp::Server_Request::ClearLeases { responder: r } => r.send(
-                    server
-                        .borrow_mut()
-                        .dispatch_clear_leases()
-                        .map_err(fuchsia_zircon::Status::into_raw),
+                    server.borrow_mut().dispatch_clear_leases().map_err(zx::Status::into_raw),
                 ),
             }
             .map(|()| socket_sink)
@@ -714,20 +709,20 @@ mod tests {
     }
 
     impl ServerDispatcher for CannedDispatcher {
-        fn try_validate_parameters(&self) -> Result<&ServerParameters, fuchsia_zircon::Status> {
-            self.params.as_ref().ok_or(fuchsia_zircon::Status::INVALID_ARGS)
+        fn try_validate_parameters(&self) -> Result<&ServerParameters, zx::Status> {
+            self.params.as_ref().ok_or(zx::Status::INVALID_ARGS)
         }
 
         fn dispatch_get_option(
             &self,
             _code: fidl_fuchsia_net_dhcp::OptionCode,
-        ) -> Result<fidl_fuchsia_net_dhcp::Option_, fuchsia_zircon::Status> {
+        ) -> Result<fidl_fuchsia_net_dhcp::Option_, zx::Status> {
             Ok(fidl_fuchsia_net_dhcp::Option_::SubnetMask(fidl_ip_v4!("0.0.0.0")))
         }
         fn dispatch_get_parameter(
             &self,
             _name: fidl_fuchsia_net_dhcp::ParameterName,
-        ) -> Result<fidl_fuchsia_net_dhcp::Parameter, fuchsia_zircon::Status> {
+        ) -> Result<fidl_fuchsia_net_dhcp::Parameter, zx::Status> {
             Ok(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
                 default: None,
                 max: None,
@@ -737,35 +732,33 @@ mod tests {
         fn dispatch_set_option(
             &mut self,
             _value: fidl_fuchsia_net_dhcp::Option_,
-        ) -> Result<(), fuchsia_zircon::Status> {
+        ) -> Result<(), zx::Status> {
             Ok(())
         }
         fn dispatch_set_parameter(
             &mut self,
             _value: fidl_fuchsia_net_dhcp::Parameter,
-        ) -> Result<(), fuchsia_zircon::Status> {
+        ) -> Result<(), zx::Status> {
             Ok(())
         }
-        fn dispatch_list_options(
-            &self,
-        ) -> Result<Vec<fidl_fuchsia_net_dhcp::Option_>, fuchsia_zircon::Status> {
+        fn dispatch_list_options(&self) -> Result<Vec<fidl_fuchsia_net_dhcp::Option_>, zx::Status> {
             Ok(vec![])
         }
         fn dispatch_list_parameters(
             &self,
-        ) -> Result<Vec<fidl_fuchsia_net_dhcp::Parameter>, fuchsia_zircon::Status> {
+        ) -> Result<Vec<fidl_fuchsia_net_dhcp::Parameter>, zx::Status> {
             Ok(vec![])
         }
-        fn dispatch_reset_options(&mut self) -> Result<(), fuchsia_zircon::Status> {
+        fn dispatch_reset_options(&mut self) -> Result<(), zx::Status> {
             Ok(())
         }
         fn dispatch_reset_parameters(
             &mut self,
             _defaults: &dhcpv4::configuration::ServerParameters,
-        ) -> Result<(), fuchsia_zircon::Status> {
+        ) -> Result<(), zx::Status> {
             Ok(())
         }
-        fn dispatch_clear_leases(&mut self) -> Result<(), fuchsia_zircon::Status> {
+        fn dispatch_clear_leases(&mut self) -> Result<(), zx::Status> {
             self.mock_leases = 0;
             Ok(())
         }
@@ -948,7 +941,7 @@ mod tests {
                     .start_serving()
                     .await
                     .expect("start_serving failed")
-                    .map_err(fuchsia_zircon::Status::from_raw)
+                    .map_err(zx::Status::from_raw)
                     .expect("start_serving returned an error");
 
                 let ServerSocketCollection { sockets, abort_registration } =
@@ -1014,10 +1007,10 @@ mod tests {
                 unreachable!("server finished before request: {:?}", res)
             },
         }
-        .map_err(fuchsia_zircon::Status::from_raw);
+        .map_err(zx::Status::from_raw);
 
         // Must have failed to start the server.
-        assert_eq!(res, Err(fuchsia_zircon::Status::INVALID_ARGS));
+        assert_eq!(res, Err(zx::Status::INVALID_ARGS));
         // No abort handler must've been set.
         assert!(server.borrow().abort_handle.is_none());
     }
@@ -1041,10 +1034,10 @@ mod tests {
                 unreachable!("server finished before request: {:?}", res)
             },
         }
-        .map_err(fuchsia_zircon::Status::from_raw);
+        .map_err(zx::Status::from_raw);
 
         // Must have failed to start the server.
-        assert_eq!(res, Err(fuchsia_zircon::Status::INVALID_ARGS));
+        assert_eq!(res, Err(zx::Status::INVALID_ARGS));
         // No abort handler must've been set.
         assert!(server.borrow().abort_handle.is_none());
     }
@@ -1066,7 +1059,7 @@ mod tests {
                 .start_serving()
                 .await
                 .expect("start_serving failed")
-                .map_err(fuchsia_zircon::Status::from_raw)
+                .map_err(zx::Status::from_raw)
                 .expect("start_serving returned an error");
 
             // SetParameter disallowed when the server is enabled.
@@ -1081,8 +1074,8 @@ mod tests {
                     ))
                     .await
                     .expect("set_parameter FIDL failure")
-                    .map_err(fuchsia_zircon::Status::from_raw),
-                Err(fuchsia_zircon::Status::BAD_STATE)
+                    .map_err(zx::Status::from_raw),
+                Err(zx::Status::BAD_STATE)
             );
 
             // ResetParameters disallowed when the server is enabled.
@@ -1091,8 +1084,8 @@ mod tests {
                     .reset_parameters()
                     .await
                     .expect("reset_parameters FIDL failure")
-                    .map_err(fuchsia_zircon::Status::from_raw),
-                Err(fuchsia_zircon::Status::BAD_STATE)
+                    .map_err(zx::Status::from_raw),
+                Err(zx::Status::BAD_STATE)
             );
         };
 

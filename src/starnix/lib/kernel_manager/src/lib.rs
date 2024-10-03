@@ -9,7 +9,6 @@ use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
 use fidl::HandleBased;
 use fuchsia_component::client as fclient;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{AsHandleRef, Task};
 use futures::TryStreamExt;
 use kernels::Kernels;
 use rand::Rng;
@@ -17,11 +16,11 @@ use std::future::Future;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tracing::{debug, warn};
+use zx::{AsHandleRef, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
-    fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
 };
 
 /// The name of the collection that the starnix_kernel is run in.

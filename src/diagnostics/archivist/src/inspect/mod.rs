@@ -11,11 +11,11 @@ use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl_fuchsia_diagnostics::Selector;
 use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use fuchsia_inspect::reader::PartialNodeHierarchy;
+use fuchsia_trace as ftrace;
 use futures::prelude::*;
 use selectors::SelectorExt;
 use std::sync::Arc;
 use tracing::error;
-use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 pub mod collector;
 pub mod container;
@@ -348,8 +348,7 @@ mod tests {
     };
     use fuchsia_async::{self as fasync, Task};
     use fuchsia_inspect::{Inspector, InspectorConfig};
-    use fuchsia_zircon as zx;
-    use fuchsia_zircon::Peered;
+
     use futures::StreamExt;
     use inspect_runtime::{service, TreeServerSendPreference};
     use moniker::ExtendedMoniker;
@@ -357,6 +356,7 @@ mod tests {
     use serde_json::json;
     use std::collections::HashMap;
     use test_case::test_case;
+    use zx::Peered;
 
     const TEST_URL: &str = "fuchsia-pkg://test";
     const BATCH_RETRIEVAL_TIMEOUT_SECONDS: i64 = 300;

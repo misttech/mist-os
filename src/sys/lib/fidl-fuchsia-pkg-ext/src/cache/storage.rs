@@ -4,7 +4,7 @@
 
 use super::{OpenBlobError, TruncateBlobError, WriteBlobError};
 use anyhow::Context as _;
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub(super) fn into_blob_writer_and_closer(

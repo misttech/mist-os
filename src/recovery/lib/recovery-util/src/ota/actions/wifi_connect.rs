@@ -10,9 +10,9 @@ use crate::send_report;
 use crate::wlan::{create_network_info, WifiConnect, WifiConnectImpl};
 use anyhow::Error;
 use fuchsia_async::{DurationExt, Task};
-use fuchsia_zircon::Duration;
 use recovery_metrics_registry::cobalt_registry as metrics;
 use std::rc::Rc;
+use zx::Duration;
 
 /// Connects to a Wifi network.
 /// Asynchronously ends event Connected or Error as appropriate.
@@ -93,10 +93,10 @@ mod tests {
     use async_trait::async_trait;
     use fidl_fuchsia_wlan_policy::NetworkConfig;
     use fuchsia_async::{self as fasync};
-    use fuchsia_zircon::Duration;
     use futures::future;
     use mockall::predicate::eq;
     use recovery_metrics_registry::cobalt_registry as metrics;
+    use zx::Duration;
 
     struct FakeWifiConnectImpl {
         connected: bool,

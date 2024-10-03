@@ -15,7 +15,7 @@ use fidl_fuchsia_hardware_display::{
 use itertools::Itertools;
 use std::collections::HashMap;
 use thiserror::Error;
-use {fidl_fuchsia_hardware_display_types as display_types, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_display_types as display_types, zx};
 
 /// Errors that can be returned by `MockCoordinator`.
 #[derive(Error, Debug)]

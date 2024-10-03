@@ -32,9 +32,9 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/zircon/rust:fuchsia-zircon",
   ]
 
   sources = [

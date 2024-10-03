@@ -7,7 +7,7 @@ use fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerProx
 use fuchsia_component::client::connect_to_protocol;
 use session_framework_metrics_registry::cobalt_registry as metrics;
 use tracing::warn;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// Creates a `LoggerProxy` connected to Cobalt.
 ///

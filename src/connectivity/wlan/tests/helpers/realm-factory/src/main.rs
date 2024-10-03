@@ -14,10 +14,7 @@ use fuchsia_component_test::{
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::{StreamExt, TryStreamExt};
 use tracing::{error, info, warn};
-use {
-    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
-    fuchsia_zircon_status as zx_status,
-};
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync, zx_status};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

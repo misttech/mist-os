@@ -183,7 +183,7 @@ mod test {
         // This is intentionally a datagram socket so we can
         // guarantee torn writes and test all the code paths
         // in the decoder.
-        let (local, remote) = fuchsia_zircon::Socket::create_datagram();
+        let (local, remote) = zx::Socket::create_datagram();
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
@@ -210,7 +210,7 @@ mod test {
     async fn test_json_decoder_regular_message() {
         // This is intentionally a datagram socket so we can
         // send the entire message as one "packet".
-        let (local, remote) = fuchsia_zircon::Socket::create_datagram();
+        let (local, remote) = zx::Socket::create_datagram();
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
@@ -231,7 +231,7 @@ mod test {
     #[fuchsia::test]
     async fn test_json_decoder_large_message() {
         const MSG_COUNT: usize = 100;
-        let (local, remote) = fuchsia_zircon::Socket::create_stream();
+        let (local, remote) = zx::Socket::create_stream();
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = Box::pin(
             stream_raw_json::<LogsData, 100, 10>(socket)
@@ -269,7 +269,7 @@ mod test {
     async fn test_json_decoder_large_single_message() {
         // At least 10MB of characters in a single message
         const CHAR_COUNT: usize = 1000 * 1000;
-        let (local, remote) = fuchsia_zircon::Socket::create_stream();
+        let (local, remote) = zx::Socket::create_stream();
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = Box::pin(
             stream_raw_json::<LogsData, 256000, 20000>(socket)
@@ -300,7 +300,7 @@ mod test {
         // This is intentionally a datagram socket so we can
         // guarantee torn writes and test all the code paths
         // in the decoder.
-        let (local, remote) = fuchsia_zircon::Socket::create_datagram();
+        let (local, remote) = zx::Socket::create_datagram();
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {

@@ -35,7 +35,7 @@ pub struct NewIface {
     // The lazy inspect node populated by this ifaces USME.
     pub inspect_node: Option<std::sync::Arc<fuchsia_inspect::LazyNode>>,
     // The VMO backing the inspect node.
-    pub inspect_vmo: Option<std::sync::Arc<fuchsia_zircon::Vmo>>,
+    pub inspect_vmo: Option<std::sync::Arc<zx::Vmo>>,
 }
 
 pub struct PhyDevice {
@@ -51,7 +51,7 @@ pub struct IfaceDevice {
     pub inspect_node: Option<std::sync::Arc<fuchsia_inspect::LazyNode>>,
     // This node is never read in our Rust code, only within the Inspect process.
     #[allow(dead_code)]
-    pub inspect_vmo: Option<std::sync::Arc<fuchsia_zircon::Vmo>>,
+    pub inspect_vmo: Option<std::sync::Arc<zx::Vmo>>,
 }
 
 pub type PhyMap = WatchableMap<u16, PhyDevice>;
@@ -137,7 +137,7 @@ mod tests {
     use futures::task::Poll;
     use wlan_common::assert_variant;
     use wlan_common::test_utils::ExpectWithin;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     fn test_serve_phys_exits_when_watching_devices_fails() {

@@ -7,7 +7,7 @@ use fuchsia_sync::Mutex;
 use id::Id;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// [`ComponentSet`] tracks all the components executing inside an ELF runner,
 /// and presents an iterator over those components. It does this under the
@@ -160,7 +160,7 @@ pub mod id {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon as zx;
+
     use futures::FutureExt;
     use moniker::Moniker;
     use std::future;

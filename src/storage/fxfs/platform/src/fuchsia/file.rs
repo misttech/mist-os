@@ -12,7 +12,6 @@ use crate::fuchsia::pager::{
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
 use anyhow::Error;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, HandleBased, Status};
 use futures::future::BoxFuture;
 use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::log::*;
@@ -30,6 +29,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode};
 use vfs::name::Name;
 use vfs::{attributes, ObjectRequestRef, ProtocolsExt};
+use zx::{self as zx, HandleBased, Status};
 
 /// In many operating systems, it is possible to delete a file with open handles. In this case the
 /// file will continue to use space on disk but will not openable and the storage it uses will be
@@ -557,7 +557,6 @@ mod tests {
     use anyhow::format_err;
     use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
     use fuchsia_fs::file;
-    use fuchsia_zircon::Status;
     use futures::join;
     use fxfs::object_handle::INVALID_OBJECT_ID;
     use rand::{thread_rng, Rng};
@@ -566,6 +565,7 @@ mod tests {
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
     use vfs::common::rights_to_posix_mode_bits;
+    use zx::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test(threads = 10)]

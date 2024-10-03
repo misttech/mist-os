@@ -26,8 +26,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon_status as zx_status,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx_status,
 };
 
 mod builtin;
@@ -2284,10 +2283,7 @@ mod tests {
     };
     use std::time::Duration;
     use test_case::test_case;
-    use {
-        fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
-    };
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync, zx};
 
     /// Assert that two ComponentTrees are equivalent.
     ///

@@ -92,7 +92,7 @@ mod tests {
     use vfs::path::Path;
     use vfs::pseudo_directory;
     use wlan_common::test_utils::ExpectWithin;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     #[fasync::run_singlethreaded(test)]
     async fn watch_single_phy() {

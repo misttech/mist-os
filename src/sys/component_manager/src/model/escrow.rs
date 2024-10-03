@@ -14,8 +14,7 @@ use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
 use zx::AsHandleRef;
 use {
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx,
 };
 
 use super::start::Start;
@@ -295,7 +294,7 @@ mod tests {
     use vfs::directory::entry::OpenRequest;
     use vfs::execution_scope::ExecutionScope;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     use crate::bedrock::program::EscrowRequest;
     use crate::framework::controller;

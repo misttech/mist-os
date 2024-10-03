@@ -8,7 +8,7 @@ use fidl_fuchsia_tpm_cr50::{
     Cr50Marker, Cr50Proxy, Cr50Rc, Cr50Status, PhysicalPresenceEvent,
     PhysicalPresenceNotifierEvent, PhysicalPresenceNotifierProxy, PhysicalPresenceState, WpState,
 };
-use fuchsia_zircon as zx;
+
 use futures::TryStreamExt;
 
 #[derive(FromArgs, PartialEq, Debug)]

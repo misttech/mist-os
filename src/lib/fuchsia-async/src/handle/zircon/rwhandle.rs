@@ -4,9 +4,9 @@
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use crate::OnSignalsRef;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::{Arc, Mutex};
 use std::task::{ready, Context, Poll, Waker};
+use zx::{self as zx, AsHandleRef};
 
 const OBJECT_PEER_CLOSED: zx::Signals = zx::Signals::OBJECT_PEER_CLOSED;
 const OBJECT_READABLE: zx::Signals = zx::Signals::OBJECT_READABLE;
@@ -317,7 +317,6 @@ where
 mod tests {
     use super::*;
     use crate::TestExecutor;
-    use fuchsia_zircon as zx;
 
     #[test]
     fn is_closed_immediately_after_close() {

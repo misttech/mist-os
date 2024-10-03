@@ -8,9 +8,9 @@
 
 use super::on_signals::OnSignalsRef;
 use super::{Handle, HandleDisposition, HandleInfo, MessageBuf, MessageBufEtc, Signals};
-use fuchsia_zircon_status as zx_status;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use zx_status;
 
 /// An I/O object representing a `Channel`.
 pub struct Channel {

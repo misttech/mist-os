@@ -5,8 +5,8 @@
 #[allow(unused_imports)]
 use super::prelude::*;
 
-use fuchsia_zircon::Duration;
 use openthread::ot;
+use zx::Duration;
 
 mod api;
 mod border_agent;

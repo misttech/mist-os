@@ -4,7 +4,6 @@
 
 use crate::time::utc;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::time::{itimerspec_from_deadline_interval, time_from_timespec};
 use starnix_uapi::{itimerspec, timespec};

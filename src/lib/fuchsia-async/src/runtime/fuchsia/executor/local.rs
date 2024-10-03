@@ -6,7 +6,7 @@ use super::common::{EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeRef;
 use super::time::Time;
 use crate::atomic_future::AtomicFuture;
-use fuchsia_zircon as zx;
+
 use futures::future::{self, Either};
 use futures::task::AtomicWaker;
 use std::fmt;
@@ -380,10 +380,10 @@ mod tests {
     use crate::handle::on_signals::OnSignals;
     use crate::{Interval, Timer};
     use assert_matches::assert_matches;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::StreamExt;
     use std::cell::{Cell, RefCell};
     use std::task::Waker;
+    use zx::{self as zx, AsHandleRef};
 
     fn spawn(future: impl Future<Output = ()> + Send + 'static) {
         crate::EHandle::local().spawn_detached(future);

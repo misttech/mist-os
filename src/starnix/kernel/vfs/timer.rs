@@ -12,7 +12,6 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
 };
-use fuchsia_zircon::{self as zx, HandleRef};
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
@@ -22,6 +21,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, itimerspec, TFD_TIMER_ABSTIME};
 use std::sync::{Arc, Weak};
 use zerocopy::IntoBytes;
+use zx::{self as zx, HandleRef};
 
 pub trait TimerOps: Send + Sync + 'static {
     /// Starts the timer with the specified `deadline`.

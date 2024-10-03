@@ -17,9 +17,9 @@ use carnelian::{
     ViewAssistantPtr, ViewKey,
 };
 use fuchsia_trace::{duration, duration_begin, duration_end};
-use fuchsia_zircon::{Event, MonotonicInstant};
 use rive_rs::{self as rive};
 use std::path::Path;
+use zx::{Event, MonotonicInstant};
 
 /// Rive.
 #[derive(Debug, FromArgs)]

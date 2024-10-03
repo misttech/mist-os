@@ -10,11 +10,11 @@ use fidl_fuchsia_space::{
     ManagerRequestStream as SpaceManagerRequestStream,
 };
 use fidl_fuchsia_update::CommitStatusProviderProxy;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{error, info};
+use zx::{self as zx, AsHandleRef};
 
 pub async fn serve(
     blobfs: blobfs::Client,

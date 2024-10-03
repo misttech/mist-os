@@ -21,7 +21,7 @@ use std::fmt;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vigil::{DropWatch, Vigil};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_zircon as zx};
+use {fidl_fuchsia_bluetooth_bredr as bredr, zx};
 
 use super::calls::{Call, CallAction, Calls};
 use super::gain_control::GainControl;

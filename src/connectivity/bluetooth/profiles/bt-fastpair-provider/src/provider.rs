@@ -537,8 +537,7 @@ impl Provider {
                     }
                     Err(e) => {
                         info!("Couldn't enable Fast Pair: {e:?}");
-                        let _ =
-                            responder.send(Err(fuchsia_zircon::Status::ALREADY_BOUND.into_raw()));
+                        let _ = responder.send(Err(zx::Status::ALREADY_BOUND.into_raw()));
                     }
                 }
             }
@@ -848,7 +847,7 @@ mod tests {
 
         // Should be rejected.
         let result = request_fut.await.expect("fidl response");
-        assert_eq!(result, Err(fuchsia_zircon::Status::ALREADY_BOUND.into_raw()));
+        assert_eq!(result, Err(zx::Status::ALREADY_BOUND.into_raw()));
     }
 
     #[fuchsia::test]

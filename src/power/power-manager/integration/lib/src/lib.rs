@@ -475,10 +475,8 @@ async fn set_fake_time_scale(realm_instance: &RealmInstance, scale: u32) {
     fake_clock_control.pause().await.expect("failed to pause fake time: FIDL error");
     fake_clock_control
         .resume_with_increments(
-            fuchsia_zircon::Duration::from_millis(1).into_nanos(),
-            &ftesting::Increment::Determined(
-                fuchsia_zircon::Duration::from_millis(scale.into()).into_nanos(),
-            ),
+            zx::Duration::from_millis(1).into_nanos(),
+            &ftesting::Increment::Determined(zx::Duration::from_millis(scale.into()).into_nanos()),
         )
         .await
         .expect("failed to set fake time scale: FIDL error")

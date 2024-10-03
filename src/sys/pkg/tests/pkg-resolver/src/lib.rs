@@ -30,7 +30,6 @@ use fuchsia_pkg_testing::serve::ServedRepository;
 use fuchsia_pkg_testing::{Package, PackageBuilder};
 use fuchsia_sync::Mutex;
 use fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl};
-use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use futures::prelude::*;
 use mock_boot_arguments::MockBootArgumentsService;
 use mock_metrics::MockMetricEventLoggerFactory;
@@ -44,6 +43,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
+use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_rewrite as fpkg_rewrite, fidl_fuchsia_space as fspace,

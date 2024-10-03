@@ -11,7 +11,7 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor, SensorType};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
 

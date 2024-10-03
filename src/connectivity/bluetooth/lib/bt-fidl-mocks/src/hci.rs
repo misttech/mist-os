@@ -8,7 +8,7 @@ use fidl_fuchsia_hardware_bluetooth::{
     HciTransportMarker, HciTransportProxy, HciTransportRequest, HciTransportRequestStream,
     SentPacket,
 };
-use fuchsia_zircon::Duration;
+use zx::Duration;
 
 /// Provides a simple mock implementation of `fuchsia.hardware.bluetooth/HciTransport`.
 pub struct HciTransportMock {

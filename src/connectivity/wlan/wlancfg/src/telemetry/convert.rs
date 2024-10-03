@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx};
 use wlan_common::bss::Protection as BssProtection;
 use {fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics};
 

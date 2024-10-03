@@ -531,7 +531,6 @@ fn convert_hist_scope_and_antenna_id(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon as zx;
 
     fn fake_set_key_descriptor() -> fidl_mlme::SetKeyDescriptor {
         fidl_mlme::SetKeyDescriptor {

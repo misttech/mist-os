@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::mm::{PAGE_SIZE, ZX_VM_SPECIFIC_OVERWRITE};
-use fuchsia_zircon as zx;
-use fuchsia_zircon::{AsHandleRef, HandleBased, Koid};
+
 use starnix_logging::{impossible_error, set_zx_name};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use std::mem::MaybeUninit;
 use zerocopy::FromBytes;
+use zx::{AsHandleRef, HandleBased, Koid};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MemoryObject {

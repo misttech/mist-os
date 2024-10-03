@@ -12,7 +12,7 @@ use futures::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 /// Handles a `fcrunner::ComponentRunnerRequestStream`.

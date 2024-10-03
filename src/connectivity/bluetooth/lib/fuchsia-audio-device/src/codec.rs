@@ -15,7 +15,7 @@ use futures::task::{Context, Poll};
 use futures::{Stream, StreamExt};
 use std::fmt::Debug;
 use std::sync::Arc;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 use crate::types::{Error, Result};
 

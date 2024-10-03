@@ -7,11 +7,11 @@ use crate::metrics::{BlockMetrics, BlockStatus};
 use anyhow::{bail, format_err, Error};
 use fuchsia_inspect::reader as ireader;
 use fuchsia_inspect::reader::snapshot::ScannedBlock;
-use fuchsia_zircon::Vmo;
 use inspect_format::constants::MIN_ORDER_SIZE;
 use inspect_format::{ArrayFormat, BlockIndex, BlockType, LinkNodeDisposition, PropertyFormat};
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use zx::Vmo;
 
 // When reading from a VMO, the keys of the HashMaps are the indexes of the relevant
 // blocks. Thus, they will never collide.

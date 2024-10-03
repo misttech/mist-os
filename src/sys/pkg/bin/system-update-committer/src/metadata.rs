@@ -8,10 +8,10 @@ use crate::config::Config;
 use crate::metadata::verify::VerifierProxy;
 use commit::do_commit;
 use errors::MetadataError;
-use fuchsia_zircon::{self as zx, EventPair, Peered};
 use futures::channel::oneshot;
 use policy::PolicyEngine;
 use verify::do_health_verification;
+use zx::{self as zx, EventPair, Peered};
 use {fidl_fuchsia_paver as paver, fuchsia_inspect as finspect};
 
 mod commit;
@@ -89,11 +89,11 @@ mod tests {
     use configuration::Configuration;
     use fasync::OnSignals;
     use fidl_fuchsia_update_verify::BlobfsVerifierProxy;
-    use fuchsia_zircon::{AsHandleRef, Status};
     use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
     use mock_verifier::MockVerifierService;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use zx::{AsHandleRef, Status};
     use {fidl_fuchsia_update_verify as fidl, fuchsia_async as fasync};
 
     fn blobfs_verifier_and_call_count(

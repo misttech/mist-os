@@ -13,9 +13,9 @@ rustc_library("fidl_driver") {
     "src/lib.rs",
   ]
   deps = [
+    "//sdk/rust/zx",
     "//src/devices/bin/driver_runtime/rust:fdf_rust_lib",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/zircon/rust:fuchsia-zircon",
   ]
   with_unit_tests = true
 

@@ -33,8 +33,8 @@ rustc_library("cm_fidl_analyzer") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
 
-    # Depend on fuchsia_zircon_status crate instead of fuchsia_zircon so that this builds for host.
-    "//src/lib/zircon/rust/fuchsia-zircon-status",
+    # Depend on zx-status crate instead of zx so that this builds for host.
+    "//sdk/rust/zx-status",
   ]
   test_deps = [
     "//src/lib/fuchsia",

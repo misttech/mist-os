@@ -6,7 +6,7 @@ use a2dp_profile_config::Config;
 use anyhow::{format_err, Error};
 use std::collections::HashSet;
 use thiserror::Error;
-use {fidl_fuchsia_bluetooth as fidl_bt, fuchsia_zircon as zx};
+use {fidl_fuchsia_bluetooth as fidl_bt, zx};
 
 use crate::media::sources::AudioSourceType;
 

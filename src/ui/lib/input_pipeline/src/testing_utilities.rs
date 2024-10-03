@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use {
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_input3 as fidl_ui_input3, fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 pub use diagnostics_assertions;

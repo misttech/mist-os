@@ -10,9 +10,9 @@ use std::pin::Pin;
 use anyhow::Error;
 
 use fuchsia_async::LocalExecutor;
-use fuchsia_zircon::Status;
 use installer::{BootloaderType, InstallationPaths};
 use recovery_util_block::BlockDevice;
+use zx::Status;
 
 // Converts a raw c-string into a Rust String, or None if the c-string was NULL.
 //

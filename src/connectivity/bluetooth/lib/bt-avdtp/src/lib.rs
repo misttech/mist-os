@@ -5,7 +5,6 @@
 use fuchsia_async::{DurationExt, OnTimeout, TimeoutExt};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Duration};
 use futures::future::{FusedFuture, MaybeDone};
 use futures::stream::Stream;
 use futures::task::{Context, Poll, Waker};
@@ -18,6 +17,7 @@ use std::mem;
 use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{info, trace, warn};
+use zx::{self as zx, Duration};
 
 #[cfg(test)]
 mod tests;

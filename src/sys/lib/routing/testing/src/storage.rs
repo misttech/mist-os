@@ -13,7 +13,7 @@ use component_id_index::InstanceId;
 use moniker::{ExtendedMoniker, Moniker};
 use std::collections::HashSet;
 use std::marker::PhantomData;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 pub struct CommonStorageTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

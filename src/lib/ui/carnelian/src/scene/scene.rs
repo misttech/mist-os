@@ -19,10 +19,10 @@ use crate::{Coord, IntPoint, Point, Rect, Size, ViewAssistantContext};
 use anyhow::{bail, Error};
 use euclid::{size2, vec2};
 use fuchsia_trace::duration;
-use fuchsia_zircon::{AsHandleRef, Event, Signals};
 use std::any::Any;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Debug};
+use zx::{AsHandleRef, Event, Signals};
 
 // Maximum order supported by scene. 3 layers are reserved for
 /// scene features such as rounded corners.

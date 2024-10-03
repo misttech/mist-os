@@ -5,7 +5,7 @@
 use crate::TestEnv;
 use fidl_fuchsia_io as fio;
 use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
-use fuchsia_zircon::Status;
+use zx::Status;
 
 /// Test executability enforcement of fuchsia.pkg/PackageCache.{Get|Open}, i.e. whether the
 /// handle to the package directory has RIGHT_EXECUTABLE.

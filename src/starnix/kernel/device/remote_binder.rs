@@ -40,7 +40,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use {
     fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    zx,
 };
 
 // The name used to track the duration of a remote binder ioctl.

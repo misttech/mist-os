@@ -4,7 +4,7 @@
 
 use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes128GcmSiv, Aes256GcmSiv, Key, KeyInit};
-use fuchsia_zircon::{self as zx};
+
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::Entry;

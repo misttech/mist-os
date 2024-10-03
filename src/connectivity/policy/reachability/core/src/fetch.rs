@@ -6,7 +6,7 @@ use anyhow::{format_err, Context};
 use async_trait::async_trait;
 use fuchsia_async::net::TcpStream;
 use fuchsia_async::TimeoutExt;
-use fuchsia_zircon as zx;
+
 use futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt};
 use std::net;
 use tracing::warn;

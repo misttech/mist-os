@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::str::Utf8Error;
 use thiserror::Error;
 use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, Unaligned};
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 mod watcher;
 pub use watcher::{WatchEvent, WatchMessage, Watcher, WatcherCreateError, WatcherStreamError};
@@ -1076,8 +1076,6 @@ mod tests {
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
     #[cfg(target_os = "fuchsia")]
-    use fuchsia_zircon as zx;
-
     #[cfg(target_os = "fuchsia")]
     const LONG_DURATION: Duration = Duration::from_seconds(30);
 

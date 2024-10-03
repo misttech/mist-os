@@ -21,7 +21,6 @@ use crate::enums::{
 };
 use fidl_fuchsia_time_external::Status;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
 #[cfg(test)]

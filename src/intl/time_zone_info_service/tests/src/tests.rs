@@ -13,7 +13,7 @@ mod tests {
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     static SVC_URL: &str =
         "fuchsia-pkg://fuchsia.com/time-zone-info-service-test#meta/time-zone-info-service.cm";

@@ -30,13 +30,13 @@ use fidl_fuchsia_settings::{
 };
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fuchsia_async::TestExecutor;
-use fuchsia_zircon::Status;
 use futures::lock::Mutex;
 use futures::pin_mut;
 use futures::stream::StreamExt;
 use futures::task::Poll;
 use std::collections::HashMap;
 use std::sync::Arc;
+use zx::Status;
 
 use super::input_test_environment::default_settings;
 

@@ -37,8 +37,8 @@ impl request::Responder<Scoped<FactoryResetSetResult>> for FactoryResetSetRespon
     }
 }
 
-impl watch::Responder<FactoryResetSettings, fuchsia_zircon::Status> for FactoryResetWatchResponder {
-    fn respond(self, response: Result<FactoryResetSettings, fuchsia_zircon::Status>) {
+impl watch::Responder<FactoryResetSettings, zx::Status> for FactoryResetWatchResponder {
+    fn respond(self, response: Result<FactoryResetSettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings);

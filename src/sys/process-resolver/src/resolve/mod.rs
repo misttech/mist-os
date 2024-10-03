@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 use tracing::warn;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc, zx};
 
 mod serve;
 pub use serve::serve;

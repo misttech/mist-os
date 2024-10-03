@@ -8,10 +8,10 @@ use std::rc::Rc;
 use anyhow::Context;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::{StreamExt, TryStreamExt};
 use rust_measure_tape_for_case::Measurable as _;
 use serde_derive::Deserialize;
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_test as ftest, fuchsia_async as fasync};
 
 #[derive(Deserialize, Debug)]

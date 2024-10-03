@@ -657,7 +657,6 @@ mod tests {
 
     use crate::bindings::integration_tests::set_logger_for_test;
 
-    use fuchsia_zircon as zx;
     use futures::channel::mpsc;
     use test_case::test_case;
 

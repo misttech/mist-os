@@ -148,8 +148,8 @@ mod tests {
     use fidl_fuchsia_hardware_tee::DeviceConnectorRequest;
     use fidl_fuchsia_tee::ApplicationMarker;
     use fidl_fuchsia_tee_manager::ProviderProxy;
-    use fuchsia_zircon_status::Status;
     use futures::channel::mpsc;
+    use zx_status::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     fn spawn_device_connector<F>(

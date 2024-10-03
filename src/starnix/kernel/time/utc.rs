@@ -6,12 +6,12 @@ use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::{
     duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcClockTransform, UtcInstant,
 };
-use fuchsia_zircon::{
-    AsHandleRef, ClockTransformation, {self as zx},
-};
 use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
 use starnix_sync::Mutex;
+use zx::{
+    AsHandleRef, ClockTransformation, {self as zx},
+};
 
 // Many Linux APIs need a running UTC clock to function. Since there can be a delay until the
 // UTC clock in Zircon starts up (https://fxbug.dev/42081426), Starnix provides a synthetic utc clock initially,

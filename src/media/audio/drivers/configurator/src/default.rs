@@ -19,7 +19,7 @@ use futures::lock::Mutex;
 use futures::{select, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub struct CodecState {
     /// Codec manufacturer name.

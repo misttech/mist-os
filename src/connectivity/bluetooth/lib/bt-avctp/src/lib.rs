@@ -4,7 +4,6 @@
 
 #![recursion_limit = "128"]
 
-use fuchsia_zircon as zx;
 use std::result;
 use thiserror::Error;
 

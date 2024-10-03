@@ -7,7 +7,7 @@
 use crate::sources::FTStreamProvider;
 use anyhow::Error;
 use freetype_ffi::{FT_Stream, FT_StreamRec};
-use fuchsia_zircon as zx;
+
 use libc::{c_uchar, c_ulong, c_void};
 use std::{cmp, ptr, slice};
 

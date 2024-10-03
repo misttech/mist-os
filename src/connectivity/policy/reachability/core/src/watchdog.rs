@@ -13,7 +13,7 @@ use crate::{Id as InterfaceId, InterfaceView};
 use itertools::Itertools as _;
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx};
+use {fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx};
 
 /// The minimum amount of time for a device counter to be stuck in the same
 /// value for the device to be considered unhealthy.

@@ -77,7 +77,7 @@ impl<T: AsRef<FakeDiagnostics> + Send + Sync> Diagnostics for T {
 mod test {
     use super::*;
     use crate::datatypes::Poll;
-    use fuchsia_zircon as zx;
+
     use lazy_static::lazy_static;
 
     lazy_static! {

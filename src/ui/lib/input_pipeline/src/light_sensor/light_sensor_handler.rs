@@ -20,7 +20,7 @@ use fidl_fuchsia_settings::LightProxy;
 use fidl_fuchsia_ui_brightness::ControlProxy as BrightnessControlProxy;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::NumericProperty;
-use fuchsia_zircon as zx;
+
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::{Future, FutureExt, TryStreamExt};

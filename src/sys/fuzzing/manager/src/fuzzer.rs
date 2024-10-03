@@ -13,7 +13,7 @@ use test_manager::{Artifact, LaunchError, RunControllerProxy, SuiteControllerPro
 use tracing::warn;
 use {
     fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 /// Represents the what stage of its lifecycle a fuzzer is currently in.

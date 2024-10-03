@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zbi_abi::{ZBI_ALIGNMENT_BYTES, ZBI_FLAGS_CRC32};
-use fuchsia_zircon as zx;
+
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::mem::size_of;

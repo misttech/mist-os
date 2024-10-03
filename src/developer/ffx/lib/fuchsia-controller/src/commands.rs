@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
-use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
+use {zx_status, zx_types};
 
 type Responder<T> = mpsc::SyncSender<T>;
 type CmdResult<T> = Result<T, zx_status::Status>;

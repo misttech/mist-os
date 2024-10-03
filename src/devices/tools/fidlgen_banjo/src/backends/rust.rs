@@ -518,8 +518,7 @@ impl<'a, W: io::Write> Backend<'a, W> for RustBackend<'a, W> {
     fn codegen(&mut self, ir: FidlIr) -> Result<(), Error> {
         let decl_order = get_declarations(&ir)?;
 
-        let zircon_include =
-            if has_zircon_dep(&ir) { "use fuchsia_zircon_types as zircon_types;" } else { "" };
+        let zircon_include = if has_zircon_dep(&ir) { "use zx_types as zircon_types;" } else { "" };
 
         self.w.write_fmt(format_args!(
             include_str!("templates/rust/header.rs"),

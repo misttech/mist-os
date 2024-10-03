@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use fuchsia_zircon as zx;
+
 use objects::ObexObjectError;
 use thiserror::Error;
 

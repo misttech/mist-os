@@ -8,11 +8,11 @@ use anyhow::Result;
 use async_lock::Mutex as AsyncMutex;
 use byteorder::{NativeEndian, WriteBytesExt};
 use fuchsia_async::{LocalExecutor, Task};
-use fuchsia_zircon_types as zx_types;
 use futures_lite::AsyncWriteExt;
 use std::ops::DerefMut;
 use std::os::fd::{FromRawFd, RawFd};
 use std::sync::{Arc, Mutex};
+use zx_types;
 
 type Notifier = Arc<AsyncMutex<Option<LibNotifier>>>;
 

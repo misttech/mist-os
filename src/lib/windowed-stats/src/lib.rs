@@ -8,7 +8,7 @@ pub mod experimental;
 use crate::aggregations::SumAndCount;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{ArrayProperty, Node as InspectNode};
-use fuchsia_zircon::{self as zx};
+
 use std::collections::VecDeque;
 use std::fmt::{self, Debug};
 

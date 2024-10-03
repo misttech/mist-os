@@ -6,7 +6,7 @@ use crate::elementary_stream::*;
 
 use fidl_fuchsia_media::*;
 use fuchsia_stream_processors::*;
-use fuchsia_zircon as zx;
+
 use std::collections::HashMap;
 use std::fmt;
 use thiserror::Error;

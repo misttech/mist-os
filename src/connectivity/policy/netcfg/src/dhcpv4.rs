@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_zircon as zx,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, zx,
 };
 
 use anyhow::Context as _;

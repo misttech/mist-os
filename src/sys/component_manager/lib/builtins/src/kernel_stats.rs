@@ -5,9 +5,9 @@
 use anyhow::Error;
 use fidl_fuchsia_kernel as fkernel;
 use fuchsia_async::DurationExt as _;
-use fuchsia_zircon::{self as zx, Resource};
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::{self as zx, Resource};
 
 /// An implementation of the `fuchsia.kernel.Stats` protocol.
 pub struct KernelStats {

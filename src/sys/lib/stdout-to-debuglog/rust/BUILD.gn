@@ -8,9 +8,9 @@ rustc_library("stdout-to-debuglog") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 

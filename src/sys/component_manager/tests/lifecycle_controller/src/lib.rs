@@ -5,9 +5,9 @@
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component_test::{ChildOptions, RealmBuilder};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{AsHandleRef, Event};
 use futures::channel::mpsc;
 use futures::{FutureExt, SinkExt, StreamExt};
+use zx::{AsHandleRef, Event};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,

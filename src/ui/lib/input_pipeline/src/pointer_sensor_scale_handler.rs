@@ -8,7 +8,7 @@ use crate::utils::Position;
 use crate::{input_device, metrics, mouse_binding};
 use async_trait::async_trait;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon as zx;
+
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::num::FpCategory;
@@ -444,7 +444,7 @@ mod tests {
     use std::cell::Cell;
     use std::ops::Add;
     use test_util::{assert_gt, assert_lt, assert_near};
-    use {fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, fuchsia_inspect, zx};
 
     const COUNTS_PER_MM: f32 = 12.0;
     const DEVICE_DESCRIPTOR: input_device::InputDeviceDescriptor =
@@ -524,8 +524,8 @@ mod tests {
             PointerSensorScaleHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
 
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
-        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
+        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
 
         let input_events = vec![
             testing_utilities::create_mouse_event(

@@ -10,7 +10,7 @@ use crate::message::base::{
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::receptor::Receptor;
 
-use fuchsia_zircon::Duration;
+use zx::Duration;
 
 /// MessengerClient is a wrapper around a messenger with a fuse.
 #[derive(Clone, Debug)]

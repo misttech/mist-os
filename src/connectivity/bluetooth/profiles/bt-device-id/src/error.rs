@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth_deviceid::{DeviceIdentificationRecord, DeviceReleaseNumber};
-use fuchsia_zircon as zx;
+
 use thiserror::Error;
 
 /// Errors that occur during the operation of the Device Identification component.

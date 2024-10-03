@@ -20,7 +20,7 @@ use wlan_mlme::{DriverEvent, DriverEventSink};
 use wlan_sme::serve::create_sme;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx, wlan_trace as wtrace,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, wlan_trace as wtrace, zx,
 };
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;

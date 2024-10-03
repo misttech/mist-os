@@ -6,7 +6,7 @@ use anyhow::Result;
 use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierProxy;
 use fidl_test_time_realm::RealmOptions;
 use fuchsia_component_test::RealmInstance;
-use fuchsia_zircon as zx;
+
 use std::sync::Arc;
 use timekeeper_integration_lib::{
     FakeClockController, NestedTimekeeper, PushSourcePuppet, RtcOptions, RtcUpdates,

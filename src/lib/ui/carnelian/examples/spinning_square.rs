@@ -20,10 +20,10 @@ use euclid::{point2, size2, vec2, Angle, Transform2D};
 use fidl::prelude::*;
 use fidl_test_placeholders::{EchoMarker, EchoRequest, EchoRequestStream};
 use fuchsia_async as fasync;
-use fuchsia_zircon::MonotonicInstant;
 use futures::prelude::*;
 use std::f32::consts::PI;
 use std::path::PathBuf;
+use zx::MonotonicInstant;
 
 struct SpinningSquareAppAssistant {
     app_sender: AppSender,

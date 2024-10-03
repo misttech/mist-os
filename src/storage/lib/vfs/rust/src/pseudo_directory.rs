@@ -4,7 +4,7 @@
 
 //! A macro to generate pseudo directory trees using a small DSL.
 
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 
 /// A helper function used by the `pseudo_directory!` macro, to report nice errors in case
 /// add_entry() fails.

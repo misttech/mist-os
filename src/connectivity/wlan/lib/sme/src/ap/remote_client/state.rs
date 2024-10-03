@@ -7,7 +7,7 @@ use crate::ap::event::*;
 use crate::ap::remote_client::RemoteClient;
 use crate::ap::{aid, Context, RsnCfg};
 use anyhow::{ensure, format_err};
-use fuchsia_zircon::{self as zx};
+
 use ieee80211::MacAddr;
 use std::sync::{Arc, Mutex};
 use tracing::error;

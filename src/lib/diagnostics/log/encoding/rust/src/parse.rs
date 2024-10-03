@@ -7,7 +7,7 @@
 
 use crate::{ArgType, Header, StringRef};
 use fidl_fuchsia_diagnostics_stream::{Argument, RawSeverity, Record, Value};
-use fuchsia_zircon as zx;
+
 use nom::bytes::complete::take;
 use nom::multi::many0;
 use nom::number::complete::{le_f64, le_i64, le_u64};

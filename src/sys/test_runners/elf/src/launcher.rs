@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fuchsia_zircon::{self as zx, HandleBased};
 use lazy_static::lazy_static;
 use test_runners_lib::elf::{Component, KernelError};
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::LoggerStream;
+use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime};
 
 lazy_static! {

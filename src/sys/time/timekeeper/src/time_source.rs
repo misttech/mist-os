@@ -14,7 +14,6 @@ use fidl_fuchsia_time_external::{
 };
 use fuchsia_component::client;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 use futures::stream::Stream;
 use futures::{FutureExt, TryFutureExt};
 use std::fmt::Debug;

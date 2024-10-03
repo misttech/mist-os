@@ -10,7 +10,7 @@ use futures::{Future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _}
 use thiserror::Error;
 use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_zircon_status as zx,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, zx_status as zx,
 };
 
 /// Error type when using a [`fnet_interfaces_admin::AddressStateProviderProxy`].
@@ -482,7 +482,7 @@ mod test {
     use test_case::test_case;
     use {
         fidl_fuchsia_net_interfaces as fnet_interfaces,
-        fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_zircon_status as zx,
+        fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, zx_status as zx,
     };
 
     // Test that the terminal event is observed when the server closes its end.

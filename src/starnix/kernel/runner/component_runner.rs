@@ -42,7 +42,7 @@ use std::path::Path;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 /// Component controller epitaph value used as the base value to pass non-zero error

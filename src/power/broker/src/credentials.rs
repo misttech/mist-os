@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use fidl_fuchsia_power_broker::{DependencyToken, Permissions};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::collections::HashMap;
+use zx::{self as zx, AsHandleRef};
 
 use crate::topology::ElementID;
 
@@ -224,7 +224,7 @@ mod tests {
             permissions: Permissions::MODIFY_ASSERTIVE_DEPENDENT,
         };
         registry.register(&element_kryptonite, credential_to_register).expect("register failed");
-        use fuchsia_zircon::HandleBased;
+        use zx::HandleBased;
         let token_kryptonite_dup =
             token_kryptonite.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed");
         let credential = registry.lookup(&token_kryptonite_dup.into()).unwrap();

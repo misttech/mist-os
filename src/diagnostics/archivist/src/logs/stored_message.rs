@@ -16,7 +16,7 @@ use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::sync::Arc;
-use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics as fdiagnostics, zx};
 
 #[derive(Debug)]
 pub struct StoredMessage {

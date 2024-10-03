@@ -4,7 +4,7 @@
 
 use crate::gestures::gesture_arena;
 use crate::{input_device, mouse_binding, touch_binding, Position};
-use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
+use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
 /// Takes a sequence of InputEvents and return a sequence of InputEvents the
 /// gesture_arena converted to.

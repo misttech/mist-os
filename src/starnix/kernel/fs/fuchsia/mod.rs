@@ -4,7 +4,7 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
-use fuchsia_zircon as zx;
+
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 

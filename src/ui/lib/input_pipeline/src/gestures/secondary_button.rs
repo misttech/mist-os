@@ -10,7 +10,7 @@ use super::gesture_arena::{
 use super::utils::{movement_from_events, MovementDetail};
 use crate::mouse_binding::{MouseButton, MouseEvent, MouseLocation, MousePhase, RelativeLocation};
 use crate::utils::{euclidean_distance, Position};
-use fuchsia_zircon as zx;
+
 use maplit::hashset;
 use std::collections::HashSet;
 

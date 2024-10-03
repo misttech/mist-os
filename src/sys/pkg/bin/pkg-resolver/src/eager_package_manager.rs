@@ -27,7 +27,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use system_image::CachePackages;
 use tracing::{error, warn};
-use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, zx};
 
 const EAGER_PACKAGE_PERSISTENT_FIDL_NAME: &str = "eager_packages.pf";
 
@@ -700,7 +700,7 @@ mod tests {
     };
     use omaha_client::cup_ecdsa::{Cupv2RequestHandler, PublicKeyAndId, PublicKeyId};
     use omaha_client::protocol::request::Request;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     const TEST_URL: &str = "fuchsia-pkg://example.com/package";
     const TEST_HASH: &str = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";

@@ -20,7 +20,7 @@ use fidl_fuchsia_time_external::{
     PullSourceRequestStream, PushSourceRequestStream, Status, Urgency,
 };
 use fuchsia_component::server::{ServiceFs, ServiceObj};
-use fuchsia_zircon as zx;
+
 use futures::future::{join, Future};
 use futures::{FutureExt, StreamExt};
 use pull_source::PullSource;

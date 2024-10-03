@@ -65,9 +65,7 @@ impl TraceFs {
         dir.subdir(current_task, "per_cpu", 0o755, |dir| {
             /// A name for each cpu directory, cached to provide a 'static lifetime.
             static CPU_DIR_NAMES: Lazy<Vec<String>> = Lazy::new(|| {
-                (0..fuchsia_zircon::system_get_num_cpus())
-                    .map(|cpu| format!("cpu{}", cpu))
-                    .collect()
+                (0..zx::system_get_num_cpus()).map(|cpu| format!("cpu{}", cpu)).collect()
             });
             for dir_name in CPU_DIR_NAMES.iter().map(|s| s.as_str()) {
                 dir.subdir(current_task, dir_name, 0o755, |dir| {

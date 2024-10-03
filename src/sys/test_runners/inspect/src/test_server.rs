@@ -9,12 +9,12 @@ use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
 use fidl::endpoints::ServerEnd;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{Duration, MonotonicInstant, Status};
 use futures::channel::oneshot;
 use futures::future::{abortable, select, Either};
 use futures::{pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::warn;
+use zx::{Duration, MonotonicInstant, Status};
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
@@ -80,7 +80,7 @@ impl TestServer {
     /// Output logs are written to the given socket.
     ///
     /// Returns true on pass and false on failure.
-    async fn run_case(spec: &ProgramSpec, case: &str, logs: fuchsia_zircon::Socket) -> bool {
+    async fn run_case(spec: &ProgramSpec, case: &str, logs: zx::Socket) -> bool {
         let case = match spec.cases.get(case) {
             Some(case) => case,
             None => {
@@ -221,8 +221,7 @@ impl TestServer {
                                 let spec = spec.clone();
                                 let proxy = proxy.clone();
                                 tasks.push(async move {
-                                    let (stdout_end, stdout) =
-                                        fuchsia_zircon::Socket::create_stream();
+                                    let (stdout_end, stdout) = zx::Socket::create_stream();
 
                                     let name = test.name.clone().unwrap_or_default();
 

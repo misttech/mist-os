@@ -8,11 +8,11 @@ use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_mem::Buffer;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{Status, Vmo, VmoOptions};
 use futures::channel::mpsc;
 use futures::lock::Mutex as AsyncMutex;
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::{Status, Vmo, VmoOptions};
 use {fidl_fuchsia_paver as paver, fuchsia_async as fasync};
 
 fn verify_buffer(buffer: &mut Buffer) {
@@ -817,7 +817,7 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_paver as paver;
-    use fuchsia_zircon::{self as zx};
+
     use futures::task::Poll;
 
     struct MockPaverForTest {

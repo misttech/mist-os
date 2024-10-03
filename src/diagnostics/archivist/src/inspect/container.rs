@@ -13,7 +13,6 @@ use fidl::endpoints::Proxy;
 use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use selectors::SelectorExt;
@@ -21,6 +20,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_inspect as finspect,
     fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect,
@@ -550,7 +550,7 @@ impl UnpopulatedInspectDataContainer {
 mod test {
     use super::*;
     use fuchsia_inspect::Node;
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use std::sync::LazyLock;
 

@@ -8,9 +8,6 @@ use crate::task::{ClockId, CurrentTask, Timeline, TimerId, TimerWakeup};
 use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon::{
-    Task, {self as zx},
-};
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
 use starnix_uapi::auth::CAP_WAKE_ALARM;
@@ -26,6 +23,9 @@ use starnix_uapi::{
     CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME,
     CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS,
     TIMER_ABSTIME,
+};
+use zx::{
+    Task, {self as zx},
 };
 
 pub fn sys_clock_getres(
@@ -543,11 +543,11 @@ mod test {
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
     use fuchsia_runtime::{UtcClock, UtcClockUpdate};
-    use fuchsia_zircon::HandleBased;
     use starnix_uapi::ownership::OwnedRef;
     use starnix_uapi::signals;
     use starnix_uapi::user_address::UserAddress;
     use test_util::{assert_geq, assert_leq};
+    use zx::HandleBased;
 
     #[::fuchsia::test]
     async fn test_nanosleep_without_remainder() {

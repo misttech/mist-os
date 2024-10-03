@@ -57,8 +57,8 @@ rustc_library("usercopy") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:zerocopy",
   ]
   non_rust_deps = [ ":usercopy_assembly_routines" ]

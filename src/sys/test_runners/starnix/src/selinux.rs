@@ -8,7 +8,7 @@ use fidl::endpoints::create_proxy;
 use std::collections::HashMap;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_test as ftest, fuchsia_zircon as zx,
+    fidl_fuchsia_test as ftest, zx,
 };
 
 pub async fn run_selinux_cases(

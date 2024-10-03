@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_async::{self as fasync, ReadableHandle, ReadableState};
-use fuchsia_zircon as zx;
+
 use futures::Stream;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};

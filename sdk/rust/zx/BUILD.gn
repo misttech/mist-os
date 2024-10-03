@@ -73,7 +73,7 @@ if (is_fuchsia) {
 
 # Certain tests written as unit tests of fuchsia-zircon make use of other
 # crates which themselves depend on fuchsia-zircon. This causes
-# fuchsia_zircon::foo to be a different type from crate::foo in the context of
+# zx::foo to be a different type from crate::foo in the context of
 # those unit tests when fuchsia-zircon is built with `with_unit_tests = true`.
 #
 # Since those tests are really integration tests, we should either move them

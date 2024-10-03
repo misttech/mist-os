@@ -12,7 +12,6 @@ use fidl_fuchsia_update_installer_ext::{self as installer};
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, EventPair, HandleBased, Peered};
 use futures::channel::mpsc;
 use futures::lock::Mutex as AsyncMutex;
 use futures::prelude::*;
@@ -24,6 +23,7 @@ use mock_reboot::{MockRebootService, RebootReason};
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
 use std::time::Duration;
+use zx::{self as zx, EventPair, HandleBased, Peered};
 use {fidl_fuchsia_update as fidl_update, fidl_fuchsia_update_installer as fidl_installer};
 
 const BINARY_PATH: &str = "/pkg/bin/update";

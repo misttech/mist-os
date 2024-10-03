@@ -9,7 +9,7 @@
 
 use anyhow::{ensure, Context, Error};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
+
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 /// The following types and constants are defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.

@@ -22,7 +22,7 @@ use std::task::Poll;
 use explicit::ResultExt as _;
 use fuchsia_runtime::vmar_root_self;
 use futures::channel::oneshot::{channel, Receiver, Sender};
-use {fidl_fuchsia_hardware_network as netdev, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_network as netdev, zx};
 
 use super::{ChainLength, DescId, DescRef, DescRefMut, Descriptors};
 use crate::error::{Error, Result};

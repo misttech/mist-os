@@ -179,7 +179,7 @@ mod test {
         generate_random_scanned_candidate, random_connection_data,
     };
     use test_util::assert_gt;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     fn connect_failure_with_bssid(bssid: types::Bssid) -> ConnectFailure {
         ConnectFailure {

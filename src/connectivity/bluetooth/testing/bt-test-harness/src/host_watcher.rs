@@ -10,7 +10,7 @@ use fuchsia_bluetooth::expectation::asynchronous::{
 };
 use fuchsia_bluetooth::expectation::Predicate;
 use fuchsia_bluetooth::types::{Address, HostId, HostInfo};
-use fuchsia_zircon as zx;
+
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hci_emulator_client::Emulator;
 use std::collections::HashMap;

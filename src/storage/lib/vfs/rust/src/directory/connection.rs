@@ -17,9 +17,9 @@ use fidl::endpoints::ServerEnd;
 #[cfg(any(fuchsia_api_level_less_than = "23", fuchsia_api_level_at_least = "PLATFORM"))]
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
+use zx_status::Status;
 
 use crate::common::CreationMode;
 use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt};

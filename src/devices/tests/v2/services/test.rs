@@ -7,7 +7,7 @@ use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::client;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft, fuchsia_zircon as zx};
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft, zx};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_services() -> Result<()> {

@@ -27,7 +27,7 @@ use lazy_static::lazy_static;
 use maplit::hashmap;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fuchsia_trace as ftrace, zx};
 
 /// The vendor ID denoting the internal Chromebook keyboard.
 const VENDOR_ID: u32 = 0x18d1; // Google

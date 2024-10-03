@@ -232,7 +232,7 @@ impl PhyManager {
     ) -> Result<Option<fidl_service::QueryIfaceResponse>, PhyManagerError> {
         match self.device_monitor.query_iface(iface_id).await {
             Ok(Ok(response)) => Ok(Some(response)),
-            Ok(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND)) => Ok(None),
+            Ok(Err(zx::sys::ZX_ERR_NOT_FOUND)) => Ok(None),
             _ => Err(PhyManagerError::IfaceQueryFailure),
         }
     }
@@ -857,7 +857,7 @@ async fn create_iface(
             // Ensure that the CreateIface call
             // 1. Did not return a non-ok status
             // 2. Resulted in an interface ID
-            if fuchsia_zircon::ok(status).is_err() {
+            if zx::ok(status).is_err() {
                 warn!("create iface failed for PHY {}: {:?}", phy_id, status);
                 Err(PhyManagerError::IfaceCreateFailure)
             } else {
@@ -897,10 +897,10 @@ async fn destroy_iface(
     let request = fidl_service::DestroyIfaceRequest { iface_id };
     let (destroy_iface_response, metric) = match proxy.destroy_iface(&request).await {
         Ok(status) => match status {
-            fuchsia_zircon::sys::ZX_OK => (Ok(()), Some(Ok(()))),
+            zx::sys::ZX_OK => (Ok(()), Some(Ok(()))),
             ref e => {
                 let metric = match *e {
-                    fuchsia_zircon::sys::ZX_ERR_NOT_FOUND => None,
+                    zx::sys::ZX_ERR_NOT_FOUND => None,
                     _ => Some(Err(())),
                 };
                 warn!("failed to destroy iface {}: {}", iface_id, e);
@@ -960,7 +960,7 @@ async fn set_phy_country_code(
             PhyManagerError::PhySetCountryFailure
         })?;
 
-    fuchsia_zircon::ok(status).map_err(|e| {
+    zx::ok(status).map_err(|e| {
         error!("Received bad status when setting country code for PHY {}: {}", phy_id, e);
         PhyManagerError::PhySetCountryFailure
     })
@@ -976,7 +976,7 @@ async fn clear_phy_country_code(
             PhyManagerError::PhySetCountryFailure
         })?;
 
-    fuchsia_zircon::ok(status).map_err(|e| {
+    zx::ok(status).map_err(|e| {
         error!("Received bad status when clearing country code for PHY {}: {}", phy_id, e);
         PhyManagerError::PhySetCountryFailure
     })
@@ -987,10 +987,7 @@ async fn disconnect(
     iface_id: u16,
 ) -> Result<(), Error> {
     let (sme_proxy, remote) = create_proxy()?;
-    dev_monitor_proxy
-        .get_client_sme(iface_id, remote)
-        .await?
-        .map_err(fuchsia_zircon::Status::from_raw)?;
+    dev_monitor_proxy.get_client_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
 
     sme_proxy
         .disconnect(fidl_sme::UserDisconnectReason::Recovery)
@@ -1003,10 +1000,7 @@ async fn stop_ap(
     iface_id: u16,
 ) -> Result<(), Error> {
     let (sme_proxy, remote) = create_proxy()?;
-    dev_monitor_proxy
-        .get_ap_sme(iface_id, remote)
-        .await?
-        .map_err(fuchsia_zircon::Status::from_raw)?;
+    dev_monitor_proxy.get_ap_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
 
     match sme_proxy.stop().await {
         Ok(result) => match result {
@@ -1025,13 +1019,13 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints;
     use fuchsia_async::{run_singlethreaded, TestExecutor};
-    use fuchsia_zircon::sys::{ZX_ERR_NOT_FOUND, ZX_OK};
     use futures::channel::mpsc;
     use futures::stream::StreamExt;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::assert_variant;
+    use zx::sys::{ZX_ERR_NOT_FOUND, ZX_OK};
     use {
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_inspect as inspect,
@@ -1081,7 +1075,7 @@ mod tests {
     fn send_get_supported_mac_roles_response(
         exec: &mut TestExecutor,
         server: &mut fidl_service::DeviceMonitorRequestStream,
-        supported_mac_roles: Result<&[fidl_common::WlanMacRole], fuchsia_zircon::sys::zx_status_t>,
+        supported_mac_roles: Result<&[fidl_common::WlanMacRole], zx::sys::zx_status_t>,
     ) {
         let _ = assert_variant!(
             exec.run_until_stalled(&mut server.next()),
@@ -1193,7 +1187,7 @@ mod tests {
     fn send_destroy_iface_response(
         exec: &mut TestExecutor,
         server: &mut fidl_service::DeviceMonitorRequestStream,
-        return_status: fuchsia_zircon::sys::zx_status_t,
+        return_status: zx::sys::zx_status_t,
     ) {
         assert_variant!(
             exec.run_until_stalled(&mut server.next()),
@@ -1297,7 +1291,7 @@ mod tests {
             send_get_supported_mac_roles_response(
                 &mut exec,
                 &mut test_values.monitor_stream,
-                Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND),
+                Err(zx::sys::ZX_ERR_NOT_FOUND),
             );
 
             assert!(exec.run_until_stalled(&mut add_phy_fut).is_ready());
@@ -3287,7 +3281,7 @@ mod tests {
                 ))) => {
                     // Send back a failure.
                     responder
-                        .send(fuchsia_zircon::sys::ZX_ERR_NOT_SUPPORTED)
+                        .send(zx::sys::ZX_ERR_NOT_SUPPORTED)
                         .expect("sending fake set country response");
                 }
             );
@@ -3846,7 +3840,7 @@ mod tests {
         send_destroy_iface_response(
             &mut exec,
             &mut test_values.monitor_stream,
-            fuchsia_zircon::sys::ZX_ERR_NO_RESOURCES,
+            zx::sys::ZX_ERR_NO_RESOURCES,
         );
 
         // The future should complete.

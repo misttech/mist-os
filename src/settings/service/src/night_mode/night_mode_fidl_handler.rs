@@ -30,8 +30,8 @@ impl request::Responder<Scoped<NightModeSetResult>> for NightModeSetResponder {
     }
 }
 
-impl watch::Responder<NightModeSettings, fuchsia_zircon::Status> for NightModeWatchResponder {
-    fn respond(self, response: Result<NightModeSettings, fuchsia_zircon::Status>) {
+impl watch::Responder<NightModeSettings, zx::Status> for NightModeWatchResponder {
+    fn respond(self, response: Result<NightModeSettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings);

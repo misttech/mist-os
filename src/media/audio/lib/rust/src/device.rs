@@ -11,8 +11,7 @@ use std::str::FromStr;
 use thiserror::Error;
 use {
     fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
-    fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_io as fio,
-    fuchsia_zircon_types as zx_types,
+    fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_io as fio, zx_types,
 };
 
 /// The type of an audio device.

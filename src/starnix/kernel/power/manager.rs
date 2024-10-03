@@ -16,16 +16,16 @@ use anyhow::{anyhow, Context};
 use fidl::endpoints::create_sync_proxy;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use fuchsia_zircon::{HandleBased, Peered};
 use once_cell::sync::OnceCell;
 use starnix_logging::log_warn;
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
+use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
-    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, zx,
 };
 
 cfg_if::cfg_if! {

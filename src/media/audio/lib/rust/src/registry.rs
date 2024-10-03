@@ -10,12 +10,12 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_async::Task;
-use fuchsia_zircon_status::Status;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tracing::error;
+use zx_status::Status;
 
 pub struct Registry {
     proxy: fadevice::RegistryProxy,

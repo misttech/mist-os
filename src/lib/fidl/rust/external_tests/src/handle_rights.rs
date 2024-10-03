@@ -24,10 +24,10 @@ use fidl_test_external::{
     SendHandleProtocolRequest, SendHandleProtocolSynchronousProxy,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::{Handle, MonotonicInstant, ObjectType, Rights, Signals};
 use futures::future;
 use futures::stream::StreamExt;
 use std::io::prelude::*;
+use zx::{Handle, MonotonicInstant, ObjectType, Rights, Signals};
 
 const SEND_HANDLE_REDUCED_RIGHTS_ORDINAL: u64 = 0x7675407e0eb5f825;
 const SEND_HANDLE_SAME_RIGHTS_ORDINAL: u64 = 0x1d43414e5560333a;

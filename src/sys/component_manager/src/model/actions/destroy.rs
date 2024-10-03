@@ -148,7 +148,7 @@ pub mod tests {
     use futures::channel::mpsc;
     use futures::StreamExt;
     use moniker::{ChildName, Moniker};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn destroy_one_component() {

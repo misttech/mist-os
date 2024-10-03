@@ -8,7 +8,7 @@ use fidl::endpoints;
 use fidl_fuchsia_hardware_display::{
     CoordinatorListenerMarker, CoordinatorMarker, Info, ProviderSynchronousProxy,
 };
-use fuchsia_zircon as zx;
+
 use futures::executor::block_on;
 use futures::{future, TryStreamExt};
 use serde_json::json;

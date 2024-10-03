@@ -12,7 +12,6 @@ use crate::encoding::{
 use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
 use crate::Error;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone};
 use futures::ready;
 use futures::stream::{FusedStream, Stream};
@@ -24,6 +23,7 @@ use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{RawWaker, RawWakerVTable};
+use zx_status;
 
 /// Decodes the body of `buf` as the FIDL type `T`.
 #[doc(hidden)] // only exported for use in macros or generated code
@@ -822,8 +822,8 @@ pub mod sync {
     //! Synchronous FIDL Client
 
     use super::*;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use std::mem::MaybeUninit;
+    use zx::{self as zx, AsHandleRef};
 
     /// A synchronous client for making FIDL calls.
     #[derive(Debug)]
@@ -994,7 +994,6 @@ mod tests {
     use anyhow::{Context as _, Error};
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_zircon::AsHandleRef;
     use futures::channel::oneshot;
     use futures::stream::FuturesUnordered;
     use futures::task::{noop_waker, waker, ArcWake};
@@ -1002,7 +1001,8 @@ mod tests {
     use futures_test::task::new_count_waker;
     use std::future::pending;
     use std::thread;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::AsHandleRef;
+    use {fuchsia_async as fasync, zx};
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
     const SEND_ORDINAL: u64 = 42 << 32;

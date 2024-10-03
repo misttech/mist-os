@@ -19,7 +19,6 @@ use fs_management::FSConfig;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_inspect::hierarchy::DiagnosticsHierarchy;
-use fuchsia_zircon::Vmo;
 use futures::lock::Mutex as FuturesMutex;
 use futures::StreamExt as _;
 use key_bag::Aes256Key;
@@ -35,6 +34,7 @@ use storage_stress_test_utils::io::Directory;
 use stress_test::actor::ActorRunner;
 use stress_test::environment::Environment;
 use stress_test::random_seed;
+use zx::Vmo;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
 // All partitions in this test have their type set to this arbitrary GUID.
@@ -56,7 +56,7 @@ const METADATA_KEY: Aes256Key = Aes256Key::create([
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ]);
 
-const INSPECT_POLL_INTERVAL: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(1);
+const INSPECT_POLL_INTERVAL: zx::Duration = zx::Duration::from_seconds(1);
 
 fn print_inspect_data(data: &DiagnosticsHierarchy) {
     match serde_json::to_string_pretty(&data) {

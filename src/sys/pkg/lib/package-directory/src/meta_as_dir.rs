@@ -13,7 +13,7 @@ use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as VfsPath;
 use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 pub(crate) struct MetaAsDir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,

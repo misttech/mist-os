@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fs_management::partition::{find_partition, PartitionMatcher};
-use fuchsia_zircon::Duration;
 use ramdevice_client::RamdiskClient;
+use zx::Duration;
 
 #[fuchsia::test]
 async fn find_partition_test() {

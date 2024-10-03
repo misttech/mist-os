@@ -14,7 +14,6 @@ use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_pkg::PackageDirectory;
 use fuchsia_sync::Mutex;
 use fuchsia_url::AbsolutePackageUrl;
-use fuchsia_zircon::Status;
 use futures::lock::Mutex as AsyncMutex;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
@@ -24,6 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use zx::Status;
 use {cobalt_sw_delivery_registry as metrics, fuchsia_trace as ftrace};
 
 pub use fidl_fuchsia_pkg_ext::BasePackageIndex;

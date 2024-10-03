@@ -19,10 +19,7 @@ mod tests {
         CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
     };
     use std::collections::HashSet;
-    use {
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
-        fuchsia_zircon_status as zx_status,
-    };
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status};
 
     #[fuchsia::test]
     async fn storage_dir_from_cm_namespace() {

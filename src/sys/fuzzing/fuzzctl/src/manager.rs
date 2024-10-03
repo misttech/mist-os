@@ -5,7 +5,7 @@
 use anyhow::{bail, Context as _, Result};
 use fidl::endpoints::{create_proxy, ProtocolMarker};
 use url::Url;
-use {fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_fuzzer as fuzz, zx_status as zx};
 
 /// Represents the FIDL connection from the `ffx fuzz` plugin to the `fuzz-manager` component on a
 /// target device.

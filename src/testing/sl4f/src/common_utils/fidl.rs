@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use anyhow::Error;
 use fidl::endpoints::{ClientEnd, ProtocolMarker};
-use fuchsia_zircon as zx;
+
 use glob::glob;
 
 /// Connects to a protocol served at a path that matches a glob pattern.

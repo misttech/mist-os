@@ -11,7 +11,7 @@ use fidl_fuchsia_fxfs::{
     CryptManagementSetActiveKeyResult, CryptRequest, CryptRequestStream, CryptUnwrapKeyResult,
     KeyPurpose,
 };
-use fuchsia_zircon as zx;
+
 use futures::stream::TryStreamExt;
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::Mutex;

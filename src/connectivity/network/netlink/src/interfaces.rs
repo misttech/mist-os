@@ -1441,7 +1441,6 @@ pub(crate) mod testutil {
 
     use std::sync::{Arc, Mutex};
 
-    use fuchsia_zircon as zx;
     use futures::channel::mpsc;
     use futures::future::Future;
     use futures::stream::Stream;

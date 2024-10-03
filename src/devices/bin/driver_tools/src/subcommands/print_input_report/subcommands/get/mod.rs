@@ -10,7 +10,7 @@ use futures::lock::Mutex;
 use std::io::Write;
 use std::ops::DerefMut;
 use std::sync::Arc;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_io as fio, zx_status as zx};
 
 pub async fn get(
     cmd: &GetCommand,

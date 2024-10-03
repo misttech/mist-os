@@ -4,12 +4,12 @@
 
 use anyhow::{format_err, Error};
 use fdio::{SpawnAction, SpawnOptions};
-use fuchsia_zircon::{self as zx, AsHandleRef, MonotonicInstant, Signals, Socket, Status};
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::{Error as IOError, Read, Write};
 use std::os::fd::AsFd as _;
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef, MonotonicInstant, Signals, Socket, Status};
 
 pub struct BlockingSocket {
     // Holding a reference to File so it lives as long as the associated socket. If the FD is closed

@@ -293,7 +293,7 @@ impl Message<[MaybeUninit<u8>]> {
 
 #[cfg(test)]
 mod test {
-    use fuchsia_zircon::HandleBased;
+    use zx::HandleBased;
 
     use super::*;
     use crate::*;
@@ -327,8 +327,7 @@ mod test {
     #[test]
     fn round_trip_handles() {
         let arena = Arena::new().unwrap();
-        let zircon_handle =
-            MixedHandle::from_zircon_handle(fuchsia_zircon::Port::create().into_handle());
+        let zircon_handle = MixedHandle::from_zircon_handle(zx::Port::create().into_handle());
         let (driver_handle1, driver_handle2) = Channel::create().unwrap();
         driver_handle2
             .write(Message::new_with_data(arena.clone(), |arena| arena.insert(1)))

@@ -6,7 +6,6 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_pkg_rewrite::{
     EditTransactionMarker, EngineMarker, EngineProxy, LiteralRule, Rule,
 };
-use fuchsia_zircon as zx;
 
 pub async fn disable_updates() -> Result<(), Error> {
     let engine = fuchsia_component::client::connect_to_protocol::<EngineMarker>()

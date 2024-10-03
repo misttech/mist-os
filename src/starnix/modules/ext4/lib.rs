@@ -5,8 +5,7 @@
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
-use fuchsia_zircon as zx;
-use fuchsia_zircon::HandleBased;
+
 use once_cell::sync::OnceCell;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::ProtectionFlags;
@@ -28,6 +27,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, ino_t, off_t, statfs, EXT4_SUPER_MAGIC};
 use std::sync::Arc;
+use zx::HandleBased;
 
 mod pager;
 

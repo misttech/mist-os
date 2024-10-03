@@ -5,7 +5,7 @@
 use crate::task_metrics::constants::*;
 use core::cmp::Reverse;
 use fuchsia_inspect::{self as inspect, ArrayProperty};
-use fuchsia_zircon as zx;
+
 use injectable_time::TimeSource;
 use std::cmp::{max, Eq, Ord, PartialEq, PartialOrd};
 use std::collections::BinaryHeap;
@@ -272,9 +272,9 @@ impl MeasurementsQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{Duration as ZxDuration, MonotonicInstant};
     use injectable_time::FakeTime;
     use std::time::Duration;
+    use zx::{Duration as ZxDuration, MonotonicInstant};
 
     fn insert_default(q: &mut MeasurementsQueue, clock: &FakeTime) {
         q.insert(Measurement::empty(MonotonicInstant::from_nanos(clock.now())));

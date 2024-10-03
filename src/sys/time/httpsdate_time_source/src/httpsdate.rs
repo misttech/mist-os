@@ -20,7 +20,7 @@ use httpdate_hyper::{HttpsDateError, HttpsDateErrorType};
 use push_source::Update;
 use rand::Rng;
 use tracing::{debug, error, info};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// A definition of how long an algorithm should wait between polls. Defines fixed wait durations
 /// following successful poll attempts, and a capped exponential backoff following failed poll

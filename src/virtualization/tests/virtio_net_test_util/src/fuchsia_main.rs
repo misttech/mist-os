@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_net_ext::MacAddress;
 use fuchsia_async::TimeoutExt as _;
-use fuchsia_zircon as zx;
+
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use std::convert::TryInto as _;
 use std::str::FromStr;

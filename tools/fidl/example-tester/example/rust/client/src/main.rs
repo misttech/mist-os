@@ -6,7 +6,7 @@ use anyhow::{Context as _, Error};
 use config::Config;
 use fidl_test_exampletester::SimpleMarker;
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 use std::{thread, time};
 
 fn main() -> Result<(), Error> {

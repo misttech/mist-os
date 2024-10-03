@@ -7,7 +7,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MessageBufEtc};
+use zx::{self as zx, AsHandleRef, MessageBuf, MessageBufEtc};
 
 use crate::{OnSignalsRef, RWHandle, ReadableHandle as _};
 
@@ -199,7 +199,7 @@ impl<'a> Future for RecvEtcMsg<'a> {
 mod tests {
     use super::*;
     use crate::TestExecutor;
-    use fuchsia_zircon::{self as zx};
+
     use futures::task::{waker, ArcWake};
     use std::future::poll_fn;
     use std::mem;

@@ -10,7 +10,7 @@ use fuchsia_inspect::{
     UintProperty,
 };
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use httpdate_hyper::HttpsDateErrorType;
 use std::collections::HashMap;
 use tracing::error;
@@ -191,7 +191,7 @@ mod test {
     use crate::datatypes::Poll;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::Inspector;
-    use fuchsia_zircon as zx;
+
     use lazy_static::lazy_static;
 
     lazy_static! {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters};
-use fuchsia_zircon as zx;
+
 use futures::channel::oneshot;
 use std::cmp::PartialEq;
 use std::collections::hash_map::Iter;

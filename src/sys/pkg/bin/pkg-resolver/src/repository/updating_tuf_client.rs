@@ -24,7 +24,7 @@ use tuf::error::Error as TufError;
 use tuf::metadata::{Metadata, TargetDescription, TargetPath};
 use tuf::pouf::Pouf1;
 use tuf::repository::{RepositoryProvider, RepositoryStorageProvider};
-use {cobalt_sw_delivery_registry as metrics, fuchsia_zircon as zx};
+use {cobalt_sw_delivery_registry as metrics, zx};
 
 type TufClient = tuf::client::Client<
     Pouf1,

@@ -5,7 +5,7 @@
 use crate::connection::VsockConnectionKey;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 type HostPort = u32;
 type GuestPort = u32;

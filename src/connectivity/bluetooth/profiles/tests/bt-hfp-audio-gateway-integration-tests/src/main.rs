@@ -15,13 +15,13 @@ use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
-use fuchsia_zircon::Duration;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use futures::TryFutureExt;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use realmbuilder_mock_helpers::{mock_component, mock_dev};
 use test_call_manager::TestCallManager;
+use zx::Duration;
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_io as fio};
 
 /// HFP-AG component URL.

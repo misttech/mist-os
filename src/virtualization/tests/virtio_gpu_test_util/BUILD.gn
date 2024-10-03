@@ -23,9 +23,9 @@ rustc_binary("virtio_gpu_test_util") {
   if (is_fuchsia) {
     deps += [
       "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_rust",
+      "//sdk/rust/zx",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-component",
-      "//src/lib/zircon/rust:fuchsia-zircon",
       "//third_party/rust_crates:futures",
     ]
   }

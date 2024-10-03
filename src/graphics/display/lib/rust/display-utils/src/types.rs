@@ -10,8 +10,8 @@ use fidl_fuchsia_hardware_display::{
 };
 use fidl_fuchsia_hardware_display_types::{DisplayId as FidlDisplayId, INVALID_DISP_ID};
 use fuchsia_async::OnSignals;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::fmt;
+use zx::{self as zx, AsHandleRef};
 
 /// Strongly typed wrapper around a display ID.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

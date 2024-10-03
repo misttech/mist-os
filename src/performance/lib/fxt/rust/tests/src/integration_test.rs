@@ -16,7 +16,7 @@ use futures::StreamExt;
 use std::collections::BTreeMap;
 use std::path::Path;
 use tracing::info;
-use {fidl_fuchsia_component_decl as fdecl, fuchsia_zircon as zx};
+use {fidl_fuchsia_component_decl as fdecl, zx};
 
 const COLLECTION_NAME: &str = "dynamic";
 const CHILD_NAME: &str = "provider_puppet";

@@ -29,6 +29,7 @@ rustc_test("bin") {
   source_root = "src/main.rs"
   deps = [
     "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//sdk/rust/zx",
     "//src/devices/testing/syscall-intercept:fuchsia.test.syscalls_rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia-async",
@@ -36,7 +37,6 @@ rustc_test("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/tests/diagnostics/suspend_inspect/testing/suspend_driver_realm_proxy/fidl/fuchsia.test.suspend:fuchsia.test.suspend_rust",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",

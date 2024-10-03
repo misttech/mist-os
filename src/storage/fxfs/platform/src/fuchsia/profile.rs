@@ -26,7 +26,7 @@ use std::mem::size_of;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferRef};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const FILE_OPEN_MARKER: u64 = u64::MAX;
 const REPLAY_THREADS: usize = 2;

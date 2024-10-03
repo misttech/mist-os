@@ -27,11 +27,11 @@ rustc_binary("virtio_vsock_bin") {
   deps = [
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_rust",
     "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/virtualization/lib/machina-virtio-device",
     "//src/virtualization/lib/virtio-device",
     "//third_party/rust_crates:anyhow",

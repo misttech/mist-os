@@ -216,7 +216,7 @@ impl TryFrom<KeyEvent> for ui_input3::KeyEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fuchsia_zircon as zx;
+
     use keymaps::usages::Usages;
     use maplit::hashset;
 

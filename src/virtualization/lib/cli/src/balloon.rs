@@ -240,7 +240,7 @@ mod test {
     use fidl::endpoints::{create_proxy_and_stream, ControlHandle, RequestStream};
     use fidl_fuchsia_virtualization::MemStat;
     use futures::StreamExt;
-    use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
+    use {fuchsia_async as fasync, zx_status};
 
     #[fasync::run_until_stalled(test)]
     async fn balloon_valid_page_num_returns_ok() {

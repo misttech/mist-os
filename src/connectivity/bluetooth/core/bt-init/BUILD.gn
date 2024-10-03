@@ -35,8 +35,8 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
-    "//src/lib/zircon/rust:fuchsia-zircon",
   ]
 
   sources = [ "src/main.rs" ]

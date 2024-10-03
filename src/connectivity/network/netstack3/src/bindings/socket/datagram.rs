@@ -20,8 +20,6 @@ use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _};
 use fuchsia_async as fasync;
-use fuchsia_zircon::prelude::HandleBased as _;
-use fuchsia_zircon::{self as zx, Peered as _};
 use log::{debug, error, trace, warn};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6};
 use net_types::{MulticastAddr, SpecifiedAddr, ZonedAddr};
@@ -39,6 +37,8 @@ use netstack3_core::udp::UdpPacketMeta;
 use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
 use packet_formats::ip::DscpAndEcn;
+use zx::prelude::HandleBased as _;
+use zx::{self as zx, Peered as _};
 
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::worker::{self, SocketWorker};
@@ -2542,10 +2542,10 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::StreamExt;
     use packet::Serializer as _;
     use packet_formats::icmp::IcmpIpExt;
+    use zx::{self as zx, AsHandleRef};
 
     use crate::bindings::integration_tests::{
         test_ep_name, StackSetupBuilder, TestSetup, TestSetupBuilder, TestStack,

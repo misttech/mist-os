@@ -762,7 +762,7 @@ mod tests {
     use super::*;
     use crate::touch_binding;
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+
     use test_case::test_case;
 
     const MOTION_THRESHOLD_IN_MM: f32 = 5.0;

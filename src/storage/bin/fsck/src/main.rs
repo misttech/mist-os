@@ -9,7 +9,7 @@ use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_device::ControllerMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
 use fuchsia_component::client::{connect_channel_to_protocol_at_path, connect_to_protocol_at_path};
-use {fidl_fuchsia_fs_realm as fs_realm, fuchsia_zircon as zx};
+use {fidl_fuchsia_fs_realm as fs_realm, zx};
 
 #[derive(FromArgs)]
 #[argh(description = "A utility for checking the consistency of a filesystem instance running on a

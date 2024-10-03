@@ -29,7 +29,7 @@ use {
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_power_broker as fpower_broker, fidl_fuchsia_power_system as fpower_system,
-    fidl_test_sagcontrol as fsagcontrol, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_test_sagcontrol as fsagcontrol, fuchsia_async as fasync, zx,
 };
 
 async fn create_power_realm<'a>(

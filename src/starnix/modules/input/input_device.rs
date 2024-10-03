@@ -6,7 +6,6 @@ use crate::input_event_relay::{DeviceId, EventProxyMode, OpenedFiles};
 use crate::{parse_fidl_keyboard_event_to_linux_input_event, InputFile};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use fuchsia_zircon::Peered;
 use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
@@ -25,10 +24,10 @@ use starnix_uapi::time::timeval_from_time;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::Arc;
+use zx::Peered;
 use {
     fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
-    starnix_uapi as uapi,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, starnix_uapi as uapi, zx,
 };
 
 // Add a fuchsia-specific vendor ID. 0xf1ca is currently not allocated
@@ -422,10 +421,7 @@ mod test {
     use test_case::test_case;
     use test_util::assert_near;
     use zerocopy::FromBytes as _;
-    use {
-        fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy,
-        fuchsia_zircon as zx,
-    }; // for `read_from()`
+    use {fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy, zx}; // for `read_from()`
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 

@@ -4,12 +4,12 @@
 
 use fuchsia_async::{Time, TimeoutExt};
 use fuchsia_bluetooth::types::Channel;
-use fuchsia_zircon::Duration;
 use futures::future::Ready;
 use futures::stream::FilterMap;
 use futures::{future, Stream, StreamExt};
 use packet_encoding::{Decodable, Encodable};
 use tracing::{info, trace};
+use zx::Duration;
 
 #[cfg(test)]
 mod tests;

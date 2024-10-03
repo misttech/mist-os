@@ -13,7 +13,7 @@ use std::sync::Arc;
 use timekeeper_integration_lib::{PushSourcePuppet, RtcUpdates};
 use {
     fidl_fuchsia_metrics_test as ffmt, fidl_test_time_realm as fttr, fuchsia_async as fasync,
-    fuchsia_zircon_status as zx_status,
+    zx_status,
 };
 
 use fidl_fuchsia_testing as _; // TODO: fmil - Figure out why this is needed.

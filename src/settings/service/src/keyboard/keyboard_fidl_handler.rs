@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     KeyboardRequest, KeyboardSetResponder, KeyboardSetSetResult, KeyboardSettings,
     KeyboardWatchResponder,
 };
-use fuchsia_zircon as zx;
 
 impl ErrorResponder for KeyboardSetResponder {
     fn id(&self) -> &'static str {

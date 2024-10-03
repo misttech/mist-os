@@ -6,7 +6,7 @@ use anyhow::{self, Error};
 use fidl_fuchsia_recovery_ui::{ProgressRendererMarker, ProgressRendererSynchronousProxy, Status};
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_info};
-use fuchsia_zircon as zx;
+
 use rand::prelude::*;
 
 #[fuchsia::main(logging = true)]

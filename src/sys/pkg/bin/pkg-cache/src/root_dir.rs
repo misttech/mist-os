@@ -80,7 +80,7 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
         flags: fio::Flags,
         scope: package_directory::ExecutionScope,
         object_request: vfs::ObjectRequestRef<'_>,
-    ) -> Result<(), fuchsia_zircon::Status> {
+    ) -> Result<(), zx::Status> {
         if self.0.bootfs_contents.contains(blob) {
             self.0
                 .bootfs
@@ -94,7 +94,7 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
                     tracing::warn!(
                         "Error calling open3 on bootfs blobs dir for blob {blob}: {e:?}"
                     );
-                    fuchsia_zircon::Status::INTERNAL
+                    zx::Status::INTERNAL
                 })
         } else {
             package_directory::NonMetaStorage::open3(
@@ -110,7 +110,7 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
     async fn get_blob_vmo(
         &self,
         hash: &fuchsia_hash::Hash,
-    ) -> Result<fuchsia_zircon::Vmo, package_directory::NonMetaStorageError> {
+    ) -> Result<zx::Vmo, package_directory::NonMetaStorageError> {
         if self.0.bootfs_contents.contains(hash) {
             package_directory::NonMetaStorage::get_blob_vmo(&self.0.bootfs, hash).await
         } else {

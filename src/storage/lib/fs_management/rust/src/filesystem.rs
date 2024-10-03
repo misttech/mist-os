@@ -15,10 +15,10 @@ use fuchsia_component::client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
     connect_to_protocol_at_dir_svc, open_childs_exposed_directory,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef as _, Status};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef as _, Status};
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 /// An abstract connector for things that speak fuchsia.hardware.block.Block and similar protocols.

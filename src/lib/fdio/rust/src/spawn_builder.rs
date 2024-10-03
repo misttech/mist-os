@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{spawn_etc, transfer_fd, SpawnAction, SpawnOptions};
-use fuchsia_zircon as zx;
+
 use std::ffi::CString;
 use std::fs::File;
 

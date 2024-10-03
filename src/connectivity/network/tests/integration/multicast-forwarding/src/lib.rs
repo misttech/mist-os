@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use derivative::Derivative;
 use fidl::endpoints::Proxy as _;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon::{self as zx};
+
 use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use maplit::hashmap;
 use net_declare::{fidl_ip, fidl_subnet};

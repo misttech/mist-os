@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 // This mod implements a refresh rate counter that calculates the exponential moving average of the
 // frame rate. See https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average.
 

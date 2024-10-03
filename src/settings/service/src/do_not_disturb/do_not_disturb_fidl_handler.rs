@@ -44,8 +44,8 @@ impl request::Responder<Scoped<DoNotDisturbSetResult>> for DoNotDisturbSetRespon
     }
 }
 
-impl watch::Responder<DoNotDisturbSettings, fuchsia_zircon::Status> for DoNotDisturbWatchResponder {
-    fn respond(self, response: Result<DoNotDisturbSettings, fuchsia_zircon::Status>) {
+impl watch::Responder<DoNotDisturbSettings, zx::Status> for DoNotDisturbWatchResponder {
+    fn respond(self, response: Result<DoNotDisturbSettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings);

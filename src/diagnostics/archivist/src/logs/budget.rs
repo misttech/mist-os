@@ -5,7 +5,7 @@
 use crate::identity::ComponentIdentity;
 use crate::logs::container::LogsArtifactsContainer;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};

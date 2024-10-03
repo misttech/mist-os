@@ -6,7 +6,7 @@ use fidl_fuchsia_diagnostics::{Interest, Severity};
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx};
+
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt::Debug;

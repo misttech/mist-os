@@ -26,7 +26,6 @@ use fuchsia_inspect::{self as inspect, unique_name, NumericProperty, Property};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::{self as zx, AsHandleRef, Duration};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{self, BoxFuture, FusedFuture, Future, Shared};
 use futures::FutureExt;
@@ -35,6 +34,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 use tracing::{debug, error, info, trace, warn};
+use zx::{self as zx, AsHandleRef, Duration};
 
 use crate::host_device::{HostDevice, HostDiscoverableSession, HostListener};
 use crate::services::pairing::pairing_dispatcher::{PairingDispatcher, PairingDispatcherHandle};

@@ -11,7 +11,6 @@ use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon::{self as zx};
 use futures::{select, FutureExt, StreamExt, TryFutureExt};
 use std::path::PathBuf;
 use thiserror::Error;

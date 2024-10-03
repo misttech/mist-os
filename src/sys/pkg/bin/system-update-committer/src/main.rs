@@ -17,13 +17,13 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{self as finspect};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{error, info, warn};
+use zx::{self as zx, HandleBased};
 
 mod config;
 mod fidl;

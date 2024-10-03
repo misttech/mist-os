@@ -6,7 +6,7 @@ use super::common::{Executor, ExecutorTime};
 use super::scope::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
-use fuchsia_zircon as zx;
+
 use futures::FutureExt;
 use std::future::Future;
 use std::sync::atomic::Ordering;
@@ -179,7 +179,7 @@ impl Drop for SendExecutor {
 mod tests {
     use super::SendExecutor;
     use crate::{Task, Timer};
-    use fuchsia_zircon as zx;
+
     use futures::channel::oneshot;
     use std::sync::{Arc, Condvar, Mutex};
 

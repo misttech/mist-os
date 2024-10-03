@@ -6,10 +6,10 @@ use anyhow::Error;
 use fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_component::client::{self as fclient, connect_to_service_instance};
-use fuchsia_zircon::Duration;
 use futures::{TryFutureExt, TryStreamExt};
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use zx::Duration;
 
 const CPU_DRIVER_TIMEOUT: Duration = Duration::from_seconds(5);
 

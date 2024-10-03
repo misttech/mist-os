@@ -19,7 +19,7 @@ use futures::{pin_mut, select_biased, SinkExt};
 use tracing::info;
 use {
     fidl_fuchsia_debugdata as fdebug, fidl_fuchsia_io as fio,
-    fidl_fuchsia_test_debug as ftest_debug, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_test_debug as ftest_debug, fuchsia_async as fasync, zx,
 };
 
 /// Processor that collects debug data and serves the iterator sending data back to a test

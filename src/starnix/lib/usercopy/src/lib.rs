@@ -5,7 +5,6 @@
 use std::mem::MaybeUninit;
 use std::ops::Range;
 
-use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
 

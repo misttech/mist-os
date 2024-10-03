@@ -34,7 +34,7 @@ use wlan_rsn::rsna::{AuthRejectedReason, AuthStatus, SecAssocUpdate, UpdateSink}
 use wlan_statemachine::*;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 /// Timeout for the MLME connect op, which consists of Join, Auth, and Assoc steps.

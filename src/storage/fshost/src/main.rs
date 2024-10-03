@@ -9,7 +9,6 @@ use crate::inspect::register_stats;
 use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use fuchsia_runtime::{take_startup_handle, HandleType};
-use fuchsia_zircon::sys::zx_debug_write;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -20,6 +19,7 @@ use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::remote::remote_dir;
+use zx::sys::zx_debug_write;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 mod boot_args;

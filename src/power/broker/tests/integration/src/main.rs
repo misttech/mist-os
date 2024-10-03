@@ -11,8 +11,8 @@ use fidl_fuchsia_power_broker::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-use fuchsia_zircon::{self as zx, HandleBased};
 use power_broker_client::BINARY_POWER_LEVELS;
+use zx::{self as zx, HandleBased};
 
 async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;

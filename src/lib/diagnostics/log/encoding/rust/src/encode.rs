@@ -18,7 +18,7 @@ use tracing_core::span;
 use tracing_log::NormalizeEvent;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::{LookupSpan, Scope};
-use {fidl_fuchsia_diagnostics_stream as fstream, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics_stream as fstream, zx};
 
 /// An `Encoder` wraps any value implementing `MutableBuffer` and writes diagnostic stream records
 /// into it.

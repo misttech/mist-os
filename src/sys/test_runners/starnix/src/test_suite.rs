@@ -12,12 +12,12 @@ use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_test::{self as ftest};
 use frunner::{ComponentRunnerMarker, ComponentRunnerProxy, ComponentStartInfo};
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::TryStreamExt;
 use namespace::Namespace;
 use rust_measure_tape_for_case::Measurable as _;
 use test_runners_lib::elf::SuiteServerError;
 use tracing::debug;
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata};
 
 /// Determines what type of tests the program is.
@@ -265,7 +265,7 @@ async fn handle_case_iterator(
 mod tests {
     use super::*;
     use fidl::endpoints::{create_request_stream, ClientEnd};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// Returns a `ftest::CaseIteratorProxy` that is served by `super::handle_case_iterator`.
     ///

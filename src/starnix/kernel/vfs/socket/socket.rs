@@ -15,7 +15,7 @@ use crate::vfs::buffers::{
 use crate::vfs::socket::SocketShutdownFlags;
 use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeInfo};
 use byteorder::{ByteOrder as _, NativeEndian};
-use fuchsia_zircon as zx;
+
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::address::{AddressAttribute, AddressMessage};

@@ -8,8 +8,8 @@ use fidl_fuchsia_scheduler::{
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::{HandleBased, MonotonicInstant, Rights, Status, Thread};
 use std::sync::Arc;
+use zx::{HandleBased, MonotonicInstant, Rights, Status, Thread};
 
 static ROLE_MANAGER: RwLock<Option<Arc<RoleManagerSynchronousProxy>>> = RwLock::new(None);
 

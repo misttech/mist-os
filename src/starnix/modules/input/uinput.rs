@@ -11,7 +11,7 @@ use fidl_fuchsia_ui_test_input::{
     RegistryRegisterKeyboardAndGetDeviceInfoRequest,
     RegistryRegisterTouchScreenAndGetDeviceInfoRequest,
 };
-use fuchsia_zircon as zx;
+
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fileops_impl_seekless;

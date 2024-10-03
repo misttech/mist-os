@@ -18,9 +18,9 @@ use fidl_test_unknown_interactions::{
     UnknownInteractionsProtocolSynchronousProxy,
 };
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MonotonicInstant, Signals};
 use futures::stream::StreamExt;
 use std::future::Future;
+use zx::{self as zx, AsHandleRef, MessageBuf, MonotonicInstant, Signals};
 
 trait ExpectResumeUnwind {
     type Result;

@@ -10,10 +10,7 @@ use fidl_fuchsia_net_neighbor::{
     self as fnet_neighbor, ControllerRequest, ControllerRequestStream, ViewRequest,
     ViewRequestStream,
 };
-use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext, zx};
 
 use assert_matches::assert_matches;
 use futures::channel::mpsc;

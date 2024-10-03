@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use cm_types::Availability;
-use fuchsia_zircon_status as zx;
 use moniker::ExtendedMoniker;
 use router_error::Explain;
 use thiserror::Error;
+use zx_status as zx;
 
 /// Ensure that availability cannot decrease from target to source.
 pub fn advance(

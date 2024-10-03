@@ -6,17 +6,17 @@
 
 use crate::directory::entry_container::MutableDirectory;
 use fidl::{Event, Handle, HandleBased, Rights};
-use fuchsia_zircon_status::Status;
 use pin_project::{pin_project, pinned_drop};
 use std::collections::hash_map::{Entry, HashMap};
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use zx_status::Status;
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::{AsHandleRef, Koid};
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::{AsHandleRef, Koid};
+use zx::{AsHandleRef, Koid};
 
 const DEFAULT_TOKEN_RIGHTS: Rights = Rights::BASIC;
 
@@ -255,8 +255,8 @@ mod tests {
         use crate::ObjectRequestRef;
         use fidl::endpoints::ServerEnd;
         use fidl_fuchsia_io as fio;
-        use fuchsia_zircon_status::Status;
         use std::sync::Arc;
+        use zx_status::Status;
 
         pub(super) struct MockChannel(pub Arc<TokenRegistry>, pub Arc<MockDirectory>);
 

@@ -14,7 +14,7 @@ use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest
 use vfs::execution_scope::ExecutionScope;
 use vfs::remote::RemoteLike;
 use zx::AsHandleRef;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 use crate::model::actions::{ActionsManager, DestroyAction};
 use crate::model::component::StartReason;

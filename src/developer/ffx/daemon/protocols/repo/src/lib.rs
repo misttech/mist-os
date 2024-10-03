@@ -19,7 +19,6 @@ use fidl_fuchsia_pkg_rewrite::{EngineMarker as RewriteEngineMarker, EngineProxy}
 use fidl_fuchsia_pkg_rewrite_ext::RuleConfig;
 use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repository::{self, RepoProvider, RepositorySpec};
-use fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::{FutureExt as _, StreamExt as _};
 use measure_fuchsia_developer_ffx::Measurable;
 use pkg::repo::{
@@ -33,6 +32,7 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
+use zx_types::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_developer_ffx as ffx, fuchsia_async as fasync};
 
 const PKG_RESOLVER_MONIKER: &str = "/core/pkg-resolver";

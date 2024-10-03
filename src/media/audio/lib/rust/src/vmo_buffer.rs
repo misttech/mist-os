@@ -4,7 +4,7 @@
 
 use crate::Format;
 use fuchsia_runtime::vmar_root_self;
-use fuchsia_zircon as zx;
+
 use thiserror::Error;
 
 /// A VMO-backed ring buffer that contains frames of audio.

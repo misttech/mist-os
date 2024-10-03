@@ -6,7 +6,7 @@ use anyhow::{format_err, Error};
 use async_helpers::hanging_get::asynchronous as hanging_get;
 use fidl_fuchsia_bluetooth_sys::{self as sys, HostWatcherRequest, HostWatcherRequestStream};
 use fuchsia_bluetooth::types::host_info::HostInfo;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 use tracing::warn;
 

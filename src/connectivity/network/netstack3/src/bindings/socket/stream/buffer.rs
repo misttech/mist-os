@@ -15,7 +15,7 @@ use async_ringbuf::traits::{
     AsyncConsumer as _, AsyncProducer, Consumer as _, Observer as _, Producer as _, Split as _,
 };
 use fuchsia_async::{self as fasync, ReadableHandle as _, WritableHandle as _};
-use fuchsia_zircon as zx;
+
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt as _, StreamExt as _};
 use netstack3_core::socket::ShutdownType;

@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use tracing::{debug, info, trace, warn};
-use {fuchsia_inspect as inspect, fuchsia_zircon as zx};
+use {fuchsia_inspect as inspect, zx};
 
 /// For sending out-of-band commands over the A2DP peer.
 mod controller;

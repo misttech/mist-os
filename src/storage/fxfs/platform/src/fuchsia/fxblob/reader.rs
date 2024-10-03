@@ -7,7 +7,7 @@
 use crate::fxblob::directory::BlobDirectory;
 use anyhow::Error;
 use fuchsia_hash::Hash;
-use fuchsia_zircon::{self as zx};
+
 use fxfs::errors::FxfsError;
 use std::sync::Arc;
 

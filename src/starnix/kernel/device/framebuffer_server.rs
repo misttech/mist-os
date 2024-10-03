@@ -38,7 +38,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_images2 as fimages2, fidl_fuchsia_math as fmath,
     fidl_fuchsia_sysmem2 as fsysmem2, fidl_fuchsia_ui_composition as fuicomposition,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, zx,
 };
 
 /// The offset at which the framebuffer will be placed.

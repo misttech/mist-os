@@ -5,8 +5,8 @@
 use crate::wire;
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_ui_composition::BufferCollectionImportToken;
-use fuchsia_zircon::{self as zx, HandleBased};
 use virtio_device::mem::DeviceRange;
+use zx::{self as zx, HandleBased};
 
 #[cfg(not(test))]
 use {

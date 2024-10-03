@@ -16,7 +16,6 @@ use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{CheckOptions, MountOptions, VolumeRequest, VolumeRequestStream};
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, ProjectIdMarker};
 use fs_inspect::{FsInspectTree, FsInspectVolume};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use fxfs::errors::FxfsError;
@@ -33,6 +32,7 @@ use std::sync::{Arc, OnceLock, Weak};
 use vfs::directory::entry_container::{self, MutableDirectory};
 use vfs::directory::helper::DirectlyMutable;
 use vfs::path::Path;
+use zx::{self as zx, AsHandleRef};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const MEBIBYTE: u64 = 1024 * 1024;
@@ -791,7 +791,6 @@ mod tests {
     use fidl_fuchsia_fxfs::KeyPurpose;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
-    use fuchsia_zircon::Status;
     use futures::join;
     use fxfs::errors::FxfsError;
     use fxfs::filesystem::FxFilesystem;
@@ -811,6 +810,7 @@ mod tests {
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
+    use zx::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test]

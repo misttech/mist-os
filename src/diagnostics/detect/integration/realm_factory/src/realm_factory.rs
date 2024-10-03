@@ -22,7 +22,7 @@ use std::sync::Arc;
 use tracing::{error, info};
 use {
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_feedback as fcrash,
-    fidl_test_detect_factory as ftest, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_test_detect_factory as ftest, fuchsia_async as fasync, zx,
 };
 
 // Errors returned from this module.

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_memory_heapdump_client::StoredSnapshot;
-use fuchsia_zircon::Koid;
 use std::collections::HashMap;
 use std::sync::Arc;
+use zx::Koid;
 
 use crate::process::Snapshot;
 

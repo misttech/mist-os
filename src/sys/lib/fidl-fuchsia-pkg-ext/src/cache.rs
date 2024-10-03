@@ -10,10 +10,10 @@
 use crate::types::{BlobId, BlobInfo};
 use fidl_fuchsia_pkg as fpkg;
 use fuchsia_pkg::PackageDirectory;
-use fuchsia_zircon_status::Status;
 use futures::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use zx_status::Status;
 
 mod storage;
 

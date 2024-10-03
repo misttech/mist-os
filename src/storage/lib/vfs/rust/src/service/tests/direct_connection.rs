@@ -13,10 +13,10 @@ use fidl::endpoints::{Proxy, RequestStream};
 use fidl::Error;
 use fidl_fuchsia_io as fio;
 use fidl_test_placeholders::{EchoProxy, EchoRequest, EchoRequestStream};
-use fuchsia_zircon_status::Status;
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
 use std::sync::Mutex;
+use zx_status::Status;
 
 async fn echo_server(
     mut requests: EchoRequestStream,

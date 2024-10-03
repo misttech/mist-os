@@ -20,7 +20,7 @@ use tracing_subscriber::fmt::format::{self, FormatEvent, FormatFields};
 use tracing_subscriber::fmt::FmtContext;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::LookupSpan;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
 

@@ -5,9 +5,9 @@
 use crate::logs::error::LogsError;
 use fidl::prelude::*;
 use fidl_fuchsia_diagnostics::BatchIteratorControlHandle;
-use fuchsia_zircon_status::Status as ZxStatus;
 use thiserror::Error;
 use tracing::warn;
+use zx_status::Status as ZxStatus;
 
 #[derive(Debug, Error)]
 pub enum Error {

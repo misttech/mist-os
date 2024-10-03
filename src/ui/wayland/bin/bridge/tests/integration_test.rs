@@ -11,7 +11,7 @@ mod test {
     use fuchsia_async::{self as fasync};
     use fuchsia_component::client::connect_to_protocol;
     use fuchsia_wayland_core::{self as wl, Interface, IntoMessage};
-    use fuchsia_zircon as zx;
+
     use wayland_client_protocol::{
         WlCompositor, WlDataDeviceManager, WlDisplayRequest, WlOutput, WlSeat, WlShm,
         WlSubcompositor,

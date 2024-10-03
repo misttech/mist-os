@@ -9,7 +9,7 @@ use futures::channel::mpsc;
 use futures::{select, Future, FutureExt, StreamExt};
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 use crate::experimental::clock::{TimedSample, Timestamp};
 use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};

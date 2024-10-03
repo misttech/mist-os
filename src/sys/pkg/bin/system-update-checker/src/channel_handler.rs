@@ -7,7 +7,7 @@ use crate::rate_limiter::RateLimiterMonotonic;
 use anyhow::{anyhow, Context as _, Error};
 use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
-use fuchsia_zircon as zx;
+
 use futures::prelude::*;
 use std::sync::Arc;
 use tracing::warn;

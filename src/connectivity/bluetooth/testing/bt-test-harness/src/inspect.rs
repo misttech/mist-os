@@ -10,12 +10,12 @@ use fuchsia_bluetooth::expectation::asynchronous::{
     expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
 };
 use fuchsia_bluetooth::expectation::Predicate;
-use fuchsia_zircon::Duration;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
+use zx::Duration;
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
 use crate::host_watcher::ActivatedFakeHost;

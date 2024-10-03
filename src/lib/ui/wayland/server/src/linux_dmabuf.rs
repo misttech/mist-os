@@ -7,15 +7,13 @@ use crate::client::Client;
 use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
 use anyhow::Error;
 use fidl_fuchsia_math::Size;
-use fuchsia_zircon::{EventPair, Handle, HandleBased};
 use std::rc::Rc;
 use zwp_linux_dmabuf_v1_server_protocol::{
     ZwpLinuxBufferParamsV1, ZwpLinuxBufferParamsV1Request, ZwpLinuxDmabufV1, ZwpLinuxDmabufV1Event,
     ZwpLinuxDmabufV1Request,
 };
-use {
-    fidl_fuchsia_ui_composition as composition, fuchsia_wayland_core as wl, fuchsia_zircon as zx,
-};
+use zx::{EventPair, Handle, HandleBased};
+use {fidl_fuchsia_ui_composition as composition, fuchsia_wayland_core as wl, zx};
 
 const DRM_FORMAT_ARGB8888: u32 = 0x34325241;
 const DRM_FORMAT_ABGR8888: u32 = 0x34324241;

@@ -10,8 +10,8 @@ use fidl_fuchsia_pkg::{
     PackageIndexEntry, PackageIndexIteratorNextResponder, PackageIndexIteratorRequest,
     PackageIndexIteratorRequestStream,
 };
-use fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::prelude::*;
+use zx_types::ZX_CHANNEL_MAX_MSG_BYTES;
 
 /// Serves fidl iterators like:
 ///

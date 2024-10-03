@@ -17,10 +17,10 @@ use ::cm_logger::klog;
 use anyhow::Error;
 use cm_config::RuntimeConfig;
 use fuchsia_runtime::{job_default, process_self};
-use fuchsia_zircon::JobCriticalOptions;
 use std::path::PathBuf;
 use std::{panic, process};
 use tracing::{error, info};
+use zx::JobCriticalOptions;
 use {fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync};
 
 mod bedrock;
@@ -38,9 +38,7 @@ mod sandbox_util;
 mod startup;
 
 extern "C" {
-    fn dl_set_loader_service(
-        handle: fuchsia_zircon::sys::zx_handle_t,
-    ) -> fuchsia_zircon::sys::zx_handle_t;
+    fn dl_set_loader_service(handle: zx::sys::zx_handle_t) -> zx::sys::zx_handle_t;
 }
 
 fn main() {
@@ -56,11 +54,7 @@ fn main() {
     // freed, as component manager won't make use of a loader service such as by calling dlopen.
     // If userboot invoked component manager directly, this service was the only reason userboot
     // continued to run and closing it will let userboot terminate.
-    let ldsvc = unsafe {
-        fuchsia_zircon::Handle::from_raw(dl_set_loader_service(
-            fuchsia_zircon::sys::ZX_HANDLE_INVALID,
-        ))
-    };
+    let ldsvc = unsafe { zx::Handle::from_raw(dl_set_loader_service(zx::sys::ZX_HANDLE_INVALID)) };
     drop(ldsvc);
 
     let args = startup::Arguments::from_args()

@@ -14,7 +14,7 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Arc;
 use tracing::warn;
-use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fuchsia_trace as ftrace, zx};
 
 const MAX_SERIAL_WRITE_SIZE: usize = 256;
 
@@ -89,7 +89,7 @@ impl Write for SerialSink {
         }
         // SAFETY: calling a syscall. We pass a pointer to the buffer and its exact size.
         unsafe {
-            fuchsia_zircon::sys::zx_debug_write(buffer.as_ptr(), buffer.len());
+            zx::sys::zx_debug_write(buffer.as_ptr(), buffer.len());
         }
         Ok(buffer.len())
     }
@@ -196,10 +196,10 @@ mod tests {
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::BootInstant;
     use futures::channel::mpsc;
     use moniker::ExtendedMoniker;
     use std::io::Cursor;
+    use zx::BootInstant;
 
     struct TestSink {
         snd: mpsc::UnboundedSender<String>,

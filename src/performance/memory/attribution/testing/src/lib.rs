@@ -8,10 +8,7 @@ use pin_project::pin_project;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution, zx};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PrincipalIdentifier(pub u64);

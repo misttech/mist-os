@@ -4,7 +4,6 @@
 
 #![recursion_limit = "512"]
 
-use fuchsia_zircon as zx;
 use starnix_core::mm::PAGE_SIZE;
 use starnix_core::mutable_state::Guard;
 use starnix_core::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};

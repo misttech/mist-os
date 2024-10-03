@@ -10,8 +10,7 @@
 use crate::runtime::{EHandle, Time, WakeupTime};
 use crate::PacketReceiver;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef as _;
+
 use futures::stream::FusedStream;
 use futures::task::{AtomicWaker, Context};
 use futures::{FutureExt, Stream};
@@ -22,6 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use std::task::Poll;
 use std::{cmp, fmt};
+use zx::AsHandleRef as _;
 
 pub trait TimeInterface:
     Clone + Copy + fmt::Debug + PartialEq + PartialOrd + Ord + Send + Sync + 'static
@@ -396,9 +396,9 @@ mod test {
     use super::*;
     use crate::{LocalExecutor, SendExecutor, TestExecutor};
     use assert_matches::assert_matches;
-    use fuchsia_zircon::Duration;
     use futures::future::Either;
     use futures::prelude::*;
+    use zx::Duration;
 
     #[test]
     fn shorter_fires_first() {

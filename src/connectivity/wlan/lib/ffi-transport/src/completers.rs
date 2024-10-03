@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 /// Type that wraps a closure for completing an operation.
 ///
 /// Calling `Completer::reply()` forwards the status to the wrapped closure. Otherwise,

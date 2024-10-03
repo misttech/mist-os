@@ -15,7 +15,7 @@ use fuchsia_bluetooth::constants::DEV_DIR;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use futures::future::Either;
 use futures::io::{ReadHalf, WriteHalf};
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, TryFutureExt};

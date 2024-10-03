@@ -10,7 +10,7 @@ use cm_types::Name;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use lazy_static::lazy_static;
 use tracing::*;
-use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx};
+use {fidl_fuchsia_component_sandbox as fsandbox, zx};
 
 lazy_static! {
     static ref CAPABILITY_NAME: Name =

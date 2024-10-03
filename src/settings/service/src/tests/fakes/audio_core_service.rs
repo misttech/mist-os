@@ -14,7 +14,7 @@ use futures::lock::Mutex;
 use futures::{FutureExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 pub(crate) struct Builder {
     suppress_client_errors: bool,

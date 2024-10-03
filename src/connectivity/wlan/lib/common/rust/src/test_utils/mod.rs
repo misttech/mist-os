@@ -4,7 +4,7 @@
 
 use crate::append::{Append, BufferTooSmall, TrackedAppend, VecCursor};
 use fuchsia_async::{DurationExt, OnTimeout, TimeoutExt};
-use fuchsia_zircon as zx;
+
 use futures::Future;
 
 pub mod fake_capabilities;

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;

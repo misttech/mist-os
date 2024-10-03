@@ -479,7 +479,7 @@ mod tests {
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fidl_fuchsia_logger::LogSinkMarker;
-    use fuchsia_zircon as zx;
+
     use moniker::ExtendedMoniker;
     use selectors::FastError;
     use std::io::Cursor;

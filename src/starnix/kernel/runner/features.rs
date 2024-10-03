@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
-use fuchsia_zircon as zx;
+
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
 use starnix_core::device::remote_block_device::remote_block_device_init;

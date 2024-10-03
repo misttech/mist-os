@@ -15,7 +15,6 @@ use const_unwrap::const_unwrap_option;
 use explicit::ResultExt as _;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, RequestStream as _};
 use fidl::{AsHandleRef as _, HandleBased as _};
-use fuchsia_zircon::{self as zx, Peered as _};
 use futures::channel::{mpsc, oneshot};
 use futures::FutureExt as _;
 use log::{debug, error};
@@ -32,6 +31,7 @@ use netstack3_core::tcp::{
 use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
+use zx::{self as zx, Peered as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
     fidl_fuchsia_posix_socket as fposix_socket,

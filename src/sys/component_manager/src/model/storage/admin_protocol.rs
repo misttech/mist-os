@@ -670,7 +670,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::{ObjectRequestRef, ToObjectRequest};
-    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+    use {fidl_fuchsia_io as fio, zx};
 
     #[test_case(
         "aabbccddeeff11223344556677889900aabbccddeeff11223344556677889900",

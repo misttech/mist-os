@@ -87,7 +87,7 @@ use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
-use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_zircon as zx};
+use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, zx};
 
 // The name used to track the duration of a local binder ioctl.
 const NAME_BINDER_IOCTL: &'static CStr = c"binder_ioctl";

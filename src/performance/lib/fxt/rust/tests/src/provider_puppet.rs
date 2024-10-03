@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fuchsia_trace::*;
-use fuchsia_zircon as zx;
 
 #[fuchsia::main]
 fn main() {

@@ -27,7 +27,7 @@ use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
-use {fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, fuchsia_trace as ftrace, zx};
 
 #[derive(Clone)]
 /// [Seeder] properly packages and sends [Job] source streams to a [Job] manager.

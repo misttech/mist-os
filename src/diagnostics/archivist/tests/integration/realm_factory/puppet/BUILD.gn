@@ -14,6 +14,7 @@ rustc_binary("bin") {
   deps = [
     "../fidl:fuchsia.archivist.test_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
@@ -25,7 +26,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",

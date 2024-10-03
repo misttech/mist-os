@@ -11,7 +11,6 @@ use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
@@ -21,6 +20,7 @@ use vfs::directory::entry_container::Directory as _;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_sandbox as fsandbox,

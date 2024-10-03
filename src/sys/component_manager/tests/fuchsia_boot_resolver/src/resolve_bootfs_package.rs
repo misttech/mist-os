@@ -11,8 +11,8 @@ use {
     fidl_fuchsia_sys2 as fsys,
     fuchsia_component_test::ScopedInstance,
     fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, HandleBased},
     std::{fs::File, io::Read},
+    zx::{self as zx, HandleBased},
 };
 
 // macros

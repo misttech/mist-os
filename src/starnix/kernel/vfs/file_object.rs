@@ -18,7 +18,7 @@ use crate::vfs::{
 };
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon as zx;
+
 use starnix_logging::{
     impossible_error, log_error, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };

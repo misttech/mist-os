@@ -15,7 +15,7 @@ use test_manager::Artifact;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_test_manager as test_manager,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 /// Dispatches `test_manager` artifacts to the `ArtifactBridge`s used to forward data to `ffx fuzz`.

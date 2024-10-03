@@ -30,7 +30,7 @@ use std::collections::HashMap;
 use std::mem::size_of;
 use thiserror::Error;
 use zerocopy::{FromBytes, IntoBytes};
-use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
+use {fidl_fuchsia_net_filter as fnet_filter, zx};
 
 const NAMESPACE_ID_PREFIX: &str = "starnix";
 

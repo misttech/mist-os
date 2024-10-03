@@ -7,7 +7,6 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
 use fuchsia_runtime::{UtcClockTransform, UtcInstant};
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use process_builder::elf_parse;
 use starnix_uapi::errors::Errno;

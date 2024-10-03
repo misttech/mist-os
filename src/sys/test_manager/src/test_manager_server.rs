@@ -20,7 +20,7 @@ use fuchsia_async::{self as fasync};
 use futures::prelude::*;
 use std::sync::Arc;
 use tracing::warn;
-use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx};
+use {fidl_fuchsia_test_manager as ftest_manager, zx};
 
 /// Start `RunBuilder` server and serve it over `stream`.
 pub async fn run_test_manager_run_builder_server(

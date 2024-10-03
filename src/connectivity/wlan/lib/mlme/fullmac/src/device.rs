@@ -7,7 +7,7 @@ use anyhow::{format_err, Context};
 use fidl::endpoints::ClientEnd;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, zx,
 };
 
 /// This trait abstracts how Device accomplish operations. Test code

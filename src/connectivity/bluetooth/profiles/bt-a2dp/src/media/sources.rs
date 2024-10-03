@@ -7,7 +7,7 @@ use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, PcmFormat};
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use fuchsia_inspect_derive::Inspect;
-use fuchsia_zircon::{self as zx};
+
 use futures::stream::{BoxStream, FusedStream};
 use futures::task::{Context, Poll};
 use futures::FutureExt;

@@ -4,7 +4,7 @@
 
 use super::common::EHandle;
 use crate::runtime::DurationExt;
-use fuchsia_zircon as zx;
+
 use std::ops;
 
 /// A time relative to the executor's clock.
@@ -119,7 +119,6 @@ impl DurationExt for zx::Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{self as zx};
 
     fn time_operations_param(
         zxt1: zx::MonotonicInstant,

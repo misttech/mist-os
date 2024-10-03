@@ -5,7 +5,7 @@
 //! Safe bindings for the driver runtime channel stable ABI
 
 use core::future::Future;
-use fuchsia_zircon::Status;
+use zx::Status;
 
 use crate::fdf_sys::*;
 use crate::{Arena, ArenaBox, DispatcherRef, DriverHandle, Message, MixedHandle};

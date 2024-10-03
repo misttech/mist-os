@@ -6,7 +6,7 @@ use anyhow::{format_err, Result};
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use tracing::{error, info};
-use {fidl_fuchsia_device as fdevice, fuchsia_zircon as zx};
+use {fidl_fuchsia_device as fdevice, zx};
 
 #[derive(Deserialize)]
 pub struct DriverAlias {

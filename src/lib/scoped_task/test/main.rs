@@ -6,9 +6,9 @@
 
 use fdio::SpawnOptions;
 use fuchsia_runtime as runtime;
-use fuchsia_zircon::{self as zx, AsHandleRef, Task};
 use std::ffi::{CStr, CString};
 use std::mem::size_of_val;
+use zx::{self as zx, AsHandleRef, Task};
 
 #[test]
 fn zx_singlethreaded() {
@@ -99,7 +99,7 @@ fn run_test_with_c_args(args: &[&CStr], expect_success: bool) {
 }
 
 fn check_all_processes_terminated(job: &zx::Job) {
-    use fuchsia_zircon::sys::*;
+    use zx::sys::*;
 
     let mut koids: [zx_koid_t; 32] = Default::default();
     let mut actual: usize = 0;

@@ -32,8 +32,7 @@ use wlan_common::bss::BssDescription;
 use wlan_common::sequestered::Sequestered;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
@@ -1091,7 +1090,7 @@ mod tests {
     use std::pin::pin;
     use wlan_common::{assert_variant, random_fidl_bss_description};
     use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
-    use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
+    use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
     lazy_static! {
         pub static ref TEST_PASSWORD: Credential = Credential::Password(b"password".to_vec());

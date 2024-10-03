@@ -5,8 +5,8 @@
 //! Utilities for loading ELF files into an existing address space.
 
 use crate::{elf_parse as elf, util};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use thiserror::Error;
+use zx::{self as zx, AsHandleRef};
 
 /// Possible errors that can occur during ELF loading.
 #[derive(Error, Debug)]

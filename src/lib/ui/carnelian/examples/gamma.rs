@@ -14,7 +14,7 @@ use carnelian::{
     ViewAssistantPtr, ViewKey,
 };
 use euclid::{size2, vec2, Transform2D};
-use fuchsia_zircon::Event;
+use zx::Event;
 
 const BLACK_COLOR: Color = Color { r: 0, g: 0, b: 0, a: 255 };
 const TRANSLUCENT_COLOR: Color = Color { r: 0, g: 0, b: 0, a: 127 };

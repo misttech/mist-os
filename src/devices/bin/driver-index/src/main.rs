@@ -15,11 +15,11 @@ use fidl_fuchsia_driver_index::{
 };
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::Status;
 use futures::prelude::*;
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use zx::Status;
 use {
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
@@ -79,7 +79,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
         Session::new(
             sender,
             boot_drivers,
-            fuchsia_zircon::Duration::from_millis(config.driver_load_fuzzer_max_delay_ms),
+            zx::Duration::from_millis(config.driver_load_fuzzer_max_delay_ms),
             None,
         ),
     );
@@ -460,7 +460,7 @@ async fn main() -> Result<()> {
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::Lifecycle.into())
             .expect("Expected to have a lifecycle startup handle.");
     let lifecycle = fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(
-        fuchsia_zircon::Channel::from(lifecycle),
+        zx::Channel::from(lifecycle),
     );
     let (lifecycle_request_stream, lifecycle_control_handle) = lifecycle
         .into_stream_and_control_handle()
@@ -754,8 +754,7 @@ mod tests {
         indexer: Rc<Indexer>,
         stream: DriverIndexRequestStream,
     ) -> Result<()> {
-        return run_index_server_with_timeout(indexer, stream, fuchsia_zircon::Duration::INFINITE)
-            .await;
+        return run_index_server_with_timeout(indexer, stream, zx::Duration::INFINITE).await;
     }
 
     async fn execute_driver_index_test(
@@ -794,13 +793,9 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
         let index = Rc::new(Indexer::new(vec![], BaseRepo::Resolved(std::vec![]), false));
-        run_index_server_with_timeout(
-            index.clone(),
-            stream,
-            fuchsia_zircon::Duration::from_millis(10),
-        )
-        .await
-        .unwrap();
+        run_index_server_with_timeout(index.clone(), stream, zx::Duration::from_millis(10))
+            .await
+            .unwrap();
 
         let result =
             proxy.add_composite_node_spec(&fdf::CompositeNodeSpec { ..Default::default() }).await;
@@ -3680,7 +3675,7 @@ mod tests {
             let register_result = registrar_proxy.register(component_manifest_url).await.unwrap();
 
             // The register should have failed.
-            assert_eq!(fuchsia_zircon::sys::ZX_ERR_ALREADY_EXISTS, register_result.err().unwrap());
+            assert_eq!(zx::sys::ZX_ERR_ALREADY_EXISTS, register_result.err().unwrap());
         }
         .fuse();
 
@@ -3744,7 +3739,7 @@ mod tests {
             let register_result = registrar_proxy.register(component_manifest_url).await.unwrap();
 
             // The register should have failed.
-            assert_eq!(fuchsia_zircon::sys::ZX_ERR_ALREADY_EXISTS, register_result.err().unwrap());
+            assert_eq!(zx::sys::ZX_ERR_ALREADY_EXISTS, register_result.err().unwrap());
         }
         .fuse();
 

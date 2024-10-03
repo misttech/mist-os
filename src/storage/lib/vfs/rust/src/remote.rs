@@ -13,8 +13,8 @@ use crate::path::Path;
 use crate::{ObjectRequestRef, ToObjectRequest as _};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::sync::Arc;
+use zx_status::Status;
 
 pub trait RemoteLike {
     fn open(

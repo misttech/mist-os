@@ -8,10 +8,10 @@ use {
     fuchsia_async::{self as fasync},
     // fuchsia_component::server::ServiceFs,
     fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx},
     futures_util::stream::{StreamExt, TryStreamExt},
     std::{process, thread, time},
     tracing::{error, info},
+    zx::{self as zx},
 };
 
 /// Takes the Lifecycle handle passed by the Runner. The program listens to the

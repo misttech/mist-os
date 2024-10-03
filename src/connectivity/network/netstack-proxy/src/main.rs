@@ -16,7 +16,7 @@
 
 use cstr::cstr;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fuchsia_zircon::{self as zx};
+
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use {fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_async as fasync};

@@ -10,9 +10,9 @@ use fidl_fuchsia_validate_logs::{
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as rt;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::prelude::*;
 use tracing::*;
+use zx::{self as zx, AsHandleRef};
 
 #[fuchsia::main(always_log_file_line = true)]
 async fn main() {

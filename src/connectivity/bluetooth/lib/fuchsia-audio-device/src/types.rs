@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_hardware_audio::{PcmFormat, SampleFormat};
-use fuchsia_zircon as zx;
+
 use std::result;
 use thiserror::Error;
 

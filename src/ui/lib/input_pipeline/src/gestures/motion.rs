@@ -243,7 +243,7 @@ mod tests {
     use super::*;
     use crate::touch_binding;
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 

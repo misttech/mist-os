@@ -9,7 +9,7 @@ use carnelian::{
     make_app_assistant, App, AppAssistant, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
     ViewKey,
 };
-use fuchsia_zircon::{AsHandleRef, Event, Signals};
+use zx::{AsHandleRef, Event, Signals};
 
 #[derive(Default)]
 struct IntegrationTestAppAssistant;

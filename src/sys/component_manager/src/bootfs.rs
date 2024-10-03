@@ -8,7 +8,6 @@ use fuchsia_bootfs::{
 };
 use fuchsia_component::client;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, HandleBased, Resource};
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
@@ -19,6 +18,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo;
 use vfs::tree_builder::{self, TreeBuilder};
 use vfs::ToObjectRequest;
+use zx::{self as zx, HandleBased, Resource};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
 // Used to create executable VMOs.

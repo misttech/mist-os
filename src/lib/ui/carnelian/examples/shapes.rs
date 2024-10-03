@@ -19,10 +19,10 @@ use carnelian::{
 use euclid::default::Vector2D;
 use euclid::{point2, size2, vec2};
 use fuchsia_trace::duration;
-use fuchsia_zircon::Event;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 use std::mem;
+use zx::Event;
 
 fn make_bounds(context: &ViewAssistantContext) -> Rect {
     Rect::from_size(context.size)

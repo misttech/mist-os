@@ -9,7 +9,7 @@ use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
 use fuchsia_inspect_derive::{IValue, Inspect};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx};
+
 use futures::{select, StreamExt};
 use std::sync::Arc;
 use tracing::{info, warn};

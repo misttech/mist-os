@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, zx_status as zx,
 };
 
 /// Construct a capability path for the hippo service.

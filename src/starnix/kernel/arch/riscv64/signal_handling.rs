@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 use crate::arch::registers::RegisterState;
 use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};

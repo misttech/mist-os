@@ -5,7 +5,7 @@
 use std::fmt::{self, Debug, Display};
 use std::sync::Arc;
 use thiserror::Error;
-use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_component_sandbox as fsandbox, zx_status as zx};
 
 /// The error type returned by bedrock operations.
 #[derive(Debug, Error, Clone)]

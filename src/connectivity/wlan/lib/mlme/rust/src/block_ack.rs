@@ -23,7 +23,7 @@ use wlan_common::{frame_len, mac};
 use wlan_frame_writer::append_frame_to;
 use wlan_statemachine::*;
 use zerocopy::{Ref, SplitByteSlice};
-use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, zx};
 
 pub const ADDBA_REQ_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaReqHdr);
 pub const ADDBA_RESP_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaRespHdr);
@@ -411,7 +411,7 @@ mod tests {
     use super::*;
     use wlan_common::append::TrackedAppend;
     use wlan_common::assert_variant;
-    use {fuchsia_zircon as zx, wlan_statemachine as statemachine};
+    use {wlan_statemachine as statemachine, zx};
 
     /// A STA that can send ADDBA frames (implements the `BlockAckTx` trait).
     enum Station {

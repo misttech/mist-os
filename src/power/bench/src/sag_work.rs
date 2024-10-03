@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use fuchsia_component::client::connect_to_protocol_sync;
-use {fidl_fuchsia_power_system as fsystem, fuchsia_zircon as zx};
+use {fidl_fuchsia_power_system as fsystem, zx};
 
 use std::sync::Arc;
 

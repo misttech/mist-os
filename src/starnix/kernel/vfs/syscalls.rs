@@ -24,7 +24,7 @@ use crate::vfs::{
     SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
     XattrOp,
 };
-use fuchsia_zircon as zx;
+
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};

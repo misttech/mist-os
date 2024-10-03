@@ -141,7 +141,7 @@ mod tests {
     use super::*;
     use crate::updater::for_tests::{UpdaterBuilder, UpdaterForTest, UpdaterResult};
     use fuchsia_pkg_testing::PackageBuilder;
-    use fuchsia_zircon as zx;
+
     use mock_paver::{hooks as mphooks, PaverEvent};
     use omaha_client::http_request::mock::MockHttpRequest;
     use serde_json::json;

@@ -22,7 +22,7 @@ use vfs::directory::entry_container::MutableDirectory;
 use vfs::name::Name;
 use vfs::node::Node;
 use vfs::symlink::Symlink;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[derive(ToWeakNode)]
 pub struct FxSymlink {

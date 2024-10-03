@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -14,13 +12,13 @@ use crate::vfs::socket::{
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
 };
-use fuchsia_zircon::HandleBased;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
+use zx::HandleBased;
 
 pub fn new_socket_file(
     current_task: &CurrentTask,

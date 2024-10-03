@@ -7,8 +7,8 @@ pub mod args;
 use anyhow::{format_err, Result};
 use args::DisableCommand;
 use fidl_fuchsia_driver_development as fdd;
-use fuchsia_zircon_status::Status;
 use std::io::Write;
+use zx_status::Status;
 
 pub async fn disable(
     cmd: DisableCommand,

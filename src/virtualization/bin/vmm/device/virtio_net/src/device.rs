@@ -8,7 +8,7 @@ use crate::guest_ethernet::{
 use crate::wire;
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_net::MacAddress;
-use fuchsia_zircon as zx;
+
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::StreamExt;
 use machina_virtio_device::{GuestMem, WrappedDescChainStream};

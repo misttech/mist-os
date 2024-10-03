@@ -12,7 +12,7 @@ use fuchsia_async::TimeoutExt;
 use futures::future::{BoxFuture, FutureExt};
 use futures::TryStreamExt;
 use std::sync::Mutex;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_io as fio, zx_status as zx};
 
 // This isn't actually unused, but rustc can't seem to tell otherwise.
 #[allow(unused_imports)]

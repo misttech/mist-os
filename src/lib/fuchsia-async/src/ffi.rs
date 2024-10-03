@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use fuchsia_sync::Mutex;
-use fuchsia_zircon_types::{
+use futures::channel::oneshot;
+use std::time::Duration;
+use zx_types::{
     zx_handle_t, zx_packet_signal_t, zx_signals_t, zx_status_t, zx_time_t, ZX_ERR_NOT_SUPPORTED,
     ZX_OK,
 };
-use futures::channel::oneshot;
-use std::time::Duration;
-use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
+use {fuchsia_async as fasync, zx_status};
 
 struct EPtr(*mut Executor);
 unsafe impl Send for EPtr {}
@@ -29,7 +29,6 @@ impl EPtr {
 mod fuchsia_details {
 
     use super::*;
-    use fuchsia_zircon as zx;
 
     // The callback holder... gets registered with the executor and receives a packet when
     // trigger signals are observed. Needs to hold its own registration as dropping that would cause
@@ -149,7 +148,7 @@ impl Executor {
         // TODO: figure out how to change fasync::Executor such that this can be done without allocation.
 
         use fuchsia_details::*;
-        use fuchsia_zircon as zx;
+
         use std::sync::Arc;
         use zx::AsHandleRef;
 

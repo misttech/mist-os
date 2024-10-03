@@ -150,9 +150,7 @@ async fn test_handle_dai_requests(
                 let shutdown_bad_args =
                     |server: fidl::endpoints::ServerEnd<RingBufferMarker>, err: anyhow::Error| {
                         warn!("CreateRingBuffer: {:?}", err);
-                        if let Err(e) =
-                            server.close_with_epitaph(fuchsia_zircon::Status::INVALID_ARGS)
-                        {
+                        if let Err(e) = server.close_with_epitaph(zx::Status::INVALID_ARGS) {
                             warn!("Couldn't send ring buffer epitaph: {:?}", e);
                         }
                     };

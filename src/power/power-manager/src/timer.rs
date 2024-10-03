@@ -8,11 +8,11 @@ pub const DEADLINE_ID: DeadlineId<'static> =
     DeadlineId::new("power-manager", "thermal-policy-timer");
 
 pub fn get_periodic_timer_stream(
-    duration: fuchsia_zircon::Duration,
+    duration: zx::Duration,
 ) -> std::pin::Pin<Box<impl futures::Stream<Item = ()>>> {
-    let next = fuchsia_zircon::MonotonicInstant::get() + duration;
+    let next = zx::MonotonicInstant::get() + duration;
     let stream = futures::stream::unfold((next, duration), |(n, d)| async move {
-        NamedTimer::new(&DEADLINE_ID, n - fuchsia_zircon::MonotonicInstant::get()).await;
+        NamedTimer::new(&DEADLINE_ID, n - zx::MonotonicInstant::get()).await;
         Some(((), (n + d, d)))
     });
     Box::pin(stream)

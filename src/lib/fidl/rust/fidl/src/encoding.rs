@@ -18,7 +18,6 @@ use bitflags::bitflags;
 use std::cell::{RefCell, RefMut};
 use std::marker::PhantomData;
 use std::{mem, ptr, str};
-use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Traits

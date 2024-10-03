@@ -263,11 +263,11 @@ mod tests {
     use fidl_fuchsia_paver::Configuration;
     use fuchsia_hash::Hash;
     use fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage};
-    use fuchsia_zircon::Vmo;
     use mock_paver::{hooks as mphooks, MockPaverServiceBuilder};
     use omaha_client::version::Version as SemanticVersion;
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
+    use zx::Vmo;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_invalid_update_package() {

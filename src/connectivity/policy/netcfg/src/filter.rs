@@ -14,7 +14,7 @@ use fidl_fuchsia_net_filter_ext::{
 use fuchsia_async::DurationExt as _;
 use {
     fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated, fuchsia_zircon as zx,
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated, zx,
 };
 
 use anyhow::{bail, Context as _};

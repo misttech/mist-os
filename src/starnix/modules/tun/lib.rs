@@ -21,7 +21,7 @@ use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 #[derive(Debug, Clone, Copy)]

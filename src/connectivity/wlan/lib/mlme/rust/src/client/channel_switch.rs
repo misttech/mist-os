@@ -12,7 +12,7 @@ use wlan_common::mac::BeaconHdr;
 use wlan_common::timer::EventId;
 use wlan_common::{ie, TimeUnit};
 use zerocopy::SplitByteSlice;
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
 
 pub trait ChannelActions {
     fn switch_channel(

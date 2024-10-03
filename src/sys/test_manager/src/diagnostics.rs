@@ -46,7 +46,7 @@ pub(crate) fn serve_syslog(
 
 fn run_iterator_socket(
     host_accessor: &fhost::ArchiveAccessorProxy,
-    socket: fuchsia_zircon::Socket,
+    socket: zx::Socket,
 ) -> fidl::client::QueryResponseFut<()> {
     host_accessor.stream_diagnostics(
         &StreamParameters {

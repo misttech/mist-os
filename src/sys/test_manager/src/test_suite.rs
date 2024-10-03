@@ -28,7 +28,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 const EXECUTION_PROPERTY: &'static str = "execution";

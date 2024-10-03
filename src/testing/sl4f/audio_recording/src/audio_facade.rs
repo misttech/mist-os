@@ -12,7 +12,7 @@ use futures::{select, StreamExt, TryFutureExt, TryStreamExt};
 use std::io::Write;
 use std::sync::Arc;
 use tracing::trace;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 // Fixed configuration for our virtual output device.
 const OUTPUT_SAMPLE_FORMAT: AudioSampleFormat = AudioSampleFormat::Signed16;

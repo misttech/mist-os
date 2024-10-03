@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::{fmt, fs};
 use {
     fidl_fuchsia_hardware_network, fidl_fuchsia_net_interfaces as ninterfaces,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 // This is a locally administered MAC address (first byte 0x02) mixed with the

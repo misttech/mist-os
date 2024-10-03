@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::MonotonicInstant;
+use zx::MonotonicInstant;
 
 const TIMESTAMP_DIVIDEND: i64 = 1_000_000_000;
 

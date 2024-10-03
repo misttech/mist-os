@@ -10,7 +10,7 @@ use cm_config::SecurityPolicy;
 use cm_types::Name;
 use cm_util::TaskGroup;
 use errors::CapabilityProviderError;
-use fuchsia_zircon as zx;
+
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 

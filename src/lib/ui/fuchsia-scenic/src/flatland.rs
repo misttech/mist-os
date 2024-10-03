@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fuchsia_zircon as zx;
 
 pub use fidl_fuchsia_scenic_scheduling::PresentationInfo;
 pub use fidl_fuchsia_ui_composition::{

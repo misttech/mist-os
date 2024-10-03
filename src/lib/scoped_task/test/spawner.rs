@@ -14,7 +14,7 @@ use std::io::Write;
 use std::os::unix::io::FromRawFd;
 use std::sync::mpsc;
 use std::{env, panic, thread};
-use {fuchsia_runtime as runtime, fuchsia_zircon as zx};
+use {fuchsia_runtime as runtime, zx};
 
 /// Spawns a subprocess in a configurable way. Used by the scoped_task test.
 #[derive(FromArgs, Clone, Copy, Debug)]

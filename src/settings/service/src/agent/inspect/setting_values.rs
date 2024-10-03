@@ -220,7 +220,7 @@ impl SettingValuesInspectAgent {
 #[cfg(test)]
 mod tests {
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_zircon::MonotonicInstant;
+    use zx::MonotonicInstant;
 
     use crate::agent::Invocation;
     use crate::base::UnknownInfo;

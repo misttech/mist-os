@@ -7,7 +7,7 @@
 
 use fshost::{AdminProxy, AdminWriteDataFileResult};
 use fshost_test_fixture::disk_builder::VolumesSpec;
-use fuchsia_zircon::{self as zx, HandleBased as _};
+use zx::{self as zx, HandleBased as _};
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 pub mod config;

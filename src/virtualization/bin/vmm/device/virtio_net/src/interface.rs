@@ -7,7 +7,7 @@
 //! Use the guest_ethernet crate to interact with these functions.
 
 use crate::guest_ethernet;
-use fuchsia_zircon::sys::zx_status_t;
+use zx::sys::zx_status_t;
 
 #[repr(C)]
 #[allow(non_camel_case_types)]

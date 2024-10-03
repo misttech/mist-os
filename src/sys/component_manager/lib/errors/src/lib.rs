@@ -17,7 +17,7 @@ use sandbox::ConversionError;
 use serve_processargs::BuildNamespaceError;
 use std::sync::Arc;
 use thiserror::Error;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, zx};
 
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]

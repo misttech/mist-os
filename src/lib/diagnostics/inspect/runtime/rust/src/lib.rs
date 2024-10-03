@@ -14,7 +14,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tracing::error;
-use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, zx};
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub use finspect::EscrowToken;
@@ -265,7 +265,7 @@ mod tests {
     use fuchsia_inspect::reader::snapshot::Snapshot;
     use fuchsia_inspect::reader::{read, PartialNodeHierarchy};
     use fuchsia_inspect::InspectorConfig;
-    use fuchsia_zircon as zx;
+
     use futures::{FutureExt, StreamExt};
 
     const TEST_PUBLISH_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";

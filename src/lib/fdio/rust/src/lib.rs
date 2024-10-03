@@ -12,7 +12,6 @@ pub use spawn_builder::{Error as SpawnBuilderError, SpawnBuilder};
 
 use bitflags::bitflags;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::convert::TryInto as _;
 use std::ffi::{CStr, CString, NulError};
 use std::fs::File;
@@ -23,6 +22,7 @@ use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 use std::os::raw;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::str::Utf8Error;
+use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 
 /// Connects a channel to a named service.
 pub fn service_connect(service_path: &str, channel: zx::Channel) -> Result<(), zx::Status> {
@@ -786,7 +786,7 @@ pub struct NamespaceEntry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_zircon::{object_wait_many, MonotonicInstant, Signals, Status, WaitItem};
+    use zx::{object_wait_many, MonotonicInstant, Signals, Status, WaitItem};
 
     #[test]
     fn namespace_get_installed() {

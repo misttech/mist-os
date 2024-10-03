@@ -24,6 +24,7 @@ rustc_binary("bootfs_launching_benchmark") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/rust/zx",
     "//src/developer/fuchsia-criterion",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -31,7 +32,6 @@ rustc_binary("bootfs_launching_benchmark") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
   ]
 

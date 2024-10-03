@@ -33,8 +33,8 @@ impl From<fidl::Error> for ControllerError {
     }
 }
 
-impl From<fuchsia_zircon_status::Status> for ControllerError {
-    fn from(source: fuchsia_zircon_status::Status) -> Self {
+impl From<zx_status::Status> for ControllerError {
+    fn from(source: zx_status::Status) -> Self {
         Self { inner: fac::Error::UnknownCanRetry, msg: format!("Zx error: {source}") }
     }
 }

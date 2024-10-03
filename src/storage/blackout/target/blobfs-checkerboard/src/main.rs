@@ -15,7 +15,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::sync::Arc;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 async fn write_blob(rng: &mut impl Rng, root: &fio::DirectoryProxy, i: u64) -> Result<String> {
     let mut data = vec![];

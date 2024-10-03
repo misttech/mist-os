@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::Proxy;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef, Peered};
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
+use zx::{self as zx, AsHandleRef, HandleBased, HandleRef, Peered};
 use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
 use std::collections::BinaryHeap;

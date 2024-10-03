@@ -7,7 +7,7 @@ use fidl_fuchsia_examples_inspect::{FizzBuzzRequest, FizzBuzzRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{self as inspect, component, HistogramProperty, NumericProperty};
-use fuchsia_zircon::{self as zx};
+
 use futures::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::{error, info};

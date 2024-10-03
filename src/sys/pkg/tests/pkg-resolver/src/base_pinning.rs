@@ -7,10 +7,10 @@ use {
     assert_matches::assert_matches,
     fuchsia_pkg_testing::serve::responder,
     fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder},
-    fuchsia_zircon::Status,
     futures::future,
     lib::{TestEnvBuilder, EMPTY_REPO_PATH},
     std::sync::Arc,
+    zx::Status,
 };
 
 async fn test_package(name: &str, contents: &str) -> Package {

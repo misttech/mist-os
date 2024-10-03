@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
 use pin_project::pin_project;
 use std::ffi::CStr;
 use std::future::Future;
@@ -1379,7 +1378,7 @@ unsafe impl Send for ProlongedContext {}
 
 mod sys {
     #![allow(non_camel_case_types, unused)]
-    use fuchsia_zircon::sys::{zx_handle_t, zx_koid_t, zx_obj_type_t, zx_status_t, zx_ticks_t};
+    use zx::sys::{zx_handle_t, zx_koid_t, zx_obj_type_t, zx_status_t, zx_ticks_t};
 
     pub type trace_ticks_t = zx_ticks_t;
     pub type trace_counter_id_t = u64;

@@ -175,7 +175,7 @@ impl AudioFacade {
         // This is safe since `bytes` will cover the same memory range as `samples`.
         let bytes =
             unsafe { std::slice::from_raw_parts(samples.as_ptr() as *const _, samples.len() * 2) };
-        let vmo = fuchsia_zircon::Vmo::create((frame_count * 2) as u64).context("Creating VMO")?;
+        let vmo = zx::Vmo::create((frame_count * 2) as u64).context("Creating VMO")?;
         vmo.write(&bytes, 0).context("Writing to VMO")?;
 
         Ok((

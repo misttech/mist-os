@@ -15,7 +15,7 @@ import("//build/rust/rustc_library.gni")
 #     Additional protocol dependencies for this protocol. These labels should
 #     correspond another `wayland_protocol` target.
 #
-#   need_fuchsia_zircon (optional, default = false)
+#   need_zx (optional, default = false)
 #     Whether the generated rust library should depend on the fuchsia-zircon
 #     crate.
 #
@@ -74,8 +74,8 @@ template("wayland_protocol") {
         "//third_party/rust_crates:anyhow",
         "//third_party/rust_crates:bitflags",
       ]
-      if (defined(invoker.need_fuchsia_zircon) && invoker.need_fuchsia_zircon) {
-        deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+      if (defined(invoker.need_zx) && invoker.need_zx) {
+        deps += [ "//sdk/rust/zx" ]
       }
       foreach(dep, protocol_deps) {
         deps += [ dep + "_${type}_protocol" ]

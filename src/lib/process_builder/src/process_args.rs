@@ -5,7 +5,7 @@
 // The constant and type definitions in this file must all match
 // //zircon/system/public/zircon/processargs.h
 use fuchsia_runtime::HandleInfo;
-use fuchsia_zircon as zx;
+
 use std::ffi::CString;
 use std::{fmt, mem, num};
 use thiserror::Error;
@@ -242,8 +242,8 @@ mod tests {
     use super::*;
     use anyhow::Error;
     use fuchsia_runtime::HandleType;
-    use fuchsia_zircon::{AsHandleRef, HandleBased};
     use std::iter;
+    use zx::{AsHandleRef, HandleBased};
 
     #[test]
     fn build_and_write_message() -> Result<(), Error> {

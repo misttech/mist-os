@@ -36,7 +36,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+    fidl_fuchsia_process as fprocess, zx,
 };
 
 /// Starts a component instance.
@@ -653,7 +653,7 @@ mod tests {
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::resolving::ComponentAddress;
     use std::sync::{Mutex, Weak};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     // Child name for test child components instantiated during tests.
     const TEST_CHILD_NAME: &str = "child";

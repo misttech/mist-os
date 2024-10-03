@@ -6,7 +6,7 @@ use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, Filter, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
 use crate::tests::message_utils::verify_payload;
-use fuchsia_zircon as zx;
+
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -290,8 +290,7 @@ fn test_timeout() {
 
     loop {
         let new_time = fuchsia_async::Time::from_nanos(
-            executor.now().into_nanos()
-                + fuchsia_zircon::Duration::from_millis(timeout_ms).into_nanos(),
+            executor.now().into_nanos() + zx::Duration::from_millis(timeout_ms).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(x) => break x,

@@ -8,10 +8,10 @@ use crate::scenic::{FlatlandInstanceId, FlatlandPtr};
 use anyhow::Error;
 use fidl_fuchsia_math::Size;
 use fidl_fuchsia_ui_composition::{BufferCollectionImportToken, ContentId, ImageProperties};
-use fuchsia_zircon::{self as zx, HandleBased};
 use std::cell::Cell;
 use std::rc::Rc;
 use wayland_server_protocol::*;
+use zx::{self as zx, HandleBased};
 use {
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as composition, fuchsia_trace as ftrace,
 };

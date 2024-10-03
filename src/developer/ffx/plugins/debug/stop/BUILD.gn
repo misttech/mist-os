@@ -13,8 +13,8 @@ ffx_plugin("ffx_debug_stop") {
 
   deps = [
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_rust",
+    "//sdk/rust/zx-status",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//third_party/rust_crates:async-trait",
   ]
 

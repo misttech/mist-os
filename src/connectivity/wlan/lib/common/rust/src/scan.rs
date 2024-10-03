@@ -9,7 +9,7 @@ use fidl_fuchsia_wlan_sme as fidl_sme;
 use std::collections::HashSet;
 
 #[cfg(target_os = "fuchsia")]
-use {anyhow::Context as _, fuchsia_zircon as zx};
+use {anyhow::Context as _, zx};
 
 /// Compatibility of a BSS with respect to a scanning interface.
 ///

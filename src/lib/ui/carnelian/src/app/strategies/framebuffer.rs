@@ -23,7 +23,6 @@ use fidl_fuchsia_hardware_display::{
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync};
 use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
-use fuchsia_zircon::Status;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use keymaps::Keymap;
@@ -32,6 +31,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use zx::Status;
 
 async fn watch_directory_async(
     dir: PathBuf,

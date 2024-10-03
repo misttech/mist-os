@@ -4,7 +4,7 @@
 
 use fuchsia_async::TimeoutExt;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+
 use std::sync::Arc;
 use tracing::{error, warn};
 use windowed_stats::experimental::clock::TimedSample;

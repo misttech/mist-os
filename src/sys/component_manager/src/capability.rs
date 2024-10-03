@@ -14,7 +14,7 @@ use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// The server-side of a capability implements this trait.
 /// Multiple `CapabilityProvider` objects can compose with one another for a single

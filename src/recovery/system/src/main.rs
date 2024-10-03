@@ -26,7 +26,6 @@ use fidl_fuchsia_input_report::ConsumerControlButton;
 use fidl_fuchsia_recovery_policy::FactoryResetMarker as FactoryResetPolicyMarker;
 use fuchsia_async::{self as fasync, Task};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{Duration, Event};
 use futures::StreamExt;
 use recovery_ui::font;
 use recovery_ui::proxy_view_assistant::ProxyViewAssistant;
@@ -34,6 +33,7 @@ use recovery_ui_config::Config as UiConfig;
 use rive_rs::{self as rive};
 use std::borrow::{Borrow, Cow};
 use std::path::Path;
+use zx::{Duration, Event};
 
 #[cfg(feature = "ota_ui")]
 mod ui_v2;
@@ -684,8 +684,7 @@ impl RecoveryViewAssistant {
                             );
                             match take_startup_handle(HandleType::DirectoryRequest.into()) {
                                 Some(out_dir_handle) => {
-                                    let out_dir =
-                                        fuchsia_zircon::Channel::from(out_dir_handle).into();
+                                    let out_dir = zx::Channel::from(out_dir_handle).into();
 
                                     // TODO(https://fxbug.dev/42064284): make this call the OTA component
                                     // instead of calling isolated-ota here.

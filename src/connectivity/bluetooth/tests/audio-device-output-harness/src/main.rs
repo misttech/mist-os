@@ -5,7 +5,7 @@
 use anyhow::Context;
 use fidl_fuchsia_media::{AudioChannelId, AudioDeviceEnumeratorMarker, AudioPcmMode, PcmFormat};
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 use tracing::info;
 

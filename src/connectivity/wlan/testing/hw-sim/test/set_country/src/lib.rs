@@ -7,12 +7,12 @@ use fidl_fuchsia_wlan_device_service::{
 };
 use fidl_test_wlan_realm::WlanConfig;
 use fuchsia_component::client::connect_to_protocol_at;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::sys::ZX_OK;
+
 use futures::channel::oneshot;
 use std::pin::pin;
 use wlan_hw_sim::event::Handler;
 use wlan_hw_sim::*;
+use zx::sys::ZX_OK;
 
 async fn set_country_and_await_match<'a>(
     receiver: oneshot::Receiver<()>,

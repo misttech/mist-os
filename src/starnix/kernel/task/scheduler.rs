@@ -6,7 +6,7 @@ use fidl::HandleBased;
 use fidl_fuchsia_scheduler::{
     RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
 };
-use fuchsia_zircon as zx;
+
 use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{

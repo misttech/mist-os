@@ -8,13 +8,13 @@
 pub mod reexport {
     pub use crate::directory::test_utils::DirentsSameInodeBuilder;
     pub use fidl_fuchsia_io as fio;
-    pub use fuchsia_zircon_status::Status;
     pub use futures::stream::StreamExt;
+    pub use zx_status::Status;
 
     #[cfg(not(target_os = "fuchsia"))]
     pub use fuchsia_async::emulated_handle::MessageBuf;
     #[cfg(target_os = "fuchsia")]
-    pub use fuchsia_zircon::MessageBuf;
+    pub use zx::MessageBuf;
 }
 
 // All of the macros in this file should be async functions.  There are two reasons they are not:

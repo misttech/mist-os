@@ -435,7 +435,7 @@ pub fn merged_configuration_stream(
 pub mod testutil {
     use super::*;
     use futures::future::ready;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     /// Task for polling the DHCP client.
     pub struct DhcpClientTask {

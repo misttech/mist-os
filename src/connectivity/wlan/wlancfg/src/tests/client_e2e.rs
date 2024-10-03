@@ -37,7 +37,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx, hex,
+    fidl_fuchsia_wlan_sme as fidl_sme, hex, zx,
 };
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;

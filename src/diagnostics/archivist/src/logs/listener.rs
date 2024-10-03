@@ -224,7 +224,7 @@ mod tests {
     use fidl_fuchsia_logger::{LogLevelFilter, LogListenerSafeRequest};
     use libc::c_char;
     use moniker::ExtendedMoniker;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn normal_behavior_test() {

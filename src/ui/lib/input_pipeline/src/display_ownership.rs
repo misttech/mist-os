@@ -10,13 +10,13 @@ use fidl_fuchsia_ui_composition_internal as fcomp;
 use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_async::{OnSignals, Task};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon::{AsHandleRef, Duration, MonotonicInstant, Signals, Status};
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::{select, StreamExt};
 use keymaps::KeyState;
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::rc::Rc;
+use zx::{AsHandleRef, Duration, MonotonicInstant, Signals, Status};
 
 lazy_static! {
     // The signal value corresponding to the `DISPLAY_OWNED_SIGNAL`.  Same as zircon's signal
@@ -297,8 +297,8 @@ mod tests {
     use crate::testing_utilities::{create_fake_input_event, create_input_event};
     use fidl_fuchsia_input::Key;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{EventPair, Peered};
     use pretty_assertions::assert_eq;
+    use zx::{EventPair, Peered};
 
     // Manages losing and regaining display, since manual management is error-prone:
     // if signal_peer does not change the signal state, the waiting process will block

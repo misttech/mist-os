@@ -18,7 +18,7 @@ use {
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_sys2 as fsys, zx,
 };
 
 mod host_identifier;
@@ -120,7 +120,7 @@ impl RemoteControlService {
                 Ok(())
             }
             rcs::RemoteControlRequest::GetTime { responder } => {
-                responder.send(fuchsia_zircon::MonotonicInstant::get().into_nanos())?;
+                responder.send(zx::MonotonicInstant::get().into_nanos())?;
                 Ok(())
             }
             rcs::RemoteControlRequest::_UnknownMethod { ordinal, .. } => {
@@ -346,7 +346,7 @@ mod tests {
         fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
         fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio,
         fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
-        fidl_fuchsia_sysinfo as sysinfo, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fidl_fuchsia_sysinfo as sysinfo, fuchsia_async as fasync, zx,
     };
 
     const NODENAME: &'static str = "thumb-set-human-shred";

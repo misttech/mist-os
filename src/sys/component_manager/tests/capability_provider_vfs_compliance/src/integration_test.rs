@@ -4,7 +4,7 @@
 use assert_matches::assert_matches;
 use fuchsia_fs::node::OpenError;
 use futures::StreamExt;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx_status};
 
 #[fasync::run_singlethreaded(test)]
 async fn component_manager_namespace() {

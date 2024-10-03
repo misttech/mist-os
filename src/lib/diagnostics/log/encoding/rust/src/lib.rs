@@ -220,7 +220,7 @@ mod tests {
     use super::*;
     use crate::encode::{Encoder, EncoderOpts, EncodingError, MutableBuffer};
     use crate::parse::{parse_argument, try_parse_record, ParseResult};
-    use fuchsia_zircon as zx;
+
     use std::fmt::Debug;
     use std::io::Cursor;
 

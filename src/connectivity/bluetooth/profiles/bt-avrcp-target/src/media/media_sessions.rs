@@ -15,7 +15,7 @@ use futures::{future, Future, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{trace, warn};
-use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fuchsia_zircon as zx};
+use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, zx};
 
 use crate::media::media_state::{
     MediaState, MEDIA_SESSION_ADDRESSED_PLAYER_ID, MEDIA_SESSION_DISPLAYABLE_NAME,

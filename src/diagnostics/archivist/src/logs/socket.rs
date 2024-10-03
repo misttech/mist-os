@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
@@ -112,7 +112,7 @@ mod tests {
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use diagnostics_message::fx_log_packet_t;
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use std::io::Cursor;
 

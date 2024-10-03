@@ -4,7 +4,6 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 
-use fuchsia_zircon as zx;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;

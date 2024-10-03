@@ -27,7 +27,7 @@ use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon as zx, wlan_legacy_metrics_registry as metrics,
+    wlan_legacy_metrics_registry as metrics, zx,
 };
 
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 10;
@@ -400,7 +400,7 @@ mod tests {
     use diagnostics_assertions::{
         assert_data_tree, AnyBoolProperty, AnyBytesProperty, AnyNumericProperty, AnyStringProperty,
     };
-    use fuchsia_zircon as zx;
+
     use futures::task::Poll;
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;

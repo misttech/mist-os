@@ -11,8 +11,7 @@ use fuchsia_component::client;
 use futures::future::{select, Either};
 use security_policy_test_util::{open_exposed_dir, start_policy_test};
 use {
-    fidl_fuchsia_component as fcomponent, fidl_test_policy as ftest, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_test_policy as ftest, fuchsia_async as fasync, zx,
 };
 
 const COMPONENT_MANAGER_URL: &str = "#meta/cm_for_test.cm";

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::sys;
+use zx::sys;
 
 extern "C" {
     fn sync_mutex_lock(lock: *const sys::zx_futex_t);

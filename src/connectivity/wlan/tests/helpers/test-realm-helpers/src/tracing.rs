@@ -6,8 +6,8 @@ use anyhow::{format_err, Context};
 use fidl::endpoints::Proxy;
 use fuchsia_component::client::connect_to_protocol_at;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::prelude::*;
-use fuchsia_zircon::{self as zx};
+use zx::prelude::*;
+
 use futures::AsyncReadExt;
 use std::io::Write;
 use std::sync::Arc;

@@ -89,8 +89,7 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                 }
 
                 RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
-                    control_handle
-                        .shutdown_with_epitaph(fuchsia_zircon_status::Status::NOT_SUPPORTED);
+                    control_handle.shutdown_with_epitaph(zx_status::Status::NOT_SUPPORTED);
                 }
             },
             Ok(None) => {

@@ -16,7 +16,7 @@ use metrics_registry::*;
 use std::collections::{HashMap, HashSet};
 use {
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_pointerinjector as pointerinjector, zx,
 };
 
 /// A [`TouchScreenEvent`] represents a set of contacts and the phase those contacts are in.
@@ -784,13 +784,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn process_empty_reports() {
-        let previous_report_time = fuchsia_zircon::MonotonicInstant::get().into_nanos();
+        let previous_report_time = zx::MonotonicInstant::get().into_nanos();
         let previous_report = create_touch_input_report(
             vec![],
             /* pressed_buttons= */ None,
             previous_report_time,
         );
-        let report_time = fuchsia_zircon::MonotonicInstant::get().into_nanos();
+        let report_time = zx::MonotonicInstant::get().into_nanos();
         let report =
             create_touch_input_report(vec![], /* pressed_buttons= */ None, report_time);
 
@@ -1022,14 +1022,14 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn sent_event_has_trace_id() {
-        let previous_report_time = fuchsia_zircon::MonotonicInstant::get().into_nanos();
+        let previous_report_time = zx::MonotonicInstant::get().into_nanos();
         let previous_report = create_touch_input_report(
             vec![],
             /* pressed_buttons= */ None,
             previous_report_time,
         );
 
-        let report_time = fuchsia_zircon::MonotonicInstant::get().into_nanos();
+        let report_time = zx::MonotonicInstant::get().into_nanos();
         let contact = fidl_fuchsia_input_report::ContactInputReport {
             contact_id: Some(222),
             position_x: Some(333),

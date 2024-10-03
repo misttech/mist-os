@@ -14,7 +14,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use {
     fidl_fuchsia_net_debug as fnet_debug, fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx,
 };
 
 mod interfaces;

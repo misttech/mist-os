@@ -8,7 +8,7 @@ use ftest_manager::{
     RunEvent as FidlRunEvent, RunEventPayload as FidlRunEventPayload, SuiteEvent as FidlSuiteEvent,
     SuiteEventPayload as FidlSuiteEventPayload, SuiteResult, SuiteStatus, TestCaseResult,
 };
-use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx};
+use {fidl_fuchsia_test_manager as ftest_manager, zx};
 
 pub(crate) enum RunEventPayload {
     DebugData(ClientEnd<DebugDataIteratorMarker>),
@@ -486,7 +486,7 @@ mod tests {
             }))
         );
 
-        let (client_end, _server_end) = fuchsia_zircon::Socket::create_stream();
+        let (client_end, _server_end) = zx::Socket::create_stream();
         let event = SuiteEvents::suite_syslog(ftest_manager::Syslog::Stream(client_end))
             .into_suite_run_event();
         assert_matches!(event.timestamp, Some(_));
@@ -599,7 +599,7 @@ mod tests {
             }))
         );
 
-        let (client_end, _server_end) = fuchsia_zircon::Socket::create_stream();
+        let (client_end, _server_end) = zx::Socket::create_stream();
         let event =
             SuiteEvents::suite_syslog(ftest_manager::Syslog::Stream(client_end)).into_event();
         assert_matches!(event.timestamp, Some(_));

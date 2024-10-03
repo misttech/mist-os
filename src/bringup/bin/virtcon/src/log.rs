@@ -5,10 +5,10 @@
 use crate::terminal::Terminal;
 use anyhow::Error;
 use fuchsia_async::{self as fasync, OnSignals};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::io::sink;
 use term_model::ansi::Processor;
 use term_model::event::EventListener;
+use zx::{self as zx, AsHandleRef};
 
 pub trait LogClient: 'static + Clone {
     type Listener;

@@ -1138,7 +1138,7 @@ mod tests {
         net_ip_v6, net_subnet_v4, net_subnet_v6,
     };
     use test_case::test_case;
-    use {fidl_fuchsia_net as _, fuchsia_zircon_status as zx_status};
+    use {fidl_fuchsia_net as _, zx_status};
 
     const ARBITRARY_TABLE_ID: u32 = 0;
 

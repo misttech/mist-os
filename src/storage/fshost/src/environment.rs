@@ -36,7 +36,7 @@ pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 const INITIAL_SLICE_COUNT: u64 = 1;
 

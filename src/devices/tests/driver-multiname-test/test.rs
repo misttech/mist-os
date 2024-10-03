@@ -4,7 +4,7 @@
 
 use fuchsia_component_test::new::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync, zx};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_sample_driver() {

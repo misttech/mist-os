@@ -11,7 +11,7 @@ use diagnostics_reader::ArchiveReader;
 use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
 use regex::Regex;
 use std::future::Future;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// Represents a component under test. The `name` is the test-local name assigned to the component,
 /// whereas the path is the relative path to its component manifest (ex: "#meta/client.cm").

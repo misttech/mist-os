@@ -16,7 +16,7 @@ use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::sync::{mpsc, Arc};
-use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics as fdiagnostics, zx};
 
 const BUFFER_SIZE: i32 = 1_049_000;
 

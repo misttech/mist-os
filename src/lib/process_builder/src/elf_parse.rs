@@ -4,7 +4,7 @@
 
 //! Parses ELF files per the ELF specification in ulib/musl/include/elf.h
 use bitflags::bitflags;
-use fuchsia_zircon as zx;
+
 use num_derive::FromPrimitive;
 use num_traits::cast::FromPrimitive;
 use static_assertions::assert_eq_size;

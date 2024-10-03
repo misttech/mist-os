@@ -63,7 +63,7 @@ mod tests {
         for test_case in &[
             TestCase {
                 expose_availability: Availability::Required,
-                expected_res: ExpectedResult::Err(fuchsia_zircon_status::Status::NOT_FOUND),
+                expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
             },
             TestCase {
                 expose_availability: Availability::Optional,

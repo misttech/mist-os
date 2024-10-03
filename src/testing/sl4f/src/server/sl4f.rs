@@ -8,7 +8,7 @@ use fidl_fuchsia_testing_sl4f::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
+
 use maplit::{convert_args, hashmap};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};

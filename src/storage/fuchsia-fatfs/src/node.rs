@@ -5,9 +5,9 @@
 use crate::directory::FatDirectory;
 use crate::file::FatFile;
 use crate::filesystem::{FatFilesystem, FatFilesystemInner};
-use fuchsia_zircon::Status;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
+use zx::Status;
 
 pub trait Node {
     /// Attach this FatNode to the given FatDirectory, with the given name.

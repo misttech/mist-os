@@ -17,7 +17,7 @@ use wlan_hw_sim::*;
 use wlan_rsn::rsna::UpdateSink;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap as fidl_tap, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_tap as fidl_tap, zx,
 };
 
 async fn run_policy_and_assert_transparent_reconnect(

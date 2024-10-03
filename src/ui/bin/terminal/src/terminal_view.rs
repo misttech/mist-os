@@ -588,7 +588,7 @@ impl ViewAssistant for TerminalViewAssistant {
     fn render(
         &mut self,
         render_context: &mut RenderContext,
-        ready_event: fuchsia_zircon::Event,
+        ready_event: zx::Event,
         context: &ViewAssistantContext,
     ) -> Result<(), Error> {
         ftrace::duration!(c"terminal", c"TerminalViewAssistant:render");
@@ -716,7 +716,7 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use fuchsia_async::{DurationExt, Timer};
-    use fuchsia_zircon as zx;
+
     use futures::future::Either;
 
     fn unit_metrics() -> Size {

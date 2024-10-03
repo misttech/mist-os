@@ -7,7 +7,7 @@
 use argh::FromArgs;
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-use fuchsia_zircon::{self as zx};
+
 use iquery::command_line::CommandLine;
 use iquery::commands::*;
 use iquery::types::Error;

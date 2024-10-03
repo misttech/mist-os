@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{BlockContainer, CopyBytes, ReadBytes, WriteBytes};
-use fuchsia_zircon as zx;
 
 #[derive(Debug)]
 pub struct Container {

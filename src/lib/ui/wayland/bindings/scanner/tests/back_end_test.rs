@@ -5,8 +5,8 @@
 #[cfg(test)]
 mod test {
     use fuchsia_wayland_core::{Arg, Enum, Fixed, FromArgs, IntoMessage};
-    use fuchsia_zircon::{self as zx, HandleBased};
     use test_protocol_server_protocol::{test_interface, TestInterfaceEvent, TestInterfaceRequest};
+    use zx::{self as zx, HandleBased};
 
     static SENDER_ID: u32 = 3;
 

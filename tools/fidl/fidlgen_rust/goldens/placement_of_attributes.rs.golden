@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 pub type Alias = u32;
 

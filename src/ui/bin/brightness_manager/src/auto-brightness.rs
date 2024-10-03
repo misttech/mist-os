@@ -4,10 +4,10 @@
 
 use anyhow::{Context, Error};
 use fuchsia_async::DurationExt;
-use fuchsia_zircon::Duration;
 use led::{Led, LedControl};
 use lib::backlight::{Backlight, BacklightControl};
 use lib::sensor::{Sensor, SensorControl};
+use zx::Duration;
 
 const SMALL_SLEEP_TIME_MS: i64 = 1;
 const LARGE_SLEEP_TIME_MS: i64 = 500;
@@ -122,11 +122,11 @@ mod tests {
     use async_trait::async_trait;
     use fidl_fuchsia_hardware_light::{Capability, Info, LightError};
     use fuchsia_async::{self as fasync};
-    use fuchsia_zircon::Duration;
     use futures::lock::Mutex;
     use lib::backlight::BacklightControl;
     use lib::sensor::{AmbientLightInputRpt, SensorControl};
     use std::sync::Arc;
+    use zx::Duration;
 
     struct MockSensor {
         next_reading: f32,

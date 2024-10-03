@@ -9,8 +9,8 @@ use fidl_fuchsia_wlan_common as wlan_common;
 use fidl_fuchsia_wlan_policy::{self as wlan_policy, NetworkConfig, SecurityType};
 use fuchsia_async::{Time, TimeoutExt as _};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::Duration;
 use futures::TryStreamExt as _;
+use zx::Duration;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_seconds(60);
 

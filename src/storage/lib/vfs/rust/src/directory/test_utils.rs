@@ -11,13 +11,13 @@
 #[doc(hidden)]
 pub mod reexport {
     pub use fuchsia_async::Channel;
-    pub use fuchsia_zircon_status::Status;
+    pub use zx_status::Status;
     pub use {fidl, fidl_fuchsia_io as fio};
 
     #[cfg(not(target_os = "fuchsia"))]
     pub use fuchsia_async::emulated_handle::MessageBuf;
     #[cfg(target_os = "fuchsia")]
-    pub use fuchsia_zircon::MessageBuf;
+    pub use zx::MessageBuf;
 }
 
 use crate::directory::entry::DirectoryEntry;

@@ -17,7 +17,6 @@ use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
-use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::future::{self, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -63,6 +62,7 @@ use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
 use test_case::test_case;
+use zx::{self as zx, AsHandleRef as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,

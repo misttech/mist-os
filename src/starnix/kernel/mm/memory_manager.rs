@@ -17,7 +17,7 @@ use crate::vfs::{
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
-use fuchsia_zircon::{self as zx};
+
 use once_cell::sync::Lazy;
 use range_map::RangeMap;
 use smallvec::SmallVec;
@@ -546,7 +546,7 @@ impl PrivateAnonymousMemoryManager {
         let source_memory_offset = source.start.ptr() as u64;
         self.backing
             .memmove(
-                fuchsia_zircon::TransferDataOptions::empty(),
+                zx::TransferDataOptions::empty(),
                 dest_memory_offset,
                 source_memory_offset,
                 length.try_into().unwrap(),
@@ -5062,7 +5062,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_snapshot_paged_memory() {
-        use fuchsia_zircon::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
+        use zx::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
 
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();

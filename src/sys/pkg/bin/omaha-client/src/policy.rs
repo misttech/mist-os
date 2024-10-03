@@ -667,13 +667,12 @@ mod tests {
     use fidl_fuchsia_update::CommitStatusProviderRequest;
     use fidl_fuchsia_update_config::OptOutRequest;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, Peered};
     use omaha_client::time::{MockTimeSource, StandardTimeSource};
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::time::Instant;
-    use zx::HandleBased;
+    use zx::{self as zx, HandleBased, Peered};
 
     // We do periodic update check roughly every hour.
     const PERIODIC_INTERVAL_FOR_TEST: Duration = Duration::from_secs(60 * 60);

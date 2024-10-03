@@ -27,7 +27,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use test_case::test_case;
 use zx::MonotonicInstant;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const VENDOR_ID: u32 = 1;
 const PRODUCT_ID: u32 = 2;

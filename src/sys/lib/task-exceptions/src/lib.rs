@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, sys as zx_sys, HandleBased};
 use std::task::Poll;
 use std::{mem, ptr};
+use zx::{self as zx, sys as zx_sys, HandleBased};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExceptionType {

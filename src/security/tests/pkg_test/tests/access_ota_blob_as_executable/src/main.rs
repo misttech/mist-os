@@ -20,13 +20,13 @@ use fuchsia_fs::directory::{open_file_deprecated, readdir};
 use fuchsia_fs::file;
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
-use fuchsia_zircon::{AsHandleRef, Rights, Status};
 use futures::channel::oneshot::channel;
 use futures::{join, TryStreamExt};
 use security_pkg_test_util::config::load_config;
 use security_pkg_test_util::storage::mount_image_as_ramdisk;
 use std::fs::File;
 use tracing::info;
+use zx::{AsHandleRef, Rights, Status};
 
 const DEFAULT_DOMAIN: &str = "fuchsia.com";
 const HELLO_WORLD_PACKAGE_NAME: &str = "hello_world";

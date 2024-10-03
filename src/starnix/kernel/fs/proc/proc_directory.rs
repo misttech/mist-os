@@ -20,7 +20,7 @@ use crate::vfs::{
     StubEmptyFile, SymlinkTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
+
 use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
@@ -657,7 +657,7 @@ impl DynamicFileSource for CpuinfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let is_qemu = SYSINFO.is_qemu();
 
-        for i in 0..fuchsia_zircon::system_get_num_cpus() {
+        for i in 0..zx::system_get_num_cpus() {
             writeln!(sink, "processor\t: {}", i)?;
 
             // Report emulated CPU as "QEMU Virtual CPU". Some LTP tests rely on this to detect

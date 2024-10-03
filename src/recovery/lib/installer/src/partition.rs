@@ -11,7 +11,7 @@ use fidl_fuchsia_hardware_block::BlockMarker;
 use fidl_fuchsia_hardware_block_partition::PartitionProxy;
 use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_paver::{Asset, Configuration, DynamicDataSinkProxy};
-use fuchsia_zircon as zx;
+
 use futures::future::try_join;
 use futures::TryFutureExt;
 use payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer};

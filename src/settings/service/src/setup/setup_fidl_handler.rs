@@ -86,8 +86,8 @@ impl request::Responder<Scoped<SetupSetResult>> for SetupSetResponder {
     }
 }
 
-impl watch::Responder<SetupSettings, fuchsia_zircon::Status> for SetupWatchResponder {
-    fn respond(self, response: Result<SetupSettings, fuchsia_zircon::Status>) {
+impl watch::Responder<SetupSettings, zx::Status> for SetupWatchResponder {
+    fn respond(self, response: Result<SetupSettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings);

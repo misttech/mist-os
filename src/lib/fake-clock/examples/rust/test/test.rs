@@ -6,7 +6,7 @@ use fidl_fuchsia_fakeclock_test::ExampleMarker;
 use fidl_fuchsia_testing::{DeadlineEventType, FakeClockControlMarker, Increment};
 use fuchsia_component::client::connect_to_protocol;
 use named_timer::DeadlineId;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const DEADLINE_NAME: DeadlineId<'static> = DeadlineId::new("fake-clock-example", "deadline");
 

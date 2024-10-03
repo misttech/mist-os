@@ -21,7 +21,7 @@ use metrics_registry::*;
 use std::path::PathBuf;
 use {
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_trace as ftrace, zx,
 };
 
 pub use input_device_constants::InputDeviceType;
@@ -584,7 +584,7 @@ mod tests {
     use assert_matches::assert_matches;
     use diagnostics_assertions::AnyProperty;
     use fidl::endpoints::spawn_stream_handler;
-    use fuchsia_zircon as zx;
+
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
     use test_case::test_case;

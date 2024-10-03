@@ -378,11 +378,11 @@ mod tests {
     use fidl_fuchsia_inspect::InspectSinkMarker;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::AsHandleRef;
     use futures::FutureExt;
     use moniker::ExtendedMoniker;
     use std::sync::LazyLock;
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use zx::AsHandleRef;
+    use {fuchsia_async as fasync, zx};
 
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;

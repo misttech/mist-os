@@ -10,7 +10,6 @@ use fidl_fuchsia_settings::{
     AudioMarker, AudioRequest, AudioSetResponder, AudioSetResult, AudioSettings,
     AudioStreamSettingSource, AudioStreamSettings, AudioWatchResponder, Volume,
 };
-use fuchsia_zircon as zx;
 
 use fidl_fuchsia_media::AudioRenderUsage;
 use fuchsia_trace as ftrace;

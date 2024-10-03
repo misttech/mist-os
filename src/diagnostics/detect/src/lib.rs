@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use triage_detect_config::Config as ComponentConfig;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 const MINIMUM_CHECK_TIME_NANOS: i64 = 60 * 1_000_000_000;
 const CONFIG_GLOB: &str = "/config/data/*.triage";

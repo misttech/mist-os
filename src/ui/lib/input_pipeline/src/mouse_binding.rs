@@ -13,7 +13,7 @@ use fuchsia_inspect::ArrayProperty;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
 use std::collections::HashSet;
-use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
+use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
 pub type MouseButton = u8;
 

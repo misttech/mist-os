@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fuchsia_zircon::Status;
 use std::thread;
+use zx::Status;
 
 #[fuchsia::test]
 fn test_set_role_for_this_thread() -> Result<()> {

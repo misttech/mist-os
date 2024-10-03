@@ -5,7 +5,7 @@
 use crate::log_debug;
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use fuchsia_zircon as zx;
+
 use starnix_sync::Mutex;
 
 /// The maximum number of failed tasks to record.

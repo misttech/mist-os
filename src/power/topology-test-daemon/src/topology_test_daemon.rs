@@ -8,7 +8,6 @@ use fidl_test_powerelementrunner::ControlMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-use fuchsia_zircon::{HandleBased, Rights};
 use futures::StreamExt;
 use power_broker_client::PowerElementContext;
 use std::cell::RefCell;
@@ -17,6 +16,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use tracing::{error, info, warn};
+use zx::{HandleBased, Rights};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
     fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync,

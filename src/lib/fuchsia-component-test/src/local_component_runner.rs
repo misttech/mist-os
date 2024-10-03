@@ -20,7 +20,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
 };
 
 /// The handles from the framework over which the local component should interact with other
@@ -402,8 +402,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, Proxy as _};
-    use fuchsia_zircon::AsHandleRef;
     use futures::future::pending;
+    use zx::AsHandleRef;
 
     #[fuchsia::test]
     async fn runner_builder_correctly_stores_a_function() {

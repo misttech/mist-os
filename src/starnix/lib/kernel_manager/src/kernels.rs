@@ -18,7 +18,7 @@ use vfs::execution_scope::ExecutionScope;
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx,
+    fidl_fuchsia_memory_attribution as fattribution, zx,
 };
 
 /// The component URL of the Starnix kernel.

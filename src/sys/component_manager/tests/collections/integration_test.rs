@@ -9,7 +9,7 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 #[fasync::run_singlethreaded(test)]

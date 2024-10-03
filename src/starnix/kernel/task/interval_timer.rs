@@ -8,7 +8,7 @@ use crate::task::{
 };
 use crate::vfs::timer::TimerOps;
 use fuchsia_async::Duration;
-use fuchsia_zircon as zx;
+
 use futures::stream::AbortHandle;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;

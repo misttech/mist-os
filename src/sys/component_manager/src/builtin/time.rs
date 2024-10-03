@@ -7,9 +7,9 @@ use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_time as ftime;
 use fuchsia_fs::{file, OpenFlags};
 use fuchsia_runtime::{UtcClock, UtcInstant};
-use fuchsia_zircon::{ClockOpts, HandleBased, Rights};
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::{ClockOpts, HandleBased, Rights};
 
 /// An implementation of the `fuchsia.time.Maintenance` protocol, which
 /// maintains a UTC clock, vending out handles with write access.

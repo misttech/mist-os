@@ -16,7 +16,7 @@ use fidl_fuchsia_bluetooth_sys::{
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_bluetooth::types::Address;
 use fuchsia_component as component;
-use fuchsia_zircon::{self as zx};
+
 use tracing::{error, info};
 
 use fuchsia_sync::RwLock;

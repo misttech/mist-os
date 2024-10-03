@@ -918,7 +918,7 @@ pub(crate) mod tests {
             Err((
                 _,
                 LoadRulesError::FileOpen(fuchsia_fs::node::OpenError::OpenError(
-                    fuchsia_zircon::Status::NOT_FOUND
+                    zx::Status::NOT_FOUND
                 ))
             ))
         );
@@ -937,7 +937,7 @@ pub(crate) mod tests {
             Err((
                 _,
                 LoadRulesError::FileOpen(fuchsia_fs::node::OpenError::OpenError(
-                    fuchsia_zircon::Status::NOT_FOUND
+                    zx::Status::NOT_FOUND
                 ))
             ))
         );

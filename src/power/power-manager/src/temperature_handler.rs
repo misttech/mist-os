@@ -21,8 +21,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
 use {
-    fidl_fuchsia_hardware_temperature as ftemperature, fuchsia_async as fasync,
-    fuchsia_zircon as zx, serde_json as json,
+    fidl_fuchsia_hardware_temperature as ftemperature, fuchsia_async as fasync, serde_json as json,
+    zx,
 };
 
 /// Node: TemperatureHandler

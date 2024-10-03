@@ -12,10 +12,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
 use tracing::error;
-use {
-    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
-    fuchsia_zircon_status as zx_status,
-};
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync, zx_status};
 
 enum IncomingService {
     RealmFactory(RealmFactoryRequestStream),

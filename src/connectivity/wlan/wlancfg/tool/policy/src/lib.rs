@@ -712,12 +712,12 @@ mod tests {
     use super::*;
     use fidl::endpoints;
     use fuchsia_async::TestExecutor;
-    use fuchsia_zircon_status as zx_status;
     use futures::stream::StreamExt;
     use futures::task::Poll;
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::assert_variant;
+    use zx_status;
 
     static TEST_SSID: &str = "test_ssid";
     static TEST_PASSWORD: &str = "test_password";

@@ -50,7 +50,7 @@ use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::Explain;
 use sandbox::{Capability, Data, Dict, Request, Routable};
 use std::sync::Arc;
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as zx};
 
 pub use bedrock::dict_ext::DictExt;
 pub use bedrock::lazy_get::LazyGet;

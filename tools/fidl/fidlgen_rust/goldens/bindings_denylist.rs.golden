@@ -8,11 +8,8 @@
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use fuchsia_zircon_status as zx_status;
 use futures::future::{self, MaybeDone, TryFutureExt};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use zx_status;
 
 pub const ALL_BINDINGS: u32 = 0;
 
@@ -165,7 +162,10 @@ impl AllowedSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicInstant) -> Result<AllowedEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicInstant,
+    ) -> Result<AllowedEvent, fidl::Error> {
         AllowedEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }

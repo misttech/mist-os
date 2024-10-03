@@ -8,10 +8,7 @@ use fidl_fuchsia_virtualization::GuestLifecycleMarker;
 use fuchsia_component::client;
 use futures::stream::Stream;
 use futures::StreamExt;
-use {
-    fidl_fuchsia_component_decl as cdecl, fidl_fuchsia_io as fio,
-    fuchsia_zircon_status as zx_status,
-};
+use {fidl_fuchsia_component_decl as cdecl, fidl_fuchsia_io as fio, zx_status};
 
 fn send_epitaph<T>(server_end: ServerEnd<T>, epitaph: zx_status::Status) {
     if let Err(e) = server_end.close_with_epitaph(epitaph) {

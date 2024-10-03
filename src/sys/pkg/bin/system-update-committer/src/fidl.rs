@@ -5,11 +5,11 @@
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderRequestStream};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-use fuchsia_zircon::{self as zx, EventPair, HandleBased};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use std::sync::Arc;
 use tracing::warn;
+use zx::{self as zx, EventPair, HandleBased};
 
 pub struct FidlServer {
     p_external: EventPair,

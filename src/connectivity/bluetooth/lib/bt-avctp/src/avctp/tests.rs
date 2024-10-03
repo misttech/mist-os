@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, Status};
 use futures::executor::block_on;
 use futures::StreamExt;
 use std::result;
+use zx::{self as zx, Status};
 
 use super::*;
 

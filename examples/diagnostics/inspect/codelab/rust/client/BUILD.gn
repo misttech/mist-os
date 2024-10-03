@@ -12,9 +12,9 @@ rustc_binary("bin") {
   deps = [
     "//examples/diagnostics/inspect/codelab/fidl:fuchsia.examples.inspect_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:tracing",
   ]

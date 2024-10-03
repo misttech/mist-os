@@ -73,9 +73,9 @@ rustc_test("ddk_firmware_test") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//sdk/rust/zx",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 

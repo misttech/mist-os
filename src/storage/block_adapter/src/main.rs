@@ -5,9 +5,7 @@
 use anyhow::{anyhow, Error};
 use fidl::endpoints::ClientEnd;
 use fuchsia_runtime::HandleType;
-use {
-    fidl_fuchsia_hardware_block as fhardware_block, fuchsia_async as fasync, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_hardware_block as fhardware_block, fuchsia_async as fasync, zx};
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {

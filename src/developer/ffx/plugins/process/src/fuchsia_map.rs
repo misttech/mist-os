@@ -5,9 +5,9 @@
 pub mod json {
     use crate::processes_data::processed;
     use fidl_fuchsia_buildinfo::BuildInfo;
-    use fuchsia_zircon_types as zx_types;
     use serde::Serialize;
     use std::collections::HashSet;
+    use zx_types;
 
     /// A node is part of the graph, and it represents a process.
     #[derive(Serialize, PartialEq, Debug)]

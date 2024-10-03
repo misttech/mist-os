@@ -15,7 +15,6 @@ use fidl_fuchsia_media::{
     STREAM_PACKET_FLAG_DISCONTINUITY,
 };
 use fuchsia_audio_codec::StreamProcessor;
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::channel::mpsc;
 use futures::future::MapOk;
 use futures::io::{AsyncWrite, AsyncWriteExt};
@@ -26,6 +25,7 @@ use std::collections::HashSet;
 use std::io;
 use std::pin::Pin;
 use tracing::{info, warn};
+use zx::{self as zx, HandleBased};
 use {fuchsia_async as fasync, fuchsia_trace as trace};
 
 use crate::latm::AudioMuxElement;

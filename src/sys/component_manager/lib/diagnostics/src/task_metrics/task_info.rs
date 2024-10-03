@@ -6,7 +6,6 @@ use crate::task_metrics::constants::{COMPONENT_CPU_MAX_SAMPLES, CPU_SAMPLE_PERIO
 use crate::task_metrics::measurement::{Measurement, MeasurementsQueue};
 use crate::task_metrics::runtime_stats_source::RuntimeStatsSource;
 use fuchsia_inspect::{self as inspect, HistogramProperty, UintLinearHistogramProperty};
-use fuchsia_zircon::sys::{self as zx_sys, zx_system_get_num_cpus};
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::FutureExt;
@@ -15,7 +14,8 @@ use moniker::ExtendedMoniker;
 use std::fmt::Debug;
 use std::sync::{Arc, Weak};
 use tracing::debug;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use zx::sys::{self as zx_sys, zx_system_get_num_cpus};
+use {fuchsia_async as fasync, zx};
 
 pub(crate) fn create_cpu_histogram(
     node: &inspect::Node,

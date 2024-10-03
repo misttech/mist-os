@@ -16,9 +16,6 @@ use crate::task::{
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon::{
-    AsHandleRef, Signals, Task as _, {self as zx},
-};
 use macro_rules_attribute::apply;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_warn, set_zx_name};
@@ -46,6 +43,9 @@ use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::{cmp, fmt};
+use zx::{
+    AsHandleRef, Signals, Task as _, {self as zx},
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExitStatus {

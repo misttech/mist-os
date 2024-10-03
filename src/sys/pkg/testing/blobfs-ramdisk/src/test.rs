@@ -6,9 +6,9 @@ use super::*;
 use assert_matches::assert_matches;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Status;
 use std::io::Write as _;
 use std::time::Duration;
+use zx::Status;
 
 // merkle root of b"Hello world!\n".
 static BLOB_MERKLE: &str = "e5892a9b652ede2e19460a9103fd9cb3417f782a8d29f6c93ec0c31170a94af3";

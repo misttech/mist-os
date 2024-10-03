@@ -29,7 +29,6 @@ use chrono::prelude::*;
 use fidl::AsHandleRef;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcTimeline};
-use fuchsia_zircon::MonotonicTimeline;
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
@@ -38,10 +37,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use tracing::{debug, error, info, warn};
-use {
-    fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-};
+use zx::MonotonicTimeline;
+use {fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync, zx};
 
 // TODO(https://fxbug.dev/356911500) switch to boot timeline
 type UtcTransform = time_util::Transform<MonotonicTimeline, UtcTimeline>;
@@ -561,7 +558,7 @@ mod tests {
     use std::matches;
     use std::pin::pin;
     use test_case::test_case;
-    use {fidl_fuchsia_time_external as ftexternal, fuchsia_zircon as zx};
+    use {fidl_fuchsia_time_external as ftexternal, zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);

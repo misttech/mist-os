@@ -112,8 +112,8 @@ impl request::Responder<Scoped<DisplaySetResult>> for DisplaySetResponder {
     }
 }
 
-impl watch::Responder<DisplaySettings, fuchsia_zircon::Status> for DisplayWatchResponder {
-    fn respond(self, response: Result<DisplaySettings, fuchsia_zircon::Status>) {
+impl watch::Responder<DisplaySettings, zx::Status> for DisplayWatchResponder {
+    fn respond(self, response: Result<DisplaySettings, zx::Status>) {
         match response {
             Ok(settings) => {
                 let _ = self.send(&settings);

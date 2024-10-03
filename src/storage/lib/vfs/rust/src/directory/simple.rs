@@ -25,11 +25,11 @@ use crate::protocols::ProtocolsExt;
 use crate::{ObjectRequestRef, ToObjectRequest};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::iter;
 use std::sync::{Arc, Mutex};
+use zx_status::Status;
 
 use super::entry::GetEntryInfo;
 

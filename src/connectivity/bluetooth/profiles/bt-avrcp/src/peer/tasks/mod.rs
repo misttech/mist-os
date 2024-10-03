@@ -13,7 +13,7 @@ use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{error, info, trace, warn};
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 mod notification_stream;
 

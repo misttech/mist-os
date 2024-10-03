@@ -8,10 +8,10 @@ use crate::update_mode::UpdateMode;
 use camino::Utf8Path;
 use fidl_fuchsia_io as fio;
 use fuchsia_url::{AbsoluteComponentUrl, ParseError, PinnedAbsolutePackageUrl};
-use fuchsia_zircon_status::Status;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use thiserror::Error;
+use zx_status::Status;
 
 /// An error encountered while resolving images.
 #[derive(Debug, Error)]

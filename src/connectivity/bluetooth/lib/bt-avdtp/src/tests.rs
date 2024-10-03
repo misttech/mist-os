@@ -4,10 +4,10 @@
 
 use assert_matches::assert_matches;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, Status};
 use futures::executor::block_on;
 use futures::{future, StreamExt, TryStreamExt};
 use std::result;
+use zx::{self as zx, Status};
 
 use crate::*;
 

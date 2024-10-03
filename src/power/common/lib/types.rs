@@ -9,8 +9,8 @@
 //! developed measurement unit library would probably require const generics, so the compiler can
 //! interpret exponents applied to different unit types.
 
-use fuchsia_zircon::sys;
 use std::ops;
+use zx::sys;
 
 /// Defines aspects of a measurement unit that are applicable regardless of the scalar type.
 /// mul_scalar and div_scalar are defined to eliminate some common needs for shedding the unit type.
@@ -173,9 +173,9 @@ impl From<Nanoseconds> for Milliseconds {
     }
 }
 
-impl From<Seconds> for fuchsia_zircon::Duration {
-    fn from(seconds: Seconds) -> fuchsia_zircon::Duration {
-        fuchsia_zircon::Duration::from_nanos(Nanoseconds::from(seconds).0)
+impl From<Seconds> for zx::Duration {
+    fn from(seconds: Seconds) -> zx::Duration {
+        zx::Duration::from_nanos(Nanoseconds::from(seconds).0)
     }
 }
 

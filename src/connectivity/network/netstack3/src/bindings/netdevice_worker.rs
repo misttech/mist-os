@@ -625,7 +625,7 @@ async fn get_mac(
     // don't really plumb through multicast filtering.
     // TODO(https://fxbug.dev/42136929): Remove this when multicast filtering
     // is available.
-    fuchsia_zircon::Status::ok(
+    zx::Status::ok(
         mac_proxy
             .set_mode(fhardware_network::MacFilterMode::MulticastPromiscuous)
             .await

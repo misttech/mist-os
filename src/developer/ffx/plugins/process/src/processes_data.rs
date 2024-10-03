@@ -7,8 +7,8 @@
 /// Types and utilities related to the raw data produced by
 /// `process_explorer`.
 pub mod raw {
-    use fuchsia_zircon_types::{zx_koid_t, zx_obj_type_t};
     use serde::{Deserialize, Serialize};
+    use zx_types::{zx_koid_t, zx_obj_type_t};
 
     /// A simplified version of the zx_info_handle_extended_t
     /// type.
@@ -71,9 +71,9 @@ pub mod raw {
 /// suitable for user-facing consumption.
 pub mod processed {
     use crate::processes_data::raw;
-    use fuchsia_zircon_types::{zx_koid_t, zx_obj_type_t};
     use serde::Serialize;
     use std::collections::HashMap;
+    use zx_types::{zx_koid_t, zx_obj_type_t};
 
     /// Similar to raw::KernelObject, except it does not contain the
     /// object type.

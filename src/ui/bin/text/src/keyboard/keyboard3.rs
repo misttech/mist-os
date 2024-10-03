@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 use anyhow::{format_err, Context as _, Error};
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::lock::Mutex;
 use futures::{future, TryStreamExt};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as ui_input3,
     fidl_fuchsia_ui_views as ui_views, fuchsia_scenic as scenic,

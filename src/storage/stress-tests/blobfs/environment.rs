@@ -10,7 +10,6 @@ use crate::{Args, BLOBFS_MOUNT_PATH};
 use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fs_management::Blobfs;
-use fuchsia_zircon::Vmo;
 use futures::lock::Mutex;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -22,6 +21,7 @@ use storage_stress_test_utils::io::Directory;
 use stress_test::actor::ActorRunner;
 use stress_test::environment::Environment;
 use stress_test::random_seed;
+use zx::Vmo;
 
 // All partitions in this test have their type set to this arbitrary GUID.
 const TYPE_GUID: Guid =

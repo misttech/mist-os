@@ -11,7 +11,7 @@ use block_client::{
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 use fs_management::filesystem::BlockConnector;
-use fuchsia_zircon as zx;
+
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -241,7 +241,7 @@ mod tests {
     use vfs::ObjectRequest;
     use {
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, zx,
     };
 
     struct MockBlockConnector {

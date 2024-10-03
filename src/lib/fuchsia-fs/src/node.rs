@@ -6,7 +6,7 @@
 
 use futures::prelude::*;
 use thiserror::Error;
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_io as fio, zx_status};
 
 #[cfg(target_os = "fuchsia")]
 pub use fuchsia::*;

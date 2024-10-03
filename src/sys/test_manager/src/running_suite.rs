@@ -45,7 +45,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test as ftest,
-    fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx,
+    fidl_fuchsia_test_manager as ftest_manager, zx,
 };
 
 const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
@@ -177,7 +177,7 @@ impl RunningSuite {
 
         let (log_iterator, syslog) = match options.log_iterator {
             Some(ftest_manager::LogsIteratorOption::SocketBatchIterator) => {
-                let (local, remote) = fuchsia_zircon::Socket::create_stream();
+                let (local, remote) = zx::Socket::create_stream();
                 (ftest_manager::LogsIterator::Stream(local), ftest_manager::Syslog::Stream(remote))
             }
             _ => {

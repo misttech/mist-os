@@ -7,7 +7,7 @@ use fidl::endpoints::RequestStream as _;
 use fidl_examples_canvas_baseline::{BoundingBox, InstanceRequest, InstanceRequestStream, Point};
 use fuchsia_async::{Time, Timer};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{self as zx};
+
 use futures::future::join;
 use futures::prelude::*;
 use std::sync::{Arc, Mutex};

@@ -31,7 +31,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::unimplemented;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -3746,7 +3746,7 @@ mod tests {
                     iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
                 }))) => {
                     responder
-                        .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                        .send(Err(zx::sys::ZX_ERR_NOT_FOUND))
                         .expect("failed to send client SME response.");
                 }
             );
@@ -4091,7 +4091,7 @@ mod tests {
                     iface_id: TEST_AP_IFACE_ID, responder
                 }) => {
                     responder
-                        .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                        .send(Err(zx::sys::ZX_ERR_NOT_FOUND))
                         .expect("Sending iface response");
                 }
             );

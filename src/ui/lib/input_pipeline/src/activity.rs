@@ -13,7 +13,7 @@ use fidl_fuchsia_input_interaction_observation::{
 use fidl_fuchsia_power_system::{ActivityGovernorMarker, ActivityGovernorProxy};
 use fuchsia_async::{Task, Timer};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
+
 use futures::StreamExt;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;

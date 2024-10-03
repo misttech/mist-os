@@ -12,7 +12,7 @@ use fidl_fuchsia_hardware_bluetooth::{
 };
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx};
+
 use futures::{ready, Stream, StreamExt};
 use std::fmt;
 use std::pin::Pin;

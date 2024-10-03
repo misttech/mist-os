@@ -14,7 +14,6 @@ use errors::ModelError;
 use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, ArrayProperty, HistogramProperty};
-use fuchsia_zircon::{self as zx, sys as zx_sys, HandleBased};
 use futures::channel::{mpsc, oneshot};
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
@@ -26,6 +25,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::fmt::Debug;
 use std::sync::{Arc, Weak};
 use tracing::warn;
+use zx::{self as zx, sys as zx_sys, HandleBased};
 
 macro_rules! maybe_return {
     ($e:expr) => {
@@ -542,7 +542,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use diagnostics_hierarchy::DiagnosticsHierarchy;
     use fuchsia_inspect::DiagnosticsHierarchyGetter;
-    use fuchsia_zircon as zx;
+
     use injectable_time::{FakeTime, IncrementingFakeTime};
 
     #[fuchsia::test]

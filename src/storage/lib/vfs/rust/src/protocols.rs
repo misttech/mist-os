@@ -9,7 +9,7 @@ use crate::node::NodeOptions;
 use crate::service::ServiceOptions;
 use crate::symlink::SymlinkOptions;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 
 /// Extends fio::Flags and fio::OpenFlags
 pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {

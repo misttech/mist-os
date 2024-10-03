@@ -20,7 +20,7 @@ use std::rc::Rc;
 use {
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config, zx,
 };
 
 /// An input handler that parses touch events and forwards them to Scenic through the
@@ -501,7 +501,7 @@ mod tests {
     use std::ops::Add;
     use {
         fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, zx,
     };
 
     const TOUCH_ID: u32 = 1;
@@ -1074,8 +1074,8 @@ mod tests {
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
-        let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
+        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
 
         let input_events = vec![
             create_touch_screen_event(

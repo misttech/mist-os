@@ -9,7 +9,7 @@ use bootfs::{
     ZBI_BOOTFS_PAGE_SIZE,
 };
 use byteorder::{ByteOrder, LittleEndian};
-use fuchsia_zircon as zx;
+
 use std::ffi::CStr;
 use std::mem::size_of;
 use std::str::Utf8Error;
@@ -261,11 +261,11 @@ impl<'parser> Iterator for BootfsParserIterator<'parser> {
 mod tests {
     use super::*;
     use anyhow::Error;
-    use fuchsia_zircon::HandleBased;
     use lazy_static::lazy_static;
     use std::collections::HashMap;
     use std::fs::File;
     use std::io::prelude::*;
+    use zx::HandleBased;
 
     static GOLDEN_DIR: &str = "/pkg/data/golden/";
     static BASIC_BOOTFS_UNCOMPRESSED_FILE: &str = "/pkg/data/basic.bootfs.uncompressed";

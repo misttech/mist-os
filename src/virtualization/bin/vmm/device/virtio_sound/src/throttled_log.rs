@@ -5,7 +5,6 @@
 // Don't complain if one of info/warn/err/debug are unused.
 #![allow(unused)]
 
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::Rc;

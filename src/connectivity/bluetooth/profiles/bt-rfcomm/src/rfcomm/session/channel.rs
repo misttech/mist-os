@@ -512,7 +512,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon as zx;
+
     use futures::task::Poll;
     use std::pin::pin;
 

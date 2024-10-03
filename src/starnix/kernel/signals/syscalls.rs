@@ -15,7 +15,7 @@ use crate::task::{
     WaitableChildResult, Waiter,
 };
 use crate::vfs::{FdFlags, FdNumber};
-use fuchsia_zircon as zx;
+
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;

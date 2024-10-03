@@ -13,12 +13,12 @@ use fidl_fuchsia_sysmem2::{
     BufferCollectionWaitForAllBuffersAllocatedResponse,
     BufferCollectionWaitForAllBuffersAllocatedResult, BufferMemorySettings, NodeSetNameRequest,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::{FusedFuture, Future};
 use futures::task::{Context, Poll};
 use futures::{ready, FutureExt};
 use std::pin::Pin;
 use tracing::error;
+use zx::{self as zx, AsHandleRef};
 
 /// A set of buffers that have been allocated with the SysmemAllocator.
 #[derive(Debug)]

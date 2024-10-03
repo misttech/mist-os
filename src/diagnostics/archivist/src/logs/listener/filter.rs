@@ -111,7 +111,7 @@ mod tests {
     use super::*;
     use crate::identity::ComponentIdentity;
     use diagnostics_data::Severity;
-    use fuchsia_zircon as zx;
+
     use moniker::ExtendedMoniker;
 
     fn test_message_with_tag(tag: Option<&str>) -> LogsData {

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use zx::{self as zx, AsHandleRef, HandleBased};
 
 /// Root of the Inspect API. Through this API, further nodes can be created and inspect can be
 /// served.

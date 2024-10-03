@@ -18,7 +18,7 @@ pub(super) async fn reboot() {
             .reboot(RebootReason::CriticalComponentFailure)
             .await
             .context("while performing reboot call")?
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .context("reboot responded with")
     }
     .await

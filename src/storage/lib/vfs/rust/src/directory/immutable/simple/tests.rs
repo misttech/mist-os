@@ -26,11 +26,11 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
-use fuchsia_zircon_status::Status;
 use futures::TryStreamExt;
 use static_assertions::assert_eq_size;
 use std::sync::{Arc, Mutex};
 use vfs_macros::pseudo_directory;
+use zx_status::Status;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
@@ -1671,7 +1671,7 @@ impl File for MockWritableFile {
     }
 
     #[cfg(target_os = "fuchsia")]
-    async fn get_backing_memory(&self, _: fio::VmoFlags) -> Result<fuchsia_zircon::Vmo, Status> {
+    async fn get_backing_memory(&self, _: fio::VmoFlags) -> Result<zx::Vmo, Status> {
         unimplemented!()
     }
 

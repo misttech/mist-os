@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_virtualization_hardware::VirtioMemControlHandle;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect::{NumericProperty, Property};
-use fuchsia_zircon::{self as zx};
+
 use std::io::{Read, Write};
 use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
 use virtio_device::mem::DriverMem;

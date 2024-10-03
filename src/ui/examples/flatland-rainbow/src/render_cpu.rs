@@ -10,7 +10,7 @@ use fuchsia_framebuffer::FrameUsage;
 use fuchsia_scenic::{duplicate_buffer_collection_import_token, BufferCollectionTokenPair};
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_ui_composition as fland, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_composition as fland, zx,
 };
 
 pub struct CpuRenderer {

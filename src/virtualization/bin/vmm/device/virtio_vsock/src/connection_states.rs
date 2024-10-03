@@ -63,7 +63,6 @@ use fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder;
 use fuchsia_async::{
     self as fasync, ReadableHandle as _, ReadableState, WritableHandle as _, WritableState,
 };
-use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::{self, poll_fn};
 use futures::task::noop_waker_ref;
@@ -74,6 +73,7 @@ use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
 use zerocopy::IntoBytes;
+use zx::{self as zx, AsHandleRef as _};
 
 #[derive(Debug)]
 pub struct GuestInitiated {

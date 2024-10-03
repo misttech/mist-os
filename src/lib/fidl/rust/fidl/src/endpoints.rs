@@ -13,10 +13,7 @@ use futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tracing::error;
-use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use {fuchsia_async as fasync, zx_status};
 
 /// A marker for a particular FIDL protocol.
 ///

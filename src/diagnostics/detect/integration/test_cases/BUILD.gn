@@ -18,11 +18,11 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
 
     # fake-clock/fidl defines library fuchsia.testing, unrelated to fuchsia.testing.harness.
+    "//sdk/rust/zx",
     "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

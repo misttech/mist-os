@@ -12,7 +12,7 @@ use fuchsia_component_test::{
 use tracing::*;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
-    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync, zx,
 };
 
 // Report prolonged match delay after this many loops.

@@ -66,8 +66,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -1490,7 +1489,7 @@ impl std::fmt::Debug for ComponentInstance {
 #[cfg(test)]
 pub mod testing {
     use crate::model::events::stream::EventStream;
-    use fuchsia_zircon as zx;
+
     use hooks::EventType;
     use moniker::Moniker;
 
@@ -1526,7 +1525,6 @@ pub mod tests {
     use errors::{AddChildError, DynamicCapabilityError};
     use fasync::TestExecutor;
     use fidl::endpoints::DiscoverableProtocolMarker;
-    use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::channel::mpsc;
     use futures::{FutureExt, StreamExt, TryStreamExt};
     use hooks::EventType;
@@ -1538,6 +1536,7 @@ pub mod tests {
     use vfs::path::Path as VfsPath;
     use vfs::service::host;
     use vfs::ToObjectRequest;
+    use zx::{self as zx, AsHandleRef};
     use {fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
     #[fuchsia::test]

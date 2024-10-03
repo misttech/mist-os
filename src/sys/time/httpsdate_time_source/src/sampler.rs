@@ -8,7 +8,7 @@ use crate::Config;
 use anyhow::format_err;
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon as zx;
+
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::FutureExt;

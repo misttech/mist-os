@@ -18,7 +18,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_sme as fidl_sme, zx,
 };
 
 /// Thread-safe counter for spawned ifaces.

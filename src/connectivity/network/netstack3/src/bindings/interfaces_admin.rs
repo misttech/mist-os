@@ -40,7 +40,6 @@ use std::pin::pin;
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
-use fuchsia_zircon::{self as zx, HandleBased, Rights};
 use futures::future::FusedFuture as _;
 use futures::stream::FusedStream as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -58,6 +57,7 @@ use netstack3_core::ip::{
     Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
     UpdateIpConfigurationError,
 };
+use zx::{self as zx, HandleBased, Rights};
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,

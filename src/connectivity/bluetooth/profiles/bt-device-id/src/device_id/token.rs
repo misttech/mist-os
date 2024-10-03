@@ -100,7 +100,7 @@ impl Drop for DeviceIdRequestToken {
     fn drop(&mut self) {
         if let Some(responder) = self.responder.take() {
             warn!(service = ?self.service, "DeviceIdRequestToken unexpectedly dropped");
-            let _ = responder.send(Err(fuchsia_zircon::Status::CANCELED.into_raw()));
+            let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
         }
     }
 }
@@ -182,7 +182,7 @@ mod tests {
             .run_until_stalled(&mut client_fut)
             .expect("Token dropped, client fut should resolve")
             .expect("fidl response");
-        assert_eq!(res, Err(fuchsia_zircon::Status::CANCELED.into_raw()));
+        assert_eq!(res, Err(zx::Status::CANCELED.into_raw()));
     }
 
     #[fuchsia::test]

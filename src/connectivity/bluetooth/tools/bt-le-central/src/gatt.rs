@@ -783,7 +783,7 @@ mod tests {
     use bt_fidl_mocks::gatt2::{ClientMock, RemoteServiceMock};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_gatt2::{ClientMarker, ServiceHandle};
-    use fuchsia_zircon as zx;
+
     use futures::future::FutureExt;
     use futures::{join, select};
     use std::pin::pin;

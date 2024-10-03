@@ -11,9 +11,9 @@ use crate::EnvironmentBuilder;
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{KeyboardMarker, KeyboardProxy};
-use fuchsia_zircon::Status;
 use settings_storage::device_storage::DeviceStorage;
 use std::sync::Arc;
+use zx::Status;
 
 const ENV_NAME: &str = "settings_service_keyboard_test_environment";
 

@@ -7,7 +7,6 @@ use crate::time_source::Sample;
 use crate::{Config, UtcTransform};
 use anyhow::{anyhow, Error};
 use fuchsia_runtime::UtcInstant;
-use fuchsia_zircon as zx;
 use std::sync::Arc;
 
 /// The minimum covariance allowed for the UTC estimate in nanoseconds squared. This helps the

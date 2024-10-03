@@ -7,7 +7,6 @@ use crate::fuchsia::errors::map_to_status;
 use crate::volumes_directory::VolumesDirectory;
 use fidl_fuchsia_fxfs::DebugRequest;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, Status};
 use fxfs::filesystem::FxFilesystem;
 use fxfs::lsm_tree::types::LayerIterator;
 use fxfs::lsm_tree::Query;
@@ -26,6 +25,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use vfs::node::Node;
 use vfs::{attributes, immutable_attributes, ObjectRequestRef, ToObjectRequest};
+use zx::{self as zx, Status};
 
 // To avoid dependency cycles, FxfsDebug stores weak references back to internal structures.  This
 // convenience method returns an appropriate error when these internal structures are dropped.

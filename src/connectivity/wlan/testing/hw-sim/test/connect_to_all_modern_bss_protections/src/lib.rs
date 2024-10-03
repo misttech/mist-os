@@ -7,7 +7,7 @@ use ieee80211::{Bssid, Ssid};
 use tracing::info;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 /// Test connections against all modern bool (non-WEP/WPA1) BSS protection types.
 #[fuchsia::test]

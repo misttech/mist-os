@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
-use {fidl_test_detect_factory as ftest, fuchsia_zircon as zx};
+use {fidl_test_detect_factory as ftest, zx};
 
 /// An adaptor for the generated FIDL RealmOptions struct.
 #[derive(Default)]

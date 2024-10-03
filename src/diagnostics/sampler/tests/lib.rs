@@ -11,7 +11,7 @@ use fidl_fuchsia_samplertestcontroller::SamplerTestControllerMarker;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
 use realm_client::InstalledNamespace;
 use utils::{Event, EventVerifier};
-use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync, zx};
 
 mod test_topology;
 mod utils;

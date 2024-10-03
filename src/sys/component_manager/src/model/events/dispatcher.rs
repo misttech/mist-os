@@ -159,7 +159,7 @@ impl EventDispatcherScope {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+
     use futures::StreamExt;
     use hooks::CapabilityReceiver;
     use moniker::Moniker;

@@ -12,7 +12,6 @@ use crate::time_source_manager::{KernelMonotonicProvider, TimeSourceManager};
 use crate::{Command, Config, UtcTransform};
 use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcInstant};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::mpsc;
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use std::cell::Cell;
@@ -21,6 +20,7 @@ use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+use zx::AsHandleRef;
 use {fidl_fuchsia_time as fft, fuchsia_async as fasync};
 
 /// One million for PPM calculations
@@ -655,7 +655,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::pin::pin;
     use test_util::{assert_geq, assert_gt, assert_leq, assert_lt, assert_near};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {fuchsia_async as fasync, zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const TEST_ROLE: Role = Role::Primary;

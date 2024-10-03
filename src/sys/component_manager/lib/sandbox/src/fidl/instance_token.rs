@@ -5,7 +5,7 @@
 use crate::WeakInstanceToken;
 use fidl::handle::{EventPair, Signals};
 use fuchsia_async as fasync;
-use fuchsia_zircon::Koid;
+use zx::Koid;
 
 impl crate::RemotableCapability for WeakInstanceToken {}
 

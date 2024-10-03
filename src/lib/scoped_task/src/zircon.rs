@@ -8,7 +8,7 @@ use std::ffi::CStr;
 use std::ops::Deref;
 use std::panic;
 use tracing::error;
-use {fuchsia_runtime as runtime, fuchsia_zircon as zx};
+use {fuchsia_runtime as runtime, zx};
 
 lazy_static! {
     static ref SCOPED_JOB: Scoped<zx::Job> = initialize();

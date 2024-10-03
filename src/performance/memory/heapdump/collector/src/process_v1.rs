@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
-use fuchsia_zircon::{self as zx, AsHandleRef, Koid};
 use futures::lock::Mutex;
 use futures::StreamExt;
 use heapdump_vmo::allocations_table_v1::AllocationsTableReader;
@@ -13,6 +12,7 @@ use heapdump_vmo::stack_trace_compression;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{info, warn};
+use zx::{self as zx, AsHandleRef, Koid};
 use {
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
     fidl_fuchsia_memory_heapdump_process as fheapdump_process,
@@ -279,13 +279,13 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::HandleBased;
     use futures::pin_mut;
     use heapdump_vmo::allocations_table_v1::AllocationsTableWriter;
     use heapdump_vmo::resources_table_v1::ResourcesTableWriter;
     use itertools::{assert_equal, Itertools};
     use std::pin::Pin;
     use test_case::test_case;
+    use zx::HandleBased;
 
     use crate::registry::Registry;
 

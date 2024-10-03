@@ -398,7 +398,7 @@ mod tests {
         Test, TEST_URL,
     };
     use url::Url;
-    use {fuchsia_async as fasync, fuchsia_zircon_status as zx};
+    use {fuchsia_async as fasync, zx_status as zx};
 
     // Creates a test setup suitable for unit testing `Fuzzer`.
     fn perform_test_setup(

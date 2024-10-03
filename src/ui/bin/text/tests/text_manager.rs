@@ -11,7 +11,7 @@ use keymaps::usages::Usages;
 use test_helpers::{bind_editor, get_state_update, simulate_keypress};
 use {
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
-    fidl_fuchsia_ui_input3 as ui_input3, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_input3 as ui_input3, fuchsia_async as fasync, zx,
 };
 
 /// Connects to a service that provides key injection.

@@ -16,7 +16,7 @@
 
 use {
     bitflags::bitflags,
-    fuchsia_zircon_status as zx_status,
+    zx_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
     fidl::{
         endpoints::{ControlHandle as _, Responder as _},
@@ -24,8 +24,7 @@ use {
     },
 };
 
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+
 
 {{- range .Aliases }}
 {{ template "AliasDeclaration" . }}

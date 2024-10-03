@@ -6,9 +6,7 @@ use component_events::events::{ExitStatus, Started, Stopped};
 use component_events::matcher::EventMatcher;
 use fidl_fidl_test_components::TriggerMarker;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess, zx};
 
 /// Tests a component can stop with a request buffered in its outgoing dir,
 /// and that request is handled on the next start (which should be automatic).

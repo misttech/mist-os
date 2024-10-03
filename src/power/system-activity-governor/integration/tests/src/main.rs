@@ -10,7 +10,6 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
@@ -18,6 +17,7 @@ use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,

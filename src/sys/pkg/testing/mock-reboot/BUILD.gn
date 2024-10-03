@@ -18,7 +18,7 @@ rustc_library("mock-reboot") {
     "//third_party/rust_crates:futures",
   ]
 
-  test_deps = [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+  test_deps = [ "//sdk/rust/zx" ]
 
   sources = [ "src/lib.rs" ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

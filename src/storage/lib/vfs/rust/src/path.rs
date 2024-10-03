@@ -7,7 +7,7 @@
 //! approach is used to allow passing the path string, from one `open()` method to the next,
 //! without the need to copy the path itself.
 
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 
 #[derive(Clone, Debug)]
 pub struct Path {

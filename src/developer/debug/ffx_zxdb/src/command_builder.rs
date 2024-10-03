@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon_types::zx_koid_t;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::Command;
+use zx_types::zx_koid_t;
 
 use crate::debug_agent::DebugAgentSocket;
 

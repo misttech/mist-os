@@ -9,7 +9,6 @@ use diagnostics_log_encoding::encode::{
 use diagnostics_log_encoding::Metatag;
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -17,6 +16,7 @@ use tracing::subscriber::Subscriber;
 use tracing::{span, Event};
 use tracing_subscriber::layer::{Context, Layer};
 use tracing_subscriber::registry::LookupSpan;
+use zx::{self as zx, AsHandleRef};
 
 #[derive(Default)]
 pub(crate) struct SinkConfig {

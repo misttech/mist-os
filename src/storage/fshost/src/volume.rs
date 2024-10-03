@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeProxy};
 use fuchsia_component::client::connect_to_protocol_at_path;
-use fuchsia_zircon as zx;
+
 use std::cmp;
 
 // Number of bits required for the VSlice address space.
@@ -122,7 +122,7 @@ mod tests {
     use fidl_fuchsia_hardware_block_volume::{
         VolumeManagerInfo, VolumeMarker, VolumeRequest, VsliceRange,
     };
-    use fuchsia_zircon as zx;
+
     use futures::{pin_mut, select, FutureExt, StreamExt};
 
     const SLICE_SIZE: u64 = 16384;

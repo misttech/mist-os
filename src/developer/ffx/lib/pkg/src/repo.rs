@@ -20,7 +20,6 @@ use fuchsia_repo::repository::{
 };
 use fuchsia_repo::server::RepositoryServer;
 use fuchsia_url::RepositoryUrl;
-use fuchsia_zircon_status::Status;
 use futures::FutureExt as _;
 use protocols::prelude::Context;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -28,6 +27,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
+use zx_status::Status;
 use {fidl_fuchsia_developer_ffx as ffx, fuchsia_async as fasync};
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);

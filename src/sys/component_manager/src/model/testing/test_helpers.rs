@@ -22,7 +22,6 @@ use cm_rust::{
 use cm_rust_testing::*;
 use cm_types::{Name, Url};
 use fidl::endpoints;
-use fuchsia_zircon::{self as zx, Koid};
 use futures::channel::mpsc::Receiver;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
@@ -32,6 +31,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::service;
+use zx::{self as zx, Koid};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,

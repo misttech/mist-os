@@ -11,8 +11,8 @@ use std::task::Poll;
 use std::{fmt, mem};
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::task::{AtomicWaker, Context};
+use zx::{self as zx, AsHandleRef};
 
 struct OnSignalsReceiver {
     maybe_signals: AtomicUsize,

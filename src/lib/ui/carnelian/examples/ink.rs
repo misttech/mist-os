@@ -13,13 +13,13 @@ use carnelian::{
 use euclid::default::{Rect, Transform2D, Vector2D};
 use euclid::{point2, size2, vec2, Angle};
 use fuchsia_trace::duration;
-use fuchsia_zircon::{self as zx, AsHandleRef, Event, MonotonicInstant, Signals};
 use itertools::izip;
 use rand::{thread_rng, Rng};
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::Range;
 use std::time::Duration;
 use std::{f32, fs};
+use zx::{self as zx, AsHandleRef, Event, MonotonicInstant, Signals};
 use {fidl_fuchsia_hardware_hidbus as hidbus, fidl_fuchsia_hardware_input as hid};
 
 const BACKGROUND_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };

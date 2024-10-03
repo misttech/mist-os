@@ -4,7 +4,7 @@
 
 use fuchsia_component::client::connect_to_protocol_sync;
 use once_cell::sync::Lazy;
-use {fidl_fuchsia_kernel as fkernel, fuchsia_zircon as zx};
+use {fidl_fuchsia_kernel as fkernel, zx};
 
 pub static VMEX_RESOURCE: Lazy<zx::Resource> = Lazy::new(|| {
     connect_to_protocol_sync::<fkernel::VmexResourceMarker>()

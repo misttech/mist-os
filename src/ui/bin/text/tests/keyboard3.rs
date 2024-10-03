@@ -16,8 +16,7 @@ use test_helpers::create_key_event;
 use {
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as fidl_input,
     fidl_fuchsia_ui_input3 as ui_input3, fidl_fuchsia_ui_keyboard_focus as fidl_focus,
-    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic, zx,
 };
 
 const URL_TEXT_MANAGER: &str =

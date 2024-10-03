@@ -4,7 +4,7 @@
 #![cfg(test)]
 
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_zircon as zx;
+
 use futures::future::Either;
 use futures::prelude::*;
 use futures::stream::StreamFuture;

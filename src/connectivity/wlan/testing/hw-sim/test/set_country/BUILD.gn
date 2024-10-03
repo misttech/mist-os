@@ -9,11 +9,11 @@ rust_wlan_integration_test("set_country") {
   edition = "2021"
   binary_deps = [
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
+    "//sdk/rust/zx",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
   ]
 

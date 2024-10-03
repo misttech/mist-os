@@ -8,10 +8,7 @@ use fidl::HandleBased;
 use fidl_fuchsia_dash::LauncherError;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_runtime::{HandleInfo as HandleId, HandleType};
-use {
-    fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, zx};
 
 pub mod component;
 pub mod package;

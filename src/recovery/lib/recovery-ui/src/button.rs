@@ -19,8 +19,8 @@ use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{make_message, Coord, Point, Size, ViewAssistantContext};
 use derivative::Derivative;
 use euclid::{size2, Size2D, UnknownUnit};
-use fuchsia_zircon::MonotonicInstant;
 use std::ops::Add;
+use zx::MonotonicInstant;
 
 /// enum that defines all messages sent with `App::queue_message` that
 /// the button view assistant will understand and process.

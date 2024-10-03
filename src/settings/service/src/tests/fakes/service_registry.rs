@@ -4,7 +4,7 @@
 use crate::service_context::GenerateService;
 use crate::tests::fakes::base::Service;
 use anyhow::{format_err, Error};
-use fuchsia_zircon as zx;
+
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use std::sync::Arc;

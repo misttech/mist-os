@@ -1245,7 +1245,6 @@ mod tests {
     mod utils {
         use super::*;
         use fidl_fuchsia_input_report::{InputDeviceProxy, InputReportsReaderProxy};
-        use fuchsia_zircon as zx;
 
         /// Creates a `DeviceDescriptor` for a keyboard which has the keys enumerated
         /// in `keys`.

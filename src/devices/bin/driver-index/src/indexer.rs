@@ -9,13 +9,13 @@ use crate::resolved_driver::{DriverPackageType, ResolvedDriver};
 use bind::interpreter::decode_bind_rules::DecodedRules;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_pkg_ext::BlobId;
-use fuchsia_zircon::Status;
 use futures::StreamExt;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::str::FromStr;
+use zx::Status;
 use {
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_framework as fdf,
     fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,

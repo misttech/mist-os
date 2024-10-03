@@ -5,7 +5,7 @@
 //! Error (common to all fidl operations)
 
 use crate::handle::{ObjectType, Rights};
-use fuchsia_zircon_status::Status;
+use zx_status::Status;
 
 /// A specialized `Result` type for FIDL operations.
 pub type Result<T> = std::result::Result<T, Error>;

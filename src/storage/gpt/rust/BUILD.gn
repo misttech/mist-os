@@ -23,9 +23,9 @@ rustc_library("gpt") {
   test_deps = [
     ":gpt_testing",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/gpt:golden_images",
     "//src/storage/lib/block_server:fake_block_server",
     "//third_party/rust_crates:futures",
@@ -45,7 +45,7 @@ rustc_library("gpt_testing") {
   edition = "2021"
   deps = [
     ":gpt",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//sdk/rust/zx",
     "//third_party/rust_crates:crc",
     "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",

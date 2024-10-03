@@ -209,7 +209,7 @@ mod test {
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_testing_proxy::{TcpProxyControlMarker, TcpProxyControlProxy};
     use fuchsia_async::DurationExt;
-    use fuchsia_zircon as zx;
+
     use hyper::server::accept::from_stream;
     use hyper::server::Server;
     use hyper::{Body, Response, Uri};

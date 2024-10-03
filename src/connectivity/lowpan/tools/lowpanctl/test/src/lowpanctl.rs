@@ -11,7 +11,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component_test::ScopedInstanceFactory;
 use futures::prelude::*;
 
-const DEFAULT_TIMEOUT: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(50);
+const DEFAULT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(50);
 
 #[fasync::run_singlethreaded(test)]
 pub async fn test_lowpanctl() {

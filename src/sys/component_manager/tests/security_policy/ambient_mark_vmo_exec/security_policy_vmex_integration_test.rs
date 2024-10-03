@@ -8,8 +8,8 @@ use component_events::events::*;
 use component_events::matcher::*;
 use component_events::sequence::{EventSequence, Ordering};
 use fuchsia_component::client;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use security_policy_test_util::{open_exposed_dir, start_policy_test};
+use zx::{self as zx, AsHandleRef};
 use {fidl_fuchsia_component as fcomponent, fidl_test_policy as ftest, fuchsia_async as fasync};
 
 const CM_URL: &str = "#meta/cm_for_test.cm";

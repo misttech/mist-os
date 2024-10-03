@@ -16,7 +16,7 @@ use fs_management::BLOBFS_TYPE_GUID;
 use fuchsia_component::client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
 };
-use fuchsia_zircon::{self as zx};
+
 use ramdevice_client::RamdiskClient;
 use std::path::PathBuf;
 use storage_benchmarks::block_device::BlockDevice;

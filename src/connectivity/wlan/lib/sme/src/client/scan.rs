@@ -355,7 +355,7 @@ mod tests {
     use super::*;
     use crate::test_utils;
     use fuchsia_inspect::Inspector;
-    use fuchsia_zircon as zx;
+
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
     use regex::bytes::Regex;

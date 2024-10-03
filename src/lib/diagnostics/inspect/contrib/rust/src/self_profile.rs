@@ -40,7 +40,6 @@
 
 use fuchsia_inspect::{Inspector, Node};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Task as _};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -48,6 +47,7 @@ use std::panic::Location;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
+use zx::{self as zx, Task as _};
 
 static PROFILING_ENABLED: AtomicBool = AtomicBool::new(false);
 

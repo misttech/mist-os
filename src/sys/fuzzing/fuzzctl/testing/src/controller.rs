@@ -13,7 +13,7 @@ use fuchsia_fuzzctl::InputPair;
 use futures::{join, AsyncReadExt, AsyncWriteExt, StreamExt};
 use std::cell::RefCell;
 use std::rc::Rc;
-use {fuchsia_async as fasync, fuchsia_zircon_status as zx};
+use {fuchsia_async as fasync, zx_status as zx};
 
 /// Test fake that allows configuring how to respond to `fuchsia.fuzzer.Controller` methods.
 ///

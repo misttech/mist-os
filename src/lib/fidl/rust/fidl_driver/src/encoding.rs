@@ -8,7 +8,7 @@ use fidl::encoding::{
 };
 
 use fdf::{Channel, MixedHandle, MixedHandleType};
-use fuchsia_zircon::{
+use zx::{
     AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights,
     Status,
 };
@@ -145,11 +145,11 @@ pub unsafe fn mixed_into_handle_info(this: Option<MixedHandle>) -> Result<Handle
 ///
 /// # Panics
 ///
-/// This panics if the handle's op is not [`fuchsia_zircon::HandleOp::Move`]
+/// This panics if the handle's op is not [`zx::HandleOp::Move`]
 pub fn mixed_from_handle_disposition(
     mut handle: HandleDisposition<'static>,
 ) -> Option<MixedHandle> {
-    use fuchsia_zircon::HandleOp::*;
+    use zx::HandleOp::*;
     match handle.take_op() {
         Move(handle) => MixedHandle::from_zircon_handle(handle),
         Duplicate(_) => {
@@ -161,7 +161,7 @@ pub fn mixed_from_handle_disposition(
 #[cfg(test)]
 mod tests {
     use fdf::DriverHandle;
-    use fuchsia_zircon::Port;
+    use zx::Port;
 
     use super::*;
 

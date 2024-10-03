@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use futures::Future;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Creates `temp_filename` under the `dir_proxy`, overwrite it if already exists, call the callback
 /// with the opened file proxy, and then atomically rename it to `permanent_filename`.

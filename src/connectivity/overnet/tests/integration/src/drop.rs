@@ -8,10 +8,10 @@
 
 use super::{connect, Overnet};
 use anyhow::{format_err, Context as _, Error};
-use fuchsia_zircon_status as zx_status;
 use futures::prelude::*;
 use overnet_core::NodeIdGenerator;
 use std::sync::Arc;
+use zx_status;
 
 #[fuchsia::test]
 async fn drop_connection_2node(run: usize) -> Result<(), Error> {

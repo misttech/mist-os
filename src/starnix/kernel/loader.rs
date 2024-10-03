@@ -11,9 +11,6 @@ use crate::security;
 use crate::task::CurrentTask;
 use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
 use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
-use fuchsia_zircon::{
-    HandleBased, {self as zx},
-};
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
@@ -33,6 +30,9 @@ use std::ffi::{CStr, CString};
 use std::mem::size_of;
 use std::ops::Deref as _;
 use std::sync::Arc;
+use zx::{
+    HandleBased, {self as zx},
+};
 
 #[derive(Debug)]
 struct StackResult {

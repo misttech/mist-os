@@ -16,7 +16,7 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync, zx,
 };
 
 /// A special instance identified with component manager, at the top of the tree.

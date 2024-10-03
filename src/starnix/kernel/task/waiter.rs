@@ -7,7 +7,7 @@ use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
 use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon as zx;
+
 use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_sync::{
     EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,

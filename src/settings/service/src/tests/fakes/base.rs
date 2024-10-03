@@ -7,7 +7,7 @@ use anyhow::Error;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use std::sync::Arc;
-use {fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fuchsia_async as fasync, zx};
 
 /// Trait for providing a service.
 pub(crate) trait Service {

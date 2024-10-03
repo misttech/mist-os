@@ -5,11 +5,11 @@
 use core::fmt;
 use core::mem::replace;
 
-pub use fuchsia_zircon::sys::zx_handle_t;
-pub use fuchsia_zircon::Handle;
+pub use zx::sys::zx_handle_t;
+pub use zx::Handle;
 
-use fuchsia_zircon::sys::ZX_HANDLE_INVALID;
-use fuchsia_zircon::HandleBased as _;
+use zx::sys::ZX_HANDLE_INVALID;
+use zx::HandleBased as _;
 
 use crate::encode::{self, EncodableOption, EncodeOption};
 use crate::{

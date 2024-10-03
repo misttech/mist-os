@@ -154,7 +154,7 @@ mod tests {
     use futures::FutureExt as _;
     use net_declare::fidl_subnet;
     use std::convert::TryInto as _;
-    use {fidl_fuchsia_hardware_network as fnetwork, fuchsia_zircon_types as zx};
+    use {fidl_fuchsia_hardware_network as fnetwork, zx_types as zx};
 
     const IPV4_LINK_LOCAL: fnet::Subnet = fidl_subnet!("169.254.0.1/16");
     const IPV6_LINK_LOCAL: fnet::Subnet = fidl_subnet!("fe80::1/64");

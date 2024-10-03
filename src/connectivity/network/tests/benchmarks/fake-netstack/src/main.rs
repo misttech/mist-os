@@ -29,7 +29,7 @@ use std::rc::Rc;
 use tracing::{error, info};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_zircon as zx,
+    fidl_fuchsia_posix_socket as fposix_socket, zx,
 };
 
 #[fuchsia::main]

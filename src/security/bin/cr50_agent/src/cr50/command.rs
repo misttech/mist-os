@@ -41,7 +41,7 @@ impl<T: TpmRequest + Serializable + Sync + Send> TpmCommand for T {
             .execute_vendor_command(0, &vec)
             .await
             .context("Sending execute request")?
-            .map_err(fuchsia_zircon::Status::from_raw)
+            .map_err(zx::Status::from_raw)
             .context("Executing TPM command")?;
 
         let status = TpmStatus::from(rc);

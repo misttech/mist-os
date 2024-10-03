@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::{channel::mpsc as async_mpsc, StreamExt},
-    std::sync::mpsc as sync_mpsc,
-    wayland_bridge::dispatcher::WaylandDispatcher,
-};
+use fuchsia_async as fasync;
+use futures::channel::mpsc as async_mpsc;
+use futures::StreamExt;
+use std::sync::mpsc as sync_mpsc;
+use wayland_bridge::dispatcher::WaylandDispatcher;
+use zx::{self as zx, HandleBased};
 
 pub enum WaylandCommand {
     PushClient(zx::Channel),

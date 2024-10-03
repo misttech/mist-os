@@ -4,7 +4,6 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints::ServerEnd;
-use fuchsia_zircon::{self as zx, HandleBased};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::*;
@@ -14,6 +13,7 @@ use vfs::directory::immutable::simple as simpledir;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::VmoFile;
 use vfs::path::Path as VfsPath;
+use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_component_test as ftest, fidl_fuchsia_io as fio};
 
 enum DirectoryOrFile {

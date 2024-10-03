@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use thiserror::Error;
-use {fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status};
+use {fidl_fuchsia_sys2 as fsys, zx_status};
 
 /// Errors that may occur when building a `ComponentModelForAnalyzer` from
 /// a set of component manifests.

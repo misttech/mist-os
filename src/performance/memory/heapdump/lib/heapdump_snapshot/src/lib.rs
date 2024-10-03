@@ -25,7 +25,7 @@ pub enum Error {
         .element_type)]
     InvalidCrossReference { element_type: &'static str },
     #[error("Zircon error: {}", .0)]
-    ZxError(#[from] fuchsia_zircon_status::Status),
+    ZxError(#[from] zx_status::Status),
     #[error("FIDL error: {}", .0)]
     FidlError(#[from] fidl::Error),
     #[error("Collector error: {:?}", .0)]

@@ -23,7 +23,7 @@ use fuchsia_fs::directory::{readdir, DirEntry, DirentKind};
 use fuchsia_fs::file::WriteError;
 use fuchsia_fs::node::{OpenError, RenameError};
 use fuchsia_fs::OpenFlags;
-use fuchsia_zircon as zx;
+
 use std::collections::{BTreeMap, HashSet};
 
 /// Errors that can occur during an individual migration.

@@ -22,7 +22,7 @@ use starnix_uapi::{
 use std::collections::VecDeque;
 use std::sync::Arc;
 use zerocopy::IntoBytes;
-use {fidl_fuchsia_hardware_adb as fadb, fuchsia_zircon as zx};
+use {fidl_fuchsia_hardware_adb as fadb, zx};
 
 // The node identifiers of different nodes in FunctionFS.
 const ROOT_NODE_ID: ino_t = 1;

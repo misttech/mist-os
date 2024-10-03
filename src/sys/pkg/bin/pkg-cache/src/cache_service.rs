@@ -21,17 +21,14 @@ use fuchsia_async::Task;
 use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_hash::Hash;
 use fuchsia_inspect::{self as finspect, NumericProperty as _, Property as _, StringProperty};
-use fuchsia_zircon::Status;
 use futures::{FutureExt as _, TryFutureExt as _, TryStreamExt as _};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tracing::{error, warn};
 use vfs::directory::entry_container::Directory;
-use {
-    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace,
-    fuchsia_zircon as zx,
-};
+use zx::Status;
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace, zx};
 
 mod missing_blobs;
 

@@ -21,7 +21,7 @@ use futures::prelude::*;
 use futures::stream::TryStreamExt;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
@@ -67,7 +67,7 @@ async fn find_cr50() -> Result<TpmDeviceProxy, Error> {
 
     while let Some(entry) = stream
         .try_next()
-        .on_timeout(fuchsia_zircon::Duration::from_seconds(300), || Ok(None))
+        .on_timeout(zx::Duration::from_seconds(300), || Ok(None))
         .await
         .context("Watching for TPM devices")?
     {

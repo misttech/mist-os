@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::attribution_client::AttributionState;
-use fuchsia_zircon_types::{zx_rights_t, ZX_RIGHT_SAME_RIGHTS};
 use std::collections::{HashMap, HashSet};
+use zx_types::{zx_rights_t, ZX_RIGHT_SAME_RIGHTS};
 use {
     fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_memory_attribution_plugin as fplugin, fuchsia_zircon as zx,
+    fidl_fuchsia_memory_attribution_plugin as fplugin, zx,
 };
 
 /// A structure containing a set of kernel resources (jobs, processes, VMOs), indexed by KOIDs.

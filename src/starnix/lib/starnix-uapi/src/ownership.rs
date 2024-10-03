@@ -31,7 +31,7 @@
 // operation.
 
 use core::hash::Hasher;
-use fuchsia_zircon as zx;
+
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::atomic::{fence, AtomicUsize, Ordering};

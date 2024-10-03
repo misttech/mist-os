@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::wire::*;
-use fuchsia_zircon as zx;
+
 use num_traits::cast::cast;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;

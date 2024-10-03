@@ -202,7 +202,7 @@ mod tests {
         Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent, UnhandledInputEvent,
     };
     use crate::input_handler::InputHandlerStatus;
-    use fuchsia_zircon as zx;
+
     use futures::channel::mpsc;
     use futures::StreamExt as _;
     use pretty_assertions::assert_eq;

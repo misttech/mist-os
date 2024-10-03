@@ -13,7 +13,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
-use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn open() {

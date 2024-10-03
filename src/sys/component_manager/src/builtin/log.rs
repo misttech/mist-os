@@ -4,9 +4,9 @@
 
 use anyhow::Error;
 use fidl_fuchsia_boot as fboot;
-use fuchsia_zircon::{self as zx, DebugLog, DebugLogOpts, HandleBased, Resource};
 use futures::prelude::*;
 use std::sync::Arc;
+use zx::{self as zx, DebugLog, DebugLogOpts, HandleBased, Resource};
 
 /// An implementation of the `fuchsia.boot.ReadOnlyLog` protocol.
 pub struct ReadOnlyLog {
@@ -65,7 +65,7 @@ impl WriteOnlyLog {
 mod tests {
     use super::*;
     use fuchsia_component::client::connect_to_protocol;
-    use fuchsia_zircon::AsHandleRef;
+    use zx::AsHandleRef;
     use {fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
     async fn get_debuglog_resource() -> Result<zx::Resource, Error> {

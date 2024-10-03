@@ -14,7 +14,7 @@ use prettytable::{cell, row, Table};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io::Write;
-use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
+use {fuchsia_async as fasync, guest_cli_args as arguments, zx_status};
 
 const LATENCY_CHECK_SIZE_BYTES: usize = 4096;
 const THROUGHPUT_SIZE_MEBIBYTES: usize = 128;

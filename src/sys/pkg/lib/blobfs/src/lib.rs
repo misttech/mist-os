@@ -8,7 +8,6 @@
 
 use fidl::endpoints::{Proxy as _, ServerEnd};
 use fuchsia_hash::{Hash, ParseHashError};
-use fuchsia_zircon::{self as zx, AsHandleRef as _, Status};
 use futures::{stream, StreamExt as _};
 use std::collections::HashSet;
 use thiserror::Error;
@@ -17,6 +16,7 @@ use vfs::common::send_on_open_with_error;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::StreamIoConnection;
 use vfs::{ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest as _};
+use zx::{self as zx, AsHandleRef as _, Status};
 use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub mod mock;

@@ -7,7 +7,7 @@ use fidl::prelude::*;
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fuchsia_async::{self as fasync};
 use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx};
+
 use futures_util::stream::TryStreamExt;
 use std::process;
 use tracing::{error, info};
