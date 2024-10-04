@@ -81,21 +81,10 @@ fuchsia_structured_config_cpp_elf_lib("factory_reset_config") {
   visibility = [ ":*" ]
 }
 
-fuchsia_structured_config_values("config_values_from_gn") {
-  cm_label = ":manifest"
-  values = {
-    use_fxblob = fxfs_blob
-  }
-  visibility = [ ":*" ]
-}
-
 fuchsia_package_with_single_component("factory_reset_pkg") {
   package_name = "factory_reset"
   cm_label = ":manifest"
-  deps = [
-    ":bin",
-    ":config_values_from_gn",
-  ]
+  deps = [ ":bin" ]
 }
 
 group("factory_reset") {

@@ -4311,10 +4311,7 @@ assembly_input_bundle("zoneinfo") {
 # feature set levels: standard (always), utility (optionally)
 # build types: all
 assembly_input_bundle("factory_reset") {
-  base_packages = [
-    # This still needs to be configured correctly for fxblob support
-    "//src/recovery/factory_reset:factory_reset_pkg",
-  ]
+  base_packages = [ "//src/recovery/factory_reset:factory_reset_pkg" ]
   compiled_packages = [
     {
       name = "core"
@@ -4332,10 +4329,7 @@ assembly_input_bundle("factory_reset") {
 
 # Assembly support for recovery-fdr
 assembly_input_bundle("recovery_fdr") {
-  base_packages = [
-    # This still needs to be configured correctly for board display rotations
-    "//src/recovery/system:system_recovery_fdr",
-  ]
+  base_packages = [ "//src/recovery/system:system_recovery_fdr" ]
   compiled_packages = [
     {
       name = "core"
