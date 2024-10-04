@@ -202,7 +202,7 @@
       "optionality": "optional",
       "long": "--symbolize",
       "short": null,
-      "description": "configure symbolization options. Valid options are: - pretty (default): pretty concise symbolization - off: disables all symbolization - classic: traiditional, non-prettified symbolization",
+      "description": "configure symbolization options. Valid options are: - pretty (default): pretty concise symbolization - off: disables all symbolization - classic: traditional, non-prettified symbolization",
       "hidden": false
     },
     {
