@@ -1319,6 +1319,17 @@ impl ComponentInstance {
                 }
             },
         };
+
+        if let Some(resource) = component_address.resource() {
+            if resource.ends_with(".cm") {
+                warn!(
+                    "Component resource ends with .cml instead of .cm, which was \
+probably not intended: {}",
+                    component_address.url()
+                );
+            }
+        }
+
         let resolvers_dict = component_input.environment().resolvers();
         let resolver_capability_res =
             resolvers_dict.get(&Name::new(component_address.scheme()).unwrap());
