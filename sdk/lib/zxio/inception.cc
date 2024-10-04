@@ -59,8 +59,39 @@ zx_status_t zxio_create_with_allocator(zx::handle handle, zxio_storage_alloc all
 }
 
 zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
-                                       fuchsia_io::wire::NodeInfoDeprecated& info,
+                                       fuchsia_io::wire::Representation& representation,
                                        zxio_storage_alloc allocator, void** out_context) {
+  zxio_storage_t* storage = nullptr;
+  zxio_object_type_t type = ZXIO_OBJECT_TYPE_NONE;
+  switch (representation.Which()) {
+    case fio::wire::Representation::Tag::kDirectory:
+      type = ZXIO_OBJECT_TYPE_DIR;
+      break;
+    case fio::wire::Representation::Tag::kFile:
+      type = ZXIO_OBJECT_TYPE_FILE;
+      break;
+    case fio::wire::Representation::Tag::kConnector:
+      type = ZXIO_OBJECT_TYPE_NODE;
+      break;
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+    case fio::wire::Representation::Tag::kSymlink:
+      type = ZXIO_OBJECT_TYPE_SYMLINK;
+      break;
+#endif
+    default:
+      return ZX_ERR_NOT_SUPPORTED;
+  }
+  zx_status_t status = allocator(type, &storage, out_context);
+  if (status != ZX_OK || storage == nullptr) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  return zxio_create_with_representation(std::move(node), representation, nullptr, storage);
+}
+
+zx_status_t zxio_create_with_allocator_deprecated(fidl::ClientEnd<fuchsia_io::Node> node,
+                                                  fuchsia_io::wire::NodeInfoDeprecated& info,
+                                                  zxio_storage_alloc allocator,
+                                                  void** out_context) {
   zxio_storage_t* storage = nullptr;
   zxio_object_type_t type = ZXIO_OBJECT_TYPE_NONE;
   switch (info.Which()) {
@@ -83,5 +114,5 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
   if (status != ZX_OK || storage == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
-  return zxio_create_with_nodeinfo(std::move(node), info, storage);
+  return zxio_create_with_nodeinfo_deprecated(std::move(node), info, storage);
 }

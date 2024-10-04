@@ -28,6 +28,9 @@ zx::result<fbl::RefPtr<fdio>> open_at_impl(int dirfd, const char* path,
                                            fuchsia_io::wire::OpenFlags flags,
                                            OpenAtOptions options);
 
+zx::result<fbl::RefPtr<fdio>> open3_at_impl(int dirfd, const char* path, fuchsia_io::Flags flags,
+                                            OpenAtOptions options);
+
 }  // namespace fdio_internal
 
 void fdio_chdir(fbl::RefPtr<fdio> io, const char* path);

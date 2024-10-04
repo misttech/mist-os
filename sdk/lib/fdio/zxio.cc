@@ -28,7 +28,7 @@ namespace fio = fuchsia_io;
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 namespace {
-constexpr zxio_open_flags_t Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
+constexpr fio::Flags Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
   fio::Flags flags = fio::Flags::kPermGetAttributes;
 
   if (io1_flags & fio::OpenFlags::kNodeReference) {
@@ -88,7 +88,7 @@ constexpr zxio_open_flags_t Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
     }
   }
 
-  return static_cast<zxio_open_flags_t>(flags);
+  return flags;
 }
 }  // namespace
 #endif
@@ -302,22 +302,18 @@ zx_status_t pipe::recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int
   return status;
 }
 
-zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path,
-                                fio::wire::OpenFlags flags) {
-  zx_status_t status;
+zx::result<fdio_ptr> open_async_deprecated(zxio_t* directory, std::string_view path,
+                                           fio::wire::OpenFlags flags) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  zxio_open_flags_t open3_flags = Open1FlagsToOpen3(flags);
-
-  fdio_ptr io = fbl::MakeRefCounted<remote>();
-  status = zxio_open3(directory, path.data(), path.length(), open3_flags,
-                      /*options*/ {}, &io->zxio_storage());
-  if (status == ZX_OK) {
-    return zx::ok(io);
-  }
-
+  // This is the primary way that our POSIX functions open files/directories, so to ensure
+  // compatibility with Open3 when we remove this in lieu of |open_async|, we translate the legacy
+  // OpenFlags to an equivalent set of Flags and try calling Open3 at HEAD.
+  zx::result io = open_async(directory, path, Open1FlagsToOpen3(flags));
   // Only fallback to open1 if open3 is not supported.
-  if (status != ZX_ERR_NOT_SUPPORTED) {
-    return zx::error(status);
+  // TODO(https://fxbug.dev/324111518): Remove this branch and make sure we can rely on Open3
+  // unconditionally (e.g. this function should just call |open_async| with translated flags).
+  if (io.is_ok() || io.error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return io;
   }
 #endif
   zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
@@ -325,20 +321,31 @@ zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path,
     return endpoints.take_error();
   }
 
-  status = zxio_open_async(directory, static_cast<uint32_t>(flags), path.data(), path.length(),
-                           endpoints->server.channel().release());
+  zx_status_t status = zxio_open_async(directory, static_cast<uint32_t>(flags), path.data(),
+                                       path.length(), endpoints->server.channel().release());
   if (status != ZX_OK) {
     return zx::error(status);
   }
 
   if (flags & fio::wire::OpenFlags::kDescribe) {
-    return fdio::create_with_on_open(std::move(endpoints->client));
+    return fdio::create_with_on_open_deprecated(std::move(endpoints->client));
   }
 
   return remote::create(std::move(endpoints->client));
 }
 
-zx::result<fdio_ptr> remote::open(std::string_view path, fio::wire::OpenFlags flags) {
+zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path, fio::Flags flags) {
+  fdio_ptr io = fbl::MakeRefCounted<remote>();
+  return zx::make_result(zxio_open3(directory, path.data(), path.length(), zxio_open_flags_t{flags},
+                                    /*options*/ {}, &io->zxio_storage()),
+                         io);
+}
+
+zx::result<fdio_ptr> remote::open_deprecated(std::string_view path, fio::wire::OpenFlags flags) {
+  return open_async_deprecated(&zxio_storage().io, path, flags);
+}
+
+zx::result<fdio_ptr> remote::open(std::string_view path, fio::Flags flags) {
   return open_async(&zxio_storage().io, path, flags);
 }
 

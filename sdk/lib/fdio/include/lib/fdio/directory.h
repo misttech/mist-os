@@ -48,6 +48,43 @@ zx_status_t fdio_service_connect_by_name(const char* name, ZX_HANDLE_RELEASE zx_
     ZX_AVAILABLE_SINCE(1);
 
 // Opens an object at `path` relative to the root of the namespace for the current process with
+// `flags` asynchronously. `flags` corresponds to `fuchsia.io/Flags`. Always consumes `request`.
+// See `fdio_ns_open3` for details.
+zx_status_t fdio_open3(const char* path, uint64_t flags, ZX_HANDLE_RELEASE zx_handle_t request)
+    ZX_AVAILABLE_SINCE(NEXT);
+
+// Opens an object at `path` with `flags` relative to `directory`. `flags` corresponds to
+// `fuchsia.io/Flags`. Always consumes `request`.
+//
+// # Errors
+//
+// ZX_ERR_INVALID_ARGS: `directory` or `path` is invalid.
+zx_status_t fdio_open3_at(zx_handle_t directory, const char* path, uint64_t flags,
+                          ZX_HANDLE_RELEASE zx_handle_t request) ZX_AVAILABLE_SINCE(NEXT);
+
+// Opens an object at `path` relative to the root of the namespace for the current process with
+// `flags` synchronously, and on success, binds that channel to `out_fd` as a file descriptor.
+// Unlike `fdio_open` this function is synchronous, as creating a file descriptor requires waiting
+// for a response indicating the open result.
+//
+// `flags` corresponds to `fuchsia.io/Flags`. See `fdio_open3` for details.
+zx_status_t fdio_open3_fd(const char* path, uint64_t flags, int* out_fd) ZX_AVAILABLE_SINCE(NEXT);
+
+// Opens an object at `path` relative to `dir_fd` with `flags` synchronously, and on success, binds
+// that channel to a file descriptor, returned via `out_fd`.
+//
+// `flags` corresponds to `fuchsia.io/Flags`. See `fdio_open3_at` for details.
+zx_status_t fdio_open3_fd_at(int dir_fd, const char* path, uint64_t flags, int* out_fd)
+    ZX_AVAILABLE_SINCE(NEXT);
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+//                      Deprecated fuchsia.io/Directory.Open1 Functionality
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+//
+// TODO(https://fxbug.dev/324111518): Mark the following functions as deprecated once all in-tree
+// callers have migrated to the fdio_open3 equivalents above.
+
+// Opens an object at `path` relative to the root of the namespace for the current process with
 // `flags` asynchronously.
 //
 // `flags` is a `fuchsia.io/OpenFlags`.
@@ -94,7 +131,7 @@ zx_status_t fdio_open_fd(const char* path, uint32_t flags, int* out_fd) ZX_AVAIL
 //
 // `flags` is a `fuchsia.io/OpenFlags`.
 //
-// See `fdio_open_at` fort details.
+// See `fdio_open_at` for details.
 zx_status_t fdio_open_fd_at(int dir_fd, const char* path, uint32_t flags, int* out_fd)
     ZX_AVAILABLE_SINCE(1);
 

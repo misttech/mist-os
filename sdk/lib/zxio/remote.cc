@@ -2001,7 +2001,7 @@ uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t a
   return mode;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_attributes_t* out) {
   if (out->has.protocols && in.immutable_attributes.has_protocols()) {
     out->protocols = static_cast<uint64_t>(in.immutable_attributes.protocols());
@@ -2039,6 +2039,7 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     out->has.link_count = false;
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (out->has.fsverity_options && in.immutable_attributes.has_options()) {
     zxio_verification_options_t out_options{};
     fio::wire::VerificationOptions in_options = in.immutable_attributes.options();
@@ -2068,6 +2069,7 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
   } else {
     out->has.fsverity_enabled = false;
   }
+#endif
 
   if (out->has.creation_time && in.mutable_attributes.has_creation_time()) {
     out->creation_time = in.mutable_attributes.creation_time();
@@ -2079,12 +2081,6 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     out->modification_time = in.mutable_attributes.modification_time();
   } else {
     out->has.modification_time = false;
-  }
-
-  if (out->has.change_time && in.immutable_attributes.has_change_time()) {
-    out->change_time = in.immutable_attributes.change_time();
-  } else {
-    out->has.change_time = false;
   }
 
   if (out->has.access_time && in.mutable_attributes.has_access_time()) {
@@ -2117,12 +2113,20 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     out->has.rdev = false;
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (out->has.change_time && in.immutable_attributes.has_change_time()) {
+    out->change_time = in.immutable_attributes.change_time();
+  } else {
+    out->has.change_time = false;
+  }
+
   if (out->has.casefold && in.mutable_attributes.has_casefold()) {
     out->casefold = in.mutable_attributes.casefold();
   } else {
     out->has.casefold = false;
   }
+#endif
 
   return ZX_OK;
 }
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#endif

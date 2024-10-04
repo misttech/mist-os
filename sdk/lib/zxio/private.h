@@ -116,9 +116,7 @@ zx_status_t zxio_pipe_init(zxio_storage_t* pipe, zx::socket socket, zx_info_sock
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
 zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fuchsia_io::Symlink> client,
                               std::vector<uint8_t> target);
-#endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx_status_t zxio_attr_from_wire(const fuchsia_io::wire::NodeAttributes2& in,
                                 zxio_node_attributes_t* out);
 #endif
@@ -189,12 +187,12 @@ zx_status_t zxio_vmo_init(zxio_storage_t* file, zx::vmo vmo, zx::stream stream);
 // The file will be transferable to another process.
 zx_status_t zxio_transferable_init(zxio_storage_t* file, zx::channel channel);
 
-zx_status_t zxio_create_with_nodeinfo(fidl::ClientEnd<fuchsia_io::Node> node,
-                                      fuchsia_io::wire::NodeInfoDeprecated& node_info,
-                                      zxio_storage_t* storage);
+zx_status_t zxio_create_with_nodeinfo_deprecated(fidl::ClientEnd<fuchsia_io::Node> node,
+                                                 fuchsia_io::wire::NodeInfoDeprecated& node_info,
+                                                 zxio_storage_t* storage);
 
 zx_status_t zxio_create_with_representation(fidl::ClientEnd<fuchsia_io::Node> node,
-                                            fuchsia_io::wire::Representation& reresentation,
+                                            fuchsia_io::wire::Representation& representation,
                                             zxio_node_attributes_t* attr, zxio_storage_t* storage);
 
 zx::result<zxio_object_type_t> zxio_get_object_type(

@@ -102,13 +102,13 @@ zx::result<fdio_ptr> fdio::create(zx::handle handle) {
 }
 
 zx::result<fdio_ptr> fdio::create(fidl::ClientEnd<fio::Node> node,
-                                  fio::wire::NodeInfoDeprecated info) {
+                                  fio::wire::Representation representation) {
   return fdio::create([&](zxio_storage_alloc allocator, void** out_context) {
-    return zxio_create_with_allocator(std::move(node), info, allocator, out_context);
+    return zxio_create_with_allocator(std::move(node), representation, allocator, out_context);
   });
 }
 
-zx::result<fdio_ptr> fdio::create_with_on_open(fidl::ClientEnd<fio::Node> node) {
+zx::result<fdio_ptr> fdio::create_with_on_open_deprecated(fidl::ClientEnd<fio::Node> node) {
   class EventHandler final : public fidl::WireSyncEventHandler<fio::Node> {
    public:
     explicit EventHandler(fidl::ClientEnd<fio::Node> client_end)
@@ -127,7 +127,10 @@ zx::result<fdio_ptr> fdio::create_with_on_open(fidl::ClientEnd<fio::Node> node) 
           // Status was OK but the server did not give us an info union.
           return zx::error(ZX_ERR_INVALID_ARGS);
         }
-        return fdio::create(std::move(client_end_), std::move(event.info.value()));
+        return fdio::create([&](zxio_storage_alloc allocator, void** out_context) {
+          return zxio_create_with_allocator_deprecated(std::move(client_end_), event.info.value(),
+                                                       allocator, out_context);
+        });
       }();
     }
 
