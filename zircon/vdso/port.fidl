@@ -108,18 +108,18 @@ type PacketPageRequest = struct {
 
 @next
 type PacketProcessorPowerLevelTransitionRequest = struct {
-    /// Request targetting the provided power domain.
-    power_domain uint64;
+    /// Request targeting the provided power domain.
+    domain_id uint32;
 
-    /// Opaque argument provided for the OPP transition.
-    /// The value is provided through `ProcessorPowerLevel` to the kernel.
+    // Options applying to this transition.
+    options uint32;
+
+    // Control Interface ID provided in the energy model.
     control_argument uint64;
 
-    /// Opaque value indicating the context in which the transition is requested.
-    /// This value must be provided when acknowleding the transition.
-    context uint64;
+    // Control Interface Argument provided in the energy model.
+    control_interface uint64;
 
-    /// Padding
     reserved uint64;
 };
 
