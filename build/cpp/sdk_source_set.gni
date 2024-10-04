@@ -401,10 +401,9 @@ template("sdk_source_set") {
 
       api_contents = sdk_header_files
     } else {
-      # TODO(https://fxbug.dev/366221510): Uncomment after addressing zx_library.
-      # assert(
-      #     !defined(invoker.api),
-      #     "Unstable targets do not require/support modification acknowledgement.")
+      assert(
+          !defined(invoker.api),
+          "Unstable targets do not require/support modification acknowledgement.")
     }
 
     meta = {
