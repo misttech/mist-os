@@ -243,7 +243,7 @@ utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
 which = "4.0.2"
-zerocopy = { version = "0.8.0-alpha.26", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.1", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
@@ -1027,7 +1027,7 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.0-alpha.26"]
+[gn.package.zerocopy."0.8.1"]
 rustflags = [
   "--cfg=zerocopy_core_error",
   "--cfg=zerocopy_diagnostic_on_unimplemented",
@@ -1036,6 +1036,10 @@ rustflags = [
   "--cfg=zerocopy_aarch64_simd",
   "--cfg=zerocopy_panic_in_const_and_vec_try_reserve"
 ]
+
+[gn.package.zerocopy-derive."0.8.1"]
+# See https://github.com/google/zerocopy/issues/1792
+rustflags = [ "--cfg=zerocopy_derive_union_into_bytes" ]
 
 [gn.package.zstd-safe."5.0.2+zstd.1.5.2"]
 rustflags = []
