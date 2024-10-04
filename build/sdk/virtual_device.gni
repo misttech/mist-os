@@ -134,6 +134,10 @@ template("virtual_device_specification") {
           pointing_device = "touch"
         }
         window_size = emu_window_size
+        vsock = {
+          enabled = false
+          cid = 3
+        }
         memory = _memory
         storage = _storage
       }

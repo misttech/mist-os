@@ -115,6 +115,10 @@ mod tests {
                         "storage": {
                             "quantity": 1,
                             "units": "gigabytes"
+                        },
+                        "vsock": {
+                            "enabled": false,
+                            "cid": 3
                         }
                     },
                     "start_up_args_template": "/path/to/args"

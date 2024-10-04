@@ -47,6 +47,16 @@ pub struct Screen {
     pub units: ScreenUnits,
 }
 
+/// Details of the virtual device's vsock interface, if any.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct VsockDevice {
+    /// Whether the vsock device is enabled.
+    pub enabled: bool,
+
+    /// The context id the kernel should associate with the vsock.
+    pub cid: u32,
+}
+
 /// A generic data structure for indicating quantities of data.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct DataAmount {
@@ -83,6 +93,9 @@ pub struct Hardware {
 
     /// The size of the virtual device's screen, measured in pixels.
     pub window_size: Screen,
+
+    /// Details about the vsock device.
+    pub vsock: VsockDevice,
 }
 
 /// Description of a virtual (rather than physical) hardware device.
@@ -173,6 +186,10 @@ mod tests {
                     "storage": {
                         "quantity": 1,
                         "units": "gigabytes"
+                    },
+                    "vsock": {
+                        "enabled": true,
+                        "cid": 3
                     }
                 },
                 "start_up_args_template": "/path/to/args"
@@ -213,6 +230,10 @@ mod tests {
                     "storage": {
                         "quantity": 1,
                         "units": "gigabytes"
+                    },
+                    "vsock": {
+                        "enabled": true,
+                        "cid": 3
                     }
                 },
                 "start_up_args_template": "/path/to/args"

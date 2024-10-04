@@ -204,6 +204,10 @@
             "-object", "rng-random,filename=/dev/urandom,id=rng0",
             "-device", "virtio-rng-device,rng=rng0"
         {{/if}}
+        {{#if device.vsock.enabled}}
+            ,"-device",
+            "vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={{device.vsock.cid}}"
+        {{/if}}
          {{#each runtime.addl_emu_args}}
           ,"{{this}}"
          {{/each}}

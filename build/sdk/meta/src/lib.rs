@@ -25,5 +25,5 @@ pub use crate::manifest::*;
 pub use crate::product_bundle::*;
 pub use crate::virtual_device::{
     AudioDevice, DataAmount, InputDevice, Screen, VirtualDevice, VirtualDeviceManifest,
-    VirtualDeviceV1,
+    VirtualDeviceV1, VsockDevice,
 };

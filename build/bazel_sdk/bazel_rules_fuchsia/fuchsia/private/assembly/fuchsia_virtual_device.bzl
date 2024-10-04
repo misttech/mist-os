@@ -33,6 +33,10 @@ def _fuchsia_virtual_device_impl(ctx):
                     # especially with cloudtops.
                     "pointing_device": "touch",
                 },
+                "vsock": {
+                    "enabled": ctx.attr.vsock_enabled,
+                    "cid": ctx.attr.vsock_cid,
+                },
                 "window_size": {
                     "height": ctx.attr.window_height_px,
                     "width": ctx.attr.window_width_px,
@@ -108,6 +112,14 @@ fuchsia_virtual_device = rule(
         "storage_unit": attr.string(
             doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.).",
             default = "gigabytes",
+        ),
+        "vsock_enabled": attr.bool(
+            doc = "Whether the virtual device should expose a vsock",
+            default = False,
+        ),
+        "vsock_cid": attr.int(
+            doc = "The context id the guest vsock should. Only used if vsock_enable = true.",
+            default = 3,
         ),
     },
 )

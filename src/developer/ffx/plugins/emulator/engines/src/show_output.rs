@@ -73,6 +73,7 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) -> ShowDetail {
             inputs: InputDevice { pointing_device: emu_config.device.pointing_device.clone() },
             memory: emu_config.device.memory.clone(),
             window_size: emu_config.device.screen.clone(),
+            vsock: emu_config.device.vsock.clone().unwrap_or_default(),
         },
         ports: None,
     };

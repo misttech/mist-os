@@ -26,6 +26,10 @@
                 "height": 800,
                 "units": "pixels",
                 "width": 1280
+            },
+            "vsock": {
+                "enabled": false,
+                "cid": 3
             }
         },
         "ports": {

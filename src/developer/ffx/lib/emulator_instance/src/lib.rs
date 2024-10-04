@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Context as _, Result};
 use schemars::JsonSchema;
-pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
+pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen, VsockDevice};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -345,6 +345,11 @@ pub struct DeviceConfig {
     /// populated by the GuestConfig's fvm_image. Only one virtual storage device is supported
     /// at this time.
     pub storage: DataAmount,
+
+    /// The amount of virtual storage to allocate to the guest's storage device, which will be
+    /// populated by the GuestConfig's fvm_image. Only one virtual storage device is supported
+    /// at this time.
+    pub vsock: Option<VsockDevice>,
 }
 
 /// Collects the specific configurations into a single struct for ease of passing around.
