@@ -137,8 +137,8 @@ void SimInterface::OnScanResult(OnScanResultRequestView request,
 }
 
 void SimInterface::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
-  auto& end = request->end;
-  auto results = scan_results_.find(end.txn_id);
+  auto& end = request;
+  auto results = scan_results_.find(end->txn_id());
 
   // Verify that we started a scan on this interface
   ZX_ASSERT(results != scan_results_.end());
@@ -146,7 +146,7 @@ void SimInterface::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::S
   // Verify that the scan hasn't already received a completion notice
   ZX_ASSERT(!results->second.result_code);
 
-  results->second.result_code = end.code;
+  results->second.result_code = end->code();
   completer.Reply();
 }
 

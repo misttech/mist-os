@@ -74,11 +74,6 @@ type WlanScanResult = flexible enum : uint8 {
     CANCELED_BY_DRIVER_OR_FIRMWARE = 5;
 };
 
-type WlanFullmacScanEnd = struct {
-    txn_id uint64;
-    code WlanScanResult;
-};
-
 type WlanFullmacConnectConfirm = struct {
     peer_sta_address ieee80211.MacAddr;
     result_code ieee80211.StatusCode;
@@ -406,8 +401,9 @@ closed protocol WlanFullmacImplIfc {
         2: timestamp_nanos zx.Time;
         3: bss fuchsia.wlan.common.BssDescription;
     }) -> ();
-    strict OnScanEnd(struct {
-        end WlanFullmacScanEnd;
+    strict OnScanEnd(table {
+        1: txn_id uint64;
+        2: code WlanScanResult;
     }) -> ();
     strict ConnectConf(struct {
         resp WlanFullmacConnectConfirm;
@@ -566,7 +562,7 @@ closed protocol WlanFullmacImpl {
         1: txn_id uint64;
         2: scan_type WlanScanType;
         /// List of channels to scan on. An empty list of channels will cause a
-        /// scan request to immediately return a WlanFullmacScanEnd with code INVALID_ARGS.
+        /// scan request to immediately return a OnScanEnd with code INVALID_ARGS.
         ///
         /// Invalid channel numbers will be silently ignored. The validity of a channel
         /// number depends on the current regulatory region, and a FullMAC driver cannot

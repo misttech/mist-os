@@ -30,9 +30,9 @@ class EscanArgsIfc : public SimInterface {
 };
 
 void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
-  EXPECT_EQ(request->end.txn_id, kScanTxnId);
+  EXPECT_EQ(request->txn_id(), kScanTxnId);
   scan_completed_ = true;
-  scan_result_ = request->end.code;
+  scan_result_ = request->code();
   completer.Reply();
 }
 

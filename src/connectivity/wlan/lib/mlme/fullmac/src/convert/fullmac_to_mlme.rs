@@ -186,19 +186,21 @@ pub fn convert_set_keys_resp(
 
 pub fn convert_scan_result(
     result: fidl_fullmac::WlanFullmacImplIfcOnScanResultRequest,
-) -> fidl_mlme::ScanResult {
-    fidl_mlme::ScanResult {
-        txn_id: result.txn_id.expect("missing txn_id"),
-        timestamp_nanos: result.timestamp_nanos.expect("missing txn_id"),
-        bss: result.bss.expect("missing txn_id"),
-    }
+) -> Result<fidl_mlme::ScanResult> {
+    Ok(fidl_mlme::ScanResult {
+        txn_id: result.txn_id.context("missing txn_id")?,
+        timestamp_nanos: result.timestamp_nanos.context("missing timestamp_nanos")?,
+        bss: result.bss.context("missing bss")?,
+    })
 }
 
-pub fn convert_scan_end(end: fidl_fullmac::WlanFullmacScanEnd) -> fidl_mlme::ScanEnd {
+pub fn convert_scan_end(
+    end: fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest,
+) -> Result<fidl_mlme::ScanEnd> {
     use fidl_fullmac::WlanScanResult;
-    fidl_mlme::ScanEnd {
-        txn_id: end.txn_id,
-        code: match end.code {
+    Ok(fidl_mlme::ScanEnd {
+        txn_id: end.txn_id.context("missing txn_id")?,
+        code: match end.code.context("missing code")? {
             WlanScanResult::Success => fidl_mlme::ScanResultCode::Success,
             WlanScanResult::NotSupported => fidl_mlme::ScanResultCode::NotSupported,
             WlanScanResult::InvalidArgs => fidl_mlme::ScanResultCode::InvalidArgs,
@@ -210,12 +212,12 @@ pub fn convert_scan_end(end: fidl_fullmac::WlanFullmacScanEnd) -> fidl_mlme::Sca
             _ => {
                 warn!(
                     "Invalid scan result code {}, defaulting to ScanResultCode::NotSupported",
-                    end.code.into_primitive()
+                    end.code.unwrap().into_primitive()
                 );
                 fidl_mlme::ScanResultCode::NotSupported
             }
         },
-    }
+    })
 }
 
 pub fn convert_connect_confirm(

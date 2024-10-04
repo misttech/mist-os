@@ -750,32 +750,33 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
               arena.status_string());
     return;
   }
-  fuchsia_wlan_fullmac_wire::WlanFullmacScanEnd scan_end = {};
-  scan_end.txn_id = txn_id;
-  scan_end.code = scan_result_code;
+  auto scan_end_builder =
+      fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcOnScanEndRequest::Builder(*arena);
+  scan_end_builder.txn_id(txn_id);
+  scan_end_builder.code(scan_result_code);
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  BRCMF_DBG(SCAN, "Signaling on_scan_end with txn_id %ld and code %d", scan_end.txn_id,
-            fidl::ToUnderlying(scan_end.code));
+  BRCMF_DBG(SCAN, "Signaling on_scan_end with txn_id %ld and code %d", txn_id, scan_result_code);
   BRCMF_IFDBG(
       WLANIF, ndev,
       "Sending scan end event to SME. txn_id: %" PRIu64
       ", result: %s"
       ", number of results: %" PRIu32 "",
-      scan_end.txn_id,
-      scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kSuccess        ? "success"
-      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kNotSupported ? "not supported"
-      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInvalidArgs  ? "invalid args"
-      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError
+      txn_id,
+      scan_result_code == fuchsia_wlan_fullmac_wire::WlanScanResult::kSuccess ? "success"
+      : scan_result_code == fuchsia_wlan_fullmac_wire::WlanScanResult::kNotSupported
+          ? "not supported"
+      : scan_result_code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInvalidArgs ? "invalid args"
+      : scan_result_code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError
           ? "internal error"
-      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kShouldWait ? "should wait"
-      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware
+      : scan_result_code == fuchsia_wlan_fullmac_wire::WlanScanResult::kShouldWait ? "should wait"
+      : scan_result_code == fuchsia_wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware
           ? "canceled by driver or firmware"
           : "unknown",
       ndev->scan_num_results);
-  auto result = ndev->if_proto.buffer(*arena)->OnScanEnd(scan_end);
+  auto result = ndev->if_proto.buffer(*arena)->OnScanEnd(scan_end_builder.Build());
   if (!result.ok()) {
     BRCMF_ERR("Failed to indicate scan end result.status: %s, txn_id=%zu", result.status_string(),
-              scan_end.txn_id);
+              txn_id);
     return;
   }
 }

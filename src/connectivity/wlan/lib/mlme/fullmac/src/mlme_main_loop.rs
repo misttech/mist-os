@@ -1194,9 +1194,10 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let scan_end = fidl_fullmac::WlanFullmacScanEnd {
-            txn_id: 42u64,
-            code: fidl_fullmac::WlanScanResult::Success,
+        let scan_end = fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
+            txn_id: Some(42u64),
+            code: Some(fidl_fullmac::WlanScanResult::Success),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_scan_end(&scan_end)),

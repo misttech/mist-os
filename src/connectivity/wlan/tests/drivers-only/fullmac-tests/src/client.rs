@@ -143,9 +143,10 @@ async fn test_scan_request_success() {
 
         fullmac_driver
             .ifc_proxy
-            .on_scan_end(&fidl_fullmac::WlanFullmacScanEnd {
-                txn_id,
-                code: fidl_fullmac::WlanScanResult::Success,
+            .on_scan_end(&fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
+                txn_id: Some(txn_id),
+                code: Some(fidl_fullmac::WlanScanResult::Success),
+                ..Default::default()
             })
             .await
             .expect("Failed to send on_scan_end");
@@ -196,9 +197,10 @@ async fn test_scan_request_error() {
 
         fullmac_driver
             .ifc_proxy
-            .on_scan_end(&fidl_fullmac::WlanFullmacScanEnd {
-                txn_id,
-                code: fidl_fullmac::WlanScanResult::NotSupported,
+            .on_scan_end(&fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
+                txn_id: Some(txn_id),
+                code: Some(fidl_fullmac::WlanScanResult::NotSupported),
+                ..Default::default()
             })
             .await
             .expect("Failed to send on_scan_end");
