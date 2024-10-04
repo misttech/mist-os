@@ -116,9 +116,10 @@ template("zx_library") {
     "stable",
   ]
 
-  assert(defined(sdk_publishable) ||
-         (!defined(sdk_area) && !defined(stable) && !defined(sdk_name) &&
-          !defined(sdk_headers_for_internal_use)))
+  assert(defined(invoker.sdk_publishable) ||
+         (!defined(invoker.sdk_area) && !defined(invoker.stable) &&
+          !defined(invoker.sdk_name) &&
+          !defined(invoker.sdk_headers_for_internal_use)))
 
   if (zircon_toolchain != false) {
     _library_name = target_name
