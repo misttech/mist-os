@@ -16,6 +16,7 @@ group("tests_no_e2e") {
     "//sdk/lib/fidl/hlcpp/fuzzing:tests",
     "//sdk/lib/fidl_driver/tests",
     "//src/lib/fidl:tests",
+    "//src/lib/fidl_codec:tests",
     "//src/lib/fidl_table_validation/fidl_table_validation_tests",
     "//src/tests/fidl/dynsuite/channel_util:tests",
     "//src/tests/fidl/dynsuite/client_suite",
@@ -23,6 +24,7 @@ group("tests_no_e2e") {
     "//src/tests/fidl/go_bindings_test",
     "//third_party/go:fidl-tests",
     "//tools/fidl:tests",
+    "//tools/fidlcat:tests",
   ]
 }
 
