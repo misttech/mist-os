@@ -41,7 +41,7 @@ async fn test_logs_lifecycle() {
         }
     });
 
-    reader.retry(RetryConfig::EMPTY);
+    reader.retry(RetryConfig::always());
     for i in 0..50 {
         let puppet_name = format!("puppet{i}");
         let puppet = test_topology::connect_to_puppet(&realm, &puppet_name).await.unwrap();

@@ -98,7 +98,6 @@ async fn main() {
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
         .with_minimum_schema_count(1)
-        .retry_if_empty(true)
         .snapshot::<Inspect>()
         .await
         .unwrap()[0]
