@@ -135,6 +135,7 @@ pub struct If {
 pub enum IfEnum {
     Addr(IfAddr),
     Bridge(IfBridge),
+    Config(IfConfig),
     Disable(IfDisable),
     Enable(IfEnable),
     Get(IfGet),
@@ -306,6 +307,7 @@ pub struct IfGet {
     pub interface: InterfaceIdentifier,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "igmp")]
 /// get or set IGMP configuration
@@ -314,6 +316,7 @@ pub struct IfIgmp {
     pub cmd: IfIgmpEnum,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum IfIgmpEnum {
@@ -321,6 +324,7 @@ pub enum IfIgmpEnum {
     Set(IfIgmpSet),
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config get.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "get")]
 /// get IGMP configuration for an interface
@@ -329,6 +333,7 @@ pub struct IfIgmpGet {
     pub interface: InterfaceIdentifier,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config set.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "set")]
 /// set IGMP configuration for an interface
@@ -353,6 +358,7 @@ fn parse_igmp_version(s: &str) -> Result<finterfaces_admin::IgmpVersion, String>
     }
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "ip-forward")]
 /// get or set IP forwarding for an interface
@@ -361,6 +367,7 @@ pub struct IfIpForward {
     pub cmd: IfIpForwardEnum,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum IfIpForwardEnum {
@@ -368,6 +375,7 @@ pub enum IfIpForwardEnum {
     Set(IfIpForwardSet),
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config get.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "get")]
 /// get IP forwarding for an interface
@@ -379,6 +387,7 @@ pub struct IfIpForwardGet {
     pub ip_version: fnet::IpVersion,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config set.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "set")]
 /// set IP forwarding for an interface
@@ -401,6 +410,7 @@ pub struct IfList {
     pub name_pattern: Option<String>,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "mld")]
 /// get or set MLD configuration
@@ -409,6 +419,7 @@ pub struct IfMld {
     pub cmd: IfMldEnum,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum IfMldEnum {
@@ -416,6 +427,7 @@ pub enum IfMldEnum {
     Set(IfMldSet),
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config get.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "get")]
 /// get MLD configuration for an interface
@@ -424,6 +436,7 @@ pub struct IfMldGet {
     pub interface: InterfaceIdentifier,
 }
 
+// TODO(https://fxbug.dev/371584272): Replace this with if config set.
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "set")]
 /// set MLD configuration for an interface
@@ -446,6 +459,51 @@ fn parse_mld_version(s: &str) -> Result<finterfaces_admin::MldVersion, String> {
         },
     }
 }
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "config")]
+/// get or set interface configuration
+pub struct IfConfig {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
+
+    #[argh(subcommand)]
+    pub cmd: IfConfigEnum,
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand)]
+/// get configuration for an interface
+pub enum IfConfigEnum {
+    Set(IfConfigSet),
+    Get(IfConfigGet),
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "set")]
+// TODO(https://fxbug.dev/370850762): Generate the help string programmatically
+// so that it can live next to the parsing logic.
+/** set interface configuration
+
+Configuration parameters and the values to be set to should be passed
+in pairs. The names of the configuration parameters are taken from
+the structure of fuchsia.net.interfaces.admin/Configuration.
+
+The list of supported parameters are:
+  ipv6.ndp.slaac.temporary_address_enabled
+    bool
+    Whether temporary addresses should be generated.
+*/
+pub struct IfConfigSet {
+    /// the config parameter names and the
+    #[argh(positional)]
+    pub options: Vec<String>,
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "get")]
+/// get interface configuration
+pub struct IfConfigGet {}
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "log")]

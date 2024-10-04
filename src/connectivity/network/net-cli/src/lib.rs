@@ -10,6 +10,7 @@ use anyhow::{anyhow, Context as _, Error};
 use ffx_writer::ToolIO as _;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use itertools::Itertools as _;
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
@@ -465,6 +466,9 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("get configuration")?;
 
+                let _: usize = out.stderr().write(
+                    b"DEPRECATION WARNING: if igmp get will soon be replaced by if config get",
+                )?;
                 out.line(format!("IGMP configuration on interface {}:", id))?;
                 out.line(format!(
                     "    Version: {:?}",
@@ -494,11 +498,14 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("set configuration")?;
 
+                let _: usize = out.stderr().write(
+                    b"DEPRECATION WARNING: if igmp set will soon be replaced by if config set",
+                )?;
                 info!(
                     "IGMP version set to {:?} on interface {}; previously set to {:?}",
                     version,
                     id,
-                    extract_igmp_version(prev_config).context("get IGMP version")?,
+                    extract_igmp_version(prev_config).context("set IGMP version")?,
                 );
             }
         },
@@ -517,6 +524,9 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("get configuration")?;
 
+                let _: usize = out.stderr().write(
+                    b"DEPRECATION WARNING: if mld get will soon be replaced by if config get",
+                )?;
                 out.line(format!("MLD configuration on interface {}:", id))?;
                 out.line(format!(
                     "    Version: {:?}",
@@ -546,11 +556,14 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("set configuration")?;
 
+                let _: usize = out.stderr().write(
+                    b"DEPRECATION WARNING: if mld set will soon be replaced by if config set",
+                )?;
                 info!(
                     "MLD version set to {:?} on interface {}; previously set to {:?}",
                     version,
                     id,
-                    extract_mld_version(prev_config).context("get MLD version")?,
+                    extract_mld_version(prev_config).context("set MLD version")?,
                 );
             }
         },
@@ -569,6 +582,9 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("get configuration")?;
 
+                let _: usize = out.stderr().write(
+                    b"DEPRECATION WARNING: if ip-forward get will soon be replaced by if config get",
+                )?;
                 out.line(format!(
                     "IP forwarding for {:?} is {} on interface {}",
                     ip_version,
@@ -590,13 +606,16 @@ async fn do_if<C: NetCliDepsConnector>(
                         })
                     })
                     .context("set configuration")?;
+                let _: usize = out.stderr().write(
+                    b"DEPRECATION WARNING: if ip-forward set will soon be replaced by if config set",
+                )?;
                 info!(
                     "IP forwarding for {:?} set to {} on interface {}; previously set to {}",
                     ip_version,
                     enable,
                     id,
                     extract_ip_forwarding(prev_config, ip_version)
-                        .context("extract IP forwarding configuration")?
+                        .context("set IP forwarding configuration")?
                 );
             }
         },
@@ -831,7 +850,86 @@ async fn do_if<C: NetCliDepsConnector>(
             bridge.detach().context("detach bridge")?;
             info!("network bridge created with id {}", bridge_id);
         }
+        opts::IfEnum::Config(opts::IfConfig { interface, cmd }) => {
+            let id = interface.find_nicid(connector).await.context("find nicid")?;
+            let control = get_control(connector, id).await.context("get control")?;
+
+            match cmd {
+                opts::IfConfigEnum::Set(opts::IfConfigSet { options }) => {
+                    do_if_config_set(control, options).await?;
+                }
+                opts::IfConfigEnum::Get(opts::IfConfigGet {}) => {
+                    let configuration = control
+                        .get_configuration()
+                        .await
+                        .map_err(anyhow::Error::new)
+                        .and_then(|res| {
+                            res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
+                                anyhow::anyhow!("{:?}", e)
+                            })
+                        })
+                        .context("get configuration")?;
+                    // TODO(https://fxbug.dev/368806554): Print these with the same names used when
+                    // setting each property.
+                    out.line(format!("{:#?}", configuration))?;
+                }
+            }
+        }
     }
+    Ok(())
+}
+
+async fn do_if_config_set(
+    control: finterfaces_ext::admin::Control,
+    options: Vec<String>,
+) -> Result<(), Error> {
+    if options.len() % 2 != 0 {
+        return Err(user_facing_error(format!(
+            "if config set expects property value pairs and thus an even number of arguments"
+        )));
+    }
+    let mut temporary_address_enabled = None;
+    let config = options.iter().tuples().try_fold(
+        finterfaces_admin::Configuration::default(),
+        |mut config, (property, value)| {
+            match property.as_str() {
+                "ipv6.ndp.slaac.temporary_address_enabled" => {
+                    let enabled = value.parse::<bool>().map_err(|e| {
+                        user_facing_error(format!("failed to parse {value} as bool: {e}"))
+                    })?;
+                    config
+                        .ipv6
+                        .get_or_insert(Default::default())
+                        .ndp
+                        .get_or_insert(Default::default())
+                        .slaac
+                        .get_or_insert(Default::default())
+                        .temporary_address = Some(enabled);
+                    temporary_address_enabled = Some(enabled);
+                }
+                unknown_property => {
+                    return Err(user_facing_error(format!(
+                        "unknown configuration parameter: {unknown_property}"
+                    )));
+                }
+            }
+            Ok(config)
+        },
+    )?;
+
+    // TODO(https://fxbug.dev/368806554): Print the returned configuration
+    // struct to give feedback to user about which parameters changed.
+    let _: finterfaces_admin::Configuration = control
+        .set_configuration(&config)
+        .await
+        .map_err(anyhow::Error::new)
+        .and_then(|res| {
+            res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
+                anyhow::anyhow!("{:?}", e)
+            })
+        })
+        .context("set configuration")?;
+
     Ok(())
 }
 
