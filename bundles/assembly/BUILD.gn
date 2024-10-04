@@ -143,7 +143,10 @@ assembly_input_bundle("embeddable") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/sys/bootstrap/meta/bootstrap.cml" ]
+          shards = [
+            "//src/diagnostics/archivist/meta/archivist.bootstrap_shard.cml",
+            "//src/sys/bootstrap/meta/bootstrap.cml",
+          ]
         },
       ]
     },
