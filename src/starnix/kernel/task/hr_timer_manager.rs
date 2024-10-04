@@ -226,8 +226,11 @@ impl HrTimerManager {
                     }
 
                     let mut guard = self.lock();
-                    // Remove the expired HrTimer from the heap.
-                    guard.timer_heap.retain(|t| !Arc::ptr_eq(&t.hr_timer, &hrtimer_ref));
+                    // Remove the expired HrTimer from the heap, but only actually remove it if the
+                    // deadline has not changed.
+                    guard.timer_heap.retain(|t| {
+                        !(t.deadline == new_deadline && Arc::ptr_eq(&t.hr_timer, &hrtimer_ref))
+                    });
 
                     if guard.timer_heap.is_empty() && !*hrtimer_ref.is_interval.lock() {
                         // Only clear the timer event if there are no more timers to start.
@@ -324,6 +327,7 @@ impl HrTimerManager {
         deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         let mut guard = self.lock();
+
         let new_timer_node = HrTimerNode::new(deadline, wake_source, new_timer.clone());
         // If the deadline of a timer changes, this function will be called to update the order of
         // the `timer_heap`.
