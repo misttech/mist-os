@@ -54,6 +54,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingData.broadcast_name",
+        "ordinal": "10",
+        "type": "string:128"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.bluetooth.le/AdvertisingData.include_tx_power_level",
         "ordinal": "8",
         "type": "bool"
@@ -69,6 +75,12 @@
         "name": "fuchsia.bluetooth.le/AdvertisingData.name",
         "ordinal": "1",
         "type": "string:248"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingData.resolvable_set_identifier",
+        "ordinal": "9",
+        "type": "array<uint8,6>"
     },
     {
         "kind": "table/member",
@@ -1021,6 +1033,12 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/Legacy"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.bluetooth.le/MAX_BROADCAST_NAME_OCTETS",
+        "type": "uint8",
+        "value": "128"
     },
     {
         "kind": "const",

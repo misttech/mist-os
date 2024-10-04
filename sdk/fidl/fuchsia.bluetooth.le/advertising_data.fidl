@@ -20,6 +20,11 @@ const MAX_MANUFACTURER_DATA_LENGTH uint8 = 252;
 // length 25, leading to a limit of 25 - 1 + 255 - 1 = 278.
 const MAX_URI_LENGTH uint16 = 278;
 
+// The size of the broadcast name is at least 4 UTF-8 characters (min 4 bytes)
+// and a max of 32 UTF-8 characters (32 * 4) = 128
+@available(added=NEXT)
+const MAX_BROADCAST_NAME_OCTETS uint8 = 128;
+
 /// Entry in the `service_data` field of a [`fuchsia.bluetooth.le/AdvertisingData`].
 type ServiceData = struct {
     uuid bt.Uuid;
@@ -62,4 +67,21 @@ type AdvertisingData = table {
 
     /// Indicates whether the current TX power level should be included in the advertising data.
     8: include_tx_power_level bool;
+
+    /// Identifies the peer as belonging to a Coordinated Set.
+    /// Resolution and generation of this parameter is defined in the
+    /// Coordinated Set Identification Service Specification.
+    @available(added=NEXT)
+    9: resolvable_set_identifier array<uint8, 6>;
+
+    /// The broadcast name string can be used by a user interface on a scanning
+    /// device that displays information on the available broadcast sources.
+    ///
+    /// Multiple devices with the same Broadcast Name may be transmitting the
+    /// same data, allowing devices to choose one.  At least 4 unicode characters
+    /// long and no more than 32 characters.
+    ///
+    /// Defined in the Public Broadcast Profile specification.
+    @available(added=NEXT)
+    10: broadcast_name string:MAX_BROADCAST_NAME_OCTETS;
 };
