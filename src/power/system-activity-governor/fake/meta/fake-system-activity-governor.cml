@@ -53,7 +53,10 @@
             to: [ "#system-activity-governor" ],
         },
         {
-            config: "fuchsia.power.UseSuspender",
+            config: [
+                "fuchsia.power.UseSuspender",
+                "fuchsia.power.WaitForSuspendingToken",
+            ],
             from: "parent",
             to: [ "#system-activity-governor" ],
             availability: "optional",

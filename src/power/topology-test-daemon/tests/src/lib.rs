@@ -213,6 +213,17 @@ async fn create_test_env() -> TestEnv {
         .await
         .unwrap();
 
+    // Offer capabilities from void to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.WaitForSuspendingToken"))
+                .from(Ref::void())
+                .to(&system_activity_governor_ref),
+        )
+        .await
+        .unwrap();
+
     // Expose capabilities from system-activity-governor to topology-test-daemon.
     builder
         .add_route(

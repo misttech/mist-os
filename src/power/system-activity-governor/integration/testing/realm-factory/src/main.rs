@@ -147,6 +147,15 @@ async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
         )
         .await?;
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.WaitForSuspendingToken"))
+                .from(Ref::void())
+                .to(&component_ref),
+        )
+        .await?;
+
     // Expose capabilities from system-activity-governor.
     builder
         .add_route(

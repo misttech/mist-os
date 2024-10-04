@@ -4,6 +4,7 @@
 {
     include: [
         "//src/power/system-activity-governor/meta/no-suspender-for-test-sag.shard.cml",
+        "//src/power/system-activity-governor/meta/no-suspending-token-for-test-sag.shard.cml",
         "inspect/offer.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "sys/testing/rust_test_runner.shard.cml",

@@ -40,8 +40,24 @@
             availability: "optional",
             default: true,
         },
+        {
+            config: "fuchsia.power.WaitForSuspendingToken",
+
+            // If set, SAG blocks until the fuchsia.power.system/CpuPowerManager
+            // receives a token. Otherwise, it will fake one.
+            from: "parent",
+            key: "wait_for_suspending_token",
+            type: "bool",
+            availability: "optional",
+            default: false,
+        },
     ],
     expose: [
+        {
+            config: [ "fuchsia.power.WaitForSuspendingToken" ],
+            from: "void",
+            availability: "optional",
+        },
         {
             protocol: [
                 "fuchsia.power.suspend.Stats",

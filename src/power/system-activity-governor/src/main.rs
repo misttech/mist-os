@@ -91,6 +91,9 @@ async fn main() -> Result<()> {
         None
     };
 
+    let wait_for_suspending_token = config.wait_for_suspending_token;
+    tracing::info!("wait_for_suspending_token={wait_for_suspending_token}");
+
     let sag = SystemActivityGovernor::new(
         &connect_to_protocol::<fbroker::TopologyMarker>()?,
         inspector.root().clone_weak(),

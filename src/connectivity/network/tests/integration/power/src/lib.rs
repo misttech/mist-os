@@ -47,21 +47,13 @@ async fn create_power_realm<'a>(
     const CONFIG_NO_SUSPENDER_NAME: &str = "config-no-suspender";
     const CONFIG_NO_SUSPENDER_CONFIG: &str = "fuchsia.power.UseSuspender";
 
+    const CONFIG_NO_SUSPENDING_TOKEN_CONFIG: &str = "fuchsia.power.WaitForSuspendingToken";
+
     fn power_broker_dep() -> fnetemul::Capability {
         fnetemul::Capability::ChildDep(fnetemul::ChildDep {
             name: Some(PB_NAME.to_string()),
             capability: Some(fnetemul::ExposedCapability::Protocol(
                 fpower_broker::TopologyMarker::PROTOCOL_NAME.to_string(),
-            )),
-            ..Default::default()
-        })
-    }
-
-    fn sag_config_cap_dep() -> fnetemul::Capability {
-        fnetemul::Capability::ChildDep(fnetemul::ChildDep {
-            name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
-            capability: Some(fnetemul::ExposedCapability::Configuration(
-                CONFIG_NO_SUSPENDER_CONFIG.to_string(),
             )),
             ..Default::default()
         })
@@ -93,7 +85,20 @@ async fn create_power_realm<'a>(
         uses: Some(fnetemul::ChildUses::Capabilities(vec![
             fnetemul::Capability::LogSink(fnetemul::Empty {}),
             power_broker_dep(),
-            sag_config_cap_dep(),
+            fnetemul::Capability::ChildDep(fnetemul::ChildDep {
+                name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
+                capability: Some(fnetemul::ExposedCapability::Configuration(
+                    CONFIG_NO_SUSPENDER_CONFIG.to_string(),
+                )),
+                ..Default::default()
+            }),
+            fnetemul::Capability::ChildDep(fnetemul::ChildDep {
+                name: None,
+                capability: Some(fnetemul::ExposedCapability::Configuration(
+                    CONFIG_NO_SUSPENDING_TOKEN_CONFIG.to_string(),
+                )),
+                ..Default::default()
+            }),
         ])),
         exposes: Some(vec![
             fpower_system::ActivityGovernorMarker::PROTOCOL_NAME.to_string(),
@@ -111,14 +116,14 @@ async fn create_power_realm<'a>(
         ..Default::default()
     };
 
-    let sag_config_def = fnetemul::ChildDef {
+    let sag_config_suspender_def = fnetemul::ChildDef {
         source: Some(fnetemul::ChildSource::Component(CONFIG_NO_SUSPENDER_URL.to_string())),
         name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
         ..Default::default()
     };
 
     sandbox
-        .create_realm(name, [netstack_def, sag_def, pb_def, sag_config_def])
+        .create_realm(name, [netstack_def, sag_def, pb_def, sag_config_suspender_def])
         .expect("failed to create realm")
 }
 
