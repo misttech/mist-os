@@ -652,8 +652,11 @@ impl FsNodeOps for ClassDirectory {
         let fs = node.fs();
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.set_mode(mode!(IFDIR, 0o555));
-        let id =
-            self.security_server.class_id_by_name(&name.to_string()).map_err(|_| errno!(EINVAL))?;
+        let id: u32 = self
+            .security_server
+            .class_id_by_name(&name.to_string())
+            .map_err(|_| errno!(EINVAL))?
+            .into();
         let index_bytes = format!("{}", id).into_bytes();
         dir.entry(current_task, "index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
         dir.entry(
