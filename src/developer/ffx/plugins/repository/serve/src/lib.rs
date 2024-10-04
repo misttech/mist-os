@@ -183,12 +183,52 @@ fn get_repo_base_name(cmd_line: &Option<String>, context: &EnvironmentContext) -
     Ok(DEFAULT_REPO_NAME.to_string())
 }
 
-pub fn serve_impl_validate_args(
+pub async fn serve_impl_validate_args(
     cmd: &ServeCommand,
+    rcs_proxy_connector: &Connector<RemoteControlProxy>,
     context: &EnvironmentContext,
 ) -> Result<Option<PkgServerInfo>> {
-    let repo_base_name = get_repo_base_name(&cmd.repository, context)?;
+    // Check that there is a target device identifed, it is OK if it is not online.
+    if !cmd.no_device {
+        let res = rcs_proxy_connector
+            .try_connect(|target, err| {
+                tracing::info!(
+            "Validating RCS proxy: Waiting for target '{target:?}' to return error: {err:?}"
+        );
+                if target.is_none() {
+                    return Err(errors::FfxError::OpenTargetError {
+                        err: fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound,
+                        target: None,
+                    }
+                    .into());
+                } else {
+                    Ok(())
+                }
+            })
+            .await;
+        match res {
+            //  For validating the arguments to this command, we're only checking for there being
+            // 1 device identified as the target. If there is more than one or zero, print an error.
+            Err(fho::Error::User(e)) => {
+                if let Some(ee) = e.downcast_ref::<errors::FfxError>() {
+                    match ee {
+                        errors::FfxError::OpenTargetError { err, .. } => {
+                            if err == &fidl_fuchsia_developer_ffx::OpenTargetError::TargetNotFound
+                                || err
+                                    == &fidl_fuchsia_developer_ffx::OpenTargetError::QueryAmbiguous
+                            {
+                                return_user_error!("{e} To disable auto-registration use the `--no-device` option.")
+                            }
+                        }
+                        _ => (),
+                    };
+                }
+            }
+            _ => (),
+        };
+    }
 
+    let repo_base_name = get_repo_base_name(&cmd.repository, context)?;
     // Validate the repo-path vs. product bundle.
     // Product bundles may contain multiple repositories, So return a list.
     let repo_name_paths: Vec<(String, Utf8PathBuf)> = match (
@@ -321,7 +361,7 @@ pub async fn serve_impl<W: Write + 'static>(
     // Validate the cmd args before processing. This allows good error messages to be presented
     // to the user when running in Background mode. If the server is already running, this returns
     // Ok.
-    if let Some(running) = serve_impl_validate_args(&cmd, &context)? {
+    if let Some(running) = serve_impl_validate_args(&cmd, &rcs_proxy, &context).await? {
         // The server that matches the cmd is already running.
         writeln!(
             writer,
@@ -928,6 +968,29 @@ mod test {
         ffx_config::test_init().await.expect("test initialization")
     }
 
+    async fn make_fake_rcs_proxy_connector(test_env: &TestEnv) -> Connector<RemoteControlProxy> {
+        let (fake_repo, _) = FakeRepositoryManager::new();
+        let (fake_engine, _content) = FakeEngine::new();
+        let (_, fake_target_proxy, _) = FakeTarget::new(None);
+
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
+
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = fake_target_proxy.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let fho_env = tool_env.make_environment(test_env.context.clone());
+        Connector::try_from_env(&fho_env).await.expect("Could not make RCS test connector")
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_serve_impl_validate_args() {
         let env = get_test_env().await;
@@ -1062,8 +1125,10 @@ mod test {
             ),
         ];
 
+        let rcs_proxy_connector = make_fake_rcs_proxy_connector(&env).await;
+
         for (cmd, expected) in test_cases {
-            let result = serve_impl_validate_args(&cmd, &env.context);
+            let result = serve_impl_validate_args(&cmd, &rcs_proxy_connector, &env.context).await;
             match expected {
                 Ok(Some(pkg_server_info)) => {
                     if let Some(actual_info) = result.ok().expect("Ok result") {
@@ -1111,7 +1176,9 @@ mod test {
             build_dir.path().join("amber-files")
         ));
 
-        let result = serve_impl_validate_args(&cmd, &env.context);
+        let fake_rcs_proxy_connector = make_fake_rcs_proxy_connector(&env).await;
+
+        let result = serve_impl_validate_args(&cmd, &fake_rcs_proxy_connector, &env.context).await;
         match expected {
             Ok(Some(pkg_server_info)) => {
                 if let Some(actual_info) = result.ok().expect("Ok result") {
@@ -1242,8 +1309,10 @@ mod test {
    )
     ];
 
+        let rcs_proxy_connector = make_fake_rcs_proxy_connector(&env).await;
+
         for (cmd, expected) in test_cases {
-            let result = serve_impl_validate_args(&cmd, &env.context);
+            let result = serve_impl_validate_args(&cmd, &rcs_proxy_connector, &env.context).await;
             match expected {
                 Ok(Some(pkg_server_info)) => {
                     if let Some(actual_info) = match result {
