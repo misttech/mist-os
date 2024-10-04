@@ -21,6 +21,7 @@
 #include <linux/netlink.h>
 #include <linux/taskstats.h>
 
+#include "capabilities_helper.h"
 #include "gtest/gtest.h"
 #include "syscall_matchers.h"
 
@@ -380,15 +381,6 @@ bool TryWrite(uintptr_t addr);
 int MemFdCreate(const char *name, unsigned int flags);
 
 void WaitUntilBlocked(pid_t target, bool ignore_tracer);
-
-// Unsets a capability from the effective set.
-void UnsetCapability(int cap);
-
-// Drops all capabilities from the effective, permitted and inheritable sets.
-void DropAllCapabilities();
-
-// Checks if a capability is in the effective set.
-bool HasCapability(int cap);
 
 enum AccessType { Read, Write };
 
