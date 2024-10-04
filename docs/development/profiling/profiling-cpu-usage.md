@@ -48,7 +48,7 @@ do the following:
    Flame graph, for example:
 
    ```posix-terminal
-   pprof -top profile.out.pb
+   pprof -top profile.pb
    ```
 
    This command produces output similar to the following:
