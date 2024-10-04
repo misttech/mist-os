@@ -28,6 +28,7 @@ rustc_library("modules") {
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/modules/device-mapper",
     "//src/starnix/modules/ext4",
     "//src/starnix/modules/functionfs",
     "//src/starnix/modules/fuse",

@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{Device, DeviceMetadata};
-use crate::device::DeviceMode;
-use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
-use crate::mm::memory::MemoryObject;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
-use crate::task::CurrentTask;
-use crate::vfs::buffers::VecOutputBuffer;
-use crate::vfs::{
-    default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
-    fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
-};
 use bitflags::bitflags;
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
 use linux_uapi::DM_UUID_LEN;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
+use starnix_core::device::kobject::{Device, DeviceMetadata};
+use starnix_core::device::DeviceMode;
+use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::buffers::{InputBuffer, VecOutputBuffer};
+use starnix_core::vfs::{
+    default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
+    fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
+};
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -317,13 +317,13 @@ impl FileOps for DmDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-        _file: &crate::vfs::FileObject,
-        _current_task: &crate::task::CurrentTask,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::vfs::buffers::InputBuffer,
-    ) -> Result<usize, starnix_uapi::errors::Errno> {
-        starnix_uapi::error!(ENOTSUP)
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOTSUP)
     }
 
     fn read(
@@ -1195,7 +1195,7 @@ pub fn create_device_mapper(
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    Ok(Box::new(DeviceMapper::new(current_task.kernel().device_mapper_registry.clone())))
+    Ok(Box::new(DeviceMapper::new(current_task.kernel().expando.get::<DeviceMapperRegistry>())))
 }
 
 fn get_or_create_dm_device(
@@ -1207,7 +1207,8 @@ fn get_or_create_dm_device(
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task
         .kernel()
-        .device_mapper_registry
+        .expando
+        .get::<DeviceMapperRegistry>()
         .get_or_create_by_minor(locked, current_task, id.minor())
         .create_file_ops())
 }

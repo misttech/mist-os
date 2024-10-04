@@ -4,7 +4,6 @@
 
 use starnix_core::bpf::fs::BpfFs;
 use starnix_core::device::binder::BinderFs;
-use starnix_core::device::device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::{simple_device_ops, DeviceMode};
@@ -17,6 +16,7 @@ use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
 use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
+use starnix_modules_device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_modules_ext4::ExtFilesystem;
 use starnix_modules_functionfs::FunctionFs;
 use starnix_modules_fuse::{new_fuse_fs, new_fusectl_fs, open_fuse_device};
