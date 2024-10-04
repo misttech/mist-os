@@ -10,7 +10,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <threads.h>
 
@@ -56,7 +56,7 @@ class AmlEthernet : public DeviceType,
   zx_status_t InitPdev();
   zx_status_t Bind();
 
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
   ddk::I2cChannel i2c_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpios_[GPIO_COUNT];
   std::optional<component::OutgoingDirectory> outgoing_;
