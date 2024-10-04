@@ -17,7 +17,7 @@ use netstack3_core::device::{
 use netstack3_core::error::NotFoundError;
 use netstack3_core::ip::{
     AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfiguration,
+    SlaacConfigurationUpdate,
 };
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder,
@@ -585,10 +585,10 @@ fn test_add_ip_addr_subnet_link_local() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()

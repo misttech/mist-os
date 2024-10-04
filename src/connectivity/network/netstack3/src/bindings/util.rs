@@ -20,6 +20,7 @@ use net_types::ip::{
 use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
 use netstack3_core::error::{ExistsError, NotFoundError};
+use netstack3_core::ip::{SlaacConfiguration, SlaacConfigurationUpdate};
 use netstack3_core::neighbor::{NudUserConfig, NudUserConfigUpdate};
 use netstack3_core::routes::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
@@ -1337,6 +1338,30 @@ impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfiguration {
     fn into_fidl(self) -> fnet_interfaces_admin::ArpConfiguration {
         let ArpConfiguration { nud } = self;
         ArpConfigurationUpdate { nud: Some(nud_user_config_to_update(nud)) }.into_fidl()
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfigurationUpdate {
+    fn into_fidl(self) -> fnet_interfaces_admin::SlaacConfiguration {
+        let SlaacConfigurationUpdate {
+            temporary_address_configuration,
+            enable_stable_addresses: _,
+        } = self;
+        fnet_interfaces_admin::SlaacConfiguration {
+            temporary_address: temporary_address_configuration.map(|config| config.is_enabled()),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfiguration {
+    fn into_fidl(self) -> fnet_interfaces_admin::SlaacConfiguration {
+        let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } =
+            self;
+        fnet_interfaces_admin::SlaacConfiguration {
+            temporary_address: Some(temporary_address_configuration.is_enabled()),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
     }
 }
 

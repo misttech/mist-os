@@ -22,7 +22,7 @@ use netstack3_core::error::NotFoundError;
 use netstack3_core::ip::{
     AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
     Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime,
-    SlaacConfiguration,
+    SlaacConfigurationUpdate,
 };
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
@@ -86,10 +86,10 @@ fn remove_ethernet_device_disables_timers() {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     max_router_solicitations: Some(Some(const_unwrap_option(NonZeroU8::new(2)))),
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
+                    slaac_config: SlaacConfigurationUpdate {
+                        enable_stable_addresses: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ip_config,
                     ..Default::default()
                 },
@@ -189,10 +189,10 @@ fn tx_queue(
                 dad_transmits: Some(Some(const_unwrap_option(NonZeroU16::new(1)))),
                 // Enable stable addresses so the link-local address is auto-
                 // generated.
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()

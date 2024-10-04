@@ -852,6 +852,18 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 				_ = syslog.WarnTf(controlName, "ignoring unsupported DAD configuration")
 			}
 
+			if ipv6Config.Ndp.HasSlaac() {
+				var previousSLAACConfig admin.SlaacConfiguration
+				if ipv6Config.Ndp.Slaac.HasTemporaryAddress() {
+					ndpEP := ci.getNetworkEndpoint(ipv6.ProtocolNumber).(ipv6.NDPEndpoint)
+					config := ndpEP.NDPConfigurations()
+					previousSLAACConfig.SetTemporaryAddress(config.AutoGenTempGlobalAddresses)
+					config.AutoGenTempGlobalAddresses = ipv6Config.Ndp.Slaac.TemporaryAddress
+					ndpEP.SetNDPConfigurations(config)
+				}
+				previousNdpConfig.SetSlaac(previousSLAACConfig)
+			}
+
 			previousIpv6Config.SetNdp(previousNdpConfig)
 		}
 
@@ -919,6 +931,12 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 		if !ci.isLoopback() {
 			var ndpConfig admin.NdpConfiguration
 			ndpConfig.SetNud(toAdminNudConfiguration(ci.getNUDConfig(ipv6.ProtocolNumber)))
+
+			var slaacConfig admin.SlaacConfiguration
+			config := ci.getNetworkEndpoint(ipv6.ProtocolNumber).(ipv6.NDPEndpoint).NDPConfigurations()
+			slaacConfig.SetTemporaryAddress(config.AutoGenTempGlobalAddresses)
+			ndpConfig.SetSlaac(slaacConfig)
+
 			ipv6Config.SetNdp(ndpConfig)
 		}
 

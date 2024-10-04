@@ -10,7 +10,7 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_base::{AnyDevice, DeviceIdContext, DeviceIdentifier};
 
 use crate::internal::device::router_solicitation::RsHandler;
-use crate::internal::device::slaac::SlaacConfiguration;
+use crate::internal::device::slaac::SlaacConfigurationUpdate;
 use crate::internal::device::state::{IpDeviceFlags, Ipv4DeviceConfiguration};
 use crate::internal::device::{
     self, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
@@ -214,7 +214,7 @@ pub struct Ipv6DeviceConfigurationUpdate {
     /// A change in maximum router solicitations.
     pub max_router_solicitations: Option<Option<NonZeroU8>>,
     /// A change in SLAAC configuration.
-    pub slaac_config: Option<SlaacConfiguration>,
+    pub slaac_config: SlaacConfigurationUpdate,
     /// A change in the IP device configuration.
     pub ip_config: IpDeviceConfigurationUpdate,
 }
@@ -272,7 +272,7 @@ where
                         &mut config.max_router_solicitations,
                         max_router_solicitations,
                     ),
-                    get_prev_next_and_update(&mut config.slaac_config, slaac_config),
+                    config.slaac_config.update(slaac_config),
                     get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled),
                     get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
                     get_prev_next_and_update(
@@ -292,7 +292,6 @@ where
             let dad_transmits = dont_handle_change_and_get_prev(dad_transmits_updates);
             let max_router_solicitations =
                 dont_handle_change_and_get_prev(max_router_solicitations_updates);
-            let slaac_config = dont_handle_change_and_get_prev(slaac_config_updates);
 
             let ip_config = IpDeviceConfigurationUpdate {
                 ip_enabled: handle_change_and_get_prev(ip_enabled_updates, |next| {
@@ -355,7 +354,7 @@ where
             Ipv6DeviceConfigurationUpdate {
                 dad_transmits,
                 max_router_solicitations,
-                slaac_config,
+                slaac_config: slaac_config_updates,
                 ip_config,
             }
         })

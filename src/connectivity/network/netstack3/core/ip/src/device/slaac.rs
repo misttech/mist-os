@@ -524,16 +524,20 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
         _marker,
     } = addrs_config;
     let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } = config;
-    let temporary_address_configuration = match temporary_address_configuration {
-        Some(configuration) => configuration,
-        None => return,
+    let temp_valid_lifetime = match temporary_address_configuration {
+        TemporarySlaacAddressConfiguration::Enabled {
+            temp_idgen_retries,
+            temp_valid_lifetime,
+            temp_preferred_lifetime: _,
+        } => {
+            if dad_counter >= temp_idgen_retries {
+                return;
+            }
+            temp_valid_lifetime
+        }
+        TemporarySlaacAddressConfiguration::Disabled => return,
     };
 
-    if dad_counter >= temporary_address_configuration.temp_idgen_retries {
-        return;
-    }
-
-    let temp_valid_lifetime = temporary_address_configuration.temp_valid_lifetime;
     // Compute the original preferred lifetime for the removed address so that
     // it can be used for the new address being generated. If, when the address
     // was created, the prefix's preferred lifetime was less than
@@ -641,10 +645,14 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     // temporary address on an interface even though temporary
                     // addressing is disabled. Don't update the valid lifetime
                     // in this case.
-                    None => {
+                    TemporarySlaacAddressConfiguration::Disabled => {
                         (ValidLifetimeBound::FromMaxBound(Duration::ZERO), None, *entry_valid_until)
                     }
-                    Some(temporary_address_config) => {
+                    TemporarySlaacAddressConfiguration::Enabled {
+                        temp_preferred_lifetime,
+                        temp_valid_lifetime,
+                        temp_idgen_retries: _,
+                    } => {
                         // RFC 8981 Section 3.4.2:
                         //   When updating the preferred lifetime of an existing
                         //   temporary address, it would be set to expire at
@@ -653,8 +661,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                         //   TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR). A similar
                         //   approach can be used with the valid lifetime.
                         let preferred_for = preferred_lifetime.and_then(|preferred_lifetime| {
-                            temporary_address_config
-                                .temp_preferred_lifetime
+                            temp_preferred_lifetime
                                 .get()
                                 .checked_sub(now.saturating_duration_since(*creation_time))
                                 .and_then(|p| p.checked_sub(*desync_factor))
@@ -669,8 +676,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                         //   (TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR),
                         //   respectively.
                         let since_creation = now.saturating_duration_since(*creation_time);
-                        let configured_max_lifetime =
-                            temporary_address_config.temp_valid_lifetime.get();
+                        let configured_max_lifetime = temp_valid_lifetime.get();
                         let max_valid_lifetime = if since_creation > configured_max_lifetime {
                             Duration::ZERO
                         } else {
@@ -703,14 +709,15 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     temporary_address_configuration,
                 } = config;
 
-                let regen_at = temporary_address_configuration.and_then(
-                    |TemporarySlaacAddressConfiguration {
-                         temp_idgen_retries,
-                         temp_preferred_lifetime: _,
-                         temp_valid_lifetime: _,
-                     }| {
+                let regen_at = match temporary_address_configuration {
+                    TemporarySlaacAddressConfiguration::Disabled => None,
+                    TemporarySlaacAddressConfiguration::Enabled {
+                        temp_idgen_retries,
+                        temp_preferred_lifetime: _,
+                        temp_valid_lifetime: _,
+                    } => {
                         let regen_advance = regen_advance(
-                            temp_idgen_retries,
+                            *temp_idgen_retries,
                             retrans_timer,
                             dad_transmits.map_or(0, NonZeroU16::get),
                         )
@@ -731,8 +738,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                             .get()
                             .checked_sub(regen_advance)
                             .map_or(Some(now), |d| now.checked_add(d))
-                    },
-                );
+                    }
+                };
 
                 (NonZeroNdpLifetime::Finite(preferred_for), regen_at)
             });
@@ -977,19 +984,30 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
 /// [Section 3.3.2]: http://tools.ietf.org/html/rfc8981#section-3.3.2
 /// [Section 3.8]: http://tools.ietf.org/html/rfc8981#section-3.8
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct TemporarySlaacAddressConfiguration {
-    /// The maximum amount of time that a temporary address can be considered
-    /// valid, from the time of its creation.
-    pub temp_valid_lifetime: NonZeroDuration,
+pub enum TemporarySlaacAddressConfiguration {
+    /// Temporary SLAAC address generation is enabled.
+    Enabled {
+        /// The maximum amount of time that a temporary address can be considered
+        /// valid, from the time of its creation.
+        temp_valid_lifetime: NonZeroDuration,
 
-    /// The maximum amount of time that a temporary address can be preferred,
-    /// from the time of its creation.
-    pub temp_preferred_lifetime: NonZeroDuration,
+        /// The maximum amount of time that a temporary address can be preferred,
+        /// from the time of its creation.
+        temp_preferred_lifetime: NonZeroDuration,
 
-    /// The number of times to attempt to pick a new temporary address after DAD
-    /// detects a duplicate before stopping and giving up on temporary address
-    /// generation for that prefix.
-    pub temp_idgen_retries: u8,
+        /// The number of times to attempt to pick a new temporary address after DAD
+        /// detects a duplicate before stopping and giving up on temporary address
+        /// generation for that prefix.
+        temp_idgen_retries: u8,
+    },
+    /// Temporary SLAAC address generation is disabled.
+    Disabled,
+}
+
+impl Default for TemporarySlaacAddressConfiguration {
+    fn default() -> Self {
+        Self::Disabled
+    }
 }
 
 impl TemporarySlaacAddressConfiguration {
@@ -1011,11 +1029,19 @@ impl TemporarySlaacAddressConfiguration {
     pub const DEFAULT_TEMP_IDGEN_RETRIES: u8 = 3;
 
     /// Constructs a new instance with default values.
-    pub fn rfc_default() -> Self {
-        Self {
+    pub fn enabled_with_rfc_defaults() -> Self {
+        Self::Enabled {
             temp_valid_lifetime: Self::DEFAULT_TEMP_VALID_LIFETIME,
             temp_preferred_lifetime: Self::DEFAULT_TEMP_PREFERRED_LIFETIME,
             temp_idgen_retries: Self::DEFAULT_TEMP_IDGEN_RETRIES,
+        }
+    }
+
+    /// Returns if `self` is enabled.
+    pub fn is_enabled(&self) -> bool {
+        match self {
+            Self::Enabled { .. } => true,
+            Self::Disabled => false,
         }
     }
 }
@@ -1028,12 +1054,48 @@ pub struct SlaacConfiguration {
 
     /// Configuration for temporary address assignment.
     ///
-    /// If `None`, temporary addresses will not be assigned to interfaces, and
-    /// any already-assigned temporary addresses will be removed.
+    /// If `None`, temporary addresses will not be assigned to interfaces.
     ///
     /// If Some, specifies the configuration parameters for temporary addressing,
     /// including those relating to how long temporary addresses should remain
     /// preferred and valid.
+    pub temporary_address_configuration: TemporarySlaacAddressConfiguration,
+}
+
+impl SlaacConfiguration {
+    /// Updates self and returns the previous values in a new update structure.
+    pub fn update(
+        &mut self,
+        SlaacConfigurationUpdate {
+        enable_stable_addresses,
+        temporary_address_configuration,
+    }: SlaacConfigurationUpdate,
+    ) -> SlaacConfigurationUpdate {
+        fn get_prev_and_update<T>(old: &mut T, update: Option<T>) -> Option<T> {
+            update.map(|new| core::mem::replace(old, new))
+        }
+        SlaacConfigurationUpdate {
+            enable_stable_addresses: get_prev_and_update(
+                &mut self.enable_stable_addresses,
+                enable_stable_addresses,
+            ),
+            temporary_address_configuration: get_prev_and_update(
+                &mut self.temporary_address_configuration,
+                temporary_address_configuration,
+            ),
+        }
+    }
+}
+
+/// An update structure for [`SlaacConfiguration`].
+///
+/// Only fields with variant `Some` are updated.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+pub struct SlaacConfigurationUpdate {
+    /// Configuration to enable stable address assignment.
+    pub enable_stable_addresses: Option<bool>,
+
+    /// Update value for temporary address configuration.
     pub temporary_address_configuration: Option<TemporarySlaacAddressConfiguration>,
 }
 
@@ -1222,13 +1284,13 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
 
         let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } =
             config;
-        let TemporarySlaacAddressConfiguration {
-            temp_valid_lifetime,
-            temp_preferred_lifetime: _,
-            temp_idgen_retries: _,
-        } = match temporary_address_configuration {
-            Some(configuration) => configuration,
-            None => return Action::SkipRegen,
+        let temp_valid_lifetime = match temporary_address_configuration {
+            TemporarySlaacAddressConfiguration::Enabled {
+                temp_valid_lifetime,
+                temp_preferred_lifetime: _,
+                temp_idgen_retries: _,
+            } => temp_valid_lifetime,
+            TemporarySlaacAddressConfiguration::Disabled => return Action::SkipRegen,
         };
 
         let (deprecate_at, ()) = timers
@@ -1453,127 +1515,142 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
             )
         }
         SlaacInitConfig::Temporary { dad_count } => {
-            let temporary_address_config = match temporary_address_configuration {
-                Some(temporary_address_config) => temporary_address_config,
-                None => {
+            match temporary_address_configuration {
+                TemporarySlaacAddressConfiguration::Enabled {
+                    temp_valid_lifetime,
+                    temp_preferred_lifetime,
+                    temp_idgen_retries,
+                } => {
+                    let per_attempt_random_seed: u64 = bindings_ctx.rng().gen();
+
+                    // Per RFC 8981 Section 3.4.4:
+                    //    When creating a temporary address, DESYNC_FACTOR MUST be computed
+                    //    and associated with the newly created address, and the address
+                    //    lifetime values MUST be derived from the corresponding prefix as
+                    //    follows:
+                    //
+                    //    *  Its valid lifetime is the lower of the Valid Lifetime of the
+                    //       prefix and TEMP_VALID_LIFETIME.
+                    //
+                    //    *  Its preferred lifetime is the lower of the Preferred Lifetime
+                    //       of the prefix and TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR.
+                    let valid_for = match prefix_valid_for {
+                        NonZeroNdpLifetime::Finite(prefix_valid_for) => {
+                            core::cmp::min(prefix_valid_for, temp_valid_lifetime)
+                        }
+                        NonZeroNdpLifetime::Infinite => temp_valid_lifetime,
+                    };
+
+                    let regen_advance = regen_advance(
+                        temp_idgen_retries,
+                        retrans_timer,
+                        dad_transmits.map_or(0, NonZeroU16::get),
+                    );
+
+                    let mut seed = per_attempt_random_seed;
+                    let addresses = either::Either::Right(core::iter::repeat_with(move || {
+                        // RFC 8981 Section 3.3.3 specifies that
+                        //
+                        //   The resulting IID MUST be compared against the reserved
+                        //   IPv6 IIDs and against those IIDs already employed in an
+                        //   address of the same network interface and the same network
+                        //   prefix.  In the event that an unacceptable identifier has
+                        //   been generated, the DAD_Counter should be incremented by 1,
+                        //   and the algorithm should be restarted from the first step.
+                        loop {
+                            let address = generate_global_temporary_address(
+                                &subnet,
+                                &iid,
+                                seed,
+                                &temp_secret_key,
+                            );
+                            seed = seed.wrapping_add(1);
+
+                            if has_iana_allowed_iid(address.addr().get()) {
+                                break address;
+                            }
+                        }
+                    }));
+
+                    let valid_until = now.checked_add(valid_for.get()).unwrap();
+
+                    let desync_factor = if let Some(d) = desync_factor(
+                        &mut bindings_ctx.rng(),
+                        temp_preferred_lifetime,
+                        regen_advance,
+                    ) {
+                        d
+                    } else {
+                        // We only fail to calculate a desync factor when the configured
+                        // maximum temporary address preferred lifetime is less than
+                        // REGEN_ADVANCE and per RFC 8981 Section 3.4.5,
+                        //
+                        //   A temporary address is created only if this calculated
+                        //   preferred lifetime is greater than REGEN_ADVANCE time
+                        //   units.
+                        trace!(
+                            "failed to calculate DESYNC_FACTOR; \
+                                temp_preferred_lifetime={:?}, regen_advance={:?}",
+                            temp_preferred_lifetime,
+                            regen_advance,
+                        );
+                        return;
+                    };
+
+                    let preferred_for = prefix_preferred_for.and_then(|prefix_preferred_for| {
+                        temp_preferred_lifetime
+                            .get()
+                            .checked_sub(desync_factor)
+                            .and_then(NonZeroDuration::new)
+                            .map(|d| prefix_preferred_for.min_finite_duration(d))
+                    });
+
+                    // RFC 8981 Section 3.4.5:
+                    //
+                    //   A temporary address is created only if this calculated
+                    //   preferred lifetime is greater than REGEN_ADVANCE time
+                    //   units.
+                    let preferred_for_and_regen_at = match preferred_for {
+                        None => return,
+                        Some(preferred_for) => {
+                            match preferred_for.get().checked_sub(regen_advance.get()) {
+                                Some(before_regen) => PreferredForAndRegenAt(
+                                    NonZeroNdpLifetime::Finite(preferred_for),
+                                    Some(now.checked_add(before_regen).unwrap()),
+                                ),
+                                None => {
+                                    trace!(
+                                        "receive_ndp_packet: preferred lifetime of {:?} \
+                                            for subnet {:?} is too short to allow regen",
+                                        preferred_for,
+                                        subnet
+                                    );
+                                    return;
+                                }
+                            }
+                        }
+                    };
+
+                    (
+                        Lifetime::Finite(valid_until),
+                        Some(preferred_for_and_regen_at),
+                        SlaacConfig::Temporary(TemporarySlaacConfig {
+                            desync_factor,
+                            valid_until,
+                            creation_time: now,
+                            dad_counter: dad_count,
+                        }),
+                        addresses,
+                    )
+                }
+                TemporarySlaacAddressConfiguration::Disabled => {
                     trace!(
                         "receive_ndp_packet: temporary addresses are disabled on device {:?}",
                         device_id
                     );
                     return;
                 }
-            };
-
-            let per_attempt_random_seed: u64 = bindings_ctx.rng().gen();
-
-            // Per RFC 8981 Section 3.4.4:
-            //    When creating a temporary address, DESYNC_FACTOR MUST be computed
-            //    and associated with the newly created address, and the address
-            //    lifetime values MUST be derived from the corresponding prefix as
-            //    follows:
-            //
-            //    *  Its valid lifetime is the lower of the Valid Lifetime of the
-            //       prefix and TEMP_VALID_LIFETIME.
-            //
-            //    *  Its preferred lifetime is the lower of the Preferred Lifetime
-            //       of the prefix and TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR.
-            let valid_for = match prefix_valid_for {
-                NonZeroNdpLifetime::Finite(prefix_valid_for) => {
-                    core::cmp::min(prefix_valid_for, temporary_address_config.temp_valid_lifetime)
-                }
-                NonZeroNdpLifetime::Infinite => temporary_address_config.temp_valid_lifetime,
-            };
-
-            let regen_advance = regen_advance(
-                temporary_address_config.temp_idgen_retries,
-                retrans_timer,
-                dad_transmits.map_or(0, NonZeroU16::get),
-            );
-
-            let mut seed = per_attempt_random_seed;
-            let addresses = either::Either::Right(core::iter::repeat_with(move || {
-                // RFC 8981 Section 3.3.3 specifies that
-                //
-                //   The resulting IID MUST be compared against the reserved
-                //   IPv6 IIDs and against those IIDs already employed in an
-                //   address of the same network interface and the same network
-                //   prefix.  In the event that an unacceptable identifier has
-                //   been generated, the DAD_Counter should be incremented by 1,
-                //   and the algorithm should be restarted from the first step.
-                loop {
-                    let address =
-                        generate_global_temporary_address(&subnet, &iid, seed, &temp_secret_key);
-                    seed = seed.wrapping_add(1);
-
-                    if has_iana_allowed_iid(address.addr().get()) {
-                        break address;
-                    }
-                }
-            }));
-
-            let valid_until = now.checked_add(valid_for.get()).unwrap();
-
-            let desync_factor = if let Some(d) = desync_factor(
-                &mut bindings_ctx.rng(),
-                temporary_address_config.temp_preferred_lifetime,
-                regen_advance,
-            ) {
-                d
-            } else {
-                // We only fail to calculate a desync factor when the configured
-                // maximum temporary address preferred lifetime is less than
-                // REGEN_ADVANCE and per RFC 8981 Section 3.4.5,
-                //
-                //   A temporary address is created only if this calculated
-                //   preferred lifetime is greater than REGEN_ADVANCE time
-                //   units.
-                trace!(
-                    "failed to calculate DESYNC_FACTOR; temp_preferred_lifetime={:?}, regen_advance={:?}",
-                    temporary_address_config.temp_preferred_lifetime,
-                    regen_advance,
-                );
-                return;
-            };
-
-            let preferred_for = prefix_preferred_for.and_then(|prefix_preferred_for| {
-                temporary_address_config
-                    .temp_preferred_lifetime
-                    .get()
-                    .checked_sub(desync_factor)
-                    .and_then(NonZeroDuration::new)
-                    .map(|d| prefix_preferred_for.min_finite_duration(d))
-            });
-
-            // RFC 8981 Section 3.4.5:
-            //
-            //   A temporary address is created only if this calculated
-            //   preferred lifetime is greater than REGEN_ADVANCE time
-            //   units.
-            let preferred_for_and_regen_at = match preferred_for {
-                None => return,
-                Some(preferred_for) => match preferred_for.get().checked_sub(regen_advance.get()) {
-                    Some(before_regen) => PreferredForAndRegenAt(
-                        NonZeroNdpLifetime::Finite(preferred_for),
-                        Some(now.checked_add(before_regen).unwrap()),
-                    ),
-                    None => {
-                        trace!("receive_ndp_packet: preferred lifetime of {:?} for subnet {:?} is too short to allow regen", preferred_for, subnet);
-                        return;
-                    }
-                },
-            };
-
-            (
-                Lifetime::Finite(valid_until),
-                Some(preferred_for_and_regen_at),
-                SlaacConfig::Temporary(TemporarySlaacConfig {
-                    desync_factor,
-                    valid_until,
-                    creation_time: now,
-                    dad_counter: dad_count,
-                }),
-                addresses,
-            )
+            }
         }
     };
 
@@ -2418,13 +2495,15 @@ mod tests {
     ) {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
-                temporary_address_configuration: enable.then(|| {
-                    TemporarySlaacAddressConfiguration {
+                temporary_address_configuration: if enable {
+                    TemporarySlaacAddressConfiguration::Enabled {
                         temp_valid_lifetime: ONE_HOUR,
                         temp_preferred_lifetime: preferred_lifetime_config,
                         temp_idgen_retries,
                     }
-                }),
+                } else {
+                    TemporarySlaacAddressConfiguration::Disabled
+                },
                 ..Default::default()
             },
             Default::default(),
@@ -2550,14 +2629,14 @@ mod tests {
 
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
-                temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+                temporary_address_configuration: TemporarySlaacAddressConfiguration::Enabled {
                     temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(
                         vl_config.into(),
                     ))
                     .unwrap(),
                     temp_preferred_lifetime: NonZeroDuration::new(pl_config).unwrap(),
                     temp_idgen_retries,
-                }),
+                },
                 ..Default::default()
             },
             Default::default(),
@@ -2737,7 +2816,7 @@ mod tests {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
                 enable_stable_addresses: false,
-                temporary_address_configuration: None,
+                temporary_address_configuration: TemporarySlaacAddressConfiguration::Disabled,
             },
             FakeSlaacAddrs {
                 slaac_addrs: vec![SlaacAddressEntry {

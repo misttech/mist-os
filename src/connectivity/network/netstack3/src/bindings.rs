@@ -91,7 +91,7 @@ use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
     IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfiguration,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -1069,10 +1069,10 @@ impl Netstack {
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
+                    slaac_config: SlaacConfigurationUpdate {
+                        enable_stable_addresses: Some(true),
                         temporary_address_configuration: None,
-                    }),
+                    },
                     ip_config,
                 },
             )

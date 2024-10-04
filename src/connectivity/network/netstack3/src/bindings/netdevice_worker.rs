@@ -22,7 +22,7 @@ use netstack3_core::device::{
 };
 use netstack3_core::ip::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfiguration, TemporarySlaacAddressConfiguration,
+    SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
@@ -573,12 +573,12 @@ impl DeviceHandler {
                         max_router_solicitations: Some(Some(
                             Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
                         )),
-                        slaac_config: Some(SlaacConfiguration {
-                            enable_stable_addresses: true,
+                        slaac_config: SlaacConfigurationUpdate {
+                            enable_stable_addresses: Some(true),
                             temporary_address_configuration: Some(
-                                TemporarySlaacAddressConfiguration::rfc_default(),
+                                TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults(),
                             ),
-                        }),
+                        },
                         ip_config,
                     },
                 )

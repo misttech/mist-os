@@ -54,8 +54,8 @@ use netstack3_core::ip::{
     AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfiguration,
     IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
     Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
-    UpdateIpConfigurationError,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
+    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
 };
 use zx::{self as zx, HandleBased, Rights};
 
@@ -916,7 +916,7 @@ fn set_configuration(
                 info!("updating IPv6 multicast forwarding on {core_id:?} to enabled={forwarding}");
             }
 
-            let fnet_interfaces_admin::NdpConfiguration { nud, dad, __source_breaking } =
+            let fnet_interfaces_admin::NdpConfiguration { nud, dad, slaac, __source_breaking } =
                 ndp.unwrap_or_default();
 
             let fnet_interfaces_admin::DadConfiguration {
@@ -924,15 +924,31 @@ fn set_configuration(
                 __source_breaking,
             } = dad.unwrap_or_default();
 
+            let fnet_interfaces_admin::SlaacConfiguration { temporary_address, __source_breaking } =
+                slaac.unwrap_or_default();
+
+            let temporary_address_configuration = temporary_address.map(|enabled| {
+                if enabled {
+                    TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults()
+                } else {
+                    TemporarySlaacAddressConfiguration::Disabled
+                }
+            });
+
             (
                 Some(Ipv6DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
                         unicast_forwarding_enabled: unicast_forwarding,
+                        ip_enabled: None,
                         multicast_forwarding_enabled: multicast_forwarding,
-                        ..Default::default()
+                        gmp_enabled: None,
                     },
                     dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
-                    ..Default::default()
+                    slaac_config: SlaacConfigurationUpdate {
+                        temporary_address_configuration,
+                        enable_stable_addresses: None,
+                    },
+                    max_router_solicitations: None,
                 }),
                 nud.map(|nud| Ok(NdpConfigurationUpdate { nud: Some(nud.try_into_core()?) }))
                     .transpose()
@@ -1017,8 +1033,8 @@ fn set_configuration(
         let Ipv6DeviceConfigurationUpdate {
             ip_config,
             dad_transmits,
+            slaac_config,
             max_router_solicitations: _,
-            slaac_config: _,
         } = ctx.api().device_ip::<Ipv6>().apply_configuration(u);
 
         let dad = dad_transmits.map(|transmits| fnet_interfaces_admin::DadConfiguration {
@@ -1026,9 +1042,11 @@ fn set_configuration(
             __source_breaking: fidl::marker::SourceBreaking,
         });
 
+        let slaac = slaac_config.into_fidl();
         let ndp = fnet_interfaces_admin::NdpConfiguration {
             nud: nud.map(IntoFidl::into_fidl),
             dad,
+            slaac: (slaac != Default::default()).then_some(slaac),
             __source_breaking: fidl::marker::SourceBreaking,
         };
         let ndp = (ndp != Default::default()).then_some(ndp);
@@ -1084,7 +1102,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
             Ipv6DeviceConfiguration {
                 dad_transmits,
                 max_router_solicitations: _,
-                slaac_config: _,
+                slaac_config,
                 ip_config:
                     IpDeviceConfiguration {
                         gmp_enabled: _,
@@ -1103,6 +1121,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
             transmits: Some(dad_transmits.map_or(0, NonZeroU16::get)),
             __source_breaking: fidl::marker::SourceBreaking,
         }),
+        slaac: Some(slaac_config.into_fidl()),
         __source_breaking: fidl::marker::SourceBreaking,
     });
 

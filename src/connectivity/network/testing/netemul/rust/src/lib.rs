@@ -1932,6 +1932,25 @@ impl<'a> TestInterface<'a> {
     pub async fn set_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
         set_dad_transmits(self.control(), dad_transmits).await
     }
+
+    /// Sets whether temporary SLAAC address generation is enabled
+    /// or disabled on this interface.
+    pub async fn set_temporary_address_generation_enabled(&self, enabled: bool) -> Result<()> {
+        self.set_configuration(fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                    slaac: Some(fnet_interfaces_admin::SlaacConfiguration {
+                        temporary_address: Some(enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await
+    }
 }
 
 async fn set_dad_transmits(control: &Control, dad_transmits: u16) -> Result<Option<u16>> {
