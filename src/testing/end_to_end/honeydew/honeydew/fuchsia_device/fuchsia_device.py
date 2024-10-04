@@ -42,6 +42,9 @@ from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
 from honeydew.affordances.fuchsia_controller.wlan import (
     wlan_policy as wlan_policy_fc,
 )
+from honeydew.affordances.fuchsia_controller.wlan import (
+    wlan_policy_ap as wlan_policy_ap_fc,
+)
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_sl4f,
 )
@@ -70,7 +73,11 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_le as bluetooth_le_interface,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input
-from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
+from honeydew.interfaces.affordances.wlan import (
+    wlan,
+    wlan_policy,
+    wlan_policy_ap,
+)
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -544,6 +551,21 @@ class FuchsiaDevice(
                 reboot_affordance=self,
                 fuchsia_device_close=self,
             )
+
+    @properties.Affordance
+    def wlan_policy_ap(self) -> wlan_policy_ap.WlanPolicyAp:
+        """Returns a wlan_policy_ap affordance object.
+
+        Returns:
+            wlan_policy_ap.WlanPolicyAp object
+        """
+        return wlan_policy_ap_fc.WlanPolicyAp(
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+            fuchsia_device_close=self,
+        )
 
     @properties.Affordance
     def wlan(self) -> wlan.Wlan:

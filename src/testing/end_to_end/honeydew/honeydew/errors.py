@@ -5,6 +5,8 @@
 
 import logging
 
+from honeydew.typing.wlan import RequestStatus
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
@@ -112,6 +114,24 @@ class HoneydewDataResourceError(HoneydewError):
 
 class HoneydewWlanError(HoneydewError):
     """Raised by WLAN affordances."""
+
+
+class HoneydewWlanRequestRejectedError(HoneydewWlanError):
+    """WLAN stack rejected a request.
+
+    Read the `reason` member variable for details on why this request has been
+    rejected by the WLAN stack.
+    """
+
+    def __init__(self, method: str, reason: RequestStatus) -> None:
+        """Initialize a HoneydewWlanRequestRejectedError.
+
+        Args:
+            name: name of the request that failed
+            reason: additional information about the failed request.
+        """
+        super().__init__(f"{method} rejected with RequestStatus {reason}")
+        self.reason = reason
 
 
 class HoneydewNetstackError(HoneydewError):
