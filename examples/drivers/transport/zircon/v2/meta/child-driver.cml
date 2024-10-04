@@ -9,6 +9,6 @@
         bind: 'meta/bind/child-driver.bindbc',
     },
     use: [
-        { service: 'fuchsia.examples.gizmo.Service' },
+        { service: 'fuchsia.hardware.i2c.Service' },
     ],
 }
