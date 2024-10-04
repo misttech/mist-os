@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/component/config/cpp/fidl.h>
 #include <fuchsia/component/test/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/mem/cpp/fidl.h>

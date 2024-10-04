@@ -12,10 +12,6 @@ type Use = flexible union {
     2: protocol UseProtocol;
     3: directory UseDirectory;
     4: storage UseStorage;
-    @available(removed=14)
-    5: event UseEvent;
-    @available(removed=14)
-    6: event_stream_deprecated UseEventStreamDeprecated;
     7: event_stream UseEventStream;
     @available(added=HEAD)
     8: runner UseRunner;
@@ -167,59 +163,6 @@ type UseStorage = table {
     ///
     /// Must be an absolute path starting with /.
     2: target_path string:MAX_PATH_LENGTH;
-
-    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
-    /// If set to `required`, the component is likely to malfunction if this
-    /// capability is not provided. If set to `optional`, the component can
-    /// handle the capability's absence.
-    3: availability Availability;
-};
-
-/// Declares an event used by a component, which was offered to it.
-@available(removed=14)
-type UseEvent = table {
-    /// (Required) The provider of the event. Must be `realm` or `framework`. If
-    /// the availability is set to `optional`, then this must be set to
-    /// `parent`.
-    1: source Ref;
-
-    /// (Required) Name identifying the event which was presented to this
-    /// component.
-    2: source_name name;
-
-    /// (Required) The name which the component will use to refer to this event.
-    3: target_name name;
-
-    /// (Optional) Filter for the event. The structure of the filter depends on
-    /// the event type. May be absent for some events. (TODO: which ones?)
-    4: filter fuchsia.data.Dictionary;
-
-    /// (Required) The dependency type this use represents.
-    ///
-    /// A component which offers a capability to a child from itself and uses a
-    /// capability from the same child, must mark the dependency as `weak`.  A
-    /// `weak` dependency implies that the capability may become unavailable at
-    /// any point. Taking a strong dependency on a child's capability will
-    /// cause this the child to shut down before its parent. When using a weak
-    /// dependency, the parent shuts down before the child.
-    5: dependency_type DependencyType;
-
-    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
-    /// If set to `required`, the component is likely to malfunction if this
-    /// capability is not provided. If set to `optional`, the component can
-    /// handle the capability's absence.
-    6: availability Availability;
-};
-
-/// Declares a static EventStream used by a component.
-@available(removed=14)
-type UseEventStreamDeprecated = table {
-    /// (Required) The name of the event stream.
-    1: name name;
-
-    /// (Required) The set of events to which this EventStream is subscribed.
-    /// Note: This vector must be non-empty.
-    2: subscriptions vector<EventSubscription>:MAX_NUM_EVENT_STREAM_SUBSCRIPTIONS;
 
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.
     /// If set to `required`, the component is likely to malfunction if this

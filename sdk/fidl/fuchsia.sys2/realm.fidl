@@ -6,7 +6,6 @@ library fuchsia.sys2;
 using fuchsia.io;
 using fuchsia.component;
 using fuchsia.component.decl;
-using fuchsia.component.config;
 using fuchsia.component.runner;
 using fuchsia.url;
 
@@ -257,9 +256,6 @@ closed protocol RealmQuery {
     strict GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
-        @available(replaced=13)
-        config fuchsia.component.config.ResolvedConfig;
-        @available(added=13)
         config fuchsia.component.decl.ResolvedConfig;
     }) error GetStructuredConfigError;
 
@@ -301,33 +297,6 @@ closed protocol RealmQuery {
         storage_name fuchsia.component.decl.name;
         server_end server_end:StorageAdmin;
     }) -> () error ConnectToStorageAdminError;
-
-    /// Gets the detailed information of a particular instance identified by its moniker.
-    /// This response contains handles to resources of the instance. As a result, component manager
-    /// pays a non-trivial cost when this method is invoked.
-    @available(added=11, deprecated=11, removed=12, note="Use GetInstance instead")
-    strict GetInstanceInfo(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (resource struct {
-        /// Basic information about the component instance.
-        info InstanceInfo;
-
-        /// Detailed information about the resolved component instance.
-        /// If this object does not exist, the instance is not resolved.
-        resolved box<ResolvedState>;
-    }) error RealmQueryError;
-
-    /// Gets all directories relevant to a particular instance identified by its moniker.
-    /// This response contains directory handles served by component manager. As a result,
-    /// component manager pays a non-trivial cost when this method is invoked.
-    @available(added=11, deprecated=11, removed=12, note="Use Open instead")
-    strict GetInstanceDirectories(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (resource struct {
-        /// The directories available because the component instance is in resolved state
-        /// If this object does not exist, the instance is not resolved.
-        resolved_dirs box<ResolvedDirectories>;
-    }) error RealmQueryError;
 };
 
 /// An iterator over all instances in the realm
@@ -346,122 +315,6 @@ closed protocol ManifestBytesIterator {
     });
 };
 
-// ------------------------------------------------------------
-// All types below are marked deprecated and will be removed in
-// a newer API version.
-// ------------------------------------------------------------
-
-/// Describes the current state of instance
-@available(added=11, deprecated=11, removed=12)
-type InstanceState = strict enum {
-    /// The component is created, but has not been resolved by component manager.
-    /// Most information about this component is unknown.
-    UNRESOLVED = 0;
-
-    /// The component has been resolved by component manager but is not currently running.
-    RESOLVED = 1;
-
-    /// The component has been resolved and started by component manager. It is currently running.
-    STARTED = 2;
-};
-
-/// Basic information about a component instance.
-/// This object contains information that is readily available to component manager.
-@available(added=11, deprecated=11, removed=12, note="Use Instance instead")
-type InstanceInfo = struct {
-    /// The path to this instance relative to the scope root.
-    moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-
-    /// The URL of the component manifest for this instance.
-    url fuchsia.url.Url;
-
-    /// The stable identifier for this instance.
-    instance_id string:<MAX_INSTANCE_ID_LENGTH, optional>;
-
-    /// The current state of this instance.
-    state InstanceState;
-};
-
-/// The detailed resolved state of a component instance
-@available(added=11, deprecated=11, removed=12, note="Use ResolvedInfo instead")
-type ResolvedState = resource struct {
-    /// All `use` declarations as defined in the component manifest.
-    uses vector<fuchsia.component.decl.Use>:MAX;
-
-    /// All `expose` declarations as defined in the component manifest.
-    exposes vector<fuchsia.component.decl.Expose>:MAX;
-
-    /// The resolved structured configuration of this component instance.
-    config box<fuchsia.component.config.ResolvedConfig>;
-
-    /// The package directory containing the component manifest, if one exists.
-    /// This directory has the same permissions given by the package resolver
-    /// (most likely RO permissions).
-    pkg_dir client_end:<fuchsia.io.Directory, optional>;
-
-    /// The information available because the component instance is running.
-    /// If this object does not exist, the instance is not running.
-    execution box<ExecutionState>;
-
-    /// The directory containing all capabilities exposed by the component.
-    /// This directory has RW permissions.
-    exposed_dir client_end:<fuchsia.io.Directory>;
-
-    /// The directory representing the component's namespace.
-    /// This directory has RW permissions.
-    ns_dir client_end:<fuchsia.io.Directory>;
-};
-
-/// The detailed execution state of a component instance
-@available(added=11, deprecated=11, removed=12, note="Use ExecutionInfo instead")
-type ExecutionState = resource struct {
-    /// The outgoing directory of this instance, if one exists.
-    out_dir client_end:<fuchsia.io.Directory, optional>;
-
-    /// The debug directory served by the runner of this instance, if one exists.
-    runtime_dir client_end:<fuchsia.io.Directory, optional>;
-
-    /// The human-readable explanation for why this instance was started.
-    start_reason string:MAX;
-};
-
-/// The directories available because the component instance is in resolved state
-@available(added=11, deprecated=11, removed=12)
-type ResolvedDirectories = resource struct {
-    /// The package directory containing the component manifest, if one exists.
-    /// This directory has the same permissions given by the package resolver
-    /// (most likely RX permissions).
-    pkg_dir client_end:<fuchsia.io.Directory, optional>;
-
-    /// The directory containing all capabilities exposed by the component.
-    /// This directory has RW permissions.
-    exposed_dir client_end:<fuchsia.io.Directory>;
-
-    /// The directory handles + paths that constitute the component's namespace.
-    ns_entries vector<fuchsia.component.runner.ComponentNamespaceEntry>:MAX;
-
-    /// The directories available because the component instance is running.
-    /// If this object does not exist, the instance is not running.
-    execution_dirs box<ExecutionDirectories>;
-};
-
-/// The directories available because the component instance is running
-@available(added=11, deprecated=11, removed=12)
-type ExecutionDirectories = resource struct {
-    /// The outgoing directory of this instance, if one exists.
-    out_dir client_end:<fuchsia.io.Directory, optional>;
-
-    /// The debug directory served by the runner of this instance, if one exists.
-    runtime_dir client_end:<fuchsia.io.Directory, optional>;
-};
-
-/// An iterator over basic information of all instances in the realm
-@available(added=11, deprecated=11, removed=12, note="Use InstanceIterator instead")
-closed protocol InstanceInfoIterator {
-    strict Next() -> (struct {
-        infos vector<InstanceInfo>:MAX;
-    });
-};
 
 /// Errors that can be returned by the RealmQuery API.
 type RealmQueryError = flexible enum {
@@ -472,23 +325,6 @@ type RealmQueryError = flexible enum {
     BAD_MONIKER = 2;
 };
 
-/// Errors that can be returned by the RealmExplorer API.
-@available(added=11, deprecated=11, removed=12)
-type RealmExplorerError = flexible enum {
-    /// Could not find the scope root instance.
-    // TODO(https://fxbug.dev/42059901): Close the connection when this error occurs.
-    INSTANCE_NOT_FOUND = 1;
-};
-
 /// Offers basic introspection into component instances under a realm.
 @discoverable
-closed protocol RealmExplorer {
-    /// Returns an iterator over basic information of each instance scoped to this realm.
-    /// When the server receives this call, it will take a snapshot of the current component
-    /// topology and relays that over the iterator. Any changes to the topology *after* this method
-    /// call is received by the server will not be shown by the iterator.
-    @available(added=11, deprecated=11, removed=12, note="Use RealmQuery.GetAllInstances instead")
-    strict GetAllInstanceInfos() -> (resource struct {
-        iterator client_end:InstanceInfoIterator;
-    }) error RealmExplorerError;
-};
+closed protocol RealmExplorer {};

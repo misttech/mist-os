@@ -219,7 +219,6 @@ fidl_library://fidl/fuchsia.castsetup
 fidl_library://fidl/fuchsia.castsysteminfo
 fidl_library://fidl/fuchsia.castwindow
 fidl_library://fidl/fuchsia.component
-fidl_library://fidl/fuchsia.component.config
 fidl_library://fidl/fuchsia.component.decl
 fidl_library://fidl/fuchsia.component.resolution
 fidl_library://fidl/fuchsia.component.runner

@@ -13,8 +13,6 @@ type Capability = flexible union {
     4: storage Storage;
     5: runner Runner;
     6: resolver Resolver;
-    @available(removed=14)
-    7: event Event;
     @available(added=8)
     8: event_stream EventStream;
     @available(added=HEAD)
@@ -144,18 +142,6 @@ type Resolver = table {
     ///
     /// Not set for built-in capabilities.
     2: source_path string:MAX_PATH_LENGTH;
-};
-
-/// Declares an event capability which component instances may subscribe to.
-/// This type cannot be used in `fuchsia.component.decl.Component`. It is only
-/// used for the framework's built-in capabilities declared in
-/// `internal.Config`.
-@available(removed=14)
-type Event = table {
-    /// (Required) The name of this event.
-    ///
-    /// Must be unique among built-in capabilities.
-    1: name name;
 };
 
 /// Declares an event_stream capability

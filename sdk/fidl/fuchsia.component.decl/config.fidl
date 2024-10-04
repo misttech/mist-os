@@ -104,14 +104,12 @@ type ConfigMutability = flexible bits {
 /// A configuration value which can be provided to a component.
 ///
 /// Used both for storing configuration at-rest and in runtime configuration APIs.
-@available(added=12)
 type ConfigValue = flexible union {
     1: single ConfigSingleValue;
     2: vector ConfigVectorValue;
 };
 
 /// A single configuration value.
-@available(added=12)
 type ConfigSingleValue = flexible union {
     1: bool bool;
     2: uint8 uint8;
@@ -126,7 +124,6 @@ type ConfigSingleValue = flexible union {
 };
 
 /// A vector configuration value.
-@available(added=12)
 type ConfigVectorValue = flexible union {
     1: bool_vector vector<bool>:MAX;
     2: uint8_vector vector<uint8>:MAX;
@@ -152,19 +149,16 @@ type ConfigValuesData = table {
 
 /// An individual configuration value. It is matched against a specific configuration field based
 /// on its offset within `ValuesData.values`.
-@available(added=12)
 type ConfigValueSpec = table {
     1: value ConfigValue;
 };
 
 /// A configuration that has been completely resolved by component manager.
-@available(added=12)
 type ResolvedConfig = struct {
     fields vector<ResolvedConfigField>:MAX;
     checksum ConfigChecksum;
 };
 
-@available(added=12)
 type ResolvedConfigField = struct {
     key string:MAX;
     value ConfigValue;

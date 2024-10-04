@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.component.decl;
 
-using fuchsia.data;
 using fuchsia.io;
 
 /// Declares a capability offered by a component to one of its children, which
@@ -16,8 +15,6 @@ type Offer = flexible union {
     4: storage OfferStorage;
     5: runner OfferRunner;
     6: resolver OfferResolver;
-    @available(removed=14)
-    7: event OfferEvent;
     8: event_stream OfferEventStream;
     @available(added=HEAD)
     9: dictionary OfferDictionary;
@@ -33,9 +30,6 @@ type DependencyType = strict enum {
     /// a weak dependency must support the dependency being unavailable at
     /// arbitrary times.
     WEAK = 2;
-
-    @available(deprecated=14, removed=15)
-    WEAK_FOR_MIGRATION = 3;
 };
 
 
@@ -329,37 +323,6 @@ type OfferResolver = table {
     4: target_name name;
 };
 
-/// Declares an event offered by a component.
-@available(removed=14)
-type OfferEvent = table {
-    /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent` or `void`. If set to `void`, then the target
-    /// must offer or use the capability with `optional` availability.
-    1: source Ref;
-
-    /// (Required) Name of the event being offered.
-    2: source_name name;
-
-    /// (Required) Reference to the target. Must be `child`, `collection`, or
-    /// a dictionary `capability`.
-    3: target Ref;
-
-    /// (Required) Name under which the event is being offered.
-    4: target_name name;
-
-    /// (Optional) Filter for the event. The structure of the filter depends on
-    /// the event type. May be absent for some events. (TODO: which ones?)
-    5: filter fuchsia.data.Dictionary;
-
-    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
-    /// If set to `required`, the target may use or offer the capability with
-    /// either `required` or `optional` availability. If set to `optional`, the
-    /// target must use or offer the capability with `optional` availability.
-    /// The `same_as_target` value causes this offer's availability to match the
-    /// availability set in the target.
-    6: availability Availability;
-};
-
 /// Declares an event stream offered by a component.
 type OfferEventStream = table {
     /// (Required) The provider of the capability relative to the component
@@ -383,11 +346,6 @@ type OfferEventStream = table {
 
     /// (Required) Name under which the event stream is being offered.
     5: target_name name;
-
-    /// (Optional) Filter for the event stream. Only present for DirectoryReady
-    /// events and CapabilityRequested events
-    @available(removed=14)
-    6: filter fuchsia.data.Dictionary;
 
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.
     /// If set to `required`, the target may use or offer the capability with
