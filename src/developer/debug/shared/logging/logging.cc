@@ -52,4 +52,6 @@ void LogBackend::Set(LogBackend* backend, bool enable_syslog) {
 
 void LogBackend::Unset() { Set(nullptr, true); }
 
+LogBackend::~LogBackend() = default;
+
 }  // namespace debug

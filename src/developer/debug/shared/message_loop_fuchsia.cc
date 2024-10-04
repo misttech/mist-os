@@ -24,6 +24,8 @@
 
 namespace debug {
 
+ChannelWatcher::~ChannelWatcher() = default;
+
 MessageLoopFuchsia::MessageLoopFuchsia() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
 
 MessageLoopFuchsia::~MessageLoopFuchsia() {

@@ -10,6 +10,8 @@
 
 namespace debug {
 
+StreamBuffer::Writer::~Writer() = default;
+
 StreamBuffer::StreamBuffer() = default;
 StreamBuffer::~StreamBuffer() = default;
 

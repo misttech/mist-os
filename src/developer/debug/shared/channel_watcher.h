@@ -16,6 +16,8 @@ class ChannelWatcher {
  public:
   virtual void OnChannelReadable(zx_handle_t) = 0;
   virtual void OnChannelClosed(zx_handle_t) = 0;
+
+  virtual ~ChannelWatcher();
 };
 }  // namespace debug
 #endif  // SRC_DEVELOPER_DEBUG_SHARED_CHANNEL_WATCHER_H_

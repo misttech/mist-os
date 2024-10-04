@@ -22,6 +22,8 @@ class StreamBuffer {
     // less than "len" bytes are written, the system will notify the stream buffer when more data
     // can be written via SetWriteable().
     virtual size_t ConsumeStreamBufferData(const char* data, size_t len) = 0;
+
+    virtual ~Writer();
   };
 
   // You must call set_writer before using.
