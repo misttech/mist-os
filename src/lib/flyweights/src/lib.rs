@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
-use std::mem::{size_of, ManuallyDrop};
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
@@ -67,7 +66,7 @@ impl Borrow<str> for Storage {
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct FlyStr(RawRepr);
 
-static_assertions::const_assert_eq!(std::mem::size_of::<FlyStr>(), std::mem::size_of::<usize>());
+static_assertions::assert_eq_size!(FlyStr, usize);
 
 impl FlyStr {
     /// Create a `FlyStr`, allocating it in the cache if the value is not already cached.
@@ -271,7 +270,7 @@ union RawRepr {
     /// used for the string itself. The first byte has its least significant bit set to 1 to
     /// distinguish inline strings from heap-allocated ones, and the size is stored in the remaining
     /// 7 bits.
-    inline: ManuallyDrop<InlineRepr>,
+    inline: InlineRepr,
 }
 
 // The inline variant should not cause us to occupy more space than the heap variant alone.
@@ -300,7 +299,7 @@ impl RawRepr {
     fn new(s: impl AsRef<str> + Into<String>) -> Self {
         let borrowed = s.as_ref();
         if borrowed.len() <= MAX_INLINE_SIZE {
-            let new = Self { inline: ManuallyDrop::new(InlineRepr::new(borrowed)) };
+            let new = Self { inline: InlineRepr::new(borrowed) };
             assert!(new.is_inline(), "least significant bit must be 1 for inline strings");
             new
         } else {
@@ -383,17 +382,14 @@ impl Clone for RawRepr {
 
                 Self { heap: nonnull_from_arc(clone) }
             }
-            SafeRepr::Inline(i) => Self { inline: ManuallyDrop::new(i.clone()) },
+            SafeRepr::Inline(&inline) => Self { inline },
         }
     }
 }
 
 impl Drop for RawRepr {
     fn drop(&mut self) {
-        if self.is_inline() {
-            // SAFETY: We checked above that this is the inline representation.
-            drop(unsafe { ManuallyDrop::take(&mut self.inline) });
-        } else {
+        if !self.is_inline() {
             // Lock the cache before checking the count to ensure consistency.
             let mut cache = CACHE.lock().unwrap();
 
@@ -416,7 +412,7 @@ fn nonnull_from_arc(a: Arc<Box<str>>) -> NonNull<Box<str>> {
     unsafe { NonNull::new_unchecked(raw as *mut Box<str>) }
 }
 
-#[derive(Clone, Hash, PartialEq)]
+#[derive(Clone, Copy, Hash, PartialEq)]
 #[repr(C)] // Preserve field ordering.
 struct InlineRepr {
     /// The first byte, which corresponds to the LSB of a pointer in the other variant.
@@ -429,7 +425,7 @@ struct InlineRepr {
 
 /// We can store small strings up to 1 byte less than the size of the pointer to the heap-allocated
 /// string.
-const MAX_INLINE_SIZE: usize = size_of::<NonNull<Box<str>>>() - 1;
+const MAX_INLINE_SIZE: usize = std::mem::size_of::<NonNull<Box<str>>>() - 1;
 
 // Guard rail to make sure we never end up with an incorrect inline size encoding. Ensure that
 // MAX_INLINE_SIZE is always smaller than the maximum size we can represent in a byte with the LSB
