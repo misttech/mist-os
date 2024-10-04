@@ -236,16 +236,13 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
         # TODO(http://b/324948461): Finish implementation
         raise NotImplementedError()
 
-    @asyncmethod
-    # pylint: disable-next=invalid-overridden-method
-    async def stop_all(self) -> None:
+    def stop_all(self) -> None:
         """Stop all active access points.
 
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        # TODO(http://b/324948461): Finish implementation
-        raise NotImplementedError()
+        self._access_point_controller.proxy.stop_all_access_points()
 
     def set_new_update_listener(self) -> None:
         """Sets the update listener stream of the facade to a new stream.

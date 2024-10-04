@@ -108,8 +108,7 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     def test_stop_all(self) -> None:
         """Verify WlanPolicyAp.stop_all()."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_ap_obj.stop_all()
+        self.wlan_policy_ap_obj.stop_all()
 
     def test_set_new_update_listener(self) -> None:
         """Verify WlanPolicyAp.set_new_update_listener()."""
