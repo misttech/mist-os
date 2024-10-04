@@ -1,11 +1,11 @@
 # Debugging workflow
 
-## Native code debugging
+## Code debugging
 
-Fuchsia has a debugger for native code (C++ and Rust) called zxdb.
+Fuchsia has a debugger for code (C++ and Rust) called zxdb.
 
-Please see the [zxdb documentation](/docs/development/debugger/README.md) for
-more details.
+For more information, see the
+[zxdb documentation](/docs/development/debugger/README.md)
 
 ## Backtraces
 
