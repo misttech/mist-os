@@ -1,32 +1,15 @@
 # Logging
 
-The preferred way to publish logs is to use the `syslog` API, currently
-available for C in `//pkg/syslog`.
+Logs play an important part in diagnostics in Fuchsia as they describe human
+readable events that have happened on a system.
 
-The library provides the ability to tag logs so that they can later be filtered
-upon retrieval.
+When working with the IDK, you can publish logs with the `syslog` API which is
+available for C in `//pkg/syslog` and C++ in `//pkg/syslog_cpp`.
 
-In order to get logs from a device, open a shell on the device as described in
-[this document](ssh.md) and run:
-```
-$ log_listener
-```
+When you work with the IDK, one of the main tools for working with logs is
+[`ffx log`][ffx-log-ref] to retrieve logs from a Fuchsia device.
 
-To view specifics logs, add a tag specification:
-```
-$ log_listener --tag foobar
-```
+To learn more about logging on Fuchsia, see [Logging on Fuchsia][logs-concepts].
 
-See [log_listener CLI] for a list of available flags.
-
-## Symbolization
-
-`//tools/symbolizer` should be used to symbolize stack traces. It should be
-pointed to the `.build-id` directory at the root of the SDK, where debug symbols
-are hosted:
-
-```posix-terminal
-symbolizer --build-id-dir .build-id
-```
-
-[log_listener CLI]: /docs/reference/diagnostics/consumers/log_listener.md
+[ffx-log-ref]: /reference/tools/sdk/ffx.md#ffx_log
+[logs-concepts]: /docs/concepts/components/diagnostics/logs/README.md
