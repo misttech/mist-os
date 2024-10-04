@@ -108,7 +108,7 @@ zx_koid_t ProcessSelfKoid() {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-zx_koid_t pid = ProcessSelfKoid();
+zx_koid_t globalPid = ProcessSelfKoid();
 const char kTagFieldName[] = "tag";
 
 void BeginRecordInternal(LogBuffer* buffer, FuchsiaLogSeverity severity,
@@ -145,7 +145,7 @@ void BeginRecordInternal(LogBuffer* buffer, FuchsiaLogSeverity severity,
   if (severity == FUCHSIA_LOG_FATAL) {
     buffer->SetFatalErrorString(msg->data());
   }
-  buffer->BeginRecord(severity, file_name, line, msg, socket, 0, pid,
+  buffer->BeginRecord(severity, file_name, line, msg, socket, 0, globalPid,
                       internal::FuchsiaLogGetCurrentThreadKoid());
   for (size_t i = 0; i < log_state->tags().size(); i++) {
     buffer->WriteKeyValue(kTagFieldName, log_state->tags()[i]);
