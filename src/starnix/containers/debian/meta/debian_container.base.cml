@@ -43,7 +43,10 @@
     ],
     use: [
         {
-            protocol: "fuchsia.element.GraphicalPresenter",
+            protocol: [
+                "fuchsia.element.GraphicalPresenter",
+                "fuchsia.fxfs.CryptManagement",
+            ],
             from: "parent",
             availability: "optional",
         },

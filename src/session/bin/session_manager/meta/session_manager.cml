@@ -187,6 +187,12 @@
             availability: "same_as_target",
         },
         {
+            protocol: [ "fuchsia.fxfs.CryptManagement" ],
+            from: "parent",
+            to: "#session",
+            availability: "optional",
+        },
+        {
             // Routed to session-manager via tee-clients.core_shard.cml
             protocol: [
                 "fuchsia.castauth.CastCertificateRetriever",
