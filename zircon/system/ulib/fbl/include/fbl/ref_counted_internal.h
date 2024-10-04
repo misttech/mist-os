@@ -76,7 +76,7 @@ class RefCountedBase {
     }
 
     if (rc == 1) {
-      atomic_thread_fence(std::memory_order_acquire);
+      std::atomic_thread_fence(std::memory_order_acquire);
       return true;
     }
 
