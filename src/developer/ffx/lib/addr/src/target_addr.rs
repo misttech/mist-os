@@ -161,6 +161,13 @@ impl TargetAddr {
     pub fn set_port(&mut self, new_port: u16) {
         self.0.set_port(new_port);
     }
+
+    pub fn optional_port_str(&self) -> String {
+        match self.0.port() {
+            0 | 22 => format!("{self}"),
+            p => format!("{self}:{p}"),
+        }
+    }
 }
 
 impl std::fmt::Display for TargetAddr {

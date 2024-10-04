@@ -389,13 +389,29 @@ macro_rules! make_structs_and_support_functions {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
+pub struct JsonTargetAddress {
+    ip: String,
+    ssh_port: u16,
+}
+
+impl From<ffx::TargetAddrInfo> for JsonTargetAddress {
+    fn from(info: ffx::TargetAddrInfo) -> Self {
+        let tai: TargetAddr = info.into();
+        JsonTargetAddress {
+            ip: tai.to_string(), // May include scope name
+            ssh_port: tai.port(),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
 pub struct JsonTarget {
     nodename: String,
     rcs_state: String,
     serial: String,
     target_type: String,
     target_state: String,
-    addresses: Vec<String>,
+    addresses: Vec<JsonTargetAddress>,
     is_default: bool,
 }
 // Second field is printed last in this implementation, everything else is printed in order.
@@ -425,7 +441,7 @@ impl std::error::Error for StringifyError {}
 
 impl StringifiedTarget {
     fn from_target_addr_info(a: ffx::TargetAddrInfo) -> String {
-        TargetAddr::from(a).to_string()
+        TargetAddr::from(a).optional_port_str()
     }
 
     fn from_addresses(mut v: Vec<ffx::TargetAddrInfo>) -> String {
@@ -507,7 +523,7 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for JsonTarget {
                 .addresses
                 .unwrap_or(vec![])
                 .drain(..)
-                .map(StringifiedTarget::from_target_addr_info)
+                .map(JsonTargetAddress::from)
                 .collect::<Vec<_>>(),
             rcs_state: StringifiedTarget::from_rcs_state(
                 target.rcs_state.ok_or(StringifyError::MissingRcsState)?,
@@ -574,52 +590,53 @@ mod test {
     use super::*;
     use fidl_fuchsia_net::{Ipv4Address, Ipv6Address};
     use lazy_static::lazy_static;
+    use std::collections::HashMap;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
     lazy_static! {
         static ref EMPTY_FORMATTER_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_formatter_golden");
+            include_str!("../test_data/target_formatter_empty_formatter_golden").trim();
         static ref ONE_TARGET_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_one_target_with_default_golden");
+            include_str!("../test_data/target_formatter_one_target_with_default_golden").trim();
         static ref ONE_TARGET_NO_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_one_target_no_default_golden");
+            include_str!("../test_data/target_formatter_one_target_no_default_golden").trim();
         static ref EMPTY_NODENAME_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_nodename_with_default_golden");
+            include_str!("../test_data/target_formatter_empty_nodename_with_default_golden").trim();
         static ref EMPTY_NODENAME_WITH_DEFAULT_MULTIPLE_UNKNOWN_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_nodename_with_default_multiple_unknown_golden");
+            include_str!("../test_data/target_formatter_empty_nodename_with_default_multiple_unknown_golden").trim();
         static ref EMPTY_NODENAME_NO_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_nodename_no_default_golden");
+            include_str!("../test_data/target_formatter_empty_nodename_no_default_golden").trim();
         static ref SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_simple_formatter_with_default_golden");
+            include_str!("../test_data/target_formatter_simple_formatter_with_default_golden").trim();
         static ref NAME_ONLY_FORMATTER_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_name_only_formatter_with_default_golden");
+            include_str!("../test_data/target_formatter_name_only_formatter_with_default_golden").trim();
         static ref NAME_ONLY_FORMATTER_MULTIPLE_UNKNOWN_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_name_only_multiple_unknown_formatter_with_default_golden");
+            include_str!("../test_data/target_formatter_name_only_multiple_unknown_formatter_with_default_golden").trim();
         static ref DEVICE_FINDER_FORMAT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_device_finder_format_golden");
+            include_str!("../test_data/target_formatter_device_finder_format_golden").trim();
         static ref DEVICE_FINDER_FORMAT_IPV4_ONLY_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_device_finder_format_ipv4_only_golden");
+            include_str!("../test_data/target_formatter_device_finder_format_ipv4_only_golden").trim();
         static ref DEVICE_FINDER_FORMAT_IPV6_ONLY_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_device_finder_format_ipv6_only_golden");
+            include_str!("../test_data/target_formatter_device_finder_format_ipv6_only_golden").trim();
         static ref ADDRESSES_FORMAT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_addresses_format_golden");
+            include_str!("../test_data/target_formatter_addresses_format_golden").trim();
         static ref BUILD_CONFIG_FULL_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_build_config_full_golden");
+            include_str!("../test_data/target_formatter_build_config_full_golden").trim();
         static ref BUILD_CONFIG_PRODUCT_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_build_config_product_missing_golden");
+            include_str!("../test_data/target_formatter_build_config_product_missing_golden").trim();
         static ref BUILD_CONFIG_BOARD_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_build_config_board_missing_golden");
+            include_str!("../test_data/target_formatter_build_config_board_missing_golden").trim();
         static ref JSON_BUILD_CONFIG_FULL_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_full_golden");
+            include_str!("../test_data/target_formatter_json_build_config_full_golden").trim();
         static ref JSON_BUILD_CONFIG_FULL_DEFAULT_TARGET_GOLDEN: &'static str = include_str!(
             "../test_data/target_formatter_json_build_config_full_default_target_golden"
-        );
+        ).trim();
         static ref JSON_BUILD_CONFIG_PRODUCT_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_product_missing_golden");
+            include_str!("../test_data/target_formatter_json_build_config_product_missing_golden").trim();
         static ref JSON_BUILD_CONFIG_BOARD_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_board_missing_golden");
+            include_str!("../test_data/target_formatter_json_build_config_board_missing_golden").trim();
         static ref JSON_BUILD_CONFIG_BOTH_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_both_missing_golden");
+            include_str!("../test_data/target_formatter_json_build_config_both_missing_golden").trim();
     }
 
     fn make_valid_target() -> ffx::TargetInfo {
@@ -779,11 +796,11 @@ mod test {
         .unwrap();
         let lines = formatter.lines(Some("fooberdoober"));
         assert_eq!(lines.len(), 2);
-        assert_eq!(lines.join("\n"), SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN.to_string());
+        assert_eq!(lines.join("\n").trim(), SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN.to_string());
 
         let lines = formatter.lines(None);
         assert_eq!(lines.len(), 2);
-        assert_eq!(lines.join("\n"), SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN.to_string());
+        assert_eq!(lines.join("\n").trim(), SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN.to_string());
     }
 
     #[test]
@@ -984,7 +1001,7 @@ mod test {
         t.product_config = Some(p);
         let formatter = TabularTargetFormatter::try_from(vec![t]).unwrap();
         let lines = formatter.lines(None);
-        assert_eq!(lines.join("\n"), BUILD_CONFIG_FULL_GOLDEN.to_string());
+        assert_eq!(lines.join("\n").trim(), BUILD_CONFIG_FULL_GOLDEN.to_string());
     }
 
     #[test]
@@ -995,7 +1012,7 @@ mod test {
         t.product_config = None;
         let formatter = TabularTargetFormatter::try_from(vec![t]).unwrap();
         let lines = formatter.lines(None);
-        assert_eq!(lines.join("\n"), BUILD_CONFIG_PRODUCT_MISSING_GOLDEN.to_string());
+        assert_eq!(lines.join("\n").trim(), BUILD_CONFIG_PRODUCT_MISSING_GOLDEN.to_string());
     }
 
     #[test]
@@ -1006,7 +1023,7 @@ mod test {
         t.product_config = Some(p);
         let formatter = TabularTargetFormatter::try_from(vec![t]).unwrap();
         let lines = formatter.lines(None);
-        assert_eq!(lines.join("\n"), BUILD_CONFIG_BOARD_MISSING_GOLDEN.to_string());
+        assert_eq!(lines.join("\n").trim(), BUILD_CONFIG_BOARD_MISSING_GOLDEN.to_string());
     }
 
     #[test]
@@ -1184,5 +1201,67 @@ mod test {
         let formatter = JsonTargetFormatter::try_from(vec![t]).unwrap();
         let lines = formatter.lines(None);
         assert_eq!(lines.join("\n"), JSON_BUILD_CONFIG_BOTH_MISSING_GOLDEN.to_string());
+    }
+
+    fn get_first_address(json: &str) -> (String, u16) {
+        let parsed_json: Vec<HashMap<String, serde_json::Value>> =
+            serde_json::from_str(&json).unwrap();
+        let addresses: Vec<serde_json::Value> =
+            serde_json::from_value(parsed_json[0]["addresses"].clone()).unwrap();
+        let first_address: HashMap<String, serde_json::Value> =
+            serde_json::from_value(addresses[0].clone()).unwrap();
+        let ip = serde_json::from_value(first_address["ip"].clone()).unwrap();
+        let port = serde_json::from_value(first_address["ssh_port"].clone()).unwrap();
+        (ip, port)
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_nonstandard_port_ipv4() {
+        let target = ffx::TargetInfo {
+            nodename: Some("lorberding".to_string()),
+            addresses: Some(vec![ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
+                scope_id: 0,
+                port: 1234,
+            })]),
+            rcs_state: Some(ffx::RemoteControlState::Unknown),
+            target_state: Some(ffx::TargetState::Unknown),
+            ..Default::default()
+        };
+        let formatter = JsonTargetFormatter::try_from(vec![target.clone()]).unwrap();
+        let json = formatter.lines(None)[0].clone();
+        let (first_ip, first_port) = get_first_address(dbg!(&json));
+        assert_eq!(first_ip, "127.0.0.1".to_string());
+        assert_eq!(first_port, 1234);
+
+        let formatter = TabularTargetFormatter::try_from(vec![target]).unwrap();
+        let out = formatter.lines(None)[1].clone();
+        assert!(out.contains("127.0.0.1:1234"));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_nonstandard_port_ipv6() {
+        let target = ffx::TargetInfo {
+            nodename: Some("lorberding".to_string()),
+            addresses: Some(vec![ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                ip: IpAddress::Ipv6(Ipv6Address {
+                    addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+                }),
+                scope_id: 42,
+                port: 1234,
+            })]),
+            rcs_state: Some(ffx::RemoteControlState::Unknown),
+            target_state: Some(ffx::TargetState::Unknown),
+            ..Default::default()
+        };
+        let formatter = JsonTargetFormatter::try_from(vec![target.clone()]).unwrap();
+        let json = formatter.lines(None)[0].clone();
+        let (first_ip, first_port) = get_first_address(dbg!(&json));
+        assert_eq!(first_ip, "fe80::1:101:101:101%42".to_string());
+        assert_eq!(first_port, 1234);
+
+        let formatter = TabularTargetFormatter::try_from(vec![target]).unwrap();
+        let out = formatter.lines(None)[1].clone();
+        assert!(out.contains("fe80::1:101:101:101%42:1234"));
     }
 }
