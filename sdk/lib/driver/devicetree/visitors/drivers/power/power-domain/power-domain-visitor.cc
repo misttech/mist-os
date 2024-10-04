@@ -137,7 +137,7 @@ zx::result<> PowerDomainVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       return zx::error(encoded_domain_info.error_value().status());
     }
     fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
-        .type = DEVICE_METADATA_POWER_DOMAINS,
+        .id = std::to_string(DEVICE_METADATA_POWER_DOMAINS),
         .data = encoded_domain_info.value(),
     }};
     node.AddMetadata(std::move(controller_metadata));

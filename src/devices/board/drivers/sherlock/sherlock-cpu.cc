@@ -42,7 +42,7 @@ constexpr amlogic_cpu::legacy_cluster_info_t cluster_sizes[] = {
 
 const std::vector<fpbus::Metadata> cpu_metadata{
     {{
-        .type = DEVICE_METADATA_CLUSTER_SIZE_LEGACY,
+        .id = std::to_string(DEVICE_METADATA_CLUSTER_SIZE_LEGACY),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&cluster_sizes),
             reinterpret_cast<const uint8_t*>(&cluster_sizes) + sizeof(cluster_sizes)),

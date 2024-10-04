@@ -44,7 +44,7 @@ zx::result<> SerialPortVisitor::Visit(fdf_devicetree::Node& node,
   }
 
   fuchsia_hardware_platform_bus::Metadata metadata = {{
-      .type = DEVICE_METADATA_SERIAL_PORT_INFO,
+      .id = std::to_string(DEVICE_METADATA_SERIAL_PORT_INFO),
       .data = *std::move(encoded),
   }};
 

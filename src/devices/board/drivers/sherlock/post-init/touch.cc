@@ -85,7 +85,7 @@ zx::result<> PostInit::InitTouch() {
   dev.did() = PDEV_DID_FOCALTOUCH;
   dev.metadata() = std::vector<fpbus::Metadata>{
       {{
-          .type = DEVICE_METADATA_PRIVATE,
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&device_info),
               reinterpret_cast<const uint8_t*>(&device_info) + sizeof(device_info)),

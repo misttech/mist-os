@@ -164,7 +164,7 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   fidl_metadata.emplace_back([&]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_I2C_CHANNELS;
+    ret.id() = std::to_string(DEVICE_METADATA_I2C_CHANNELS);
     ret.data() = std::move(data);
     return ret;
   }());

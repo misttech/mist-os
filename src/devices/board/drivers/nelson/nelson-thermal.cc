@@ -227,13 +227,13 @@ static const aml_thermal_info_t aml_thermal_info = {
 
 static const std::vector<fpbus::Metadata> thermal_metadata{
     {{
-        .type = DEVICE_METADATA_THERMAL_CONFIG,
+        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&nelson_config),
             reinterpret_cast<const uint8_t*>(&nelson_config) + sizeof(nelson_config)),
     }},
     {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&aml_thermal_info),
             reinterpret_cast<const uint8_t*>(&aml_thermal_info) + sizeof(aml_thermal_info)),

@@ -114,7 +114,7 @@ constexpr wifi_config_t wifi_config = {
 
 static const std::vector<fpbus::Metadata> wifi_metadata{
     {{
-        .type = DEVICE_METADATA_WIFI_CONFIG,
+        .id = std::to_string(DEVICE_METADATA_WIFI_CONFIG),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&wifi_config),
             reinterpret_cast<const uint8_t*>(&wifi_config) + sizeof(wifi_config)),
@@ -231,7 +231,7 @@ zx_status_t Sherlock::SdioInit() {
 
   const std::vector<fpbus::Metadata> sd_emmc_metadata{
       {{
-          .type = DEVICE_METADATA_SDMMC,
+          .id = std::to_string(DEVICE_METADATA_SDMMC),
           .data = std::move(sdmmc_metadata.value()),
       }},
   };

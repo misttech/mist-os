@@ -49,7 +49,7 @@ zx::result<> SpiBusVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   }
 
   fuchsia_hardware_platform_bus::Metadata pbus_metadata = {{
-      .type = DEVICE_METADATA_SPI_CHANNELS,
+      .id = std::to_string(DEVICE_METADATA_SPI_CHANNELS),
       .data = data.value(),
   }};
   node.AddMetadata(std::move(pbus_metadata));

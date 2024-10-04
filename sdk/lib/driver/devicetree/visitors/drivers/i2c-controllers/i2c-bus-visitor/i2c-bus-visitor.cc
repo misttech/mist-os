@@ -178,7 +178,7 @@ zx::result<> I2cBusVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       return zx::ok();
     }
     fuchsia_hardware_platform_bus::Metadata pbus_metadata = {{
-        .type = DEVICE_METADATA_I2C_CHANNELS,
+        .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
         .data = data.value(),
     }};
     node.AddMetadata(std::move(pbus_metadata));

@@ -190,7 +190,7 @@ zx_status_t Nelson::Spi0Init() {
   std::vector<fpbus::Metadata> spi_0_metadata;
   spi_0_metadata.emplace_back([]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_AMLSPI_CONFIG;
+    ret.id() = std::to_string(DEVICE_METADATA_AMLSPI_CONFIG);
     ret.data() = std::vector<uint8_t>(
         reinterpret_cast<const uint8_t*>(&spi_0_config),
         reinterpret_cast<const uint8_t*>(&spi_0_config) + sizeof(spi_0_config));
@@ -207,7 +207,7 @@ zx_status_t Nelson::Spi0Init() {
 
   spi_0_metadata.emplace_back([&]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_SPI_CHANNELS;
+    ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS);
     ret.data() = std::move(data);
     return ret;
   }());
@@ -307,7 +307,7 @@ zx_status_t Nelson::Spi1Init() {
   std::vector<fpbus::Metadata> spi_1_metadata;
   spi_1_metadata.emplace_back([]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_AMLSPI_CONFIG,
+    ret.id() = std::to_string(DEVICE_METADATA_AMLSPI_CONFIG),
     ret.data() = std::vector<uint8_t>(
         reinterpret_cast<const uint8_t*>(&spi_1_config),
         reinterpret_cast<const uint8_t*>(&spi_1_config) + sizeof(spi_1_config));
@@ -325,7 +325,7 @@ zx_status_t Nelson::Spi1Init() {
     }
 
     spi_1_metadata.emplace_back(
-        fpbus::Metadata{{DEVICE_METADATA_SCHEDULER_ROLE_NAME, *std::move(result)}});
+        fpbus::Metadata{{std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME), *std::move(result)}});
   }
 
   auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC1, spi_1_channels);
@@ -338,7 +338,7 @@ zx_status_t Nelson::Spi1Init() {
 
   spi_1_metadata.emplace_back([&]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_SPI_CHANNELS;
+    ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS);
     ret.data() = std::move(data);
     return ret;
   }());

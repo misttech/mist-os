@@ -66,7 +66,7 @@ zx::result<> Vim3AdcButtonsVisitor::AddAdcButtonMetadata(fdf_devicetree::Node& n
   }
 
   fuchsia_hardware_platform_bus::Metadata adc_buttons_metadata{{
-      .type = DEVICE_METADATA_BUTTONS,
+      .id = std::to_string(DEVICE_METADATA_BUTTONS),
       .data = metadata_bytes.value(),
   }};
   node.AddMetadata(adc_buttons_metadata);
@@ -113,7 +113,7 @@ zx::result<> Vim3AdcButtonsVisitor::AddAdcMetadata(fdf_devicetree::Node& node) {
   }
 
   fuchsia_hardware_platform_bus::Metadata adc_metadata{{
-      .type = fuchsia_hardware_adcimpl::kPdevMetadataTypeIdentifier,
+      .id = std::to_string(fuchsia_hardware_adcimpl::kPdevMetadataTypeIdentifier),
       .data = encoded_metadata.value(),
   }};
 

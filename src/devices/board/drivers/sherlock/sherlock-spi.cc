@@ -119,7 +119,7 @@ zx_status_t Sherlock::SpiInit() {
   std::vector<fpbus::Metadata> spi_metadata;
   spi_metadata.emplace_back([&]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_AMLSPI_CONFIG,
+    ret.id() = std::to_string(DEVICE_METADATA_AMLSPI_CONFIG),
     ret.data() =
         std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&spi_config),
                              reinterpret_cast<const uint8_t*>(&spi_config) + sizeof(spi_config));
@@ -136,7 +136,7 @@ zx_status_t Sherlock::SpiInit() {
 
   spi_metadata.emplace_back([&]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_SPI_CHANNELS, ret.data() = std::move(data);
+    ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS), ret.data() = std::move(data);
     return ret;
   }());
 

@@ -53,7 +53,7 @@ class TestBoard : public TestBoardType {
 
     std::vector<fpbus::Metadata> metadata{[&]() {
       fpbus::Metadata ret;
-      ret.type() = fuchsia_board_test::wire::kPdevMetadataTypeIdentifier;
+      ret.id() = std::to_string(fuchsia_board_test::wire::kPdevMetadataTypeIdentifier);
       ret.data() =
           std::vector<uint8_t>(request->entry.metadata.begin(), request->entry.metadata.end());
       return ret;
@@ -143,7 +143,7 @@ zx_status_t TestBoard::FetchAndDeserialize() {
 
     // Create the metadata.
     fpbus::Metadata metadata = {};
-    metadata.type() = fuchsia_board_test::wire::kPdevMetadataTypeIdentifier;
+    metadata.id() = std::to_string(fuchsia_board_test::wire::kPdevMetadataTypeIdentifier);
     metadata.data() =
         std::vector<uint8_t>(metadata_bytes.data() + metadata_offset,
                              metadata_bytes.data() + metadata_offset + entry.metadata_size);

@@ -110,7 +110,7 @@ zx_status_t Astro::BluetoothInit() {
 
   const std::vector<fpbus::Metadata> bt_uart_metadata{
       {{
-          .type = DEVICE_METADATA_SERIAL_PORT_INFO,
+          .id = std::to_string(DEVICE_METADATA_SERIAL_PORT_INFO),
           .data = *std::move(encoded),
       }},
   };

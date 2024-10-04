@@ -84,8 +84,8 @@ type Smc = table {
 
 /// Represents the metadata that's available in a platform device.
 type Metadata = table {
-    /// Metadata type.
-    1: type uint32;
+    /// Metadata identifier.
+    1: id string:MAX;
     /// Metadata bytes.
     2: data vector<uint8>:MAX;
 };

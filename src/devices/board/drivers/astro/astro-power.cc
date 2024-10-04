@@ -61,19 +61,19 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_POWER;
   dev.metadata() = std::vector<fpbus::Metadata>{
       {{
-          .type = DEVICE_METADATA_AML_VOLTAGE_TABLE,
+          .id = std::to_string(DEVICE_METADATA_AML_VOLTAGE_TABLE),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&kS905D2VoltageTable),
               reinterpret_cast<const uint8_t*>(&kS905D2VoltageTable) + sizeof(kS905D2VoltageTable)),
       }},
       {{
-          .type = DEVICE_METADATA_AML_PWM_PERIOD_NS,
+          .id = std::to_string(DEVICE_METADATA_AML_PWM_PERIOD_NS),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs),
               reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs) + sizeof(kS905d2PwmPeriodNs)),
       }},
       {{
-          .type = DEVICE_METADATA_POWER_DOMAINS,
+          .id = std::to_string(DEVICE_METADATA_POWER_DOMAINS),
           .data = encoded_metadata.value(),
       }},
   };

@@ -81,13 +81,13 @@ zx_status_t Nelson::ThermistorInit() {
 
   std::vector<fpbus::Metadata> therm_metadata{
       {{
-          .type = NTC_CHANNELS_METADATA_PRIVATE,
+          .id = std::to_string(NTC_CHANNELS_METADATA_PRIVATE),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&ntc_channels),
               reinterpret_cast<const uint8_t*>(&ntc_channels) + sizeof(ntc_channels)),
       }},
       {{
-          .type = NTC_PROFILE_METADATA_PRIVATE,
+          .id = std::to_string(NTC_PROFILE_METADATA_PRIVATE),
           .data =
               std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&ntc_info),
                                    reinterpret_cast<const uint8_t*>(&ntc_info) + sizeof(ntc_info)),

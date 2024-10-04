@@ -197,7 +197,7 @@ static const gpio_pin_t gpio_c_pins[] = {
 
 static const std::vector<fpbus::Metadata> gpio_c_metadata{
     {{
-        .type = DEVICE_METADATA_GPIO_PINS,
+        .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&gpio_c_pins),
             reinterpret_cast<const uint8_t*>(&gpio_c_pins) + sizeof(gpio_c_pins)),
@@ -235,13 +235,13 @@ zx_status_t Sherlock::GpioInit() {
 
   const std::vector<fpbus::Metadata> gpio_metadata{
       {{
-          .type = DEVICE_METADATA_GPIO_PINS,
+          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&gpio_pins),
               reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
       }},
       {{
-          .type = DEVICE_METADATA_GPIO_INIT,
+          .id = std::to_string(DEVICE_METADATA_GPIO_INIT),
           .data = encoded_metadata.value(),
       }},
   };

@@ -444,7 +444,7 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       return zx::error(encoded_controller_metadata.error_value().status());
     }
     fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
-        .type = DEVICE_METADATA_GPIO_CONTROLLER,
+        .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
         .data = encoded_controller_metadata.value(),
     }};
     node.AddMetadata(std::move(controller_metadata));
@@ -460,7 +460,7 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     }
 
     fuchsia_hardware_platform_bus::Metadata init_metadata = {{
-        .type = DEVICE_METADATA_GPIO_INIT,
+        .id = std::to_string(DEVICE_METADATA_GPIO_INIT),
         .data = encoded_init_steps.value(),
     }};
     node.AddMetadata(std::move(init_metadata));
@@ -469,7 +469,7 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
 
   if (!controller->second.gpio_pins_metadata.empty()) {
     fuchsia_hardware_platform_bus::Metadata pin_metadata = {{
-        .type = DEVICE_METADATA_GPIO_PINS,
+        .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(controller->second.gpio_pins_metadata.data()),
             reinterpret_cast<const uint8_t*>(controller->second.gpio_pins_metadata.data()) +

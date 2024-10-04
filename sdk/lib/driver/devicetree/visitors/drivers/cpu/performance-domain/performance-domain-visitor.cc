@@ -61,7 +61,7 @@ zx::result<> PerformanceDomainVisitor::Visit(fdf_devicetree::Node& node,
 
   if (!performance_domains.empty()) {
     fuchsia_hardware_platform_bus::Metadata perf_domains_metadata = {{
-        .type = DEVICE_METADATA_AML_PERF_DOMAINS,
+        .id = std::to_string(DEVICE_METADATA_AML_PERF_DOMAINS),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(performance_domains.data()),
             reinterpret_cast<const uint8_t*>(performance_domains.data()) +
@@ -70,7 +70,7 @@ zx::result<> PerformanceDomainVisitor::Visit(fdf_devicetree::Node& node,
     device_node->AddMetadata(std::move(perf_domains_metadata));
 
     fuchsia_hardware_platform_bus::Metadata opp_metadata = {{
-        .type = DEVICE_METADATA_AML_OP_POINTS,
+        .id = std::to_string(DEVICE_METADATA_AML_OP_POINTS),
         .data =
             std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(opp_tables.data()),
                                  reinterpret_cast<const uint8_t*>(opp_tables.data()) +

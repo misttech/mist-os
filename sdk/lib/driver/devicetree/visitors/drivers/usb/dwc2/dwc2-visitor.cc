@@ -95,7 +95,7 @@ zx::result<> Dwc2Visitor::DriverVisit(fdf_devicetree::Node& node,
     }
 
     fuchsia_hardware_platform_bus::Metadata metadata = {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&dwc2_metadata),
             reinterpret_cast<const uint8_t*>(&dwc2_metadata) + sizeof(dwc2_metadata)),

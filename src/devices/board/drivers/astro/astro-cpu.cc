@@ -62,13 +62,13 @@ constexpr amlogic_cpu::perf_domain_t performance_domains[] = {
 
 static const std::vector<fpbus::Metadata> cpu_metadata{
     {{
-        .type = DEVICE_METADATA_AML_OP_POINTS,
+        .id = std::to_string(DEVICE_METADATA_AML_OP_POINTS),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&operating_points),
             reinterpret_cast<const uint8_t*>(&operating_points) + sizeof(operating_points)),
     }},
     {{
-        .type = DEVICE_METADATA_AML_PERF_DOMAINS,
+        .id = std::to_string(DEVICE_METADATA_AML_PERF_DOMAINS),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&performance_domains),
             reinterpret_cast<const uint8_t*>(&performance_domains) + sizeof(performance_domains)),

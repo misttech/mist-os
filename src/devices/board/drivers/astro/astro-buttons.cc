@@ -66,11 +66,11 @@ zx_status_t Astro::ButtonsInit() {
                       .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC,
                       .did = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_BUTTONS,
                       .metadata = std::vector<fpbus::Metadata>{
-                          {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
+                          {{.id = std::to_string(DEVICE_METADATA_BUTTONS_BUTTONS),
                             .data = std::vector<uint8_t>(
                                 reinterpret_cast<const uint8_t*>(&buttons),
                                 reinterpret_cast<const uint8_t*>(&buttons) + sizeof(buttons))}},
-                          {{.type = DEVICE_METADATA_BUTTONS_GPIOS,
+                          {{.id = std::to_string(DEVICE_METADATA_BUTTONS_GPIOS),
                             .data = std::vector<uint8_t>(
                                 reinterpret_cast<const uint8_t*>(&gpios),
                                 reinterpret_cast<const uint8_t*>(&gpios) + sizeof(gpios))}}

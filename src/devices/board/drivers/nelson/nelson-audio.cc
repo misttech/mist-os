@@ -246,7 +246,7 @@ zx_status_t Nelson::AudioInit() {
 
   std::vector<fpbus::Metadata> tdm_metadata{
       {{
-          .type = DEVICE_METADATA_PRIVATE,
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&aml_metadata),
               reinterpret_cast<const uint8_t*>(&aml_metadata) + sizeof(aml_metadata)),
@@ -302,7 +302,7 @@ zx_status_t Nelson::AudioInit() {
   dev.did() = PDEV_DID_TI_TAS58xx;
   dev.metadata() = std::vector<fpbus::Metadata>{
       {{
-          .type = DEVICE_METADATA_PRIVATE,
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&tas_metadata),
               reinterpret_cast<const uint8_t*>(&tas_metadata) + sizeof(tas_metadata)),
@@ -377,7 +377,7 @@ zx_status_t Nelson::AudioInit() {
     metadata.lanes_enable_mask[0] = 1;
     std::vector<fpbus::Metadata> tdm_metadata{
         {{
-            .type = DEVICE_METADATA_PRIVATE,
+            .id = std::to_string(DEVICE_METADATA_PRIVATE),
             .data = std::vector<uint8_t>(
                 reinterpret_cast<const uint8_t*>(&metadata),
                 reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),
@@ -444,7 +444,7 @@ zx_status_t Nelson::AudioInit() {
     metadata.lanes_enable_mask[1] = 1;
     std::vector<fpbus::Metadata> tdm_metadata{
         {{
-            .type = DEVICE_METADATA_PRIVATE,
+            .id = std::to_string(DEVICE_METADATA_PRIVATE),
             .data = std::vector<uint8_t>(
                 reinterpret_cast<const uint8_t*>(&metadata),
                 reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),
@@ -489,7 +489,7 @@ zx_status_t Nelson::AudioInit() {
     metadata.dClockDivFactor = 250;
     std::vector<fpbus::Metadata> pdm_metadata{
         {{
-            .type = DEVICE_METADATA_PRIVATE,
+            .id = std::to_string(DEVICE_METADATA_PRIVATE),
             .data = std::vector<uint8_t>(
                 reinterpret_cast<const uint8_t*>(&metadata),
                 reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),

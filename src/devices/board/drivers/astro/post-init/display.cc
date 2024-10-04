@@ -85,7 +85,7 @@ static const std::vector<fpbus::Irq> display_irqs{
 
 static std::vector<fpbus::Metadata> display_panel_metadata{
     {{
-        .type = DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
+        .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
         // No metadata for this item.
     }},
 };

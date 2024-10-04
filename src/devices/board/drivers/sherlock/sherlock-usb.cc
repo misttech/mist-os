@@ -76,7 +76,7 @@ constexpr dwc2_metadata_t dwc2_metadata = {
 
 static std::vector<fpbus::Metadata> usb_metadata{
     {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&dwc2_metadata),
             reinterpret_cast<const uint8_t*>(&dwc2_metadata) + sizeof(dwc2_metadata)),
@@ -160,12 +160,12 @@ static const std::vector<UsbPhyMode> phy_modes = {
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{
     {{
-        .type = DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&type),
                                      reinterpret_cast<const uint8_t*>(&type) + sizeof(type)),
     }},
     {{
-        .type = DEVICE_METADATA_USB_MODE,
+        .id = std::to_string(DEVICE_METADATA_USB_MODE),
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(phy_modes.data()),
                                      reinterpret_cast<const uint8_t*>(phy_modes.data()) +
                                          phy_modes.size() * sizeof(UsbPhyMode)),

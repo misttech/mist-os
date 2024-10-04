@@ -62,7 +62,7 @@ static uint64_t s_external_sram_phys_base = T931_NNA_SRAM_BASE;
 
 static const std::vector<fpbus::Metadata> nna_metadata{
     {{
-        .type = 0,
+        .id = "0",
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&s_external_sram_phys_base),
                                      reinterpret_cast<const uint8_t*>(&s_external_sram_phys_base) +
                                          sizeof(s_external_sram_phys_base)),

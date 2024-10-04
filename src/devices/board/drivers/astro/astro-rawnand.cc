@@ -90,7 +90,7 @@ static const nand_config_t config = {
 
 static const std::vector<fpbus::Metadata> raw_nand_metadata{
     {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
                                      reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
     }},

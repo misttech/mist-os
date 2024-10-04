@@ -51,7 +51,7 @@ zx::result<> DisplayPanelVisitor::Visit(fdf_devicetree::Node& node,
   display_panel_info.height = *parser_output->at(kDisplayHeight)[0].AsUint32();
 
   fuchsia_hardware_platform_bus::Metadata display_panel_metadata{{
-      .type = DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
+      .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
       .data = std::vector<uint8_t>(
           reinterpret_cast<const uint8_t*>(&display_panel_info),
           reinterpret_cast<const uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),

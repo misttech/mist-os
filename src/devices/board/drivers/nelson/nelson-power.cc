@@ -55,7 +55,7 @@ constexpr power_sensor::Ina231Metadata kMlbSensorMetadata = {
 
 static const std::vector<fpbus::Metadata> kMlbMetadata{
     {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&kMlbSensorMetadata),
             reinterpret_cast<const uint8_t*>(&kMlbSensorMetadata) + sizeof(kMlbSensorMetadata)),
@@ -75,7 +75,7 @@ constexpr power_sensor::Ina231Metadata kAudioSensorMetadata = {
 
 static const std::vector<fpbus::Metadata> kSpeakersMetadata{
     {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&kAudioSensorMetadata),
             reinterpret_cast<const uint8_t*>(&kAudioSensorMetadata) + sizeof(kAudioSensorMetadata)),

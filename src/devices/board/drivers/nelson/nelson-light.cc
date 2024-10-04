@@ -41,7 +41,7 @@ zx_status_t Nelson::LightInit() {
   params.gain = 64;
   params.polling_time_us = 700'000;
   const std::vector<fpbus::Metadata> kTcs3400Metadata{
-      {{.type = DEVICE_METADATA_PRIVATE,
+      {{.id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&params),
                                      reinterpret_cast<uint8_t*>(&params) + sizeof(params))}},
   };
@@ -185,7 +185,7 @@ zx_status_t Nelson::LightInit() {
   light_node.did() = PDEV_DID_GPIO_LIGHT;
   light_node.metadata() = {
       {{
-          .type = fuchsia_hardware_light::kPdevMetadataTypeIdentifier,
+          .id = std::to_string(fuchsia_hardware_light::kPdevMetadataTypeIdentifier),
           .data = std::move(metadata.value()),
       }},
   };

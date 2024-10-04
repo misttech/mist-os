@@ -44,7 +44,7 @@ zx_status_t TestBoard::SpiInit() {
   std::vector<fuchsia_hardware_platform_bus::Metadata> metadata{
       [&]() {
         fuchsia_hardware_platform_bus::Metadata ret;
-        ret.type() = DEVICE_METADATA_SPI_CHANNELS, ret.data() = std::move(data);
+        ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS), ret.data() = std::move(data);
         return ret;
       }(),
   };

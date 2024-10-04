@@ -90,7 +90,7 @@ zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,
   }
 
   fuchsia_hardware_platform_bus::Metadata metadata = {
-      {.type = DEVICE_METADATA_SDMMC, .data = encoded_metadata.value()}};
+      {.id = std::to_string(DEVICE_METADATA_SDMMC), .data = encoded_metadata.value()}};
   node.AddMetadata(std::move(metadata));
   FDF_LOG(DEBUG, "SDMMC metadata added to node '%s'", node.name().c_str());
 
