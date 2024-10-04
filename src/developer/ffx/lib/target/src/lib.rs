@@ -47,6 +47,10 @@ pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 
+/// The default target name if no target spec is given (for debugging, reporting to the user, etc).
+/// TODO(b/371222096): Use this everywhere (will require a bit of digging).
+pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
+
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery

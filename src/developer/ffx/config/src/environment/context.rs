@@ -209,6 +209,13 @@ impl EnvironmentContext {
         }
     }
 
+    pub fn is_strict(&self) -> bool {
+        match self.kind {
+            EnvironmentKind::StrictContext => true,
+            _ => false,
+        }
+    }
+
     pub fn is_isolated(&self) -> bool {
         match self.kind {
             EnvironmentKind::ConfigDomain { isolate_root: Some(..), .. }
@@ -672,7 +679,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_find_sdk_root_finds_root() {
         let temp = tempdir().unwrap();
         let temp_path = std::fs::canonicalize(temp.path()).expect("canonical temp path");
@@ -688,7 +695,7 @@ mod test {
         assert_eq!(find_sdk_root(&start_path).unwrap().unwrap(), temp_path);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_find_sdk_root_no_manifest() {
         let temp = tempdir().unwrap();
 
@@ -705,7 +712,7 @@ mod test {
         Utf8Path::new(DOMAINS_TEST_DATA_PATH)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_config_domain_context() {
         let domain_root = domains_test_data_path().join("basic_example");
         let context = EnvironmentContext::config_domain_root(
@@ -721,7 +728,45 @@ mod test {
         assert!(!context.is_isolated());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
+    async fn test_strict_context() {
+        // For the time being, these are all the values that default (built into the binary,
+        // specifically) to being env variables. These must be overwritten to allow for allocating
+        // of a strict env context.
+        let mut config_map = ConfigMap::new();
+        config_map.insert(
+            "target".to_string(),
+            serde_json::json!({
+                "default": "127.0.0.1"
+            }),
+        );
+        config_map.insert(
+            "ssh".to_string(),
+            serde_json::json!({
+                "pub": "/tmp/whatever",
+                "priv": "/tmp/whatever2"
+            }),
+        );
+        config_map.insert(
+            "log".to_string(),
+            serde_json::json!({
+                "dir": "/tmp/loggodoggo"
+            }),
+        );
+        config_map.insert(
+            "fastboot".to_string(),
+            serde_json::json!({
+                "devices_file": {
+                    "path": "/tmp/fastboot_thing_I_guess"
+                }
+            }),
+        );
+        let context =
+            EnvironmentContext::strict(ExecutableKind::Test, config_map).expect("strict context");
+        assert!(context.is_strict());
+    }
+
+    #[fuchsia::test]
     async fn test_config_domain_context_isolated() {
         let isolate_dir = tempdir().expect("tempdir");
         let domain_root = domains_test_data_path().join("basic_example");

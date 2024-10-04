@@ -63,10 +63,15 @@ impl TryFromEnvContext for Option<String> {
 impl TryFromEnvContext for ffx_target::Resolution {
     fn try_from_env_context<'a>(env: &'a EnvironmentContext) -> LocalBoxFuture<'a, Result<Self>> {
         Box::pin(async {
+            let unspecified_target = ffx_target::UNSPECIFIED_TARGET_NAME.to_owned();
             let target_spec = Option::<String>::try_from_env_context(env).await?;
-            let target_spec_unwrapped = target_spec.as_ref().ok_or(ffx_command::user_error!(
-                "You must specify a target via `-t <target_name>` before any command arguments"
-            ))?;
+            let target_spec_unwrapped = if env.is_strict() {
+                target_spec.as_ref().ok_or(ffx_command::user_error!(
+                    "You must specify a target via `-t <target_name>` before any command arguments"
+                ))?
+            } else {
+                target_spec.as_ref().unwrap_or(&unspecified_target)
+            };
             tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
             let resolution = ffx_target::resolve_target_address(&target_spec, env)
                 .await
