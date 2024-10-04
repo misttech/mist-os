@@ -10,49 +10,40 @@ import("//bundles/assembly/platform_aibs.gni")
 #
 # Arguments
 #
-#   product_configs (optional)
-#     [list] List of paths to the product configs.
-#
 #   output_path (required)
 #     [path] Where to write the output list.
 #
 #   sources (optional)
 #     [list of str] Additional files or directories to list as inputs.
 #
+#   aibs (optional)
+#     [list of str] Any assembly input bundles to include.
+#
 template("generated_assembly_inputs") {
   assert(defined(invoker.output_path), "Need to define output_path")
 
   labels = {
-    platform_aibs = "platform_assembly_input_bundles"
+    aib_list = "aib_list"
   }
 
   files = {
-    platform_aibs = "${target_out_dir}/platform_assembly_input_bundles.json"
+    aib_list = "${target_out_dir}/aib_list.json"
   }
 
-  generated_file(labels.platform_aibs) {
+  generated_file(labels.aib_list) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    outputs = [ files.platform_aibs ]
+    outputs = [ files.aib_list ]
     data_keys = [ "assembly_input_archives" ]
     walk_keys = [ "assembly_input_archives_barrier" ]
     output_conversion = "json"
 
     deps = []
-
-    # The platform bundles
-    if (testonly) {
-      deps += eng_platform_aib_labels
-    } else {
-      deps += user_platform_aib_labels
-    }
-
-    # The legacy bundle from the assembly.
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
+    if (defined(invoker.aibs)) {
+      deps += invoker.aibs
     }
   }
 
@@ -69,30 +60,17 @@ template("generated_assembly_inputs") {
     if (!defined(deps)) {
       deps = []
     }
-    deps += [ ":${labels.platform_aibs}" ]
-
-    depfile_path = "$target_out_dir/$target_name.depfile"
-    depfile = depfile_path
+    deps += [ ":${labels.aib_list}" ]
 
     outputs = [ invoker.output_path ]
-    inputs = [ files.platform_aibs ]
+    inputs = [ files.aib_list ]
 
     args = [
       "--assembly-input-bundles",
-      rebase_path(files.platform_aibs, root_build_dir),
+      rebase_path(files.aib_list, root_build_dir),
       "--output",
       rebase_path(invoker.output_path, root_build_dir),
-      "--depfile",
-      rebase_path(depfile_path, root_build_dir),
     ]
-
-    if (defined(invoker.product_configs)) {
-      inputs += invoker.product_configs
-      args += [ "--product-config" ]
-      foreach(product_config, invoker.product_configs) {
-        args += [ rebase_path(product_config, root_build_dir) ]
-      }
-    }
 
     if (defined(invoker.sources)) {
       args += [ "--sources" ]

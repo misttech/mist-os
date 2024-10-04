@@ -494,8 +494,7 @@ template("legacy_assembly_input_bundle") {
     generated_assembly_inputs(labels.assembly_inputs) {
       testonly = fuchsia_zbi_testonly
       output_path = files.assembly_inputs
-      sources = [ "${files.assembly_input_bundle_dir}" ]
-      deps = [ ":${labels.assembly_input_bundle}" ]
+      aibs = [ ":${labels.assembly_input_bundle}" ]
 
       metadata = {
         package_barrier = []
