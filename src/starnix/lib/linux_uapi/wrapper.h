@@ -98,8 +98,18 @@
 #include <linux/wait.h>
 #include <linux/xattr.h>
 
+#ifndef __KERNEL__
+#define __KERNEL__ 1
+#define __HAS_KERNEL__ 0
+#else
+#define __HAS_KERNEL__ 1
+#endif
 // Specific fuse header to use android specific extensions
 #include "src/starnix/lib/linux_uapi/third_party/fuse_kernel.h"
+#if __HAS_KERNEL__
+#undef __KERNEL__
+#endif
+#undef __HAS_KERNEL__
 
 // Data shared between Starnix and a vDSO implementation.
 #include "src/starnix/kernel/vdso/vvar-data.h"
