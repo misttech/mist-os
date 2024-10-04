@@ -1011,6 +1011,13 @@ class ConnectivityMode(enum.IntEnum):
     tethering mode).
     """
 
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.ConnectivityMode,
+    ) -> "ConnectivityMode":
+        """Parse from a fuchsia.wlan.policy/ConnectivityMode."""
+        return ConnectivityMode(fidl)
+
 
 class OperatingBand(enum.IntEnum):
     """Operating band for wlan control request and status updates."""
@@ -1024,6 +1031,13 @@ class OperatingBand(enum.IntEnum):
 
     ONLY_5GHZ = 3
     """Restricted to 5 GHz bands only."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.OperatingBand,
+    ) -> "OperatingBand":
+        """Parse from a fuchsia.wlan.policy/OperatingBand."""
+        return OperatingBand(fidl)
 
 
 class OperatingState(enum.IntEnum):
@@ -1042,6 +1056,13 @@ class OperatingState(enum.IntEnum):
 
     ACTIVE = 3
     """Access point operation is active."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.OperatingState,
+    ) -> "OperatingState":
+        """Parse from a fuchsia.wlan.policy/OperatingState."""
+        return OperatingState(fidl)
 
 
 @dataclass(frozen=True)
@@ -1069,6 +1090,22 @@ class AccessPointState:
     id: NetworkIdentifier
     """Identifying information of the access point whose state has changed."""
 
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.AccessPointState,
+    ) -> "AccessPointState":
+        """Parse from a fuchsia.wlan.policy/AccessPointState."""
+        return AccessPointState(
+            state=OperatingState.from_fidl(fidl.state),
+            mode=ConnectivityMode.from_fidl(fidl.mode),
+            band=OperatingBand.from_fidl(fidl.band),
+            frequency=fidl.frequency,
+            clients=ConnectedClientInformation.from_fidl(fidl.clients)
+            if fidl.clients
+            else None,
+            id=NetworkIdentifier.from_fidl(fidl.id),
+        )
+
 
 @dataclass(frozen=True)
 class ConnectedClientInformation:
@@ -1079,3 +1116,10 @@ class ConnectedClientInformation:
 
     count: int
     """Number of connected clients."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.ConnectedClientInformation,
+    ) -> "ConnectedClientInformation":
+        """Parse from a fuchsia.wlan.policy/ConnectedClientInformation."""
+        return ConnectedClientInformation(count=fidl.count)

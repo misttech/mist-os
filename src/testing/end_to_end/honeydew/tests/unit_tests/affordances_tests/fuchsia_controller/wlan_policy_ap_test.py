@@ -52,6 +52,15 @@ class WlanPolicyApFCTests(unittest.TestCase):
             fuchsia_device_close=self.fuchsia_device_close_obj,
         )
 
+        self.assertFalse(
+            self.wlan_policy_ap_obj._access_point_controller.access_point_state_updates_server_task.cancelled(),
+            "Expected access point state update server to be running",
+        )
+
+    def tearDown(self) -> None:
+        self.wlan_policy_ap_obj._close()
+        return super().tearDown()
+
     def test_verify_supported(self) -> None:
         """Verify _verify_supported fails."""
         self.ffx_transport_obj.run.return_value = ""
@@ -74,7 +83,12 @@ class WlanPolicyApFCTests(unittest.TestCase):
     def test_init_connect_proxy(self) -> None:
         """Verify WlanPolicyAp connects to
         fuchsia.wlan.policy/AccessPointProvider and AccessPointListener."""
-        # TODO(http://b/324948461): Finish implementation
+        self.assertIsNotNone(
+            self.wlan_policy_ap_obj._access_point_provider_proxy
+        )
+        self.assertIsNotNone(
+            self.wlan_policy_ap_obj._access_point_listener_proxy
+        )
 
     def test_start(self) -> None:
         """Verify WlanPolicyAp.start()."""

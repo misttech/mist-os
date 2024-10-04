@@ -4,8 +4,12 @@
 """WLAN policy access point affordance implementation using Fuchsia
 Controller."""
 
+import asyncio
 import logging
+from dataclasses import dataclass
 
+import fidl.fuchsia_wlan_policy as f_wlan_policy
+from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
 from honeydew import errors
@@ -13,6 +17,7 @@ from honeydew.interfaces.affordances.wlan import wlan_policy_ap
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
+from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.wlan import (
     AccessPointState,
     ConnectivityMode,
@@ -28,6 +33,23 @@ _REQUIRED_CAPABILITIES = [
 ]
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# Fuchsia Controller proxies
+_ACCESS_POINT_PROVIDER_PROXY = FidlEndpoint(
+    "core/wlancfg", "fuchsia.wlan.policy.AccessPointProvider"
+)
+_ACCESS_POINT_LISTENER_PROXY = FidlEndpoint(
+    "core/wlancfg", "fuchsia.wlan.policy.AccessPointListener"
+)
+
+
+@dataclass
+class _AccessPointControllerState:
+    proxy: f_wlan_policy.AccessPointController.Client
+    updates: asyncio.Queue[list[AccessPointState]]
+    # Keep the async task for fuchsia.wlan.policy/AccessPointStateUpdates so it
+    # doesn't get garbage collected when cancelled.
+    access_point_state_updates_server_task: asyncio.Task[None]
 
 
 class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
@@ -59,8 +81,9 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
 
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
-
         self._fuchsia_device_close.register_for_on_device_close(self._close)
+
+        self._access_point_controller = self._create_access_point_controller()
 
     def _close(self) -> None:
         """Release handle on ap controller.
@@ -109,7 +132,59 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
 
     def _connect_proxy(self) -> None:
         """Re-initializes connection to the WLAN stack."""
-        # TODO(http://b/324948461): Finish implementation
+        self._access_point_provider_proxy = (
+            f_wlan_policy.AccessPointProvider.Client(
+                self._fc_transport.connect_device_proxy(
+                    _ACCESS_POINT_PROVIDER_PROXY
+                )
+            )
+        )
+        self._access_point_listener_proxy = (
+            f_wlan_policy.AccessPointListener.Client(
+                self._fc_transport.connect_device_proxy(
+                    _ACCESS_POINT_LISTENER_PROXY
+                )
+            )
+        )
+
+    def _create_access_point_controller(self) -> _AccessPointControllerState:
+        """Initialize the access point controller.
+
+        See fuchsia.wlan.policy/AccessPointProvider.GetController().
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+        """
+        controller_client, controller_server = Channel.create()
+        access_point_controller_proxy = (
+            f_wlan_policy.AccessPointController.Client(controller_client.take())
+        )
+
+        updates: asyncio.Queue[list[AccessPointState]] = asyncio.Queue()
+
+        updates_client, updates_server = Channel.create()
+        access_point_state_updates_server = AccessPointStateUpdatesImpl(
+            updates_server, updates
+        )
+        task = self.loop().create_task(
+            access_point_state_updates_server.serve()
+        )
+
+        try:
+            self._access_point_provider_proxy.get_controller(
+                requests=controller_server.take(),
+                updates=updates_client.take(),
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"AccessPointProvider.GetController() error {status}"
+            ) from status
+
+        return _AccessPointControllerState(
+            proxy=access_point_controller_proxy,
+            updates=updates,
+            access_point_state_updates_server_task=task,
+        )
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -213,3 +288,36 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
         """
         # TODO(http://b/324948461): Finish implementation
         raise NotImplementedError()
+
+
+class AccessPointStateUpdatesImpl(f_wlan_policy.AccessPointStateUpdates.Server):
+    """Server to receive WLAN access point state changes.
+
+    Receive updates on the current summary of wlan access point operating
+    states. This will be called when there are changes with active access point
+    networks - both the number of access points and their individual activity.
+    """
+
+    def __init__(
+        self, server: Channel, updates: asyncio.Queue[list[AccessPointState]]
+    ) -> None:
+        super().__init__(server)
+        self._updates = updates
+        _LOGGER.debug("Started AccessPointStateUpdates server")
+
+    async def on_access_point_state_update(
+        self,
+        request: f_wlan_policy.AccessPointStateUpdatesOnAccessPointStateUpdateRequest,
+    ) -> None:
+        """Detected a change to the state or registered listeners.
+
+        Args:
+            request: Current summary of WLAN access point operating states.
+        """
+        access_points = [
+            AccessPointState.from_fidl(ap) for ap in request.access_points
+        ]
+        _LOGGER.debug(
+            "OnAccessPointStateUpdates called with %s", repr(access_points)
+        )
+        await self._updates.put(access_points)
