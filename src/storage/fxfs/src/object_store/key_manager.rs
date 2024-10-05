@@ -267,7 +267,7 @@ impl KeyManager {
                                         Ok(keys)
                                     };
                                 }
-                                Err(e) => e,
+                                Err(e) => e.into(),
                             }
                         }
                         Err(_) => wrapped_keys.take_output().unwrap().unwrap_err(),
@@ -339,7 +339,7 @@ impl ToCipherSet for Arc<XtsCipherSet> {
 #[cfg(test)]
 mod tests {
     use super::{KeyManager, PURGE_TIMEOUT};
-    use anyhow::{anyhow, Error};
+    use crate::log::*;
     use async_trait::async_trait;
     use fuchsia_async::{self as fasync, MonotonicInstant, TestExecutor};
 
@@ -402,7 +402,15 @@ mod tests {
             &self,
             _owner: u64,
             _purpose: KeyPurpose,
-        ) -> Result<(WrappedKey, UnwrappedKey), Error> {
+        ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+            unimplemented!("Not used in tests");
+        }
+
+        async fn create_key_with_id(
+            &self,
+            _owner: u64,
+            _wrapping_key_id: u64,
+        ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
             unimplemented!("Not used in tests");
         }
 
@@ -410,13 +418,14 @@ mod tests {
             &self,
             _wrapped_key: &WrappedKey,
             _owner: u64,
-        ) -> Result<UnwrappedKey, Error> {
+        ) -> Result<UnwrappedKey, zx::Status> {
             if !self.unwrap_delay.is_zero() {
                 fasync::Timer::new(self.unwrap_delay).await;
             }
             let counter = self.counter.fetch_add(1, Ordering::Relaxed);
             if counter == ERROR_COUNTER {
-                Err(anyhow!("Unwrap failed!"))
+                error!("Unwrap failed!");
+                Err(zx::Status::INTERNAL)
             } else {
                 Ok(unwrapped_key(counter))
             }

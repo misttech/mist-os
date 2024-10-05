@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Error};
+use super::errors::map_to_status;
 use async_trait::async_trait;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose};
 use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE};
+use zx;
 
 pub struct RemoteCrypt {
     client: CryptProxy,
@@ -37,17 +38,39 @@ impl Crypt for RemoteCrypt {
         &self,
         owner: u64,
         purpose: KeyPurpose,
-    ) -> Result<(WrappedKey, UnwrappedKey), Error> {
-        let (wrapping_key_id, key, unwrapped_key) =
-            self.client.create_key(owner, purpose.into_fidl()).await?.map_err(|e| anyhow!(e))?;
+    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+        let (wrapping_key_id, key, unwrapped_key) = self
+            .client
+            .create_key(owner, purpose.into_fidl())
+            .await
+            .map_err(|e| map_to_status(e.into()))?
+            .map_err(|e| zx::Status::from_raw(e))?;
         Ok((
             WrappedKey {
                 wrapping_key_id: wrapping_key_id as u128,
-                key: WrappedKeyBytes::try_from(key)?,
+                key: WrappedKeyBytes::try_from(key).map_err(map_to_status)?,
             },
-            UnwrappedKey::new(
-                unwrapped_key.try_into().map_err(|_| anyhow!("Unexpected unwrapped key length"))?,
-            ),
+            UnwrappedKey::new(unwrapped_key.try_into().map_err(|_| zx::Status::INTERNAL)?),
+        ))
+    }
+
+    async fn create_key_with_id(
+        &self,
+        owner: u64,
+        wrapping_key_id: u64,
+    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+        let (key, unwrapped_key) = self
+            .client
+            .create_key_with_id(owner, wrapping_key_id)
+            .await
+            .map_err(|e| map_to_status(e.into()))?
+            .map_err(|e| zx::Status::from_raw(e))?;
+        Ok((
+            WrappedKey {
+                wrapping_key_id: wrapping_key_id as u128,
+                key: WrappedKeyBytes::try_from(key).map_err(map_to_status)?,
+            },
+            UnwrappedKey::new(unwrapped_key.try_into().map_err(|_| zx::Status::INTERNAL)?),
         ))
     }
 
@@ -55,16 +78,20 @@ impl Crypt for RemoteCrypt {
         &self,
         wrapped_key: &WrappedKey,
         owner: u64,
-    ) -> Result<UnwrappedKey, Error> {
+    ) -> Result<UnwrappedKey, zx::Status> {
         let unwrapped = self
             .client
             // TODO(b/361105712): Remove try_into() when changing key to u128.
-            .unwrap_key(wrapped_key.wrapping_key_id.try_into().map_err(
-                |_| anyhow!("Wrapping key too large"))?, owner, &wrapped_key.key[..])
-            .await?
-            .map_err(|e| anyhow!(e))?;
+            .unwrap_key(
+                wrapped_key.wrapping_key_id.try_into().map_err(|_| zx::Status::INTERNAL)?,
+                owner,
+                &wrapped_key.key[..],
+            )
+            .await
+            .map_err(|e| map_to_status(e.into()))?
+            .map_err(|e| zx::Status::from_raw(e))?;
         if unwrapped.len() != KEY_SIZE {
-            bail!("Unexpected key length");
+            return Err(zx::Status::INTERNAL);
         }
         Ok(UnwrappedKey::new(unwrapped.try_into().unwrap()))
     }

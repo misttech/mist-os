@@ -6,7 +6,7 @@ use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
 use anyhow::{Context, Error};
 use fidl_fuchsia_fxfs::{
-    CryptCreateKeyResult, CryptManagementAddWrappingKeyResult,
+    CryptCreateKeyResult, CryptCreateKeyWithIdResult, CryptManagementAddWrappingKeyResult,
     CryptManagementForgetWrappingKeyResult, CryptManagementRequest, CryptManagementRequestStream,
     CryptManagementSetActiveKeyResult, CryptRequest, CryptRequestStream, CryptUnwrapKeyResult,
     KeyPurpose,
@@ -66,6 +66,22 @@ impl CryptService {
         })?;
 
         Ok((*wrapping_key_id, wrapped.into(), key.into()))
+    }
+
+    fn create_key_with_id(&self, owner: u64, wrapping_key_id: u64) -> CryptCreateKeyWithIdResult {
+        let inner = self.inner.lock().unwrap();
+        let cipher = inner.ciphers.get(&wrapping_key_id).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+        let nonce = zero_extended_nonce(owner);
+
+        let mut key = [0u8; 32];
+        zx::cprng_draw(&mut key);
+
+        let wrapped = cipher.encrypt(&nonce, &key[..]).map_err(|error| {
+            error!(?error, "Failed to wrap key");
+            zx::Status::INTERNAL.into_raw()
+        })?;
+
+        Ok((wrapped.into(), key.into()))
     }
 
     fn unwrap_key(&self, wrapping_key_id: u64, owner: u64, key: Vec<u8>) -> CryptUnwrapKeyResult {
@@ -141,6 +157,19 @@ impl CryptService {
                                     error!(
                                         error = e.as_value(),
                                         "Failed to send CreateKey response"
+                                    )
+                                });
+                        }
+                        CryptRequest::CreateKeyWithId { owner, wrapping_key_id, responder } => {
+                            responder
+                                .send(match self.create_key_with_id(owner, wrapping_key_id) {
+                                    Ok((ref wrapped, ref key)) => Ok((wrapped, key)),
+                                    Err(e) => Err(e),
+                                })
+                                .unwrap_or_else(|e| {
+                                    error!(
+                                        error = e.as_value(),
+                                        "Failed to send CreateKeyWithId response"
                                     )
                                 });
                         }
@@ -231,6 +260,40 @@ mod tests {
         assert_eq!(wrapping_key_id, 1);
         let unwrap_result =
             service.unwrap_key(wrapping_key_id, 1, wrapped).expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped);
+    }
+
+    #[test]
+    fn wrap_unwrap_key_with_arbitrary_wrapping_key() {
+        let service = CryptService::new();
+        let key = vec![0xABu8; 32];
+        service.add_wrapping_key(2, key.clone()).expect("add_key failed");
+
+        let (wrapped, unwrapped) =
+            service.create_key_with_id(0, 2).expect("create_key_with_id failed");
+        let unwrap_result = service.unwrap_key(2, 0, wrapped).expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped);
+
+        // Do it twice to make sure the service can use the same key repeatedly.
+        let (wrapped, unwrapped) =
+            service.create_key_with_id(1, 2).expect("create_key_with_id failed");
+        let unwrap_result = service.unwrap_key(2, 1, wrapped).expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped);
+    }
+
+    #[test]
+    fn create_key_with_wrapping_key_that_does_not_exist() {
+        let service = CryptService::new();
+        service
+            .create_key_with_id(0, 2)
+            .expect_err("create_key_with_id should fail if the wrapping key does not exist");
+
+        let wrapping_key = vec![0xABu8; 32];
+        service.add_wrapping_key(2, wrapping_key.clone()).expect("add_key failed");
+
+        let (wrapped, unwrapped) =
+            service.create_key_with_id(0, 2).expect("create_key_with_id failed");
+        let unwrap_result = service.unwrap_key(2, 0, wrapped).expect("unwrap_key failed");
         assert_eq!(unwrap_result, unwrapped);
     }
 

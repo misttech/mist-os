@@ -233,6 +233,9 @@ async fn with_crypt_service<R, Fut: Future<Output = Result<R, Error>>>(
                         .map(|(id, w, u)| (*id, &w[..], &u[..]))
                         .map_err(|s| s.into_raw()),
                 )?,
+                CryptRequest::CreateKeyWithId { responder, .. } => {
+                    responder.send(Err(zx::Status::BAD_PATH.into_raw()))?
+                }
                 CryptRequest::UnwrapKey { responder, key, .. } => responder.send(
                     unwrap_zxcrypt_key(&key)
                         .await

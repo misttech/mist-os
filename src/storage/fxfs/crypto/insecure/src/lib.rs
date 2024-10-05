@@ -4,13 +4,15 @@
 
 use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
-use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use rustc_hash::FxHashMap as HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+use tracing::error;
+use zx_status as zx;
 
 pub const DATA_KEY: [u8; 32] = [
     0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11,
@@ -26,24 +28,38 @@ pub const METADATA_KEY: [u8; 32] = [
 /// It is intended for use only in test code where actual security is inconsequential.
 #[derive(Default)]
 pub struct InsecureCrypt {
-    ciphers: HashMap<u128, Aes256GcmSiv>,
+    ciphers: Mutex<HashMap<u128, Aes256GcmSiv>>,
     active_data_key: Option<u128>,
     active_metadata_key: Option<u128>,
     shutdown: AtomicBool,
 }
 impl InsecureCrypt {
     pub fn new() -> Self {
-        let mut this = Self::default();
-        this.ciphers.insert(0, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&DATA_KEY)));
-        this.ciphers.insert(1, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&METADATA_KEY)));
-        this.active_data_key = Some(0);
-        this.active_metadata_key = Some(1);
-        this
+        Self {
+            ciphers: Mutex::new(HashMap::from_iter([
+                (0, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&DATA_KEY))),
+                (1, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&METADATA_KEY))),
+            ])),
+            active_data_key: Some(0),
+            active_metadata_key: Some(1),
+            ..Default::default()
+        }
     }
 
     /// Simulates a crypt instance prematurely terminating.  All requests will fail.
     pub fn shutdown(&self) {
         self.shutdown.store(true, Ordering::Relaxed);
+    }
+
+    pub fn add_wrapping_key(&self, id: u128, key: [u8; 32]) {
+        self.ciphers
+            .lock()
+            .unwrap()
+            .insert(id, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key)));
+    }
+
+    pub fn remove_wrapping_key(&self, id: u128) {
+        let _key = self.ciphers.lock().unwrap().remove(&id);
     }
 }
 
@@ -53,45 +69,84 @@ impl Crypt for InsecureCrypt {
         &self,
         owner: u64,
         purpose: KeyPurpose,
-    ) -> Result<(WrappedKey, UnwrappedKey), Error> {
+    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
         if self.shutdown.load(Ordering::Relaxed) {
-            bail!("Crypt was shut down");
+            error!("Crypt was shut down");
+            return Err(zx::Status::INTERNAL);
         }
         let wrapping_key_id = match purpose {
             KeyPurpose::Data => self.active_data_key.as_ref(),
             KeyPurpose::Metadata => self.active_metadata_key.as_ref(),
         }
-        .ok_or(anyhow!("Invalid args in create_key"))?;
-        let cipher = self.ciphers.get(wrapping_key_id).ok_or(anyhow!("No cipher."))?;
+        .ok_or(zx::Status::INVALID_ARGS)?;
+        let ciphers = self.ciphers.lock().unwrap();
+        let cipher = ciphers.get(wrapping_key_id).ok_or(zx::Status::NOT_FOUND)?;
         let mut nonce = Nonce::default();
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
 
         let mut key = [0u8; 32];
         StdRng::from_entropy().fill_bytes(&mut key);
 
-        let wrapped: Vec<u8> = cipher.encrypt(&nonce, &key[..]).context("Failed to wrap key")?;
-        let wrapped = WrappedKeyBytes::try_from(wrapped)?;
+        let wrapped: Vec<u8> = cipher.encrypt(&nonce, &key[..]).map_err(|e| {
+            error!("Failed to wrap key: {:?}", e);
+            zx::Status::INTERNAL
+        })?;
+        let wrapped = WrappedKeyBytes::try_from(wrapped).map_err(|_| zx::Status::INTERNAL)?;
         Ok((WrappedKey { wrapping_key_id: *wrapping_key_id, key: wrapped }, UnwrappedKey::new(key)))
     }
 
+    async fn create_key_with_id(
+        &self,
+        owner: u64,
+        wrapping_key_id: u64,
+    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+        if self.shutdown.load(Ordering::Relaxed) {
+            error!("Crypt was shut down");
+            return Err(zx::Status::INTERNAL);
+        }
+        let ciphers = self.ciphers.lock().unwrap();
+        let cipher = ciphers.get(&(wrapping_key_id as u128)).ok_or(zx::Status::NOT_FOUND)?;
+        let mut nonce = Nonce::default();
+        nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
+
+        let mut key = [0u8; 32];
+        StdRng::from_entropy().fill_bytes(&mut key);
+
+        let wrapped: Vec<u8> = cipher.encrypt(&nonce, &key[..]).map_err(|e| {
+            error!("Failed to wrap key: {:?}", e);
+            zx::Status::INTERNAL
+        })?;
+        let wrapped = WrappedKeyBytes::try_from(wrapped).map_err(|_| zx::Status::BAD_STATE)?;
+        Ok((
+            WrappedKey { wrapping_key_id: wrapping_key_id as u128, key: wrapped },
+            UnwrappedKey::new(key),
+        ))
+    }
     async fn unwrap_key(
         &self,
         wrapped_key: &WrappedKey,
         owner: u64,
-    ) -> Result<UnwrappedKey, Error> {
+    ) -> Result<UnwrappedKey, zx::Status> {
         if self.shutdown.load(Ordering::Relaxed) {
-            bail!("Crypt was shut down");
+            error!("Crypt was shut down");
+            return Err(zx::Status::INTERNAL);
         }
-        let cipher =
-            self.ciphers.get(&wrapped_key.wrapping_key_id).ok_or(anyhow!("cipher fail"))?;
+        let ciphers = self.ciphers.lock().unwrap();
+        let cipher = ciphers.get(&wrapped_key.wrapping_key_id).ok_or(zx::Status::NOT_FOUND)?;
         let mut nonce = Nonce::default();
         nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
         Ok(UnwrappedKey::new(
             cipher
                 .decrypt(&nonce, &wrapped_key.key.0[..])
-                .map_err(|_| anyhow!("unwrap keys failed"))?
+                .map_err(|e| {
+                    error!("unwrap keys failed: {:?}", e);
+                    zx::Status::INTERNAL
+                })?
                 .try_into()
-                .map_err(|_| anyhow!("Unexpected wrapped key length"))?,
+                .map_err(|_| {
+                    error!("Unexpected wrapped key length");
+                    zx::Status::INTERNAL
+                })?,
         ))
     }
 }

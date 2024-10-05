@@ -19,6 +19,7 @@ use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use static_assertions::assert_cfg;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zx_status as zx;
 
 pub mod ff1;
 
@@ -319,14 +320,31 @@ pub trait Crypt: Send + Sync {
         &self,
         owner: u64,
         purpose: KeyPurpose,
-    ) -> Result<(WrappedKey, UnwrappedKey), Error>;
+    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status>;
+
+    /// `owner` is intended to be used such that when the key is wrapped, it appears to be different
+    /// to that of the same key wrapped by a different owner.  In this way, keys can be shared
+    /// amongst different filesystem objects (e.g. for clones), but it is not possible to tell just
+    /// by looking at the wrapped keys.
+    async fn create_key_with_id(
+        &self,
+        owner: u64,
+        wrapping_key_id: u64,
+    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status>;
 
     // Unwraps a single key.
-    async fn unwrap_key(&self, wrapped_key: &WrappedKey, owner: u64)
-        -> Result<UnwrappedKey, Error>;
+    async fn unwrap_key(
+        &self,
+        wrapped_key: &WrappedKey,
+        owner: u64,
+    ) -> Result<UnwrappedKey, zx::Status>;
 
     /// Unwraps the keys and stores the result in UnwrappedKeys.
-    async fn unwrap_keys(&self, keys: &WrappedKeys, owner: u64) -> Result<UnwrappedKeys, Error> {
+    async fn unwrap_keys(
+        &self,
+        keys: &WrappedKeys,
+        owner: u64,
+    ) -> Result<UnwrappedKeys, zx::Status> {
         let mut futures = vec![];
         for (key_id, key) in keys.iter() {
             futures.push(async move { Ok((*key_id, self.unwrap_key(key, owner).await?)) });

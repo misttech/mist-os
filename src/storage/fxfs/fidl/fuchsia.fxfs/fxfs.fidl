@@ -18,8 +18,8 @@ type KeyPurpose = flexible enum {
 @discoverable
 closed protocol Crypt {
     /// Creates a new key wrapped with the key identified by `wrapping_key_id`.  `owner` identifies
-    /// the owner of the key and must be supplied to `UnwrapKeys`.  The crypt service chooses a
-    /// `wrapping_key_id` which must be supplied to UnwrapKeys.  The `wrapping_key_id` has no
+    /// the owner of the key and must be supplied to `UnwrapKey`.  The crypt service chooses a
+    /// `wrapping_key_id` which must be supplied to UnwrapKey.  The `wrapping_key_id` has no
     /// meaning to Fxfs.
     strict CreateKey(struct {
         owner uint64;
@@ -28,6 +28,17 @@ closed protocol Crypt {
         wrapping_key_id uint64;
         wrapped_key vector<uint8>:132;
         unwrapped_key vector<uint8>:80;
+    }) error zx.Status;
+
+    /// Creates a new key wrapped with the key identified by `wrapping_key_id`.  `owner` identifies
+    /// the owner of the key and must be supplied to `UnwrapKey` along with  `wrapping_key_id`.
+    /// The `wrapping_key_id` has no meaning to Fxfs.
+    strict CreateKeyWithId(struct {
+        owner uint64;
+        wrapping_key_id uint64;
+    }) -> (struct {
+        wrapped_key vector<uint8>:48;
+        unwrapped_key vector<uint8>:32;
     }) error zx.Status;
 
     /// Unwraps a key that is wrapped by the key identified by `wrapping_key_id`.  `owner` must be

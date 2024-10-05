@@ -10,6 +10,7 @@ rustc_library("crypto") {
   name = "fxfs-crypto"
 
   deps = [
+    "//sdk/rust/zx-status",
     "//src/storage/fxfs:fxfs_macros",
     "//src/storage/fxfs/trace:trace",
     "//src/storage/type-fprint:fprint",
