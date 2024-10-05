@@ -144,7 +144,7 @@ class DataFrameTest : public SimTest {
 
   // Fullmac event handlers
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
-  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
+  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
@@ -242,7 +242,7 @@ void DataFrameInterface::DeauthInd(DeauthIndRequestView request,
 }
 void DataFrameInterface::ConnectConf(ConnectConfRequestView request,
                                      ConnectConfCompleter::Sync& completer) {
-  test_->OnConnectConf(&request->resp);
+  test_->OnConnectConf(request);
   completer.Reply();
 }
 void DataFrameInterface::DisassocInd(DisassocIndRequestView request,
@@ -307,9 +307,10 @@ void DataFrameTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndica
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(200));
 }
 
-void DataFrameTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp) {
+void DataFrameTest::OnConnectConf(
+    const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp) {
   assoc_context_.connect_resp_count++;
-  EXPECT_EQ(resp->result_code, assoc_context_.expected_results.front());
+  EXPECT_EQ(resp->result_code(), assoc_context_.expected_results.front());
   assoc_context_.expected_results.pop_front();
 }
 

@@ -38,7 +38,7 @@ TEST_F(SimTest, DisassocFromApResultsInDisassocInd) {
   // Make sure association was successful
   ASSERT_EQ(client_ifc.stats_.connect_attempts, 1U);
   ASSERT_EQ(client_ifc.stats_.connect_results.size(), 1U);
-  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
 
   // Make sure disassociation was successful
@@ -74,7 +74,7 @@ TEST_F(SimTest, DeauthFromApResultsInDeauthInd) {
   // Make sure association was successful
   ASSERT_EQ(client_ifc.stats_.connect_attempts, 1U);
   ASSERT_EQ(client_ifc.stats_.connect_results.size(), 1U);
-  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
 
   // Make sure deauth was successful
@@ -283,9 +283,9 @@ TEST_F(SimTest, SmeDeauthThenConnectThenFwDisassoc) {
   // Make sure associations were successful
   ASSERT_EQ(client_ifc.stats_.connect_attempts, 2U);
   ASSERT_EQ(client_ifc.stats_.connect_results.size(), 2U);
-  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
-  ASSERT_EQ(client_ifc.stats_.connect_results.back().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.back().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
 
   // Make sure disassociation was successful
@@ -338,9 +338,9 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDisassoc) {
   // Make sure associations were successful.
   ASSERT_EQ(client_ifc.stats_.connect_attempts, 2U);
   ASSERT_EQ(client_ifc.stats_.connect_results.size(), 2U);
-  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
-  ASSERT_EQ(client_ifc.stats_.connect_results.back().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.back().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
 
   // Make sure final disconnect was successful.
@@ -391,9 +391,9 @@ TEST_F(SimTest, SmeDisassocThenConnectThenFwDeauth) {
   // Make sure associations were successful.
   ASSERT_EQ(client_ifc.stats_.connect_attempts, 2U);
   ASSERT_EQ(client_ifc.stats_.connect_results.size(), 2U);
-  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.front().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
-  ASSERT_EQ(client_ifc.stats_.connect_results.back().result_code,
+  ASSERT_EQ(client_ifc.stats_.connect_results.back().result_code(),
             wlan_ieee80211::StatusCode::kSuccess);
 
   // Make sure final disconnect was successful.

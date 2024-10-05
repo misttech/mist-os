@@ -1218,11 +1218,12 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let connect_conf = fidl_fullmac::WlanFullmacConnectConfirm {
-            peer_sta_address: [1u8; 6],
-            result_code: fidl_ieee80211::StatusCode::Success,
-            association_id: 2,
-            association_ies: vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        let connect_conf = fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+            peer_sta_address: Some([1u8; 6]),
+            result_code: Some(fidl_ieee80211::StatusCode::Success),
+            association_id: Some(2),
+            association_ies: Some(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]),
+            ..Default::default()
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.connect_conf(&connect_conf)),
@@ -1264,11 +1265,12 @@ mod handle_driver_event_tests {
             .expect("sending ConnectReq should succeed");
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let connect_conf = fidl_fullmac::WlanFullmacConnectConfirm {
-            peer_sta_address: [1u8; 6],
-            result_code: connect_result_code,
-            association_id: 2,
-            association_ies: vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        let connect_conf = fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+            peer_sta_address: Some([1u8; 6]),
+            result_code: Some(connect_result_code),
+            association_id: Some(2),
+            association_ies: Some(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]),
+            ..Default::default()
         };
 
         assert_variant!(

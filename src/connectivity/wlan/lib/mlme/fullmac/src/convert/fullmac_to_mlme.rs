@@ -221,14 +221,22 @@ pub fn convert_scan_end(
 }
 
 pub fn convert_connect_confirm(
-    conf: fidl_fullmac::WlanFullmacConnectConfirm,
-) -> fidl_mlme::ConnectConfirm {
-    fidl_mlme::ConnectConfirm {
-        peer_sta_address: conf.peer_sta_address,
-        result_code: conf.result_code,
-        association_id: conf.association_id,
-        association_ies: conf.association_ies,
-    }
+    conf: fidl_fullmac::WlanFullmacImplIfcConnectConfRequest,
+) -> Result<fidl_mlme::ConnectConfirm> {
+    Ok(fidl_mlme::ConnectConfirm {
+        peer_sta_address: conf.peer_sta_address.context("missing peer_sta_address")?,
+        result_code: conf.result_code.context("missing result_code")?,
+        association_id: if conf.result_code == Some(fidl_ieee80211::StatusCode::Success) {
+            conf.association_id.context("missing association_id")?
+        } else {
+            0
+        },
+        association_ies: if conf.result_code == Some(fidl_ieee80211::StatusCode::Success) {
+            conf.association_ies.context("missing association_ies")?
+        } else {
+            vec![]
+        },
+    })
 }
 
 pub fn convert_roam_confirm(

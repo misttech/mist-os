@@ -74,15 +74,6 @@ type WlanScanResult = flexible enum : uint8 {
     CANCELED_BY_DRIVER_OR_FIRMWARE = 5;
 };
 
-type WlanFullmacConnectConfirm = struct {
-    peer_sta_address ieee80211.MacAddr;
-    result_code ieee80211.StatusCode;
-
-    // These fields are only valid if the result is success.
-    association_id uint16;
-    association_ies vector<uint8>:MAX;
-};
-
 type WlanAuthResult = flexible enum : uint8 {
     SUCCESS = 0;
     REFUSED = 1;
@@ -405,8 +396,13 @@ closed protocol WlanFullmacImplIfc {
         1: txn_id uint64;
         2: code WlanScanResult;
     }) -> ();
-    strict ConnectConf(struct {
-        resp WlanFullmacConnectConfirm;
+    strict ConnectConf(table {
+        1: peer_sta_address ieee80211.MacAddr;
+        2: result_code ieee80211.StatusCode;
+
+        // These fields are only valid if the result is success.
+        3: association_id uint16;
+        4: association_ies vector<uint8>:MAX;
     }) -> ();
     /// Report the result of an MLME-initiated roam attempt.
     strict RoamConf(table {

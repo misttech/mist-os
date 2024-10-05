@@ -139,7 +139,7 @@ class ConnectTest : public SimTest {
   void DetailedHistogramErrorInject();
 
   // Event handlers
-  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
+  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
   void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
@@ -247,7 +247,7 @@ void ConnectInterface::OnScanEnd(OnScanEndRequestView request,
 }
 void ConnectInterface::ConnectConf(ConnectConfRequestView request,
                                    ConnectConfCompleter::Sync& completer) {
-  test_->OnConnectConf(&request->resp);
+  test_->OnConnectConf(request);
   completer.Reply();
 }
 void ConnectInterface::DisassocConf(DisassocConfRequestView request,
@@ -349,16 +349,17 @@ void ConnectTest::DisassocFromAp() {
   }
 }
 
-void ConnectTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp) {
+void ConnectTest::OnConnectConf(
+    const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp) {
   context_.connect_resp_count++;
-  EXPECT_EQ(resp->result_code, context_.expected_results.front());
+  EXPECT_EQ(resp->result_code(), context_.expected_results.front());
 
   if (!context_.expected_wmm_param.empty()) {
-    EXPECT_GT(resp->association_ies.count(), 0ul);
+    EXPECT_GT(resp->association_ies().count(), 0ul);
     bool contains_wmm_param = false;
     for (size_t offset = 0;
-         offset <= resp->association_ies.count() - context_.expected_wmm_param.size(); offset++) {
-      if (memcmp(resp->association_ies.data() + offset, &context_.expected_wmm_param[0],
+         offset <= resp->association_ies().count() - context_.expected_wmm_param.size(); offset++) {
+      if (memcmp(resp->association_ies().data() + offset, &context_.expected_wmm_param[0],
                  context_.expected_wmm_param.size()) == 0) {
         contains_wmm_param = true;
         break;

@@ -1874,29 +1874,30 @@ void brcmf_return_assoc_result(struct net_device* ndev,
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm conf = {};
-  // TODO(https://fxbug.dev/359842400) Set conf.peer_sta_address here.
-  conf.result_code = status_code;
-  if (conf.result_code == fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess &&
-      cfg->conn_info.resp_ie_len > 0) {
-    BRCMF_DBG(TEMP, " * Hard-coding association_id to 42; this will likely break something!");
-    uint16_t association_id = 42;  // TODO: Use brcmf_cfg80211_get_station() to get aid
-    conf.association_id = association_id;
-    conf.association_ies = ::fidl::VectorView<uint8_t>::FromExternal(cfg->conn_info.resp_ie,
-                                                                     cfg->conn_info.resp_ie_len);
-  } else {
-    conf.association_id = 0;
-    conf.association_ies = {};
-  }
-
-  BRCMF_IFDBG(WLANIF, ndev, "Sending connect result to SME. result: %" PRIu16 ", aid: %" PRIu16,
-              fidl::ToUnderlying(conf.result_code), conf.association_id);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
-  auto result = ndev->if_proto.buffer(*arena)->ConnectConf(conf);
+  auto conf = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest::Builder(*arena);
+  fidl::Array<uint8_t, ETH_ALEN> address;
+  memcpy(address.data(), ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
+  conf.peer_sta_address(address);
+  conf.result_code(status_code);
+  if (status_code == fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess &&
+      cfg->conn_info.resp_ie_len > 0) {
+    BRCMF_DBG(TEMP, " * Hard-coding association_id to 42; this will likely break something!");
+    uint16_t association_id = 42;  // TODO: Use brcmf_cfg80211_get_station() to get aid
+    conf.association_id(association_id);
+    conf.association_ies(::fidl::VectorView<uint8_t>::FromExternal(cfg->conn_info.resp_ie,
+                                                                   cfg->conn_info.resp_ie_len));
+  } else {
+    conf.association_id(0);
+  }
+
+  BRCMF_IFDBG(WLANIF, ndev, "Sending connect result to SME. result: %" PRIu16 ", aid: %" PRIu16,
+              status_code, conf.association_id());
+  auto result = ndev->if_proto.buffer(*arena)->ConnectConf(conf.Build());
   if (!result.ok()) {
     BRCMF_ERR("Failed to send connect conf result.status: %s", result.status_string());
   }
@@ -3974,17 +3975,24 @@ void brcmf_if_connect_req(net_device* ndev,
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm result = {};
+  // Saving the request as FIDL natural type.
+  // Note that below this point, `req` and `ifp->connect_req` refer to the same connect request and
+  // are equivalent.
+  ifp->connect_req = fidl::ToNatural(*req);
+  fuchsia_wlan_ieee80211_wire::StatusCode status_code;
   zx_status_t status;
-  memcpy(result.peer_sta_address.data(), req->selected_bss().bssid.data(),
-         req->selected_bss().bssid.size());
 
   auto ssid =
       brcmf_find_ssid_in_ies(req->selected_bss().ies.data(), req->selected_bss().ies.count());
 
+  // Saving the request as FIDL natural type.
+  // Note that below this point, `req` and `ifp->connect_req` refer to the same connect request and
+  // are equivalent.
+  ifp->connect_req = fidl::ToNatural(*req);
+
   if (ssid.empty()) {
     BRCMF_DBG(WLANIF, "Connect request from SME exited: no SSID in request");
-    result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+    status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
     goto fail;
   }
 
@@ -3992,21 +4000,21 @@ void brcmf_if_connect_req(net_device* ndev,
     if (!req->wep_key().has_key()) {
       BRCMF_DBG(WLANIF,
                 "Connect request from SME exited: WEP key configuration does not have key data");
-      result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+      status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
     if (req->wep_key().key().count() > 0 &&
         !(req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey ||
           req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem)) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unexpected WEP key in request");
-      result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+      status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
 
     if (req->wep_key().key().count() > MAX_SUPPORTED_WEP_KEY_LEN) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: WEP key len %zu larger than %d",
                 req->wep_key().key().count(), MAX_SUPPORTED_WEP_KEY_LEN);
-      result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+      status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
   }
@@ -4018,11 +4026,6 @@ void brcmf_if_connect_req(net_device* ndev,
               req->selected_bss().channel.primary);
 #endif /* !defined(NDEBUG) */
 
-  // Saving the request as FIDL natural type.
-  // Note that below this point, `req` and `ifp->connect_req` refer to the same connect request and
-  // are equivalent.
-  ifp->connect_req = fidl::ToNatural(*req);
-
   // Once a connection attempt is in progress, no roam is possible. Erase anything about any
   // previous roam, just in case.
   clear_roam_attempt(ifp);
@@ -4032,7 +4035,7 @@ void brcmf_if_connect_req(net_device* ndev,
   status = brcmf_configure_opensecurity(ifp);
   if (status != ZX_OK) {
     BRCMF_DBG(WLANIF, "Connect request from SME exited: unable to reset security iovars");
-    result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+    status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
     goto fail;
   }
 
@@ -4040,14 +4043,14 @@ void brcmf_if_connect_req(net_device* ndev,
     auto add_key_result = brcmf_cfg80211_add_key(ndev, &req->wep_key());
     if (add_key_result != ZX_OK) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unable to set WEP key");
-      result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+      status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
   }
 
   if (brcmf_set_auth_type(ndev, ifp->connect_req.auth_type().value()) != ZX_OK) {
     BRCMF_IFDBG(WLANIF, ndev, "Connect request from SME exited: bad auth_type parameters");
-    result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kUnsupportedAuthAlgorithm;
+    status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kUnsupportedAuthAlgorithm;
     goto fail;
   }
 
@@ -4062,15 +4065,7 @@ void brcmf_if_connect_req(net_device* ndev,
   return;
 
 fail:
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
-    return;
-  }
-  auto proto_status = ndev->if_proto.buffer(*arena)->ConnectConf(result);
-  if (!proto_status.ok()) {
-    BRCMF_ERR("Failed to send connect conf result.status: %s", proto_status.status_string());
-  }
+  brcmf_return_assoc_result(ndev, status_code);
 }
 
 void brcmf_if_reconnect_req(net_device* ndev,

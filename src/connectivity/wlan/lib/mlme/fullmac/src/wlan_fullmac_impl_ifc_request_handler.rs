@@ -37,10 +37,10 @@ fn handle_one_request(
                 end: fullmac_to_mlme::convert_scan_end(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::ConnectConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::ConnectConf { payload, responder } => {
             responder.send().context("Failed to respond to ConnectConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::ConnectConf {
-                resp: fullmac_to_mlme::convert_connect_confirm(resp),
+                resp: fullmac_to_mlme::convert_connect_confirm(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::RoamConf { payload, responder } => {

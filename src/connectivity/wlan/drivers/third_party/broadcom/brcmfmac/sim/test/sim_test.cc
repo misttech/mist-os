@@ -153,10 +153,10 @@ void SimInterface::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::S
 void SimInterface::ConnectConf(ConnectConfRequestView request,
                                ConnectConfCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociating);
-  auto& resp = request->resp;
-  stats_.connect_results.push_back(resp);
+  auto connect_conf = fidl::ToNatural(*request);
+  stats_.connect_results.push_back(connect_conf);
 
-  if (resp.result_code == wlan_ieee80211::StatusCode::kSuccess) {
+  if (request->result_code() == wlan_ieee80211::StatusCode::kSuccess) {
     assoc_ctx_.state = AssocContext::kAssociated;
     stats_.connect_successes++;
   } else {
